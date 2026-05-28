@@ -1,0 +1,7 @@
+{
+  "name": "elkoplast-smernice",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Seznámení se směrnicemi – aplikace + poštovní server (bez závislostí, čistý Node.js).",
+  "scripts": { "start": "node server.js" }
+}
