@@ -906,18 +906,42 @@ async function sendBulk(id){
     const recipients=aud.map(e=>({email:e.email,name:e.name,link:personalLink(e.email)}));
     out.innerHTML='<p class="muted">Odesílám '+recipients.length+' e-mailů…</p>';
     const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject,body,recipients,dirTitle:d.title})});
-    const j=await res.json();
-    if(j.error) throw new Error(j.error);
+    let j={}; try{ j=await res.json(); }catch(_){ }
+    if(!res.ok || j.error) throw new Error(j.error || ("HTTP "+res.status));
     const ok=j.results.filter(r=>r.ok).length, bad=j.results.filter(r=>!r.ok);
-    out.innerHTML='<span class="pill green">✓ Odesláno: '+ok+'</span> '+(bad.length?'<span class="pill amber">Chyba: '+bad.length+'</span>':'')+
-      (bad.length?'<div class="muted" style="margin-top:8px;font-size:13px">'+bad.map(b=>esc(b.email)+": "+esc(b.error)).join("<br>")+'</div>':'');
+    let detail="";
+    if(bad.length){
+      detail='<div class="mono" style="margin-top:8px;font-size:12px;word-break:break-word">'+bad.map(b=>esc(b.email)+": "+esc(b.error||"(prázdná chyba)")).join("<br>")+'</div>';
+      const hint=interpretMailError(bad[0].error);
+      if(hint) detail+='<div class="hint" style="margin-top:8px;background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><strong>'+esc(hint)+'</strong></div>';
+    }
+    out.innerHTML='<span class="pill green">✓ Odesláno: '+ok+'</span> '+(bad.length?'<span class="pill amber">Chyba: '+bad.length+'</span>':'')+detail;
     toast("Rozesláno "+ok+" e-mailů");
   }catch(e){
-    out.innerHTML='<div class="hint">Rozeslání přes server selhalo: '+esc(e.message)+'<br>Zkontroluj, že běží <span class="mono">node server.js</span> a API adresa v Nastavení. Mezitím lze použít ruční možnosti níže.</div>';
+    out.innerHTML='<div class="hint" style="background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><strong>❌ Rozeslání selhalo:</strong><br><span class="mono" style="font-size:12px;word-break:break-word">'+esc(e.message)+'</span>'+((interpretMailError(e.message))?'<br><br><strong>'+esc(interpretMailError(e.message))+'</strong>':'')+'</div>';
   }
 }
 
 async function pullAcks(id){ if(DEMO){ toast("Ukázkový režim"); return; } await reloadState(); if(id) renderSendList(id); toast("Potvrzení načtena ze serveru"); }
+
+/* ---------- Výklad chyby pošty ---------- */
+function interpretMailError(msg){
+  msg=(msg||"").toString();
+  if(/535|5\.7\.8|5\.7\.0|password not accepted|username and password|authentication|auth\b|badcredentials/i.test(msg))
+    return "PŘÍČINA: Pošta odmítla přihlášení (špatné jméno/heslo). U Gmailu/Google Workspace MUSÍŠ použít 16místné heslo aplikace (App Password) a mít zapnuté dvoufázové ověření — běžné heslo k účtu nefunguje. Zkontroluj i, že odesílací e-mail je přesně ten účet, ke kterému heslo aplikace patří.";
+  if(/timeout|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|connect|spojení|failed to fetch|network/i.test(msg))
+    return "PŘÍČINA: Nepodařilo se připojit k poštovnímu serveru. Buď je špatná adresa/port serveru, nebo je odchozí spojení blokované. Zkus v sekci Pokročilé přepnout port: 465 (SSL zaškrtnuté) nebo 587 (nezaškrtnuté).";
+  if(/STARTTLS|TLS|certificate|SSL|wrong version/i.test(msg))
+    return "PŘÍČINA: Problém se šifrovaným spojením — přepni port mezi 465 (SSL zaškrtnuté) a 587 (nezaškrtnuté).";
+  return "";
+}
+function showMailError(full){
+  full=full||"(server nevrátil text chyby)";
+  const hint=interpretMailError(full);
+  const st=document.getElementById("mailStatus");
+  if(st) st.innerHTML='<div class="hint" style="background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><strong>❌ Chyba odeslání:</strong><br><span class="mono" style="font-size:12px;word-break:break-word">'+esc(full)+'</span>'+(hint?'<br><br><strong>'+esc(hint)+'</strong>':'')+'</div>';
+  return hint;
+}
 
 /* ---------- Nastavení pošty (v aplikaci) ---------- */
 const MAIL_PROVIDERS={
@@ -981,9 +1005,15 @@ async function sendTestMail(){
   toast("Odesílám zkušební e-mail…");
   try{
     const res=await fetch(apiBase()+"/api/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to})});
-    const j=await res.json(); if(j.error) throw new Error(j.error);
+    let j={}; try{ j=await res.json(); }catch(_){ }
+    if(!res.ok || j.error) throw new Error(j.error || ("HTTP "+res.status));
+    document.getElementById("mailStatus").innerHTML='<span class="pill green">✓ Zkušební e-mail odeslán na '+esc(to)+'</span>';
     alert("Zkušební e-mail odeslán na "+to+". Zkontroluj schránku (i spam).");
-  }catch(e){ alert("Odeslání selhalo:\n"+e.message+"\n\nTip: zkontroluj e-mail a heslo (u M365/Gmailu se obvykle používá tzv. heslo aplikace) a výběr poskytovatele."); }
+  }catch(e){
+    const full=e.message||"(server nevrátil text chyby)";
+    const hint=showMailError(full);
+    alert("Odeslání selhalo:\n\n"+full+(hint?"\n\n"+hint:""));
+  }
 }
 
 function openSendModal(id){
