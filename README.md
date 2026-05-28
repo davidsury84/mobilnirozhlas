@@ -60,4 +60,5 @@ Spusť jako službu (systemd / pm2) a postav před to nginx/Caddy s HTTPS.
 - `Dockerfile` — pro nasazení přes Docker
 - `data/` — vznikne sám: `state.json` (směrnice, zaměstnanci), `acks.json` (potvrzení),
   `mail.config.json` (SMTP – obsahuje heslo), `secret.json` (heslo správy + klíč), `published/` (rozeslané směrnice)
-- `Spustit-WINDOWS.bat` / `Spustit-MAC-LINUX.command` — spuštění pro lokální vyzkoušení
+- `Spustit-WINDOWS.bat` / `Spustit-MAC-LINUX.command` — spuštění pro lokální vyzkoušení OK
+- 
