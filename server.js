@@ -9,6 +9,7 @@
      DATA_DIR        kam ukládat data (výchozí ./data)
    ============================================================ */
 const http   = require('http');
+const https  = require('https');
 const net    = require('net');
 const tls    = require('tls');
 const fs     = require('fs');
@@ -97,6 +98,32 @@ function smtpSend(cfg, mail) {
 }
 
 /* ============================================================
+   Resend (HTTPS API) – funguje i tam, kde je SMTP blokované
+   ============================================================ */
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+function resendSend(mail) {
+  return new Promise((resolve, reject) => {
+    const key = process.env.RESEND_API_KEY;
+    const fromEmail = (process.env.RESEND_FROM || 'onboarding@resend.dev').trim();
+    const fromName = mail.fromName || '';
+    const from = fromName ? (fromName + ' <' + fromEmail + '>') : fromEmail;
+    const payload = JSON.stringify({ from: from, to: [mail.to], subject: mail.subject || '', html: mail.html || undefined, text: mail.text || undefined });
+    const r = https.request({ method: 'POST', hostname: 'api.resend.com', path: '/emails', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, (resp) => {
+      let d = ''; resp.on('data', c => d += c); resp.on('end', () => {
+        if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(true);
+        let msg = d; try { const j = JSON.parse(d); msg = j.message || j.error || d; } catch (_) {}
+        reject(new Error('Resend ' + resp.statusCode + ': ' + msg));
+      });
+    });
+    r.on('error', e => reject(new Error('Resend spojení: ' + e.message)));
+    r.setTimeout(20000, () => { try { r.destroy(new Error('Resend: časový limit spojení.')); } catch (_) {} });
+    r.write(payload); r.end();
+  });
+}
+// jednotné odeslání: když je nastavený RESEND_API_KEY → Resend, jinak SMTP
+function deliver(mail) { return process.env.RESEND_API_KEY ? resendSend(mail) : smtpSend(CFG, mail); }
+
+/* ============================================================
    stav (směrnice/zaměstnanci) + potvrzení
    ============================================================ */
 function getState() {
@@ -149,8 +176,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/config' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeConfig({ host: (b.host || '').trim(), port: Number(b.port) || 587, secure: !!b.secure, user: (b.user || '').trim(), pass: b.pass, fromName: (b.fromName || '').trim() }); return send(res, 200, { ok: true, status: configStatus() }); }
     if (p === '/api/test' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
-      if (!CFG.host || !CFG.user) return send(res, 400, { error: 'Pošta není nastavená.' });
-      try { await smtpSend(CFG, { to: (b.to || CFG.user).trim(), fromAddr: CFG.user, fromName: CFG.fromName, subject: 'Zkušební e-mail – Seznámení se směrnicemi', text: 'Toto je zkušební e-mail. Pokud jste ho dostali, odesílání funguje.', html: toHtml('Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.') }); return send(res, 200, { ok: true }); }
+      if (!process.env.RESEND_API_KEY && (!CFG.host || !CFG.user)) return send(res, 400, { error: 'Pošta není nastavená.' });
+      try { await deliver({ to: (b.to || CFG.user).trim(), fromAddr: CFG.user, fromName: CFG.fromName, subject: 'Zkušební e-mail – Seznámení se směrnicemi', text: 'Toto je zkušební e-mail. Pokud jste ho dostali, odesílání funguje.', html: toHtml('Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.') }); return send(res, 200, { ok: true }); }
       catch (e) { return send(res, 500, { error: e.message }); }
     }
     if (p === '/api/publish' && req.method === 'POST') {
@@ -161,10 +188,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/send' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
-      if (!CFG.host || !CFG.user) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
+      if (!process.env.RESEND_API_KEY && (!CFG.host || !CFG.user)) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
       const recipients = b.recipients || []; const results = []; const queue = recipients.slice();
-      async function worker() { while (queue.length) { const r = queue.shift(); const vars = { jmeno: ((r.name || '').split(' ')[0] || r.name || ''), smernice: b.dirTitle || '', odkaz: r.link || '' }; const subject = renderTpl(b.subject, vars), text = renderTpl(b.body, vars); try { await smtpSend(CFG, { to: r.email, fromAddr: CFG.user, fromName: CFG.fromName, subject, text, html: toHtml(text, r.link) }); results.push({ email: r.email, ok: true }); } catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } } }
-      await Promise.all(Array.from({ length: Math.min(3, recipients.length || 1) }, worker));
+      const useResend = !!process.env.RESEND_API_KEY;
+      async function worker() { while (queue.length) { const r = queue.shift(); const vars = { jmeno: ((r.name || '').split(' ')[0] || r.name || ''), smernice: b.dirTitle || '', odkaz: r.link || '' }; const subject = renderTpl(b.subject, vars), text = renderTpl(b.body, vars); try { await deliver({ to: r.email, fromAddr: CFG.user, fromName: CFG.fromName, subject, text, html: toHtml(text, r.link) }); results.push({ email: r.email, ok: true }); } catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
+      await Promise.all(Array.from({ length: useResend ? 1 : Math.min(3, recipients.length || 1) }, worker));
       return send(res, 200, { results });
     }
     // veřejné cesty
@@ -182,6 +210,7 @@ if (require.main === module) {
     console.log(' Adresa:  ' + (CFG.publicUrl || ('http://localhost:' + PORT)));
     console.log(' Data:    ' + DATA_DIR);
     console.log(' Heslo do správy: ' + (process.env.ADMIN_PASSWORD ? '(z proměnné ADMIN_PASSWORD)' : SEC.password));
+    console.log(' Odesílání pošty: ' + (process.env.RESEND_API_KEY ? ('Resend (HTTPS), odesílatel: ' + (process.env.RESEND_FROM || 'onboarding@resend.dev')) : 'SMTP'));
     console.log('====================================================');
     if (!CFG.host) console.log(' i Poštu nastavíte v aplikaci: záložka Nastavení.');
   });
