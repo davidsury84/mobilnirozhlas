@@ -104,7 +104,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 function resendSend(mail) {
   return new Promise((resolve, reject) => {
     const key = process.env.RESEND_API_KEY;
-    const fromEmail = (process.env.RESEND_FROM || 'onboarding@resend.dev').trim();
+    const fromEmail = (mail.fromEmail || process.env.RESEND_FROM || 'onboarding@resend.dev').trim();
     const fromName = mail.fromName || '';
     const from = fromName ? (fromName + ' <' + fromEmail + '>') : fromEmail;
     const payload = JSON.stringify({ from: from, to: [mail.to], subject: mail.subject || '', html: mail.html || undefined, text: mail.text || undefined });
@@ -127,7 +127,7 @@ function deliver(mail) { return process.env.RESEND_API_KEY ? resendSend(mail) : 
    stav (směrnice/zaměstnanci) + potvrzení
    ============================================================ */
 function getState() {
-  const s = readJson(STATE_F, { categories: [], employees: [], directives: [] });
+  const s = readJson(STATE_F, { categories: [], employees: [], directives: [], profiles: [] });
   const acks = readJson(ACKS_F, []);
   (s.directives || []).forEach(d => {
     const merged = Object.assign({}, d.acks || {});
@@ -148,7 +148,33 @@ function recordAck(a) {
 function send(res, code, obj, headers) { const h = Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, headers || {}); res.writeHead(code, h); res.end(typeof obj === 'string' ? obj : JSON.stringify(obj)); }
 function readBody(req) { return new Promise((resolve, reject) => { let d = ''; req.on('data', c => { d += c; if (d.length > 12e6) req.destroy(); }); req.on('end', () => resolve(d)); req.on('error', reject); }); }
 function esc(s) { return (s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-function renderTpl(t, v) { return (t || '').replace(/\{(jmeno|smernice|odkaz)\}/g, (m, k) => (v[k] != null ? v[k] : m)); }
+/* Český 5. pád (oslovení) pro křestní jméno – jednoduchý pravidlový algoritmus + slovník výjimek */
+const VOC_OVERRIDES = {
+  'pavel':'Pavle','karel':'Karle','zdeněk':'Zdeňku','zdenek':'Zdeňku',
+  'daniel':'Danieli','michael':'Michaeli','marcel':'Marcele',
+  'jiří':'Jiří','jiri':'Jiří','hugo':'Hugo','otto':'Otto','leo':'Leo','timo':'Timo',
+  'ondřej':'Ondřeji','ondrej':'Ondřeji'
+};
+function vocCs(name) {
+  if (!name) return name;
+  const m = String(name).match(/^(\S+)(\s.*)?$/); if (!m) return name;
+  const first = m[1], rest = m[2] || '', lower = first.toLowerCase();
+  const cap = (t) => (first[0] === first[0].toUpperCase()) ? (t.charAt(0).toUpperCase() + t.slice(1)) : t;
+  if (VOC_OVERRIDES[lower]) return cap(VOC_OVERRIDES[lower]) + rest;
+  if (lower.length < 2) return name;
+  if (/a$/.test(lower)) return cap(lower.slice(0,-1) + 'o') + rest;          // -a → -o (Jana→Jano, Honza→Honzo)
+  if (/ie$/.test(lower)) return name;                                         // Marie, Lucie – beze změny
+  if (/[eiouyíáéěůúýó]$/.test(lower)) return name;                            // ostatní samohlásky beze změny (Jiří, Hugo)
+  if (/[jščřžďťňc]$/.test(lower)) return cap(lower + 'i') + rest;             // měkké souhlásky → -i (Tomáš→Tomáši)
+  if (/ek$/.test(lower) && lower.length > 2) return cap(lower.slice(0,-2) + 'ku') + rest; // -ek (mizící e): Marek→Marku, Radek→Radku
+  if (/ch$/.test(lower)) return cap(lower + 'u') + rest;                      // -ch → -chu (Vojtěch→Vojtěchu)
+  if (/[khg]$/.test(lower)) return cap(lower + 'u') + rest;                   // -k/-h/-g → +u (Patrik→Patriku)
+  if (/r$/.test(lower)) return cap(lower.slice(0,-1) + 'ře') + rest;          // -r → -ře (Petr→Petře)
+  if (/l$/.test(lower)) return cap(lower + 'e') + rest;                       // -l → -le (Michal→Michale)
+  if (/[dtnmvbszfp]$/.test(lower)) return cap(lower + 'e') + rest;            // tvrdé souhlásky → +e (David→Davide, Jan→Jane)
+  return name;
+}
+function renderTpl(t, v) { return (t || '').replace(/\{(jmeno5|jmeno|smernice|odkaz)\}/g, (m, k) => (v[k] != null ? v[k] : m)); }
 function toHtml(text, link) { let h = esc(text).replace(/\n/g, '<br>'); if (link) { const s = esc(link); h = h.split(s).join('<a href="' + s + '" style="color:#1f5d3f">' + s + '</a>') + '<div style="margin-top:18px"><a href="' + s + '" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-family:Arial,sans-serif;font-weight:bold">Otevřít a potvrdit seznámení</a></div>'; } return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55">' + h + '</div>'; }
 function baseUrl(req) { return (CFG.publicUrl || (((req.headers['x-forwarded-proto'] || 'http')) + '://' + req.headers.host)).replace(/\/$/, ''); }
 
@@ -171,13 +197,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 401, { error: 'Nesprávné heslo.' });
     }
     if (p === '/api/state' && req.method === 'GET') return send(res, 200, getState());
-    if (p === '/api/state' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(STATE_F, { categories: b.categories || [], employees: b.employees || [], directives: b.directives || [] }); return send(res, 200, { ok: true }); }
+    if (p === '/api/state' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(STATE_F, { categories: b.categories || [], employees: b.employees || [], directives: b.directives || [], profiles: b.profiles || [] }); return send(res, 200, { ok: true }); }
     if (p === '/api/config' && req.method === 'GET') return send(res, 200, configStatus());
     if (p === '/api/config' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeConfig({ host: (b.host || '').trim(), port: Number(b.port) || 587, secure: !!b.secure, user: (b.user || '').trim(), pass: b.pass, fromName: (b.fromName || '').trim() }); return send(res, 200, { ok: true, status: configStatus() }); }
     if (p === '/api/test' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
       if (!process.env.RESEND_API_KEY && (!CFG.host || !CFG.user)) return send(res, 400, { error: 'Pošta není nastavená.' });
-      try { await deliver({ to: (b.to || CFG.user).trim(), fromAddr: CFG.user, fromName: CFG.fromName, subject: 'Zkušební e-mail – Seznámení se směrnicemi', text: 'Toto je zkušební e-mail. Pokud jste ho dostali, odesílání funguje.', html: toHtml('Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.') }); return send(res, 200, { ok: true }); }
+      try { await deliver({ to: (b.to || CFG.user || '').trim(), fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName, subject: 'Zkušební e-mail – Seznámení se směrnicemi', text: 'Toto je zkušební e-mail. Pokud jste ho dostali, odesílání funguje.', html: toHtml('Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.') }); return send(res, 200, { ok: true }); }
       catch (e) { return send(res, 500, { error: e.message }); }
     }
     if (p === '/api/publish' && req.method === 'POST') {
@@ -191,7 +217,7 @@ const server = http.createServer(async (req, res) => {
       if (!process.env.RESEND_API_KEY && (!CFG.host || !CFG.user)) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
       const recipients = b.recipients || []; const results = []; const queue = recipients.slice();
       const useResend = !!process.env.RESEND_API_KEY;
-      async function worker() { while (queue.length) { const r = queue.shift(); const vars = { jmeno: ((r.name || '').split(' ')[0] || r.name || ''), smernice: b.dirTitle || '', odkaz: r.link || '' }; const subject = renderTpl(b.subject, vars), text = renderTpl(b.body, vars); try { await deliver({ to: r.email, fromAddr: CFG.user, fromName: CFG.fromName, subject, text, html: toHtml(text, r.link) }); results.push({ email: r.email, ok: true }); } catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
+      async function worker() { while (queue.length) { const r = queue.shift(); const fn = ((r.name || '').split(' ')[0] || r.name || ''); const vars = { jmeno: fn, jmeno5: vocCs(fn), smernice: b.dirTitle || '', odkaz: r.link || '' }; const subject = renderTpl(b.subject, vars), text = renderTpl(b.body, vars); try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName, subject, text, html: toHtml(text, r.link) }); results.push({ email: r.email, ok: true }); } catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
       await Promise.all(Array.from({ length: useResend ? 1 : Math.min(3, recipients.length || 1) }, worker));
       return send(res, 200, { results });
     }

@@ -305,38 +305,50 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
       <h2>Nastavení a data</h2>
       <p>Záloha dat, sloučení z jiného zařízení, reset.</p>
     </div>
-    <div class="card pad" style="max-width:680px">
-      <h3 style="margin-top:0">Nastavení odesílání e-mailů</h3>
-      <div id="mailStatus" class="muted" style="margin-bottom:12px">Načítám stav serveru…</div>
-      <div id="mailForm" style="display:none">
-        <label class="field"><span>Poskytovatel pošty</span>
-          <select id="cfProvider" onchange="applyProvider()">
-            <option value="">— vyber a předvyplní se —</option>
-            <option value="m365">Microsoft 365 / Outlook firemní</option>
-            <option value="outlook">Outlook.com / Hotmail</option>
-            <option value="google">Gmail / Google Workspace</option>
-            <option value="seznam">Seznam.cz</option>
-            <option value="custom">Vlastní / jiný</option>
-          </select></label>
-        <label class="field"><span>Tvůj e-mail (odesílatel)</span>
-          <input type="email" id="cfUser" placeholder="smernice@elkoplast.cz" autocomplete="off"></label>
-        <label class="field"><span>Heslo k e-mailu</span>
-          <input type="password" id="cfPass" placeholder="•••••••• (nech prázdné = beze změny)" autocomplete="new-password"></label>
-        <label class="field"><span>Jméno odesílatele (zobrazí se příjemci)</span>
-          <input type="text" id="cfFromName" placeholder="ELKOPLAST – Směrnice"></label>
-        <details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;color:var(--ink-soft)">Pokročilé (server / port)</summary>
-          <div class="row" style="margin-top:10px">
-            <label class="field" style="flex:2"><span>SMTP server</span><input type="text" id="cfHost" placeholder="smtp.office365.com"></label>
-            <label class="field" style="flex:1"><span>Port</span><input type="text" id="cfPort" placeholder="587"></label>
-          </div>
-          <label style="display:inline-flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="cfSecure"> Šifrované spojení už od portu (SSL, obvykle port 465)</label>
-        </details>
-        <div class="inline-actions">
-          <button class="btn" onclick="saveMailConfig()">Uložit nastavení pošty</button>
-          <button class="btn ghost" onclick="sendTestMail()">Odeslat zkušební e-mail</button>
-        </div>
-        <div class="hint" style="margin-top:12px">Heslo se ukládá jen na tomto serveru (soubor <span class="mono">mail.config.json</span>), nikam se neodesílá. Tip: u Microsoft 365 / Gmailu obvykle potřebuješ „heslo aplikace" místo běžného hesla.</div>
+    <div class="card pad" style="max-width:680px;margin-bottom:18px">
+      <div class="spread" style="margin-bottom:6px">
+        <h3 style="margin:0">Odesílací profily</h3>
+        <button class="btn sm" onclick="openProfileModal()">+ Nový profil</button>
       </div>
+      <p class="muted" style="margin:0 0 14px;font-size:13px">Vytvoř si víc odesílatelů (např. „Směrnice", „BOZP", „Personalistika"). Při rozesílání pak jen vybereš, kterým profilem chceš poslat. Adresa musí být na ověřené doméně v Resendu.</p>
+      <div id="profilesList"></div>
+    </div>
+    <div class="card pad" style="max-width:680px">
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:15px;color:var(--ink-soft)">Pokročilé — SMTP nastavení (volitelné, jen pokud nepoužíváš Resend)</summary>
+        <div style="margin-top:14px">
+          <div id="mailStatus" class="muted" style="margin-bottom:12px">Načítám stav serveru…</div>
+          <div id="mailForm" style="display:none">
+            <label class="field"><span>Poskytovatel pošty</span>
+              <select id="cfProvider" onchange="applyProvider()">
+                <option value="">— vyber a předvyplní se —</option>
+                <option value="m365">Microsoft 365 / Outlook firemní</option>
+                <option value="outlook">Outlook.com / Hotmail</option>
+                <option value="google">Gmail / Google Workspace</option>
+                <option value="seznam">Seznam.cz</option>
+                <option value="custom">Vlastní / jiný</option>
+              </select></label>
+            <label class="field"><span>Tvůj e-mail (odesílatel)</span>
+              <input type="email" id="cfUser" placeholder="smernice@elkoplast.cz" autocomplete="off"></label>
+            <label class="field"><span>Heslo k e-mailu</span>
+              <input type="password" id="cfPass" placeholder="•••••••• (nech prázdné = beze změny)" autocomplete="new-password"></label>
+            <label class="field"><span>Jméno odesílatele (zobrazí se příjemci)</span>
+              <input type="text" id="cfFromName" placeholder="ELKOPLAST – Směrnice"></label>
+            <details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;color:var(--ink-soft)">Server / port</summary>
+              <div class="row" style="margin-top:10px">
+                <label class="field" style="flex:2"><span>SMTP server</span><input type="text" id="cfHost" placeholder="smtp.office365.com"></label>
+                <label class="field" style="flex:1"><span>Port</span><input type="text" id="cfPort" placeholder="587"></label>
+              </div>
+              <label style="display:inline-flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="cfSecure"> Šifrované spojení už od portu (SSL, obvykle port 465)</label>
+            </details>
+            <div class="inline-actions">
+              <button class="btn" onclick="saveMailConfig()">Uložit nastavení pošty</button>
+              <button class="btn ghost" onclick="sendTestMail()">Odeslat zkušební e-mail</button>
+            </div>
+            <div class="hint" style="margin-top:12px">SMTP se použije jen pokud na serveru není nastavený Resend (proměnná <span class="mono">RESEND_API_KEY</span>). Pokud Resend máš, ponech tuto sekci prázdnou.</div>
+          </div>
+        </div>
+      </details>
       <div class="divider"></div>
       <h3 style="margin-top:0">Záloha dat (JSON)</h3>
       <p class="muted">Data jsou uložena v tomto prohlížeči. Pro přenos mezi zařízeními použij export / import.</p>
@@ -404,7 +416,7 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
 /* ============================================================
    ÚLOŽIŠTĚ — server (online aplikace)
    ============================================================ */
-let DB = { categories:[], employees:[], directives:[], settings:{} };
+let DB = { categories:[], employees:[], directives:[], profiles:[], settings:{} };
 let booted = false, saveTimer = null, DEMO = false;
 
 function save(){
@@ -412,7 +424,7 @@ function save(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=>{
     fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({categories:DB.categories, employees:DB.employees, directives:DB.directives})})
+      body:JSON.stringify({categories:DB.categories, employees:DB.employees, directives:DB.directives, profiles:DB.profiles})})
       .then(r=>{ if(r.status===401) showLogin(); })
       .catch(()=>{});
   }, 400);
@@ -425,7 +437,7 @@ async function boot(){
     if(res.status===401){ showLogin(); return; }
     if(!res.ok) throw new Error("bad");
     const s = await res.json();
-    DB = { categories:s.categories||[], employees:s.employees||[], directives:s.directives||[], settings:DB.settings||{} };
+    DB = { categories:s.categories||[], employees:s.employees||[], directives:s.directives||[], profiles:s.profiles||[], settings:DB.settings||{} };
     booted = true;
     renderAll(); route();
   }catch(e){
@@ -449,7 +461,7 @@ async function reloadState(){
   try{
     const res=await fetch("/api/state"); if(res.status===401){ showLogin(); return; }
     const s=await res.json();
-    DB.categories=s.categories||[]; DB.employees=s.employees||[]; DB.directives=s.directives||[];
+    DB.categories=s.categories||[]; DB.employees=s.employees||[]; DB.directives=s.directives||[]; DB.profiles=s.profiles||[];
     renderAll();
   }catch(e){}
 }
@@ -528,7 +540,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   document.querySelectorAll(".view").forEach(s=>s.classList.toggle("active", s.id==="view-"+v));
   if(v==="stats") renderStats();
   if(v==="employees") renderEmployees();
-  if(v==="settings") loadMailConfig();
+  if(v==="settings"){ loadMailConfig(); renderProfiles(); }
 });
 
 /* ============================================================
@@ -619,10 +631,23 @@ function openDirectiveModal(id){
     <label class="field"><span>Dokument</span>
       <input type="file" id="docFile" accept=".docx,.html,.htm,.txt" onchange="parseDoc(this)">
     </label>
-    <div class="hint">Nahraj <strong>.docx</strong> (Word) — aplikace ho převede a nastyluje. Lze i .html / .txt. Náhled se zobrazí níže.</div>
+    <div class="hint">Nahraj <strong>.docx</strong> (Word) — aplikace ho převede, nastyluje a vyčistí. Lze i .html / .txt. Pak text můžeš **přímo upravovat** v náhledu níže.</div>
     <div id="docPreviewWrap" style="${pendingHtml?'':'display:none'}">
-      <span style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase">Náhled</span>
-      <div id="docPreview" class="doc-paper" style="padding:24px 28px;max-height:300px;overflow:auto;margin:6px 0 14px;font-size:14px">${pendingHtml||""}</div>
+      <div class="spread" style="margin-bottom:6px"><span style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase">Náhled · klikni a uprav</span>
+        <div class="inline-actions" style="gap:4px">
+          <button type="button" class="btn ghost sm" onclick="docCmd('bold')" title="Tučně" style="font-weight:700">B</button>
+          <button type="button" class="btn ghost sm" onclick="docCmd('italic')" title="Kurzíva" style="font-style:italic">I</button>
+          <button type="button" class="btn ghost sm" onclick="docCmd('underline')" title="Podtržení" style="text-decoration:underline">U</button>
+          <button type="button" class="btn ghost sm" onclick="docBlock('H2')" title="Nadpis 2">H2</button>
+          <button type="button" class="btn ghost sm" onclick="docBlock('H3')" title="Nadpis 3">H3</button>
+          <button type="button" class="btn ghost sm" onclick="docBlock('P')" title="Odstavec">P</button>
+          <button type="button" class="btn ghost sm" onclick="docCmd('insertUnorderedList')" title="Odrážky">•</button>
+          <button type="button" class="btn ghost sm" onclick="docCmd('insertOrderedList')" title="Číslovaný seznam">1.</button>
+          <button type="button" class="btn ghost sm" onclick="docCmd('removeFormat')" title="Zrušit formátování">⌫</button>
+          <button type="button" class="btn ghost sm" onclick="docCleanWord()" title="Vyčistit zbylé artefakty z Wordu">⌫W</button>
+        </div>
+      </div>
+      <div id="docPreview" class="doc-paper" contenteditable="true" spellcheck="true" oninput="pendingHtml=this.innerHTML" style="padding:24px 28px;max-height:360px;overflow:auto;margin:0 0 14px;font-size:14px;outline:none">${pendingHtml||""}</div>
     </div>
 
     <label class="field"><span>Komu je určena</span>
@@ -639,6 +664,36 @@ function openDirectiveModal(id){
   showModal();
 }
 
+/* Vyčištění artefaktů z Wordu / HTML (volá se po nahrání i ručně z lišty) */
+function cleanDocHtml(html){
+  if(!html) return html;
+  let h=String(html);
+  // odstranit MS Office a podmíněné komentáře
+  h=h.replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi,"");
+  h=h.replace(/<\/?o:p[^>]*>/gi,"");
+  h=h.replace(/<\/?[wvm]:[^>]+>/gi,"");
+  // styly a fonty z Wordu (mso-, font-family Calibri/Times, color:windowtext apod.)
+  h=h.replace(/\sstyle="[^"]*(mso-[^"]*|font-family\s*:[^";]*|color\s*:\s*windowtext)[^"]*"/gi,"");
+  h=h.replace(/\sclass="Mso[^"]*"/gi,"");
+  h=h.replace(/\sclass=""/gi,"").replace(/\sstyle=""/gi,"").replace(/\slang="[^"]*"/gi,"");
+  // prázdné odstavce a nesmyslné mezery
+  h=h.replace(/<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>/gi,"");
+  h=h.replace(/<span[^>]*>(\s*)<\/span>/gi,"$1");
+  // divné neviditelné znaky
+  h=h.replace(/\uFEFF/g,"");                 // BOM
+  h=h.replace(/\u00AD/g,"");                 // měkký rozdělovník
+  h=h.replace(/[\u200B-\u200D]/g,"");        // nulové šířky
+  h=h.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,""); // řídicí znaky
+  h=h.replace(/\u00A0/g," ");                // NBSP → běžná mezera
+  // sjednotit zalomení
+  h=h.replace(/(\r\n|\r)/g,"\n");
+  // víc po sobě jdoucích mezer mimo tagy
+  return h;
+}
+function docCmd(cmd){ const el=document.getElementById("docPreview"); if(!el) return; el.focus(); document.execCommand(cmd,false,null); pendingHtml=el.innerHTML; }
+function docBlock(tag){ const el=document.getElementById("docPreview"); if(!el) return; el.focus(); document.execCommand("formatBlock",false,tag); pendingHtml=el.innerHTML; }
+function docCleanWord(){ const el=document.getElementById("docPreview"); if(!el) return; el.innerHTML=cleanDocHtml(el.innerHTML); pendingHtml=el.innerHTML; toast("Word artefakty vyčištěny"); }
+
 async function parseDoc(input){
   const f=input.files[0]; if(!f) return;
   const prev=document.getElementById("docPreview"), wrap=document.getElementById("docPreviewWrap");
@@ -648,10 +703,10 @@ async function parseDoc(input){
       if(typeof mammoth==="undefined") throw new Error("Knihovna pro Word není načtena (offline?). Použij .html / .txt nebo připoj internet.");
       const buf=await f.arrayBuffer();
       const res=await mammoth.convertToHtml({arrayBuffer:buf});
-      pendingHtml=res.value;
+      pendingHtml=cleanDocHtml(res.value);
     } else {
       const txt=await f.text();
-      pendingHtml = f.name.match(/\.html?$/i)? txt : "<p>"+esc(txt).replace(/\n\n+/g,"</p><p>").replace(/\n/g,"<br>")+"</p>";
+      pendingHtml = f.name.match(/\.html?$/i)? cleanDocHtml(txt) : "<p>"+esc(txt).replace(/\n\n+/g,"</p><p>").replace(/\n/g,"<br>")+"</p>";
     }
     prev.innerHTML=pendingHtml;
   }catch(err){
@@ -873,6 +928,27 @@ function exportStatsXlsx(){
 function slug(s){ return (s||"smernice").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40)||"smernice"; }
 function copyText(t){ if(navigator.clipboard){ navigator.clipboard.writeText(t).then(()=>toast("Zkopírováno"),()=>prompt("Kopíruj:",t)); } else prompt("Kopíruj:",t); }
 function personalLink(email){ const base=(DB.settings.baseUrl||"").trim(); return (base?base:"")+"#kdo="+encodeURIComponent(email); }
+/* Český 5. pád (oslovení) – stejná logika jako na serveru */
+const VOC_OVERRIDES={'pavel':'Pavle','karel':'Karle','zdeněk':'Zdeňku','zdenek':'Zdeňku','daniel':'Danieli','michael':'Michaeli','marcel':'Marcele','jiří':'Jiří','jiri':'Jiří','hugo':'Hugo','otto':'Otto','leo':'Leo','ondřej':'Ondřeji','ondrej':'Ondřeji'};
+function vocCs(name){
+  if(!name) return name;
+  const m=String(name).match(/^(\S+)(\s.*)?$/); if(!m) return name;
+  const first=m[1], rest=m[2]||"", lower=first.toLowerCase();
+  const cap=(t)=>(first[0]===first[0].toUpperCase())?(t.charAt(0).toUpperCase()+t.slice(1)):t;
+  if(VOC_OVERRIDES[lower]) return cap(VOC_OVERRIDES[lower])+rest;
+  if(lower.length<2) return name;
+  if(/a$/.test(lower)) return cap(lower.slice(0,-1)+"o")+rest;
+  if(/ie$/.test(lower)) return name;
+  if(/[eiouyíáéěůúýó]$/.test(lower)) return name;
+  if(/[jščřžďťňc]$/.test(lower)) return cap(lower+"i")+rest;
+  if(/ek$/.test(lower)&&lower.length>2) return cap(lower.slice(0,-2)+"ku")+rest;
+  if(/ch$/.test(lower)) return cap(lower+"u")+rest;
+  if(/[khg]$/.test(lower)) return cap(lower+"u")+rest;
+  if(/r$/.test(lower)) return cap(lower.slice(0,-1)+"ře")+rest;
+  if(/l$/.test(lower)) return cap(lower+"e")+rest;
+  if(/[dtnmvbszfp]$/.test(lower)) return cap(lower+"e")+rest;
+  return name;
+}
 
 /* ---------- Komunikace se serverem ---------- */
 function apiBase(){ return (DB.settings.apiUrl||"").replace(/\/+$/,""); }
@@ -900,12 +976,17 @@ async function sendBulk(id){
   }
   const subject=document.getElementById("mSubj").value;
   const body=document.getElementById("mBody").value;
+  const profSel=document.getElementById("mProfile"); const profId=profSel?profSel.value:"";
+  const prof=profId? DB.profiles.find(p=>p.id===profId) : null;
+  if(prof){ DB.settings.lastProfileId=prof.id; save(); }
   out.innerHTML='<p class="muted">Připravuji odeslání…</p>';
   try{
     await ensurePublished(id); // vždy aktuální obsah + funkční odkazy
     const recipients=aud.map(e=>({email:e.email,name:e.name,link:personalLink(e.email)}));
-    out.innerHTML='<p class="muted">Odesílám '+recipients.length+' e-mailů…</p>';
-    const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject,body,recipients,dirTitle:d.title})});
+    out.innerHTML='<p class="muted">Odesílám '+recipients.length+' e-mailů'+(prof?' (profil „'+esc(prof.label)+'")':"")+'…</p>';
+    const payload={subject,body,recipients,dirTitle:d.title};
+    if(prof){ payload.fromEmail=prof.fromEmail; payload.fromName=prof.fromName; }
+    const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
     let j={}; try{ j=await res.json(); }catch(_){ }
     if(!res.ok || j.error) throw new Error(j.error || ("HTTP "+res.status));
     const ok=j.results.filter(r=>r.ok).length, bad=j.results.filter(r=>!r.ok);
@@ -920,6 +1001,22 @@ async function sendBulk(id){
   }catch(e){
     out.innerHTML='<div class="hint" style="background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><strong>❌ Rozeslání selhalo:</strong><br><span class="mono" style="font-size:12px;word-break:break-word">'+esc(e.message)+'</span>'+((interpretMailError(e.message))?'<br><br><strong>'+esc(interpretMailError(e.message))+'</strong>':'')+'</div>';
   }
+}
+
+/* Aplikuje šablonu vybraného profilu do předmětu / textu (s potvrzením, když je tam vlastní obsah) */
+function applyProfileToSend(dirId){
+  const sel=document.getElementById("mProfile"); if(!sel) return;
+  const p=DB.profiles.find(x=>x.id===sel.value);
+  const d=DB.directives.find(x=>x.id===dirId);
+  const mSubj=document.getElementById("mSubj"), mBody=document.getElementById("mBody");
+  if(!p){ // bez profilu — vrať výchozí
+    mSubj.value="K seznámení: "+(d?d.title:"");
+    mBody.value="Dobrý den, {jmeno5},\n\nprosíme Vás o seznámení se směrnicí „{smernice}\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n{odkaz}\n\nDěkujeme.";
+    return;
+  }
+  // pokud má profil šablony, použij je
+  if(p.subjectTpl) mSubj.value=p.subjectTpl;
+  if(p.bodyTpl) mBody.value=p.bodyTpl;
 }
 
 async function pullAcks(id){ if(DEMO){ toast("Ukázkový režim"); return; } await reloadState(); if(id) renderSendList(id); toast("Potvrzení načtena ze serveru"); }
@@ -1016,19 +1113,103 @@ async function sendTestMail(){
   }
 }
 
+/* ---------- Odesílací profily ---------- */
+function renderProfiles(){
+  const w=document.getElementById("profilesList"); if(!w) return;
+  if(!DB.profiles.length){
+    w.innerHTML='<div class="muted" style="padding:14px 0;font-size:14px">Zatím žádný profil. Klikni na <strong>+ Nový profil</strong>.</div>';
+    return;
+  }
+  w.innerHTML='<table class="grid"><tbody>'+DB.profiles.map(p=>(
+    '<tr><td><strong>'+esc(p.label||"(bez názvu)")+'</strong>'+
+      (p.fromEmail?'<br><span class="mono muted" style="font-size:12px">'+esc(p.fromName?p.fromName+" <"+p.fromEmail+">":p.fromEmail)+'</span>':'')+
+    '</td>'+
+    '<td style="text-align:right;white-space:nowrap">'+
+      '<button class="btn ghost sm" onclick="testProfile(\''+p.id+'\')">✉ Test</button> '+
+      '<button class="btn ghost sm" onclick="openProfileModal(\''+p.id+'\')">Upravit</button> '+
+      '<button class="btn danger sm" onclick="deleteProfile(\''+p.id+'\')">Smazat</button>'+
+    '</td></tr>'
+  )).join("")+'</tbody></table>';
+}
+function openProfileModal(id){
+  const p = id? DB.profiles.find(x=>x.id===id) : null;
+  document.getElementById("modalTitle").textContent = p? "Upravit profil" : "Nový odesílací profil";
+  const defSubj="K seznámení: {smernice}";
+  const defBody="Dobrý den, {jmeno5},\n\nprosíme Vás o seznámení se směrnicí „{smernice}\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n{odkaz}\n\nDěkujeme.";
+  document.getElementById("modalBody").innerHTML=`
+    <label class="field"><span>Název profilu (interní)</span>
+      <input type="text" id="pLabel" value="${p?esc(p.label||""):""}" placeholder="např. Směrnice, BOZP, Personalistika"></label>
+    <label class="field"><span>Odesílací adresa (musí být na ověřené doméně v Resendu)</span>
+      <input type="email" id="pFromEmail" value="${p?esc(p.fromEmail||""):""}" placeholder="smernice@elkoplast.cz"></label>
+    <label class="field"><span>Jméno odesílatele (zobrazí se příjemci)</span>
+      <input type="text" id="pFromName" value="${p?esc(p.fromName||""):""}" placeholder="ELKOPLAST – Směrnice"></label>
+    <label class="field"><span>Výchozí předmět e-mailu</span>
+      <input type="text" id="pSubject" value="${p?esc(p.subjectTpl||defSubj):defSubj}"></label>
+    <label class="field"><span>Výchozí text e-mailu</span>
+      <textarea id="pBody" style="min-height:160px">${p?esc(p.bodyTpl||defBody):defBody}</textarea></label>
+    <div class="muted" style="font-size:12px">Značky: <span class="mono">{jmeno}</span> · <span class="mono">{jmeno5}</span> (oslovení) · <span class="mono">{smernice}</span> · <span class="mono">{odkaz}</span></div>`;
+  document.getElementById("modalFoot").innerHTML=`
+    <button class="btn ghost" onclick="closeModal()">Zrušit</button>
+    <button class="btn" onclick="saveProfile('${id||""}')">Uložit profil</button>`;
+  showModal();
+}
+function saveProfile(id){
+  const label=document.getElementById("pLabel").value.trim();
+  const fromEmail=document.getElementById("pFromEmail").value.trim().toLowerCase();
+  const fromName=document.getElementById("pFromName").value.trim();
+  const subjectTpl=document.getElementById("pSubject").value;
+  const bodyTpl=document.getElementById("pBody").value;
+  if(!label){ alert("Zadej název profilu."); return; }
+  if(!fromEmail||!fromEmail.includes("@")){ alert("Zadej platnou odesílací adresu."); return; }
+  if(id){
+    const p=DB.profiles.find(x=>x.id===id); if(p){ p.label=label; p.fromEmail=fromEmail; p.fromName=fromName; p.subjectTpl=subjectTpl; p.bodyTpl=bodyTpl; }
+  } else {
+    DB.profiles.push({id:uid(),label,fromEmail,fromName,subjectTpl,bodyTpl});
+  }
+  save(); closeModal(); renderProfiles(); toast(id?"Profil upraven":"Profil přidán");
+}
+function deleteProfile(id){
+  const p=DB.profiles.find(x=>x.id===id); if(!p) return;
+  if(!confirm("Smazat profil „"+p.label+"\"?")) return;
+  DB.profiles=DB.profiles.filter(x=>x.id!==id);
+  save(); renderProfiles(); toast("Profil smazán");
+}
+async function testProfile(id){
+  if(DEMO){ alert("Ukázkový režim – e-maily se neodesílají."); return; }
+  const p=DB.profiles.find(x=>x.id===id); if(!p) return;
+  const to=prompt("Na jakou adresu poslat zkušební e-mail z profilu „"+p.label+"\"?", p.fromEmail);
+  if(!to) return;
+  toast("Odesílám zkušební e-mail z profilu „"+p.label+"\"…");
+  try{
+    const res=await fetch(apiBase()+"/api/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to, fromEmail:p.fromEmail, fromName:p.fromName})});
+    let j={}; try{ j=await res.json(); }catch(_){ }
+    if(!res.ok || j.error) throw new Error(j.error || ("HTTP "+res.status));
+    alert("Zkušební e-mail odeslán na "+to+" z profilu „"+p.label+"\". Zkontroluj schránku (i spam).");
+  }catch(e){
+    const full=e.message||"(server nevrátil text chyby)";
+    const hint=interpretMailError(full);
+    alert("Odeslání selhalo:\n\n"+full+(hint?"\n\n"+hint:""));
+  }
+}
+
 function openSendModal(id){
   const d=DB.directives.find(x=>x.id===id); if(!d) return;
   document.getElementById("modalTitle").textContent="Rozeslat – "+d.title;
-  const defBody="Dobrý den {jmeno},\n\nprosíme o seznámení se směrnicí „{smernice}\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n{odkaz}\n\nDěkujeme.";
+  const defBody="Dobrý den, {jmeno5},\n\nprosíme Vás o seznámení se směrnicí „{smernice}\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n{odkaz}\n\nDěkujeme.";
+  const lastProfId = DB.settings.lastProfileId || (DB.profiles[0]&&DB.profiles[0].id) || "";
+  const profOpts = '<option value="">— Výchozí (bez profilu) —</option>' +
+    DB.profiles.map(p=>'<option value="'+p.id+'" '+(p.id===lastProfId?'selected':'')+'>'+esc(p.label)+(p.fromEmail?' · '+esc(p.fromEmail):'')+'</option>').join("");
   document.getElementById("modalBody").innerHTML=`
     <div class="card pad" style="background:var(--green-soft);border-color:#bcd8c7;margin-bottom:18px">
       <strong>📧 Hromadné rozeslání e-mailem</strong>
-      <p class="muted" style="margin:6px 0 12px;font-size:13px">Každý zaměstnanec dostane <strong>vlastní e-mail</strong> s osobním odkazem. Odkaz se publikuje automaticky při odeslání. (Vyžaduje spuštěný server a nastavenou poštu v záložce <strong>Nastavení</strong>.)</p>
+      <p class="muted" style="margin:6px 0 12px;font-size:13px">Každý zaměstnanec dostane <strong>vlastní e-mail</strong> s osobním odkazem. Odkaz se publikuje automaticky při odeslání.</p>
+      <label class="field"><span>Odesílací profil</span>
+        <select id="mProfile" onchange="applyProfileToSend('${id}')">${profOpts}</select></label>
       <label class="field"><span>Předmět e-mailu</span>
         <input type="text" id="mSubj" value="K seznámení: ${esc(d.title)}"></label>
       <label class="field" style="margin-bottom:6px"><span>Text e-mailu</span>
-        <textarea id="mBody" style="min-height:130px">${esc(defBody)}</textarea></label>
-      <div class="muted" style="font-size:12px;margin-bottom:12px">Značky: <span class="mono">{jmeno}</span> · <span class="mono">{smernice}</span> · <span class="mono">{odkaz}</span></div>
+        <textarea id="mBody" style="min-height:140px">${esc(defBody)}</textarea></label>
+      <div class="muted" style="font-size:12px;margin-bottom:12px">Značky: <span class="mono">{jmeno}</span> (1. pád) · <span class="mono">{jmeno5}</span> (5. pád, oslovení – „Davide") · <span class="mono">{smernice}</span> · <span class="mono">{odkaz}</span></div>
       <div class="inline-actions">
         <button class="btn" onclick="sendBulk('${id}')">Rozeslat všem e-mailem</button>
         <button class="btn ghost" onclick="pullAcks('${id}')">Načíst potvrzení ze serveru</button>
@@ -1053,7 +1234,7 @@ function openSendModal(id){
     <div class="divider"></div>
     <div id="sendList" style="max-height:300px;overflow:auto"></div>`;
   document.getElementById("modalFoot").innerHTML=`<button class="btn ghost" onclick="closeModal()">Zavřít</button>`;
-  showModal(); renderSendList(id);
+  showModal(); renderSendList(id); if(DB.profiles.length) applyProfileToSend(id);
 }
 function onSendCfg(id){
   DB.settings.hrEmail=document.getElementById("sHr").value.trim();
@@ -1083,8 +1264,8 @@ function oneMailto(id,email){
   const link=personalLink(email);
   const subj=encodeURIComponent("K seznámení: "+d.title);
   const body=encodeURIComponent(
-    "Dobrý den"+(emp?", "+emp.name.split(" ")[0]:"")+",\n\n"+
-    "prosíme o seznámení se směrnicí „"+d.title+"\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n"+
+    "Dobrý den"+(emp?", "+vocCs(emp.name.split(" ")[0]):"")+",\n\n"+
+    "prosíme Vás o seznámení se směrnicí „"+d.title+"\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n"+
     link+"\n\nDěkujeme.");
   location.href="mailto:"+encodeURIComponent(email)+"?subject="+subj+"&body="+body;
 }
