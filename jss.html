@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dotazník pracovní spokojenosti (JSS)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1ec;--paper:#fff;--ink:#0f1512;--ink-soft:#5b635c;--line:#e3e7e0;--line-strong:#cdd3ca;
+  --green:#0e8a43;--green-2:#12a350;--green-d:#0a6b34;--green-soft:#e6f6ec;--yellow:#ffd21a;--yellow-2:#ffc400;--amber:#7a5c0e;
+  --radius:14px;--shadow:0 1px 2px rgba(15,21,18,.04),0 10px 30px rgba(15,21,18,.07);
+  --grad-green:linear-gradient(135deg,#15ab57,#0a6b34);--grad-dark:linear-gradient(135deg,#11271c,#0b1411 60%,#0d1f17);}
+*{box-sizing:border-box} html,body{margin:0}
+body{font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--ink);font-size:15px;line-height:1.55;
+  background:radial-gradient(1100px 480px at 100% -8%,var(--green-soft),transparent 62%),var(--bg);background-attachment:fixed;-webkit-font-smoothing:antialiased}
+header{background:var(--grad-dark);color:#eef3ee;border-bottom:2px solid var(--yellow);padding:22px 0}
+.wrap{max-width:820px;margin:0 auto;padding:0 20px}
+header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em}
+header p{margin:6px 0 0;color:#9fd9b6;font-size:14px}
+main{max-width:820px;margin:0 auto;padding:24px 20px 90px}
+.intro{color:var(--ink-soft);font-size:14px;margin:0 0 18px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:14px}
+label.field{display:block;margin-bottom:12px}
+label.field span{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
+input[type=text],select{width:100%;padding:10px 12px;border:1px solid var(--line-strong);border-radius:10px;background:var(--paper);color:var(--ink);font-family:inherit;font-size:14px}
+input:focus,select:focus{outline:none;border-color:var(--green-2);box-shadow:0 0 0 3px var(--green-soft)}
+.choices{display:flex;flex-wrap:wrap;gap:8px}
+.choice{padding:9px 14px;border:1px solid var(--line-strong);border-radius:10px;cursor:pointer;background:var(--paper);font-size:13px;transition:.15s;user-select:none}
+.choice:hover{border-color:var(--green-2);background:var(--green-soft)}
+.choice.sel{border-color:var(--green);background:var(--green-soft);color:var(--green-d);font-weight:600}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:560px){.row{grid-template-columns:1fr}}
+.q{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:12px}
+.q .num{font-family:"IBM Plex Mono";font-size:12px;font-weight:600;color:var(--green-d)}
+.q h3{margin:4px 0 12px;font-size:15px;font-weight:600;line-height:1.4}
+.opts{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.opt{display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;padding:9px 4px;border:1px solid var(--line-strong);border-radius:10px;cursor:pointer;transition:.15s;background:var(--paper);font-size:11px;color:var(--ink-soft);line-height:1.2}
+.opt:hover{border-color:var(--green-2);background:var(--green-soft)}
+.opt .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--line-strong);flex:none}
+.opt.sel{border-color:var(--green);background:var(--green-soft);color:var(--green-d);font-weight:600}
+.opt.sel .dot{border-color:var(--green);background:var(--green);box-shadow:inset 0 0 0 4px var(--paper)}
+.scale-hint{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin:0 0 8px;text-transform:uppercase;letter-spacing:.03em}
+.bar{position:sticky;bottom:0;background:rgba(238,241,236,.92);backdrop-filter:blur(6px);border-top:1px solid var(--line);padding:14px 0;margin-top:8px}
+.bar .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.btn{border:none;background:var(--grad-green);color:#fff;padding:12px 22px;border-radius:12px;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit;box-shadow:0 3px 12px rgba(10,107,52,.28);transition:.15s}
+.btn:hover:not(:disabled){transform:translateY(-1px)} .btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.btn.ghost{background:var(--paper);color:var(--ink);border:1px solid var(--line-strong);box-shadow:none}
+.btn.ghost:hover:not(:disabled){background:var(--green-soft);border-color:var(--green-2);color:var(--green-d)}
+#pbar{height:9px;border-radius:999px;background:#e3e7e0;overflow:hidden;margin:0 0 16px}
+#pfill{height:100%;width:0;background:linear-gradient(90deg,var(--green-2),var(--green-d));border-radius:999px;transition:width .25s}
+.prog{flex:1;min-width:160px;font-size:13px;color:var(--ink-soft)} .prog b{color:var(--ink)} .err{color:#c23636;font-size:13px}
+#result{display:none;background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:28px;margin-bottom:20px}
+#result.show{display:block}
+.hs{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+.hs .v{font-family:"IBM Plex Mono";font-size:42px;font-weight:600;color:var(--green-d);letter-spacing:-.02em}
+.hs .pct{font-size:26px;font-weight:700} .hs .lbl{color:var(--ink-soft);font-size:13px}
+.who-line{font-size:14px;color:var(--ink-soft);margin:-2px 0 14px}.who-line b{color:var(--ink)}
+.fac{margin:8px 0}.fac .ft{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.fac .track{height:12px;border-radius:999px;background:#e7eae4;overflow:hidden}
+.fac .fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green-2),var(--green-d))}
+.again{margin-top:20px;background:none;border:1px solid var(--line-strong);color:var(--ink);padding:9px 16px;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500}
+.pdfbtn{margin-top:20px;margin-left:10px;background:linear-gradient(150deg,var(--yellow),var(--yellow-2));border:none;color:#11271c;padding:9px 16px;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:600}
+#printHead{display:none}
+@media print{header,.intro,.scale-hint,#quiz,#demo,.bar,.again,.pdfbtn,.err{display:none!important}body{background:#fff}main{padding:0}#result{box-shadow:none;border:none;margin:0;padding:0}#printHead{display:block!important;margin-bottom:14px;border-bottom:2px solid var(--yellow);padding-bottom:10px}#printHead h2{margin:0;font-size:20px}#printHead .pd{color:#5b635c;font-size:13px;margin-top:3px}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>Dotazník pracovní spokojenosti (JSS)</h1><p>36 výroků · cca 7 minut · 9 oblastí spokojenosti</p></div></header>
+<main>
+  <div id="result"></div>
+  <p class="intro">U každého výroku označte, nakolik souhlasíte. Neexistují správné ani špatné odpovědi.</p>
+
+  <div class="card" id="demo">
+    <div style="font-weight:600;margin-bottom:12px">Údaje o vás <span style="font-weight:400;color:var(--ink-soft);font-size:13px">(všechna pole povinná)</span></div>
+    <div class="row">
+      <label class="field"><span>Pracovní pozice</span><input type="text" id="dPozice" placeholder="např. skladník, obchodní zástupce" onblur="if(PAGE===0)maybeAdvance()"></label>
+      <label class="field"><span>Středisko</span><input type="text" id="dStredisko" placeholder="např. Sklad, Plasty, Obchod" onblur="if(PAGE===0)maybeAdvance()"></label>
+    </div>
+    <label class="field"><span>Délka na pracovní pozici</span>
+      <div class="choices" id="cDelka">
+        <div class="choice" onclick="pickDem('delka','méně než 1 rok',this)">méně než 1 rok</div>
+        <div class="choice" onclick="pickDem('delka','1–3 roky',this)">1–3 roky</div>
+        <div class="choice" onclick="pickDem('delka','3–5 let',this)">3–5 let</div>
+        <div class="choice" onclick="pickDem('delka','5–10 let',this)">5–10 let</div>
+        <div class="choice" onclick="pickDem('delka','více než 10 let',this)">více než 10 let</div>
+      </div></label>
+    <label class="field" style="margin-bottom:0"><span>Pracovní zařazení</span>
+      <div class="choices" id="cZarazeni">
+        <div class="choice" onclick="pickDem('zarazeni','Dělnická pozice',this)">Dělnická pozice</div>
+        <div class="choice" onclick="pickDem('zarazeni','Technickohospodářská (THP)',this)">Technickohospodářská (THP)</div>
+        <div class="choice" onclick="pickDem('zarazeni','Vedoucí / management',this)">Vedoucí / management</div>
+        <div class="choice" onclick="pickDem('zarazeni','Jiné',this)">Jiné</div>
+      </div></label>
+  </div>
+
+  <div id="pbar"><div id="pfill"></div></div>
+  <div class="scale-hint"><span>← rozhodně nesouhlasím</span><span>rozhodně souhlasím →</span></div>
+  <div id="quiz"></div>
+</main>
+<div class="bar"><div class="wrap">
+  <button class="btn ghost" id="backBtn" onclick="goPage(-1)" disabled>← Zpět</button>
+  <button class="btn" id="evalBtn" style="display:none" onclick="evaluate()">Vyhodnotit</button>
+  <div class="prog" id="prog">Strana 1 / 12 · 0 %</div>
+  <span class="err" id="err"></span>
+</div></div>
+
+<script>
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+const OPTS=["Rozhodně nesouhlasím","Nesouhlasím","Spíše nesouhlasím","Spíše souhlasím","Souhlasím","Rozhodně souhlasím"];
+const REV=[2,4,6,8,10,12,14,16,18,19,21,23,24,26,29,31,32,34,36];
+const TXT=[
+ "Jsem přesvědčen(a) o tom, že jsem spravedlivě finančně ohodnocen(a) za práci, kterou dělám.",
+ "V mém zaměstnání jsou možnosti povýšení skutečně mizivé.",
+ "Můj nadřízený vykoná svoji funkci kompetentně.",
+ "Nejsem spokojen(a) s benefity, které dostávám.",
+ "Pokud odvedu dobrou práci, dostane se mi zaslouženého uznání.",
+ "Máme mnoho vnitřních pravidel a nařízení, která ztěžují práci.",
+ "Mám rád(a) lidi, se kterými pracuji.",
+ "Občas mám pocit, že moje práce nemá moc velký smysl.",
+ "Myslím si, že komunikace v naší firmě je dobrá.",
+ "Nárůst platu je mizivý a málo častý.",
+ "Ti, kteří dobře pracují, mají velkou šanci na povýšení.",
+ "Můj nadřízený je ke mně nespravedlivý.",
+ "Benefity, které u nás máme, jsou srovnatelné s výhodami u jiných firem.",
+ "Nemyslím si, že práce, kterou dělám, je dostatečně doceněna.",
+ "Moje úsilí dělat dobrou práci je málokdy brzděno zbytečnou byrokracií.",
+ "Zjistil(a) jsem, že kvůli neschopnosti svých spolupracovníků mám víc práce.",
+ "Věci, které dělám v práci, mě baví.",
+ "Nejsou mi jasné cíle naší organizace.",
+ "Když se podívám na výši svého platu, mám pocit, že moje práce je organizací nedoceněna.",
+ "Lidé zde mohou postupovat stejně rychle nahoru, jako u jiných firem.",
+ "Můj nadřízený se téměř nezajímá o pocity svých podřízených.",
+ "Benefity, které máme, jsou spravedlivé.",
+ "Lidé, kteří zde pracují, jsou málo odměňováni.",
+ "Mám příliš mnoho pracovních úkolů.",
+ "Cítím se příjemně se svými spolupracovníky.",
+ "Mám často pocit, že nevím, co se děje s naší firmou.",
+ "Jsem hrdý(á) na svoji práci.",
+ "Jsem spokojen(a) s možnostmi platového růstu.",
+ "Existují benefity, které nemáme, přestože bychom je určitě mít měli.",
+ "Mám rád(a) svého nadřízeného.",
+ "Mám příliš mnoho papírování.",
+ "Nemám pocit, že mé úsilí je odměňováno tak, jak by mělo být.",
+ "Jsem spokojen(a) s šancemi na povýšení.",
+ "V práci je příliš mnoho hašteření a rozepří.",
+ "Má práce mě těší.",
+ "Pracovní úkoly nejsou dostatečně vysvětleny."
+];
+const FACETS=[
+ {name:"Mzda / finanční ohodnocení",items:[1,10,19,28]},
+ {name:"Povýšení / kariérní růst",items:[2,11,20,33]},
+ {name:"Nadřízený",items:[3,12,21,30]},
+ {name:"Benefity",items:[4,13,22,29]},
+ {name:"Uznání a odměny za výkon",items:[5,14,23,32]},
+ {name:"Vnitřní pravidla a pracovní postupy",items:[6,15,24,31]},
+ {name:"Spolupracovníci",items:[7,16,25,34]},
+ {name:"Povaha práce",items:[8,17,27,35]},
+ {name:"Komunikace",items:[9,18,26,36]}
+];
+const Q=TXT.map((t,i)=>({t:t,rev:REV.indexOf(i+1)>=0}));
+const _who=(location.hash.match(/kdo=([^&]+)/i)||[])[1];
+const RESP={ email:_who?decodeURIComponent(_who):'', name:'', dept:'' };
+const DEM={ delka:'', zarazeni:'' };
+function pickDem(key,val,el){ DEM[key]=val; const wrap=el.parentNode; wrap.querySelectorAll('.choice').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); document.getElementById('err').textContent=''; if(PAGE===0) maybeAdvance(); }
+const answers=new Array(36).fill(0);
+
+const PER=3, PAGES=Math.ceil(36/PER); let PAGE=0;
+function renderQuiz(){
+  const start=PAGE*PER, end=Math.min(start+PER,36);
+  let h='';
+  for(let i=start;i<end;i++){
+    h+='<div class="q"><div class="num">Výrok '+(i+1)+' / 36</div><h3>'+esc(Q[i].t)+'</h3><div class="opts">';
+    for(let p=1;p<=6;p++) h+='<label class="opt'+(answers[i]===p?' sel':'')+'" id="o'+i+'_'+p+'" onclick="pick('+i+','+p+')"><span class="dot"></span>'+OPTS[p-1]+'</label>';
+    h+='</div></div>';
+  }
+  document.getElementById('quiz').innerHTML=h;
+  document.getElementById('demo').style.display = PAGE===0 ? '' : 'none';
+  updateNav();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function updateNav(){
+  const done=answers.filter(a=>a>0).length, pct=Math.round(done/36*100), last=PAGE===PAGES-1;
+  document.getElementById('pfill').style.width=pct+'%';
+  document.getElementById('prog').innerHTML='Strana '+(PAGE+1)+' / '+PAGES+' · zodpovězeno <b>'+done+'/36</b> ('+pct+' %)';
+  document.getElementById('backBtn').disabled = PAGE===0;
+  const ev=document.getElementById('evalBtn'); ev.style.display = last?'':'none'; ev.disabled = done<36;
+}
+function goPage(d){ PAGE=Math.max(0,Math.min(PAGES-1,PAGE+d)); renderQuiz(); }
+function pageDone(pg){ const start=pg*PER, end=Math.min(start+PER,36); for(let k=start;k<end;k++) if(!answers[k]) return false; return true; }
+function demoDone(){ return !!(document.getElementById('dPozice').value.trim() && DEM.delka && document.getElementById('dStredisko').value.trim() && DEM.zarazeni); }
+function maybeAdvance(){
+  if(!pageDone(PAGE)) return;
+  if(PAGE===0 && !demoDone()){ document.getElementById('err').textContent='Vyplňte prosím i všechny údaje o vás.'; return; }
+  document.getElementById('err').textContent='';
+  const cur=PAGE;
+  if(PAGE<PAGES-1){ setTimeout(()=>{ if(PAGE===cur && pageDone(cur) && (cur!==0||demoDone())) goPage(1); }, 400); }
+  else if(answers.filter(a=>a>0).length===36){ setTimeout(()=>{ if(PAGE===cur) evaluate(); }, 450); }
+}
+function pick(i,p){
+  answers[i]=p;
+  for(let x=1;x<=6;x++){ const el=document.getElementById('o'+i+'_'+x); if(el) el.classList.toggle('sel',x===p); }
+  document.getElementById('err').textContent='';
+  updateNav();
+  maybeAdvance();
+}
+function scoreOf(i){ const p=answers[i]; return Q[i].rev?(7-p):p; }
+function compute(){
+  let total=0; for(let i=0;i<36;i++) total+=scoreOf(i);
+  const subs=FACETS.map(f=>({name:f.name, score:f.items.reduce((s,n)=>s+scoreOf(n-1),0)}));
+  const pct=Math.round((total-36)/180*100);
+  return {total, pct, subs};
+}
+async function evaluate(){
+  if(!demoDone()){ PAGE=0; renderQuiz(); document.getElementById('err').textContent='Vyplňte prosím všechny údaje o vás (jsou povinné).'; return; }
+  if(answers.filter(a=>a>0).length<36){ const i=answers.findIndex(a=>!a); if(i>=0){ PAGE=Math.floor(i/PER); renderQuiz(); } document.getElementById('err').textContent='Zodpovězte prosím všech 36 výroků (chybí výrok '+(i+1)+').'; return; }
+  const dem={ pozice:document.getElementById('dPozice').value.trim(), delka:DEM.delka, stredisko:document.getElementById('dStredisko').value.trim(), zarazeni:DEM.zarazeni };
+  const r=compute();
+  if(RESP.email){
+    const btn=document.getElementById('evalBtn'); if(btn){btn.disabled=true;btn.textContent='Ukládám…';}
+    try{ const res=await fetch('/api/jss',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({email:RESP.email,total:r.total,pct:r.pct,subs:r.subs},dem))}); const j=await res.json(); if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; } }catch(e){}
+    if(btn){btn.textContent='Vyhodnotit';}
+  }
+  const itemAvg=r.total/36;
+  const label=itemAvg>4?'spokojen(a)':(itemAvg<3?'nespokojen(a)':'spíše neutrální');
+  const today=new Date().toLocaleDateString('cs-CZ');
+  const demLine=[dem.pozice,dem.zarazeni,dem.stredisko,dem.delka].filter(Boolean).map(esc).join(' · ');
+  const whoLine=(RESP.name||demLine)?('<div class="who-line">'+(RESP.name?'<b>'+esc(RESP.name)+'</b>'+(RESP.dept&&RESP.dept!=='—'?(' · '+esc(RESP.dept)):''):'')+(demLine?((RESP.name?'<br>':'')+demLine):'')+'</div>'):'';
+  const printHead='<div id="printHead"><h2>Dotazník pracovní spokojenosti (JSS)</h2><div class="pd">'+(RESP.name?esc(RESP.name)+' · ':'')+today+'</div></div>';
+  let h=printHead+'<h2 style="margin:0 0 14px;font-size:20px">Vaše pracovní spokojenost</h2>'+whoLine+
+    '<div class="hs"><span class="v">'+r.total+'</span><span class="pct">'+r.pct+' %</span>'+
+    '<span class="lbl">celkové skóre (36–216) · '+label+'</span></div>'+
+    '<div style="margin:18px 0 6px;font-weight:600">Oblasti spokojenosti</div>';
+  r.subs.forEach(s=>{ const p=Math.round((s.score-4)/20*100); h+='<div class="fac"><div class="ft"><span>'+esc(s.name)+'</span><span>'+s.score+' / 24 · '+p+' %</span></div><div class="track"><div class="fill" style="width:'+p+'%"></div></div></div>'; });
+  h+='<button class="again" onclick="restart()">Vyplnit znovu</button><button class="pdfbtn" onclick="window.print()">⬇ Stáhnout PDF</button>';
+  const el=document.getElementById('result'); el.innerHTML=h; el.classList.add('show'); window.scrollTo({top:0,behavior:'smooth'});
+}
+function restart(){ for(let i=0;i<36;i++) answers[i]=0; PAGE=0; document.getElementById('result').classList.remove('show'); renderQuiz(); }
+renderQuiz();
+</script>
+</body>
+</html>

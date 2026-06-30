@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test kognitivní zátěže (TW44)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef1ec;--paper:#fff;--ink:#0f1512;--ink-soft:#5b635c;--line:#e3e7e0;--line-strong:#cdd3ca;
+  --green:#0e8a43;--green-2:#12a350;--green-d:#0a6b34;--green-soft:#e6f6ec;--yellow:#ffd21a;--yellow-2:#ffc400;
+  --red:#c23636;--red-soft:#fbeaea;
+  --radius:14px;--shadow:0 1px 2px rgba(15,21,18,.04),0 10px 30px rgba(15,21,18,.07);
+  --grad-green:linear-gradient(135deg,#15ab57,#0a6b34);--grad-dark:linear-gradient(135deg,#11271c,#0b1411 60%,#0d1f17);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--ink);font-size:15px;line-height:1.55;
+  background:radial-gradient(1100px 480px at 100% -8%,var(--green-soft),transparent 62%),var(--bg);background-attachment:fixed;-webkit-font-smoothing:antialiased}
+header{background:var(--grad-dark);color:#eef3ee;border-bottom:2px solid var(--yellow);padding:22px 0}
+.wrap{max-width:900px;margin:0 auto;padding:0 20px}
+header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em}
+header p{margin:6px 0 0;color:#9fd9b6;font-size:14px}
+main{max-width:900px;margin:0 auto;padding:26px 20px 90px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 24px;margin-bottom:18px}
+.intro{color:var(--ink-soft);font-size:14px}
+.field{display:block;margin:14px 0}
+.field span{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:5px}
+.field input{width:100%;max-width:380px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:10px;font-family:inherit;font-size:15px}
+.vars{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 4px}
+.var{border:1px solid var(--line-strong);border-radius:11px;padding:12px 16px;cursor:pointer;transition:.15s;flex:1;min-width:200px}
+.var:hover{border-color:var(--green-2);background:var(--green-soft)}
+.var.sel{border-color:var(--green);background:var(--green-soft)}
+.var b{display:block;font-size:15px;color:var(--green-d)}
+.var small{color:var(--ink-soft);font-size:12px}
+.btn{border:none;background:var(--grad-green);color:#fff;padding:12px 24px;border-radius:12px;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit;box-shadow:0 3px 12px rgba(10,107,52,.28);transition:.15s}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:none;border:1px solid var(--line-strong);color:var(--ink);box-shadow:none;font-weight:500}
+.err{color:var(--red);font-size:13px;margin-top:8px}
+/* ---- test plocha ---- */
+#test{display:none}
+.tbar{position:sticky;top:0;z-index:5;background:rgba(238,241,236,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:14px}
+.tbar .wrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.target{font-size:14px;color:var(--ink-soft)}
+.target b{font-family:"IBM Plex Mono";font-size:24px;font-weight:700;color:var(--ink);letter-spacing:.06em;margin-left:6px}
+.tmeta{font-size:13px;color:var(--ink-soft)}
+.tmeta b{color:var(--ink)}
+.timer{font-family:"IBM Plex Mono";font-weight:700;font-size:18px;color:var(--green-d)}
+.timer.low{color:var(--red)}
+.wbar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;flex-basis:100%;margin-top:2px}
+.wbar > i{display:block;height:100%;background:var(--green-2);width:100%;transition:width .25s linear}
+.wbar > i.low{background:var(--red)}
+.grid{display:grid;grid-template-columns:34px repeat(10,1fr);gap:4px;user-select:none;-webkit-user-select:none}
+.gh{font-family:"IBM Plex Mono";font-size:11px;font-weight:600;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;padding:4px 0}
+.cell{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 4px;text-align:center;cursor:pointer;font-size:13px;font-weight:500;letter-spacing:.02em;transition:.08s;min-height:40px;display:flex;align-items:center;justify-content:center}
+.cell:hover{border-color:var(--green-2);background:var(--green-soft)}
+.cell.hit{background:var(--green);color:#fff;border-color:var(--green)}
+.cell.miss{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.cell.rev-g{background:var(--green-soft)}
+.cell.rev-d{background:#fbe4ea}
+/* mezisubtest */
+#inter{display:none;text-align:center;padding:40px 0}
+#inter h2{font-size:22px;margin:0 0 8px}
+#inter p{color:var(--ink-soft);max-width:520px;margin:0 auto 18px}
+/* ---- výsledky ---- */
+#result{display:none}
+#result.show{display:block;animation:fade .3s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+table.res{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}
+table.res th,table.res td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right}
+table.res th:first-child,table.res td:first-child{text-align:left}
+table.res thead th{color:var(--ink-soft);font-weight:600;border-bottom:2px solid var(--line-strong)}
+.idxgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:8px}
+.ix{background:var(--green-soft);border:1px solid #cfe9d8;border-radius:12px;padding:13px 15px}
+.ix .v{font-family:"IBM Plex Mono";font-size:24px;font-weight:700;color:var(--green-d)}
+.ix .v.neg{color:var(--red)}
+.ix .l{font-size:12px;color:var(--ink-soft);margin-top:3px}
+.ix .f{font-size:11px;color:var(--ink-soft);margin-top:6px;font-family:"IBM Plex Mono"}
+h2.sec{font-size:17px;margin:26px 0 6px}
+.muted{color:var(--ink-soft);font-size:13px}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>Test kognitivní zátěže — TW44</h1><p>Vizuální vyhledávání slov v tabulce 10×10 · měří pozornost a výkon pod časovou zátěží</p></div></header>
+<main>
+  <!-- ÚVOD -->
+  <div class="card" id="intro">
+    <p class="intro">V tabulce 10×10 je 100 cizích slov. Nahoře se vždy ukáže <b>hledané slovo</b> — co nejrychleji ho najdi a <b>klikni na něj</b>. Hned se objeví další. Test má několik <b>subtestů</b>: některé jsou bez tlaku, jiné mají na každé slovo jen <b>12 sekund</b>. Měří se čas a chybovost.</p>
+    <label class="field"><span>Jméno / e-mail (pro uložení výsledku)</span><input type="text" id="who" placeholder="jan.novak@elkoplast.cz"></label>
+    <div class="field"><span>Varianta</span>
+      <div class="vars" id="vars">
+        <div class="var sel" data-v="kratka" onclick="pickVar('kratka')"><b>Krátká</b><small>Subtest I → II → V (+ pozornost). ~6–9 min.</small></div>
+        <div class="var" data-v="dlouha" onclick="pickVar('dlouha')"><b>Dlouhá</b><small>Subtesty I → II → III → IV → V (+ pozornost). ~15–25 min.</small></div>
+      </div>
+    </div>
+    <label class="field" style="display:flex;align-items:center;gap:8px;max-width:none"><input type="checkbox" id="attrOn" checked style="width:auto"> <span style="margin:0">Zařadit doplňkový subtest pozornosti (hledání slov podle písmene)</span></label>
+    <button class="btn" id="startBtn" onclick="startTest()">Spustit test</button>
+    <div class="err" id="introErr"></div>
+    <p class="muted" style="margin-top:16px">⏱️ Po spuštění běží čas. Najdi si klid a otevři na celé obrazovce.</p>
+  </div>
+
+  <!-- TEST -->
+  <div id="test">
+    <div class="tbar"><div class="wrap">
+      <span class="target">Hledej:<b id="tWord">—</b></span>
+      <span class="tmeta" id="tMeta"></span>
+      <span style="flex:1"></span>
+      <span class="timer" id="tTimer">5:00</span>
+      <div class="wbar"><i id="wFill"></i></div>
+    </div></div>
+    <div class="wrap"><div class="grid" id="grid"></div></div>
+  </div>
+
+  <!-- MEZISUBTEST -->
+  <div class="card" id="inter">
+    <h2 id="interTitle"></h2>
+    <p id="interText"></p>
+    <button class="btn" id="interBtn" onclick="beginNext()">Pokračovat</button>
+  </div>
+
+  <!-- VÝSLEDEK -->
+  <div class="card" id="result"></div>
+</main>
+
+<script>
+/* ===================== DATA (z digitalni_tabulka.xlsx, ověřeno proti PDF) ===================== */
+const COLS=['A','B','C','D','E','F','G','H','CH','I'];
+// 10 řádků × 10 sloupců; [slovo, typ]  g=cíl, d=duplikát(KHAKI/DAMAGE), x=distraktor, b=tmavý blok(distraktor)
+const GRID=[
+ [['ALIEN','g'],['SCREN','x'],['FLAGGA','g'],['JOVIAL','g'],['TASSE','g'],['BASS','x'],['PARDON','g'],['QUILL','g'],['AVERSE','g'],['EMERIT','g']],
+ [['FRONT','g'],['DAMAGE','d'],['PULSE','x'],['RABOT','x'],['KRAKEN','x'],['JOKEY','x'],['CEYLON','x'],['RAMPE','x'],['NIVELL','g'],['TRIPES','x']],
+ [['OSTRE','g'],['INFAME','g'],['BURBON','g'],['PAPYRE','g'],['MANIAC','x'],['OLIVE','x'],['SARCO','g'],['CALIF','x'],['MODUS','g'],['HUMAN','x']],
+ [['QUOTE','g'],['GERMAN','g'],['TAPAR','x'],['EDUCA','b'],['TALMUD','b'],['QUADR','b'],['LIBRE','b'],['PALACE','g'],['ELEGIE','g'],['DELIC','x']],
+ [['CAPON','x'],['KHAKI','d'],['SATINE','x'],['HORDE','b'],['NOTION','b'],['CAMERA','b'],['SOLD','b'],['AZUR','x'],['DAMAGE','d'],['IDIOT','g']],
+ [['NUMERO','g'],['MENSU','g'],['LEGATE','x'],['ASTOR','b'],['GENOVA','b'],['PACTE','b'],['BASTON','b'],['LAMA','x'],['OBSCEN','g'],['DUNE','x']],
+ [['IMAGE','g'],['CAMION','g'],['REDUTE','g'],['QUEM','b'],['OZON','b'],['MILD','b'],['RANGE','b'],['OXIDE','x'],['BOSS','g'],['GALANT','x']],
+ [['HOSTEL','g'],['JESUIT','g'],['GRAND','g'],['RACKET','x'],['ARAB','x'],['KOREA','x'],['FINLAND','g'],['MANGOLIA','x'],['KNUT','g'],['HAREM','g']],
+ [['KIWI','x'],['HAWAI','x'],['LEGION','x'],['NAFTA','g'],['SALUT','g'],['INTACT','g'],['DOLLAR','x'],['NUCE','x'],['ENORM','x'],['FORM','g']],
+ [['BILION','x'],['ELAN','g'],['IBIS','g'],['JUNIOR','x'],['FREUD','g'],['LABIL','g'],['KHAKI','d'],['GARSON','x'],['JURNAL','g'],['DEBIL','x']]
+];
+// pevné pořadí cílů subtestů I–IV (44 slov, vč. KHAKI) — přesně dle PDF
+const ORDER=['ALIEN','HAREM','PARDON','ELAN','GERMAN','JURNAL','EMERIT','KHAKI','NAFTA','FLAGGA','FINLAND','QUILL','REDUTE','TASSE','BOSS','PALACE','JESUIT','QUOTE','INTACT','MODUS','IBIS','BURBON','OBSCEN','CAMION','JOVIAL','LABIL','AVERSE','GRAND','FRONT','KNUT','FORM','IDIOT','MENSU','OSTRE','HOSTEL','NIVELL','FREUD','INFAME','SALUT','NUMERO','ELEGIE','PAPYRE','IMAGE','SARCO'];
+const DUPS=['KHAKI','DAMAGE'];
+
+/* ===================== KONFIGURACE SUBTESTŮ (k odsouhlasení) ===================== */
+const SUBTESTS={
+  // mode free = bez tlaku (limit na celý subtest); stress = 12 s na slovo
+  I:  {n:'I',  mode:'free',   limit:300, label:'Subtest I — bez časového tlaku'},
+  II: {n:'II', mode:'stress', limit:300, perWord:12, label:'Subtest II — 12 s na slovo (zátěž)'},
+  III:{n:'III',mode:'free',   limit:300, label:'Subtest III — bez tlaku (opakování)'},
+  IV: {n:'IV', mode:'stress', limit:300, perWord:12, label:'Subtest IV — 12 s na slovo (druhá zátěž)'},
+  V:  {n:'V',  mode:'free',   limit:300, dup:true, label:'Subtest V — bez tlaku, aktivní i duplikáty (KHAKI/DAMAGE)'}
+};
+const SEQ={kratka:['I','II','V'], dlouha:['I','II','III','IV','V']};
+// pro vývoj/zkrácení testu lze přepsat limity přes #t=...; výchozí = reálné
+
+/* ===================== STAV ===================== */
+let VARIANT='kratka', ATTR=true;
+let plan=[], planPos=0, STATS={}, ATTRRES=null;
+let cur=null;        // aktuální subtest běh
+let subTimer=null, wordTimer=null, tickTimer=null;
+
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function $(id){return document.getElementById(id);}
+const _who=(location.hash.match(/kdo=([^&]+)/i)||[])[1];
+if(_who) window.addEventListener('DOMContentLoaded',()=>{$('who').value=decodeURIComponent(_who);});
+function pickVar(v){VARIANT=v;[...document.querySelectorAll('.var')].forEach(e=>e.classList.toggle('sel',e.dataset.v===v));}
+
+/* ===================== MŘÍŽKA ===================== */
+function buildGrid(){
+  let h='<div class="gh"></div>'+COLS.map(c=>'<div class="gh">'+c+'</div>').join('');
+  for(let r=0;r<10;r++){
+    h+='<div class="gh">'+(r+1)+'</div>';
+    for(let c=0;c<10;c++){
+      const cell=GRID[r][c];
+      h+='<div class="cell" id="c_'+r+'_'+c+'" data-w="'+esc(cell[0])+'" onclick="cellClick('+r+','+c+')">'+esc(cell[0])+'</div>';
+    }
+  }
+  $('grid').innerHTML=h;
+}
+
+/* ===================== BĚH TESTU ===================== */
+function startTest(){
+  const who=$('who').value.trim();
+  ATTR=$('attrOn').checked;
+  // sestav plán
+  plan=SEQ[VARIANT].slice();
+  if(ATTR) plan.push('ATTR');
+  planPos=0; STATS={}; ATTRRES=null;
+  $('intro').style.display='none';
+  buildGrid();
+  showInter(true);
+}
+
+function showInter(first){
+  $('test').style.display='none';
+  const key=plan[planPos];
+  const intoEl=$('inter'); intoEl.style.display='block';
+  if(key==='ATTR'){
+    $('interTitle').textContent='Doplňkový subtest pozornosti';
+    $('interText').innerHTML='Teď nehledáš konkrétní slovo, ale <b>všechna slova, která obsahují zadané písmeno</b>. Označ jich co nejvíc — máš <b>60 sekund</b>. Klikej na slova s daným písmenem.';
+    $('interBtn').textContent='Spustit ('+ (first?'1.':(planPos+1)+'.') +' část)';
+    return;
+  }
+  const st=SUBTESTS[key];
+  $('interTitle').textContent=st.label;
+  const mode = st.mode==='stress'
+    ? 'Na <b>každé slovo máš jen '+st.perWord+' sekund</b> — když ho nenajdeš, jede se dál.'
+    : 'Hledej <b>v klidu</b>, bez časového tlaku na jednotlivá slova. Celý subtest trvá max. '+(st.limit/60)+' min.';
+  $('interText').innerHTML=mode+' Klikni na hledané slovo, hned se ukáže další. Pořadí slov je vždy stejné.';
+  $('interBtn').textContent='Spustit '+st.n;
+}
+
+function beginNext(){
+  $('inter').style.display='none';
+  const key=plan[planPos];
+  if(key==='ATTR'){ beginAttr(); return; }
+  beginSubtest(key);
+}
+
+function beginSubtest(key){
+  const st=SUBTESTS[key];
+  cur={key, st, idx:0, found:0, miss:0, notfound:0, foundTimes:[], errLog:[], dupSet:new Set(st.dup?DUPS:['KHAKI']), tEnd:performance.now()+st.limit*1000};
+  $('test').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+  nextWord(true);
+  clearInterval(tickTimer); tickTimer=setInterval(tickSub,200);
+}
+
+function curTarget(){ return ORDER[cur.idx % ORDER.length]; }
+
+function nextWord(firstOrAdvance){
+  if(!cur) return;
+  // reset zvýraznění
+  // (necháváme krátké blikání hit/miss → smažeme po krátké pauze v cellClick)
+  cur.idx++; if(firstOrAdvance===true) cur.idx=0; else if(cur.idx>=99999) cur.idx=0;
+  const w=curTarget();
+  cur.wordStart=performance.now();
+  $('tWord').textContent=w;
+  const done=cur.found+cur.miss+cur.notfound;
+  $('tMeta').innerHTML='Subtest <b>'+cur.st.n+'</b> · zadáno <b>'+done+'</b> · nalezeno <b>'+cur.found+'</b>';
+  if(cur.st.mode==='stress'){
+    clearTimeout(wordTimer);
+    wordTimer=setTimeout(()=>{ cur.notfound++; advance(); }, cur.st.perWord*1000);
+  }
+}
+function advance(){ if(!cur) return; nextWord(false); }
+
+function cellClick(r,c){
+  if(!cur) return;
+  const w=GRID[r][c][0];
+  const target=curTarget();
+  const t=(performance.now()-cur.wordStart)/1000;
+  const el=$('c_'+r+'_'+c);
+  const correct = (w===target) || (cur.dupSet.has(target) && cur.dupSet.has(w) && w===target);
+  if(w===target){
+    cur.found++; cur.foundTimes.push(+t.toFixed(2));
+    el.classList.add('hit'); setTimeout(()=>el.classList.remove('hit'),180);
+    if(cur.st.mode==='stress') clearTimeout(wordTimer);
+    advance();
+  } else {
+    cur.miss++; cur.errLog.push({target, clicked:w, t:+t.toFixed(2)});
+    el.classList.add('miss'); setTimeout(()=>el.classList.remove('miss'),260);
+    if(cur.st.mode==='stress'){ clearTimeout(wordTimer); advance(); } // zátěž: jakýkoliv klik posune dál
+    // free: zůstává na stejném cíli, hledá dál
+  }
+}
+
+function tickSub(){
+  if(!cur){clearInterval(tickTimer);return;}
+  const rem=Math.max(0,(cur.tEnd-performance.now())/1000);
+  $('tTimer').textContent=Math.floor(rem/60)+':'+String(Math.floor(rem%60)).padStart(2,'0');
+  $('tTimer').classList.toggle('low',rem<30);
+  // wordbar
+  let frac=1;
+  if(cur.st.mode==='stress'){ frac=Math.max(0,1-(performance.now()-cur.wordStart)/(cur.st.perWord*1000)); }
+  else { frac=rem/cur.st.limit; }
+  const f=$('wFill'); f.style.width=(frac*100)+'%'; f.classList.toggle('low',frac<0.2);
+  if(rem<=0) endSubtest();
+}
+
+function endSubtest(){
+  clearInterval(tickTimer); clearTimeout(wordTimer);
+  STATS[cur.key]=summarize(cur);
+  cur=null;
+  planPos++;
+  if(planPos>=plan.length){ finish(); return; }
+  showInter(false);
+}
+
+function summarize(c){
+  // do statistik času počítáme jen časy správně nalezených cílů
+  return {
+    found:c.found, miss:c.miss, notfound:c.notfound,
+    avgT:+mean(c.foundTimes).toFixed(2),
+    sd:+sd(c.foundTimes).toFixed(2),
+    errors:c.miss
+  };
+}
+function mean(a){ if(!a||!a.length) return 0; return a.reduce((s,x)=>s+x,0)/a.length; }
+function sd(a){ if(!a||a.length<2) return 0; const m=mean(a); return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/a.length); }
+
+/* ===================== ATRIBUTOVÝ SUBTEST ===================== */
+function beginAttr(){
+  // vyber písmeno, jehož počet výskytů je nejblíž 15
+  const letters='AEIORNTLSU'.split('');
+  let best=null;
+  letters.forEach(L=>{ const cells=allCellsWith(L); const d=Math.abs(cells.length-15); if(!best||d<best.d) best={L,cells,d}; });
+  ATTRRES={L:best.L, total:best.cells.length, set:new Set(best.cells.map(x=>x.r+'_'+x.c)), found:0, miss:0, tEnd:performance.now()+60*1000};
+  cur={attr:true};
+  $('test').style.display='block'; window.scrollTo({top:0,behavior:'smooth'});
+  $('tWord').textContent='písmeno '+best.L;
+  $('tMeta').innerHTML='Označ <b>všechna</b> slova obsahující toto písmeno';
+  clearInterval(tickTimer); tickTimer=setInterval(tickAttr,200);
+}
+function allCellsWith(L){ const out=[]; for(let r=0;r<10;r++)for(let c=0;c<10;c++) if(GRID[r][c][0].indexOf(L)>=0) out.push({r,c}); return out; }
+function tickAttr(){
+  const rem=Math.max(0,(ATTRRES.tEnd-performance.now())/1000);
+  $('tTimer').textContent='0:'+String(Math.floor(rem)).padStart(2,'0');
+  $('tTimer').classList.toggle('low',rem<10);
+  $('wFill').style.width=(rem/60*100)+'%';
+  $('tMeta').innerHTML='Nalezeno <b>'+ATTRRES.found+'</b> / '+ATTRRES.total+' · chyb '+ATTRRES.miss;
+  if(rem<=0) endAttr();
+}
+
+/* atribut klik – přepíšeme cellClick pro attr mód */
+const _cellClick=cellClick;
+cellClick=function(r,c){
+  if(cur&&cur.attr){
+    const key=r+'_'+c, el=$('c_'+r+'_'+c);
+    if(el.classList.contains('hit')||el.classList.contains('miss')) return;
+    if(ATTRRES.set.has(key)){ ATTRRES.found++; el.classList.add('hit'); }
+    else { ATTRRES.miss++; el.classList.add('miss'); }
+    return;
+  }
+  _cellClick(r,c);
+};
+function endAttr(){
+  clearInterval(tickTimer);
+  cur=null; planPos++;
+  if(planPos>=plan.length){ finish(); return; }
+  showInter(false);
+}
+
+/* ===================== VÝPOČET INDEXŮ (k odsouhlasení) ===================== */
+function nf(s){ return STATS[s]?STATS[s].found:null; }
+function at(s){ return STATS[s]?STATS[s].avgT:null; }
+function sdv(s){ return STATS[s]?STATS[s].sd:null; }
+function avg(arr){ const a=arr.filter(x=>x!=null); return a.length?a.reduce((s,x)=>s+x,0)/a.length:null; }
+function pctRound(x){ return x==null?null:Math.round(x*1000)/10; }
+
+function computeIndices(){
+  const free_n=avg([nf('I'),nf('III'),nf('V')]), stress_n=avg([nf('II'),nf('IV')]);
+  const free_t=avg([at('I'),at('III')]),         stress_t=avg([at('II'),at('IV')]);
+  const free_s=avg([sdv('I'),sdv('III')]),        stress_s=avg([sdv('II'),sdv('IV')]);
+  const I_t=at('I'), I_s=sdv('I'), I_n=nf('I');
+  const idx={};
+  idx.zatizeni  = (free_n!=null&&stress_n!=null)? +(free_n-stress_n).toFixed(2) : null;            // počet cílů
+  idx.kompenzace= (free_t!=null&&stress_t!=null&&I_t)? pctRound((free_t-stress_t)/I_t) : null;
+  idx.adaptace  = (free_s!=null&&stress_s!=null&&I_s)? pctRound((free_s-stress_s)/I_s) : null;
+  idx.produktivita=(nf('IV')!=null&&nf('II')!=null&&I_n)? pctRound((nf('IV')-nf('II'))/I_n) : null;
+  idx.rychlost  = (at('II')!=null&&at('IV')!=null&&I_t)? pctRound((at('II')-at('IV'))/I_t) : null;
+  idx.stabilita = (sdv('II')!=null&&sdv('IV')!=null&&I_s)? pctRound((sdv('II')-sdv('IV'))/I_s) : null;
+  idx.uceni     = (nf('V')!=null&&I_n)? pctRound((nf('V')-nf('I'))/I_n) : null;
+  return idx;
+}
+
+/* ===================== VÝSLEDEK ===================== */
+async function finish(){
+  $('test').style.display='none'; $('inter').style.display='none';
+  const idx=computeIndices();
+  const email=$('who').value.trim();
+  let savedName='';
+  if(email){
+    try{
+      const payload={email, variant:VARIANT, subtests:STATS, attr:ATTRRES?{letter:ATTRRES.L,found:ATTRRES.found,total:ATTRRES.total,miss:ATTRRES.miss}:null, indices:idx};
+      const rr=await fetch('/api/tw44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const j=await rr.json(); if(j&&j.ok) savedName=j.name||'';
+    }catch(e){}
+  }
+  renderResult(idx,savedName);
+}
+
+function fmt(x,d){ return x==null?'—':Number(x).toLocaleString('cs-CZ',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); }
+function pctStr(x){ return x==null?'—':(x>0?'+':'')+fmt(x,1)+' %'; }
+
+function renderResult(idx,savedName){
+  const order=SEQ[VARIANT];
+  let rows=order.map(s=>{
+    const v=STATS[s]||{};
+    return '<tr><td>Subtest '+s+'</td><td>'+fmt(v.found)+'</td><td>'+fmt(v.miss)+'</td><td>'+fmt(v.notfound)+'</td><td>'+fmt(v.avgT,1)+' s</td><td>'+fmt(v.sd,1)+'</td></tr>';
+  }).join('');
+  const ix=[
+    ['zatizeni','Stupeň zatížení','rozdíl počtu cílů (volné − zátěž)','(Ø I,III,V) − (Ø II,IV)',false],
+    ['kompenzace','Míra kompenzace','o kolik se zkrátil čas pod zátěží','(Øt I,III − Øt II,IV) / t I',true],
+    ['adaptace','Míra adaptace','pokles kolísání časů pod zátěží','(Øσ I,III − Øσ II,IV) / σ I',true],
+    ['produktivita','Změna produktivity','víc cílů ve 2. zátěži než v 1.','(cíle IV − cíle II) / cíle I',true],
+    ['rychlost','Změna rychlosti','zrychlení mezi zátěžemi','(Øt II − Øt IV) / t I',true],
+    ['stabilita','Změna stability','ustálení časů mezi zátěžemi','(σ II − σ IV) / σ I',true],
+    ['uceni','Vliv učení','zlepšení mezi subtestem I a V','(cíle V − cíle I) / cíle I',true]
+  ];
+  const cards=ix.map(it=>{
+    const val=idx[it[0]];
+    const isPct=it[4];
+    const disp=val==null?'—':(isPct?pctStr(val):fmt(val,1));
+    const neg=(val!=null&&val<0)?' neg':'';
+    return '<div class="ix"><div class="v'+neg+'">'+disp+'</div><div class="l">'+it[1]+' — '+it[2]+'</div><div class="f">'+it[3]+'</div></div>';
+  }).join('');
+  const attrHtml=ATTRRES? '<h2 class="sec">Pozornost (atributový subtest)</h2><p class="muted">Hledané písmeno <b style="font-family:IBM Plex Mono">'+ATTRRES.L+'</b> · nalezeno <b>'+ATTRRES.found+'</b> z '+ATTRRES.total+' · chybných kliknutí '+ATTRRES.miss+' · úspěšnost '+(ATTRRES.total?Math.round(ATTRRES.found/ATTRRES.total*100):0)+' %.</p>' : '';
+  const who=savedName?('<p class="muted">Uloženo pro: <b>'+esc(savedName)+'</b></p>'):($('who').value.trim()?'<p class="muted">Odeslání na server se nezdařilo — výsledek je zobrazen jen zde.</p>':'<p class="muted">Bez jména — výsledek se neukládá na server.</p>');
+  const r=$('result');
+  r.innerHTML='<h2 style="margin:0 0 4px;font-size:20px">Výsledek — TW44</h2>'+who+
+    '<h2 class="sec">Výkon po subtestech</h2>'+
+    '<table class="res"><thead><tr><th>Subtest</th><th>Nalezeno</th><th>Chyb</th><th>Nestihl</th><th>Ø čas</th><th>σ (kolísání)</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<h2 class="sec">Indexy kognitivní zátěže</h2>'+
+    '<p class="muted">Kladné % = posun k lepšímu (rychlejší / stabilnější / víc cílů). „—" = subtest nebyl ve variantě.</p>'+
+    '<div class="idxgrid">'+cards+'</div>'+
+    attrHtml+
+    '<div style="margin-top:22px"><button class="btn ghost" onclick="location.reload()">Spustit znovu</button> <button class="btn" style="margin-left:8px" onclick="window.print()">⬇ Stáhnout PDF</button></div>';
+  r.classList.add('show'); window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

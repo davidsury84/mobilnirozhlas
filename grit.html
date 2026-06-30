@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test houževnatosti (Grit)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef1ec;--paper:#fff;--ink:#0f1512;--ink-soft:#5b635c;--line:#e3e7e0;--line-strong:#cdd3ca;
+  --green:#0e8a43;--green-2:#12a350;--green-d:#0a6b34;--green-soft:#e6f6ec;--yellow:#ffd21a;--yellow-2:#ffc400;
+  --radius:14px;--shadow:0 1px 2px rgba(15,21,18,.04),0 10px 30px rgba(15,21,18,.07);
+  --grad-green:linear-gradient(135deg,#15ab57,#0a6b34);--grad-dark:linear-gradient(135deg,#11271c,#0b1411 60%,#0d1f17);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:"IBM Plex Sans",system-ui,sans-serif;color:var(--ink);font-size:15px;line-height:1.55;
+  background:radial-gradient(1100px 480px at 100% -8%,var(--green-soft),transparent 62%),var(--bg);background-attachment:fixed;-webkit-font-smoothing:antialiased}
+header{background:var(--grad-dark);color:#eef3ee;border-bottom:2px solid var(--yellow);padding:22px 0}
+.wrap{max-width:780px;margin:0 auto;padding:0 20px}
+header h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em}
+header p{margin:6px 0 0;color:#9fd9b6;font-size:14px}
+main{max-width:780px;margin:0 auto;padding:26px 20px 90px}
+.intro{color:var(--ink-soft);font-size:14px;margin:0 0 22px}
+.q{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:14px}
+.q .num{font-family:"IBM Plex Mono";font-size:12px;font-weight:600;color:var(--green-d)}
+.q h3{margin:4px 0 14px;font-size:16px;font-weight:600;line-height:1.4}
+.opts{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.opt{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:12px 6px;border:1px solid var(--line-strong);border-radius:11px;cursor:pointer;transition:.15s;background:var(--paper);font-size:12px;color:var(--ink-soft);line-height:1.25}
+.opt:hover{border-color:var(--green-2);background:var(--green-soft)}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line-strong);flex:none;transition:.15s}
+.opt.sel{border-color:var(--green);background:var(--green-soft);color:var(--green-d);font-weight:600}
+.opt.sel .dot{border-color:var(--green);background:var(--green);box-shadow:inset 0 0 0 4px var(--paper)}
+.scale-hint{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-bottom:8px;text-transform:uppercase;letter-spacing:.03em}
+.bar{position:sticky;bottom:0;background:rgba(238,241,236,.92);backdrop-filter:blur(6px);border-top:1px solid var(--line);padding:14px 0;margin-top:8px}
+.bar .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.btn{border:none;background:var(--grad-green);color:#fff;padding:12px 22px;border-radius:12px;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit;box-shadow:0 3px 12px rgba(10,107,52,.28);transition:.15s}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.prog{flex:1;min-width:160px;font-size:13px;color:var(--ink-soft)}
+.prog b{color:var(--ink)}
+/* výsledek */
+#result{display:none;background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:28px;margin-bottom:20px}
+#result.show{display:block;animation:fade .3s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.hs{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.hs .v{font-family:"IBM Plex Mono";font-size:46px;font-weight:600;color:var(--green-d);letter-spacing:-.02em}
+.hs .pct{font-size:30px;font-weight:700}
+.hs .lbl{color:var(--ink-soft);font-size:13px}
+.gauge{position:relative;height:16px;border-radius:999px;margin:26px 0 8px;background:linear-gradient(90deg,#f0d9d9,#fbf0d6,#dcefe0)}
+.gauge .me{position:absolute;top:-7px;width:4px;height:30px;border-radius:3px;background:var(--ink);transform:translateX(-50%)}
+.gauge .me::after{content:attr(data-l);position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;white-space:nowrap;background:var(--ink);color:#fff;padding:2px 7px;border-radius:6px}
+.gmark{position:absolute;top:20px;font-size:11px;color:var(--ink-soft);transform:translateX(-50%);white-space:nowrap}
+.gmark i{position:absolute;top:-20px;left:50%;width:2px;height:16px;background:var(--line-strong);transform:translateX(-50%)}
+.idx{background:var(--green-soft);border:1px solid #cfe9d8;border-radius:12px;padding:16px 18px;margin:34px 0 0;font-size:15px;line-height:1.6}
+.idx b{color:var(--green-d)}
+.refs{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:18px}
+.ref{background:var(--bg);border-radius:12px;padding:14px 16px}
+.ref .rv{font-family:"IBM Plex Mono";font-size:22px;font-weight:600;color:var(--green-d)}
+.ref .rl{font-size:12px;color:var(--ink-soft);margin-top:2px}
+.again{margin-top:20px;background:none;border:1px solid var(--line-strong);color:var(--ink);padding:9px 16px;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:500}
+.err{color:#c23636;font-size:13px}
+.who-line{font-size:14px;color:var(--ink-soft);margin:-4px 0 14px}
+.who-line b{color:var(--ink)}
+.pdfbtn{margin-top:20px;margin-left:10px;background:linear-gradient(150deg,var(--yellow),var(--yellow-2));border:none;color:#11271c;padding:9px 16px;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:600}
+#printHead{display:none}
+@media print{
+  header,.intro,.scale-hint,#quiz,.bar,.again,.pdfbtn,.err{display:none!important}
+  body{background:#fff}
+  main{padding:0}
+  #result{box-shadow:none;border:none;margin:0;padding:0}
+  #printHead{display:block!important;margin-bottom:14px;border-bottom:2px solid var(--yellow);padding-bottom:10px}
+  #printHead h2{margin:0;font-size:20px}
+  #printHead .pd{color:#5b635c;font-size:13px;margin-top:3px}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>Test houževnatosti (Grit)</h1><p>10 otázek · cca 3 minuty · vyhodnocení vůči populaci ČR</p></div></header>
+<main>
+  <div id="result"></div>
+  <p class="intro">U každého tvrzení vyber, jak moc se ti podobá. Neexistují správné ani špatné odpovědi — odpovídej spontánně.</p>
+  <div class="scale-hint"><span>← vůbec se mi to nepodobá</span><span>to jsem celý/celá já →</span></div>
+  <div id="quiz"></div>
+</main>
+<div class="bar"><div class="wrap">
+  <button class="btn" id="evalBtn" disabled onclick="evaluate()">Vyhodnotit</button>
+  <div class="prog" id="prog">Zodpovězeno <b>0</b> z 10</div>
+  <span class="err" id="err"></span>
+</div></div>
+
+<script>
+const OPTS = ["Vůbec se mi to nepodobá","Spíše se mi to nepodobá","Středně se mi to podobá","Velmi se mi to podobá","To jsem celý/celá já"];
+const Q = [
+  {t:"Nové nápady a projekty mě odvedou od předchozích nápadů a projektů.", rev:true},
+  {t:"Nezdary mě neodradí. Nevzdávám se.", rev:false},
+  {t:"Často si stanovím cíl, ale později se rozhodnu realizovat jiný.", rev:true},
+  {t:"Pracuji vždy usilovně.", rev:false},
+  {t:"Dělá mi problémy soustředit se na projekty, které trvají déle jak několik měsíců.", rev:true},
+  {t:"Když něco začnu, tak to taky dokončím.", rev:false},
+  {t:"Mé zájmy se rok od roku mění.", rev:true},
+  {t:"Jsem svědomitý, nikdy se nevzdám.", rev:false},
+  {t:"Krátkou dobu jsem byl/a posedlý/á nápadem nebo projektem, ale později jsem ztratil/a zájem.", rev:true},
+  {t:"Už jsem překonal/a překážky, abych zdolal/a důležitou výzvu.", rev:false}
+];
+// průměr (HS, 1.0–5.0 po 0,1) → percentil populace ČR
+const PCT = {18:0,19:0,20:1,21:1,22:1,23:2,24:3,25:5,26:6,27:9,28:12,29:16,30:20,31:25,32:31,33:37,34:44,35:51,36:58,37:64,38:70,39:76,40:81,41:85,42:89,43:92,44:94,45:96,46:97,47:98,48:99,49:99,50:100};
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+const _who=(location.hash.match(/kdo=([^&]+)/i)||[])[1];
+const RESP={ email:_who?decodeURIComponent(_who):'', name:'', dept:'' };
+const answers = new Array(10).fill(0); // pozice 1–5, 0 = nezodpovězeno
+
+function renderQuiz(){
+  let h='';
+  Q.forEach((q,i)=>{
+    h+='<div class="q"><div class="num">Otázka '+(i+1)+' / 10</div><h3>'+q.t+'</h3><div class="opts">';
+    for(let p=1;p<=5;p++){
+      h+='<label class="opt" id="o'+i+'_'+p+'" onclick="pick('+i+','+p+')"><span class="dot"></span>'+OPTS[p-1]+'</label>';
+    }
+    h+='</div></div>';
+  });
+  document.getElementById('quiz').innerHTML=h;
+}
+function pick(i,p){
+  answers[i]=p;
+  for(let x=1;x<=5;x++) document.getElementById('o'+i+'_'+x).classList.toggle('sel',x===p);
+  const done=answers.filter(a=>a>0).length;
+  document.getElementById('prog').innerHTML='Zodpovězeno <b>'+done+'</b> z 10';
+  document.getElementById('evalBtn').disabled = done<10;
+  document.getElementById('err').textContent='';
+}
+function scoreOf(i){ const p=answers[i]; return Q[i].rev ? (6-p) : p; } // body 1–5 (otázka je dotována, respondent je nevidí)
+function pctFor(avg){ const key=Math.round(avg*10); if(key<18) return 0; if(key>50) return 100; return PCT[key]!=null?PCT[key]:0; }
+
+async function evaluate(){
+  if(answers.filter(a=>a>0).length<10){ document.getElementById('err').textContent='Zodpověz prosím všech 10 otázek.'; return; }
+  let sum=0; for(let i=0;i<10;i++) sum+=scoreOf(i);
+  const avg = sum/10;                       // hrubé skóre (HS)
+  const p = pctFor(avg);                    // percentil
+  const AVGP=51, VS=61, MGR=75;             // referenční hodnoty
+  const before = 100-p;
+  const d=p-AVGP;
+  const pos = d>0?'nad průměrem':(d<0?'pod průměrem':'přesně na průměru');
+  const intens = d===0?'':(Math.abs(d)<=12?'mírně ':'výrazně ');
+  const hsStr = avg.toFixed(1).replace('.',',');
+
+  if(RESP.email){
+    const btn=document.getElementById('evalBtn'); if(btn){btn.disabled=true;btn.textContent='Ukládám…';}
+    try{ const rr=await fetch('/api/grit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:RESP.email,hs:avg})}); const j=await rr.json(); if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; } }catch(e){}
+    if(btn){btn.textContent='Vyhodnotit';}
+  }
+  const today=new Date().toLocaleDateString('cs-CZ');
+  const dep=(RESP.dept&&RESP.dept!=='—')?(' · '+esc(RESP.dept)):'';
+  const whoLine=RESP.name?('<div class="who-line"><b>'+esc(RESP.name)+'</b>'+dep+'</div>'):'';
+  const printHead='<div id="printHead"><h2>Test houževnatosti (Grit)</h2><div class="pd">'+(RESP.name?(esc(RESP.name)+dep+' · '):'')+today+'</div></div>';
+
+  const mark=(val,label)=>'<div class="gmark" style="left:'+val+'%"><i></i>'+label+'</div>';
+  const html = printHead+
+    '<h2 style="margin:0 0 14px;font-size:20px">Vaše houževnatost</h2>'+ whoLine+
+    '<div class="hs"><span class="v">'+hsStr+'</span><span class="pct">'+p+' %</span>'+
+      '<span class="lbl">hrubé skóre (HS) · percentil populace ČR</span></div>'+
+    '<div class="gauge"><div class="me" data-l="'+p+' %" style="left:'+p+'%"></div>'+
+      mark(AVGP,'průměr '+AVGP+' %')+mark(VS,'VŠ '+VS+' %')+mark(MGR,'manažeři '+MGR+' %')+'</div>'+
+    '<div style="height:30px"></div>'+
+    '<div class="idx">Za Vámi je <b>'+p+' %</b> populace, před Vámi je <b>'+before+' %</b> houževnatější populace.<br>'+
+      'Jste '+intens+'<b>'+pos+'</b>, který je '+AVGP+' %.</div>'+
+    '<div class="refs">'+
+      '<div class="ref"><div class="rv">'+VS+' %</div><div class="rl">Vysokoškoláci nabývají hodnot</div></div>'+
+      '<div class="ref"><div class="rv">'+MGR+' %</div><div class="rl">Obchodní manažeři a majitelé firem</div></div>'+
+    '</div>'+
+    '<button class="again" onclick="restart()">Vyplnit znovu</button>'+
+    '<button class="pdfbtn" onclick="window.print()">⬇ Stáhnout PDF</button>';
+  const r=document.getElementById('result');
+  r.innerHTML=html; r.classList.add('show');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function restart(){
+  for(let i=0;i<10;i++) answers[i]=0;
+  renderQuiz();
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('prog').innerHTML='Zodpovězeno <b>0</b> z 10';
+  document.getElementById('evalBtn').disabled=true;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+renderQuiz();
+</script>
+</body>
+</html>

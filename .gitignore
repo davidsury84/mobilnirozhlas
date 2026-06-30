@@ -1,0 +1,13 @@
+# Tajné údaje a lokální konfigurace
+.env
+
+# Data za běhu (hesla SMTP, klíče, potvrzení, publikované směrnice, knihovna)
+data/
+
+# Závislosti / systémové
+node_modules/
+.DS_Store
+*.log
+
+# Lokální nástroje Claude Code (dev)
+.claude/
