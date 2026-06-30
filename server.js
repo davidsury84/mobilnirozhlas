@@ -5,7 +5,7 @@
    Proměnné prostředí (volitelné):
      PORT            port (výchozí 8080)
      ADMIN_PASSWORD  heslo do správy (jinak se vygeneruje a vypíše)
-     PUBLIC_URL      veřejná adresa, např. https://smernice.elkoplast.cz
+     PUBLIC_URL      veřejná adresa, např. https://intranet.elkoplast.cz
      DATA_DIR        kam ukládat data (výchozí ./data)
      GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET  – přihlášení zaměstnanců přes Google (intranet)
      ALLOWED_HD      omezení SSO na firemní doménu, např. elkoplast.cz

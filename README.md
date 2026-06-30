@@ -26,7 +26,7 @@ docker build -t smernice .
 docker run -d --name smernice -p 80:8080 \
   -v /opt/smernice-data:/data \
   -e ADMIN_PASSWORD=zvol-silne-heslo \
-  -e PUBLIC_URL=https://smernice.elkoplast.cz \
+  -e PUBLIC_URL=https://intranet.elkoplast.cz \
   smernice
 ```
 Složka `/opt/smernice-data` uchová data i po restartu. HTTPS vyřeš reverzní proxy (nginx/Caddy/Traefik).
@@ -40,7 +40,7 @@ Složka `/opt/smernice-data` uchová data i po restartu. HTTPS vyřeš reverzní
 
 ### C) Přímo na serveru (Node + reverzní proxy)
 ```
-DATA_DIR=/var/smernice ADMIN_PASSWORD=… PUBLIC_URL=https://smernice.elkoplast.cz node server.js
+DATA_DIR=/var/smernice ADMIN_PASSWORD=… PUBLIC_URL=https://intranet.elkoplast.cz node server.js
 ```
 Spusť jako službu (systemd / pm2) a postav před to nginx/Caddy s HTTPS.
 
