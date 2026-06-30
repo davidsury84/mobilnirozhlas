@@ -7,6 +7,11 @@
      ADMIN_PASSWORD  heslo do správy (jinak se vygeneruje a vypíše)
      PUBLIC_URL      veřejná adresa, např. https://smernice.elkoplast.cz
      DATA_DIR        kam ukládat data (výchozí ./data)
+     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET  – přihlášení zaměstnanců přes Google (intranet)
+     ALLOWED_HD      omezení SSO na firemní doménu, např. elkoplast.cz
+     REPORT_EMAIL    příjemce měsíčního vyhodnocení (výchozí tomas.krajca@elkoplast.cz)
+     REPORT_DAY      den v měsíci pro odeslání (1–28, výchozí 1)
+     REPORT_ENABLED  0 = vypnout měsíční vyhodnocení (výchozí zapnuto)
    ============================================================ */
 const http   = require('http');
 const https  = require('https');
@@ -18,12 +23,40 @@ const url     = require('url');
 const os     = require('os');
 const crypto = require('crypto');
 
+/* ---------- volitelný .env (bez závislostí) ---------- */
+(function loadEnv() {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) return;
+    for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+      const t = line.trim();
+      if (!t || t[0] === '#') continue;
+      const i = t.indexOf('='); if (i < 0) continue;
+      const k = t.slice(0, i).trim(); let v = t.slice(i + 1).trim();
+      if (v.length > 1 && ((v[0] === '"' && v.slice(-1) === '"') || (v[0] === "'" && v.slice(-1) === "'"))) v = v.slice(1, -1);
+      if (k && !(k in process.env)) process.env[k] = v;
+    }
+  } catch (_) {}
+})();
+
 const ROOT     = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const APP_FILE = path.join(ROOT, 'seznameni-se-smernicemi.html');
+const SMI_APP_FILE = path.join(ROOT, 'SMI_aplikace.html');   // hotová SMI aplikace (modul E-shop)
+const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu Kalkulace-lisy (napojí se později)
+const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
+const GRIT_FILE = path.join(ROOT, 'grit.html');              // test houževnatosti (Grit)
+const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracovní spokojenosti (JSS)
+const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
 const PUB_DIR  = path.join(DATA_DIR, 'published');
 const STATE_F  = path.join(DATA_DIR, 'state.json');
 const ACKS_F   = path.join(DATA_DIR, 'acks.json');
+const LIB_F    = path.join(DATA_DIR, 'library.json');        // knihovna: pracovní řád, SOP, postupy (verzované)
+const LIBACK_F = path.join(DATA_DIR, 'library-acks.json');   // potvrzení vázaná na konkrétní verzi dokumentu
+const REPORT_F = path.join(DATA_DIR, 'report-state.json');   // stav měsíčního vyhodnocení (kdy naposled odesláno)
+const GRIT_F   = path.join(DATA_DIR, 'grit-results.json');   // výsledky testu houževnatosti (neanonymní)
+const JSS_F    = path.join(DATA_DIR, 'jss-results.json');    // výsledky dotazníku pracovní spokojenosti
+const TW44_F   = path.join(DATA_DIR, 'tw44-results.json');   // výsledky testu kognitivní zátěže (neanonymní)
 const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
 for (const d of [DATA_DIR, PUB_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
@@ -38,6 +71,34 @@ if (!SEC) { SEC = { secret: crypto.randomBytes(24).toString('hex'), password: pr
 if (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD !== SEC.password) { SEC.password = process.env.ADMIN_PASSWORD; writeJson(SECRET_F, SEC); }
 function token() { return crypto.createHmac('sha256', SEC.secret).update('admin-v1').digest('hex'); }
 function isAuthed(req) { const c = req.headers.cookie || ''; const m = c.match(/sm_auth=([a-f0-9]+)/); return m && m[1] === token(); }
+
+/* ---------- SSO zaměstnanců (Google OIDC, bez závislostí) ---------- */
+const GOOGLE = { clientId: process.env.GOOGLE_CLIENT_ID || '', clientSecret: process.env.GOOGLE_CLIENT_SECRET || '', hd: (process.env.ALLOWED_HD || '').trim() };
+function ssoEnabled() { return !!(GOOGLE.clientId && GOOGLE.clientSecret); }
+// Demo přihlášení zaměstnance – jen na localhost a jen když není zapnuté SSO (v produkci za doménou inertní).
+function devAllowed(req) { const h = (req.headers.host || '').toLowerCase(); return !ssoEnabled() && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(h); }
+function b64url(buf) { return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function b64urlDecode(s) { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Buffer.from(s, 'base64').toString('utf8'); }
+function cookieVal(req, name) { const m = (req.headers.cookie || '').match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)')); return m ? decodeURIComponent(m[1]) : ''; }
+function empSign(payload) { const data = b64url(JSON.stringify(payload)); const sig = crypto.createHmac('sha256', SEC.secret).update('emp:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
+function empVerify(str) { if (!str) return null; const i = str.lastIndexOf('.'); if (i < 0) return null; const data = str.slice(0, i), sig = str.slice(i + 1); const exp = crypto.createHmac('sha256', SEC.secret).update('emp:' + data).digest('hex').slice(0, 32); if (sig !== exp) return null; try { return JSON.parse(b64urlDecode(data)); } catch (_) { return null; } }
+function empSession(req) { return empVerify(cookieVal(req, 'sm_emp')); }
+/* ---------- SSO do externích aplikací (nabídkový kalkulátor) ---------- */
+// Token = b64url(JSON{email,name,exp}) + "." + HMAC-SHA256("sso:"+data, SEC.secret)[0..32]. Krátká platnost.
+function ssoSign(payload) { const data = b64url(JSON.stringify(payload)); const sig = crypto.createHmac('sha256', SEC.secret).update('sso:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
+const NABIDKY_URL = process.env.NABIDKY_URL || 'https://lisy-production.up.railway.app';
+// HTTPS POST application/x-www-form-urlencoded → JSON (výměna kódu za token u Google)
+function httpsPostForm(hostname, pathName, form) {
+  return new Promise((resolve, reject) => {
+    const body = Object.keys(form).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(form[k])).join('&');
+    const r = https.request({ method: 'POST', hostname, path: pathName, headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) } }, (resp) => {
+      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300 && j) return resolve(j); reject(new Error((j && (j.error_description || j.error)) || ('HTTP ' + resp.statusCode + ': ' + d.slice(0, 200)))); });
+    });
+    r.on('error', e => reject(new Error('Spojení s Google: ' + e.message)));
+    r.setTimeout(20000, () => { try { r.destroy(new Error('Google: časový limit spojení.')); } catch (_) {} });
+    r.write(body); r.end();
+  });
+}
 
 /* ---------- konfigurace pošty ---------- */
 function loadConfig() {
@@ -141,6 +202,201 @@ function recordAck(a) {
   const email = (a.email || '').toLowerCase();
   if (!acks.find(x => x.dirId === a.dirId && x.email === email)) { acks.push({ dirId: a.dirId, dirTitle: a.dirTitle || '', email, name: a.name || email, ts: a.ts || Date.now() }); writeJson(ACKS_F, acks); }
 }
+// Najde zaměstnance podle e-mailu; pokud chybí, automaticky ho založí (SSO první přihlášení).
+function ensureEmployee(email, name) {
+  email = (email || '').toLowerCase();
+  const s = readJson(STATE_F, { categories: [], employees: [], directives: [], profiles: [] });
+  s.employees = s.employees || [];
+  let e = s.employees.find(x => (x.email || '').toLowerCase() === email);
+  if (!e) { e = { id: 'g' + crypto.randomBytes(6).toString('hex'), name: name || email, email, cats: [] }; s.employees.push(e); writeJson(STATE_F, s); }
+  return e;
+}
+// Směrnice, které se týkají daného zaměstnance, + stav přečtení a zda je publikovaná.
+function myDirectives(email) {
+  email = (email || '').toLowerCase();
+  const s = getState();
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const cats = emp ? (emp.cats || []) : [];
+  return (s.directives || [])
+    .filter(d => d.assignAll || (d.assignCats || []).some(c => cats.indexOf(c) >= 0))
+    .map(d => {
+      const ack = d.acks && d.acks[email];
+      return { id: d.id, title: d.title, ack: !!ack, ackTs: ack ? ack.ts : null, published: fs.existsSync(path.join(PUB_DIR, String(d.id).replace(/[^a-z0-9]/gi, '') + '.html')) };
+    });
+}
+
+/* ---------- knihovna (verzované dokumenty: pracovní řád, SOP, postupy) ---------- */
+function readLibrary() { const l = readJson(LIB_F, { docs: [], folders: [] }); l.docs = l.docs || []; l.folders = l.folders || []; return l; }
+function libAcks() { return readJson(LIBACK_F, []); }
+function curVersion(d) { return d.cur || (d.versions && d.versions.length ? d.versions[d.versions.length - 1].v : 1); }
+function recordLibAck(a) {
+  const acks = libAcks(); const email = (a.email || '').toLowerCase(); const v = Number(a.v);
+  if (!acks.find(x => x.docId === a.docId && Number(x.v) === v && x.email === email)) { acks.push({ docId: a.docId, v, email, name: a.name || email, ts: a.ts || Date.now() }); writeJson(LIBACK_F, acks); }
+}
+function libAcked(docId, v, email) { email = (email || '').toLowerCase(); v = Number(v); return libAcks().some(x => x.docId === docId && Number(x.v) === v && x.email === email); }
+// Dokumenty knihovny, které se týkají zaměstnance (aktuální verze + stav potvrzení).
+function myLibrary(email) {
+  email = (email || '').toLowerCase();
+  const s = getState(); const lib = readLibrary();
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const cats = emp ? (emp.cats || []) : [];
+  const acks = libAcks();
+  const docs = (lib.docs || [])
+    .filter(d => d.assignAll || (d.assignCats || []).some(c => cats.indexOf(c) >= 0))
+    .map(d => {
+      const v = curVersion(d);
+      const ack = acks.find(x => x.docId === d.id && Number(x.v) === v && x.email === email);
+      return { id: d.id, title: d.title, kind: d.kind || 'dokument', folderId: d.folderId || null, requireAck: d.requireAck !== false, v, acked: !!ack, ackTs: ack ? ack.ts : null };
+    });
+  const folders = (lib.folders || []).map(f => ({ id: f.id, name: f.name, parentId: f.parentId || null }));
+  return { folders, docs };
+}
+// Test houževnatosti (Grit) – percentil populace ČR z průměru (HS 1,0–5,0)
+const GRIT_PCT = { 18: 0, 19: 0, 20: 1, 21: 1, 22: 1, 23: 2, 24: 3, 25: 5, 26: 6, 27: 9, 28: 12, 29: 16, 30: 20, 31: 25, 32: 31, 33: 37, 34: 44, 35: 51, 36: 58, 37: 64, 38: 70, 39: 76, 40: 81, 41: 85, 42: 89, 43: 92, 44: 94, 45: 96, 46: 97, 47: 98, 48: 99, 49: 99, 50: 100 };
+function gritPct(avg) { const k = Math.round(avg * 10); if (k < 18) return 0; if (k > 50) return 100; return GRIT_PCT[k] != null ? GRIT_PCT[k] : 0; }
+// Uloží (upsert podle e-mailu) výsledek; jméno a oddělení (= 1. kategorie) dohledá ze zaměstnanců.
+function recordGrit(a) {
+  const email = (a.email || '').toLowerCase();
+  const hs = Math.round(Math.max(1, Math.min(5, Number(a.hs) || 0)) * 10) / 10;
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const rec = { email, name, dept, hs, pct: gritPct(hs), ts: Date.now() };
+  const results = readJson(GRIT_F, []);
+  const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0) results[i] = rec; else results.push(rec);
+  writeJson(GRIT_F, results);
+  return rec;
+}
+// Uloží (upsert podle e-mailu) výsledek dotazníku spokojenosti (JSS) vč. demografie.
+function recordJss(a) {
+  const email = (a.email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const total = Math.max(36, Math.min(216, Math.round(Number(a.total) || 0)));
+  const rec = { email, name, dept, total, pct: Math.round(Number(a.pct) || 0), subs: Array.isArray(a.subs) ? a.subs : [],
+    pozice: (a.pozice || '').trim(), delka: (a.delka || '').trim(), stredisko: (a.stredisko || '').trim(), zarazeni: (a.zarazeni || '').trim(), ts: Date.now() };
+  const results = readJson(JSS_F, []);
+  const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0) results[i] = rec; else results.push(rec);
+  writeJson(JSS_F, results);
+  return rec;
+}
+// Uloží (upsert podle e-mailu) výsledek testu kognitivní zátěže TW44.
+function recordTw44(a) {
+  const email = (a.email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const rec = { email, name, dept, variant: (a.variant || '').slice(0, 16),
+    subtests: (a.subtests && typeof a.subtests === 'object') ? a.subtests : {},
+    attr: (a.attr && typeof a.attr === 'object') ? a.attr : null,
+    indices: (a.indices && typeof a.indices === 'object') ? a.indices : {}, ts: Date.now() };
+  const results = readJson(TW44_F, []);
+  const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0) results[i] = rec; else results.push(rec);
+  writeJson(TW44_F, results);
+  return rec;
+}
+// Klíče modulů, ke kterým má zaměstnanec přístup (přiděluje správce v administraci).
+function employeeModules(email) {
+  email = (email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [] });
+  const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  return (e && Array.isArray(e.modules)) ? e.modules : [];
+}
+
+/* ============================================================
+   Měsíční vyhodnocení (e-mailem na zodpovědnou osobu)
+   ============================================================ */
+function reportRecipient() { return (process.env.REPORT_EMAIL || 'tomas.krajca@elkoplast.cz').trim(); }
+function reportDay() { return Math.min(28, Math.max(1, Number(process.env.REPORT_DAY) || 1)); }
+function reportEnabled() { return (process.env.REPORT_ENABLED || '1') !== '0'; }
+function emailConfigured() { return !!(process.env.RESEND_API_KEY || (CFG.host && CFG.user)); }
+function ymKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+
+// Spočítá stav seznámení pro směrnice i dokumenty knihovny vyžadující potvrzení.
+function reportData() {
+  const s = getState();
+  const emps = s.employees || [];
+  const audience = (item) => item.assignAll ? emps : emps.filter(e => (e.cats || []).some(c => (item.assignCats || []).indexOf(c) >= 0));
+  const lc = (e) => (e.email || '').toLowerCase();
+  const directives = (s.directives || []).map(d => {
+    const aud = audience(d); const acks = d.acks || {};
+    const missing = aud.filter(e => !acks[lc(e)]);
+    return { title: d.title || 'Směrnice', total: aud.length, acked: aud.length - missing.length, missing: missing.map(e => e.name || e.email) };
+  });
+  const lib = readLibrary(); const lacks = libAcks();
+  const libDocs = (lib.docs || []).filter(d => d.requireAck !== false).map(d => {
+    const v = curVersion(d); const aud = audience(d);
+    const ackedSet = {}; lacks.filter(a => a.docId === d.id && Number(a.v) === v).forEach(a => ackedSet[a.email] = 1);
+    const missing = aud.filter(e => !ackedSet[lc(e)]);
+    return { title: (d.title || 'Dokument') + ' (verze ' + v + ')', total: aud.length, acked: aud.length - missing.length, missing: missing.map(e => e.name || e.email) };
+  });
+  const all = directives.concat(libDocs);
+  const totAud = all.reduce((s2, x) => s2 + x.total, 0);
+  const totAck = all.reduce((s2, x) => s2 + x.acked, 0);
+  return { employees: emps.length, directives, libDocs, rate: totAud ? Math.round(100 * totAck / totAud) : 100 };
+}
+function reportRows(items) {
+  if (!items.length) return '<tr><td colspan="3" style="padding:10px;color:#5b635c">Žádné položky.</td></tr>';
+  return items.map(x => {
+    const pct = x.total ? Math.round(100 * x.acked / x.total) : 100;
+    const col = pct >= 100 ? '#0e8a43' : (pct >= 60 ? '#7a5c0e' : '#c23636');
+    const miss = x.missing.length ? ('<div style="font-size:12px;color:#5b635c;margin-top:3px">Nepotvrdili: ' + esc(x.missing.slice(0, 12).join(', ')) + (x.missing.length > 12 ? (' +' + (x.missing.length - 12) + ' dalších') : '') + '</div>') : '';
+    return '<tr><td style="padding:9px 10px;border-bottom:1px solid #eee">' + esc(x.title) + miss + '</td>' +
+      '<td style="padding:9px 10px;border-bottom:1px solid #eee;text-align:center;white-space:nowrap">' + x.acked + ' / ' + x.total + '</td>' +
+      '<td style="padding:9px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:' + col + '">' + pct + ' %</td></tr>';
+  }).join('');
+}
+function buildReportHtml(d, monthLabel) {
+  const head = '<tr><th style="text-align:left;padding:8px 10px;font-size:12px;text-transform:uppercase;color:#5b635c;border-bottom:2px solid #e3e7e0">Položka</th>' +
+    '<th style="padding:8px 10px;font-size:12px;text-transform:uppercase;color:#5b635c;border-bottom:2px solid #e3e7e0">Potvrzeno</th>' +
+    '<th style="padding:8px 10px;font-size:12px;text-transform:uppercase;color:#5b635c;border-bottom:2px solid #e3e7e0;text-align:right">%</th></tr>';
+  return '<div style="font-family:Arial,Helvetica,sans-serif;color:#0f1512;max-width:680px;margin:0 auto">' +
+    '<div style="background:linear-gradient(135deg,#15ab57,#0a6b34);color:#fff;padding:20px 24px;border-radius:12px 12px 0 0">' +
+    '<div style="font-size:20px;font-weight:700">Měsíční vyhodnocení seznámení</div>' +
+    '<div style="opacity:.9;font-size:14px;margin-top:2px">' + esc(monthLabel) + '</div></div>' +
+    '<div style="border:1px solid #e3e7e0;border-top:none;border-radius:0 0 12px 12px;padding:22px 24px">' +
+    '<p style="margin:0 0 16px">Celková míra potvrzení: <strong style="font-size:18px;color:#0a6b34">' + d.rate + ' %</strong> &nbsp;·&nbsp; zaměstnanců: ' + d.employees + '</p>' +
+    '<h3 style="font-size:15px;margin:18px 0 8px">Směrnice</h3>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px">' + head + reportRows(d.directives) + '</table>' +
+    '<h3 style="font-size:15px;margin:22px 0 8px">Knihovna (dokumenty k potvrzení)</h3>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px">' + head + reportRows(d.libDocs) + '</table>' +
+    '<p style="margin:22px 0 0;font-size:12px;color:#5b635c">Automaticky generováno aplikací Seznámení se směrnicemi.</p>' +
+    '</div></div>';
+}
+function buildReportText(d, monthLabel) {
+  const lines = ['Měsíční vyhodnocení seznámení – ' + monthLabel, 'Celková míra potvrzení: ' + d.rate + ' %  (zaměstnanců: ' + d.employees + ')', '', 'SMĚRNICE:'];
+  d.directives.forEach(x => lines.push('  - ' + x.title + ': ' + x.acked + '/' + x.total + (x.missing.length ? ('  (nepotvrdili: ' + x.missing.join(', ') + ')') : '')));
+  lines.push('', 'KNIHOVNA:');
+  d.libDocs.forEach(x => lines.push('  - ' + x.title + ': ' + x.acked + '/' + x.total + (x.missing.length ? ('  (nepotvrdili: ' + x.missing.join(', ') + ')') : '')));
+  return lines.join('\n');
+}
+async function sendMonthlyReport(to) {
+  const d = reportData();
+  const monthLabel = new Date().toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+  await deliver({ to: to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet – směrnice', subject: 'Měsíční vyhodnocení seznámení se směrnicemi – ' + monthLabel, text: buildReportText(d, monthLabel), html: buildReportHtml(d, monthLabel) });
+}
+async function maybeSendMonthlyReport() {
+  try {
+    if (!reportEnabled() || !emailConfigured()) return;
+    const now = new Date();
+    if (now.getDate() < reportDay()) return;
+    const st = readJson(REPORT_F, {});
+    if (st.lastSentMonth === ymKey(now)) return; // tento měsíc už odesláno
+    await sendMonthlyReport(reportRecipient());
+    writeJson(REPORT_F, { lastSentMonth: ymKey(now), lastSentAt: now.toISOString(), to: reportRecipient() });
+    console.log(' Měsíční vyhodnocení odesláno na ' + reportRecipient());
+  } catch (e) { console.log(' Měsíční vyhodnocení selhalo: ' + e.message); }
+}
 
 /* ============================================================
    HTTP
@@ -183,13 +439,25 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
 
   // chráněné cesty (správa)
-  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config'];
+  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results'];
   if (PROTECTED.indexOf(p) >= 0 && !isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
     if (p === '/' || p === '/index.html') {
       if (!fs.existsSync(APP_FILE)) return send(res, 404, '<h1>Chybí seznameni-se-smernicemi.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    if (p === '/grit' || p === '/grit.html') {
+      if (!fs.existsSync(GRIT_FILE)) return send(res, 404, '<h1>Chybí grit.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(GRIT_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    if (p === '/tw44' || p === '/tw44.html') {
+      if (!fs.existsSync(TW44_FILE)) return send(res, 404, '<h1>Chybí tw44.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(TW44_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    if (p === '/jss' || p === '/jss.html') {
+      if (!fs.existsSync(JSS_FILE)) return send(res, 404, '<h1>Chybí jss.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(JSS_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/api/login' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
@@ -197,7 +465,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 401, { error: 'Nesprávné heslo.' });
     }
     if (p === '/api/state' && req.method === 'GET') return send(res, 200, getState());
-    if (p === '/api/state' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(STATE_F, { categories: b.categories || [], employees: b.employees || [], directives: b.directives || [], profiles: b.profiles || [] }); return send(res, 200, { ok: true }); }
+    if (p === '/api/state' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(STATE_F, { categories: b.categories || [], employees: b.employees || [], directives: b.directives || [], profiles: b.profiles || [], candidates: b.candidates || [] }); return send(res, 200, { ok: true }); }
     if (p === '/api/config' && req.method === 'GET') return send(res, 200, configStatus());
     if (p === '/api/config' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeConfig({ host: (b.host || '').trim(), port: Number(b.port) || 587, secure: !!b.secure, user: (b.user || '').trim(), pass: b.pass, fromName: (b.fromName || '').trim() }); return send(res, 200, { ok: true, status: configStatus() }); }
     if (p === '/api/test' && req.method === 'POST') {
@@ -224,6 +492,125 @@ const server = http.createServer(async (req, res) => {
     // veřejné cesty
     if (p.indexOf('/s/') === 0) { const id = p.slice(3).replace(/[^a-z0-9]/gi, ''); const f = path.join(PUB_DIR, id + '.html'); if (fs.existsSync(f)) return send(res, 200, fs.readFileSync(f, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' }); return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' }); }
     if (p === '/api/ack' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.dirId || !b.email) return send(res, 400, { error: 'Chybí data.' }); recordAck(b); return send(res, 200, { ok: true }, { 'Access-Control-Allow-Origin': '*' }); }
+    // ---- test houževnatosti (Grit) ----
+    if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/grit-results' && req.method === 'GET') return send(res, 200, readJson(GRIT_F, []));
+    // ---- dotazník pracovní spokojenosti (JSS) ----
+    if (p === '/api/jss' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordJss(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, total: rec.total, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/jss-results' && req.method === 'GET') return send(res, 200, readJson(JSS_F, []));
+    // ---- test kognitivní zátěže (TW44) ----
+    if (p === '/api/tw44' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordTw44(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/tw44-results' && req.method === 'GET') return send(res, 200, readJson(TW44_F, []));
+
+    // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
+    if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null }); }
+    // ---- SSO do nabídkového kalkulátoru: přihlášený zaměstnanec → redirect s krátkodobým tokenem ----
+    if (p === '/sso/nabidky') {
+      const e = empSession(req);
+      if (!e) { res.writeHead(302, { 'Location': '/#muj' }); return res.end(); }
+      const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 });
+      res.writeHead(302, { 'Location': NABIDKY_URL + '/?sso=' + encodeURIComponent(tok) });
+      return res.end();
+    }
+    if (p === '/auth/dev') {
+      if (!devAllowed(req)) return send(res, 403, '<h1>Demo přihlášení není dostupné.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      const sess = empSign({ email: 'demo@elkoplast.cz', name: 'Demo Zaměstnanec' });
+      res.writeHead(302, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400', 'Location': '/#muj' });
+      return res.end();
+    }
+    if (p === '/api/my' && req.method === 'GET') { const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email) }); }
+
+    // ---- knihovna: správa (admin) ----
+    if (p === '/api/library' && req.method === 'GET') return send(res, 200, readLibrary());
+    if (p === '/api/library' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(LIB_F, { docs: Array.isArray(b.docs) ? b.docs : [], folders: Array.isArray(b.folders) ? b.folders : [] }); return send(res, 200, { ok: true }); }
+    // ---- knihovna: čtení a potvrzení zaměstnancem (session) ----
+    if (p === '/api/library-doc' && req.method === 'GET') {
+      const e = empSession(req); if (!e && !isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const d = (readLibrary().docs || []).find(x => x.id === u.query.id); if (!d) return send(res, 404, { error: 'Dokument nenalezen.' });
+      const v = Number(u.query.v) || curVersion(d);
+      const ver = (d.versions || []).find(x => Number(x.v) === v) || (d.versions || [])[(d.versions || []).length - 1];
+      if (!ver) return send(res, 404, { error: 'Verze nenalezena.' });
+      const email = e ? e.email : '';
+      return send(res, 200, { id: d.id, title: d.title, kind: d.kind || 'dokument', v: ver.v, note: ver.note || '', html: ver.html || '', requireAck: d.requireAck !== false, acked: email ? libAcked(d.id, ver.v, email) : false });
+    }
+    if (p === '/api/library-ack' && req.method === 'POST') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req)); if (!b.docId || !b.v) return send(res, 400, { error: 'Chybí data.' });
+      recordLibAck({ docId: b.docId, v: Number(b.v), email: e.email, name: e.name }); return send(res, 200, { ok: true });
+    }
+    if (p === '/auth/google/login') {
+      if (!ssoEnabled()) return send(res, 503, '<h1>Přihlášení přes Google není nastavené.</h1><p>Doplňte GOOGLE_CLIENT_ID a GOOGLE_CLIENT_SECRET.</p>', { 'Content-Type': 'text/html; charset=utf-8' });
+      const state = crypto.randomBytes(16).toString('hex');
+      const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
+      const params = new URLSearchParams({ client_id: GOOGLE.clientId, redirect_uri: baseUrl(req) + '/auth/google/callback', response_type: 'code', scope: 'openid email profile', state, access_type: 'online', prompt: 'select_account' });
+      if (GOOGLE.hd) params.set('hd', GOOGLE.hd);
+      res.writeHead(302, { 'Set-Cookie': 'sm_oauth=' + state + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=600' + secure, 'Location': 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString() });
+      return res.end();
+    }
+    if (p === '/auth/google/callback') {
+      if (u.query.error) return send(res, 400, '<h1>Přihlášení zrušeno.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      const want = cookieVal(req, 'sm_oauth');
+      if (!want || want !== u.query.state) return send(res, 400, '<h1>Neplatný stav přihlášení.</h1><p>Zkuste to prosím znovu.</p>', { 'Content-Type': 'text/html; charset=utf-8' });
+      try {
+        const tok = await httpsPostForm('oauth2.googleapis.com', '/token', { code: u.query.code || '', client_id: GOOGLE.clientId, client_secret: GOOGLE.clientSecret, redirect_uri: baseUrl(req) + '/auth/google/callback', grant_type: 'authorization_code' });
+        if (!tok.id_token) throw new Error('Google nevrátil id_token.');
+        const pl = JSON.parse(b64urlDecode(tok.id_token.split('.')[1]));
+        // Token přišel back-channel přímo od Google přes TLS → ověřujeme nároky (claims).
+        if (pl.aud !== GOOGLE.clientId) throw new Error('Neplatné publikum tokenu.');
+        if (['accounts.google.com', 'https://accounts.google.com'].indexOf(pl.iss) < 0) throw new Error('Neplatný vydavatel tokenu.');
+        if (pl.exp && (Date.now() / 1000) > pl.exp) throw new Error('Token vypršel.');
+        if (pl.email_verified === false) throw new Error('E-mail účtu není ověřený.');
+        if (GOOGLE.hd && pl.hd !== GOOGLE.hd) throw new Error('Účet není z povolené firemní domény (' + GOOGLE.hd + ').');
+        const email = (pl.email || '').toLowerCase();
+        if (!email) throw new Error('Token neobsahuje e-mail.');
+        const emp = ensureEmployee(email, pl.name || email);
+        const sess = empSign({ email: emp.email, name: emp.name });
+        const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
+        res.writeHead(302, { 'Set-Cookie': ['sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure, 'sm_oauth=; Path=/; Max-Age=0'], 'Location': '/#muj' });
+        return res.end();
+      } catch (e) { return send(res, 400, '<h1>Přihlášení selhalo</h1><p>' + esc(e.message) + '</p><p><a href="/#muj">Zpět</a></p>', { 'Content-Type': 'text/html; charset=utf-8' }); }
+    }
+    if (p === '/auth/logout') { res.writeHead(302, { 'Set-Cookie': 'sm_emp=; Path=/; Max-Age=0', 'Location': '/#muj' }); return res.end(); }
+
+    // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----
+    if (p === '/smi-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('eshop') >= 0) || isAuthed(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k SMI aplikaci nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!fs.existsSync(SMI_APP_FILE)) return send(res, 404, '<h1>Chybí SMI_aplikace.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(SMI_APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- Aplikace modulu Kalkulace-lisy: za přihlášením, přístup řídí správce ----
+    if (p === '/kalkulace-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('kalkulace') >= 0) || isAuthed(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup ke Kalkulaci-lisy nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (KALK_APP_URL) { res.writeHead(302, { 'Location': KALK_APP_URL }); return res.end(); }
+      if (fs.existsSync(KALK_APP_FILE)) return send(res, 200, fs.readFileSync(KALK_APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
+      // aplikace zatím nenapojena – přátelský placeholder
+      const ph = '<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<title>Kalkulace-lisy</title><style>body{margin:0;font-family:system-ui,sans-serif;background:#eef1ec;color:#0f1512;display:grid;place-items:center;min-height:100vh}'
+        + '.c{max-width:520px;text-align:center;background:#fff;border:1px solid #e3e7e0;border-radius:16px;padding:34px 30px;box-shadow:0 10px 30px rgba(15,21,18,.07)}'
+        + 'h1{font-size:20px;margin:0 0 8px}p{color:#5b635c;margin:0 0 6px;line-height:1.55}code{background:#eef1ec;padding:2px 6px;border-radius:6px;font-size:13px}</style></head>'
+        + '<body><div class="c"><h1>🧮 Kalkulace-lisy</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
+        + '<p style="margin-top:12px;font-size:13px">Pro napojení vlož soubor <code>kalkulace-lisy.html</code> do projektu, nebo nastav proměnnou <code>KALKULACE_APP_URL</code> na adresu existující aplikace.</p></div></body></html>';
+      return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- měsíční vyhodnocení (admin) ----
+    if (p === '/api/report/preview' && req.method === 'GET') {
+      const monthLabel = new Date().toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+      return send(res, 200, buildReportHtml(reportData(), monthLabel), { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+    if (p === '/api/report/send' && req.method === 'POST') {
+      if (!emailConfigured()) return send(res, 400, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení nebo nastav RESEND_API_KEY.' });
+      const b = JSON.parse(await readBody(req) || '{}');
+      const to = (b.to || reportRecipient()).trim();
+      try { await sendMonthlyReport(to); return send(res, 200, { ok: true, to: to }); }
+      catch (e) { return send(res, 500, { error: e.message }); }
+    }
+
     return send(res, 404, { error: 'Not found' });
   } catch (e) { return send(res, 500, { error: e.message }); }
 });
@@ -237,8 +624,13 @@ if (require.main === module) {
     console.log(' Data:    ' + DATA_DIR);
     console.log(' Heslo do správy: ' + (process.env.ADMIN_PASSWORD ? '(z proměnné ADMIN_PASSWORD)' : SEC.password));
     console.log(' Odesílání pošty: ' + (process.env.RESEND_API_KEY ? ('Resend (HTTPS), odesílatel: ' + (process.env.RESEND_FROM || 'onboarding@resend.dev')) : 'SMTP'));
+    console.log(' Intranet (Google SSO): ' + (ssoEnabled() ? ('zapnuto' + (GOOGLE.hd ? (', doména: ' + GOOGLE.hd) : '')) : 'vypnuto – doplňte GOOGLE_CLIENT_ID/SECRET'));
+    console.log(' Měsíční vyhodnocení: ' + (reportEnabled() ? ((emailConfigured() ? 'aktivní' : 'čeká na nastavení pošty') + ', příjemce: ' + reportRecipient() + ', den v měsíci: ' + reportDay()) : 'vypnuto'));
     console.log('====================================================');
     if (!CFG.host) console.log(' i Poštu nastavíte v aplikaci: záložka Nastavení.');
+    // měsíční vyhodnocení – kontrola při startu a pak periodicky (každých 6 h)
+    maybeSendMonthlyReport();
+    setInterval(maybeSendMonthlyReport, 6 * 3600 * 1000);
   });
 }
 module.exports = { smtpSend, loadConfig, getState };
