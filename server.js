@@ -85,7 +85,8 @@ function empVerify(str) { if (!str) return null; const i = str.lastIndexOf('.');
 function empSession(req) { return empVerify(cookieVal(req, 'sm_emp')); }
 /* ---------- SSO do externích aplikací (nabídkový kalkulátor) ---------- */
 // Token = b64url(JSON{email,name,exp}) + "." + HMAC-SHA256("sso:"+data, SEC.secret)[0..32]. Krátká platnost.
-function ssoSign(payload) { const data = b64url(JSON.stringify(payload)); const sig = crypto.createHmac('sha256', SEC.secret).update('sso:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
+const SSO_SHARED_SECRET = process.env.SSO_SHARED_SECRET || SEC.secret; // nastav stejně jako INTRANET_SSO_SECRET v nabídkové app
+function ssoSign(payload) { const data = b64url(JSON.stringify(payload)); const sig = crypto.createHmac('sha256', SSO_SHARED_SECRET).update('sso:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
 const NABIDKY_URL = process.env.NABIDKY_URL || 'https://lisy-production.up.railway.app';
 // HTTPS POST application/x-www-form-urlencoded → JSON (výměna kódu za token u Google)
 function httpsPostForm(hostname, pathName, form) {
