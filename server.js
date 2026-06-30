@@ -77,23 +77,42 @@ function isAuthed(req) { const c = req.headers.cookie || ''; const m = c.match(/
    každá stránka i API vrací přihlašovací obrazovku / 401. Cookie sm_gate (HMAC). */
 const SITE_PASSWORD = (process.env.SITE_PASSWORD || '').trim();
 function gateToken() { return crypto.createHmac('sha256', SEC.secret).update('gate-v1:' + SITE_PASSWORD).digest('hex'); }
-function gatePassed(req) { return !SITE_PASSWORD || (req.headers.cookie || '').includes('sm_gate=' + gateToken()); }
-const GATE_PAGE = '<!doctype html><html lang="cs"><head><meta charset="utf-8">'
-  + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Intranet ELKOPLAST CZ — přihlášení</title>'
-  + '<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;display:grid;place-items:center;'
-  + 'background:radial-gradient(900px 480px at 100% -8%,#e6f6ec,transparent 62%),#eef1ec;color:#0f1512}'
-  + '.card{width:min(92vw,380px);background:#fff;border:1px solid #e3e7e0;border-radius:16px;box-shadow:0 10px 30px rgba(15,21,18,.08);padding:30px 28px;text-align:center}'
-  + '.logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(150deg,#ffd21a,#ffc400);display:grid;place-items:center;margin:0 auto 14px;font-size:24px;color:#11271c;font-weight:800}'
-  + 'h1{font-size:18px;margin:0 0 4px}p{color:#5b635c;font-size:13px;margin:0 0 18px}'
-  + 'input{width:100%;padding:12px 14px;border:1px solid #cdd3ca;border-radius:10px;font-size:15px;margin-bottom:10px;font-family:inherit}'
-  + 'input:focus{outline:none;border-color:#12a350}button{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#15ab57,#0a6b34);color:#fff;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit}'
-  + '.err{color:#c23636;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>'
-  + '<form class="card" onsubmit="return go(event)"><div class="logo">✓</div><h1>Intranet ELKOPLAST CZ</h1>'
-  + '<p>Zadejte přístupové heslo</p><input id="p" type="password" placeholder="Heslo" autofocus autocomplete="current-password">'
-  + '<button type="submit">Vstoupit</button><div class="err" id="e"></div></form>'
-  + '<script>async function go(ev){ev.preventDefault();var e=document.getElementById("e");e.textContent="";'
-  + 'try{var r=await fetch("/gate-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:document.getElementById("p").value})});'
-  + 'if(r.ok){location.reload();}else{e.textContent="Nesprávné heslo.";}}catch(x){e.textContent="Chyba spojení.";}return false;}</script></body></html>';
+// Závora je aktivní, pokud je k dispozici aspoň jeden způsob přihlášení (Google SSO nebo sdílené heslo).
+function gateActive() { return ssoEnabled() || !!SITE_PASSWORD; }
+function gatePassed(req) {
+  if (!gateActive()) return true;                                                    // žádné přihlášení nenastaveno → web otevřený (jako dřív)
+  if (empSession(req)) return true;                                                   // přihlášený zaměstnanec přes Google
+  if (isAuthed(req)) return true;                                                     // přihlášený admin
+  if (SITE_PASSWORD && (req.headers.cookie || '').includes('sm_gate=' + gateToken())) return true; // sdílené heslo
+  return false;
+}
+function gatePage() {
+  const google = ssoEnabled()
+    ? '<a class="gbtn" href="/auth/google/login"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M45 24c0-1.5-.1-3-.4-4.4H24v8.4h11.8c-.5 2.8-2 5.1-4.4 6.7v5.5h7.1C42.7 36.5 45 30.8 45 24z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.3l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.3c-.4-1.3-.7-2.7-.7-4.3s.3-3 .7-4.3v-5.7H4.5C3 17.1 2.2 20.4 2.2 24s.8 6.9 2.3 10l7.3-5.7z"/><path fill="#EA4335" d="M24 10.7c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.1 29.9 2 24 2 15.4 2 8.1 6.9 4.5 14l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg> Přihlásit se přes Google</a>'
+    : '';
+  const sep = (ssoEnabled() && SITE_PASSWORD) ? '<div class="sep">nebo</div>' : '';
+  const pass = SITE_PASSWORD
+    ? '<form onsubmit="return go(event)"><input id="p" type="password" placeholder="Přístupové heslo" autocomplete="current-password"><button type="submit">Vstoupit</button><div class="err" id="e"></div></form>'
+    : '';
+  const hint = ssoEnabled() ? 'Přihlaste se firemním účtem ELKOPLAST.' : 'Zadejte přístupové heslo.';
+  return '<!doctype html><html lang="cs"><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Intranet ELKOPLAST CZ — přihlášení</title>'
+    + '<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;display:grid;place-items:center;'
+    + 'background:radial-gradient(900px 480px at 100% -8%,#e6f6ec,transparent 62%),#eef1ec;color:#0f1512}'
+    + '.card{width:min(92vw,380px);background:#fff;border:1px solid #e3e7e0;border-radius:16px;box-shadow:0 10px 30px rgba(15,21,18,.08);padding:30px 28px;text-align:center}'
+    + '.logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(150deg,#ffd21a,#ffc400);display:grid;place-items:center;margin:0 auto 14px;font-size:24px;color:#11271c;font-weight:800}'
+    + 'h1{font-size:18px;margin:0 0 4px}p{color:#5b635c;font-size:13px;margin:0 0 18px}'
+    + '.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px;border:1px solid #cdd3ca;border-radius:10px;background:#fff;color:#1c1d1a;font-weight:600;font-size:15px;text-decoration:none;margin-bottom:6px}'
+    + '.gbtn:hover{border-color:#12a350;background:#f7faf8}.sep{color:#9aa29a;font-size:12px;margin:12px 0;text-transform:uppercase;letter-spacing:.05em}'
+    + 'input{width:100%;padding:12px 14px;border:1px solid #cdd3ca;border-radius:10px;font-size:15px;margin-bottom:10px;font-family:inherit}'
+    + 'input:focus{outline:none;border-color:#12a350}button{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#15ab57,#0a6b34);color:#fff;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit}'
+    + '.err{color:#c23636;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>'
+    + '<div class="card"><div class="logo">✓</div><h1>Intranet ELKOPLAST CZ</h1><p>' + hint + '</p>'
+    + google + sep + pass + '</div>'
+    + '<script>async function go(ev){ev.preventDefault();var e=document.getElementById("e");e.textContent="";'
+    + 'try{var r=await fetch("/gate-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:document.getElementById("p").value})});'
+    + 'if(r.ok){location.reload();}else{e.textContent="Nesprávné heslo.";}}catch(x){e.textContent="Chyba spojení.";}return false;}</script></body></html>';
+}
 
 /* ---------- SSO zaměstnanců (Google OIDC, bez závislostí) ---------- */
 const GOOGLE = { clientId: process.env.GOOGLE_CLIENT_ID || '', clientSecret: process.env.GOOGLE_CLIENT_SECRET || '', hd: (process.env.ALLOWED_HD || '').trim() };
@@ -462,8 +481,9 @@ const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
 
-  // sdílená závora celého webu (aktivní jen při nastaveném SITE_PASSWORD)
+  // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
   if (!gatePassed(req)) {
+    // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
       if (SITE_PASSWORD && (b.password || '') === SITE_PASSWORD) {
@@ -472,9 +492,14 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 401, { error: 'Nesprávné heslo.' });
     }
-    if (req.method === 'GET' && (req.headers.accept || '').indexOf('text/html') >= 0)
-      return send(res, 200, GATE_PAGE, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    return send(res, 401, { error: 'Vyžadováno přihlášení.' });
+    // Google SSO přihlašovací tok propustíme (jinak by se nešlo přihlásit)
+    const authFlow = (p === '/auth/google/login' || p === '/auth/google/callback' || p === '/auth/logout' || p === '/auth/dev');
+    if (!authFlow) {
+      if (req.method === 'GET' && (req.headers.accept || '').indexOf('text/html') >= 0)
+        return send(res, 200, gatePage(), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return send(res, 401, { error: 'Vyžadováno přihlášení.' });
+    }
+    // authFlow → propadne do běžného routingu níže
   }
 
   // chráněné cesty (správa)
