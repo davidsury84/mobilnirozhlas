@@ -2144,6 +2144,26 @@ async function publishToServer(id){
   catch(e){ alert("Publikace selhala: "+e.message+"\n\nBěží server? Spusť soubor Spustit a aplikaci otevři přes http://localhost:8080."); }
 }
 
+async function previewBulk(id){
+  const S=sendableOf(id); if(!S) return; const aud=sendAudience(S);
+  if(!aud.length){ alert("Žádní příjemci — uprav výběr oddělení/tagů nebo přidej zaměstnance."); return; }
+  const out=document.getElementById("sendResults"); if(out) out.innerHTML='<p class="muted">Připravuji náhled…</p>';
+  if(S.isSurvey) await loadInvites(id, aud);
+  const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
+  const sample=aud[0], link=S.linkFor(sample.email);
+  let pv={subject:subject, html:'', mailReady:true};
+  if(!DEMO){ try{ const r=await fetch(apiBase()+"/api/send-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject,body,name:sample.name,link,dirTitle:S.title})}); const j=await r.json(); if(j&&!j.error) pv=j; }catch(e){} }
+  if(!out) return;
+  out.innerHTML='<div class="card pad" style="margin-top:4px">'
+    +'<div class="spread" style="margin-bottom:8px"><b>Náhled e-mailu</b><span class="muted" style="font-size:12px">vzorový příjemce: '+esc(sample.name||sample.email)+'</span></div>'
+    +(pv.mailReady===false?'<div class="hint" style="margin-bottom:10px;background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><b>Pošta není nastavená</b> — vyplň ji v záložce Nastavení, jinak odeslání selže.</div>':'')
+    +'<div style="font-size:13px;margin-bottom:8px"><b>Předmět:</b> '+esc(pv.subject||subject)+'</div>'
+    +'<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden"><iframe id="bulkPrev" style="width:100%;height:42vh;border:0;background:#fff" title="Náhled e-mailu"></iframe></div>'
+    +'<div class="inline-actions" style="margin-top:12px"><button class="btn" onclick="sendBulk(\''+id+'\')">✉ Odeslat všem ('+aud.length+')</button>'
+    +'<button class="btn ghost" onclick="document.getElementById(\'sendResults\').innerHTML=\'\'">Zavřít náhled</button></div>'
+    +'<div class="muted" style="font-size:12px;margin-top:8px">Každý příjemce dostane e-mail s vlastním jménem a osobním odkazem.</div></div>';
+  const ifr=document.getElementById("bulkPrev"); if(ifr) ifr.srcdoc = pv.html || '<p style="font-family:sans-serif;color:#777;padding:20px">Náhled se nepodařilo načíst.</p>';
+}
 async function sendBulk(id){
   const S=sendableOf(id); if(!S) return; const aud=sendAudience(S);
   if(!aud.length){ alert("Žádní příjemci — uprav výběr oddělení/tagů nebo přidej zaměstnance."); return; }
@@ -2276,10 +2296,31 @@ async function saveMailConfig(){
     toast("Nastavení pošty uloženo"); loadMailConfig();
   }catch(e){ alert("Uložení selhalo: "+e.message); }
 }
+/* Generický náhledový modal e-mailu (předmět/příjemce nahoře + iframe + tlačítko Odeslat) */
+function previewModal(o){
+  document.getElementById("modalTitle").textContent=o.title||"Náhled e-mailu";
+  document.getElementById("modalBody").innerHTML=
+    '<div class="card pad" style="background:var(--green-soft);border-color:#cfe9d8;margin-bottom:14px">'+(o.subLines||[]).map(s=>'<div style="font-size:14px">'+s+'</div>').join('')+
+      (o.mailReady===false?'<div class="hint" style="margin-top:10px;background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><b>Pošta není nastavená</b> — vyplň ji v záložce Nastavení, jinak odeslání selže.</div>':'')+'</div>'+
+    '<div class="muted" style="font-size:12px;margin-bottom:6px">Takto e-mail uvidí příjemce:</div>'+
+    '<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden"><iframe id="pmPrev" style="width:100%;height:52vh;border:0;background:#eef1ec" title="Náhled e-mailu"></iframe></div>';
+  document.getElementById("modalFoot").innerHTML=
+    '<button class="btn ghost" onclick="closeModal()">Zavřít</button>'+
+    '<button class="btn" id="pmSend">'+(o.sendLabel||"Odeslat")+'</button>';
+  showModal();
+  const ifr=document.getElementById("pmPrev"); if(ifr) ifr.srcdoc=o.html||'<p style="font-family:sans-serif;color:#777;padding:20px">Náhled se nepodařilo načíst.</p>';
+  const btn=document.getElementById("pmSend"); if(btn) btn.onclick=async()=>{ closeModal(); if(o.onSend) await o.onSend(); };
+}
 async function sendTestMail(){
   if(DEMO){ alert("Ukázkový režim – e-maily se neodesílají. V ostré verzi sem zadáš adresu a ověříš odeslání."); return; }
   const to=prompt("Na jakou adresu poslat zkušební e-mail?", document.getElementById("cfUser").value.trim());
   if(!to) return;
+  const subj="Zkušební e-mail – Seznámení se směrnicemi", body="Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.";
+  let pv={html:'',mailReady:true};
+  try{ const r=await fetch(apiBase()+"/api/send-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:subj,body})}); pv=await r.json(); }catch(e){}
+  previewModal({ title:"Zkušební e-mail — náhled", subLines:['<b>Předmět:</b> '+esc(subj),'<b>Příjemce:</b> '+esc(to)], html:pv.html, mailReady:pv.mailReady, sendLabel:"✉ Odeslat zkušební e-mail", onSend:()=>doSendTest(to) });
+}
+async function doSendTest(to){
   toast("Odesílám zkušební e-mail…");
   try{
     const res=await fetch(apiBase()+"/api/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to})});
@@ -2360,6 +2401,12 @@ async function testProfile(id){
   const p=DB.profiles.find(x=>x.id===id); if(!p) return;
   const to=prompt("Na jakou adresu poslat zkušební e-mail z profilu „"+p.label+"\"?", p.fromEmail);
   if(!to) return;
+  const subj="Zkušební e-mail – Seznámení se směrnicemi", body="Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.";
+  let pv={html:'',mailReady:true};
+  try{ const r=await fetch(apiBase()+"/api/send-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:subj,body})}); pv=await r.json(); }catch(e){}
+  previewModal({ title:"Zkušební e-mail z profilu — náhled", subLines:['<b>Předmět:</b> '+esc(subj),'<b>Příjemce:</b> '+esc(to),'<b>Odesílatel:</b> '+esc(p.fromName?p.fromName+" <"+p.fromEmail+">":p.fromEmail)], html:pv.html, mailReady:pv.mailReady, sendLabel:"✉ Odeslat zkušební e-mail", onSend:()=>doTestProfile(p,to) });
+}
+async function doTestProfile(p,to){
   toast("Odesílám zkušební e-mail z profilu „"+p.label+"\"…");
   try{
     const res=await fetch(apiBase()+"/api/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to, fromEmail:p.fromEmail, fromName:p.fromName})});
@@ -2426,7 +2473,7 @@ function openSendModal(id){
         <textarea id="mBody" style="min-height:140px">${esc(defBody)}</textarea></label>
       <div class="muted" style="font-size:12px;margin-bottom:12px">Značky: <span class="mono">{jmeno}</span> (1. pád) · <span class="mono">{jmeno5}</span> (5. pád, oslovení – „Davide") · <span class="mono">{smernice}</span> · <span class="mono">{odkaz}</span></div>
       <div class="inline-actions">
-        <button class="btn" onclick="sendBulk('${id}')">Rozeslat všem e-mailem</button>
+        <button class="btn" onclick="previewBulk('${id}')">👁 Náhled a rozeslat</button>
         <button class="btn ghost" onclick="refreshSend('${id}')">${S.isSurvey?'Načíst výsledky ze serveru':'Načíst potvrzení ze serveru'}</button>
       </div>
       <div id="sendResults" style="margin-top:12px"></div>

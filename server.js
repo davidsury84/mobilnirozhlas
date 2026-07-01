@@ -644,6 +644,15 @@ const server = http.createServer(async (req, res) => {
       const m = intranetInviteMail(u.query.name || '', baseUrl(req));
       return send(res, 200, { subject: m.subject, html: m.html, mailReady: emailConfigured() });
     }
+    // náhled hromadného rozeslání (směrnice/průzkumy) i zkušebního e-mailu — jen pro správce
+    if (p === '/api/send-preview' && req.method === 'POST') {
+      if (!isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req));
+      const fn = ((b.name || '').split(' ')[0]) || b.name || '';
+      const link = b.link || '';
+      const vars = { jmeno: fn, jmeno5: vocCs(fn), smernice: b.dirTitle || '', odkaz: link };
+      return send(res, 200, { subject: renderTpl(b.subject || '', vars), html: toHtml(renderTpl(b.body || '', vars), link), mailReady: emailConfigured() });
+    }
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
     if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req) }); }
