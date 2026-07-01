@@ -1819,13 +1819,34 @@ function filterEmployees(){
   const c=document.getElementById('empCount'); if(c) c.textContent=shown+' / '+rows.length+' zaměstnanců';
 }
 /* ---------- Pozvánka do intranetu (uvítací e-mail) ---------- */
-function inviteOne(id){ const e=DB.employees.find(x=>x.id===id); if(!e) return; if(confirm('Poslat pozvánku do intranetu na '+e.email+'?')) inviteToIntranet([{email:e.email,name:e.name}]); }
+function inviteOne(id){ const e=DB.employees.find(x=>x.id===id); if(!e) return; openInvitePreview([{email:e.email,name:e.name}]); }
 function inviteVisible(){
   const list=[...document.querySelectorAll('#employeeTable tr[data-emp]')].filter(t=>t.style.display!=='none')
     .map(t=>DB.employees.find(e=>e.id===t.getAttribute('data-emp'))).filter(Boolean).map(e=>({email:e.email,name:e.name}));
   if(!list.length){ toast('Žádní zaměstnanci k pozvání.'); return; }
-  if(!confirm('Poslat uvítací pozvánku do intranetu '+list.length+' zaměstnancům?')) return;
-  inviteToIntranet(list);
+  openInvitePreview(list);
+}
+function plInvite(n){ return n===1?'pozvánku':(n>=2&&n<=4?'pozvánky':'pozvánek'); }
+async function openInvitePreview(list){
+  if(!list.length){ toast('Žádní příjemci.'); return; }
+  let html='', subject='Pozvánka do intranetu ELKOPLAST CZ', mailReady=true;
+  try{ const r=await fetch('/api/invite-preview?name='+encodeURIComponent(list[0].name||'')); const j=await r.json(); if(j){ html=j.html||''; subject=j.subject||subject; mailReady=j.mailReady!==false; } }catch(e){}
+  const names=list.map(x=>esc(x.name||x.email)).join(", ");
+  document.getElementById("modalTitle").textContent="Pozvánka do intranetu — náhled e-mailu";
+  document.getElementById("modalBody").innerHTML=
+    '<div class="card pad" style="background:var(--green-soft);border-color:#cfe9d8;margin-bottom:14px">'+
+      '<div style="font-size:14px"><b>Předmět:</b> '+esc(subject)+'</div>'+
+      '<div style="font-size:14px;margin-top:6px"><b>Příjemci ('+list.length+'):</b> <span class="muted">'+names+'</span></div>'+
+      (mailReady?'':'<div class="hint" style="margin-top:10px;background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><b>Pošta není nastavená</b> — nejdřív ji vyplň v záložce Nastavení, jinak odeslání selže.</div>')+
+    '</div>'+
+    '<div class="muted" style="font-size:12px;margin-bottom:6px">Takto e-mail uvidí příjemce:</div>'+
+    '<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden"><iframe id="invPrev" style="width:100%;height:52vh;border:0;background:#eef1ec" title="Náhled e-mailu"></iframe></div>';
+  document.getElementById("modalFoot").innerHTML=
+    '<button class="btn ghost" onclick="closeModal()">Zavřít</button>'+
+    '<button class="btn" id="invSendBtn">✉ Odeslat '+list.length+' '+plInvite(list.length)+'</button>';
+  showModal();
+  const ifr=document.getElementById("invPrev"); if(ifr) ifr.srcdoc = html || '<p style="font-family:sans-serif;color:#777;padding:20px">Náhled se nepodařilo načíst.</p>';
+  const btn=document.getElementById("invSendBtn"); if(btn) btn.onclick=async()=>{ closeModal(); await inviteToIntranet(list); };
 }
 async function inviteToIntranet(list){
   if(DEMO){ toast('Ukázkový režim – e-maily se neodesílají.'); return; }

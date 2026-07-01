@@ -638,6 +638,12 @@ const server = http.createServer(async (req, res) => {
       await Promise.all(Array.from({ length: useResend ? 1 : Math.min(3, recipients.length || 1) }, worker));
       return send(res, 200, { results });
     }
+    // náhled uvítacího e-mailu (pro zobrazení před odesláním) — jen pro správce
+    if (p === '/api/invite-preview' && req.method === 'GET') {
+      if (!isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const m = intranetInviteMail(u.query.name || '', baseUrl(req));
+      return send(res, 200, { subject: m.subject, html: m.html, mailReady: emailConfigured() });
+    }
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
     if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req) }); }
