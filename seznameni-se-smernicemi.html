@@ -1084,7 +1084,7 @@ function sendAudience(S){
   return aud;
 }
 function onSendTags(id){ SEND_TAGS=[...document.querySelectorAll(".stag:checked")].map(c=>c.value); const S=sendableOf(id); if(S&&S.isSurvey){ loadInvites(id,sendAudience(S)).then(()=>renderSendList(id)); } else renderSendList(id); }
-function onSendCands(id){ SEND_CAND=[...document.querySelectorAll(".scand:checked")].map(c=>c.value); renderSendList(id); }
+function onSendCands(id){ SEND_CAND=[...document.querySelectorAll(".scand:checked")].map(c=>c.value); const S=sendableOf(id); if(S&&S.isSurvey){ loadInvites(id,sendAudience(S)).then(()=>renderSendList(id)); } else renderSendList(id); }
 function toggleAllCands(id,on){ document.querySelectorAll(".scand").forEach(c=>c.checked=on); onSendCands(id); }
 function ackStats(dir){
   const aud = audienceOf(dir);
