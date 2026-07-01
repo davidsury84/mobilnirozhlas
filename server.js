@@ -627,7 +627,11 @@ const server = http.createServer(async (req, res) => {
       const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
       const params = new URLSearchParams({ client_id: GOOGLE.clientId, redirect_uri: baseUrl(req) + '/auth/google/callback', response_type: 'code', scope: 'openid email profile', state, access_type: 'online', prompt: 'select_account' });
       if (GOOGLE.hd) params.set('hd', GOOGLE.hd);
-      res.writeHead(302, { 'Set-Cookie': 'sm_oauth=' + state + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=600' + secure, 'Location': 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString() });
+      // Volitelný návrat po přihlášení — jen bezpečné interní cesty /sso/... (proti open-redirectu)
+      const nextPath = /^\/sso\/[a-z0-9-]+$/.test(u.query.next || '') ? u.query.next : '';
+      const cookies = ['sm_oauth=' + state + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=600' + secure];
+      if (nextPath) cookies.push('sm_next=' + encodeURIComponent(nextPath) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=600' + secure);
+      res.writeHead(302, { 'Set-Cookie': cookies, 'Location': 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString() });
       return res.end();
     }
     if (p === '/auth/google/callback') {
@@ -649,7 +653,9 @@ const server = http.createServer(async (req, res) => {
         const emp = ensureEmployee(email, pl.name || email);
         const sess = empSign({ email: emp.email, name: emp.name });
         const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
-        res.writeHead(302, { 'Set-Cookie': ['sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure, 'sm_oauth=; Path=/; Max-Age=0'], 'Location': '/#muj' });
+        const nx = cookieVal(req, 'sm_next');
+        const dest = /^\/sso\/[a-z0-9-]+$/.test(nx || '') ? nx : '/#muj';
+        res.writeHead(302, { 'Set-Cookie': ['sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure, 'sm_oauth=; Path=/; Max-Age=0', 'sm_next=; Path=/; Max-Age=0'], 'Location': dest });
         return res.end();
       } catch (e) { return send(res, 400, '<h1>Přihlášení selhalo</h1><p>' + esc(e.message) + '</p><p><a href="/#muj">Zpět</a></p>', { 'Content-Type': 'text/html; charset=utf-8' }); }
     }
