@@ -1411,14 +1411,17 @@ async function saveLibDoc(id){
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
 const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"]];
+const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 function renderAccess(){
   const box=document.getElementById("accessMatrix");
   if(!DB.employees.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nejprve přidej zaměstnance v záložce Zaměstnanci.</p></div>'; return; }
-  let h='<div class="matrix-wrap"><table class="matrix"><thead><tr><th class="who">Zaměstnanec</th>'+
+  let h='<div class="matrix-wrap"><table class="matrix"><thead><tr><th class="who">Zaměstnanec</th><th style="text-align:center;color:var(--green-2)">Admin</th>'+
     ACCESS_MODULES.map(m=>'<th style="text-align:center">'+m[1]+'</th>').join('')+'</tr></thead><tbody>';
   DB.employees.forEach(e=>{
     const mset=e.modules||[];
-    h+='<tr><td class="who">'+esc(e.name||e.email)+'<div class="muted" style="font-size:12px">'+esc(e.email||'')+'</div></td>'+
+    const isSuper=(e.email||'').toLowerCase()===SUPERADMIN_EMAIL;
+    const adminTd='<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+((isSuper||e.admin)?'checked':'')+(isSuper?' disabled title="Superadmin – nelze odebrat"':'')+' onchange="toggleAdmin(\''+e.id+'\',this.checked)"></td>';
+    h+='<tr><td class="who">'+esc(e.name||e.email)+'<div class="muted" style="font-size:12px">'+esc(e.email||'')+'</div></td>'+adminTd+
       ACCESS_MODULES.map(m=>'<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(mset.indexOf(m[0])>=0?'checked':'')+' onchange="toggleAccess(\''+e.id+'\',\''+m[0]+'\',this.checked)"></td>').join('')+'</tr>';
   });
   h+='</tbody></table></div>';
@@ -1429,6 +1432,12 @@ function toggleAccess(empId, key, on){
   e.modules=Array.isArray(e.modules)?e.modules:[];
   if(on){ if(e.modules.indexOf(key)<0) e.modules.push(key); }
   else { e.modules=e.modules.filter(k=>k!==key); }
+  save();
+}
+function toggleAdmin(empId, on){
+  const e=DB.employees.find(x=>x.id===empId); if(!e) return;
+  if((e.email||'').toLowerCase()===SUPERADMIN_EMAIL){ renderAccess(); return; } // superadmin nelze měnit
+  e.admin=!!on;
   save();
 }
 

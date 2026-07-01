@@ -71,6 +71,12 @@ if (!SEC) { SEC = { secret: crypto.randomBytes(24).toString('hex'), password: pr
 if (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD !== SEC.password) { SEC.password = process.env.ADMIN_PASSWORD; writeJson(SECRET_F, SEC); }
 function token() { return crypto.createHmac('sha256', SEC.secret).update('admin-v1').digest('hex'); }
 function isAuthed(req) { const c = req.headers.cookie || ''; const m = c.match(/sm_auth=([a-f0-9]+)/); return m && m[1] === token(); }
+/* ---------- role admin (Google) + superadmin ---------- */
+const SUPERADMIN = (process.env.SUPERADMIN || 'david.sury@elkoplast.cz').toLowerCase();
+function isAdminEmp(email) { email = (email || '').toLowerCase(); if (!email) return false; if (email === SUPERADMIN) return true; const s = readJson(STATE_F, { employees: [] }); const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email); return !!(e && e.admin); }
+function isSuperadmin(req) { const e = empSession(req); return !!(e && (e.email || '').toLowerCase() === SUPERADMIN); }
+// Admin = heslo (záloha) NEBO přihlášený zaměstnanec se superadmin/admin rolí
+function isAdmin(req) { if (isAuthed(req)) return true; const e = empSession(req); return !!(e && isAdminEmp(e.email)); }
 
 /* ---------- Sdílená „závora" celého webu (aby intranet nebyl veřejný) ----------
    Aktivní jen když je nastavené SITE_PASSWORD. Dokud návštěvník nezadá toto heslo,
@@ -548,7 +554,7 @@ const server = http.createServer(async (req, res) => {
 
   // chráněné cesty (správa)
   const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results'];
-  if (PROTECTED.indexOf(p) >= 0 && !isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+  if (PROTECTED.indexOf(p) >= 0 && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
     if (p === '/' || p === '/index.html') {
@@ -611,7 +617,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/tw44-results' && req.method === 'GET') return send(res, 200, readJson(TW44_F, []));
     // podepsané pozvánkové odkazy (hash) pro dávku příjemců — jen pro správce
     if (p === '/api/invite-links' && req.method === 'POST') {
-      if (!isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const b = JSON.parse(await readBody(req));
       const kind = (b.kind || '').replace(/[^a-z0-9]/gi, '');
       const base = baseUrl(req); const links = {};
@@ -620,7 +626,7 @@ const server = http.createServer(async (req, res) => {
     }
     // pozvánka do intranetu (uvítací e-mail s návodem na přihlášení) — jen pro správce
     if (p === '/api/invite-intranet' && req.method === 'POST') {
-      if (!isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       if (!emailConfigured()) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
       const b = JSON.parse(await readBody(req));
       const recipients = (b.recipients || []).filter(r => r.email);
@@ -634,7 +640,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
-    if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null }); }
+    if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req) }); }
+    // /admin — vstup do správy: admin (heslo/Google) → aplikace, jinak přihlášení
+    if (p === '/admin') {
+      if (isAdmin(req)) { res.writeHead(302, { 'Location': '/' }); return res.end(); }
+      if (empSession(req)) return send(res, 403, '<h1>Nemáte oprávnění správce.</h1><p>Požádejte administrátora o roli admin.</p><p><a href="/">Zpět do intranetu</a></p>', { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(302, { 'Location': '/#muj' }); return res.end();
+    }
     // ---- SSO do nabídkového kalkulátoru: přihlášený zaměstnanec → redirect s krátkodobým tokenem ----
     if (p === '/sso/nabidky') {
       const e = empSession(req);
@@ -656,7 +668,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/library' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(LIB_F, { docs: Array.isArray(b.docs) ? b.docs : [], folders: Array.isArray(b.folders) ? b.folders : [] }); return send(res, 200, { ok: true }); }
     // ---- knihovna: čtení a potvrzení zaměstnancem (session) ----
     if (p === '/api/library-doc' && req.method === 'GET') {
-      const e = empSession(req); if (!e && !isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const e = empSession(req); if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const d = (readLibrary().docs || []).find(x => x.id === u.query.id); if (!d) return send(res, 404, { error: 'Dokument nenalezen.' });
       const v = Number(u.query.v) || curVersion(d);
       const ver = (d.versions || []).find(x => Number(x.v) === v) || (d.versions || [])[(d.versions || []).length - 1];
@@ -712,7 +724,7 @@ const server = http.createServer(async (req, res) => {
     // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----
     if (p === '/smi-app') {
       const e = empSession(req);
-      const allowed = (e && employeeModules(e.email).indexOf('eshop') >= 0) || isAuthed(req);
+      const allowed = (e && employeeModules(e.email).indexOf('eshop') >= 0) || isAdmin(req);
       if (!allowed) return send(res, 403, '<h1>Přístup k SMI aplikaci nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(SMI_APP_FILE)) return send(res, 404, '<h1>Chybí SMI_aplikace.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(SMI_APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
@@ -721,7 +733,7 @@ const server = http.createServer(async (req, res) => {
     // ---- Aplikace modulu Kalkulace-lisy: za přihlášením, přístup řídí správce ----
     if (p === '/kalkulace-app') {
       const e = empSession(req);
-      const allowed = (e && employeeModules(e.email).indexOf('kalkulace') >= 0) || isAuthed(req);
+      const allowed = (e && employeeModules(e.email).indexOf('kalkulace') >= 0) || isAdmin(req);
       if (!allowed) return send(res, 403, '<h1>Přístup ke Kalkulaci-lisy nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (KALK_APP_URL) {
         // Přihlášený zaměstnanec → přidej krátkodobý SSO token, aby se kalkulačka v iframu přihlásila SAMA
