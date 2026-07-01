@@ -675,7 +675,13 @@ const server = http.createServer(async (req, res) => {
       const e = empSession(req);
       const allowed = (e && employeeModules(e.email).indexOf('kalkulace') >= 0) || isAuthed(req);
       if (!allowed) return send(res, 403, '<h1>Přístup ke Kalkulaci-lisy nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      if (KALK_APP_URL) { res.writeHead(302, { 'Location': KALK_APP_URL }); return res.end(); }
+      if (KALK_APP_URL) {
+        // Přihlášený zaměstnanec → přidej krátkodobý SSO token, aby se kalkulačka v iframu přihlásila SAMA
+        // (Google login v iframu Google odmítá; tímhle se mu vyhneme úplně).
+        let target = KALK_APP_URL;
+        if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += (KALK_APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+        res.writeHead(302, { 'Location': target }); return res.end();
+      }
       if (fs.existsSync(KALK_APP_FILE)) return send(res, 200, fs.readFileSync(KALK_APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
       // aplikace zatím nenapojena – přátelský placeholder
       const ph = '<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
