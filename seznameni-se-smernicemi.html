@@ -1830,7 +1830,8 @@ function plInvite(n){ return n===1?'pozvánku':(n>=2&&n<=4?'pozvánky':'pozváne
 async function openInvitePreview(list){
   if(!list.length){ toast('Žádní příjemci.'); return; }
   let html='', subject='Pozvánka do intranetu ELKOPLAST CZ', mailReady=true;
-  try{ const r=await fetch('/api/invite-preview?name='+encodeURIComponent(list[0].name||'')); const j=await r.json(); if(j){ html=j.html||''; subject=j.subject||subject; mailReady=j.mailReady!==false; } }catch(e){}
+  try{ const r=await fetch('/api/invite-preview?name='+encodeURIComponent(list[0].name||'')); const j=await r.json(); if(j&&!j.error){ html=j.html||''; subject=j.subject||subject; mailReady=j.mailReady!==false; } }catch(e){}
+  if(!html) html=clientInviteHtml(list[0].name, location.origin);
   const names=list.map(x=>esc(x.name||x.email)).join(", ");
   document.getElementById("modalTitle").textContent="Pozvánka do intranetu — náhled e-mailu";
   document.getElementById("modalBody").innerHTML=
@@ -2144,6 +2145,31 @@ async function publishToServer(id){
   catch(e){ alert("Publikace selhala: "+e.message+"\n\nBěží server? Spusť soubor Spustit a aplikaci otevři přes http://localhost:8080."); }
 }
 
+/* Klientský fallback náhledu e-mailu (když server /api/send-preview neodpoví) */
+function clientEmailHtml(subject, body, name, title, link){
+  const fn=(name||"").split(" ")[0]||name||"";
+  const sub=v=>String(v||"").replace(/{jmeno5}/g,fn).replace(/{jmeno}/g,fn).replace(/{smernice}/g,title||"").replace(/{odkaz}/g,link||"");
+  let h=esc(sub(body)).replace(/\n/g,"<br>");
+  if(link){ const s=esc(link); h=h.split(s).join('<a href="'+s+'" style="color:#1f5d3f">'+s+'</a>')+'<div style="margin-top:18px"><a href="'+s+'" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold">Otevřít a potvrdit</a></div>'; }
+  return { subject:sub(subject), html:'<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55;padding:20px">'+h+'</div>' };
+}
+function clientInviteHtml(name, url){
+  const fn=(name||"").split(" ")[0]||name||""; const hi=fn?("Dobrý den "+esc(fn)+","):"Dobrý den,";
+  return '<div style="background:#eef1ec;padding:20px;font-family:Segoe UI,Arial,sans-serif">'
+    +'<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.08)">'
+    +'<div style="background:linear-gradient(135deg,#15ab57,#0a6b34);border-bottom:3px solid #ffd21a;padding:22px 26px;color:#fff;font-size:19px;font-weight:700">✓ Intranet ELKOPLAST CZ</div>'
+    +'<div style="padding:24px 26px;color:#1c1d1a;font-size:15px;line-height:1.6">'
+    +'<p style="margin:0 0 12px"><b>'+hi+'</b></p>'
+    +'<p style="margin:0 0 16px;color:#3a423a">byli jste pozváni do firemního <b>intranetu ELKOPLAST CZ</b> — jedno místo pro všechno pracovní.</p>'
+    +'<div style="font-size:14px;line-height:2">📄 Směrnice k seznámení<br>📚 Knihovna dokumentů<br>📊 Dotazníky a testy<br>🧮 Firemní moduly</div>'
+    +'<div style="background:#e6f6ec;border:1px solid #cfe9d8;border-radius:10px;padding:14px 16px;margin:16px 0;font-size:14px;color:#0a6b34"><b>Přihlášení bez hesla — přes firemní Google účet (@elkoplast.cz)</b></div>'
+    +'<a href="'+esc(url)+'" style="display:inline-block;background:linear-gradient(135deg,#15ab57,#0a6b34);color:#fff;padding:12px 26px;border-radius:10px;font-weight:700;text-decoration:none">Otevřít intranet →</a>'
+    +'</div><div style="background:#11271c;color:#9fd9b6;padding:14px 26px;font-size:12px">ELKOPLAST CZ · interní systém</div></div></div>';
+}
+async function fetchEmailPreview(payload){
+  try{ const r=await fetch(apiBase()+"/api/send-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); const j=await r.json(); if(j&&!j.error&&j.html) return j; }catch(e){}
+  const pv=clientEmailHtml(payload.subject,payload.body,payload.name,payload.dirTitle,payload.link); pv.fallback=true; return pv;
+}
 async function previewBulk(id){
   const S=sendableOf(id); if(!S) return; const aud=sendAudience(S);
   if(!aud.length){ alert("Žádní příjemci — uprav výběr oddělení/tagů nebo přidej zaměstnance."); return; }
@@ -2151,8 +2177,7 @@ async function previewBulk(id){
   if(S.isSurvey) await loadInvites(id, aud);
   const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
   const sample=aud[0], link=S.linkFor(sample.email);
-  let pv={subject:subject, html:'', mailReady:true};
-  if(!DEMO){ try{ const r=await fetch(apiBase()+"/api/send-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject,body,name:sample.name,link,dirTitle:S.title})}); const j=await r.json(); if(j&&!j.error) pv=j; }catch(e){} }
+  const pv=await fetchEmailPreview({subject,body,name:sample.name,link,dirTitle:S.title});
   if(!out) return;
   out.innerHTML='<div class="card pad" style="margin-top:4px">'
     +'<div class="spread" style="margin-bottom:8px"><b>Náhled e-mailu</b><span class="muted" style="font-size:12px">vzorový příjemce: '+esc(sample.name||sample.email)+'</span></div>'
@@ -2316,8 +2341,7 @@ async function sendTestMail(){
   const to=prompt("Na jakou adresu poslat zkušební e-mail?", document.getElementById("cfUser").value.trim());
   if(!to) return;
   const subj="Zkušební e-mail – Seznámení se směrnicemi", body="Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.";
-  let pv={html:'',mailReady:true};
-  try{ const r=await fetch(apiBase()+"/api/send-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:subj,body})}); pv=await r.json(); }catch(e){}
+  const pv=await fetchEmailPreview({subject:subj,body});
   previewModal({ title:"Zkušební e-mail — náhled", subLines:['<b>Předmět:</b> '+esc(subj),'<b>Příjemce:</b> '+esc(to)], html:pv.html, mailReady:pv.mailReady, sendLabel:"✉ Odeslat zkušební e-mail", onSend:()=>doSendTest(to) });
 }
 async function doSendTest(to){
@@ -2402,8 +2426,7 @@ async function testProfile(id){
   const to=prompt("Na jakou adresu poslat zkušební e-mail z profilu „"+p.label+"\"?", p.fromEmail);
   if(!to) return;
   const subj="Zkušební e-mail – Seznámení se směrnicemi", body="Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.";
-  let pv={html:'',mailReady:true};
-  try{ const r=await fetch(apiBase()+"/api/send-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject:subj,body})}); pv=await r.json(); }catch(e){}
+  const pv=await fetchEmailPreview({subject:subj,body});
   previewModal({ title:"Zkušební e-mail z profilu — náhled", subLines:['<b>Předmět:</b> '+esc(subj),'<b>Příjemce:</b> '+esc(to),'<b>Odesílatel:</b> '+esc(p.fromName?p.fromName+" <"+p.fromEmail+">":p.fromEmail)], html:pv.html, mailReady:pv.mailReady, sendLabel:"✉ Odeslat zkušební e-mail", onSend:()=>doTestProfile(p,to) });
 }
 async function doTestProfile(p,to){
