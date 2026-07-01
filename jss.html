@@ -160,7 +160,8 @@ const FACETS=[
 ];
 const Q=TXT.map((t,i)=>({t:t,rev:REV.indexOf(i+1)>=0}));
 const _who=(location.hash.match(/kdo=([^&]+)/i)||[])[1];
-const RESP={ email:_who?decodeURIComponent(_who):'', name:'', dept:'' };
+const _tok=(location.search.match(/[?&]i=([^&]+)/i)||[])[1];
+const RESP={ email:_who?decodeURIComponent(_who):'', name:'', dept:'', token:_tok?decodeURIComponent(_tok):'' };
 const DEM={ delka:'', zarazeni:'' };
 function pickDem(key,val,el){ DEM[key]=val; const wrap=el.parentNode; wrap.querySelectorAll('.choice').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); document.getElementById('err').textContent=''; if(PAGE===0) maybeAdvance(); }
 const answers=new Array(36).fill(0);
@@ -216,9 +217,9 @@ async function evaluate(){
   if(answers.filter(a=>a>0).length<36){ const i=answers.findIndex(a=>!a); if(i>=0){ PAGE=Math.floor(i/PER); renderQuiz(); } document.getElementById('err').textContent='Zodpovězte prosím všech 36 výroků (chybí výrok '+(i+1)+').'; return; }
   const dem={ pozice:document.getElementById('dPozice').value.trim(), delka:DEM.delka, stredisko:document.getElementById('dStredisko').value.trim(), zarazeni:DEM.zarazeni };
   const r=compute();
-  if(RESP.email){
+  if(RESP.token||RESP.email){
     const btn=document.getElementById('evalBtn'); if(btn){btn.disabled=true;btn.textContent='Ukládám…';}
-    try{ const res=await fetch('/api/jss',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({email:RESP.email,total:r.total,pct:r.pct,subs:r.subs},dem))}); const j=await res.json(); if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; } }catch(e){}
+    try{ const res=await fetch('/api/jss'+(RESP.token?('?i='+encodeURIComponent(RESP.token)):''),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({email:RESP.email,total:r.total,pct:r.pct,subs:r.subs},dem))}); const j=await res.json(); if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; } }catch(e){}
     if(btn){btn.textContent='Vyhodnotit';}
   }
   const itemAvg=r.total/36;

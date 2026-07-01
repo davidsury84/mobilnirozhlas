@@ -165,7 +165,9 @@ let subTimer=null, wordTimer=null, tickTimer=null;
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function $(id){return document.getElementById(id);}
 const _who=(location.hash.match(/kdo=([^&]+)/i)||[])[1];
+const _tok=(location.search.match(/[?&]i=([^&]+)/i)||[])[1];
 if(_who) window.addEventListener('DOMContentLoaded',()=>{$('who').value=decodeURIComponent(_who);});
+if(_tok) window.addEventListener('DOMContentLoaded',()=>{const w=$('who'); if(w){ const lbl=w.closest('label'); if(lbl) lbl.style.display='none'; }});
 function pickVar(v){VARIANT=v;[...document.querySelectorAll('.var')].forEach(e=>e.classList.toggle('sel',e.dataset.v===v));}
 
 /* ===================== MŘÍŽKA ===================== */
@@ -373,10 +375,10 @@ async function finish(){
   const idx=computeIndices();
   const email=$('who').value.trim();
   let savedName='';
-  if(email){
+  if(_tok||email){
     try{
       const payload={email, variant:VARIANT, subtests:STATS, attr:ATTRRES?{letter:ATTRRES.L,found:ATTRRES.found,total:ATTRRES.total,miss:ATTRRES.miss}:null, indices:idx};
-      const rr=await fetch('/api/tw44',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const rr=await fetch('/api/tw44'+(_tok?('?i='+encodeURIComponent(_tok)):''),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const j=await rr.json(); if(j&&j.ok) savedName=j.name||'';
     }catch(e){}
   }

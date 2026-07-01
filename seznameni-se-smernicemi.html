@@ -1083,7 +1083,7 @@ function sendAudience(S){
   }
   return aud;
 }
-function onSendTags(id){ SEND_TAGS=[...document.querySelectorAll(".stag:checked")].map(c=>c.value); renderSendList(id); }
+function onSendTags(id){ SEND_TAGS=[...document.querySelectorAll(".stag:checked")].map(c=>c.value); const S=sendableOf(id); if(S&&S.isSurvey){ loadInvites(id,sendAudience(S)).then(()=>renderSendList(id)); } else renderSendList(id); }
 function onSendCands(id){ SEND_CAND=[...document.querySelectorAll(".scand:checked")].map(c=>c.value); renderSendList(id); }
 function toggleAllCands(id,on){ document.querySelectorAll(".scand").forEach(c=>c.checked=on); onSendCands(id); }
 function ackStats(dir){
@@ -1434,22 +1434,31 @@ const GRIT_QUESTIONS=[
   {t:"Už jsem překonal/a překážky, abych zdolal/a důležitou výzvu.",rev:false}
 ];
 function gritAcksMap(){ const m={}; (GRIT_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
+/* Pozvánkové hash odkazy (bez přihlášení) — podpis dělá server, tady jen cache pro aktuální dotazník */
+let INVITE_MAP={};
+function surveyKind(id){ return id==="survey-grit"?"grit":id==="survey-jss"?"jss":id==="survey-tw44"?"tw44":""; }
+async function loadInvites(id, aud){
+  const kind=surveyKind(id); if(!kind){ INVITE_MAP={}; return; }
+  try{ const r=await fetch("/api/invite-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,list:(aud||[]).map(e=>({email:e.email,name:e.name}))})});
+    if(r.ok){ const j=await r.json(); INVITE_MAP=j.links||{}; } }catch(e){}
+}
+function inviteLinkFor(id,email){ return INVITE_MAP[(email||"").toLowerCase()] || (location.origin+"/"+surveyKind(id)+"#kdo="+encodeURIComponent(email)); }
 /* Deskriptor pro společný send modal: funguje pro směrnici i průzkum */
 function sendableOf(id){
   if(id==="survey-grit"){
     return { id:"survey-grit", isSurvey:true, title:"Test houževnatosti (Grit)",
       assignAll:GRIT_ASSIGN.all, assignCats:GRIT_ASSIGN.cats, acks:gritAcksMap(),
-      linkFor:(email)=>location.origin+"/grit#kdo="+encodeURIComponent(email) };
+      linkFor:(email)=>inviteLinkFor("survey-grit",email) };
   }
   if(id==="survey-jss"){
     return { id:"survey-jss", isSurvey:true, title:"Dotazník pracovní spokojenosti (JSS)",
       assignAll:JSS_ASSIGN.all, assignCats:JSS_ASSIGN.cats, acks:jssAcksMap(),
-      linkFor:(email)=>location.origin+"/jss#kdo="+encodeURIComponent(email) };
+      linkFor:(email)=>inviteLinkFor("survey-jss",email) };
   }
   if(id==="survey-tw44"){
     return { id:"survey-tw44", isSurvey:true, title:"Test kognitivní zátěže (TW44)",
       assignAll:TW44_ASSIGN.all, assignCats:TW44_ASSIGN.cats, acks:tw44AcksMap(),
-      linkFor:(email)=>location.origin+"/tw44#kdo="+encodeURIComponent(email) };
+      linkFor:(email)=>inviteLinkFor("survey-tw44",email) };
   }
   const d=DB.directives.find(x=>x.id===id); if(!d) return null;
   return { id:d.id, isSurvey:false, title:d.title, assignAll:d.assignAll, assignCats:d.assignCats,
@@ -1503,9 +1512,10 @@ async function renderGritAdmin(){
   h+='<div class="divider" style="margin:26px 0"></div>'+ await tw44BlockHtml();
   box.innerHTML=h;
 }
-function copyGritLinks(){
+async function copyGritLinks(){
   const S=sendableOf("survey-grit"); const aud=audienceOf(S);
   if(!aud.length){ alert("Žádní příjemci — zaškrtni Všem nebo vyber oddělení."); return; }
+  await loadInvites("survey-grit", aud);
   const lines=aud.map(e=>e.name+"\t"+e.email+"\t"+S.linkFor(e.email));
   copyText("Jméno\tE-mail\tOdkaz\n"+lines.join("\n")); toast("Odkazy zkopírovány ("+aud.length+")");
 }
@@ -1527,9 +1537,10 @@ const JSS_TXT=["Jsem přesvědčen(a) o tom, že jsem spravedlivě finančně oh
 function jssAcksMap(){ const m={}; (JSS_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
 function jssAssignAll(on){ JSS_ASSIGN.all=on; const w=document.getElementById("jCatWrap"); if(w) w.style.opacity=on?.4:1; }
 function jssReadCats(){ JSS_ASSIGN.cats=[...document.querySelectorAll(".jcat:checked")].map(c=>c.value); }
-function copyJssLinks(){
+async function copyJssLinks(){
   const S=sendableOf("survey-jss"); const aud=audienceOf(S);
   if(!aud.length){ alert("Žádní příjemci — zaškrtni Všem nebo vyber oddělení."); return; }
+  await loadInvites("survey-jss", aud);
   copyText("Jméno\tE-mail\tOdkaz\n"+aud.map(e=>e.name+"\t"+e.email+"\t"+S.linkFor(e.email)).join("\n")); toast("Odkazy zkopírovány ("+aud.length+")");
 }
 function exportJss(){
@@ -1591,9 +1602,10 @@ let TW44_ASSIGN={all:true,cats:[]};
 function tw44AcksMap(){ const m={}; (TW44_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
 function tw44AssignAll(on){ TW44_ASSIGN.all=on; const w=document.getElementById("tCatWrap"); if(w) w.style.opacity=on?.4:1; }
 function tw44ReadCats(){ TW44_ASSIGN.cats=[...document.querySelectorAll(".tcat:checked")].map(c=>c.value); }
-function copyTw44Links(){
+async function copyTw44Links(){
   const S=sendableOf("survey-tw44"); const aud=audienceOf(S);
   if(!aud.length){ alert("Žádní příjemci — zaškrtni Všem nebo vyber oddělení."); return; }
+  await loadInvites("survey-tw44", aud);
   copyText("Jméno\tE-mail\tOdkaz\n"+aud.map(e=>e.name+"\t"+e.email+"\t"+S.linkFor(e.email)).join("\n")); toast("Odkazy zkopírovány ("+aud.length+")");
 }
 // úspěšnost hledání respondenta = nalezené / (nalezené + chyby + nestihnuté) přes všechny subtesty
@@ -2039,6 +2051,7 @@ async function sendBulk(id){
   out.innerHTML='<p class="muted">Připravuji odeslání…</p>';
   try{
     if(!S.isSurvey) await ensurePublished(id); // u směrnice: vždy aktuální obsah + funkční odkazy
+    if(S.isSurvey) await loadInvites(id, aud);  // podepsané hash odkazy (bez přihlášení)
     const recipients=aud.map(e=>({email:e.email,name:e.name,link:S.linkFor(e.email)}));
     out.innerHTML='<p class="muted">Odesílám '+recipients.length+' e-mailů'+(prof?' (profil „'+esc(prof.label)+'")':"")+'…</p>';
     const payload={subject,body,recipients,dirTitle:S.title};
@@ -2316,6 +2329,7 @@ function openSendModal(id){
     <div id="sendList" style="max-height:300px;overflow:auto"></div>`;
   document.getElementById("modalFoot").innerHTML=`<button class="btn ghost" onclick="closeModal()">Zavřít</button>`;
   showModal(); renderSendList(id); if(DB.profiles.length) applyProfileToSend(id);
+  if(S.isSurvey){ loadInvites(id, sendAudience(S)).then(()=>renderSendList(id)); }
 }
 function refreshSend(id){ const S=sendableOf(id); if(S&&S.isSurvey){ reloadSurveyResults(id); } else { pullAcks(id); } }
 async function reloadSurveyResults(id){
@@ -2360,14 +2374,16 @@ function oneMailto(id,email){
   const body=encodeURIComponent("Dobrý den"+(emp?", "+vocCs(emp.name.split(" ")[0]):"")+",\n\n"+intro+"\n\n"+link+"\n\nDěkujeme.");
   location.href="mailto:"+encodeURIComponent(email)+"?subject="+subj+"&body="+body;
 }
-function copyAllLinks(id){
+async function copyAllLinks(id){
   const S=sendableOf(id); if(!S) return; const aud=sendAudience(S);
+  if(S.isSurvey) await loadInvites(id, aud);
   copyText(aud.map(e=>e.name+"\t"+e.email+"\t"+S.linkFor(e.email)).join("\n"));
   toast(aud.length+" odkazů zkopírováno");
 }
-function exportLinksXlsx(id){
+async function exportLinksXlsx(id){
   if(typeof XLSX==="undefined"){ alert("Knihovna XLSX není načtena (offline?)."); return; }
   const S=sendableOf(id); if(!S) return; const aud=sendAudience(S);
+  if(S.isSurvey) await loadInvites(id, aud);
   const aoa=[["Jméno","E-mail","Osobní odkaz","Předmět e-mailu"]];
   const subj=(S.isSurvey?"Dotazník: ":"K seznámení: ")+S.title;
   aud.forEach(e=>aoa.push([e.name,e.email,S.linkFor(e.email),subj]));

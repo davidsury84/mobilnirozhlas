@@ -124,6 +124,11 @@ function b64urlDecode(s) { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); 
 function cookieVal(req, name) { const m = (req.headers.cookie || '').match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)')); return m ? decodeURIComponent(m[1]) : ''; }
 function empSign(payload) { const data = b64url(JSON.stringify(payload)); const sig = crypto.createHmac('sha256', SEC.secret).update('emp:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
 function empVerify(str) { if (!str) return null; const i = str.lastIndexOf('.'); if (i < 0) return null; const data = str.slice(0, i), sig = str.slice(i + 1); const exp = crypto.createHmac('sha256', SEC.secret).update('emp:' + data).digest('hex').slice(0, 32); if (sig !== exp) return null; try { return JSON.parse(b64urlDecode(data)); } catch (_) { return null; } }
+/* ---------- Pozvánkový hash pro NEzaměstnance (dotazníky bez přihlášení) ----------
+   Token = b64url(JSON{e:email, n:jméno}) + "." + HMAC("inv:"+data)[0..32]. Bez expirace.
+   Slouží jako podepsaný „kdo to je" v odkazu ?i=... — server osobu pozná, aniž se hlásí. */
+function inviteSign(email, name) { const data = b64url(JSON.stringify({ e: (email || '').toLowerCase(), n: name || '' })); const sig = crypto.createHmac('sha256', SEC.secret).update('inv:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
+function inviteVerify(str) { if (!str) return null; const i = str.lastIndexOf('.'); if (i < 0) return null; const data = str.slice(0, i), sig = str.slice(i + 1); const exp = crypto.createHmac('sha256', SEC.secret).update('inv:' + data).digest('hex').slice(0, 32); if (sig !== exp) return null; try { const o = JSON.parse(b64urlDecode(data)); return o && o.e ? o : null; } catch (_) { return null; } }
 function empSession(req) { return empVerify(cookieVal(req, 'sm_emp')); }
 /* ---------- SSO do externích aplikací (nabídkový kalkulátor) ---------- */
 // Token = b64url(JSON{email,name,exp}) + "." + HMAC-SHA256("sso:"+data, SEC.secret)[0..32]. Krátká platnost.
@@ -481,8 +486,13 @@ const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
 
+  // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
+  const invite = inviteVerify(u.query.i || '');
+  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/api/grit', '/api/jss', '/api/tw44'];
+  const inviteOk = !!(invite && INVITE_ROUTES.indexOf(p) >= 0);
+
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req)) {
+  if (!gatePassed(req) && !inviteOk) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -557,14 +567,23 @@ const server = http.createServer(async (req, res) => {
     if (p.indexOf('/s/') === 0) { const id = p.slice(3).replace(/[^a-z0-9]/gi, ''); const f = path.join(PUB_DIR, id + '.html'); if (fs.existsSync(f)) return send(res, 200, fs.readFileSync(f, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' }); return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' }); }
     if (p === '/api/ack' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.dirId || !b.email) return send(res, 400, { error: 'Chybí data.' }); recordAck(b); return send(res, 200, { ok: true }, { 'Access-Control-Allow-Origin': '*' }); }
     // ---- test houževnatosti (Grit) ----
-    if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/grit-results' && req.method === 'GET') return send(res, 200, readJson(GRIT_F, []));
     // ---- dotazník pracovní spokojenosti (JSS) ----
-    if (p === '/api/jss' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordJss(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, total: rec.total, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/jss' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordJss(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, total: rec.total, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/jss-results' && req.method === 'GET') return send(res, 200, readJson(JSS_F, []));
     // ---- test kognitivní zátěže (TW44) ----
-    if (p === '/api/tw44' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordTw44(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/tw44' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordTw44(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/tw44-results' && req.method === 'GET') return send(res, 200, readJson(TW44_F, []));
+    // podepsané pozvánkové odkazy (hash) pro dávku příjemců — jen pro správce
+    if (p === '/api/invite-links' && req.method === 'POST') {
+      if (!isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req));
+      const kind = (b.kind || '').replace(/[^a-z0-9]/gi, '');
+      const base = baseUrl(req); const links = {};
+      (b.list || []).forEach(r => { const e = (r.email || '').toLowerCase(); if (e && kind) links[e] = base + '/' + kind + '?i=' + encodeURIComponent(inviteSign(e, r.name || '')); });
+      return send(res, 200, { links });
+    }
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
     if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null }); }
