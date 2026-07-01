@@ -42,6 +42,10 @@ const crypto = require('crypto');
 const ROOT     = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const APP_FILE = path.join(ROOT, 'seznameni-se-smernicemi.html');
+// Verze běžící instance (pro patičku) — commit z Railway + čas buildu (mtime hlavního souboru)
+const GIT_COMMIT = (process.env.RAILWAY_GIT_COMMIT_SHA || process.env.SOURCE_VERSION || process.env.GIT_COMMIT || '').slice(0, 7);
+let BUILD_TIME; try { BUILD_TIME = require('fs').statSync(APP_FILE).mtimeMs; } catch (_) { BUILD_TIME = Date.now(); }
+function injectVersion(html) { return html.replace('<!--VERSION-->', '<script>window.__VER__=' + JSON.stringify({ commit: GIT_COMMIT, built: BUILD_TIME }) + ';<\/script>'); }
 const SMI_APP_FILE = path.join(ROOT, 'SMI_aplikace.html');   // hotová SMI aplikace (modul E-shop)
 const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu Kalkulace-lisy (napojí se později)
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
@@ -559,7 +563,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (p === '/' || p === '/index.html') {
       if (!fs.existsSync(APP_FILE)) return send(res, 404, '<h1>Chybí seznameni-se-smernicemi.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, injectVersion(fs.readFileSync(APP_FILE, 'utf8')), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/grit' || p === '/grit.html') {
       if (!fs.existsSync(GRIT_FILE)) return send(res, 404, '<h1>Chybí grit.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
