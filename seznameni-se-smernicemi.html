@@ -330,6 +330,11 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
 .ack-card.done{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--green-soft)}
 .ack-card .chk span{font-size:15px;line-height:1.55}
 .ack-card .cf-wrap{margin-top:16px}
+.ec{width:100%;border:1px solid var(--line);background:var(--paper);padding:6px 8px;border-radius:7px;font:inherit;color:var(--ink);transition:border-color .12s,box-shadow .12s}
+.ec:hover{border-color:var(--line-strong)}
+.ec:focus{outline:none;border-color:var(--green-2);box-shadow:0 0 0 2px var(--green-soft)}
+.ec.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+#employeeTable td{padding:6px 8px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -413,7 +418,17 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
     </div>
 
     <div class="card">
-      <table class="grid" id="employeeTable"></table>
+      <div class="toolbar" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <input type="text" id="empFilter" placeholder="🔎 Filtrovat: jméno, e-mail, tag, jazyk, oddělení…" list="empFilterList" oninput="filterEmployees()" style="flex:1;min-width:280px">
+        <datalist id="empFilterList"></datalist>
+        <datalist id="empDeptList"></datalist>
+        <datalist id="empTagList"></datalist>
+        <span id="empCount" class="muted" style="font-size:13px;white-space:nowrap"></span>
+      </div>
+      <div class="matrix-wrap" style="max-height:none;overflow:auto">
+        <table class="grid" id="employeeTable"></table>
+      </div>
+      <div class="hint" style="margin-top:8px">Uprav cokoli přímo v tabulce — změny se ukládají hned. Oddělení a tagy piš oddělené čárkou (našeptávač napovídá).</div>
     </div>
   </section>
 
@@ -1729,27 +1744,69 @@ function langFromText(v){
   return EMP_LANGS.some(l=>l.code===s)? s : "";
 }
 
+function empLangOpts(sel){ return EMP_LANGS.map(l=>`<option value="${l.code}" ${((sel||'cs')===l.code)?'selected':''}>${l.flag} ${l.name}</option>`).join(''); }
+function empRowSearch(e){ const deptStr=e.cats.map(c=>catName(c)).filter(Boolean).join(', '); return [e.name,e.email,(e.tags||[]).join(' '),langLabel(e.lang),deptStr].join(' ').toLowerCase(); }
+function rebuildEmpDatalists(){
+  const deptNames=DB.categories.map(c=>c.name);
+  const tagSet=new Set(); DB.employees.forEach(e=>(e.tags||[]).forEach(x=>tagSet.add(x)));
+  const opt=arr=>[...new Set(arr.filter(Boolean))].map(v=>`<option value="${esc(v)}">`).join('');
+  const set=(id,arr)=>{const el=document.getElementById(id); if(el) el.innerHTML=opt(arr);};
+  set('empDeptList',deptNames);
+  set('empTagList',[...tagSet]);
+  set('empFilterList',[].concat(DB.employees.map(e=>e.name),DB.employees.map(e=>e.email),[...tagSet],EMP_LANGS.map(l=>l.name),deptNames));
+}
 function renderEmployees(){
   renderCategories();
   const t=document.getElementById("employeeTable");
+  rebuildEmpDatalists();
   if(!DB.employees.length){
     t.innerHTML=`<tbody><tr><td class="empty">Žádní zaměstnanci. Přidej je tlačítkem nebo importem.</td></tr></tbody>`;
-    return;
+    const c=document.getElementById("empCount"); if(c) c.textContent=""; return;
   }
-  t.innerHTML=`<thead><tr><th>Jméno</th><th>E-mail</th><th>Jazyk</th><th>Oddělení</th><th>Tagy</th><th></th></tr></thead><tbody>${
-    DB.employees.slice().sort((a,b)=>a.name.localeCompare(b.name,"cs")).map(e=>`
-      <tr>
-        <td>${esc(e.name)}</td>
-        <td class="mono" style="font-size:13px">${esc(e.email)}</td>
-        <td style="white-space:nowrap">${esc(langLabel(e.lang))}</td>
-        <td>${e.cats.map(c=>`<span class="tag">${esc(catName(c))}</span>`).join("")||'<span class="muted">—</span>'}</td>
-        <td>${(e.tags||[]).map(tg=>`<span class="tag" style="background:var(--yellow-soft);color:var(--amber)">${esc(tg)}</span>`).join("")||'<span class="muted">—</span>'}</td>
-        <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" onclick="openEmployeeModal('${e.id}')">Upravit</button>
-          <button class="btn danger sm" onclick="deleteEmployee('${e.id}')">Smazat</button>
-        </td>
-      </tr>`).join("")
+  t.innerHTML=`<thead><tr><th style="min-width:150px">Jméno</th><th style="min-width:190px">E-mail</th><th style="min-width:150px">Jazyk</th><th style="min-width:170px">Oddělení</th><th style="min-width:180px">Tagy</th><th></th></tr></thead><tbody>${
+    DB.employees.slice().sort((a,b)=>a.name.localeCompare(b.name,"cs")).map(e=>{
+      const deptStr=e.cats.map(c=>catName(c)).filter(Boolean).join(', ');
+      const tagStr=(e.tags||[]).join(', ');
+      return `<tr data-emp="${e.id}" data-search="${esc(empRowSearch(e))}">
+        <td><input class="ec" value="${esc(e.name)}" onchange="updEmp('${e.id}','name',this)"></td>
+        <td><input class="ec mono" value="${esc(e.email)}" onchange="updEmp('${e.id}','email',this)"></td>
+        <td><select class="ec" onchange="updEmp('${e.id}','lang',this)">${empLangOpts(e.lang)}</select></td>
+        <td><input class="ec" list="empDeptList" placeholder="—" value="${esc(deptStr)}" onchange="updEmpCats('${e.id}',this)"></td>
+        <td><input class="ec" list="empTagList" placeholder="—" value="${esc(tagStr)}" onchange="updEmpTags('${e.id}',this)"></td>
+        <td style="text-align:right"><button class="btn danger sm" onclick="deleteEmployee('${e.id}')">Smazat</button></td>
+      </tr>`;
+    }).join("")
   }</tbody>`;
+  filterEmployees();
+}
+function updRowSearch(id){ const e=DB.employees.find(x=>x.id===id); const tr=document.querySelector('#employeeTable tr[data-emp="'+id+'"]'); if(e&&tr) tr.setAttribute('data-search',empRowSearch(e)); }
+function updEmp(id,field,el){
+  const e=DB.employees.find(x=>x.id===id); if(!e) return;
+  if(field==='email'){
+    const v=el.value.trim().toLowerCase();
+    if(!v){ toast('E-mail nesmí být prázdný.'); el.value=e.email; return; }
+    if(DB.employees.some(x=>x.id!==id && (x.email||'').toLowerCase()===v)){ toast('E-mail už v seznamu existuje.'); el.value=e.email; return; }
+    e.email=v; el.value=v;
+  } else if(field==='name'){ e.name=el.value.trim()||e.email; el.value=e.name; }
+  else if(field==='lang'){ e.lang=el.value; }
+  save(); updRowSearch(id); rebuildEmpDatalists();
+}
+function updEmpTags(id,el){
+  const e=DB.employees.find(x=>x.id===id); if(!e) return;
+  e.tags=el.value.split(',').map(s=>s.trim()).filter(Boolean); el.value=e.tags.join(', ');
+  save(); updRowSearch(id); rebuildEmpDatalists();
+}
+function updEmpCats(id,el){
+  const e=DB.employees.find(x=>x.id===id); if(!e) return;
+  e.cats=el.value.split(',').map(s=>s.trim()).filter(Boolean).map(n=>{ let c=DB.categories.find(x=>x.name.toLowerCase()===n.toLowerCase()); if(!c){ c={id:uid(),name:n}; DB.categories.push(c); } return c.id; });
+  el.value=e.cats.map(c=>catName(c)).filter(Boolean).join(', ');
+  save(); renderCategories(); updRowSearch(id); rebuildEmpDatalists();
+}
+function filterEmployees(){
+  const q=(document.getElementById('empFilter')?document.getElementById('empFilter').value:'').toLowerCase().trim();
+  const rows=document.querySelectorAll('#employeeTable tr[data-emp]'); let shown=0;
+  rows.forEach(tr=>{ const ok=!q||(tr.getAttribute('data-search')||'').indexOf(q)>=0; tr.style.display=ok?'':'none'; if(ok)shown++; });
+  const c=document.getElementById('empCount'); if(c) c.textContent=shown+' / '+rows.length+' zaměstnanců';
 }
 
 function deleteEmployee(id){
