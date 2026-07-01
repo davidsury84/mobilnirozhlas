@@ -481,6 +481,40 @@ function vocCs(name) {
 function renderTpl(t, v) { return (t || '').replace(/\{(jmeno5|jmeno|smernice|odkaz)\}/g, (m, k) => (v[k] != null ? v[k] : m)); }
 function toHtml(text, link) { let h = esc(text).replace(/\n/g, '<br>'); if (link) { const s = esc(link); h = h.split(s).join('<a href="' + s + '" style="color:#1f5d3f">' + s + '</a>') + '<div style="margin-top:18px"><a href="' + s + '" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-family:Arial,sans-serif;font-weight:bold">Otevřít a potvrdit seznámení</a></div>'; } return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55">' + h + '</div>'; }
 function baseUrl(req) { return (CFG.publicUrl || (((req.headers['x-forwarded-proto'] || 'http')) + '://' + req.headers.host)).replace(/\/$/, ''); }
+/* Uvítací (pozvánkový) e-mail do intranetu — hezky nastylovaný, firemní barvy */
+function intranetInviteMail(name, url) {
+  const fn = (name || '').split(' ')[0] || name || '';
+  const hi = fn ? ('Dobrý den ' + fn + ',') : 'Dobrý den,';
+  const subject = 'Pozvánka do intranetu ELKOPLAST CZ';
+  const text = hi + '\n\nByli jste pozváni do firemního intranetu ELKOPLAST CZ — jedno místo pro všechno pracovní.\n\n'
+    + 'Najdete tu: směrnice k seznámení, knihovnu dokumentů (pracovní řád, SOP), dotazníky a firemní moduly.\n\n'
+    + 'Přihlášení je bez hesla — přes firemní Google účet (@elkoplast.cz):\n'
+    + '  1) Otevřete ' + url + '\n  2) Klikněte „Přihlásit se přes Google"\n  3) Vyberte svůj firemní účet.\n\n'
+    + 'Otevřít intranet: ' + url + '\n\nELKOPLAST CZ · interní systém';
+  const html = '<div style="margin:0;padding:0;background:#eef1ec">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1ec;padding:24px 12px"><tr><td align="center">'
+    + '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,21,18,.08);font-family:Segoe UI,Arial,sans-serif">'
+    + '<tr><td style="background:linear-gradient(135deg,#15ab57,#0a6b34);padding:26px 30px;border-bottom:3px solid #ffd21a">'
+    + '<span style="display:inline-block;width:34px;height:34px;background:#ffd21a;border-radius:9px;color:#11271c;font-weight:800;font-size:20px;text-align:center;line-height:34px">&#10003;</span>'
+    + '<span style="color:#fff;font-size:20px;font-weight:700;vertical-align:top;line-height:34px;margin-left:10px">Intranet ELKOPLAST CZ</span></td></tr>'
+    + '<tr><td style="padding:28px 30px;color:#1c1d1a;font-size:15px;line-height:1.6">'
+    + '<p style="margin:0 0 14px;font-size:16px"><b>' + esc(hi) + '</b></p>'
+    + '<p style="margin:0 0 18px;color:#3a423a">byli jste pozváni do firemního <b>intranetu ELKOPLAST CZ</b> — jedno místo pro všechno pracovní.</p>'
+    + '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px">'
+    + '<tr><td style="padding:4px 0;font-size:14px">&#128196;&nbsp; Směrnice k seznámení a potvrzení</td></tr>'
+    + '<tr><td style="padding:4px 0;font-size:14px">&#128218;&nbsp; Knihovna dokumentů (pracovní řád, SOP, postupy)</td></tr>'
+    + '<tr><td style="padding:4px 0;font-size:14px">&#128202;&nbsp; Dotazníky a testy</td></tr>'
+    + '<tr><td style="padding:4px 0;font-size:14px">&#129518;&nbsp; Firemní moduly (kalkulace, provozy…)</td></tr></table>'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e6f6ec;border:1px solid #cfe9d8;border-radius:12px;margin:0 0 22px"><tr><td style="padding:16px 18px;font-size:14px;color:#0a6b34">'
+    + '<b>Přihlášení bez hesla — přes firemní Google účet (@elkoplast.cz):</b>'
+    + '<div style="color:#1c1d1a;margin-top:8px;line-height:1.8">1) Otevřete intranet<br>2) Klikněte <b>„Přihlásit se přes Google"</b><br>3) Vyberte svůj firemní účet</div></td></tr></table>'
+    + '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:12px;background:linear-gradient(135deg,#15ab57,#0a6b34)">'
+    + '<a href="' + esc(url) + '" style="display:inline-block;padding:13px 30px;color:#fff;font-size:16px;font-weight:700;text-decoration:none">Otevřít intranet &#8594;</a></td></tr></table>'
+    + '<p style="margin:20px 0 0;font-size:12px;color:#8a938a">Odkaz: <a href="' + esc(url) + '" style="color:#0e8a43">' + esc(url) + '</a></p></td></tr>'
+    + '<tr><td style="background:#11271c;padding:16px 30px;color:#9fd9b6;font-size:12px">ELKOPLAST CZ · interní systém. Pokud jste tento e-mail dostali omylem, ignorujte ho.</td></tr>'
+    + '</table></td></tr></table></div>';
+  return { subject, text, html };
+}
 
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
@@ -583,6 +617,20 @@ const server = http.createServer(async (req, res) => {
       const base = baseUrl(req); const links = {};
       (b.list || []).forEach(r => { const e = (r.email || '').toLowerCase(); if (e && kind) links[e] = base + '/' + kind + '?i=' + encodeURIComponent(inviteSign(e, r.name || '')); });
       return send(res, 200, { links });
+    }
+    // pozvánka do intranetu (uvítací e-mail s návodem na přihlášení) — jen pro správce
+    if (p === '/api/invite-intranet' && req.method === 'POST') {
+      if (!isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!emailConfigured()) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
+      const b = JSON.parse(await readBody(req));
+      const recipients = (b.recipients || []).filter(r => r.email);
+      const url = baseUrl(req); const results = []; const useResend = !!process.env.RESEND_API_KEY;
+      const queue = recipients.slice();
+      async function worker() { while (queue.length) { const r = queue.shift(); const m = intranetInviteMail(r.name, url);
+        try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName || 'Intranet ELKOPLAST', subject: m.subject, text: m.text, html: m.html }); results.push({ email: r.email, ok: true }); }
+        catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
+      await Promise.all(Array.from({ length: useResend ? 1 : Math.min(3, recipients.length || 1) }, worker));
+      return send(res, 200, { results });
     }
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----

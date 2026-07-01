@@ -424,6 +424,7 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
         <datalist id="empDeptList"></datalist>
         <datalist id="empTagList"></datalist>
         <span id="empCount" class="muted" style="font-size:13px;white-space:nowrap"></span>
+        <button class="btn sm" onclick="inviteVisible()" title="Poslat uvítací pozvánku zobrazeným zaměstnancům">✉ Pozvat zobrazené</button>
       </div>
       <div class="matrix-wrap" style="max-height:none;overflow:auto">
         <table class="grid" id="employeeTable"></table>
@@ -1773,7 +1774,7 @@ function renderEmployees(){
         <td><select class="ec" onchange="updEmp('${e.id}','lang',this)">${empLangOpts(e.lang)}</select></td>
         <td><input class="ec" list="empDeptList" placeholder="—" value="${esc(deptStr)}" onchange="updEmpCats('${e.id}',this)"></td>
         <td><input class="ec" list="empTagList" placeholder="—" value="${esc(tagStr)}" onchange="updEmpTags('${e.id}',this)"></td>
-        <td style="text-align:right"><button class="btn danger sm" onclick="deleteEmployee('${e.id}')">Smazat</button></td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" onclick="inviteOne('${e.id}')" title="Poslat pozvánku do intranetu">✉ Pozvat</button> <button class="btn danger sm" onclick="deleteEmployee('${e.id}')">Smazat</button></td>
       </tr>`;
     }).join("")
   }</tbody>`;
@@ -1807,6 +1808,27 @@ function filterEmployees(){
   const rows=document.querySelectorAll('#employeeTable tr[data-emp]'); let shown=0;
   rows.forEach(tr=>{ const ok=!q||(tr.getAttribute('data-search')||'').indexOf(q)>=0; tr.style.display=ok?'':'none'; if(ok)shown++; });
   const c=document.getElementById('empCount'); if(c) c.textContent=shown+' / '+rows.length+' zaměstnanců';
+}
+/* ---------- Pozvánka do intranetu (uvítací e-mail) ---------- */
+function inviteOne(id){ const e=DB.employees.find(x=>x.id===id); if(!e) return; if(confirm('Poslat pozvánku do intranetu na '+e.email+'?')) inviteToIntranet([{email:e.email,name:e.name}]); }
+function inviteVisible(){
+  const list=[...document.querySelectorAll('#employeeTable tr[data-emp]')].filter(t=>t.style.display!=='none')
+    .map(t=>DB.employees.find(e=>e.id===t.getAttribute('data-emp'))).filter(Boolean).map(e=>({email:e.email,name:e.name}));
+  if(!list.length){ toast('Žádní zaměstnanci k pozvání.'); return; }
+  if(!confirm('Poslat uvítací pozvánku do intranetu '+list.length+' zaměstnancům?')) return;
+  inviteToIntranet(list);
+}
+async function inviteToIntranet(list){
+  if(DEMO){ toast('Ukázkový režim – e-maily se neodesílají.'); return; }
+  toast('Odesílám pozvánky ('+list.length+')…');
+  try{
+    const r=await fetch('/api/invite-intranet',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recipients:list})});
+    const j=await r.json();
+    if(!r.ok||j.error){ alert('Nepodařilo se odeslat: '+(j.error||('HTTP '+r.status))); return; }
+    const ok=(j.results||[]).filter(x=>x.ok).length, bad=(j.results||[]).filter(x=>!x.ok);
+    toast('Pozvánka odeslána: '+ok+(bad.length?(' · chyb: '+bad.length):''));
+    if(bad.length) console.warn('Invite chyby:', bad);
+  }catch(e){ alert('Chyba spojení: '+e.message); }
 }
 
 function deleteEmployee(id){
