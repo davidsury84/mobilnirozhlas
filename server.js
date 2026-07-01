@@ -491,16 +491,17 @@ function vocCs(name) {
 function renderTpl(t, v) { return (t || '').replace(/\{(jmeno5|jmeno|smernice|odkaz)\}/g, (m, k) => (v[k] != null ? v[k] : m)); }
 function toHtml(text, link) { let h = esc(text).replace(/\n/g, '<br>'); if (link) { const s = esc(link); h = h.split(s).join('<a href="' + s + '" style="color:#1f5d3f">' + s + '</a>') + '<div style="margin-top:18px"><a href="' + s + '" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-family:Arial,sans-serif;font-weight:bold">Otevřít a potvrdit seznámení</a></div>'; } return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55">' + h + '</div>'; }
 function baseUrl(req) { return (CFG.publicUrl || (((req.headers['x-forwarded-proto'] || 'http')) + '://' + req.headers.host)).replace(/\/$/, ''); }
-/* Uvítací (pozvánkový) e-mail do intranetu — hezky nastylovaný, firemní barvy */
-function intranetInviteMail(name, url) {
+/* Uvítací (pozvánkový) e-mail do intranetu — hezky nastylovaný, firemní barvy. Text (subject+body) je editovatelný. */
+const DEFAULT_INVITE_SUBJECT = 'Pozvánka do intranetu ELKOPLAST CZ';
+const DEFAULT_INVITE_BODY = 'Dobrý den {jmeno5},\n\nbyli jste pozváni do firemního intranetu ELKOPLAST CZ — jedno místo pro všechno pracovní.';
+function intranetInviteMail(name, url, tpl) {
+  tpl = tpl || {};
   const fn = (name || '').split(' ')[0] || name || '';
-  const hi = fn ? ('Dobrý den ' + fn + ',') : 'Dobrý den,';
-  const subject = 'Pozvánka do intranetu ELKOPLAST CZ';
-  const text = hi + '\n\nByli jste pozváni do firemního intranetu ELKOPLAST CZ — jedno místo pro všechno pracovní.\n\n'
-    + 'Najdete tu: směrnice k seznámení, knihovnu dokumentů (pracovní řád, SOP), dotazníky a firemní moduly.\n\n'
-    + 'Přihlášení je bez hesla — přes firemní Google účet (@elkoplast.cz):\n'
-    + '  1) Otevřete ' + url + '\n  2) Klikněte „Přihlásit se přes Google"\n  3) Vyberte svůj firemní účet.\n\n'
-    + 'Otevřít intranet: ' + url + '\n\nELKOPLAST CZ · interní systém';
+  const vars = { jmeno: fn, jmeno5: vocCs(fn), odkaz: url };
+  const subject = renderTpl(tpl.subject || DEFAULT_INVITE_SUBJECT, vars);
+  const bodyText = renderTpl(tpl.body || DEFAULT_INVITE_BODY, vars);
+  const bodyHtml = '<p style="margin:0 0 14px">' + esc(bodyText).replace(/\n\n+/g, '</p><p style="margin:0 0 14px">').replace(/\n/g, '<br>') + '</p>';
+  const text = bodyText + '\n\nPřihlášení bez hesla přes firemní Google účet (@elkoplast.cz):\n  1) Otevřete ' + url + '\n  2) Klikněte „Přihlásit se přes Google"\n  3) Vyberte svůj firemní účet.\n\nOtevřít intranet: ' + url + '\n\nELKOPLAST CZ · interní systém';
   const html = '<div style="margin:0;padding:0;background:#eef1ec">'
     + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1ec;padding:24px 12px"><tr><td align="center">'
     + '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,21,18,.08);font-family:Segoe UI,Arial,sans-serif">'
@@ -508,9 +509,8 @@ function intranetInviteMail(name, url) {
     + '<span style="display:inline-block;width:34px;height:34px;background:#ffd21a;border-radius:9px;color:#11271c;font-weight:800;font-size:20px;text-align:center;line-height:34px">&#10003;</span>'
     + '<span style="color:#fff;font-size:20px;font-weight:700;vertical-align:top;line-height:34px;margin-left:10px">Intranet ELKOPLAST CZ</span></td></tr>'
     + '<tr><td style="padding:28px 30px;color:#1c1d1a;font-size:15px;line-height:1.6">'
-    + '<p style="margin:0 0 14px;font-size:16px"><b>' + esc(hi) + '</b></p>'
-    + '<p style="margin:0 0 18px;color:#3a423a">byli jste pozváni do firemního <b>intranetu ELKOPLAST CZ</b> — jedno místo pro všechno pracovní.</p>'
-    + '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px">'
+    + bodyHtml
+    + '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0 20px">'
     + '<tr><td style="padding:4px 0;font-size:14px">&#128196;&nbsp; Směrnice k seznámení a potvrzení</td></tr>'
     + '<tr><td style="padding:4px 0;font-size:14px">&#128218;&nbsp; Knihovna dokumentů (pracovní řád, SOP, postupy)</td></tr>'
     + '<tr><td style="padding:4px 0;font-size:14px">&#128202;&nbsp; Dotazníky a testy</td></tr>'
@@ -583,13 +583,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 401, { error: 'Nesprávné heslo.' });
     }
     if (p === '/api/state' && req.method === 'GET') return send(res, 200, getState());
-    if (p === '/api/state' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(STATE_F, { categories: b.categories || [], employees: b.employees || [], directives: b.directives || [], profiles: b.profiles || [], candidates: b.candidates || [] }); return send(res, 200, { ok: true }); }
+    if (p === '/api/state' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(STATE_F, { categories: b.categories || [], employees: b.employees || [], directives: b.directives || [], profiles: b.profiles || [], candidates: b.candidates || [], settings: b.settings || {} }); return send(res, 200, { ok: true }); }
     if (p === '/api/config' && req.method === 'GET') return send(res, 200, configStatus());
     if (p === '/api/config' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeConfig({ host: (b.host || '').trim(), port: Number(b.port) || 587, secure: !!b.secure, user: (b.user || '').trim(), pass: b.pass, fromName: (b.fromName || '').trim() }); return send(res, 200, { ok: true, status: configStatus() }); }
     if (p === '/api/test' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
       if (!process.env.RESEND_API_KEY && (!CFG.host || !CFG.user)) return send(res, 400, { error: 'Pošta není nastavená.' });
-      try { await deliver({ to: (b.to || CFG.user || '').trim(), fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName, subject: 'Zkušební e-mail – Seznámení se směrnicemi', text: 'Toto je zkušební e-mail. Pokud jste ho dostali, odesílání funguje.', html: toHtml('Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.') }); return send(res, 200, { ok: true }); }
+      try { const tSubj = b.subject || 'Zkušební e-mail – Seznámení se směrnicemi'; const tBody = b.body || 'Toto je zkušební e-mail.\nPokud jste ho dostali, odesílání funguje.'; await deliver({ to: (b.to || CFG.user || '').trim(), fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName, subject: tSubj, text: tBody, html: toHtml(tBody) }); return send(res, 200, { ok: true }); }
       catch (e) { return send(res, 500, { error: e.message }); }
     }
     if (p === '/api/publish' && req.method === 'POST') {
@@ -636,17 +636,18 @@ const server = http.createServer(async (req, res) => {
       const recipients = (b.recipients || []).filter(r => r.email);
       const url = baseUrl(req); const results = []; const useResend = !!process.env.RESEND_API_KEY;
       const queue = recipients.slice();
-      async function worker() { while (queue.length) { const r = queue.shift(); const m = intranetInviteMail(r.name, url);
+      async function worker() { while (queue.length) { const r = queue.shift(); const m = intranetInviteMail(r.name, url, b.tpl);
         try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName || 'Intranet ELKOPLAST', subject: m.subject, text: m.text, html: m.html }); results.push({ email: r.email, ok: true }); }
         catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
       await Promise.all(Array.from({ length: useResend ? 1 : Math.min(3, recipients.length || 1) }, worker));
       return send(res, 200, { results });
     }
     // náhled uvítacího e-mailu (pro zobrazení před odesláním) — jen pro správce
-    if (p === '/api/invite-preview' && req.method === 'GET') {
+    if (p === '/api/invite-preview' && (req.method === 'GET' || req.method === 'POST')) {
       if (!isAuthed(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
-      const m = intranetInviteMail(u.query.name || '', baseUrl(req));
-      return send(res, 200, { subject: m.subject, html: m.html, mailReady: emailConfigured() });
+      let b = {}; if (req.method === 'POST') { try { b = JSON.parse(await readBody(req)); } catch (_) {} }
+      const m = intranetInviteMail(b.name || u.query.name || '', baseUrl(req), { subject: b.subject, body: b.body });
+      return send(res, 200, { subject: m.subject, html: m.html, mailReady: emailConfigured(), defaults: { subject: DEFAULT_INVITE_SUBJECT, body: DEFAULT_INVITE_BODY } });
     }
     // náhled hromadného rozeslání (směrnice/průzkumy) i zkušebního e-mailu — jen pro správce
     if (p === '/api/send-preview' && req.method === 'POST') {
