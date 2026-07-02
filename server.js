@@ -49,6 +49,8 @@ function injectVersion(html) { return html.replace('<!--VERSION-->', '<script>wi
 const SMI_APP_FILE = path.join(ROOT, 'SMI_aplikace.html');   // hotová SMI aplikace (modul E-shop)
 const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu Kalkulace-lisy (napojí se později)
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
+const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
+const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativně lokální soubor
 const GRIT_FILE = path.join(ROOT, 'grit.html');              // test houževnatosti (Grit)
 const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracovní spokojenosti (JSS)
 const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
@@ -776,6 +778,26 @@ const server = http.createServer(async (req, res) => {
         + 'h1{font-size:20px;margin:0 0 8px}p{color:#5b635c;margin:0 0 6px;line-height:1.55}code{background:#eef1ec;padding:2px 6px;border-radius:6px;font-size:13px}</style></head>'
         + '<body><div class="c"><h1>🧮 Kalkulace-lisy</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
         + '<p style="margin-top:12px;font-size:13px">Pro napojení vlož soubor <code>kalkulace-lisy.html</code> do projektu, nebo nastav proměnnou <code>KALKULACE_APP_URL</code> na adresu existující aplikace.</p></div></body></html>';
+      return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- Kalkulačka svoz ESA (modul): za přihlášením, přístup řídí správce, Google identita přes SSO token ----
+    if (p === '/svoz-esa-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('svozesa') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup ke Kalkulačce svoz ESA nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (SVOZ_ESA_URL) {
+        let target = SVOZ_ESA_URL;
+        if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += (SVOZ_ESA_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+        res.writeHead(302, { 'Location': target }); return res.end();
+      }
+      if (fs.existsSync(SVOZ_ESA_FILE)) return send(res, 200, fs.readFileSync(SVOZ_ESA_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
+      const ph = '<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<title>Kalkulačka svoz ESA</title><style>body{margin:0;font-family:system-ui,sans-serif;background:#eef1ec;color:#0f1512;display:grid;place-items:center;min-height:100vh}'
+        + '.c{max-width:520px;text-align:center;background:#fff;border:1px solid #e3e7e0;border-radius:16px;padding:34px 30px;box-shadow:0 10px 30px rgba(15,21,18,.07)}'
+        + 'h1{font-size:20px;margin:0 0 8px}p{color:#5b635c;margin:0 0 6px;line-height:1.55}code{background:#eef1ec;padding:2px 6px;border-radius:6px;font-size:13px}</style></head>'
+        + '<body><div class="c"><h1>🚛 Kalkulačka svoz ESA</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
+        + '<p style="margin-top:12px;font-size:13px">Pro napojení nastav proměnnou <code>SVOZ_ESA_URL</code> na adresu nasazené aplikace, nebo vlož soubor <code>kalkulacka-svoz-esa.html</code> do projektu.</p></div></body></html>';
       return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
     }
 

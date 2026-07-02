@@ -803,7 +803,8 @@ const MUJ_IC = {
   droplet:'<path d="M12 3s6 6.4 6 10.5a6 6 0 0 1-12 0C6 9.4 12 3 12 3z"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
   cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.3 12.2a1.5 1.5 0 0 0 1.5 1.2h8a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/>',
-  calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7.5" x2="16" y2="7.5"/><circle cx="9" cy="12" r="0.5"/><circle cx="12" cy="12" r="0.5"/><circle cx="15" cy="12" r="0.5"/><circle cx="9" cy="15" r="0.5"/><circle cx="12" cy="15" r="0.5"/><circle cx="15" cy="15" r="0.5"/><circle cx="9" cy="18" r="0.5"/><circle cx="12" cy="18" r="0.5"/><circle cx="15" cy="18" r="0.5"/>'
+  calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7.5" x2="16" y2="7.5"/><circle cx="9" cy="12" r="0.5"/><circle cx="12" cy="12" r="0.5"/><circle cx="15" cy="12" r="0.5"/><circle cx="9" cy="15" r="0.5"/><circle cx="12" cy="15" r="0.5"/><circle cx="15" cy="15" r="0.5"/><circle cx="9" cy="18" r="0.5"/><circle cx="12" cy="18" r="0.5"/><circle cx="15" cy="18" r="0.5"/>',
+  truck:'<path d="M3 6.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V16H3V6.5z"/><path d="M14 9h3.6l2.4 3v4H14V9z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>'
 };
 const MUJ_MODS = [
   { key:"dash", icon:MUJ_IC.dash, label:"Můj přehled" },
@@ -817,6 +818,7 @@ const MUJ_MODS = [
   { key:"kovo", icon:MUJ_IC.gear, label:"Kovo", gated:true },
   { key:"eshop", icon:MUJ_IC.cart, label:"E-shop", gated:true },
   { key:"kalkulace", icon:MUJ_IC.calc, label:"Kalkulace-lisy", gated:true },
+  { key:"svozesa", icon:MUJ_IC.truck, label:"Kalkulačka svoz ESA", gated:true },
   { grp:"Rozvoj a nástup" },
   { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace", soon:true },
   { key:"skoleni", icon:MUJ_IC.school, label:"Školení", soon:true },
@@ -892,7 +894,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
 function mjGo(key){
@@ -900,6 +902,7 @@ function mjGo(key){
   else if(key==="library") showLibrary(null);
   else if(key==="eshop") showEshop();
   else if(key==="kalkulace") showKalkulace();
+  else if(key==="svozesa") showSvozEsa();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
 }
@@ -922,6 +925,13 @@ function showKalkulace(){
   const body=document.getElementById("mujBody");
   if((MUJ.modules||[]).indexOf("kalkulace")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/kalkulace-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulace-lisy"></iframe>';
+  window.scrollTo(0,0);
+}
+function showSvozEsa(){
+  MUJ.view="svozesa"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if((MUJ.modules||[]).indexOf("svozesa")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<iframe src="/svoz-esa-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka svoz ESA"></iframe>';
   window.scrollTo(0,0);
 }
 function mujSoon(name){ if(typeof toast==="function") toast(name+" — modul připravujeme"); }
@@ -963,7 +973,7 @@ function showDashboard(){
     badge: c.libTodo ? '<span class="badge todo">'+c.libTodo+' k potvrzení</span>' : (c.libDocs.length ? '<span class="badge ok">Vše v pořádku</span>' : '<span class="badge soon">Žádné</span>') });
   h += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"]].filter(p=>(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"]].filter(p=>(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     h += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
     provoz.forEach(p=> h += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
@@ -1443,7 +1453,7 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 function renderAccess(){
   const box=document.getElementById("accessMatrix");
