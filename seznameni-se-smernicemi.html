@@ -784,7 +784,7 @@ window.addEventListener("hashchange", route);
 /* ============================================================
    INTRANET pro zaměstnance (#muj) — přihlášení přes Google SSO
    ============================================================ */
-let MUJ = { data:null, email:"", name:"", view:"dash", libFolder:null, modules:[] };
+let MUJ = { data:null, email:"", name:"", view:"dash", libFolder:null, modules:[], admin:false };
 function mujIcon(p){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>'; }
 const MUJ_IC = {
   dash:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="11" width="7" height="10" rx="1.5"/><rect x="3" y="15" width="7" height="6" rx="1.5"/>',
@@ -860,7 +860,7 @@ async function initIntranet(){
   }
   who.textContent = me.employee.name + " · " + me.employee.email;
   logoutBtn.style.display=""; side.style.display="";
-  MUJ.email = me.employee.email; MUJ.name = me.employee.name;
+  MUJ.email = me.employee.email; MUJ.name = me.employee.name; MUJ.admin = !!me.admin;
   await refreshMy();
   showDashboard();
 }
@@ -870,7 +870,7 @@ async function refreshMy(){
   if(!MUJ.data.library) MUJ.data.library = {folders:[],docs:[]};
   MUJ.modules = MUJ.data.modules || [];
 }
-function moduleVisible(m){ return m.gated ? (MUJ.modules||[]).indexOf(m.key)>=0 : true; }
+function moduleVisible(m){ return m.gated ? (MUJ.admin || (MUJ.modules||[]).indexOf(m.key)>=0) : true; }
 function mujCounts(){
   const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[];
   return { dirs, libDocs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length };
@@ -930,7 +930,7 @@ function showKalkulace(){
 function showSvozEsa(){
   MUJ.view="svozesa"; renderSidebar();
   const body=document.getElementById("mujBody");
-  if((MUJ.modules||[]).indexOf("svozesa")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("svozesa")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/svoz-esa-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka svoz ESA"></iframe>';
   window.scrollTo(0,0);
 }
@@ -973,7 +973,7 @@ function showDashboard(){
     badge: c.libTodo ? '<span class="badge todo">'+c.libTodo+' k potvrzení</span>' : (c.libDocs.length ? '<span class="badge ok">Vše v pořádku</span>' : '<span class="badge soon">Žádné</span>') });
   h += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"]].filter(p=>(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     h += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
     provoz.forEach(p=> h += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
