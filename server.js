@@ -269,14 +269,21 @@ function ensureEmployee(email, name) {
   if (!e) { e = { id: 'g' + crypto.randomBytes(6).toString('hex'), name: name || email, email, cats: [] }; s.employees.push(e); writeJson(STATE_F, s); }
   return e;
 }
+// Komu je položka (směrnice/dokument) určena: základ = všem / dle oddělení; pak zúžení TAGY (má-li položka tagy, musí zaměstnanec mít shodný tag).
+function assignedTo(item, emp) {
+  const cats = (emp && emp.cats) || [], tags = (emp && emp.tags) || [];
+  const base = item.assignAll || (item.assignCats || []).some(c => cats.indexOf(c) >= 0);
+  if (!base) return false;
+  const at = item.assignTags || [];
+  return at.length ? at.some(t => tags.indexOf(t) >= 0) : true;
+}
 // Směrnice, které se týkají daného zaměstnance, + stav přečtení a zda je publikovaná.
 function myDirectives(email) {
   email = (email || '').toLowerCase();
   const s = getState();
   const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
-  const cats = emp ? (emp.cats || []) : [];
   return (s.directives || [])
-    .filter(d => d.assignAll || (d.assignCats || []).some(c => cats.indexOf(c) >= 0))
+    .filter(d => assignedTo(d, emp))
     .map(d => {
       const ack = d.acks && d.acks[email];
       return { id: d.id, title: d.title, ack: !!ack, ackTs: ack ? ack.ts : null, published: fs.existsSync(path.join(PUB_DIR, String(d.id).replace(/[^a-z0-9]/gi, '') + '.html')) };
@@ -297,10 +304,9 @@ function myLibrary(email) {
   email = (email || '').toLowerCase();
   const s = getState(); const lib = readLibrary();
   const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
-  const cats = emp ? (emp.cats || []) : [];
   const acks = libAcks();
   const docs = (lib.docs || [])
-    .filter(d => d.assignAll || (d.assignCats || []).some(c => cats.indexOf(c) >= 0))
+    .filter(d => assignedTo(d, emp))
     .map(d => {
       const v = curVersion(d);
       const ack = acks.find(x => x.docId === d.id && Number(x.v) === v && x.email === email);
@@ -384,7 +390,7 @@ function ymKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padS
 function reportData() {
   const s = getState();
   const emps = s.employees || [];
-  const audience = (item) => item.assignAll ? emps : emps.filter(e => (e.cats || []).some(c => (item.assignCats || []).indexOf(c) >= 0));
+  const audience = (item) => emps.filter(e => assignedTo(item, e));
   const lc = (e) => (e.email || '').toLowerCase();
   const directives = (s.directives || []).map(d => {
     const aud = audience(d); const acks = d.acks || {};

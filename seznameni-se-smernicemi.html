@@ -1100,8 +1100,10 @@ function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">
 
 // Komu je směrnice určena → pole zaměstnanců
 function audienceOf(dir){
-  if(dir.assignAll) return DB.employees.slice();
-  return DB.employees.filter(e => e.cats.some(c => dir.assignCats.includes(c)));
+  let aud = dir.assignAll ? DB.employees.slice() : DB.employees.filter(e => e.cats.some(c => dir.assignCats.includes(c)));
+  const at = dir.assignTags||[];
+  if(at.length) aud = aud.filter(e => (e.tags||[]).some(t => at.indexOf(t)>=0));
+  return aud;
 }
 /* ---------- Tagy: cílení rozesílání (směrnice i průzkumy) ---------- */
 let SEND_TAGS=[], SEND_CAND=[];
@@ -1145,8 +1147,9 @@ function renderDirectives(){
   wrap.innerHTML="";
   DB.directives.slice().sort((a,b)=>b.createdAt-a.createdAt).forEach(d=>{
     const s=ackStats(d);
-    const cats = d.assignAll? '<span class="tag">Všichni zaměstnanci</span>'
-      : (d.assignCats.map(c=>`<span class="tag">${esc(catName(c))}</span>`).join("")||'<span class="tag">— nepřiřazeno —</span>');
+    const cats = (d.assignAll? '<span class="tag">Všichni zaměstnanci</span>'
+      : (d.assignCats.map(c=>`<span class="tag">${esc(catName(c))}</span>`).join("")||'<span class="tag">— nepřiřazeno —</span>'))
+      + (d.assignTags||[]).map(t=>`<span class="tag" style="background:var(--yellow-soft);color:var(--amber)">🏷 ${esc(t)}</span>`).join("");
     const el=document.createElement("div");
     el.className="card dir-card";
     el.innerHTML=`
@@ -1223,6 +1226,10 @@ function openDirectiveModal(id){
       </label>
     </label>
     <div id="catWrap" style="opacity:${(!d||d.assignAll)?.4:1}">${catChecks}</div>
+    <label class="field" style="margin-top:12px"><span>Jen pro tagy <span class="muted" style="font-weight:400;text-transform:none">(nepovinné — prázdné = vidí celý výběr výše; s tagem jen zaměstnanci s daným tagem, např. Bruntál)</span></span>
+      <input type="text" id="dTags" list="dTagList" value="${d&&d.assignTags?esc(d.assignTags.join(', ')):''}" placeholder="např. Bruntál, Řidiči">
+      <datalist id="dTagList">${allTags().map(t=>'<option value="'+esc(t)+'">').join('')}</datalist>
+    </label>
   `;
   document.getElementById("modalFoot").innerHTML=`
     <button class="btn ghost" onclick="closeModal()">Zrušit</button>
@@ -1288,11 +1295,12 @@ function saveDirective(id){
   if(!pendingHtml){ alert("Nahraj dokument."); return; }
   const all=document.getElementById("dAll").checked;
   const cats=[...document.querySelectorAll(".dcat:checked")].map(c=>c.value);
+  const tags=(document.getElementById("dTags").value||"").split(",").map(s=>s.trim()).filter(Boolean);
   if(id){
     const d=DB.directives.find(x=>x.id===id);
-    d.title=title; d.html=pendingHtml; d.assignAll=all; d.assignCats=cats;
+    d.title=title; d.html=pendingHtml; d.assignAll=all; d.assignCats=cats; d.assignTags=tags;
   } else {
-    DB.directives.push({id:uid(),title,html:pendingHtml,createdAt:Date.now(),assignAll:all,assignCats:cats,acks:{}});
+    DB.directives.push({id:uid(),title,html:pendingHtml,createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,acks:{}});
   }
   save(); closeModal(); renderDirectives();
   toast(id?"Směrnice upravena":"Směrnice uložena");
@@ -1340,7 +1348,8 @@ async function renderLibAdmin(folderId){
   here.forEach(d=>{
     const v=curVer(d);
     const badges=(d.requireAck!==false?'<span class="pill amber">vyžaduje potvrzení</span>':'<span class="pill gray">jen ke čtení</span>')+' '+
-      (d.assignAll?'<span class="tag">Všichni</span>':((d.assignCats||[]).map(c=>'<span class="tag">'+esc(catName(c))+'</span>').join("")||'<span class="tag">— nepřiřazeno —</span>'));
+      (d.assignAll?'<span class="tag">Všichni</span>':((d.assignCats||[]).map(c=>'<span class="tag">'+esc(catName(c))+'</span>').join("")||'<span class="tag">— nepřiřazeno —</span>'))
+      +(d.assignTags||[]).map(t=>'<span class="tag" style="background:var(--yellow-soft);color:var(--amber)">🏷 '+esc(t)+'</span>').join("");
     h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.file)+'</div>'+
       '<div><div class="li-t">'+esc(d.title)+' <span class="muted" style="font-size:12px;font-weight:400">verze '+v+(d.kind?' · '+esc(d.kind):'')+'</span></div>'+
       '<div style="margin-top:5px">'+badges+'</div></div></div>'+
@@ -1400,7 +1409,10 @@ async function openLibDocModal(id){
     '<label class="field"><span>Poznámka k verzi (volitelné)</span><input type="text" id="lNote" placeholder="např. aktualizace 2026"></label>'+
     '<label style="display:inline-flex;gap:8px;align-items:center;margin:0 0 12px"><input type="checkbox" id="lReq" '+((!d||d.requireAck!==false)?'checked':'')+'> Vyžadovat potvrzení seznámení</label>'+
     '<label class="field"><span>Komu je určen</span><label style="display:inline-flex;gap:6px;align-items:center;margin:0 0 10px"><input type="checkbox" id="lAll" '+((!d||d.assignAll)?'checked':'')+' onchange="document.getElementById(\'lcatWrap\').style.opacity=this.checked?.4:1"> Všem zaměstnancům</label></label>'+
-    '<div id="lcatWrap" style="opacity:'+((!d||d.assignAll)?.4:1)+'">'+catChecks+'</div>';
+    '<div id="lcatWrap" style="opacity:'+((!d||d.assignAll)?.4:1)+'">'+catChecks+'</div>'+
+    '<label class="field" style="margin-top:12px"><span>Jen pro tagy <span class="muted" style="font-weight:400;text-transform:none">(nepovinné — prázdné = vidí celý výběr výše; s tagem jen zaměstnanci s daným tagem, např. Bruntál)</span></span>'+
+      '<input type="text" id="lTags" list="lTagList" value="'+((d&&d.assignTags)?esc(d.assignTags.join(", ")):"")+'" placeholder="např. Bruntál">'+
+      '<datalist id="lTagList">'+allTags().map(t=>'<option value="'+esc(t)+'">').join("")+'</datalist></label>';
   document.getElementById("modalFoot").innerHTML=
     '<button class="btn ghost" onclick="closeModal()">Zrušit</button>'+
     '<button class="btn" onclick="saveLibDoc(\''+(id||'')+'\')">Uložit dokument</button>';
@@ -1414,14 +1426,15 @@ async function saveLibDoc(id){
   const requireAck=document.getElementById("lReq").checked;
   const all=document.getElementById("lAll").checked;
   const cats=[...document.querySelectorAll(".lcat:checked")].map(c=>c.value);
+  const tags=(document.getElementById("lTags").value||"").split(",").map(s=>s.trim()).filter(Boolean);
   const note=document.getElementById("lNote").value.trim();
   if(id){
     const d=LIBDB.docs.find(x=>x.id===id); if(!d) return;
-    d.title=title; d.kind=kind; d.folderId=folderId; d.requireAck=requireAck; d.assignAll=all; d.assignCats=cats;
+    d.title=title; d.kind=kind; d.folderId=folderId; d.requireAck=requireAck; d.assignAll=all; d.assignCats=cats; d.assignTags=tags;
     if(libNewVer && pendingHtml){ const nv=curVer(d)+1; d.versions=d.versions||[]; d.versions.push({v:nv,html:pendingHtml,note,ts:Date.now()}); d.cur=nv; }
   } else {
     if(!pendingHtml){ alert("Nahraj dokument."); return; }
-    LIBDB.docs.push({id:uid(),title,kind,folderId,requireAck,assignAll:all,assignCats:cats,cur:1,versions:[{v:1,html:pendingHtml,note,ts:Date.now()}]});
+    LIBDB.docs.push({id:uid(),title,kind,folderId,requireAck,assignAll:all,assignCats:cats,assignTags:tags,cur:1,versions:[{v:1,html:pendingHtml,note,ts:Date.now()}]});
   }
   await saveLibrary(); closeModal(); renderLibAdmin();
   toast(id?"Dokument uložen":"Dokument přidán");
