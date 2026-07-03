@@ -257,7 +257,7 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
 .mj-main{flex:1;min-width:0;padding:26px 26px 80px;max-width:1120px}
 .mj-main.mj-full{max-width:none;padding:0}
 .mj-nav{display:flex;flex-direction:column;gap:3px;border:1px solid transparent;border-radius:14px;transition:box-shadow .16s}
-.mj-side:hover .mj-nav{position:absolute;top:0;left:0;width:236px;background:var(--paper);border-color:var(--line);box-shadow:var(--shadow-lg);padding:10px;z-index:40}
+.mj-side:hover .mj-nav{position:absolute;top:0;left:0;width:236px;background:var(--paper);border-color:var(--line);box-shadow:var(--shadow-lg);padding:10px;z-index:40;max-height:calc(100vh - 84px);overflow-y:auto;overscroll-behavior:contain}
 .mj-grp{display:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:14px 10px 6px}
 .mj-side:hover .mj-grp{display:block}
 .mj-side:hover .mj-grp:first-child{margin-top:2px}
