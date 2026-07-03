@@ -51,6 +51,11 @@ const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
 const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
 const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativně lokální soubor
+// Dovolená: úložiště žádostí + (volitelně) zápis do sdíleného Google kalendáře přes service account
+const VAC_F = path.join(DATA_DIR, 'vacation.json');
+const VACATION_CALENDAR_ID = process.env.VACATION_CALENDAR_ID || '';       // ID sdíleného kalendáře „Dovolené"
+const GOOGLE_SA_CLIENT_EMAIL = process.env.GOOGLE_SA_CLIENT_EMAIL || '';   // client_email ze service-account JSON
+const GOOGLE_SA_PRIVATE_KEY = (process.env.GOOGLE_SA_PRIVATE_KEY || '').replace(/\\n/g, '\n'); // private_key (PEM; \n → nové řádky)
 const GRIT_FILE = path.join(ROOT, 'grit.html');              // test houževnatosti (Grit)
 const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracovní spokojenosti (JSS)
 const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
@@ -380,6 +385,95 @@ function employeeModules(email) {
 }
 
 /* ============================================================
+   Dovolená: organizační struktura, konto, schvalování
+   ============================================================ */
+function readVac() { const v = readJson(VAC_F, { requests: [] }); if (!Array.isArray(v.requests)) v.requests = []; return v; }
+function writeVac(v) { writeJson(VAC_F, v); }
+
+// Počet pracovních dnů (po–pá) v rozsahu; celý půlden odečte 0.5. Státní svátky zatím neřešíme.
+function workingDays(from, to, halfDay) {
+  const a = new Date(from + 'T00:00:00'), b = new Date(to + 'T00:00:00');
+  if (isNaN(a.getTime()) || isNaN(b.getTime()) || b < a) return 0;
+  let n = 0;
+  for (const d = new Date(a); d <= b; d.setDate(d.getDate() + 1)) { const w = d.getDay(); if (w !== 0 && w !== 6) n++; }
+  if (halfDay && n > 0) n -= 0.5;
+  return n;
+}
+
+// Roční nárok zaměstnance (default 20 dní, když není nastaveno).
+function vacEntitlement(emp) { const n = Number(emp && emp.vacDays); return isFinite(n) && n > 0 ? n : 20; }
+
+// Čerpáno = součet dnů schválených žádostí v daném roce (podle e-mailu).
+function vacUsed(email, year) {
+  email = (email || '').toLowerCase();
+  return readVac().requests
+    .filter(r => r.status === 'approved' && (r.empEmail || '').toLowerCase() === email && new Date(r.from + 'T00:00:00').getFullYear() === year)
+    .reduce((s, r) => s + (Number(r.days) || 0), 0);
+}
+
+// Kdo schvaluje dovolenou zaměstnance: 1) přiřazený nadřízený (managerId),
+// 2) ředitel jeho střediska, 3) jednatel; jinak null → řeší admin.
+function approverFor(emp, emps) {
+  emps = emps || (getState().employees || []);
+  if (!emp) return null;
+  if (emp.managerId) { const m = emps.find(x => x.id === emp.managerId); if (m && m.email) return m; }
+  if (emp.stredisko) { const dir = emps.find(x => x.director && (x.stredisko || '') === emp.stredisko && x.id !== emp.id); if (dir) return dir; }
+  const jednatel = emps.find(x => x.jednatel && x.id !== emp.id); if (jednatel) return jednatel;
+  return null;
+}
+
+/* ---------- Google Calendar (service account, bez závislostí) ---------- */
+function calendarConfigured() { return !!(VACATION_CALENDAR_ID && GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }
+
+// Získá access token přes signed JWT (RS256) service accountu.
+async function calGetToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claim = b64url(JSON.stringify({ iss: GOOGLE_SA_CLIENT_EMAIL, scope: 'https://www.googleapis.com/auth/calendar.events', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
+  const signer = crypto.createSign('RSA-SHA256'); signer.update(header + '.' + claim);
+  const sig = signer.sign(GOOGLE_SA_PRIVATE_KEY).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const tok = await httpsPostForm('oauth2.googleapis.com', '/token', { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: header + '.' + claim + '.' + sig });
+  return tok.access_token;
+}
+function calApi(method, apiPath, token, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const body = bodyObj ? JSON.stringify(bodyObj) : '';
+    const headers = Object.assign({ 'Authorization': 'Bearer ' + token }, body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {});
+    const r = https.request({ method, hostname: 'www.googleapis.com', path: apiPath, headers }, resp => {
+      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j || {}); reject(new Error('Calendar ' + resp.statusCode + ': ' + d.slice(0, 200))); });
+    });
+    r.on('error', e => reject(new Error('Spojení s kalendářem: ' + e.message)));
+    r.setTimeout(20000, () => { try { r.destroy(new Error('Kalendář: časový limit spojení.')); } catch (_) {} });
+    if (body) r.write(body); r.end();
+  });
+}
+// Vloží celodenní událost dovolené do sdíleného kalendáře; vrací id události nebo null.
+async function calInsertVacation(rq) {
+  if (!calendarConfigured()) return null;
+  const token = await calGetToken();
+  const endEx = new Date(rq.to + 'T00:00:00'); endEx.setDate(endEx.getDate() + 1); // Google end.date je exkluzivní
+  const ev = {
+    summary: 'Dovolená – ' + (rq.empName || rq.empEmail) + (rq.halfDay ? ' (½ dne)' : ''),
+    description: (rq.note ? rq.note + '\n' : '') + 'Schválil: ' + (rq.decidedBy || ''),
+    start: { date: rq.from }, end: { date: endEx.toISOString().slice(0, 10) },
+    transparency: 'transparent'
+  };
+  const r = await calApi('POST', '/calendar/v3/calendars/' + encodeURIComponent(VACATION_CALENDAR_ID) + '/events', token, ev);
+  return r && r.id ? r.id : null;
+}
+async function calDeleteVacation(eventId) {
+  if (!calendarConfigured() || !eventId) return;
+  const token = await calGetToken();
+  await calApi('DELETE', '/calendar/v3/calendars/' + encodeURIComponent(VACATION_CALENDAR_ID) + '/events/' + encodeURIComponent(eventId), token);
+}
+// Notifikační e-mail (tiše přeskočí, když pošta není nastavená).
+async function vacMail(to, subject, text) {
+  if (!emailConfigured() || !to) return;
+  try { await deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet', subject, text, html: toHtml(text, '') }); }
+  catch (e) { console.warn('Dovolená: e-mail se nepodařilo odeslat (' + to + '): ' + e.message); }
+}
+
+/* ============================================================
    Měsíční vyhodnocení (e-mailem na zodpovědnou osobu)
    ============================================================ */
 function reportRecipient() { return (process.env.REPORT_EMAIL || 'tomas.krajca@elkoplast.cz').trim(); }
@@ -689,7 +783,88 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(302, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400', 'Location': '/#muj' });
       return res.end();
     }
-    if (p === '/api/my' && req.method === 'GET') { const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email) }); }
+    if (p === '/api/my' && req.method === 'GET') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const emps = getState().employees || []; const eml = e.email.toLowerCase();
+      const me = emps.find(x => (x.email || '').toLowerCase() === eml);
+      // Je schvalovatelem? = je něčí přímý nadřízený, ředitel střediska, nebo jednatel.
+      const isApprover = isAdmin(req) || emps.some(x => x.id !== (me && me.id) && (x.email || '').toLowerCase() !== eml && (approverFor(x, emps) || {}).id === (me && me.id));
+      const vacPending = readVac().requests.filter(r => r.status === 'pending' && (isAdmin(req) || (r.approverEmail || '').toLowerCase() === eml)).length;
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), isApprover: !!isApprover, vacPending: vacPending });
+    }
+
+    // ---- Dovolená: moje konto + žádosti (zaměstnanec) ----
+    if (p === '/api/vacation/my' && req.method === 'GET') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const emps = getState().employees || [];
+      const me = emps.find(x => (x.email || '').toLowerCase() === e.email.toLowerCase()) || { email: e.email, name: e.name };
+      const ap = approverFor(me, emps);
+      const year = new Date().getFullYear();
+      const ent = vacEntitlement(me), used = vacUsed(e.email, year);
+      const mine = readVac().requests.filter(r => (r.empEmail || '').toLowerCase() === e.email.toLowerCase()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return send(res, 200, { year, entitlement: ent, used, balance: Math.round((ent - used) * 10) / 10, approver: ap ? { name: ap.name, email: ap.email } : null, requests: mine });
+    }
+    if (p === '/api/vacation/request' && req.method === 'POST') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req) || '{}');
+      if (!b.from || !b.to) return send(res, 400, { error: 'Zadej datum od a do.' });
+      const days = workingDays(b.from, b.to, !!b.halfDay);
+      if (days <= 0) return send(res, 400, { error: 'Neplatný rozsah (žádné pracovní dny).' });
+      const emps = getState().employees || [];
+      const me = emps.find(x => (x.email || '').toLowerCase() === e.email.toLowerCase()) || { email: e.email, name: e.name };
+      const ap = approverFor(me, emps);
+      const v = readVac();
+      const rq = { id: 'v' + crypto.randomBytes(6).toString('hex'), empEmail: e.email, empName: e.name, approverEmail: ap ? ap.email : '', from: b.from, to: b.to, halfDay: !!b.halfDay, days, type: b.type || 'dovolena', note: (b.note || '').slice(0, 500), status: 'pending', createdAt: Date.now() };
+      v.requests.push(rq); writeVac(v);
+      const to = ap ? ap.email : reportRecipient();
+      vacMail(to, 'Nová žádost o dovolenou – ' + e.name, e.name + ' žádá o dovolenou ' + b.from + ' – ' + b.to + ' (' + days + ' dní).' + (rq.note ? '\nPoznámka: ' + rq.note : '') + '\n\nSchval v intranetu: ' + baseUrl(req) + '/#muj');
+      return send(res, 200, { ok: true, request: rq });
+    }
+    // ---- Dovolená: ke schválení (schvalovatel/admin) ----
+    if (p === '/api/vacation/pending' && req.method === 'GET') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const admin = isAdmin(req);
+      const list = readVac().requests.filter(r => r.status === 'pending' && (admin || (r.approverEmail || '').toLowerCase() === e.email.toLowerCase())).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      return send(res, 200, { admin, requests: list });
+    }
+    if (p === '/api/vacation/decide' && req.method === 'POST') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req) || '{}');
+      const v = readVac(); const rq = v.requests.find(x => x.id === b.id);
+      if (!rq) return send(res, 404, { error: 'Žádost nenalezena.' });
+      if (!(isAdmin(req) || (rq.approverEmail || '').toLowerCase() === e.email.toLowerCase())) return send(res, 403, { error: 'Tuto žádost nemůžeš schválit.' });
+      if (rq.status !== 'pending') return send(res, 400, { error: 'Žádost už je vyřízená.' });
+      rq.decidedAt = Date.now(); rq.decidedBy = e.name; rq.reason = (b.reason || '').slice(0, 300);
+      if (b.action === 'approve') {
+        rq.status = 'approved';
+        try { const evId = await calInsertVacation(rq); if (evId) rq.calendarEventId = evId; } catch (err) { console.warn('Kalendář: ' + err.message); }
+        vacMail(rq.empEmail, 'Dovolená schválena', 'Tvá dovolená ' + rq.from + ' – ' + rq.to + ' byla schválena (' + e.name + ').' + (calendarConfigured() ? '\nUdálost byla přidána do firemního kalendáře.' : ''));
+      } else {
+        rq.status = 'rejected';
+        vacMail(rq.empEmail, 'Dovolená zamítnuta', 'Tvá dovolená ' + rq.from + ' – ' + rq.to + ' byla zamítnuta (' + e.name + ').' + (rq.reason ? '\nDůvod: ' + rq.reason : ''));
+      }
+      writeVac(v);
+      return send(res, 200, { ok: true, request: rq });
+    }
+    // ---- Dovolená: zrušení vlastní žádosti (příp. odebrání z kalendáře) ----
+    if (p === '/api/vacation/cancel' && req.method === 'POST') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req) || '{}');
+      const v = readVac(); const rq = v.requests.find(x => x.id === b.id);
+      if (!rq) return send(res, 404, { error: 'Žádost nenalezena.' });
+      if (!((rq.empEmail || '').toLowerCase() === e.email.toLowerCase() || isAdmin(req))) return send(res, 403, { error: 'Nelze zrušit.' });
+      if (rq.calendarEventId) { try { await calDeleteVacation(rq.calendarEventId); } catch (err) { console.warn('Kalendář: ' + err.message); } delete rq.calendarEventId; }
+      rq.status = 'cancelled'; rq.decidedAt = Date.now();
+      writeVac(v);
+      return send(res, 200, { ok: true });
+    }
+    // ---- Dovolená: přehled všech + konto (admin) ----
+    if (p === '/api/vacation/all' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const emps = getState().employees || []; const year = new Date().getFullYear();
+      const konto = emps.map(x => { const ent = vacEntitlement(x); const used = vacUsed(x.email, year); return { name: x.name, email: x.email, stredisko: x.stredisko || '', entitlement: ent, used, balance: Math.round((ent - used) * 10) / 10 }; });
+      return send(res, 200, { year, konto, requests: readVac().requests.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)) });
+    }
 
     // ---- knihovna: správa (admin) ----
     if (p === '/api/library' && req.method === 'GET') return send(res, 200, readLibrary());

@@ -130,6 +130,7 @@ textarea{resize:vertical;min-height:90px}
 .pill.green{background:var(--green-soft);color:var(--green-d)}
 .pill.amber{background:var(--yellow-soft);color:var(--amber);border:1px solid #f3e0a0}
 .pill.gray{background:var(--bg-2);color:var(--ink-soft)}
+.pill.red{background:#fbe9e7;color:#b3261e;border:1px solid #f3c1bb}
 .pill.yellow{background:linear-gradient(150deg,var(--yellow),var(--yellow-2));color:#11271c}
 
 .tag{display:inline-block;padding:3px 10px;border-radius:7px;font-size:12px;background:var(--green-soft);color:var(--green-d);font-weight:500;margin:2px 3px 2px 0}
@@ -358,6 +359,7 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
       <button data-view="employees">Zaměstnanci</button>
       <button data-view="candidates">Uchazeči</button>
       <button data-view="access">Přístupy</button>
+      <button data-view="org">Organizační struktura</button>
       <button data-view="stats">Statistiky</button>
       <button data-view="grit">Průzkumy</button>
       <button data-view="settings">Nastavení</button>
@@ -460,6 +462,17 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
       <p>Komu zpřístupnit provozní moduly. Zaměstnanec uvidí v intranetu jen moduly, které mu zde povolíš.</p>
     </div>
     <div id="accessMatrix"></div>
+  </section>
+
+  <!-- ===== Organizační struktura ===== -->
+  <section id="view-org" class="view">
+    <div class="view-head">
+      <h2>Organizační struktura</h2>
+      <p>Kdo je čí nadřízený. Přímý nadřízený schvaluje dovolenou. Není-li přiřazen, schvaluje ředitel střediska, jinak jednatel. Zde nastavíš i roční nárok dovolené.</p>
+    </div>
+    <div id="orgEditor"></div>
+    <div class="view-head" style="margin-top:28px"><h2 style="font-size:20px">Přehled hierarchie</h2><p>Nadřazené větve zleva doprava (nadřízený → jeho nadřízený → …).</p></div>
+    <div id="orgTree"></div>
   </section>
 
   <!-- ===== Statistiky ===== -->
@@ -824,7 +837,7 @@ const MUJ_MODS = [
   { key:"skoleni", icon:MUJ_IC.school, label:"Školení", soon:true },
   { key:"pruzkumy", icon:MUJ_IC.poll, label:"Průzkumy", soon:true },
   { grp:"Volno a žádosti" },
-  { key:"dovolena", icon:MUJ_IC.cal, label:"Dovolená", soon:true },
+  { key:"dovolena", icon:MUJ_IC.cal, label:"Dovolená" },
   { key:"homeoffice", icon:MUJ_IC.home, label:"Home office", soon:true },
   { key:"pozadavky", icon:MUJ_IC.ticket, label:"Požadavky", soon:true }
 ];
@@ -878,7 +891,7 @@ function mujCounts(){
 function plural(n,a,b,c){ return n===1?a:(n>=2&&n<=4?b:c); }
 function renderSidebar(){
   const c = mujCounts();
-  const counts = { directives:c.dirTodo, library:c.libTodo };
+  const counts = { directives:c.dirTodo, library:c.libTodo, dovolena:(MUJ.data&&MUJ.data.vacPending)||0 };
   let h='<nav class="mj-nav">'; let pendingGrp=null;
   MUJ_MODS.forEach(m=>{
     if(m.grp!==undefined){ pendingGrp=m.grp; return; }
@@ -903,6 +916,7 @@ function mjGo(key){
   else if(key==="eshop") showEshop();
   else if(key==="kalkulace") showKalkulace();
   else if(key==="svozesa") showSvozEsa();
+  else if(key==="dovolena") showDovolena();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
 }
@@ -933,6 +947,104 @@ function showSvozEsa(){
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("svozesa")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/svoz-esa-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka svoz ESA"></iframe>';
   window.scrollTo(0,0);
+}
+/* ---------- Modul Dovolená ---------- */
+const VAC_STATUS = { pending:['○ Čeká na schválení','amber'], approved:['✓ Schváleno','green'], rejected:['✕ Zamítnuto','red'], cancelled:['— Zrušeno','gray'] };
+function vacFmt(d){ try{ return new Date(d+'T00:00:00').toLocaleDateString('cs-CZ'); }catch(e){ return d; } }
+async function showDovolena(){
+  MUJ.view="dovolena"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML='<div class="dash-hero"><h2>Dovolená</h2><p>Žádost o dovolenou, přehled konta a schvalování.</p></div><p class="muted">Načítám…</p>';
+  let my, pend=null;
+  try{ my = await (await fetch("/api/vacation/my",{cache:"no-store"})).json(); }
+  catch(e){ body.innerHTML='<div class="card pad"><p>Nepodařilo se načíst data dovolené.</p></div>'; return; }
+  const isApprover = MUJ.admin || (MUJ.data&&MUJ.data.isApprover);
+  if(isApprover){ try{ pend = await (await fetch("/api/vacation/pending",{cache:"no-store"})).json(); }catch(e){ pend={requests:[]}; } }
+
+  let h='<div class="dash-hero"><h2>Dovolená</h2><p>Žádost o dovolenou, přehled konta a schvalování.</p></div>';
+
+  // Konto
+  h+='<div class="dash-grid" style="margin-bottom:18px">'+
+    vacKpi('Roční nárok', my.entitlement, 'dní', '')+
+    vacKpi('Čerpáno', my.used, 'dní', 'amber')+
+    vacKpi('Zůstatek', my.balance, 'dní', my.balance>0?'green':'red')+'</div>';
+  if(my.approver) h+='<p class="muted" style="margin:-6px 0 16px">Tvou dovolenou schvaluje: <strong>'+esc(my.approver.name||my.approver.email)+'</strong></p>';
+  else h+='<p class="muted" style="margin:-6px 0 16px">Nemáš přiřazeného nadřízeného — žádost vyřídí administrátor.</p>';
+
+  // Sekce ke schválení
+  if(pend){
+    h+='<div class="dash-sec">Ke schválení'+(pend.requests.length?' ('+pend.requests.length+')':'')+'</div>';
+    if(!pend.requests.length){ h+='<div class="card pad"><span class="pill green">✓ Hotovo</span> <span class="muted">Žádné žádosti ke schválení.</span></div>'; }
+    else pend.requests.forEach(r=>{
+      h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.cal)+'</div><div>'+
+        '<div class="li-t">'+esc(r.empName||r.empEmail)+' · '+vacFmt(r.from)+' – '+vacFmt(r.to)+'</div>'+
+        '<div class="muted" style="font-size:12px;margin-top:2px">'+r.days+' '+plural(r.days,"den","dny","dní")+(r.halfDay?' · půlden':'')+(r.note?' · '+esc(r.note):'')+'</div></div></div>'+
+        '<div style="display:flex;gap:8px"><button class="btn sm" onclick="vacDecide(\''+r.id+'\',\'approve\')">Schválit</button>'+
+        '<button class="btn ghost sm" onclick="vacDecide(\''+r.id+'\',\'reject\')">Zamítnout</button></div></div>';
+    });
+  }
+
+  // Nová žádost
+  h+='<div class="dash-sec">Nová žádost</div><div class="card pad">'+
+    '<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">'+
+    '<label style="display:block">Od<br><input type="date" id="vacFrom" style="margin-top:4px"></label>'+
+    '<label style="display:block">Do<br><input type="date" id="vacTo" style="margin-top:4px"></label>'+
+    '<label style="display:flex;align-items:center;gap:6px;padding-bottom:8px"><input type="checkbox" id="vacHalf" style="width:16px;height:16px"> Půlden</label>'+
+    '<label style="display:block;flex:1;min-width:200px">Poznámka (volitelné)<br><input type="text" id="vacNote" placeholder="např. rodinná dovolená" style="margin-top:4px;width:100%"></label>'+
+    '<button class="btn" onclick="vacSubmit()">Odeslat žádost</button></div>'+
+    '<div id="vacMsg" class="muted" style="font-size:13px;margin-top:10px"></div></div>';
+
+  // Moje žádosti
+  h+='<div class="dash-sec">Moje žádosti</div>';
+  if(!my.requests.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím jsi nepodal žádnou žádost.</p></div>'; }
+  else my.requests.forEach(r=>{
+    const st=VAC_STATUS[r.status]||[r.status,'muted'];
+    const canCancel=(r.status==='pending'||r.status==='approved');
+    h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.cal)+'</div><div>'+
+      '<div class="li-t">'+vacFmt(r.from)+' – '+vacFmt(r.to)+'</div>'+
+      '<div class="muted" style="font-size:12px;margin-top:2px">'+r.days+' '+plural(r.days,"den","dny","dní")+(r.halfDay?' · půlden':'')+(r.reason?' · '+esc(r.reason):'')+'</div></div></div>'+
+      '<div style="display:flex;align-items:center;gap:10px"><span class="pill '+st[1]+'">'+st[0]+'</span>'+
+      (canCancel?'<button class="btn ghost sm" onclick="vacCancel(\''+r.id+'\')">Zrušit</button>':'')+'</div></div>';
+  });
+
+  body.innerHTML=h; window.scrollTo(0,0);
+}
+function vacKpi(label,val,unit,accent){
+  return '<div class="tile'+(accent?' accent':'')+'" style="cursor:default"><div><h3 style="font-size:30px;margin:0">'+val+' <span style="font-size:14px;font-weight:500;color:var(--ink-soft)">'+unit+'</span></h3><p style="margin-top:2px">'+label+'</p></div></div>';
+}
+async function vacSubmit(){
+  const from=document.getElementById("vacFrom").value, to=document.getElementById("vacTo").value;
+  const half=document.getElementById("vacHalf").checked, note=document.getElementById("vacNote").value;
+  const msg=document.getElementById("vacMsg");
+  if(!from||!to){ msg.textContent="Vyplň datum od a do."; return; }
+  msg.textContent="Odesílám…";
+  try{
+    const r=await fetch("/api/vacation/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({from,to,halfDay:half,note})});
+    const j=await r.json();
+    if(!r.ok){ msg.textContent=j.error||"Chyba."; return; }
+    if(typeof toast==="function") toast("Žádost odeslána");
+    await refreshMy(); showDovolena();
+  }catch(e){ msg.textContent="Nepodařilo se odeslat."; }
+}
+async function vacDecide(id,action){
+  let reason="";
+  if(action==="reject"){ reason=prompt("Důvod zamítnutí (volitelné):")||""; }
+  try{
+    const r=await fetch("/api/vacation/decide",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,action,reason})});
+    const j=await r.json();
+    if(!r.ok){ if(typeof toast==="function") toast(j.error||"Chyba"); return; }
+    if(typeof toast==="function") toast(action==="approve"?"Schváleno":"Zamítnuto");
+    await refreshMy(); showDovolena();
+  }catch(e){ if(typeof toast==="function") toast("Chyba spojení"); }
+}
+async function vacCancel(id){
+  if(!confirm("Opravdu zrušit tuto žádost?")) return;
+  try{
+    const r=await fetch("/api/vacation/cancel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+    if(!r.ok){ const j=await r.json().catch(()=>({})); if(typeof toast==="function") toast(j.error||"Chyba"); return; }
+    if(typeof toast==="function") toast("Zrušeno");
+    await refreshMy(); showDovolena();
+  }catch(e){ if(typeof toast==="function") toast("Chyba spojení"); }
 }
 function mujSoon(name){ if(typeof toast==="function") toast(name+" — modul připravujeme"); }
 function tile(opts){
@@ -971,6 +1083,9 @@ function showDashboard(){
     badge: c.dirTodo ? '<span class="badge todo">'+c.dirTodo+' k potvrzení</span>' : (c.dirs.length ? '<span class="badge ok">Vše potvrzeno</span>' : '<span class="badge soon">Žádné</span>') });
   h += tile({ icon:MUJ_IC.book, title:"Knihovna", desc:"Pracovní řád, SOP, postupy.", action:"mjGo('library')", accent:c.libTodo>0,
     badge: c.libTodo ? '<span class="badge todo">'+c.libTodo+' k potvrzení</span>' : (c.libDocs.length ? '<span class="badge ok">Vše v pořádku</span>' : '<span class="badge soon">Žádné</span>') });
+  const vacPend=(MUJ.data&&MUJ.data.vacPending)||0;
+  h += tile({ icon:MUJ_IC.cal, title:"Dovolená", desc:"Žádost o dovolenou a konto.", action:"mjGo('dovolena')", accent:vacPend>0,
+    badge: vacPend ? '<span class="badge todo">'+vacPend+' ke schválení</span>' : '<span class="badge ok">Konto & žádosti</span>' });
   h += '</div>';
 
   const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
@@ -1097,6 +1212,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="candidates") renderCandidates();
   if(v==="library") renderLibAdmin(null);
   if(v==="access") renderAccess();
+  if(v==="org") renderOrg();
   if(v==="grit") renderGritAdmin();
   if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); }
 });
@@ -1483,6 +1599,62 @@ function toggleAdmin(empId, on){
   e.admin=!!on;
   save();
 }
+
+/* ============================================================
+   ORGANIZAČNÍ STRUKTURA — nadřízení, střediska, nárok dovolené
+   ============================================================ */
+function orgApprover(e){
+  // Vrátí zaměstnance, který schvaluje dovolenou (nadřízený → ředitel střediska → jednatel).
+  if(e.managerId){ const m=DB.employees.find(x=>x.id===e.managerId); if(m) return m; }
+  if(e.stredisko){ const d=DB.employees.find(x=>x.director&&(x.stredisko||'')===e.stredisko&&x.id!==e.id); if(d) return d; }
+  const j=DB.employees.find(x=>x.jednatel&&x.id!==e.id); if(j) return j;
+  return null;
+}
+function renderOrg(){
+  const box=document.getElementById("orgEditor");
+  if(!DB.employees.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nejprve přidej zaměstnance v záložce Zaměstnanci.</p></div>'; document.getElementById("orgTree").innerHTML=''; return; }
+  const strediska=[...new Set(DB.employees.map(e=>e.stredisko).filter(Boolean))].sort();
+  let h='<div class="matrix-wrap"><table class="matrix"><thead><tr>'+
+    '<th class="who">Zaměstnanec</th><th>Středisko</th><th>Přímý nadřízený</th>'+
+    '<th style="text-align:center">Ředitel<br>střediska</th><th style="text-align:center">Jednatel</th>'+
+    '<th style="text-align:center">Nárok<br>(dní/rok)</th><th>Schvaluje</th></tr></thead><tbody>';
+  DB.employees.forEach(e=>{
+    const opts='<option value="">— žádný —</option>'+DB.employees.filter(x=>x.id!==e.id).map(x=>'<option value="'+x.id+'"'+(e.managerId===x.id?' selected':'')+'>'+esc(x.name||x.email)+'</option>').join('');
+    const strOpts='<option value="">—</option>'+strediska.map(s=>'<option'+(e.stredisko===s?' selected':'')+'>'+esc(s)+'</option>').join('');
+    const ap=orgApprover(e);
+    h+='<tr><td class="who">'+esc(e.name||e.email)+'<div class="muted" style="font-size:12px">'+esc(e.email||'')+'</div></td>'+
+      '<td><input list="orgStrediska" value="'+esc(e.stredisko||'')+'" placeholder="—" style="width:130px" onchange="setStredisko(\''+e.id+'\',this.value)"></td>'+
+      '<td><select style="max-width:190px" onchange="setManager(\''+e.id+'\',this.value)">'+opts+'</select></td>'+
+      '<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(e.director?'checked':'')+' onchange="toggleDirector(\''+e.id+'\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(e.jednatel?'checked':'')+' onchange="toggleJednatel(\''+e.id+'\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="number" min="0" step="0.5" value="'+(e.vacDays!=null?e.vacDays:20)+'" style="width:64px;text-align:center" onchange="setVacDays(\''+e.id+'\',this.value)"></td>'+
+      '<td class="muted" style="font-size:13px">'+(ap?esc(ap.name||ap.email):'<span style="color:var(--yellow)">admin</span>')+'</td></tr>';
+  });
+  h+='</tbody></table></div><datalist id="orgStrediska">'+strediska.map(s=>'<option>'+esc(s)+'</option>').join('')+'</datalist>';
+  box.innerHTML=h;
+  renderOrgTree();
+}
+function orgChain(e){ const chain=[]; let cur=e, guard=0; while(cur&&guard++<12){ const m=cur.managerId?DB.employees.find(x=>x.id===cur.managerId):null; if(!m) break; chain.push(m); cur=m; } return chain; }
+function renderOrgTree(){
+  const box=document.getElementById("orgTree"); if(!box) return;
+  // Kořeny = osoby bez nadřízeného; potomci = ti, kdo je mají jako managerId. Rekurzivní odsazené sloupce.
+  const byMgr={}; DB.employees.forEach(e=>{ const k=e.managerId||'_root'; (byMgr[k]=byMgr[k]||[]).push(e); });
+  const roots=DB.employees.filter(e=>!e.managerId||!DB.employees.find(x=>x.id===e.managerId));
+  function node(e,depth){
+    const kids=(byMgr[e.id]||[]).filter(k=>k.id!==e.id);
+    const badge=e.jednatel?' <span style="font-size:11px;background:var(--yellow);color:#3a2f00;padding:1px 6px;border-radius:999px">jednatel</span>':(e.director?' <span style="font-size:11px;background:var(--green-2);color:#fff;padding:1px 6px;border-radius:999px">ředitel</span>':'');
+    let s='<div style="margin:4px 0 4px '+(depth*22)+'px;padding:7px 12px;border-left:3px solid var(--green-2);background:var(--card,#fff);border-radius:6px">'+
+      '<strong>'+esc(e.name||e.email)+'</strong>'+badge+(e.stredisko?' <span class="muted" style="font-size:12px">· '+esc(e.stredisko)+'</span>':'')+'</div>';
+    kids.forEach(k=>{ s+=node(k,depth+1); });
+    return s;
+  }
+  box.innerHTML='<div class="card pad">'+(roots.length?roots.map(r=>node(r,0)).join(''):'<p class="muted" style="margin:0">Zatím není nastavena žádná nadřízenost.</p>')+'</div>';
+}
+function setManager(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.managerId=val||null; save(); renderOrg(); }
+function setStredisko(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.stredisko=(val||'').trim(); save(); renderOrg(); }
+function toggleDirector(empId,on){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.director=!!on; save(); renderOrg(); }
+function toggleJednatel(empId,on){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.jednatel=!!on; save(); renderOrg(); }
+function setVacDays(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; const n=parseFloat(val); e.vacDays=isFinite(n)&&n>=0?n:20; save(); }
 
 /* ============================================================
    PRŮZKUMY — dotazník (Grit) s rozesláním přes společný send modal
