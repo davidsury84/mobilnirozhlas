@@ -134,8 +134,10 @@ function gatePage() {
 /* ---------- SSO zaměstnanců (Google OIDC, bez závislostí) ---------- */
 const GOOGLE = { clientId: process.env.GOOGLE_CLIENT_ID || '', clientSecret: process.env.GOOGLE_CLIENT_SECRET || '', hd: (process.env.ALLOWED_HD || '').trim() };
 function ssoEnabled() { return !!(GOOGLE.clientId && GOOGLE.clientSecret); }
-// Demo přihlášení zaměstnance – jen na localhost a jen když není zapnuté SSO (v produkci za doménou inertní).
-function devAllowed(req) { const h = (req.headers.host || '').toLowerCase(); return !ssoEnabled() && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(h); }
+// Demo přihlášení zaměstnance – jen když NENÍ zapnuté SSO. Standardně jen na localhost;
+// na testovacím nasazení (bez domény pro Google) lze povolit i mimo localhost přes ALLOW_DEV_LOGIN=1.
+// Bezpečnostní pojistka: v produkci je zapnuté SSO → dev přihlášení je vždy vypnuté bez ohledu na flag.
+function devAllowed(req) { const h = (req.headers.host || '').toLowerCase(); if (ssoEnabled()) return false; return process.env.ALLOW_DEV_LOGIN === '1' || /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(h); }
 function b64url(buf) { return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function b64urlDecode(s) { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Buffer.from(s, 'base64').toString('utf8'); }
 function cookieVal(req, name) { const m = (req.headers.cookie || '').match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)')); return m ? decodeURIComponent(m[1]) : ''; }
@@ -778,9 +780,28 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/auth/dev') {
       if (!devAllowed(req)) return send(res, 403, '<h1>Demo přihlášení není dostupné.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      const sess = empSign({ email: 'demo@elkoplast.cz', name: 'Demo Zaměstnanec' });
-      res.writeHead(302, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400', 'Location': '/#muj' });
-      return res.end();
+      const emps = (getState().employees || []);
+      const wanted = (u.query.email || '').toLowerCase().trim();
+      if (wanted) {
+        // Přihlášení za konkrétního zaměstnance (kvůli testování schvalování apod.).
+        const emp = emps.find(x => (x.email || '').toLowerCase() === wanted) || { email: wanted, name: u.query.name || wanted };
+        const sess = empSign({ email: emp.email, name: emp.name });
+        res.writeHead(302, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400', 'Location': '/#muj' });
+        return res.end();
+      }
+      // Výběr identity (bez hesla) – testovací přihlášení.
+      const rows = emps.length
+        ? emps.map(e => '<a class="b" href="/auth/dev?email=' + encodeURIComponent(e.email) + '">' + esc(e.name || e.email) + '<small>' + esc(e.email || '') + (e.admin ? ' · admin' : '') + '</small></a>').join('')
+        : '<a class="b" href="/auth/dev?email=demo@elkoplast.cz">Demo Zaměstnanec<small>demo@elkoplast.cz</small></a>';
+      const page = '<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<title>Testovací přihlášení</title><style>body{margin:0;font-family:system-ui,sans-serif;background:#eef1ec;color:#0f1512;display:grid;place-items:center;min-height:100vh;padding:24px}'
+        + '.c{max-width:460px;width:100%;background:#fff;border:1px solid #e3e7e0;border-radius:16px;padding:28px 26px;box-shadow:0 10px 30px rgba(15,21,18,.07)}'
+        + 'h1{font-size:20px;margin:0 0 6px}p{color:#5b635c;margin:0 0 18px;font-size:14px;line-height:1.5}'
+        + '.b{display:flex;flex-direction:column;gap:2px;padding:11px 14px;border:1px solid #e3e7e0;border-radius:10px;text-decoration:none;color:#0f1512;font-weight:600;margin-bottom:8px}'
+        + '.b:hover{border-color:#1f5d3f;background:#f4f8f5}.b small{font-weight:400;color:#8a938b;font-size:12px}</style></head>'
+        + '<body><div class="c"><h1>Testovací přihlášení</h1><p>Bez hesla — vyber, za koho se chceš přihlásit. (Dostupné jen v testovacím prostředí; v produkci se přihlašuje přes Google.)</p>'
+        + rows + '</div></body></html>';
+      return send(res, 200, page, { 'Content-Type': 'text/html; charset=utf-8' });
     }
     if (p === '/api/my' && req.method === 'GET') {
       const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
