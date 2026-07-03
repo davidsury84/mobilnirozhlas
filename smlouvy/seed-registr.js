@@ -1,0 +1,58 @@
+'use strict';
+// Jednorázový import registru REGISTR_SMLUV_ELKOPLAST (stav k 2026-07).
+// Data v pořadí 13 sloupců registru; odkaz na Disk prázdný (v sheetu jen text
+// „otevřít", ne URL — doplní se ručně). Spouští se 1× při startu (meta guard);
+// import je navíc idempotentní přes cislo_smlouvy.
+
+const imp = require('./import');
+const { todayPrague } = require('./lib/datum');
+
+const SEED_KEY = 'seed_registr_v1';
+
+// [ID, Kategorie, Protistrana, Předmět, Platnost do, Výpověď/prolongace,
+//  DEADLINE, Notifikace, Hodnota, Garant, Správce, Stav, Odkaz]
+const RADKY = [
+  ['2026-017', 'ZÁVAZEK – GARANCE', 'Contenur Polska / Elkoplast Ukraine', 'Ručení ELKOPLAST CZ za závazky Elkoplast Ukraine vůči Contenur, max. 150 000 EUR; min. odběr UA 300 000 EUR/2026; bez force majeure (válka); polské právo, soud Rzeszów', '31.12.2026', 'auto-prodloužení na 2027; výpověď 6 měs. – lhůta pro netermínování 2027 UPLYNULA 30.6.2026', 'ŘEŠIT HNED: podmínky 2027; objemy 2027 sjednat v prosinci 2026', '1.10.2026 / 1.12.2026 + průběžně platby UA', 'expozice 150 000 EUR', 'Tomáš Krajča / David Surý', 'Simona Janečková', 'AKUTNÍ', ''],
+  ['2025-004', 'ODBĚRATELSKÁ – nájem (příjem)', 'ČD Cargo Logistics a.s.', 'Nájem kontejnerů ACTS 150 Kč/ks/den; předání 14.2.2026, konec 15.4.2026; prodloužení dohodou / odkup', '15.4.2026 – UPLYNULO', 'dohoda', 'OVĚŘIT: vráceno / prodlouženo / vyfakturováno', 'ihned', '150 Kč/ks/den', 'logistika', 'Simona Janečková', 'AKUTNÍ – kontrola', ''],
+  ['2026-014', 'ODBĚRATELSKÁ (sponzoring)', 'FILMFEST, s.r.o.', 'Partner 66. ZFF: 150 000 Kč + DPH + 1 000 ks kelímků NickNack; POVINNOST: vyhodnocení spolupráce do 30.9.2026 (Filmfest do 31.10.); kontakt H. Ondrašíková / F. Bartek', '30.9.2026', '–', 'předložit vyhodnocení do 30.9.2026', '1.9.2026', '150 000 Kč + DPH', 'Hana Ondrašíková', 'Simona Janečková', 'povinnost 9/2026', ''],
+  ['2026-006', 'ODBĚRATELSKÁ (příjem)', 'ASEKOL a.s.', 'Propagace na 66. ZFF (29.–31.5.2026); odměna 100 000 Kč bez DPH po akci', '30.6.2026', '–', 'fakturovat 100 000 Kč', 'ihned', '+100 000 Kč', 'marketing', 'Simona Janečková', 'dobíhá – fakturace', ''],
+  ['2026-001', 'ZÁVAZEK – rámcová', 'Marius Pedersen a.s.', 'Rámcová KS 2026045 – kontejnery; indexace inflace k 1.1. (oznámit 30 dní předem); ocel +10 % = mimoř. úprava; pojistka odpovědnosti min. 2 mil. Kč povinná; sankce 500 Kč/kont./den', '31.12.2027', '2 měsíce', 'výpověď do 31.10.2027; oznámení nových cen do 1.12. každý rok', '1.10.2027 + každoročně 15.11.', 'dle objednávek', 'Jan Šonský', 'Simona Janečková', 'aktivní', ''],
+  ['2026-008', 'ZÁVAZEK – distribuce', 'BAROCLEAN SAS (FR)', 'Exkluzivní distribuce HYDROCITY CZ+SK 3 roky; kvóty 400/450/500 tis. EUR; demo unit 1×/rok; non-compete (pokuta 20 % 2letého závazku); rabat 15 %; open account 200 000 EUR; ICC arbitráž Paříž', '30.3.2029', 'roční review; nesplnění kvóty = výpověď / nižší rabat / dělení území', 'review Q1 2027 – kvóta 2026/27: 400 000 EUR', '1.1.2027 / 1.3.2027 + každoročně', '400–500 tis. EUR/rok', 'Martin Veselý', 'Simona Janečková', 'aktivní', ''],
+  ['2026-002', 'DODAVATELSKÁ', 'Vodafone CZ', 'Rámcová OneNet 002696 + dodatek 1; min. plnění 29 000 Kč/měs bez DPH; sleva 270 000 Kč; inflace od 1.1.2027 max +10 %; dílčí: TS eDohled, TS Hlasové služby', '31.1.2028', 'doba určitá 24 měs.', 'renegociace od 10/2027', '1.11.2027 / 1.12.2027', 'min. 348 tis. Kč/rok', 'IT / vedení', 'Simona Janečková', 'aktivní', ''],
+  ['2026-003', 'DODAVATELSKÁ', 'AVONET, s.r.o.', 'Internet Fibre Premium 100/100, sml. 4079-P, 3 900 Kč/měs; předčasné ukončení = doplatek zbylých paušálů', 'neurčitá, min. do 28.2.2029', '1 měsíc po min. době', 'výpověď bez sankce nejdřív k 28.2.2029', '1.12.2028', '3 900 Kč/měs', 'Petr Pšeja', 'Simona Janečková', 'aktivní', ''],
+  ['2026-004', 'DODAVATELSKÁ', 'Dáváme s.r.o. (Pipedrive)', 'Pipedrive Premium 11 licencí, roční plán od 20.1.2026; faktura 21 dní před obnovou, splatnost 14 dní; změny licencí min. 24 h před obnovou', 'auto-obnova 20.1.2027', 'automatická roční', 'revize licencí do 10.1.2027', '1.12.2026 / 5.1.2027', '11 licencí/rok', 'Tomáš Bursa', 'Simona Janečková', 'aktivní', ''],
+  ['2026-009', 'DODAVATELSKÁ', 'Scania CZ', 'DARIS Control 1 – 1TN2246/2247/2248, 1TP5325; 460 Kč/měs/vůz (MCA0069478)', '30.6.2027', '3 měsíce', 'výpověď do 31.3.2027', '1.3.2027', '1 840 Kč/měs', 'Dušan Fidler', 'Simona Janečková', 'aktivní', ''],
+  ['2025-008', 'DODAVATELSKÁ', 'Scania CZ', 'DARIS Control 1 – 1TN 2905 (MCA0051824), 1TN 2906 (MCA0051825); 460 Kč/měs/vůz', '31.8.2027', '3 měsíce', 'výpověď do 31.5.2027', '1.5.2027', '920 Kč/měs', 'Dušan Fidler', 'Simona Janečková', 'aktivní', ''],
+  ['2025-009', 'DODAVATELSKÁ', 'Scania CZ', 'Services 360 Core Classic – 1TN 2905 (R450/2020), FLEX; 4 555 Kč/měs + 0,5466 Kč/km (MCA0051867); konečný stav 710 000 km; projezd +15 % = právo výpovědi; pokuta 15 000 Kč za nepřistavení do 2 týdnů; inflace k 1.1.', '31.8.2027 nebo 710 000 km', '3 měsíce', 'výpověď do 31.5.2027; pololetně kontrola km', '1.5.2027 + km check 1/2027', '~55 tis. Kč/rok + km', 'Dušan Fidler', 'Simona Janečková', 'aktivní', ''],
+  ['2026-010', 'DODAVATELSKÁ', 'Scania CZ', 'Services 360 Classic Core – 1TN 2072 (R450/2019), FLEX; 3 352 Kč/měs + 0,6704 Kč/km (MCA0066150); konečný stav 564 000 km; Domácí servis Vizovice; stejné sankce', '30.4.2028 nebo 564 000 km', '3 měsíce', 'výpověď do 31.1.2028; pololetně kontrola km', '1.1.2028 + km check', '~40 tis. Kč/rok + km', 'Dušan Fidler', 'Simona Janečková', 'aktivní', ''],
+  ['2025-001', 'DODAVATELSKÁ', 'SGS ICS CZ', 'Certifikace ISO 45001:2018, cyklus 3 roky (CZ/PRG/SGS/85/250805/SMS); indexace inflace; kontakt L. Sedláčková', 'konec platnosti certifikátu (~2028)', '–', 'dohledový audit č. 1 PODZIM 2026; č. 2 2027; recertifikace 2028', '1.9.2026 + 2027 + jaro 2028', '53 125 Kč (2026); 44 625 Kč (2027)', 'Lucie Sedláčková', 'Simona Janečková', 'aktivní', ''],
+  ['2026-007', 'DODAVATELSKÁ', 'HCV group a.s.', 'HELIOS iNuvio podlicence + systémová podpora 145R21005, dodatek 2: podpora 248 181,43 Kč/rok bez DPH', 'neurčitá', 'dle základní smlouvy – doplnit', '–', 'před roční fakturací podpory', '248 tis. Kč/rok', 'Petr Pšeja', 'Simona Janečková', 'aktivní', ''],
+  ['2026-005', 'DODAVATELSKÁ', 'Solkind s.r.o., AK', 'Právní služby 2 600 Kč/h bez DPH; klient vypoví kdykoli okamžitě, advokát 1 měs.', 'neurčitá', 'kdykoli', '–', '–', '2 600 Kč/h', 'David Surý', 'Simona Janečková', 'aktivní', ''],
+  ['2026-013', 'DODAVATELSKÁ', 'TOO West East Legal (Astana, KZ)', 'Právní služby dle technických zadání; 100% předplatba do 5 bank. dnů, měna tenge', 'dle jednotlivých zadání', '–', '–', '–', 'dle zadání', 'David Surý', 'Simona Janečková', 'aktivní', ''],
+  ['2025-010', 'ZÁVAZEK – majetek v zahraničí', 'Zhejiang Elec Barrel Co. (CN)', 'Tool rental: 3 lisovací formy (~50 000 USD) u čínského výrobce od 30.12.2025; pokuta 200 000 EUR za zneužití; vrácení na výzvu, prodlení 5 000 EUR/den; nájemce povinen pojistit na plnou hodnotu', 'neurčitá (končí s dodavatelským vztahem)', 'na výzvu', 'při ukončení odběrů ihned vyžádat formy; OVĚŘIT pojištění', 'roční kontrola stavu forem', '~50 000 USD', 'nákup / David Surý', 'Simona Janečková', 'aktivní', ''],
+  ['2026-016', 'ZÁVAZEK – memorandum', 'UTB ve Zlíně', 'Memorandum o spolupráci (projekt POCEK, OP JAK); odstoupení po 30denní lhůtě k nápravě', '31.12.2028', '–', 'zvážit obnovu Q4 2028', '1.10.2028', '–', 'David Surý', 'Simona Janečková', 'aktivní', ''],
+  ['2026-011', 'DODAVATELSKÁ – energie', 'innogy Energie', 'Tichov (211180023801): EE 20.11.–31.12.2025, fix C56d 3 149/2 878 Kč/MWh; navazující smlouva 2026 ve složce; prodloužení jen novým jednáním o ceně', 'dle navazující smlouvy 2026', 'nové jednání', 'kontraktace 2027 v Q3 2026', '1.9.2026', 'dle spotřeby', 'správa budov / I. Krsička', 'Simona Janečková', 'aktivní', ''],
+  ['2026-012', 'ODBĚRATELSKÁ – energie (příjem)', 'innogy Energie', 'Výkup EE z FVE Supíkovice 5 kW (211180025582) 1.5.–31.12.2026 + druhá výrobna (EE1) + smlouvy 2027 + ZP 2027 MO/SO (plyn); exkluzivita výkupu; rozhodčí doložka RS HK ČR', '31.12.2026 / 31.12.2027', 'kalendářní rok', 'kontraktace dalšího roku vždy Q3', '1.9.2026 a 1.9.2027', 'dle výroby', 'správa budov / I. Krsička', 'Simona Janečková', 'aktivní', ''],
+  ['2026-015', 'DODAVATELSKÁ', 'Valašskokloboucké služby s.r.o.', 'Dodatek 1 ke sml. 158 – svoz SKO/tříděného Ploština/Tichov: 3× 1100 l čtrnáctidenně 18 000 Kč/rok + 740 Kč/vývoz na zavolání; ceník od 1.1.2026', 'neurčitá', 'dle základní smlouvy', 'kontrola ceníku každý leden', '1.12. každoročně', '18 000 Kč/rok +', 'správa budov', 'Simona Janečková', 'aktivní', ''],
+  ['2025-005', 'ODBĚRATELSKÁ (příjem)', 'HYCA s.r.o. (SK)', 'Rámcová: prostory + práce pro výrobu kontejnerů ve Zlíně 15.6.–30.9.2025, max. 1,9 mil. Kč; záruka 2 roky od poskytnutí', 'splněno 30.9.2025', '–', 'záruka do ~30.9.2027', '–', '1,9 mil. Kč (příjem)', 'výroba Zlín', 'Simona Janečková', 'splněno – záruka', ''],
+  ['2025-011', 'ODBĚRATELSKÁ KS (příjem)', 'OZO Ostrava s.r.o.', 'KS 5× mulda 7 m³, 308 000 Kč bez DPH; dodání 10 týdnů od podpisu (10/2025); ZÁRUKA 30 MĚSÍCŮ od předání; SLA: nástup na opravu do 72 h, odstranění do 3 dnů, jinak 500 Kč/den', 'dodáno; záruka do ~jara 2028', '–', 'držet SLA 72 h po celou záruku', 'konec záruky Q1 2028', '+308 000 Kč', 'Petr Janča', 'Simona Janečková', 'záruka + SLA', ''],
+  ['KS-2026', 'ODBĚRATELSKÉ KS 2026 (souhrn)', 'TS Zlín; SAKO Brno; Pražský plast. koš; Železný Brod; SMO Vých. Moravy 4×; Olomouc; Jasenná; Vysokomýtsko; Dolní Cerekev; Regia Autosalubritate MD 2×; Kroměříž; Nové Heřminovy; Nedašov; Pro-Doma; Mělník; Val. Meziříčí; DEK; Min. obrany 2×; KTS Ekologie; Werner Weber; Buzau RO; složky Hanácký venkov / HOLUBICE / SUTCO / Mírov / Loučka', 'Jednorázové kupní smlouvy – hlídat dodání, záruky, SLA; data k extrakci samostatným během', 'dodání dle smluv', '–', 'extrakce dat dodání/záruk/SLA – samostatný běh', 'dle extrakce', 'příslušný obchodník', 'Simona Janečková', 'plnění', ''],
+  ['KS-2025', 'ODBĚRATELSKÉ KS 2025 (souhrn)', 'OKK Koksovny; ČD Cargo KS; Rychvald; Vítkovice Steel; TS Krnov; Muzeum Prahy; EKOPACK BG; Jablůnka; Holčovice; Louka; Čechy p. Kosířem; Bílé Karpaty; Sever Znojemska; Frýdecká skládka; Luhačovské Zálesí; Moravský kras; HZS Hlučín; Mezihoří 2×; Stř. Vsetínsko; VTýnec; Větrník; SAKO Brno; Svitávka; Moravská cesta; Darkovice; Gradinarium; V. Bíteš; Rančířov; Holešovsko; Bystřička; TS Olomouc; ŘSD; Brumov-Bylnice; Holešov; V. Karlovice; Bludov; SOMPO; Skanska SoD; Dolní Bečva; BIKRAN', 'Jednorázové kupní smlouvy – dodáno, záruky běží (POZOR: 24–30 měs. dle smlouvy)', 'dodáno; záruky běží', '–', 'extrakce dat záruk – samostatný běh', 'dle extrakce', 'příslušný obchodník', 'Simona Janečková', 'plnění / záruka', ''],
+];
+
+// Spustí import 1× (meta guard). Idempotentní i bez guardu (párování na cislo_smlouvy).
+function seedOnce(M) {
+  if (M.meta.get(SEED_KEY)) return { skipped: true };
+  const plan = imp.nahled(RADKY, {});
+  const vysledek = imp.uloz({ smlouva: M.smlouva, termin: M.termin }, plan, { by: 'seed-registr', zakladatOdvozeneTerminy: true });
+  M.meta.set(SEED_KEY, todayPrague());
+  // Ať tick při TOMTO startu nepošle burst notifikací pro nově naimportované
+  // (hlavně eskalace na admina u smluv po termínu) — notifikace naběhnou další den.
+  M.meta.set('last_daily', todayPrague());
+  console.log('[smlouvy] seed registru:', JSON.stringify(vysledek),
+    '| smluv:', plan.statistika.smluv, '| placeholderů:', plan.statistika.placeholderu,
+    '| nedořešených garantů:', plan.statistika.nedoresenychGarantu);
+  return vysledek;
+}
+
+module.exports = { seedOnce, RADKY, SEED_KEY };

@@ -25,6 +25,10 @@ function mount(host) {
   const dbFile = path.join(host.dataDir || __dirname, 'smlouvy.db');
   const M = openDb(dbFile);
 
+  // Jednorázový import registru (1× přes meta guard, idempotentní).
+  try { require('./seed-registr').seedOnce(M); }
+  catch (e) { console.error('[smlouvy] seed registru selhal:', e.message); }
+
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);
   const html = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
