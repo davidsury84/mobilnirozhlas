@@ -869,7 +869,7 @@ const MUJ_MODS = [
   { grp:"Rozvoj a nástup" },
   { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace", soon:true },
   { key:"skoleni", icon:MUJ_IC.school, label:"Školení", soon:true },
-  { key:"pruzkumy", icon:MUJ_IC.poll, label:"Průzkumy", soon:true },
+  { key:"pruzkumy", icon:MUJ_IC.poll, label:"Průzkumy" },
   { grp:"Volno a žádosti" },
   { key:"dovolena", icon:MUJ_IC.cal, label:"Dovolená" },
   { key:"homeoffice", icon:MUJ_IC.home, label:"Home office", soon:true },
@@ -920,13 +920,13 @@ async function refreshMy(){
 }
 function moduleVisible(m){ return m.gated ? (MUJ.admin || (MUJ.modules||[]).indexOf(m.key)>=0) : true; }
 function mujCounts(){
-  const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[];
-  return { dirs, libDocs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length };
+  const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[]; const survs=d.surveys||[];
+  return { dirs, libDocs, survs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length, survTodo:survs.filter(x=>!x.filled).length };
 }
 function plural(n,a,b,c){ return n===1?a:(n>=2&&n<=4?b:c); }
 function renderSidebar(){
   const c = mujCounts();
-  const counts = { directives:c.dirTodo, library:c.libTodo, dovolena:(MUJ.data&&MUJ.data.vacPending)||0 };
+  const counts = { directives:c.dirTodo, library:c.libTodo, pruzkumy:c.survTodo, dovolena:(MUJ.data&&MUJ.data.vacPending)||0 };
   let h='<nav class="mj-nav">'; let pendingGrp=null;
   MUJ_MODS.forEach(m=>{
     if(m.grp!==undefined){ pendingGrp=m.grp; return; }
@@ -952,6 +952,7 @@ function mjGo(key){
   else if(key==="kalkulace") showKalkulace();
   else if(key==="svozesa") showSvozEsa();
   else if(key==="dovolena") showDovolena();
+  else if(key==="pruzkumy") showPruzkumy();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
 }
@@ -981,6 +982,40 @@ function showSvozEsa(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("svozesa")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/svoz-esa-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka svoz ESA"></iframe>';
+  window.scrollTo(0,0);
+}
+/* ---------- Modul Průzkumy (dotazníky a testy) ---------- */
+function survDate(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLocaleDateString('cs-CZ')+' '+d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
+async function showPruzkumy(){
+  MUJ.view="pruzkumy"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML='<div class="dash-hero"><h2>Průzkumy</h2><p>Načítám…</p></div>';
+  await refreshMy();
+  const surveys=(MUJ.data&&MUJ.data.surveys)||[];
+  let h='<div class="dash-hero"><h2>Průzkumy</h2><p>Vyplňte prosím dotazníky a testy. U každého vidíte, zda a kdy jste ho odeslali — vyplnit lze i opakovaně.</p></div>';
+  if(!surveys.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Žádné průzkumy nejsou k dispozici.</p></div>'; body.innerHTML=h; return; }
+  const row=(s)=>{
+    const badge=s.filled?'<span class="pill green">✓ Vyplněno '+esc(survDate(s.filledAt))+'</span>':'<span class="pill amber">○ Nevyplněno</span>';
+    return '<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.poll)+'</div><div>'+
+      '<div class="li-t">'+esc(s.title)+'</div>'+
+      '<div class="muted" style="font-size:12px;margin-top:2px">'+esc(s.desc)+' · cca '+s.mins+' min</div></div></div>'+
+      '<div style="display:flex;align-items:center;gap:10px">'+badge+
+      '<button class="btn'+(s.filled?' ghost':'')+' sm" onclick="mjSurvey(\''+s.id+'\')">'+(s.filled?'Vyplnit znovu':'Vyplnit')+'</button></div></div>';
+  };
+  const todo=surveys.filter(s=>!s.filled), done=surveys.filter(s=>s.filled);
+  if(todo.length){ h+='<div class="dash-sec">K vyplnění ('+todo.length+')</div>'; todo.forEach(s=>h+=row(s)); }
+  if(done.length){ h+='<div class="dash-sec">Vyplněné</div>'; done.forEach(s=>h+=row(s)); }
+  body.innerHTML=h; window.scrollTo(0,0);
+}
+function mjSurvey(kind){
+  MUJ.view="pruzkumy"; renderSidebar();
+  const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
+  const body=document.getElementById("mujBody");
+  const url='/'+encodeURIComponent(kind)+'#kdo='+encodeURIComponent(MUJ.email);
+  body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
+      '<button class="btn ghost sm" onclick="showPruzkumy()">← Zpět na průzkumy</button>'+
+      '<span class="muted" style="font-size:13px">Po odeslání se datum vyplnění uloží automaticky. Zpět se vrátíte tlačítkem vlevo.</span></div>'+
+    '<iframe src="'+url+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#fff" title="Průzkum"></iframe>';
   window.scrollTo(0,0);
 }
 /* ---------- Modul Dovolená ---------- */

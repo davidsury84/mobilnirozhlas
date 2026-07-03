@@ -324,6 +324,19 @@ function myLibrary(email) {
   const folders = (lib.folders || []).map(f => ({ id: f.id, name: f.name, parentId: f.parentId || null }));
   return { folders, docs };
 }
+// Průzkumy/testy dostupné zaměstnanci + jestli (a kdy) je vyplnil. Datum vyplnění = ts posledního záznamu (upsert dle e-mailu).
+function mySurveys(email) {
+  email = (email || '').toLowerCase();
+  const DEFS = [
+    { id: 'grit', title: 'Test houževnatosti (Grit)', desc: '10 otázek · vytrvalost a dlouhodobá vášeň pro cíle', mins: 3, file: GRIT_F },
+    { id: 'jss',  title: 'Dotazník pracovní spokojenosti (JSS)', desc: '36 otázek · 9 oblastí pracovní spokojenosti', mins: 8, file: JSS_F },
+    { id: 'tw44', title: 'Test kognitivní zátěže (TW44)', desc: 'krátké subtesty pozornosti a paměti', mins: 6, file: TW44_F },
+  ];
+  return DEFS.map(d => {
+    const rec = readJson(d.file, []).find(r => (r.email || '').toLowerCase() === email);
+    return { id: d.id, title: d.title, desc: d.desc, mins: d.mins, filled: !!rec, filledAt: rec ? (rec.ts || null) : null };
+  });
+}
 // Test houževnatosti (Grit) – percentil populace ČR z průměru (HS 1,0–5,0)
 const GRIT_PCT = { 18: 0, 19: 0, 20: 1, 21: 1, 22: 1, 23: 2, 24: 3, 25: 5, 26: 6, 27: 9, 28: 12, 29: 16, 30: 20, 31: 25, 32: 31, 33: 37, 34: 44, 35: 51, 36: 58, 37: 64, 38: 70, 39: 76, 40: 81, 41: 85, 42: 89, 43: 92, 44: 94, 45: 96, 46: 97, 47: 98, 48: 99, 49: 99, 50: 100 };
 function gritPct(avg) { const k = Math.round(avg * 10); if (k < 18) return 0; if (k > 50) return 100; return GRIT_PCT[k] != null ? GRIT_PCT[k] : 0; }
@@ -812,7 +825,7 @@ const server = http.createServer(async (req, res) => {
       // Je schvalovatelem? = je něčí přímý nadřízený, ředitel střediska, nebo jednatel.
       const isApprover = isAdmin(req) || emps.some(x => x.id !== (me && me.id) && (x.email || '').toLowerCase() !== eml && (approverFor(x, emps) || {}).id === (me && me.id));
       const vacPending = readVac().requests.filter(r => r.status === 'pending' && (isAdmin(req) || (r.approverEmail || '').toLowerCase() === eml)).length;
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), isApprover: !!isApprover, vacPending: vacPending });
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), isApprover: !!isApprover, vacPending: vacPending });
     }
 
     // ---- Dovolená: moje konto + žádosti (zaměstnanec) ----
