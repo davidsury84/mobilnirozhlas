@@ -420,7 +420,10 @@ function approverFor(emp, emps) {
   if (!emp) return null;
   if (emp.managerId) { const m = emps.find(x => x.id === emp.managerId); if (m && m.email) return m; }
   if (emp.stredisko) { const d = emps.find(x => x.vedouci && (x.stredisko || '') === emp.stredisko && x.id !== emp.id); if (d) return d; }
-  return null;
+  // Bez přiřazeného vedoucího schvaluje superadmin (SUPERADMIN) – kromě jeho vlastní žádosti.
+  if ((emp.email || '').toLowerCase() === SUPERADMIN) return null;
+  const sa = emps.find(x => (x.email || '').toLowerCase() === SUPERADMIN);
+  return sa || { email: SUPERADMIN, name: 'David Surý' };
 }
 
 /* ---------- Google Calendar (service account, bez závislostí) ---------- */

@@ -1659,10 +1659,12 @@ function toggleAdmin(empId, on){
 // Číselník středisek (editovatelný) – v DB.settings.strediska.
 function getStrediska(){ if(!DB.settings) DB.settings={}; if(!Array.isArray(DB.settings.strediska)) DB.settings.strediska=[]; return DB.settings.strediska; }
 function orgApprover(e){
-  // Dovolenou schvaluje přímý nadřízený („pod kým je"); není-li, vedoucí jeho střediska.
+  // Dovolenou schvaluje přímý nadřízený („pod kým je"); není-li, vedoucí jeho střediska; jinak superadmin.
   if(e.managerId){ const m=DB.employees.find(x=>x.id===e.managerId); if(m) return m; }
   if(e.stredisko){ const d=DB.employees.find(x=>x.vedouci&&(x.stredisko||'')===e.stredisko&&x.id!==e.id); if(d) return d; }
-  return null;
+  if((e.email||'').toLowerCase()===SUPERADMIN_EMAIL) return null;
+  const sa=DB.employees.find(x=>(x.email||'').toLowerCase()===SUPERADMIN_EMAIL);
+  return sa||{name:'David Surý',email:SUPERADMIN_EMAIL};
 }
 function renderOrg(){
   const box=document.getElementById("orgEditor");
