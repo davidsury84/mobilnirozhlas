@@ -665,6 +665,31 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
 <!--VERSION-->
 <footer class="app-foot no-print"><span id="verInfo">Intranet ELKOPLAST CZ</span></footer>
 <script>(function(){try{var v=window.__VER__||{};var el=document.getElementById("verInfo");if(!el)return;var when="";if(v.built){when=new Date(v.built).toLocaleString("cs-CZ",{day:"numeric",month:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"});}el.innerHTML="Intranet ELKOPLAST CZ"+(v.commit?(" · verze <b>"+v.commit+"</b>"):"")+(when?(" · aktualizováno <b>"+when+"</b>"):"");}catch(e){}})();</script>
+<script>
+/* Kontrola aktuálnosti: když server hlásí novější build, nabídneme obnovení (ať se neukazuje stará verze z cache). */
+(function(){
+  var cur = (window.__VER__||{}).built || 0;
+  var notified = false;
+  function banner(){
+    if(notified || document.getElementById("updBanner")) return; notified = true;
+    var b = document.createElement("div"); b.id = "updBanner";
+    b.style.cssText = "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9999;background:#1f5d3f;color:#fff;padding:11px 16px;border-radius:12px;box-shadow:0 12px 34px rgba(8,18,12,.35);font:14px system-ui,sans-serif;display:flex;gap:14px;align-items:center;max-width:92vw";
+    var t = document.createElement("span"); t.textContent = "Je k dispozici nová verze intranetu.";
+    var btn = document.createElement("button"); btn.textContent = "Obnovit";
+    btn.style.cssText = "background:#fff;color:#1f5d3f;border:0;border-radius:8px;padding:7px 15px;font-weight:700;cursor:pointer;font:inherit";
+    btn.onclick = function(){ location.reload(); };
+    b.appendChild(t); b.appendChild(btn); document.body.appendChild(b);
+  }
+  function check(){
+    if(notified) return;
+    fetch("/api/version",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;}).then(function(nv){
+      if(nv && nv.built && cur && nv.built !== cur) banner();
+    }).catch(function(){});
+  }
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") check(); });
+  setInterval(check, 5*60*1000);
+})();
+</script>
 
 <script>
 /* ============================================================

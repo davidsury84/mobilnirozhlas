@@ -638,6 +638,9 @@ const server = http.createServer(async (req, res) => {
   const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/api/grit', '/api/jss', '/api/tw44'];
   const inviteOk = !!(invite && INVITE_ROUTES.indexOf(p) >= 0);
 
+  // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
+  if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME }, { 'Cache-Control': 'no-store' });
+
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
   if (!gatePassed(req) && !inviteOk) {
     // přihlášení sdíleným heslem
