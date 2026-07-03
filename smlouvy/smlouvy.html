@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smlouvy — ELKOPLAST</title>
+<style>
+  :root{--cerv:#c0392b;--zlut:#e67e22;--zel:#27ae60;--tm:#2c3e50;--sed:#7f8c8d;--lin:#e5e8eb;}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#f6f7f9;color:#1a1a1a}
+  header{background:var(--tm);color:#fff;padding:12px 20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  header b{margin-right:16px;letter-spacing:.3px}
+  header button{background:transparent;border:none;color:#cfd8e3;font:inherit;font-weight:600;cursor:pointer;padding:6px 10px;border-radius:6px}
+  header button.act,header button:hover{background:rgba(255,255,255,.14);color:#fff}
+  main{max-width:1080px;margin:0 auto;padding:20px}
+  h1{font-size:20px;margin:0 0 14px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+  .card{background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .metr{font-size:30px;font-weight:800}
+  .muted{color:var(--sed);font-size:13px}
+  table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--lin);font-size:14px;vertical-align:top}
+  th{background:#f0f2f5;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--sed)}
+  tr[data-clic]{cursor:pointer} tr[data-clic]:hover td{background:#fafbfc}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:#fff}
+  .cerv{background:var(--cerv)}.zlut{background:var(--zlut)}.zel{background:var(--zel)}.sed{background:var(--sed)}
+  input,select,textarea{padding:7px 9px;border:1px solid #cfd6dd;border-radius:6px;font:inherit}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+  .btn{background:var(--zel);color:#fff;border:none;padding:9px 16px;border-radius:6px;font-weight:700;cursor:pointer}
+  .btn.sec{background:#eef1f4;color:#2c3e50}
+  a{color:#0e8a43}
+  .warn{color:var(--cerv);font-weight:700}
+  dialog{border:none;border-radius:10px;padding:0;max-width:560px;width:92%}
+  dialog .hd{padding:14px 18px;border-bottom:1px solid var(--lin);font-weight:700}
+  dialog .bd{padding:18px;display:grid;gap:10px}
+  dialog .bd label{display:grid;gap:4px;font-size:13px;color:#555}
+  dialog .ft{padding:12px 18px;border-top:1px solid var(--lin);text-align:right;display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+<header>
+  <b>ELKOPLAST · Smlouvy</b>
+  <button data-tab="dash" class="act">Dashboard</button>
+  <button data-tab="list">Seznam</button>
+  <button data-tab="kal">Kalendář</button>
+  <span style="margin-left:auto" class="muted" id="whoami"></span>
+</header>
+<main id="app"><p class="muted">Načítám…</p></main>
+
+<script>
+const $ = (s,r=document)=>r.querySelector(s);
+const el = (t,a={},...c)=>{const e=document.createElement(t);for(const k in a){if(k==='html')e.innerHTML=a[k];else if(k==='on')for(const ev in a.on)e.addEventListener(ev,a.on[ev]);else e.setAttribute(k,a[k]);}c.flat().forEach(x=>e.append(x==null?'':x));return e;};
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const czd = iso => { if(!iso) return '—'; const [y,m,d]=String(iso).slice(0,10).split('-'); return `${+d}.${+m}.${y}`; };
+const money = (v,mena)=> v==null?null:Number(v).toLocaleString('cs-CZ')+' '+mena;
+async function api(p,opt){const r=await fetch(p,opt);const t=await r.text();let j;try{j=JSON.parse(t)}catch{j=t} if(!r.ok)throw new Error((j&&j.chyba)||r.status);return j;}
+function pill(dny){return dny<0?['cerv','PO TERMÍNU']:dny<30?['cerv','do 30']:dny<=90?['zlut','do 90']:['sed',dny+' dní'];}
+
+let ADMIN=false;
+const app = $('#app');
+document.querySelectorAll('header button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('header button').forEach(x=>x.classList.remove('act'));
+  b.classList.add('act'); render(b.dataset.tab);
+});
+
+async function render(tab){
+  app.innerHTML='<p class="muted">Načítám…</p>';
+  try{ if(tab==='dash')await dash(); else if(tab==='list')await list(); else if(tab==='kal')await kal(); }
+  catch(e){ app.innerHTML='<p class="warn">Chyba: '+esc(e.message)+'</p>'; }
+}
+
+async function dash(){
+  const d = await api('/api/smlouvy/dashboard');
+  const meny = Object.keys(d.expozice);
+  app.innerHTML='';
+  app.append(el('h1',{},'Dashboard — ',el('span',{class:'muted'},'stav k '+czd(d.dnes))));
+  const cards = el('div',{class:'cards'});
+  cards.append(
+    el('div',{class:'card'}, el('div',{class:'muted'},'Červené (po termínu / do 30 dní)'), el('div',{class:'metr',style:'color:var(--cerv)'},String(d.cervene.length))),
+    el('div',{class:'card'}, el('div',{class:'muted'},'Žluté (do 90 dní)'), el('div',{class:'metr',style:'color:var(--zlut)'},String(d.zlute.length))),
+    el('div',{class:'card'}, el('div',{class:'muted'},'Finanční expozice (roční)'),
+      meny.length? el('div',{}, ...meny.map(m=>el('div',{class:'metr',style:'font-size:22px'},d.expozice[m].toLocaleString('cs-CZ')+' '+m))) : el('div',{class:'metr'},'—'))
+  );
+  app.append(cards);
+  if(d.eskalovane||d.bounced){
+    app.append(el('div',{class:'card',style:'margin-bottom:16px'},
+      el('h1',{style:'font-size:16px'},'Vyžaduje pozornost'),
+      d.eskalovane?el('p',{},el('span',{class:'pill cerv'},'Eskalováno'),' '+d.eskalovane+' termínů (D−14 bez potvrzení).'):'',
+      d.bounced?el('p',{},el('span',{class:'pill cerv'},'Nedoručeno'),' '+d.bounced+' notifikací (bounce).'):''));
+  }
+  app.append(tabulkaTerminu([...d.cervene,...d.zlute],true));
+}
+
+function tabulkaTerminu(rows,klik){
+  const t=el('table',{},el('thead',{},el('tr',{},...['Pásmo','Smlouva','Typ','Datum','Za dní','Stav'].map(h=>el('th',{},h)))));
+  const tb=el('tbody');
+  if(!rows.length)tb.append(el('tr',{},el('td',{colspan:6,class:'muted'},'Žádné termíny v pásmu 90 dní.')));
+  rows.forEach(r=>{const [c,lbl]=pill(r.dny);
+    const tr=el('tr',klik?{'data-clic':1,on:{click:()=>detail(r.smlouva_id)}}:{},
+      el('td',{},el('span',{class:'pill '+c},lbl)),
+      el('td',{html:`<strong>${esc(r.cislo_smlouvy||'')}</strong> · ${esc(r.protistrana_nazev||'')}`}),
+      el('td',{},r.typ),el('td',{},czd(r.datum)),el('td',{},String(r.dny)),
+      el('td',{html:(esc(r.stav))+(r.garant_email?'':' · <span class="warn">garant nedořešen</span>')}));
+    tb.append(tr);});
+  t.append(tb);return t;
+}
+
+async function list(){
+  app.innerHTML='';
+  const q=el('input',{placeholder:'protistrana / předmět',style:'flex:1;min-width:180px'});
+  const fk=el('select',{},el('option',{value:''},'— kategorie —'),...['odberatelska','dodavatelska','zavazek','plneni'].map(k=>el('option',{value:k},k)));
+  const fs=el('select',{},el('option',{value:''},'— stav —'),...['aktivni','vypovezena','ukoncena','archivovana'].map(k=>el('option',{value:k},k)));
+  const go=el('button',{class:'btn'},'Filtrovat');
+  const bar=el('div',{class:'row'},fk,fs,q,go);
+  if(ADMIN)bar.append(el('button',{class:'btn sec',on:{click:()=>novaSmlouva()}},'+ Nová smlouva'),el('button',{class:'btn sec',on:{click:()=>importPanel()}},'Import registru'));
+  app.append(el('h1',{},'Seznam smluv'),bar);
+  const wrap=el('div',{});app.append(wrap);
+  async function nacti(){
+    const p=new URLSearchParams();if(fk.value)p.set('kategorie',fk.value);if(fs.value)p.set('stav',fs.value);if(q.value)p.set('q',q.value);
+    const data=await api('/api/smlouvy/list?'+p);
+    const t=el('table',{},el('thead',{},el('tr',{},...['Číslo','Kategorie','Protistrana','Platnost','Hodnota','Garant','Stav'].map(h=>el('th',{},h)))));
+    const tb=el('tbody');
+    if(!data.length)tb.append(el('tr',{},el('td',{colspan:7,class:'muted'},'Nic nenalezeno.')));
+    data.forEach(s=>tb.append(el('tr',{'data-clic':1,on:{click:()=>detail(s.id)}},
+      el('td',{html:`<strong>${esc(s.cislo_smlouvy||'')}</strong>${s.je_placeholder?' 📦':''}`}),
+      el('td',{},`${s.kategorie||''}${s.podtyp?' · '+s.podtyp:''}${s.smer?' ('+s.smer+')':''}`),
+      el('td',{},s.protistrana_nazev),
+      el('td',{},s.platnost_do?czd(s.platnost_do):(s.platnost_podminka||s.platnost_typ)),
+      el('td',{},money(s.hodnota,s.mena)||s.hodnota_popis||'—'),
+      el('td',{html:s.garant_email?esc(s.garant_email):'<span class="warn">nedořešen</span>'}),
+      el('td',{},el('span',{class:'pill '+(s.stav==='aktivni'?'zel':'sed')},s.stav_popis||s.stav)))));
+    t.append(tb);wrap.innerHTML='';wrap.append(t,el('p',{class:'muted'},'📦 = souhrnný balík KS (fáze 2b).'));
+  }
+  go.onclick=nacti;q.addEventListener('keydown',e=>{if(e.key==='Enter')nacti();});await nacti();
+}
+
+async function detail(id){
+  const d=await api('/api/smlouvy/detail?id='+id);const s=d.smlouva;
+  app.innerHTML='';
+  app.append(el('p',{},el('a',{href:'#',on:{click:e=>{e.preventDefault();$('header button[data-tab=list]').click();}}},'← zpět na seznam')));
+  app.append(el('h1',{},`${esc(s.cislo_smlouvy||'')} — ${esc(s.protistrana_nazev||'')}`));
+  const info=el('table',{});
+  const radek=(k,v)=>info.append(el('tr',{},el('th',{style:'width:200px'},k),el('td',{html:v})));
+  radek('Kategorie',`${s.kategorie||''}${s.podtyp?' · '+s.podtyp:''}${s.smer?' ('+s.smer+')':''}`);
+  radek('Předmět',esc(s.predmet||''));
+  radek('Platnost',(s.platnost_do?czd(s.platnost_do):s.platnost_typ)+(s.platnost_podminka?' · '+esc(s.platnost_podminka):''));
+  radek('Výpověď / prolongace',(s.vypovedni_lhuta_mesice?s.vypovedni_lhuta_mesice+' měs.':'—')+' / '+s.prolongace);
+  radek('Hodnota',money(s.hodnota,s.mena)||esc(s.hodnota_popis||'—'));
+  radek('Garant / Správce',(s.garant_email?esc(s.garant_email):'<span class="warn">nedořešen</span>')+' / '+esc(s.spravce_email||'—'));
+  radek('Stav',`<span class="pill ${s.stav==='aktivni'?'zel':'sed'}">${esc(s.stav_popis||s.stav)}</span>`);
+  radek('Disk',s.drive_url?`<a href="${esc(s.drive_url)}" target="_blank" rel="noopener">${esc(s.drive_url)}</a>`:'—');
+  app.append(el('div',{class:'card'},info));
+  if(ADMIN)app.append(el('div',{class:'row'},el('button',{class:'btn sec',on:{click:()=>upravSmlouvu(s)}},'Upravit smlouvu'),
+    el('button',{class:'btn sec',on:{click:()=>novyTermin(s.id)}},'+ Termín'),
+    el('button',{class:'btn sec',on:{click:()=>novyDodatek(s.id)}},'+ Dodatek')));
+
+  const tt=el('table',{},el('thead',{},el('tr',{},...['Typ','Datum','Stav','Opakování','Notifikace'].map(h=>el('th',{},h)))));
+  const tb=el('tbody');
+  if(!d.terminy.length)tb.append(el('tr',{},el('td',{colspan:5,class:'muted'},'Zatím žádné termíny — zakládají se ručně.')));
+  d.terminy.forEach(t=>{const h=(d.historie[t.id]||[]).map(n=>`${n.milnik} → ${esc(n.komu_email||'')} · ${n.stav_doruceni}`).join('<br>')||'—';
+    const row=el('tr',{},el('td',{},t.typ+(t.odvozeny?' (odvozený)':'')),el('td',{},czd(t.datum)),
+      el('td',{html:`<span class="pill ${t.stav==='vyreseno'?'zel':(t.stav==='eskalovano'?'cerv':'sed')}">${t.stav}</span>`}),
+      el('td',{},t.opakovani),el('td',{class:'muted',html:h}));
+    tb.append(row);});
+  tt.append(tb);app.append(el('div',{class:'card'},el('h1',{style:'font-size:16px'},'Termíny'),tt));
+
+  const dt=el('table',{},el('thead',{},el('tr',{},...['Číslo','Datum','Co mění'].map(h=>el('th',{},h)))));
+  const db=el('tbody');(d.dodatky.length?d.dodatky:[]).forEach(x=>db.append(el('tr',{},el('td',{},x.cislo||''),el('td',{},czd(x.datum)),el('td',{},x.co_meni||''))));
+  if(!d.dodatky.length)db.append(el('tr',{},el('td',{colspan:3,class:'muted'},'Bez dodatků.')));
+  dt.append(db);app.append(el('div',{class:'card'},el('h1',{style:'font-size:16px'},'Dodatky'),dt));
+}
+
+async function kal(){
+  const rows=await api('/api/smlouvy/kalendar');
+  app.innerHTML='';app.append(el('h1',{},'Kalendář termínů'));
+  if(!rows.length){app.append(el('div',{class:'card muted'},'Žádné čekající termíny.'));return;}
+  const grp={};rows.forEach(r=>{const k=String(r.datum).slice(0,7);(grp[k]=grp[k]||[]).push(r);});
+  Object.keys(grp).sort().forEach(m=>{
+    const t=el('table',{},el('thead',{},el('tr',{},...['Datum','Smlouva','Typ','Popis','Za dní'].map(h=>el('th',{},h)))));
+    const tb=el('tbody');
+    grp[m].forEach(r=>{const[c,lbl]=pill(r.dny);tb.append(el('tr',{'data-clic':1,on:{click:()=>detail(r.smlouva_id)}},
+      el('td',{},czd(r.datum)),el('td',{html:`<strong>${esc(r.cislo_smlouvy||'')}</strong> · ${esc(r.protistrana_nazev||'')}`}),
+      el('td',{},r.typ),el('td',{class:'muted'},r.popis||''),el('td',{},el('span',{class:'pill '+c},lbl))));});
+    t.append(tb);app.append(el('div',{class:'card'},el('h1',{style:'font-size:15px'},m),t));
+  });
+}
+
+// ---- dialogy (admin) ----
+function dialog(title,fields,onSave){
+  const dlg=el('dialog');const bd=el('div',{class:'bd'});const inputs={};
+  fields.forEach(f=>{const inp=f.opts?el('select',{},...f.opts.map(o=>el('option',{value:o},o))): f.ta?el('textarea',{rows:2}):el('input',{type:f.type||'text'});
+    if(f.val!=null)inp.value=f.val;inputs[f.k]=inp;bd.append(el('label',{},f.l,inp));});
+  const err=el('p',{class:'warn'});bd.append(err);
+  dlg.append(el('div',{class:'hd'},title),bd,el('div',{class:'ft'},
+    el('button',{class:'btn sec',on:{click:()=>dlg.close()}},'Zrušit'),
+    el('button',{class:'btn',on:{click:async()=>{try{const v={};for(const k in inputs)v[k]=inputs[k].value||null;await onSave(v);dlg.close();}catch(e){err.textContent=e.message;}}}},'Uložit')));
+  document.body.append(dlg);dlg.showModal();dlg.addEventListener('close',()=>dlg.remove());
+}
+function novaSmlouva(){dialog('Nová smlouva',[
+  {k:'cislo_smlouvy',l:'Číslo'},{k:'kategorie',l:'Kategorie',opts:['odberatelska','dodavatelska','zavazek','plneni']},
+  {k:'protistrana_nazev',l:'Protistrana'},{k:'predmet',l:'Předmět',ta:1},
+  {k:'platnost_do',l:'Platnost do (YYYY-MM-DD)'},{k:'vypovedni_lhuta_mesice',l:'Výpovědní lhůta (měs.)',type:'number'},
+  {k:'prolongace',l:'Prolongace',opts:['zadna','auto','jednani']},
+  {k:'hodnota',l:'Hodnota (číslo)',type:'number'},{k:'hodnota_typ',l:'Typ hodnoty',opts:['jednorazova','rocni','mesicni']},{k:'mena',l:'Měna',opts:['CZK','EUR','USD']},
+  {k:'garant_email',l:'Garant (e-mail)'},{k:'drive_url',l:'Odkaz na Disk'}],
+  async v=>{v.platnost_typ=v.platnost_do?'urcita':'neurcita';await api('/api/smlouvy/create',{method:'POST',body:JSON.stringify(v)});$('header button[data-tab=list]').click();});}
+function upravSmlouvu(s){dialog('Upravit smlouvu',[
+  {k:'stav',l:'Stav',opts:['aktivni','vypovezena','ukoncena','archivovana'],val:s.stav},
+  {k:'garant_email',l:'Garant (e-mail)',val:s.garant_email},{k:'spravce_email',l:'Správce (e-mail)',val:s.spravce_email},
+  {k:'platnost_do',l:'Platnost do',val:s.platnost_do},{k:'vypovedni_lhuta_mesice',l:'Výpovědní lhůta (měs.)',type:'number',val:s.vypovedni_lhuta_mesice}],
+  async v=>{await api('/api/smlouvy/update?id='+s.id,{method:'POST',body:JSON.stringify(v)});detail(s.id);});}
+function novyTermin(id){dialog('Nový termín',[
+  {k:'typ',l:'Typ',opts:['konec_platnosti','deadline_vypovedi','auto_prolongace','cenova_indexace','dohledovy_audit','rocni_review','konec_zaruky','sla','km_limit','jiny']},
+  {k:'datum',l:'Datum (YYYY-MM-DD)'},{k:'popis',l:'Popis',ta:1},{k:'opakovani',l:'Opakování',opts:['zadne','mesicni','ctvrtletni','rocni']}],
+  async v=>{await api('/api/smlouvy/termin?id='+id,{method:'POST',body:JSON.stringify(v)});detail(id);});}
+function novyDodatek(id){dialog('Nový dodatek',[
+  {k:'cislo',l:'Číslo'},{k:'datum',l:'Datum (YYYY-MM-DD)'},{k:'co_meni',l:'Co mění',ta:1},{k:'drive_url',l:'Odkaz na Disk'}],
+  async v=>{await api('/api/smlouvy/dodatek?id='+id,{method:'POST',body:JSON.stringify(v)});detail(id);});}
+
+function importPanel(){
+  const ta=el('textarea',{rows:8,style:'width:100%',placeholder:'Vlož řádky registru jako JSON: [["2026-001","ZÁVAZEK – rámcová","Marius Pedersen",...], ...]'});
+  const out=el('div',{class:'muted'});
+  const dlg=el('dialog');
+  dlg.append(el('div',{class:'hd'},'Import registru'),el('div',{class:'bd'},
+    el('div',{class:'muted'},'Náhled ukáže, co se založí / přeskočí. Termíny z volného textu se nezakládají automaticky.'),ta,out),
+    el('div',{class:'ft'},el('button',{class:'btn sec',on:{click:()=>dlg.close()}},'Zavřít'),
+      el('button',{class:'btn sec',on:{click:async()=>{try{const radky=JSON.parse(ta.value);const n=await api('/api/smlouvy/import-nahled',{method:'POST',body:JSON.stringify({radky})});window.__plan=n;out.innerHTML=`Smluv: <b>${n.statistika.smluv}</b> · placeholderů: ${n.statistika.placeholderu} · nedořešených garantů: ${n.statistika.nedoresenychGarantu} · návrhů termínů: ${n.statistika.navrhovanychTerminu}`;}catch(e){out.innerHTML='<span class="warn">'+esc(e.message)+'</span>';}}}},'Náhled'),
+      el('button',{class:'btn',on:{click:async()=>{try{if(!window.__plan)throw new Error('Nejdřív náhled.');const v=await api('/api/smlouvy/import-uloz',{method:'POST',body:JSON.stringify({plan:window.__plan})});out.innerHTML=`Založeno ${v.zalozeno}, aktualizováno ${v.aktualizovano}, placeholderů ${v.placeholderu}, termínů ${v.terminu}.`;}catch(e){out.innerHTML='<span class="warn">'+esc(e.message)+'</span>';}}}},'Uložit')));
+  document.body.append(dlg);dlg.showModal();dlg.addEventListener('close',()=>dlg.remove());
+}
+
+// bootstrap
+(async()=>{
+  try{const me=await api('/api/smlouvy/me');ADMIN=!!me.admin;$('#whoami').textContent=(me.email||'')+(me.admin?' · správce':' · čtenář');}
+  catch(e){$('#whoami').textContent='';}
+  render('dash');
+})();
+</script>
+</body>
+</html>

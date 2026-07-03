@@ -645,6 +645,21 @@ function intranetInviteMail(name, url, tpl) {
   return { subject, text, html };
 }
 
+// ---- Modul „Smlouvy" (Hlídač smluv) — samostatná složka ./smlouvy ----
+// Načtení je izolované: kdyby modul selhal (např. nedostupné node:sqlite),
+// nesmí shodit zbytek intranetu (směrnice, dovolená, knihovna…).
+let smlouvyMod = null;
+try {
+  smlouvyMod = require('./smlouvy').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
+    dataDir: DATA_DIR,
+    eskalaceEmail: SUPERADMIN,
+    publicBaseUrl: (CFG.publicUrl || process.env.SMLOUVY_BASE_URL || ''),
+  });
+} catch (e) {
+  console.error('[smlouvy] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -653,12 +668,14 @@ const server = http.createServer(async (req, res) => {
   const invite = inviteVerify(u.query.i || '');
   const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/api/grit', '/api/jss', '/api/tw44'];
   const inviteOk = !!(invite && INVITE_ROUTES.indexOf(p) >= 0);
+  // Veřejné cesty modulu Smlouvy (mimo SSO závoru): potvrzení termínu tokenem + Resend webhook.
+  const smlouvyPublic = p.startsWith('/smlouvy/potvrdit') || p === '/api/smlouvy/webhook/resend';
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -683,6 +700,9 @@ const server = http.createServer(async (req, res) => {
   if (PROTECTED.indexOf(p) >= 0 && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
+    // Modul „Smlouvy" si obslouží vlastní cesty (/smlouvy*, /api/smlouvy*).
+    if (smlouvyMod && await smlouvyMod.handle(req, res)) return;
+
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
     if (p === '/' || p === '/index.html' || p === '/admin' || p === '/admin/') {
@@ -1049,6 +1069,11 @@ if (require.main === module) {
     // měsíční vyhodnocení – kontrola při startu a pak periodicky (každých 6 h)
     maybeSendMonthlyReport();
     setInterval(maybeSendMonthlyReport, 6 * 3600 * 1000);
+    // Hlídač smluv: denní notifikační běh (stejný 6h interval, vnitřní pojistka na 1×/den)
+    if (smlouvyMod) {
+      smlouvyMod.tick();
+      setInterval(() => smlouvyMod.tick(), 6 * 3600 * 1000);
+    }
   });
 }
 module.exports = { smtpSend, loadConfig, getState };

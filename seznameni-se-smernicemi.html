@@ -866,6 +866,8 @@ const MUJ_MODS = [
   { key:"eshop", icon:MUJ_IC.cart, label:"E-shop", gated:true },
   { key:"kalkulace", icon:MUJ_IC.calc, label:"Kalkulace-lisy", gated:true },
   { key:"svozesa", icon:MUJ_IC.truck, label:"Kalkulačka svoz ESA", gated:true },
+  { grp:"Smlouvy" },
+  { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { grp:"Rozvoj a nástup" },
   { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace", soon:true },
   { key:"skoleni", icon:MUJ_IC.school, label:"Školení", soon:true },
@@ -942,7 +944,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="smlouvy");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
 function mjGo(key){
@@ -951,6 +953,7 @@ function mjGo(key){
   else if(key==="eshop") showEshop();
   else if(key==="kalkulace") showKalkulace();
   else if(key==="svozesa") showSvozEsa();
+  else if(key==="smlouvy") showSmlouvy();
   else if(key==="dovolena") showDovolena();
   else if(key==="pruzkumy") showPruzkumy();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
@@ -982,6 +985,13 @@ function showSvozEsa(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("svozesa")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/svoz-esa-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka svoz ESA"></iframe>';
+  window.scrollTo(0,0);
+}
+function showSmlouvy(){
+  MUJ.view="smlouvy"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("smlouvy")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<iframe src="/smlouvy" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Smlouvy — Hlídač smluv"></iframe>';
   window.scrollTo(0,0);
 }
 /* ---------- Modul Průzkumy (dotazníky a testy) ---------- */
@@ -1174,6 +1184,9 @@ function showDashboard(){
   const vacPend=(MUJ.data&&MUJ.data.vacPending)||0;
   h += tile({ icon:MUJ_IC.cal, title:"Dovolená", desc:"Žádost o dovolenou a konto.", action:"mjGo('dovolena')", accent:vacPend>0,
     badge: vacPend ? '<span class="badge todo">'+vacPend+' ke schválení</span>' : '<span class="badge ok">Konto & žádosti</span>' });
+  if(MUJ.admin || (MUJ.modules||[]).indexOf("smlouvy")>=0){
+    h += tile({ icon:MUJ_IC.file, title:"Smlouvy", desc:"Hlídač smluv a termínů.", action:"mjGo('smlouvy')", badge:'<span class="badge ok">Otevřít</span>' });
+  }
   h += '</div>';
 
   const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
@@ -1657,7 +1670,7 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["smlouvy","Smlouvy"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 function renderAccess(){
   const box=document.getElementById("accessMatrix");

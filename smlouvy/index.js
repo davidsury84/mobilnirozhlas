@@ -1,0 +1,227 @@
+'use strict';
+// Modul „Smlouvy" (Hlídač smluv) pro intranet elkoplast-smernice.
+// Zapojení v server.js:
+//   const smlouvy = require('./smlouvy').mount({ send, readBody, deliver,
+//       empSession, isAdmin, baseUrl, employeeModules, getState,
+//       dataDir: DATA_DIR, eskalaceEmail: SUPERADMIN });
+//   ...v handleru: if (await smlouvy.handle(req, res)) return;
+//   ...ve startu:  smlouvy.tick(); setInterval(smlouvy.tick, 6*3600*1000);
+// Veřejné cesty (mimo SSO závoru): /smlouvy/potvrdit/*, /api/smlouvy/webhook/resend
+
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const urlLib = require('url');
+
+const { openDb } = require('./db');
+const engine = require('./engine');
+const importSvc = require('./import');
+const { todayPrague, daysUntil, formatCz } = require('./lib/datum');
+const L = require('./lib/logic');
+
+const HTML_FILE = path.join(__dirname, 'smlouvy.html');
+
+function mount(host) {
+  const dbFile = path.join(host.dataDir || __dirname, 'smlouvy.db');
+  const M = openDb(dbFile);
+
+  // ---- pomocné -----------------------------------------------------
+  const json = (res, code, obj) => host.send(res, code, obj);
+  const html = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  async function body(req) { try { return JSON.parse(await host.readBody(req)); } catch { return {}; } }
+
+  function smiCist(req) { const e = host.empSession(req); return e ? e.email : null; }
+  function smiPsat(req) { return host.isAdmin(req); }
+  function maModul(req) {
+    if (host.isAdmin(req)) return true;
+    const e = host.empSession(req); if (!e) return false;
+    try { return (host.employeeModules(e.email) || []).includes('smlouvy'); } catch { return false; }
+  }
+
+  // ---- data pro dashboard -----------------------------------------
+  function dashboardData(now = new Date()) {
+    const dnes = todayPrague(now);
+    const rows = M.termin.aktivniCekajici(dnes)
+      .concat(M.db.prepare(`SELECT t.*, s.garant_email, s.spravce_email, s.cislo_smlouvy, s.protistrana_nazev
+        FROM termin t JOIN smlouva s ON s.id=t.smlouva_id
+        WHERE t.stav='eskalovano' AND s.stav='aktivni' AND s.je_placeholder=0`).all());
+    const seen = new Set(); const cervene = []; const zlute = [];
+    for (const x of rows) {
+      if (seen.has(x.id)) continue; seen.add(x.id);
+      const dny = daysUntil(x.datum, dnes);
+      const z = { ...x, dny };
+      if (dny < 30) cervene.push(z); else if (dny <= 90) zlute.push(z);
+    }
+    return {
+      dnes, cervene, zlute,
+      expozice: L.expoziceZavazku(M.smlouva.proExpozici()),
+      eskalovane: rows.filter((x) => x.stav === 'eskalovano').length,
+      bounced: M.notifikace.bouncenute().length,
+    };
+  }
+
+  // ---- webhook (veřejné) ------------------------------------------
+  const DORUCENI = { 'email.delivered': 'delivered', 'email.bounced': 'bounced', 'email.opened': 'opened', 'email.complained': 'failed' };
+  async function webhook(req, res) {
+    const raw = await host.readBody(req);
+    if (!overPodpis(process.env.RESEND_WEBHOOK_SECRET, req.headers, raw)) return json(res, 401, { chyba: 'Neplatný podpis.' });
+    let p; try { p = JSON.parse(raw); } catch { return json(res, 400, { chyba: 'Neplatné tělo.' }); }
+    const stav = DORUCENI[p.type]; const msgId = p.data && (p.data.email_id || p.data.id);
+    if (stav && msgId) {
+      const row = M.notifikace.aktualizujDoruceni(msgId, stav);
+      if (stav === 'bounced' && row) await eskalujBounce(row).catch(() => {});
+    }
+    return json(res, 200, { ok: true });
+  }
+  async function eskalujBounce(row) {
+    const t = M.termin.getById(row.termin_id); if (!t) return;
+    const s = M.smlouva.getById(t.smlouva_id);
+    const to = (s && s.spravce_email) || host.eskalaceEmail;
+    if (!to) return;
+    await host.deliver({ to, subject: `[Smlouvy] NEDORUČENO: ${s ? s.cislo_smlouvy : ''}`,
+      text: `Upozornění na termín (${t.typ}, ${t.datum}) se nepodařilo doručit (${row.komu_email}). Prověřte adresu garanta.` });
+  }
+
+  // ---- potvrzení termínu (veřejné, přes token) --------------------
+  function nactiToken(tok) {
+    const n = M.notifikace.najdiPodleTokenu(tok);
+    if (!n) return { chyba: 'Neplatný odkaz.' };
+    if (n.token_used_at) return { chyba: 'Tento termín už byl potvrzen.', hotovo: true };
+    if (n.token_expires_at && new Date(n.token_expires_at) < new Date()) return { chyba: 'Platnost odkazu vypršela.' };
+    return { n };
+  }
+  function potvrzeniPage({ chyba, hotovo, termin, smlouva, token }) {
+    const box = (inner) => `<!doctype html><meta charset="utf-8"><title>Potvrzení termínu</title>
+      <div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:520px;margin:48px auto;padding:24px;border:1px solid #e5e8eb;border-radius:10px;text-align:center">${inner}</div>`;
+    if (chyba) return box(`<h2>${hotovo ? '✓ Hotovo' : 'Nelze potvrdit'}</h2><p style="color:#7f8c8d">${engineEsc(chyba)}</p>`);
+    if (hotovo) return box(`<h2 style="color:#27ae60">✓ Termín potvrzen</h2>
+      <p>Termín <strong>${engineEsc(termin.typ)}</strong> u smlouvy <strong>${engineEsc(smlouva ? smlouva.cislo_smlouvy : '')}</strong> byl označen jako vyřešený.</p>
+      <p style="color:#7f8c8d">Děkujeme. Okno můžete zavřít.</p>`);
+    return box(`<h2>Potvrdit vyřešení termínu</h2>
+      <p>Smlouva <strong>${engineEsc(smlouva ? smlouva.cislo_smlouvy : '')}</strong> — ${engineEsc(smlouva ? smlouva.protistrana_nazev : '')}</p>
+      <p style="color:#7f8c8d">${engineEsc(termin.typ)} · ${engineEsc(formatCz(termin.datum))}${termin.popis ? ' · ' + engineEsc(termin.popis) : ''}</p>
+      <form method="post" action="/smlouvy/potvrdit/${engineEsc(token)}" style="margin-top:16px">
+        <button type="submit" style="background:#27ae60;color:#fff;border:none;padding:12px 22px;border-radius:6px;font-weight:700;font-size:15px;cursor:pointer">Označit jako „Vyřešeno"</button>
+      </form>`);
+  }
+
+  // ---- hlavní dispatch --------------------------------------------
+  async function handle(req, res) {
+    const u = urlLib.parse(req.url, true); const p = u.pathname;
+    if (!p.startsWith('/smlouvy') && !p.startsWith('/api/smlouvy')) return false;
+
+    // ---- VEŘEJNÉ ----
+    if (p === '/api/smlouvy/webhook/resend' && req.method === 'POST') { await webhook(req, res); return true; }
+
+    const mToken = p.match(/^\/smlouvy\/potvrdit\/([A-Za-z0-9-]+)$/);
+    if (mToken) {
+      const tok = mToken[1];
+      const st = nactiToken(tok);
+      if (req.method === 'GET') {
+        if (st.chyba) { html(res, st.hotovo ? 200 : 410, potvrzeniPage({ ...st, token: tok })); return true; }
+        const t = M.termin.getById(st.n.termin_id); const s = M.smlouva.getById(t.smlouva_id);
+        html(res, 200, potvrzeniPage({ termin: t, smlouva: s, token: tok })); return true;
+      }
+      if (req.method === 'POST') {
+        if (st.chyba) { html(res, st.hotovo ? 200 : 410, potvrzeniPage({ ...st, token: tok })); return true; }
+        engine.uzavriTermin(M, st.n.termin_id, st.n.komu_email);
+        M.notifikace.oznacTokenPouzity(tok);
+        const t = M.termin.getById(st.n.termin_id); const s = M.smlouva.getById(t.smlouva_id);
+        html(res, 200, potvrzeniPage({ hotovo: true, termin: t, smlouva: s, token: tok })); return true;
+      }
+    }
+
+    // ---- CHRÁNĚNÉ (přihlášený zaměstnanec + modul smlouvy) ----
+    if (!maModul(req)) { json(res, 403, { chyba: 'Nemáte přístup k modulu Smlouvy.' }); return true; }
+
+    // UI stránka
+    if ((p === '/smlouvy' || p === '/smlouvy/') && req.method === 'GET') {
+      if (!fs.existsSync(HTML_FILE)) { html(res, 404, '<h1>Chybí smlouvy.html</h1>'); return true; }
+      html(res, 200, fs.readFileSync(HTML_FILE, 'utf8')); return true;
+    }
+
+    // API
+    try {
+      if (p === '/api/smlouvy/me' && req.method === 'GET') {
+        const e = host.empSession(req) || {};
+        json(res, 200, { email: e.email || null, admin: smiPsat(req) }); return true;
+      }
+      if (p === '/api/smlouvy/dashboard' && req.method === 'GET') { json(res, 200, dashboardData()); return true; }
+
+      if (p === '/api/smlouvy/list' && req.method === 'GET') {
+        json(res, 200, M.smlouva.list({ kategorie: u.query.kategorie, garant: u.query.garant, stav: u.query.stav, q: u.query.q })); return true;
+      }
+      if (p === '/api/smlouvy/detail' && req.method === 'GET') {
+        const s = M.smlouva.getById(Number(u.query.id));
+        if (!s) { json(res, 404, { chyba: 'Nenalezeno.' }); return true; }
+        const terminy = M.termin.listBySmlouva(s.id);
+        const historie = {}; terminy.forEach((t) => { historie[t.id] = M.notifikace.historieProTermin(t.id); });
+        json(res, 200, { smlouva: s, dodatky: M.dodatek.listBySmlouva(s.id), terminy, historie }); return true;
+      }
+      if (p === '/api/smlouvy/kalendar' && req.method === 'GET') {
+        const dnes = todayPrague();
+        const rows = M.db.prepare(`SELECT t.id,t.typ,t.datum,t.popis,t.stav,t.smlouva_id,s.cislo_smlouvy,s.protistrana_nazev
+          FROM termin t JOIN smlouva s ON s.id=t.smlouva_id WHERE t.stav IN ('ceka','eskalovano') ORDER BY t.datum`).all();
+        json(res, 200, rows.map((x) => ({ ...x, dny: daysUntil(x.datum, dnes) }))); return true;
+      }
+
+      // zápisové akce → jen admin/správce
+      if (p.startsWith('/api/smlouvy/') && req.method === 'POST') {
+        if (!smiPsat(req)) { json(res, 403, { chyba: 'Jen správce/admin.' }); return true; }
+        const b = await body(req); const who = (host.empSession(req) || {}).email;
+
+        if (p === '/api/smlouvy/create') {
+          const s = M.smlouva.create(b, who); syncOdvozene(s); json(res, 201, s); return true;
+        }
+        if (p === '/api/smlouvy/update') {
+          const s = M.smlouva.update(Number(u.query.id), b, who);
+          if (s && s.stav !== 'aktivni') M.termin.deaktivujProSmlouvu(s.id);
+          if (s) syncOdvozene(s);
+          json(res, 200, s); return true;
+        }
+        if (p === '/api/smlouvy/dodatek') { json(res, 201, M.dodatek.create({ smlouva_id: Number(u.query.id), ...b })); return true; }
+        if (p === '/api/smlouvy/termin') { json(res, 201, M.termin.create({ smlouva_id: Number(u.query.id), ...b })); return true; }
+        if (p === '/api/smlouvy/termin-snooze') { M.termin.snooze(Number(u.query.id), b.do); json(res, 200, M.termin.getById(Number(u.query.id))); return true; }
+
+        if (p === '/api/smlouvy/import-nahled') { json(res, 200, importSvc.nahled(b.radky || [], b.garantMapa || {})); return true; }
+        if (p === '/api/smlouvy/import-uloz') {
+          const v = importSvc.uloz({ smlouva: M.smlouva, termin: M.termin }, b.plan, { by: who, zakladatOdvozeneTerminy: true });
+          engine.runOnce(M, ctxWith(req)); // catch-up
+          json(res, 200, v); return true;
+        }
+      }
+    } catch (e) { json(res, 500, { chyba: e.message }); return true; }
+
+    json(res, 404, { chyba: 'Neznámá cesta modulu.' }); return true;
+  }
+
+  function syncOdvozene(s) {
+    const d = L.odvozenyDeadlineVypovedi(s);
+    if (d) M.termin.updateDatumOdvozenych(s.id, 'deadline_vypovedi', d);
+  }
+  function ctxWith(req) { return { deliver: host.deliver, baseUrl: host.baseUrl(req), eskalaceEmail: host.eskalaceEmail }; }
+
+  // ---- cron tick ---------------------------------------------------
+  async function tick() {
+    try { await engine.tick(M, { deliver: host.deliver, baseUrl: host.publicBaseUrl || '', eskalaceEmail: host.eskalaceEmail }); }
+    catch (e) { console.error('[smlouvy] tick chyba:', e.message); }
+  }
+
+  return { handle, tick, _models: M, _dashboardData: dashboardData };
+}
+
+function engineEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function overPodpis(secret, headers, rawBody) {
+  if (!secret) return true;
+  try {
+    const id = headers['svix-id']; const ts = headers['svix-timestamp']; const sig = headers['svix-signature'] || '';
+    if (!id || !ts || !sig) return false;
+    const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
+    const expected = crypto.createHmac('sha256', key).update(`${id}.${ts}.${rawBody}`).digest('base64');
+    return sig.split(' ').some((part) => { const v = part.includes(',') ? part.split(',')[1] : part;
+      try { return crypto.timingSafeEqual(Buffer.from(v), Buffer.from(expected)); } catch { return false; } });
+  } catch { return false; }
+}
+
+module.exports = { mount, overPodpis };
