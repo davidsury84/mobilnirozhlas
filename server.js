@@ -835,8 +835,13 @@ const server = http.createServer(async (req, res) => {
       const v = readVac();
       const rq = { id: 'v' + crypto.randomBytes(6).toString('hex'), empEmail: e.email, empName: e.name, approverEmail: ap ? ap.email : '', from: b.from, to: b.to, halfDay: !!b.halfDay, days, type: b.type || 'dovolena', note: (b.note || '').slice(0, 500), status: 'pending', createdAt: Date.now() };
       v.requests.push(rq); writeVac(v);
-      const to = ap ? ap.email : reportRecipient();
-      vacMail(to, 'Nová žádost o dovolenou – ' + e.name, e.name + ' žádá o dovolenou ' + b.from + ' – ' + b.to + ' (' + days + ' dní).' + (rq.note ? '\nPoznámka: ' + rq.note : '') + '\n\nSchval v intranetu: ' + baseUrl(req) + '/');
+      // Komu poslat notifikaci: přiřazenému schvalovateli; když žádného nemá, administrátorům (+ superadmin), kteří žádost vyřídí.
+      let recips;
+      if (ap && ap.email) recips = [ap.email];
+      else { recips = emps.filter(x => x.admin && x.email).map(x => x.email); recips.push(SUPERADMIN); if (!recips.filter(Boolean).length) recips = [reportRecipient()]; }
+      recips = [...new Set(recips.filter(Boolean).map(x => x.toLowerCase()))];
+      const mailBody = e.name + ' žádá o dovolenou ' + b.from + ' – ' + b.to + ' (' + days + ' dní).' + (rq.note ? '\nPoznámka: ' + rq.note : '') + '\n\nSchval v intranetu: ' + baseUrl(req) + '/';
+      recips.forEach(to => vacMail(to, 'Nová žádost o dovolenou – ' + e.name, mailBody));
       return send(res, 200, { ok: true, request: rq });
     }
     // ---- Dovolená: ke schválení (schvalovatel/admin) ----

@@ -998,11 +998,8 @@ async function showDovolena(){
 
   let h='<div class="dash-hero"><h2>Dovolená</h2><p>Žádost o dovolenou, přehled konta a schvalování.</p></div>';
 
-  // Konto
-  h+='<div class="dash-grid" style="margin-bottom:18px">'+
-    vacKpi('Roční nárok', my.entitlement, 'dní', '')+
-    vacKpi('Čerpáno', my.used, 'dní', 'amber')+
-    vacKpi('Zůstatek', my.balance, 'dní', my.balance>0?'green':'red')+'</div>';
+  // Konto – grafické (prstencový graf)
+  h+=vacKontoCard(my);
   if(my.approver) h+='<p class="muted" style="margin:-6px 0 16px">Tvou dovolenou schvaluje: <strong>'+esc(my.approver.name||my.approver.email)+'</strong></p>';
   else h+='<p class="muted" style="margin:-6px 0 16px">Nemáš přiřazeného nadřízeného — žádost vyřídí administrátor.</p>';
 
@@ -1044,8 +1041,29 @@ async function showDovolena(){
 
   body.innerHTML=h; window.scrollTo(0,0);
 }
-function vacKpi(label,val,unit,accent){
-  return '<div class="tile'+(accent?' accent':'')+'" style="cursor:default"><div><h3 style="font-size:30px;margin:0">'+val+' <span style="font-size:14px;font-weight:500;color:var(--ink-soft)">'+unit+'</span></h3><p style="margin-top:2px">'+label+'</p></div></div>';
+// Grafické konto dovolené – prstencový graf (nárok = celý prstenec, čerpáno + čekající = vyplněná část, zůstatek = zbytek).
+function vacKontoCard(my){
+  const ent=Math.max(0,Number(my.entitlement)||0), used=Math.max(0,Number(my.used)||0), bal=(Number(my.balance)||0);
+  const pend=(my.requests||[]).filter(r=>r.status==='pending').reduce((s,r)=>s+(Number(r.days)||0),0);
+  const r=52, C=2*Math.PI*r;
+  const frac=v=> ent>0 ? Math.max(0,Math.min(1, v/ent)) : 0;
+  const usedLen=frac(used)*C, pendLen=Math.max(0,Math.min(frac(pend), 1-frac(used)))*C;
+  const arc=(color,len,offset)=> len>0.01 ? '<circle cx="70" cy="70" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="15" stroke-dasharray="'+len.toFixed(1)+' '+(C-len).toFixed(1)+'" stroke-dashoffset="'+(-offset).toFixed(1)+'" transform="rotate(-90 70 70)"/>' : '';
+  const svg='<svg width="140" height="140" viewBox="0 0 140 140" style="flex:none">'+
+    '<circle cx="70" cy="70" r="'+r+'" fill="none" stroke="var(--green-soft)" stroke-width="15"/>'+
+    arc('var(--yellow-2)', usedLen, 0)+ arc('#e0b94e', pendLen, usedLen)+
+    '<text x="70" y="66" text-anchor="middle" font-size="30" font-weight="700" fill="var(--ink)">'+bal+'</text>'+
+    '<text x="70" y="86" text-anchor="middle" font-size="11" fill="var(--ink-soft)">'+plural(Math.round(bal),'den zbývá','dny zbývají','dní zbývá')+'</text></svg>';
+  const row=(color,label,val)=> '<div style="display:flex;align-items:center;gap:9px;margin:7px 0"><span style="width:12px;height:12px;border-radius:3px;background:'+color+';flex:none;border:1px solid rgba(0,0,0,.06)"></span><span style="flex:1;color:var(--ink-soft);font-size:13px">'+label+'</span><b style="font-size:15px">'+val+'</b></div>';
+  return '<div class="card pad" style="margin-bottom:18px">'+
+    '<strong>Konto dovolené '+my.year+'</strong>'+
+    '<div style="display:flex;gap:26px;align-items:center;flex-wrap:wrap;margin-top:14px">'+svg+
+      '<div style="flex:1;min-width:210px">'+
+        row('var(--green-soft)','Roční nárok', my.entitlement)+
+        row('var(--yellow-2)','Čerpáno', used)+
+        (pend>0?row('#e0b94e','Čeká na schválení', pend):'')+
+        row('var(--green-2)','Zůstatek', bal)+
+      '</div></div></div>';
 }
 async function vacSubmit(){
   const from=document.getElementById("vacFrom").value, to=document.getElementById("vacTo").value;
