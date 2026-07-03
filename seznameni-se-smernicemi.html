@@ -636,7 +636,7 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
         <div class="logo">✓</div>
         <div><h1>Intranet ELKOPLAST CZ</h1><small id="mujWho">Intranet pro zaměstnance</small></div>
       </div>
-      <nav class="tabs"><button id="mujLogout" style="display:none" onclick="location.href='/auth/logout'">Odhlásit</button></nav>
+      <nav class="tabs"><button id="mujAdmin" style="display:none" onclick="location.href='/admin'">Správa</button><button id="mujLogout" style="display:none" onclick="location.href='/auth/logout'">Odhlásit</button></nav>
     </div>
   </header>
   <div class="mj-shell">
@@ -781,16 +781,25 @@ function seedDemo(){
 /* ============================================================
    ROUTING — admin vs reading mode (#cti=<id>)
    ============================================================ */
+function isAdminPath(){ return /^\/admin(\/|$)/.test(location.pathname); }
 function route(){
   const muj = document.getElementById("muj");
-  if(location.hash.indexOf("muj") >= 0){ initIntranet(); return; }
   const m = location.hash.match(/cti=([a-z0-9]+)/i);
   if(m){
     if(muj) muj.style.display="none";
     const km = location.hash.match(/kdo=([^&]+)/i);
     showReader(m[1], km ? decodeURIComponent(km[1]) : "");
+    return;
   }
-  else { if(muj) muj.style.display="none"; document.getElementById("reader").style.display="none"; document.getElementById("app").style.display="block"; }
+  // /admin → administrace; kořen „/" (i historické #muj) → zaměstnanecký intranet
+  if(isAdminPath() && location.hash.indexOf("muj") < 0){
+    if(muj) muj.style.display="none";
+    document.getElementById("reader").style.display="none";
+    document.getElementById("app").style.display="block";
+    if(!booted) boot();
+  } else {
+    initIntranet();
+  }
 }
 window.addEventListener("hashchange", route);
 
@@ -873,6 +882,7 @@ async function initIntranet(){
   }
   who.textContent = me.employee.name + " · " + me.employee.email;
   logoutBtn.style.display=""; side.style.display="";
+  const adminBtn=document.getElementById("mujAdmin"); if(adminBtn) adminBtn.style.display = me.admin ? "" : "none";
   MUJ.email = me.employee.email; MUJ.name = me.employee.name; MUJ.admin = !!me.admin;
   await refreshMy();
   showDashboard();
@@ -3098,8 +3108,10 @@ function toggleThemePop(ev){ if(ev) ev.stopPropagation(); document.getElementByI
 document.addEventListener("click", e=>{ const pop=document.getElementById("themePop"); const btn=document.getElementById("themeBtn"); if(pop && pop.classList.contains("show") && !pop.contains(e.target) && e.target!==btn && !btn.contains(e.target)) pop.classList.remove("show"); });
 applyTheme((function(){ try{ return localStorage.getItem("intranetTheme"); }catch(e){ return null; } })() || "zelena");
 
-if(location.hash.indexOf("muj") >= 0) initIntranet();   // intranet zaměstnanců – bez admin přihlášení
-else boot();
+// Kořen „/" = zaměstnanecký intranet, „/admin" = administrace. (#cti= otevře čtečku směrnice.)
+if(location.hash.match(/cti=/i)) route();
+else if(isAdminPath()) boot();
+else initIntranet();
 </script>
 </body>
 </html>

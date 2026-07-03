@@ -664,7 +664,9 @@ const server = http.createServer(async (req, res) => {
   if (PROTECTED.indexOf(p) >= 0 && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
-    if (p === '/' || p === '/index.html') {
+    // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
+    // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
+    if (p === '/' || p === '/index.html' || p === '/admin' || p === '/admin/') {
       if (!fs.existsSync(APP_FILE)) return send(res, 404, '<h1>Chybí seznameni-se-smernicemi.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, injectVersion(fs.readFileSync(APP_FILE, 'utf8')), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
@@ -764,16 +766,10 @@ const server = http.createServer(async (req, res) => {
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
     if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req) }); }
-    // /admin — vstup do správy: admin (heslo/Google) → aplikace, jinak přihlášení
-    if (p === '/admin') {
-      if (isAdmin(req)) { res.writeHead(302, { 'Location': '/' }); return res.end(); }
-      if (empSession(req)) return send(res, 403, '<h1>Nemáte oprávnění správce.</h1><p>Požádejte administrátora o roli admin.</p><p><a href="/">Zpět do intranetu</a></p>', { 'Content-Type': 'text/html; charset=utf-8' });
-      res.writeHead(302, { 'Location': '/#muj' }); return res.end();
-    }
     // ---- SSO do nabídkového kalkulátoru: přihlášený zaměstnanec → redirect s krátkodobým tokenem ----
     if (p === '/sso/nabidky') {
       const e = empSession(req);
-      if (!e) { res.writeHead(302, { 'Location': '/#muj' }); return res.end(); }
+      if (!e) { res.writeHead(302, { 'Location': '/' }); return res.end(); }
       const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 });
       res.writeHead(302, { 'Location': NABIDKY_URL + '/?sso=' + encodeURIComponent(tok) });
       return res.end();
@@ -786,7 +782,7 @@ const server = http.createServer(async (req, res) => {
         // Přihlášení za konkrétního zaměstnance (kvůli testování schvalování apod.).
         const emp = emps.find(x => (x.email || '').toLowerCase() === wanted) || { email: wanted, name: u.query.name || wanted };
         const sess = empSign({ email: emp.email, name: emp.name });
-        res.writeHead(302, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400', 'Location': '/#muj' });
+        res.writeHead(302, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400', 'Location': '/' });
         return res.end();
       }
       // Výběr identity (bez hesla) – testovací přihlášení.
@@ -837,7 +833,7 @@ const server = http.createServer(async (req, res) => {
       const rq = { id: 'v' + crypto.randomBytes(6).toString('hex'), empEmail: e.email, empName: e.name, approverEmail: ap ? ap.email : '', from: b.from, to: b.to, halfDay: !!b.halfDay, days, type: b.type || 'dovolena', note: (b.note || '').slice(0, 500), status: 'pending', createdAt: Date.now() };
       v.requests.push(rq); writeVac(v);
       const to = ap ? ap.email : reportRecipient();
-      vacMail(to, 'Nová žádost o dovolenou – ' + e.name, e.name + ' žádá o dovolenou ' + b.from + ' – ' + b.to + ' (' + days + ' dní).' + (rq.note ? '\nPoznámka: ' + rq.note : '') + '\n\nSchval v intranetu: ' + baseUrl(req) + '/#muj');
+      vacMail(to, 'Nová žádost o dovolenou – ' + e.name, e.name + ' žádá o dovolenou ' + b.from + ' – ' + b.to + ' (' + days + ' dní).' + (rq.note ? '\nPoznámka: ' + rq.note : '') + '\n\nSchval v intranetu: ' + baseUrl(req) + '/');
       return send(res, 200, { ok: true, request: rq });
     }
     // ---- Dovolená: ke schválení (schvalovatel/admin) ----
@@ -937,12 +933,12 @@ const server = http.createServer(async (req, res) => {
         const sess = empSign({ email: emp.email, name: emp.name });
         const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
         const nx = cookieVal(req, 'sm_next');
-        const dest = /^\/sso\/[a-z0-9-]+$/.test(nx || '') ? nx : '/#muj';
+        const dest = /^\/sso\/[a-z0-9-]+$/.test(nx || '') ? nx : '/';
         res.writeHead(302, { 'Set-Cookie': ['sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure, 'sm_oauth=; Path=/; Max-Age=0', 'sm_next=; Path=/; Max-Age=0'], 'Location': dest });
         return res.end();
-      } catch (e) { return send(res, 400, '<h1>Přihlášení selhalo</h1><p>' + esc(e.message) + '</p><p><a href="/#muj">Zpět</a></p>', { 'Content-Type': 'text/html; charset=utf-8' }); }
+      } catch (e) { return send(res, 400, '<h1>Přihlášení selhalo</h1><p>' + esc(e.message) + '</p><p><a href="/">Zpět</a></p>', { 'Content-Type': 'text/html; charset=utf-8' }); }
     }
-    if (p === '/auth/logout') { res.writeHead(302, { 'Set-Cookie': 'sm_emp=; Path=/; Max-Age=0', 'Location': '/#muj' }); return res.end(); }
+    if (p === '/auth/logout') { res.writeHead(302, { 'Set-Cookie': 'sm_emp=; Path=/; Max-Age=0', 'Location': '/' }); return res.end(); }
 
     // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----
     if (p === '/smi-app') {
