@@ -411,14 +411,13 @@ function vacUsed(email, year) {
     .reduce((s, r) => s + (Number(r.days) || 0), 0);
 }
 
-// Kdo schvaluje dovolenou zaměstnance: 1) přiřazený nadřízený (managerId),
-// 2) ředitel jeho střediska, 3) jednatel; jinak null → řeší admin.
+// Kdo schvaluje dovolenou zaměstnance: 1) přiřazený nadřízený (managerId, „pod kým je"),
+// 2) vedoucí jeho střediska; jinak null → řeší admin.
 function approverFor(emp, emps) {
   emps = emps || (getState().employees || []);
   if (!emp) return null;
   if (emp.managerId) { const m = emps.find(x => x.id === emp.managerId); if (m && m.email) return m; }
-  if (emp.stredisko) { const dir = emps.find(x => x.director && (x.stredisko || '') === emp.stredisko && x.id !== emp.id); if (dir) return dir; }
-  const jednatel = emps.find(x => x.jednatel && x.id !== emp.id); if (jednatel) return jednatel;
+  if (emp.stredisko) { const d = emps.find(x => x.vedouci && (x.stredisko || '') === emp.stredisko && x.id !== emp.id); if (d) return d; }
   return null;
 }
 

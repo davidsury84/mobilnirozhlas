@@ -1601,40 +1601,52 @@ function toggleAdmin(empId, on){
 }
 
 /* ============================================================
-   ORGANIZAČNÍ STRUKTURA — nadřízení, střediska, nárok dovolené
+   ORGANIZAČNÍ STRUKTURA — vedoucí, „pod kým je", střediska (číselník)
    ============================================================ */
+// Číselník středisek (editovatelný) – v DB.settings.strediska.
+function getStrediska(){ if(!DB.settings) DB.settings={}; if(!Array.isArray(DB.settings.strediska)) DB.settings.strediska=[]; return DB.settings.strediska; }
 function orgApprover(e){
-  // Vrátí zaměstnance, který schvaluje dovolenou (nadřízený → ředitel střediska → jednatel).
+  // Dovolenou schvaluje přímý nadřízený („pod kým je"); není-li, vedoucí jeho střediska.
   if(e.managerId){ const m=DB.employees.find(x=>x.id===e.managerId); if(m) return m; }
-  if(e.stredisko){ const d=DB.employees.find(x=>x.director&&(x.stredisko||'')===e.stredisko&&x.id!==e.id); if(d) return d; }
-  const j=DB.employees.find(x=>x.jednatel&&x.id!==e.id); if(j) return j;
+  if(e.stredisko){ const d=DB.employees.find(x=>x.vedouci&&(x.stredisko||'')===e.stredisko&&x.id!==e.id); if(d) return d; }
   return null;
 }
 function renderOrg(){
   const box=document.getElementById("orgEditor");
-  if(!DB.employees.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nejprve přidej zaměstnance v záložce Zaměstnanci.</p></div>'; document.getElementById("orgTree").innerHTML=''; return; }
-  const strediska=[...new Set(DB.employees.map(e=>e.stredisko).filter(Boolean))].sort();
-  let h='<div class="matrix-wrap"><table class="matrix"><thead><tr>'+
-    '<th class="who">Zaměstnanec</th><th>Středisko</th><th>Přímý nadřízený</th>'+
-    '<th style="text-align:center">Ředitel<br>střediska</th><th style="text-align:center">Jednatel</th>'+
-    '<th style="text-align:center">Nárok<br>(dní/rok)</th><th>Schvaluje</th></tr></thead><tbody>';
+  const strediska=getStrediska();
+  // Číselník středisek
+  let cis='<div class="card pad" style="margin-bottom:18px"><strong>Střediska</strong>'+
+    '<p class="muted" style="margin:4px 0 12px;font-size:13px">Editovatelný číselník. Zaměstnanci si pak vybírají středisko z tohoto seznamu.</p>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">';
+  if(!strediska.length) cis+='<span class="muted" style="font-size:13px">Zatím žádné středisko.</span>';
+  strediska.forEach((s,i)=>{ cis+='<span class="pill gray" style="gap:8px">'+esc(s)+
+    ' <a href="#" onclick="renameStredisko('+i+');return false" title="Přejmenovat" style="text-decoration:none">✎</a>'+
+    ' <a href="#" onclick="removeStredisko('+i+');return false" title="Smazat" style="text-decoration:none;color:#b3261e">✕</a></span>'; });
+  cis+='</div><div style="display:flex;gap:8px;max-width:360px"><input type="text" id="newStredisko" placeholder="Název střediska" style="flex:1" onkeydown="if(event.key===\'Enter\')addStredisko()"><button class="btn sm" onclick="addStredisko()">Přidat</button></div></div>';
+
+  if(!DB.employees.length){ box.innerHTML=cis+'<div class="card pad"><p class="muted" style="margin:0">Nejprve přidej zaměstnance v záložce Zaměstnanci.</p></div>'; document.getElementById("orgTree").innerHTML=''; return; }
+
+  let h=cis+'<div class="matrix-wrap"><table class="matrix"><thead><tr>'+
+    '<th class="who">Zaměstnanec</th><th style="text-align:center">Vedoucí</th><th>Pod kým je (nadřízený)</th>'+
+    '<th>Středisko</th><th style="text-align:center">Nárok<br>(dní/rok)</th><th>Schvaluje</th></tr></thead><tbody>';
+  const vedouci=DB.employees.filter(x=>x.vedouci);
   DB.employees.forEach(e=>{
-    const opts='<option value="">— žádný —</option>'+DB.employees.filter(x=>x.id!==e.id).map(x=>'<option value="'+x.id+'"'+(e.managerId===x.id?' selected':'')+'>'+esc(x.name||x.email)+'</option>').join('');
-    const strOpts='<option value="">—</option>'+strediska.map(s=>'<option'+(e.stredisko===s?' selected':'')+'>'+esc(s)+'</option>').join('');
+    // Nadřízený se vybírá jen z vedoucích (kromě sebe sama).
+    const mgrOpts='<option value="">— nikdo —</option>'+vedouci.filter(x=>x.id!==e.id).map(x=>'<option value="'+x.id+'"'+(e.managerId===x.id?' selected':'')+'>'+esc(x.name||x.email)+'</option>').join('');
+    const sList=strediska.slice(); if(e.stredisko&&sList.indexOf(e.stredisko)<0) sList.push(e.stredisko);
+    const strOpts='<option value="">—</option>'+sList.map(s=>'<option'+(e.stredisko===s?' selected':'')+'>'+esc(s)+'</option>').join('');
     const ap=orgApprover(e);
     h+='<tr><td class="who">'+esc(e.name||e.email)+'<div class="muted" style="font-size:12px">'+esc(e.email||'')+'</div></td>'+
-      '<td><input list="orgStrediska" value="'+esc(e.stredisko||'')+'" placeholder="—" style="width:130px" onchange="setStredisko(\''+e.id+'\',this.value)"></td>'+
-      '<td><select style="max-width:190px" onchange="setManager(\''+e.id+'\',this.value)">'+opts+'</select></td>'+
-      '<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(e.director?'checked':'')+' onchange="toggleDirector(\''+e.id+'\',this.checked)"></td>'+
-      '<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(e.jednatel?'checked':'')+' onchange="toggleJednatel(\''+e.id+'\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(e.vedouci?'checked':'')+' onchange="toggleVedouci(\''+e.id+'\',this.checked)"></td>'+
+      '<td><select style="max-width:190px" onchange="setManager(\''+e.id+'\',this.value)">'+mgrOpts+'</select></td>'+
+      '<td><select style="max-width:160px" onchange="setStredisko(\''+e.id+'\',this.value)">'+strOpts+'</select></td>'+
       '<td style="text-align:center"><input type="number" min="0" step="0.5" value="'+(e.vacDays!=null?e.vacDays:20)+'" style="width:64px;text-align:center" onchange="setVacDays(\''+e.id+'\',this.value)"></td>'+
       '<td class="muted" style="font-size:13px">'+(ap?esc(ap.name||ap.email):'<span style="color:var(--yellow)">admin</span>')+'</td></tr>';
   });
-  h+='</tbody></table></div><datalist id="orgStrediska">'+strediska.map(s=>'<option>'+esc(s)+'</option>').join('')+'</datalist>';
+  h+='</tbody></table></div>';
   box.innerHTML=h;
   renderOrgTree();
 }
-function orgChain(e){ const chain=[]; let cur=e, guard=0; while(cur&&guard++<12){ const m=cur.managerId?DB.employees.find(x=>x.id===cur.managerId):null; if(!m) break; chain.push(m); cur=m; } return chain; }
 function renderOrgTree(){
   const box=document.getElementById("orgTree"); if(!box) return;
   // Kořeny = osoby bez nadřízeného; potomci = ti, kdo je mají jako managerId. Rekurzivní odsazené sloupce.
@@ -1642,7 +1654,7 @@ function renderOrgTree(){
   const roots=DB.employees.filter(e=>!e.managerId||!DB.employees.find(x=>x.id===e.managerId));
   function node(e,depth){
     const kids=(byMgr[e.id]||[]).filter(k=>k.id!==e.id);
-    const badge=e.jednatel?' <span style="font-size:11px;background:var(--yellow);color:#3a2f00;padding:1px 6px;border-radius:999px">jednatel</span>':(e.director?' <span style="font-size:11px;background:var(--green-2);color:#fff;padding:1px 6px;border-radius:999px">ředitel</span>':'');
+    const badge=e.vedouci?' <span style="font-size:11px;background:var(--green-2);color:#fff;padding:1px 6px;border-radius:999px">vedoucí</span>':'';
     let s='<div style="margin:4px 0 4px '+(depth*22)+'px;padding:7px 12px;border-left:3px solid var(--green-2);background:var(--card,#fff);border-radius:6px">'+
       '<strong>'+esc(e.name||e.email)+'</strong>'+badge+(e.stredisko?' <span class="muted" style="font-size:12px">· '+esc(e.stredisko)+'</span>':'')+'</div>';
     kids.forEach(k=>{ s+=node(k,depth+1); });
@@ -1650,11 +1662,32 @@ function renderOrgTree(){
   }
   box.innerHTML='<div class="card pad">'+(roots.length?roots.map(r=>node(r,0)).join(''):'<p class="muted" style="margin:0">Zatím není nastavena žádná nadřízenost.</p>')+'</div>';
 }
+function toggleVedouci(empId,on){
+  const e=DB.employees.find(x=>x.id===empId); if(!e) return;
+  e.vedouci=!!on;
+  // Když přestane být vedoucím, odpojím ho jako nadřízeného u ostatních.
+  if(!on) DB.employees.forEach(x=>{ if(x.managerId===empId) x.managerId=null; });
+  save(); renderOrg();
+}
 function setManager(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.managerId=val||null; save(); renderOrg(); }
 function setStredisko(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.stredisko=(val||'').trim(); save(); renderOrg(); }
-function toggleDirector(empId,on){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.director=!!on; save(); renderOrg(); }
-function toggleJednatel(empId,on){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.jednatel=!!on; save(); renderOrg(); }
 function setVacDays(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; const n=parseFloat(val); e.vacDays=isFinite(n)&&n>=0?n:20; save(); }
+function addStredisko(){
+  const inp=document.getElementById("newStredisko"); const name=(inp&&inp.value||'').trim(); if(!name) return;
+  const list=getStrediska(); if(list.some(s=>s.toLowerCase()===name.toLowerCase())){ toast("Toto středisko už existuje"); return; }
+  list.push(name); save(); renderOrg();
+}
+function renameStredisko(i){
+  const list=getStrediska(); const old=list[i]; if(old==null) return;
+  const name=(prompt("Nový název střediska:",old)||"").trim(); if(!name||name===old) return;
+  list[i]=name; DB.employees.forEach(e=>{ if(e.stredisko===old) e.stredisko=name; }); save(); renderOrg(); toast("Přejmenováno");
+}
+function removeStredisko(i){
+  const list=getStrediska(); const s=list[i]; if(s==null) return;
+  const used=DB.employees.filter(e=>e.stredisko===s).length;
+  if(!confirm("Smazat středisko „"+s+"\"?"+(used?" Přiřazení u "+used+" zaměstnanců se zruší.":""))) return;
+  list.splice(i,1); DB.employees.forEach(e=>{ if(e.stredisko===s) e.stredisko=''; }); save(); renderOrg();
+}
 
 /* ============================================================
    PRŮZKUMY — dotazník (Grit) s rozesláním přes společný send modal
