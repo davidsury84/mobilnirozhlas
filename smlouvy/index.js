@@ -28,6 +28,9 @@ function mount(host) {
   // Jednorázový import registru (1× přes meta guard, idempotentní).
   try { require('./seed-registr').seedOnce(M); }
   catch (e) { console.error('[smlouvy] seed registru selhal:', e.message); }
+  // Jednorázové doplnění odkazů na Disk k naimportovaným smlouvám.
+  try { require('./seed-drive-urls').seedDriveUrls(M); }
+  catch (e) { console.error('[smlouvy] seed drive_url selhal:', e.message); }
 
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);
