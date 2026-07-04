@@ -1387,7 +1387,8 @@ function audienceOf(dir){
 }
 /* ---------- Tagy: cílení rozesílání (směrnice i průzkumy) ---------- */
 let SEND_TAGS=[], SEND_CAND=[];
-function allTags(){ const s=new Set(); DB.employees.forEach(e=>(e.tags||[]).forEach(t=>s.add(t))); (DB.candidates||[]).forEach(e=>(e.tags||[]).forEach(t=>s.add(t))); return [...s].sort((a,b)=>a.localeCompare(b,"cs")); }
+// Tagy v pořadí, jak byly zadané (pořadí prvního výskytu), ne abecedně.
+function allTags(){ const s=new Set(); DB.employees.forEach(e=>(e.tags||[]).forEach(t=>s.add(t))); (DB.candidates||[]).forEach(e=>(e.tags||[]).forEach(t=>s.add(t))); return [...s]; }
 function sendAudience(S){
   let aud=audienceOf(S);
   if(SEND_TAGS.length){ aud=aud.filter(e=>(e.tags||[]).some(t=>SEND_TAGS.indexOf(t)>=0)); }

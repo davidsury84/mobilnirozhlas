@@ -86,7 +86,7 @@ main{max-width:780px;margin:0 auto;padding:26px 20px 90px}
   <div id="quiz"></div>
 </main>
 <div class="bar"><div class="wrap">
-  <button class="btn" id="evalBtn" disabled onclick="evaluate()">Vyhodnotit</button>
+  <button class="btn" id="evalBtn" disabled onclick="vyhodnotit()">Vyhodnotit</button>
   <div class="prog" id="prog">Zodpovězeno <b>0</b> z 10</div>
   <span class="err" id="err"></span>
 </div></div>
@@ -135,7 +135,7 @@ function pick(i,p){
 function scoreOf(i){ const p=answers[i]; return Q[i].rev ? (6-p) : p; } // body 1–5 (otázka je dotována, respondent je nevidí)
 function pctFor(avg){ const key=Math.round(avg*10); if(key<18) return 0; if(key>50) return 100; return PCT[key]!=null?PCT[key]:0; }
 
-async function evaluate(){
+async function vyhodnotit(){
   if(answers.filter(a=>a>0).length<10){ document.getElementById('err').textContent='Zodpověz prosím všech 10 otázek.'; return; }
   let sum=0; for(let i=0;i<10;i++) sum+=scoreOf(i);
   const avg = sum/10;                       // hrubé skóre (HS)

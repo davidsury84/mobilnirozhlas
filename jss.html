@@ -100,7 +100,7 @@ input:focus,select:focus{outline:none;border-color:var(--green-2);box-shadow:0 0
 </main>
 <div class="bar"><div class="wrap">
   <button class="btn ghost" id="backBtn" onclick="goPage(-1)" disabled>← Zpět</button>
-  <button class="btn" id="evalBtn" style="display:none" onclick="evaluate()">Vyhodnotit</button>
+  <button class="btn" id="evalBtn" style="display:none" onclick="vyhodnotit()">Vyhodnotit</button>
   <div class="prog" id="prog">Strana 1 / 12 · 0 %</div>
   <span class="err" id="err"></span>
 </div></div>
@@ -196,7 +196,7 @@ function maybeAdvance(){
   document.getElementById('err').textContent='';
   const cur=PAGE;
   if(PAGE<PAGES-1){ setTimeout(()=>{ if(PAGE===cur && pageDone(cur) && (cur!==0||demoDone())) goPage(1); }, 400); }
-  else if(answers.filter(a=>a>0).length===36){ setTimeout(()=>{ if(PAGE===cur) evaluate(); }, 450); }
+  else if(answers.filter(a=>a>0).length===36){ setTimeout(()=>{ if(PAGE===cur) vyhodnotit(); }, 450); }
 }
 function pick(i,p){
   answers[i]=p;
@@ -212,7 +212,7 @@ function compute(){
   const pct=Math.round((total-36)/180*100);
   return {total, pct, subs};
 }
-async function evaluate(){
+async function vyhodnotit(){
   if(!demoDone()){ PAGE=0; renderQuiz(); document.getElementById('err').textContent='Vyplňte prosím všechny údaje o vás (jsou povinné).'; return; }
   if(answers.filter(a=>a>0).length<36){ const i=answers.findIndex(a=>!a); if(i>=0){ PAGE=Math.floor(i/PER); renderQuiz(); } document.getElementById('err').textContent='Zodpovězte prosím všech 36 výroků (chybí výrok '+(i+1)+').'; return; }
   const dem={ pozice:document.getElementById('dPozice').value.trim(), delka:DEM.delka, stredisko:document.getElementById('dStredisko').value.trim(), zarazeni:DEM.zarazeni };
