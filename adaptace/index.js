@@ -42,6 +42,29 @@ function mount(host) {
     } catch { return []; }
   }
 
+  // ---- role odvozené z intranetu (state.json) ----------------------
+  function empByEmail(email) {
+    try { const s = host.getState(); return (s.employees || []).find((e) => (e.email || '').toLowerCase() === (email || '').toLowerCase()) || null; }
+    catch { return null; }
+  }
+  // Správce adaptace = intranet admin NEBO zaměstnanec s uděleným modulem 'adaptace' (Přístupy).
+  function canManage(req) {
+    if (host.isAdmin(req)) return true;
+    const e = host.empSession(req); if (!e) return false;
+    try { return (host.employeeModules(e.email) || []).includes('adaptace'); } catch { return false; }
+  }
+  function isVedouci(email) { const e = empByEmail(email); return !!(e && e.vedouci); }
+  // E-maily členů týmu vedoucího: přímí podřízení (managerId) nebo stejné středisko.
+  function teamEmails(email) {
+    const meEmp = empByEmail(email); if (!meEmp) return [];
+    try {
+      const emps = (host.getState().employees || []);
+      return emps.filter((x) => (x.email || '').toLowerCase() !== (email || '').toLowerCase()
+        && ((meEmp.id && x.managerId === meEmp.id) || (meEmp.stredisko && x.stredisko === meEmp.stredisko)))
+        .map((x) => (x.email || '').toLowerCase());
+    } catch { return []; }
+  }
+
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true); const p = u.pathname;
     if (p !== '/adaptace' && !p.startsWith('/adaptace/') && !p.startsWith('/api/adaptace')) return false;
@@ -99,10 +122,20 @@ function mount(host) {
     try {
       const me = emailOf(req);
       const admin = host.isAdmin(req);
+      const manage = canManage(req);
 
       // ---- kdo jsem -------------------------------------------------
       if (p === '/api/adaptace/me' && req.method === 'GET') {
-        json(res, 200, { email: me, admin, isMentor: isMentor(me) }); return true;
+        json(res, 200, { email: me, admin, canManage: manage, isMentor: isMentor(me), isVedouci: isVedouci(me) }); return true;
+      }
+
+      // ---- VEDOUCÍ: přehled adaptací mého týmu (read-only) ---------
+      if (p === '/api/adaptace/team' && req.method === 'GET') {
+        if (!me) { json(res, 401, { chyba: 'Nepřihlášeno.' }); return true; }
+        if (!manage && !isVedouci(me)) { json(res, 403, { chyba: 'Nejste vedoucí.' }); return true; }
+        const all = M.assignment.listWithProgress();
+        const list = manage ? all : (() => { const t = teamEmails(me); return all.filter((a) => t.includes((a.emp_email || '').toLowerCase())); })();
+        json(res, 200, list); return true;
       }
 
       // ---- ZAMĚSTNANEC: moje adaptace ------------------------------
@@ -126,9 +159,9 @@ function mount(host) {
         if (!row) { json(res, 404, { chyba: 'Úkol nenalezen.' }); return true; }
         const flag = b.flag; const val = !!b.value;
         if (flag === 'understood' || flag === 'acquainted') {
-          if (!admin && me !== row.emp_email) { json(res, 403, { chyba: 'Cizí adaptace.' }); return true; }
+          if (!manage && me !== row.emp_email) { json(res, 403, { chyba: 'Cizí adaptace.' }); return true; }
         } else if (flag === 'mentor_ok') {
-          if (!admin && me !== row.mentor_email) { json(res, 403, { chyba: 'Nejste mentor tohoto nováčka.' }); return true; }
+          if (!manage && me !== row.mentor_email) { json(res, 403, { chyba: 'Nejste mentor tohoto nováčka.' }); return true; }
         } else { json(res, 400, { chyba: 'Neznámý příznak.' }); return true; }
         const updated = engine.setProgressFlag(M, row.id, flag, val, me);
         if (flag !== 'mentor_ok') await engine.maybeNotifyMentor(M, host.deliver, host.publicBaseUrl || host.baseUrl(req), row.id);
@@ -139,14 +172,14 @@ function mount(host) {
       if (p === '/api/adaptace/discussion' && req.method === 'GET') {
         const row = M.progress.getById(Number(u.query.progressId));
         if (!row) { json(res, 404, { chyba: 'Úkol nenalezen.' }); return true; }
-        if (!admin && me !== row.emp_email && me !== row.mentor_email) { json(res, 403, { chyba: 'Nemáte přístup.' }); return true; }
+        if (!manage && me !== row.emp_email && me !== row.mentor_email) { json(res, 403, { chyba: 'Nemáte přístup.' }); return true; }
         json(res, 200, M.discussion.forProgress(row.id)); return true;
       }
       if (p === '/api/adaptace/discussion' && req.method === 'POST') {
         const bd = await body(req);
         const row = M.progress.getById(Number(bd.progressId));
         if (!row) { json(res, 404, { chyba: 'Úkol nenalezen.' }); return true; }
-        if (!admin && me !== row.emp_email && me !== row.mentor_email) { json(res, 403, { chyba: 'Nemáte přístup.' }); return true; }
+        if (!manage && me !== row.emp_email && me !== row.mentor_email) { json(res, 403, { chyba: 'Nemáte přístup.' }); return true; }
         if (!bd.text || !bd.text.trim()) { json(res, 400, { chyba: 'Prázdný komentář.' }); return true; }
         const who = host.empSession(req) || {};
         json(res, 201, M.discussion.add({ progress_id: row.id, parent_id: bd.parentId, author_email: me, author_name: who.name, text: bd.text.trim() })); return true;
@@ -164,8 +197,8 @@ function mount(host) {
         json(res, 200, { ok: true }); return true;
       }
 
-      // ---- od sem níž jen ADMIN ------------------------------------
-      if (!admin) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+      // ---- od sem níž jen SPRÁVA (admin nebo personalista s modulem 'adaptace') ----
+      if (!manage) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
 
       // seznam zaměstnanců (pro formuláře)
       if (p === '/api/adaptace/employees' && req.method === 'GET') { json(res, 200, employees()); return true; }
@@ -221,9 +254,14 @@ function mount(host) {
           json(res, 201, { ...msg, sent: recips.length }); return true;
         }
         if (p === '/api/adaptace/message-delete') { M.message.remove(id); json(res, 200, { ok: true }); return true; }
+
+        // šablony úkolů
+        if (p === '/api/adaptace/template-create') { json(res, 201, M.template.create(b, by)); return true; }
+        if (p === '/api/adaptace/template-delete') { M.template.remove(id); json(res, 200, { ok: true }); return true; }
       }
 
       if (p === '/api/adaptace/messages' && req.method === 'GET') { json(res, 200, M.message.all()); return true; }
+      if (p === '/api/adaptace/templates' && req.method === 'GET') { json(res, 200, M.template.all()); return true; }
 
       // dashboard přehled adaptací
       if (p === '/api/adaptace/assignments' && req.method === 'GET') { json(res, 200, M.assignment.listWithProgress()); return true; }

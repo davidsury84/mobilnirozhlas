@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Adaptace — onboarding</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <style>
   :root { --bg:#f5f6f8; --card:#fff; --line:#e5e8eb; --tx:#1f2933; --mut:#7b8794; --pri:#2d6cdf; --ok:#27ae60; --warn:#e67e22; --err:#c0392b; }
   * { box-sizing:border-box; }
@@ -63,6 +65,7 @@ let ME = { email:null, admin:false, isMentor:false };
 let TAB = null;
 let GUEST = null; // hash z magic-linku /adaptace/uvod/<hash>
 let ADMIN_MODE = false; // true jen v admin sekci (/adaptace?admin=1)
+let TASK_MAP = {};      // úkoly v editoru (kvůli předání referencí do editTask)
 
 async function api(path, opts) {
   const r = await fetch(path, Object.assign({ headers:{'Content-Type':'application/json'} }, opts));
@@ -90,16 +93,20 @@ async function init(){
   const m = location.pathname.match(/^\/adaptace\/uvod\/([a-f0-9]+)/);
   if (m) { GUEST = m[1]; $('#tabs').style.display='none'; return viewGuest(); }
   try { ME = await api('/api/adaptace/me'); } catch(e){}
-  ADMIN_MODE = new URLSearchParams(location.search).has('admin') && ME.admin;
+  ADMIN_MODE = new URLSearchParams(location.search).has('admin') && ME.canManage;
+  // Personalista (má správu, ale není plný admin) vidí správu i v zaměstnanecké sekci.
+  const showManage = ADMIN_MODE || (ME.canManage && !ME.admin);
   const t = [];
-  if (ADMIN_MODE) {
-    // ADMIN sekce (/admin): pouze správa
-    t.push(['scenare','Scénáře'], ['dashboard','Adaptace'], ['zpravy','Zprávy']);
-  } else {
-    // Zaměstnanecká sekce: pouze vlastní adaptace + oznámení (+ svěřenci u mentora)
+  if (!ADMIN_MODE) {
+    // osobní část
     t.push(['moje','Moje adaptace']);
     if (ME.isMentor) t.push(['mentor','Svěřenci']);
-    t.push(['zpravy','Oznámení']);
+    if (ME.isVedouci) t.push(['tym','Tým']);
+    t.push(['oznameni','Oznámení']);
+  }
+  if (showManage) {
+    // správa (admin nebo personalista)
+    t.push(['scenare','Scénáře'], ['dashboard','Adaptace'], ['sablony','Šablony'], ['zpravy','Zprávy']);
   }
   $('#tabs').innerHTML = t.map(([k,l])=>`<button class="tab" data-k="${k}">${l}</button>`).join('');
   $('#tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>go(b.dataset.k));
@@ -108,7 +115,8 @@ async function init(){
 function go(k){
   TAB=k;
   $('#tabs').querySelectorAll('.tab').forEach(b=>b.classList.toggle('act', b.dataset.k===k));
-  ({ scenare:viewScenare, dashboard:viewDashboard, moje:viewMoje, mentor:viewMentor, zpravy:viewMessages }[k]||viewMoje)();
+  ({ scenare:viewScenare, dashboard:viewDashboard, sablony:viewTemplates, moje:viewMoje,
+     mentor:viewMentor, tym:viewTeam, oznameni:viewInbox, zpravy:viewMessagesAdmin }[k]||viewMoje)();
 }
 
 /* ---------------- GUEST (magic-link pozvánka) ---------------- */
@@ -184,11 +192,14 @@ function renderPhases(s){
 }
 function taskRow(sid,t){
   const req=[]; if(t.needs_understanding)req.push('rozumím'); if(t.needs_acquaintance)req.push('seznámen'); if(t.needs_mentor_ok)req.push('mentor OK');
+  const nLinks=safeParse(t.links_json).length, nAddr=safeParse(t.addresses_json).length;
+  const extra=(nLinks?' · 🔗 '+nLinks:'')+(nAddr?' · 📍 '+nAddr:'');
+  TASK_MAP[t.id]=t;
   return `<div class="task"><div class="row">
     <div><strong>${esc(t.label)}</strong>
-      <div class="mut sm">${req.join(' · ')||'bez potvrzení'}${t.deadline_days!=null?' · termín +'+t.deadline_days+' dní':''}${t.mentor_default_email?' · mentor '+esc(t.mentor_default_email):''}</div></div>
+      <div class="mut sm">${req.join(' · ')||'bez potvrzení'}${t.deadline_days!=null?' · termín +'+t.deadline_days+' dní':''}${t.mentor_default_email?' · mentor '+esc(t.mentor_default_email):''}${extra}</div></div>
     <div class="sp"></div>
-    <button class="btn ghost mini" onclick='editTask(${sid},${t.phase_id},${JSON.stringify(t)})'>Upravit</button>
+    <button class="btn ghost mini" onclick="editTask(${sid},${t.phase_id},TASK_MAP[${t.id}])">Upravit</button>
     <button class="btn del mini" onclick="delTask(${sid},${t.id})">×</button>
   </div></div>`;
 }
@@ -215,10 +226,17 @@ function renamePhase(sid,id,label){
 async function delPhase(sid,id){ if(!confirm('Smazat fázi a její úkoly?'))return; await api('/api/adaptace/phase-delete?id='+id,{method:'POST',body:'{}'}); openEditor(sid); }
 async function delTask(sid,id){ if(!confirm('Smazat úkol?'))return; await api('/api/adaptace/task-delete?id='+id,{method:'POST',body:'{}'}); openEditor(sid); }
 
-function editTask(sid,phaseId,t){
-  t = t||{};
+let EDIT_LINKS=[], EDIT_ADDR=[];
+function safeParse(j){ try{ const a=JSON.parse(j||'[]'); return Array.isArray(a)?a:[]; }catch{ return []; } }
+
+async function editTask(sid,phaseId,t,opts){
+  t = t||{}; opts = opts||{}; const asTpl = !!opts.asTemplate;
+  EDIT_LINKS = safeParse(t.links_json); EDIT_ADDR = safeParse(t.addresses_json);
   const ck=(k,def)=>((t[k]!==undefined?t[k]:def)?'checked':'');
-  modal(`<h2>${t.id?'Upravit úkol':'Nový úkol'}</h2>
+  const showPicker = !asTpl && !t.id;
+  if (showPicker) await loadTemplates();
+  modal(`<h2>${asTpl?'Nová šablona úkolu':(t.id?'Upravit úkol':'Nový úkol')}</h2>
+    ${showPicker?`<label class="f"><span>Ze šablony</span><select id="t_tpl" onchange="applyTemplate()"><option value="">— nepoužít —</option>${TEMPLATES.map(x=>`<option value="${x.id}">${esc(x.label)}</option>`).join('')}</select></label>`:''}
     <label class="f"><span>Název úkolu</span><input id="t_label" value="${esc(t.label||'')}"></label>
     <label class="f"><span>Popis / obsah</span><textarea id="t_desc" rows="3">${esc(t.description||'')}</textarea></label>
     <div class="grid2">
@@ -234,14 +252,62 @@ function editTask(sid,phaseId,t){
       <label class="chk"><input type="checkbox" id="t_em" ${ck('email_employee',0)}> e-mail nováčkovi</label>
       <label class="chk"><input type="checkbox" id="t_mm" ${ck('email_mentor',0)}> e-mail mentorovi</label>
     </div>
-    <div class="row"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
-      <button class="btn" onclick="saveTask(${sid},${phaseId},${t.id||0})">Uložit</button></div>`);
+    <label class="f"><span>Prezentace / videa / odkazy</span><div id="t_links"></div>
+      <button class="btn ghost mini" onclick="addEditLink()">+ Přidat odkaz</button></label>
+    <label class="f"><span>Místa na mapě (OpenStreetMap)</span><div id="t_addr"></div>
+      <button class="btn ghost mini" onclick="addEditAddr()">+ Přidat místo</button></label>
+    <div class="row" style="margin-top:12px">
+      ${asTpl?'':`<button class="btn ghost mini" onclick="saveAsTemplate()">Uložit jako šablonu</button>`}
+      <div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
+      <button class="btn" onclick="${asTpl?'saveTemplate()':`saveTask(${sid},${phaseId},${t.id||0})`}">${asTpl?'Vytvořit šablonu':'Uložit'}</button>
+    </div>`);
+  renderEditLinks(); renderEditAddr();
 }
-async function saveTask(sid,phaseId,id){
-  const d = { label:$('#t_label').value.trim(), description:$('#t_desc').value.trim(),
+function renderEditLinks(){
+  $('#t_links').innerHTML = EDIT_LINKS.map((l,i)=>`<div class="row" style="gap:6px;margin-bottom:6px">
+    <input placeholder="Popis (např. Úvodní prezentace)" value="${esc(l.label||'')}" oninput="EDIT_LINKS[${i}].label=this.value" style="flex:1">
+    <input placeholder="URL (Google Slides, YouTube, PDF…)" value="${esc(l.url||'')}" oninput="EDIT_LINKS[${i}].url=this.value" style="flex:2">
+    <button class="btn del mini" onclick="EDIT_LINKS.splice(${i},1);renderEditLinks()">×</button></div>`).join('');
+}
+function addEditLink(){ EDIT_LINKS.push({label:'',url:''}); renderEditLinks(); }
+function renderEditAddr(){
+  $('#t_addr').innerHTML = EDIT_ADDR.map((a,i)=>`<div class="row" style="gap:6px;margin-bottom:6px">
+    <input placeholder="Název místa" value="${esc(a.label||'')}" oninput="EDIT_ADDR[${i}].label=this.value" style="flex:1">
+    <input placeholder="Adresa" value="${esc(a.address||'')}" oninput="EDIT_ADDR[${i}].address=this.value;EDIT_ADDR[${i}].lat=null" style="flex:2">
+    <button class="btn ${a.lat?'ok':'ghost'} mini" onclick="geocode(${i})">${a.lat?'✓ na mapě':'Najít'}</button>
+    <button class="btn del mini" onclick="EDIT_ADDR.splice(${i},1);renderEditAddr()">×</button></div>`).join('');
+}
+function addEditAddr(){ EDIT_ADDR.push({label:'',address:'',lat:null,lon:null}); renderEditAddr(); }
+async function geocode(i){
+  const q=(EDIT_ADDR[i].address||'').trim(); if(!q) return toast('Zadej adresu.');
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q),{headers:{Accept:'application/json'}});
+    const d=await r.json();
+    if(!d.length) return toast('Adresa nenalezena.');
+    EDIT_ADDR[i].lat=+d[0].lat; EDIT_ADDR[i].lon=+d[0].lon; EDIT_ADDR[i].address=d[0].display_name;
+    renderEditAddr(); toast('Nalezeno na mapě.');
+  }catch(e){ toast('Geokódování selhalo.'); }
+}
+function applyTemplate(){
+  const id=+$('#t_tpl').value; const tp=TEMPLATES.find(x=>x.id===id); if(!tp) return;
+  $('#t_label').value=tp.label||''; $('#t_desc').value=tp.description||'';
+  $('#t_dl').value=tp.deadline_days!=null?tp.deadline_days:''; $('#t_mentor').value=tp.mentor_default_email||'';
+  $('#t_u').checked=!!tp.needs_understanding; $('#t_a').checked=!!tp.needs_acquaintance; $('#t_m').checked=!!tp.needs_mentor_ok;
+  $('#t_em').checked=!!tp.email_employee; $('#t_mm').checked=!!tp.email_mentor;
+  EDIT_LINKS=safeParse(tp.links_json); EDIT_ADDR=safeParse(tp.addresses_json); renderEditLinks(); renderEditAddr();
+}
+function collectTask(){
+  return { label:$('#t_label').value.trim(), description:$('#t_desc').value.trim(),
     deadline_days:$('#t_dl').value, mentor_default_email:$('#t_mentor').value.trim(),
     needs_understanding:$('#t_u').checked, needs_acquaintance:$('#t_a').checked, needs_mentor_ok:$('#t_m').checked,
-    email_employee:$('#t_em').checked, email_mentor:$('#t_mm').checked };
+    email_employee:$('#t_em').checked, email_mentor:$('#t_mm').checked,
+    links_json:JSON.stringify(EDIT_LINKS.filter(l=>(l.url||'').trim())),
+    addresses_json:JSON.stringify(EDIT_ADDR.filter(a=>(a.address||'').trim())) };
+}
+async function saveAsTemplate(){ const d=collectTask(); if(!d.label) return toast('Zadej název.'); await api('/api/adaptace/template-create',{method:'POST',body:JSON.stringify(d)}); toast('Uloženo jako šablona.'); }
+async function saveTemplate(){ const d=collectTask(); if(!d.label) return toast('Zadej název.'); await api('/api/adaptace/template-create',{method:'POST',body:JSON.stringify(d)}); closeModal(); viewTemplates(); }
+async function saveTask(sid,phaseId,id){
+  const d = collectTask();
   if(!d.label) return toast('Zadej název úkolu.');
   if(id) await api('/api/adaptace/task-update?id='+id,{method:'POST',body:JSON.stringify(d)});
   else { d.phase_id=phaseId; await api('/api/adaptace/task-create',{method:'POST',body:JSON.stringify(d)}); }
@@ -338,7 +404,7 @@ function renderTaskList(tasks, mode){
     html+=`<div class="task"><div class="row">
       <div style="flex:1;min-width:180px"><strong>${esc(t.label)}</strong>
         ${t.description?`<div class="mut sm" style="margin-top:2px">${esc(t.description)}</div>`:''}
-        ${linksHtml(t.links_json)}</div>
+        ${linksHtml(t.links_json)}${mapHtml(t.addresses_json)}</div>
       <span class="pill ${st.cls}">${st.txt}</span>
       <div class="row" style="gap:6px">${actions}</div>
     </div>${mode.guest?'':`<div style="margin-top:8px"><span class="link sm" onclick="toggleDisc(${t.id})">💬 Diskuze</span><div id="disc_${t.id}" style="display:none;margin-top:6px"></div></div>`}</div>`;
@@ -348,7 +414,49 @@ function renderTaskList(tasks, mode){
 function btnFlag(t,flag,val,label){
   return `<button class="btn mini ${val?'ok':'ghost'}" onclick="flag(${t.id},'${flag}',${val?'false':'true'})">${val?'✓ '+label:label}</button>`;
 }
-function linksHtml(j){ try{ const a=JSON.parse(j||'[]'); return a.length?'<div class="sm" style="margin-top:4px">'+a.map(l=>`<a class="link" href="${esc(l.url)}" target="_blank">🔗 ${esc(l.label||l.url)}</a>`).join(' · ')+'</div>':''; }catch{return '';} }
+/* ---- prezentace / videa / odkazy (embed) ---- */
+function embedUrl(url){
+  try{
+    const u=new URL(url);
+    if(/(^|\.)youtube\.com$/.test(u.host)){ const id=u.searchParams.get('v'); return id?'https://www.youtube.com/embed/'+id:null; }
+    if(u.host==='youtu.be'){ return 'https://www.youtube.com/embed/'+u.pathname.slice(1); }
+    if(u.host==='docs.google.com' && /\/(presentation|document|spreadsheets)\//.test(u.pathname)){ return url.replace(/\/(edit|pub|view|preview)([?#].*)?$/,'').replace(/\/$/,'')+'/embed'; }
+    if(/\.pdf($|[?#])/i.test(u.pathname)) return url;
+    return null;
+  }catch{ return null; }
+}
+function linksHtml(j){
+  const a=safeParse(j); if(!a.length) return '';
+  return '<div class="sm" style="margin-top:8px">'+a.map(l=>{
+    if(!l.url) return '';
+    const emb=embedUrl(l.url); const uid='emb_'+Math.random().toString(36).slice(2,9);
+    let h=`<div style="margin:4px 0"><a class="link" href="${esc(l.url)}" target="_blank">🔗 ${esc(l.label||l.url)}</a>`;
+    if(emb) h+=` · <span class="link" data-emb="${esc(emb)}" data-tgt="${uid}" onclick="toggleEmbed(this)">▶ zobrazit</span><div id="${uid}"></div>`;
+    return h+'</div>';
+  }).join('')+'</div>';
+}
+function toggleEmbed(sp){
+  const el=document.getElementById(sp.dataset.tgt); if(!el) return;
+  if(el.firstChild){ el.innerHTML=''; return; }
+  const f=document.createElement('iframe'); f.src=sp.dataset.emb; f.allowFullscreen=true;
+  f.style.cssText='width:100%;height:340px;border:1px solid var(--line);border-radius:8px;margin-top:6px';
+  el.appendChild(f);
+}
+/* ---- mapy (OpenStreetMap / Leaflet) ---- */
+function mapHtml(j){
+  const a=safeParse(j).filter(x=>x.lat&&x.lon); if(!a.length) return '';
+  const id='map_'+Math.random().toString(36).slice(2,9);
+  setTimeout(()=>initMap(id,a),60);
+  return `<div class="sm" style="margin-top:8px">📍 ${a.map(x=>esc(x.label||x.address)).join(' · ')}</div>
+    <div id="${id}" style="height:220px;border-radius:8px;margin-top:6px;border:1px solid var(--line);overflow:hidden"></div>`;
+}
+function initMap(id,points){
+  const el=document.getElementById(id); if(!el||el._map||!window.L) return;
+  const map=L.map(id,{scrollWheelZoom:false}); el._map=map;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  const g=[]; points.forEach(p=>{ L.marker([p.lat,p.lon]).addTo(map).bindPopup(esc(p.label||p.address)); g.push([p.lat,p.lon]); });
+  if(g.length===1) map.setView(g[0],15); else map.fitBounds(g,{padding:[30,30]});
+}
 async function flag(progressId, flag, value){
   try{
     if(GUEST){ await api('/api/adaptace/guest-flag',{method:'POST',body:JSON.stringify({hash:GUEST,progressId,flag,value})}); return viewGuest(); }
@@ -377,9 +485,8 @@ async function addComment(pid){
   catch(e){ toast(e.message); }
 }
 
-/* ---------------- ZPRÁVY / OZNÁMENÍ ---------------- */
-async function viewMessages(){
-  if(ADMIN_MODE) return viewMessagesAdmin();
+/* ---------------- OZNÁMENÍ (zaměstnanec) ---------------- */
+async function viewInbox(){
   const list = await api('/api/adaptace/my-messages');
   $('#view').innerHTML = `<h2>Oznámení</h2>` + (list.length? list.map(m=>`
     <div class="card"><div class="row"><h3>${esc(m.label)}</h3><div class="sp"></div>
@@ -390,7 +497,38 @@ async function viewMessages(){
       ${m.needs_understanding?`<button class="btn mini ok" onclick="readMsg(${m.id},true)">Rozumím</button>`:''}</div>`:''}
     </div>`).join('') : '<div class="empty">Žádná oznámení.</div>');
 }
-async function readMsg(id, understood){ await api('/api/adaptace/message-read',{method:'POST',body:JSON.stringify({messageId:id,understood})}); viewMessages(); }
+async function readMsg(id, understood){ await api('/api/adaptace/message-read',{method:'POST',body:JSON.stringify({messageId:id,understood})}); viewInbox(); }
+
+/* ---------------- TÝM (vedoucí — read-only) ---------------- */
+async function viewTeam(){
+  const list = await api('/api/adaptace/team');
+  $('#view').innerHTML = `<h2>Adaptace mého týmu</h2>` + (list.length? list.map(a=>`
+    <div class="card"><div class="row">
+      <div style="min-width:200px"><h3>${esc(a.emp_name||a.emp_email)}</h3>
+        <div class="mut sm">${esc(a.scenario_label||'')} · start ${fmtCz(a.start_date)}</div></div>
+      <div style="flex:1;min-width:160px"><div class="bar"><i style="width:${a.percentage}%"></i></div>
+        <div class="mut sm">${a.done}/${a.total} · ${a.percentage}%</div></div>
+      ${a.complete?'<span class="pill ok">Dokončeno</span>':''}
+    </div></div>`).join('') : '<div class="empty">V týmu nikdo neprobíhá adaptací.</div>');
+}
+
+/* ---------------- ŠABLONY ÚKOLŮ (správa) ---------------- */
+let TEMPLATES = [];
+async function loadTemplates(){ try{ TEMPLATES = await api('/api/adaptace/templates'); }catch(e){ TEMPLATES=[]; } return TEMPLATES; }
+async function viewTemplates(){
+  await loadTemplates();
+  $('#view').innerHTML = `<div class="row" style="margin-bottom:12px"><h2>Šablony úkolů</h2><div class="sp"></div>
+      <button class="btn" onclick="editTemplate()">+ Nová šablona</button></div>
+    <p class="mut sm" style="margin:-6px 0 14px">Znovupoužitelné definice úkolu. Při přidávání úkolu do scénáře můžeš vybrat „Ze šablony".</p>
+    ${TEMPLATES.length? TEMPLATES.map(t=>`<div class="card"><div class="row">
+      <div><h3>${esc(t.label)}</h3><div class="mut sm">${tplMeta(t)}</div></div>
+      <div class="sp"></div><button class="btn del mini" onclick="delTemplate(${t.id})">×</button></div>
+      ${t.description?`<div class="sm" style="margin-top:6px">${esc(t.description)}</div>`:''}</div>`).join('')
+      : '<div class="empty">Zatím žádné šablony. Vytvoř první, nebo v editoru úkolu klikni „Uložit jako šablonu".</div>'}`;
+}
+function tplMeta(t){ const r=[]; if(t.needs_understanding)r.push('rozumím'); if(t.needs_acquaintance)r.push('seznámen'); if(t.needs_mentor_ok)r.push('mentor OK'); return (r.join(' · ')||'bez potvrzení')+(t.deadline_days!=null?' · termín +'+t.deadline_days+' dní':''); }
+async function delTemplate(id){ if(!confirm('Smazat šablonu?'))return; await api('/api/adaptace/template-delete?id='+id,{method:'POST',body:'{}'}); viewTemplates(); }
+function editTemplate(){ editTask(0,0,null,{asTemplate:true}); }
 async function viewMessagesAdmin(){
   const list = await api('/api/adaptace/messages');
   $('#view').innerHTML = `<div class="row" style="margin-bottom:12px"><h2>Zprávy zaměstnancům</h2><div class="sp"></div>
@@ -414,9 +552,9 @@ async function sendMsg(){
   const label=$('#m_label').value.trim(); if(!label) return toast('Zadej předmět.');
   const r = await api('/api/adaptace/message-create',{method:'POST',body:JSON.stringify({
     label, body:$('#m_body').value.trim(), needs_understanding:$('#m_und').checked, audience:'all', sendEmail:$('#m_mail').checked })});
-  closeModal(); toast('Odesláno '+r.sent+' příjemcům.'); viewMessages();
+  closeModal(); toast('Odesláno '+r.sent+' příjemcům.'); viewMessagesAdmin();
 }
-async function delMsg(id){ if(!confirm('Smazat zprávu?'))return; await api('/api/adaptace/message-delete?id='+id,{method:'POST',body:'{}'}); viewMessages(); }
+async function delMsg(id){ if(!confirm('Smazat zprávu?'))return; await api('/api/adaptace/message-delete?id='+id,{method:'POST',body:'{}'}); viewMessagesAdmin(); }
 
 init();
 </script>

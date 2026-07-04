@@ -51,11 +51,30 @@ CREATE TABLE IF NOT EXISTS task (
   deadline_days INTEGER,            -- počet dnů od startu adaptace; NULL = bez termínu
   email_employee INTEGER NOT NULL DEFAULT 0,
   email_mentor INTEGER NOT NULL DEFAULT 0,
-  links_json TEXT,                  -- JSON pole [{label,url}] (videa/wiki/odkazy)
+  links_json TEXT,                  -- JSON pole [{label,url}] (prezentace/videa/odkazy)
+  addresses_json TEXT,              -- JSON pole [{label,address,lat,lon}] (mapy — OpenStreetMap)
   position INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS ix_task_phase ON task(phase_id);
+
+-- Šablony úkolů (znovupoužitelné definice úkolu napříč scénáři)
+CREATE TABLE IF NOT EXISTS task_template (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  description TEXT,
+  mentor_default_email TEXT,
+  needs_understanding INTEGER NOT NULL DEFAULT 1,
+  needs_acquaintance INTEGER NOT NULL DEFAULT 0,
+  needs_mentor_ok INTEGER NOT NULL DEFAULT 0,
+  deadline_days INTEGER,
+  email_employee INTEGER NOT NULL DEFAULT 0,
+  email_mentor INTEGER NOT NULL DEFAULT 0,
+  links_json TEXT,
+  addresses_json TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE IF NOT EXISTS assignment (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,6 +164,9 @@ function openDb(file) {
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
 
+  // Migrace pro dříve vytvořené DB (SQLite: přidání chybějícího sloupce).
+  try { db.exec('ALTER TABLE task ADD COLUMN addresses_json TEXT'); } catch (e) { /* sloupec už existuje */ }
+
   // ---- SCENÁŘE / FÁZE / ÚKOLY (šablony) ---------------------------
   const scenario = {
     all() { return db.prepare('SELECT * FROM scenario ORDER BY active DESC, label').all(); },
@@ -182,7 +204,7 @@ function openDb(file) {
   };
 
   const TASK_COLS = ['label', 'description', 'mentor_default_email', 'needs_understanding',
-    'needs_acquaintance', 'needs_mentor_ok', 'deadline_days', 'email_employee', 'email_mentor', 'links_json'];
+    'needs_acquaintance', 'needs_mentor_ok', 'deadline_days', 'email_employee', 'email_mentor', 'links_json', 'addresses_json'];
   const BOOL_TASK = new Set(['needs_understanding', 'needs_acquaintance', 'needs_mentor_ok', 'email_employee', 'email_mentor']);
   const task = {
     listByPhase(pid) { return db.prepare('SELECT * FROM task WHERE phase_id=? ORDER BY position, id').all(pid); },
@@ -191,14 +213,14 @@ function openDb(file) {
       const pos = d.position ?? db.prepare('SELECT COALESCE(MAX(position),-1)+1 n FROM task WHERE phase_id=?').get(d.phase_id).n;
       const info = db.prepare(`INSERT INTO task
         (phase_id,label,description,mentor_default_email,needs_understanding,needs_acquaintance,
-         needs_mentor_ok,deadline_days,email_employee,email_mentor,links_json,position)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+         needs_mentor_ok,deadline_days,email_employee,email_mentor,links_json,addresses_json,position)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         d.phase_id, d.label, d.description || null, d.mentor_default_email || null,
         b(d.needs_understanding === undefined ? 1 : d.needs_understanding),
         b(d.needs_acquaintance), b(d.needs_mentor_ok),
         (d.deadline_days === '' || d.deadline_days == null) ? null : Number(d.deadline_days),
         b(d.email_employee), b(d.email_mentor),
-        d.links_json || null, pos);
+        d.links_json || null, d.addresses_json || null, pos);
       return task.getById(Number(info.lastInsertRowid));
     },
     update(id, d) {
@@ -272,7 +294,7 @@ function openDb(file) {
     forAssignment(assignmentId) {
       return db.prepare(`
         SELECT p.*, t.label, t.description, t.needs_understanding, t.needs_acquaintance,
-               t.needs_mentor_ok, t.links_json, t.mentor_default_email,
+               t.needs_mentor_ok, t.links_json, t.addresses_json, t.mentor_default_email,
                ph.id AS phase_id, ph.label AS phase_label, ph.position AS phase_pos, t.position AS task_pos
         FROM progress p
         JOIN task t ON t.id=p.task_id
@@ -351,12 +373,34 @@ function openDb(file) {
     },
   };
 
+  // ---- ŠABLONY ÚKOLŮ ----------------------------------------------
+  const TPL_COLS = ['label', 'description', 'mentor_default_email', 'needs_understanding',
+    'needs_acquaintance', 'needs_mentor_ok', 'deadline_days', 'email_employee', 'email_mentor', 'links_json', 'addresses_json'];
+  const template = {
+    all() { return db.prepare('SELECT * FROM task_template ORDER BY label').all(); },
+    getById(id) { return db.prepare('SELECT * FROM task_template WHERE id=?').get(id) || null; },
+    create(d, by) {
+      const info = db.prepare(`INSERT INTO task_template
+        (label,description,mentor_default_email,needs_understanding,needs_acquaintance,
+         needs_mentor_ok,deadline_days,email_employee,email_mentor,links_json,addresses_json,created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        d.label, d.description || null, d.mentor_default_email || null,
+        b(d.needs_understanding === undefined ? 1 : d.needs_understanding),
+        b(d.needs_acquaintance), b(d.needs_mentor_ok),
+        (d.deadline_days === '' || d.deadline_days == null) ? null : Number(d.deadline_days),
+        b(d.email_employee), b(d.email_mentor),
+        d.links_json || null, d.addresses_json || null, by || null);
+      return template.getById(Number(info.lastInsertRowid));
+    },
+    remove(id) { db.prepare('DELETE FROM task_template WHERE id=?').run(id); },
+  };
+
   const meta = {
     get(k) { const r = db.prepare('SELECT v FROM meta WHERE k=?').get(k); return r ? r.v : null; },
     set(k, v) { db.prepare('INSERT INTO meta (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run(k, String(v)); },
   };
 
-  return { db, scenario, phase, task, scenarioFull, assignment, progress, message, discussion, meta };
+  return { db, scenario, phase, task, template, scenarioFull, assignment, progress, message, discussion, meta };
 }
 
 module.exports = { openDb, SCHEMA };
