@@ -954,6 +954,7 @@ const MUJ_MODS = [
   { grp:"Rozvoj a nástup" },
   { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace" },
   { key:"skoleni", icon:MUJ_IC.school, label:"Školení", soon:true },
+  { key:"abroll", icon:MUJ_IC.school, label:"Školení ABROLL" },
   { key:"pruzkumy", icon:MUJ_IC.poll, label:"Průzkumy" },
   { grp:"Volno a žádosti" },
   { key:"dovolena", icon:MUJ_IC.cal, label:"Dovolená" },
@@ -1027,7 +1028,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="smlouvy"||MUJ.view==="adaptace");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="abroll");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
 function mjGo(key){
@@ -1040,6 +1041,7 @@ function mjGo(key){
   else if(key==="adaptace") showAdaptace();
   else if(key==="dovolena") showDovolena();
   else if(key==="pruzkumy") showPruzkumy();
+  else if(key==="abroll") showAbroll();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
 }
@@ -1069,6 +1071,13 @@ function showSvozEsa(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("svozesa")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/svoz-esa-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka svoz ESA"></iframe>';
+  window.scrollTo(0,0);
+}
+function showAbroll(){
+  MUJ.view="abroll"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  body.innerHTML='<iframe src="/abroll-app'+q+'" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Školení ABROLL"></iframe>';
   window.scrollTo(0,0);
 }
 function showSmlouvy(){
@@ -1435,7 +1444,8 @@ const ACT_META={
   'admin-login':{i:'🛡️',l:'Přihlášení do správy'},
   'invite-sent':{i:'✉',l:'Pozvánka odeslána'},
   'invite-accepted':{i:'✓',l:'Pozvánka přijata'},
-  'survey':{i:'📊',l:'Vyplnil(a) průzkum'}
+  'survey':{i:'📊',l:'Vyplnil(a) průzkum'},
+  'abroll':{i:'🎓',l:'Test ABROLL'}
 };
 async function renderActivity(){
   const box=document.getElementById("activityBox");
@@ -2168,6 +2178,7 @@ async function renderGritAdmin(){
   }
   h+='<div class="divider" style="margin:26px 0"></div>'+ await jssBlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await tw44BlockHtml();
+  h+='<div class="divider" style="margin:26px 0"></div>'+ await abrollBlockHtml();
   box.innerHTML=h;
 }
 async function copyGritLinks(){
@@ -2340,6 +2351,49 @@ async function tw44BlockHtml(){
     h+='</tbody></table></div>';
   });
   return h;
+}
+/* ---- Školení ABROLL – závěrečný test (výsledky, max 3 pokusy) ---- */
+let ABROLL_RESULTS=[];
+async function abrollBlockHtml(){
+  try{ const r=await fetch("/api/abroll-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return ""; } ABROLL_RESULTS=await r.json(); }catch(e){ ABROLL_RESULTS=[]; }
+  let h='<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:8px"><strong>Školení ABROLL — závěrečný test</strong>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="exportAbroll()">⬇ Export (XLSX)</button></div></div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">Interaktivní školení kódování ABROLL v modulu „Školení ABROLL". Test se vyhodnocuje automaticky, hranice splnění 80 %, <strong>max. 3 pokusy</strong> na osobu. Ukládá se každý pokus.</div>'+
+    '</div>';
+  const res=(ABROLL_RESULTS||[]).slice();
+  if(!res.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné výsledky ABROLL. Jakmile někdo dokončí test v modulu Školení ABROLL, objeví se tu.</p></div>'; return h; }
+  const bestOf=r=>{ const a=(r.attempts||[]); return a.reduce((m,x)=>Math.max(m,x.pct||0),0); };
+  const passedOf=r=>(r.attempts||[]).some(x=>x.passed);
+  const lastTs=r=>{ const a=(r.attempts||[]); return a.length?a[a.length-1].ts:0; };
+  const done=res.filter(passedOf).length;
+  h+='<div class="spread" style="margin:4px 0 12px"><h3 style="margin:0">ABROLL — přehled účastníků</h3></div>';
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Účastníků</div><strong style="font-size:20px">'+res.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Splnilo (≥80 %)</div><strong style="font-size:20px">'+done+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Nesplnilo</div><strong style="font-size:20px">'+(res.length-done)+'</strong></div></div>';
+  const groups={}; res.forEach(r=>{ const d=r.dept||"—"; (groups[d]=groups[d]||[]).push(r); });
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,"cs")).forEach(d=>{
+    const rows=groups[d].slice().sort((a,b)=>bestOf(b)-bestOf(a));
+    h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3></div>';
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">Pokusů</th><th class="num">Nejlepší</th><th>Stav</th><th>Poslední pokus</th></tr></thead><tbody>';
+    rows.forEach(r=>{ const best=bestOf(r), passed=passedOf(r), used=(r.attempts||[]).length, ts=lastTs(r);
+      h+='<tr><td>'+esc(r.name||r.email)+'</td><td class="muted">'+esc(r.email||"")+'</td>'+
+         '<td class="num">'+used+' / 3</td><td class="num">'+best+' %</td>'+
+         '<td>'+(passed?'<span class="pill green">✓ Splněno</span>':(used>=3?'<span class="pill red">✕ Nesplněno</span>':'<span class="pill amber">○ Probíhá</span>'))+'</td>'+
+         '<td class="muted">'+(ts?new Date(ts).toLocaleDateString("cs-CZ"):"—")+'</td></tr>'; });
+    h+='</tbody></table></div>';
+  });
+  return h;
+}
+function exportAbroll(){
+  const res=ABROLL_RESULTS||[]; if(!res.length){ toast("Žádná data k exportu."); return; }
+  const rows=[["Jméno","E-mail","Oddělení","Pokusů","Nejlepší %","Splněno","Poslední pokus"]];
+  res.forEach(r=>{ const a=r.attempts||[]; const best=a.reduce((m,x)=>Math.max(m,x.pct||0),0); const passed=a.some(x=>x.passed); const ts=a.length?a[a.length-1].ts:0;
+    rows.push([r.name||r.email||"", r.email||"", r.dept||"", a.length, best, passed?"ano":"ne", ts?new Date(ts).toLocaleString("cs-CZ"):""]); });
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="abroll-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
 }
 
 /* ============================================================
