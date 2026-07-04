@@ -204,32 +204,28 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
 .org-seg{display:inline-flex;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:18px;gap:3px}
 .org-seg button{border:none;background:none;padding:7px 18px;border-radius:8px;font:inherit;font-weight:600;font-size:14px;color:var(--ink-soft);cursor:pointer;transition:.12s}
 .org-seg button.active{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(15,21,18,.1)}
-.org-layout{display:flex;gap:14px;align-items:stretch}
-.org-side{width:244px;flex:none;display:flex;flex-direction:column;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px;max-height:540px}
-.org-side input{width:100%}
-.org-roster{overflow:auto;margin-top:10px;flex:1;display:flex;flex-direction:column;gap:2px}
-.org-ritem{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border-radius:8px;font-size:13px}
-.org-ritem:hover{background:var(--paper)}
-.org-ritem .rnm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.org-ritem .radd{border:none;border-radius:7px;padding:3px 9px;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap;background:var(--green-soft);color:var(--green-d)}
-.org-ritem.on .radd{background:var(--paper);color:var(--ink-soft);border:1px solid var(--line)}
-.org-canvas{flex:1;position:relative;overflow:auto;height:540px;border:1px solid var(--line);border-radius:12px;
+.org-canvas{position:relative;overflow:auto;height:560px;border:1px solid var(--line);border-radius:12px;
   background:radial-gradient(circle,#dfe5dc 1px,transparent 1.4px) 0 0/24px 24px, var(--paper);
   touch-action:none;-webkit-user-select:none;user-select:none}
 .org-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink-soft);font-size:14px;padding:20px}
-.org-node .rm{position:absolute;top:-9px;left:-8px;width:19px;height:19px;line-height:17px;text-align:center;border-radius:999px;background:var(--paper);border:1px solid var(--line-strong);color:#b3261e;cursor:pointer;font-size:13px;font-weight:700;display:none;z-index:3}
-.org-node:hover .rm{display:block}
-.org-inner{position:relative}
-.org-node{position:absolute;width:172px;background:var(--paper);border:1px solid var(--line-strong);border-radius:11px;
-  box-shadow:0 1px 3px rgba(15,21,18,.10);padding:9px 11px;cursor:grab;z-index:2;transition:box-shadow .12s,border-color .12s}
-.org-node:active{cursor:grabbing}
+.org-inner{position:relative;min-width:100%;min-height:100%}
+.org-node{position:absolute;width:198px;background:var(--paper);border:1px solid var(--line-strong);border-radius:11px;
+  box-shadow:0 1px 3px rgba(15,21,18,.12);padding:9px 10px 11px;z-index:2;cursor:grab;transition:box-shadow .12s,border-color .12s}
+.org-node.moving{cursor:grabbing;box-shadow:0 12px 30px rgba(8,18,12,.22);z-index:5}
+.org-node .obx-grip{height:13px;margin:-2px 0 3px;text-align:center;color:var(--line-strong);font-size:12px;letter-spacing:3px;cursor:grab;line-height:12px;user-select:none}
 .org-node.ved{border-color:var(--green-2);box-shadow:0 0 0 2px var(--green-soft),0 1px 3px rgba(15,21,18,.10)}
-.org-node .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.org-node .sub{color:var(--ink-soft);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.org-node .crown{position:absolute;top:-9px;right:-6px;font-size:11px;background:var(--green-2);color:#fff;border-radius:999px;height:18px;line-height:18px;padding:0 6px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
-.org-node.drag{opacity:.35}
 .org-node.drop{border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
-.org-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 12px 30px rgba(8,18,12,.3);transform:rotate(1.5deg)}
+.org-node .obx-label{width:100%;border:1px solid transparent;background:transparent;font-family:inherit;font-weight:600;font-size:13px;color:var(--ink);padding:4px 5px;border-radius:6px}
+.org-node .obx-label::placeholder{color:var(--ink-soft);font-weight:400}
+.org-node .obx-label:focus{border-color:var(--line-strong);background:#fff;outline:none;cursor:text}
+.org-node .obx-foot{display:flex;align-items:center;justify-content:flex-start;margin-top:7px;padding:0 3px}
+.org-node .obx-ved{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);cursor:pointer;user-select:none}
+.org-node .obx-ved input{width:15px;height:15px;accent-color:var(--green-2);cursor:pointer}
+.org-node .rm{position:absolute;top:-9px;left:-8px;width:19px;height:19px;line-height:17px;text-align:center;border-radius:999px;background:var(--paper);border:1px solid var(--line-strong);color:#b3261e;cursor:pointer;font-size:13px;font-weight:700;display:none;z-index:6}
+.org-node:hover .rm{display:block}
+.org-node .obx-handle{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:15px;height:15px;border-radius:999px;background:var(--green-2);border:2px solid var(--paper);cursor:crosshair;z-index:4;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.org-node .obx-handle:hover{background:var(--green);transform:translateX(-50%) scale(1.15)}
+.org-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 12px 30px rgba(8,18,12,.3)}
 svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-events:none}
 
 /* ---------- Modal ---------- */
@@ -522,21 +518,12 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
         <div class="spread" style="margin-bottom:6px">
           <strong>Organizační schéma (plátno)</strong>
           <div class="inline-actions">
-            <button class="btn ghost sm" onclick="orgPlaceAll()" title="Přidat všechny zaměstnance na plátno">Přidat vše</button>
-            <button class="btn ghost sm" onclick="orgClearCanvas()" title="Odebrat všechny z plátna">Vyčistit</button>
-            <button class="btn ghost sm" onclick="renderOrgCanvas()" title="Znovu uspořádat schéma">↻ Uspořádat</button>
+            <button class="btn sm" onclick="orgAddBox()" title="Přidat nový box">+ Přidat box</button>
+            <button class="btn ghost sm" onclick="orgClearBoxes()" title="Smazat všechny boxy">Vyčistit</button>
           </div>
         </div>
-        <p class="muted" style="margin:0 0 12px;font-size:13px">Osoby přidej z panelu vlevo (našeptávač). Na plátně pak <strong>přetáhni osobu na jinou</strong> = podřízený · <strong>do prázdna</strong> = bez nadřízeného · <strong>dvojklik</strong> = vedoucí. Změny se ukládají hned.</p>
-        <div class="org-layout">
-          <aside class="org-side">
-            <h4 style="margin:0 0 8px;font-size:14px">Zaměstnanci</h4>
-            <input id="orgSearch" list="orgEmpList" placeholder="🔎 Najít a přidat…" autocomplete="off" oninput="orgSearchPick()" onkeydown="if(event.key==='Enter'){event.preventDefault();orgSearchPick();}">
-            <datalist id="orgEmpList"></datalist>
-            <div class="org-roster" id="orgRoster"></div>
-          </aside>
-          <div id="orgCanvas" class="org-canvas"></div>
-        </div>
+        <p class="muted" style="margin:0 0 12px;font-size:13px">Přidej box a do textového pole napiš, o jakou <strong>sekci</strong> jde. Box <strong>přesuneš tažením</strong>. Zaškrtnutím <strong>„vedoucí"</strong> ho označíš. Spojnici vytvoříš tažením <strong>spojovacího bodu</strong> (kolečko dole na boxu) na jiný box. Změny se ukládají hned.</p>
+        <div id="orgCanvas" class="org-canvas"></div>
       </div>
     </div>
   </section>
@@ -1924,11 +1911,9 @@ function renderOrg(){
   h+='</tbody></table></div>';
   box.innerHTML=h;
   renderOrgCanvas();
-  renderOrgRoster();
   renderOrgTree();
 }
 /* ---------- Organizační plátno (drag & drop editor) ---------- */
-const ORG_NW=172, ORG_NH=54, ORG_HGAP=26, ORG_VGAP=104, ORG_PAD=26;
 let ORG_MODE='table';
 // Přepínání pohledů: klasická tabulka × plátno.
 function orgMode(m){
@@ -1937,134 +1922,102 @@ function orgMode(m){
   if(st) st.classList.toggle('active', m==='table'); if(sc) sc.classList.toggle('active', m==='canvas');
   const tm=document.getElementById('orgTableMode'), cm=document.getElementById('orgCanvasMode');
   if(tm) tm.style.display = m==='table'?'':'none'; if(cm) cm.style.display = m==='canvas'?'':'none';
-  if(m==='canvas'){ renderOrgCanvas(); renderOrgRoster(); }
+  if(m==='canvas'){ renderOrgCanvas(); }
 }
-// Které osoby jsou na plátně (id). Uloženo v settings, aby plátno nebylo přeplněné všemi.
-function orgPlacedSet(){ if(!DB.settings) DB.settings={}; if(!Array.isArray(DB.settings.orgPlaced)) DB.settings.orgPlaced=[]; return DB.settings.orgPlaced; }
-function orgIsPlaced(id){ return orgPlacedSet().indexOf(id)>=0; }
-function orgPlacedEmps(){ const s=orgPlacedSet(); return DB.employees.filter(e=>s.indexOf(e.id)>=0); }
-function orgAddToCanvas(id){ const s=orgPlacedSet(); if(s.indexOf(id)<0){ s.push(id); save(); renderOrg(); } }
-function orgRemoveFromCanvas(id){ const s=orgPlacedSet(); const i=s.indexOf(id); if(i>=0){ s.splice(i,1); save(); renderOrg(); } }
-function orgPlaceAll(){ if(!DB.settings) DB.settings={}; DB.settings.orgPlaced=DB.employees.map(e=>e.id); save(); renderOrg(); }
-function orgClearCanvas(){ if(!DB.settings) DB.settings={}; DB.settings.orgPlaced=[]; save(); renderOrg(); }
-function orgSearchPick(){
-  const inp=document.getElementById('orgSearch'); if(!inp) return; const v=(inp.value||'').trim().toLowerCase(); if(!v) return;
-  const e=DB.employees.find(x=>(x.name||'').toLowerCase()===v || (x.email||'').toLowerCase()===v);
-  if(e){ inp.value=''; if(!orgIsPlaced(e.id)) orgAddToCanvas(e.id); else { const s=document.getElementById('orgSearch'); if(s) s.value=''; } }
+// Volné boxy na plátně: {id,label,vedouci,x,y,parent}. Uloženo v settings.orgBoxes.
+function orgBoxes(){ if(!DB.settings) DB.settings={}; if(!Array.isArray(DB.settings.orgBoxes)) DB.settings.orgBoxes=[]; return DB.settings.orgBoxes; }
+function orgBoxById(id){ return orgBoxes().find(b=>b.id===id); }
+function orgAddBox(){
+  const boxes=orgBoxes(); const n=boxes.length;
+  const b={ id:'b'+uid(), label:'', vedouci:false, x:40+(n%6)*38, y:28+(n%6)*30, parent:null };
+  boxes.push(b); save(); renderOrgCanvas();
+  const inp=document.querySelector('.org-node[data-id="'+b.id+'"] .obx-label'); if(inp){ inp.focus(); }
 }
-// Boční panel: našeptávač + seznam všech zaměstnanců (přidat / na plátně).
-function renderOrgRoster(){
-  const box=document.getElementById('orgRoster'); if(!box) return;
-  const dl=document.getElementById('orgEmpList'); if(dl) dl.innerHTML=DB.employees.map(e=>'<option value="'+esc(e.name||e.email)+'">').join('');
-  const list=DB.employees.slice().sort((a,b)=>(a.name||a.email||'').localeCompare(b.name||b.email||'','cs'));
-  box.innerHTML = list.length ? list.map(e=>{
-    const on=orgIsPlaced(e.id);
-    return '<div class="org-ritem'+(on?' on':'')+'">'+
-      '<span class="rnm">'+esc(e.name||e.email)+(e.stredisko?' <span class="muted" style="font-size:11px">· '+esc(e.stredisko)+'</span>':'')+'</span>'+
-      (on?'<button class="radd" onclick="orgRemoveFromCanvas(\''+e.id+'\')">na plátně ✓</button>'
-         :'<button class="radd" onclick="orgAddToCanvas(\''+e.id+'\')">+ přidat</button>')+'</div>';
-  }).join('') : '<p class="muted" style="font-size:13px;margin:6px 0">Žádní zaměstnanci.</p>';
-}
-// Potomci daného uzlu (dle managerId), jen mezi osobami na plátně.
-function orgChildren(id){ const s=orgPlacedSet(); return DB.employees.filter(e=>e.managerId===id && e.id!==id && s.indexOf(e.id)>=0); }
-// Množina id uzlu a všech jeho potomků (na ochranu proti smyčce při přetažení).
-function orgDescendants(id){ const set=new Set([id]); const st=[id]; while(st.length){ const c=st.pop(); DB.employees.forEach(e=>{ if(e.managerId===c && !set.has(e.id)){ set.add(e.id); st.push(e.id); } }); } return set; }
-// Rozmístění uzlů: uspořádaný strom shora dolů (listy vedle sebe, rodič nad středem potomků).
-function orgLayout(){
-  const placed=orgPlacedEmps(); const placedIds=new Set(placed.map(e=>e.id));
-  const pos={}; const seen=new Set(); let nextX=0;
-  function walk(e,depth){
-    if(seen.has(e.id)){ return; } seen.add(e.id);
-    const kids=orgChildren(e.id);
-    let x;
-    if(!kids.length){ x=nextX; nextX+=ORG_NW+ORG_HGAP; }
-    else { kids.forEach(k=>walk(k,depth+1)); const first=pos[kids[0].id], last=pos[kids[kids.length-1].id]; x=(first.x+last.x)/2; }
-    pos[e.id]={x,y:depth*ORG_VGAP,depth};
-  }
-  // kořeny na plátně = bez nadřízeného, nebo jehož nadřízený není na plátně
-  const roots=placed.filter(e=>!e.managerId || !placedIds.has(e.managerId) || e.managerId===e.id);
-  roots.forEach(r=>walk(r,0));
-  // pojistka: kdo zbyl (smyčka) → doplnit jako kořen
-  placed.forEach(e=>{ if(!seen.has(e.id)) walk(e,0); });
-  return pos;
-}
+function orgClearBoxes(){ if(!orgBoxes().length) return; if(!confirm('Smazat všechny boxy z plátna?')) return; DB.settings.orgBoxes=[]; save(); renderOrgCanvas(); }
+function orgBoxDelete(id){ const boxes=orgBoxes(); const i=boxes.findIndex(b=>b.id===id); if(i<0) return; boxes.splice(i,1); boxes.forEach(b=>{ if(b.parent===id) b.parent=null; }); save(); renderOrgCanvas(); }
+function orgBoxRename(id,val){ const b=orgBoxById(id); if(b){ b.label=val; save(); } }   // bez překreslení (aby nezmizel fokus)
+function orgBoxSetVed(id,on){ const b=orgBoxById(id); if(b){ b.vedouci=!!on; save(); renderOrgCanvas(); } }
+function orgBoxDescendants(id){ const set=new Set([id]); const st=[id]; const boxes=orgBoxes(); while(st.length){ const c=st.pop(); boxes.forEach(b=>{ if(b.parent===c && !set.has(b.id)){ set.add(b.id); st.push(b.id); } }); } return set; }
+function orgLink(childId,parentId){ if(childId===parentId){ renderOrgCanvas(); return; } const child=orgBoxById(childId); if(!child) return; if(orgBoxDescendants(childId).has(parentId)){ toast('Nelze — vznikla by smyčka.'); renderOrgCanvas(); return; } child.parent=parentId; save(); renderOrgCanvas(); }
 function orgElbow(x1,y1,x2,y2){ const my=(y1+y2)/2; return '<path d="M'+x1+' '+y1+' V'+my.toFixed(1)+' H'+x2+' V'+y2+'" fill="none" stroke="#aebaad" stroke-width="1.6"/>'; }
+function orgRedrawLines(cv,extra){
+  const svg=cv.querySelector('svg.org-lines'); if(!svg) return;
+  const byId={}; cv.querySelectorAll('.org-node').forEach(n=>byId[n.dataset.id]=n);
+  let lines=extra||'';
+  orgBoxes().forEach(b=>{ if(b.parent && byId[b.parent] && byId[b.id]){ const p=byId[b.parent], c=byId[b.id];
+    lines+=orgElbow(p.offsetLeft+p.offsetWidth/2, p.offsetTop+p.offsetHeight, c.offsetLeft+c.offsetWidth/2, c.offsetTop); } });
+  svg.innerHTML=lines;
+}
 function renderOrgCanvas(){
   const cv=document.getElementById("orgCanvas"); if(!cv) return;
-  const placed=orgPlacedEmps();
-  if(!placed.length){ cv.innerHTML='<div class="org-empty">'+(DB.employees.length?'Přidej osoby z panelu vlevo (našeptávač) a přetažením vytvoř strukturu.':'Nejprve přidej zaměstnance v záložce Zaměstnanci.')+'</div>'; return; }
-  const placedIds=new Set(placed.map(e=>e.id));
-  const pos=orgLayout();
-  let maxX=0,maxY=0; Object.keys(pos).forEach(id=>{ maxX=Math.max(maxX,pos[id].x); maxY=Math.max(maxY,pos[id].y); });
-  const W=Math.max(maxX+ORG_NW+ORG_PAD*2, cv.clientWidth), H=maxY+ORG_NH+ORG_PAD*2;
-  let lines='';
-  placed.forEach(e=>{ const m=e.managerId && placedIds.has(e.managerId) && DB.employees.find(x=>x.id===e.managerId && x.id!==e.id); if(m && pos[e.id] && pos[m.id]){ const c=pos[e.id], pm=pos[m.id];
-    lines+=orgElbow(pm.x+ORG_NW/2+ORG_PAD, pm.y+ORG_NH+ORG_PAD, c.x+ORG_NW/2+ORG_PAD, c.y+ORG_PAD); } });
+  const boxes=orgBoxes();
+  if(!boxes.length){ cv.innerHTML='<div class="org-empty">Zatím žádný box. Klikni na <strong>„+ Přidat box"</strong> a napiš, o jakou sekci jde.</div>'; return; }
+  let maxX=0,maxY=0; boxes.forEach(b=>{ maxX=Math.max(maxX,b.x||0); maxY=Math.max(maxY,b.y||0); });
+  const W=Math.max(maxX+198+60, cv.clientWidth), H=Math.max(maxY+130+40, 420);
   let nodes='';
-  placed.forEach(e=>{ const p=pos[e.id]; if(!p) return;
-    nodes+='<div class="org-node'+(e.vedouci?' ved':'')+'" data-id="'+e.id+'" style="left:'+(p.x+ORG_PAD)+'px;top:'+(p.y+ORG_PAD)+'px">'+
-      '<span class="rm" title="Odebrat z plátna" onpointerdown="event.stopPropagation()" onclick="orgRemoveFromCanvas(\''+e.id+'\')">×</span>'+
-      (e.vedouci?'<span class="crown">vedoucí</span>':'')+
-      '<div class="nm">'+esc(e.name||e.email)+'</div>'+
-      '<div class="sub">'+esc(e.stredisko||'—')+'</div></div>'; });
-  cv.innerHTML='<div class="org-inner" style="width:'+W+'px;height:'+H+'px"><svg class="org-lines" width="'+W+'" height="'+H+'">'+lines+'</svg>'+nodes+'</div>';
-  orgBindDrag(cv);
+  boxes.forEach(b=>{
+    nodes+='<div class="org-node'+(b.vedouci?' ved':'')+'" data-id="'+b.id+'" style="left:'+(b.x||0)+'px;top:'+(b.y||0)+'px">'+
+      '<span class="rm" title="Smazat box" onpointerdown="event.stopPropagation()" onclick="orgBoxDelete(\''+b.id+'\')">×</span>'+
+      '<div class="obx-grip" title="Přesunout box">• • •</div>'+
+      '<input class="obx-label" placeholder="Napiš, o jakou sekci jde…" value="'+esc(b.label||'')+'" oninput="orgBoxRename(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+      '<div class="obx-foot"><label class="obx-ved" onpointerdown="event.stopPropagation()"><input type="checkbox" '+(b.vedouci?'checked':'')+' onchange="orgBoxSetVed(\''+b.id+'\',this.checked)"> vedoucí</label></div>'+
+      '<span class="obx-handle" title="Táhni na jiný box = spojnice (podřízená sekce)"></span>'+
+      '</div>';
+  });
+  cv.innerHTML='<div class="org-inner" style="width:'+W+'px;height:'+H+'px"><svg class="org-lines" width="'+W+'" height="'+H+'"></svg>'+nodes+'</div>';
+  orgRedrawLines(cv);
+  orgBindBoxes(cv);
 }
-function orgBindDrag(cv){
+function orgBindBoxes(cv){
+  const inner=cv.querySelector('.org-inner'); if(!inner) return;
   cv.querySelectorAll('.org-node').forEach(node=>{
-    node.addEventListener('dblclick', ev=>{ ev.preventDefault(); const e=DB.employees.find(x=>x.id===node.dataset.id); if(e) toggleVedouci(e.id,!e.vedouci); });
+    const id=node.dataset.id;
+    // Přesun boxu tažením (mimo interaktivní prvky).
     node.addEventListener('pointerdown', ev=>{
       if(ev.button!==0) return;
-      const dragId=node.dataset.id;
-      const startX=ev.clientX, startY=ev.clientY;
-      const rect=node.getBoundingClientRect(); const offX=ev.clientX-rect.left, offY=ev.clientY-rect.top;
-      const descend=orgDescendants(dragId);
-      let ghost=null, curTarget=null, moved=false;
+      const t=ev.target;
+      if(t.closest('.obx-handle')||t.closest('.rm')||t.closest('.obx-ved')||t.tagName==='INPUT') return;
+      const nr=node.getBoundingClientRect(); const grabX=ev.clientX-nr.left, grabY=ev.clientY-nr.top;
+      let moved=false;
       try{ node.setPointerCapture(ev.pointerId); }catch(_){}
+      node.classList.add('moving');
       const onMove=em=>{
-        if(!moved && Math.abs(em.clientX-startX)+Math.abs(em.clientY-startY)>4){
-          moved=true; node.classList.add('drag'); node.style.pointerEvents='none';
-          ghost=node.cloneNode(true); ghost.className='org-node'+(node.classList.contains('ved')?' ved':'')+' org-ghost';
-          ghost.style.width=rect.width+'px'; document.body.appendChild(ghost);
-        }
-        if(!moved) return;
-        ghost.style.left=(em.clientX-offX)+'px'; ghost.style.top=(em.clientY-offY)+'px';
-        // Cílový uzel = ten, nad jehož obdélníkem je kurzor (mimo sebe a své potomky).
-        let tnode=null;
-        cv.querySelectorAll('.org-node').forEach(n=>{ if(descend.has(n.dataset.id)) return;
-          const r=n.getBoundingClientRect();
-          if(em.clientX>=r.left && em.clientX<=r.right && em.clientY>=r.top && em.clientY<=r.bottom) tnode=n; });
-        if(curTarget && curTarget!==tnode) curTarget.classList.remove('drop');
-        if(tnode){ tnode.classList.add('drop'); curTarget=tnode; } else { curTarget=null; }
+        moved=true; const ir=inner.getBoundingClientRect();
+        let x=Math.max(0, em.clientX-ir.left-grabX), y=Math.max(0, em.clientY-ir.top-grabY);
+        node.style.left=x+'px'; node.style.top=y+'px'; orgRedrawLines(cv);
       };
       const onUp=()=>{
         node.removeEventListener('pointermove',onMove); node.removeEventListener('pointerup',onUp);
         try{ node.releasePointerCapture(ev.pointerId); }catch(_){}
-        node.style.pointerEvents=''; node.classList.remove('drag');
-        if(ghost) ghost.remove();
-        if(curTarget) curTarget.classList.remove('drop');
-        if(moved){ orgReparent(dragId, curTarget?curTarget.dataset.id:null); }
+        node.classList.remove('moving');
+        if(moved){ const b=orgBoxById(id); if(b){ b.x=parseFloat(node.style.left)||0; b.y=parseFloat(node.style.top)||0; save(); } renderOrgCanvas(); }
       };
       node.addEventListener('pointermove',onMove); node.addEventListener('pointerup',onUp);
       ev.preventDefault();
     });
+    // Spojnice: tažení ze spojovacího bodu na jiný box (ten se stane podřízeným).
+    const handle=node.querySelector('.obx-handle');
+    if(handle) handle.addEventListener('pointerdown', ev=>{
+      if(ev.button!==0) return; ev.stopPropagation(); ev.preventDefault();
+      const ir=inner.getBoundingClientRect(); const hr=handle.getBoundingClientRect();
+      const sx=hr.left+hr.width/2-ir.left, sy=hr.top+hr.height/2-ir.top;
+      let curTarget=null;
+      try{ handle.setPointerCapture(ev.pointerId); }catch(_){}
+      const onMove=em=>{
+        const ex=em.clientX-ir.left, ey=em.clientY-ir.top;
+        orgRedrawLines(cv,'<path d="M'+sx+' '+sy+' L'+ex+' '+ey+'" stroke="var(--green)" stroke-width="2" stroke-dasharray="5 4" fill="none"/>');
+        let tnode=null; cv.querySelectorAll('.org-node').forEach(n=>{ if(n===node) return; const r=n.getBoundingClientRect(); if(em.clientX>=r.left&&em.clientX<=r.right&&em.clientY>=r.top&&em.clientY<=r.bottom) tnode=n; });
+        if(curTarget && curTarget!==tnode) curTarget.classList.remove('drop');
+        if(tnode){ tnode.classList.add('drop'); curTarget=tnode; } else curTarget=null;
+      };
+      const onUp=()=>{
+        handle.removeEventListener('pointermove',onMove); handle.removeEventListener('pointerup',onUp);
+        try{ handle.releasePointerCapture(ev.pointerId); }catch(_){}
+        if(curTarget){ curTarget.classList.remove('drop'); orgLink(curTarget.dataset.id, id); } else orgRedrawLines(cv);
+      };
+      handle.addEventListener('pointermove',onMove); handle.addEventListener('pointerup',onUp);
+    });
   });
-}
-// Přepojení: dragId dostane nového nadřízeného targetId (null = kořen). Cíl se stane vedoucím.
-function orgReparent(dragId, targetId){
-  const e=DB.employees.find(x=>x.id===dragId); if(!e) return;
-  if(targetId===dragId) return;
-  if(targetId){
-    if(orgDescendants(dragId).has(targetId)){ toast('Nelze — vznikla by smyčka.'); return; }
-    if(e.managerId===targetId) return;
-    const t=DB.employees.find(x=>x.id===targetId); if(!t) return;
-    if(!t.vedouci) t.vedouci=true;   // kdo má podřízeného, je vedoucí
-    e.managerId=targetId;
-  } else {
-    if(!e.managerId) return;
-    e.managerId=null;
-  }
-  save(); renderOrg();
 }
 function renderOrgTree(){
   const box=document.getElementById("orgTree"); if(!box) return;
