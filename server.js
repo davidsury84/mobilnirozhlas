@@ -70,11 +70,44 @@ const JSS_F    = path.join(DATA_DIR, 'jss-results.json');    // výsledky dotazn
 const TW44_F   = path.join(DATA_DIR, 'tw44-results.json');   // výsledky testu kognitivní zátěže (neanonymní)
 const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
+const ACTLOG_F  = path.join(DATA_DIR, 'activity.json');   // jednoduchý log aktivity (přihlášení, pozvánky, průzkumy)
+const INVITES_F = path.join(DATA_DIR, 'invites.json');    // stav pozvánek dle e-mailu: {invitedAt, acceptedAt, lastLoginAt}
 for (const d of [DATA_DIR, PUB_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 
 /* ---------- malé util ---------- */
 function readJson(f, def) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return def; } }
 function writeJson(f, obj) { fs.writeFileSync(f, JSON.stringify(obj, null, 2), 'utf8'); }
+
+/* ---------- jednoduchý log aktivity + stav pozvánek ---------- */
+// Zapíše událost do logu (posledních 500). Typy: login, admin-login, invite-sent, invite-accepted, survey.
+function logActivity(type, who, detail) {
+  try {
+    const log = readJson(ACTLOG_F, []);
+    log.push({ ts: Date.now(), type, email: (who && who.email) || '', name: (who && who.name) || '', detail: detail || '' });
+    if (log.length > 500) log.splice(0, log.length - 500);
+    writeJson(ACTLOG_F, log);
+  } catch (e) {}
+}
+function readInvites() { const m = readJson(INVITES_F, {}); return (m && typeof m === 'object') ? m : {}; }
+// Označí, že jsme pozvánku odeslali (nastaví invitedAt) a zaloguje ji.
+function markInvited(email, name) {
+  email = (email || '').toLowerCase(); if (!email) return;
+  const m = readInvites(); const r = m[email] || {};
+  r.invitedAt = Date.now(); if (name && !r.name) r.name = name;
+  m[email] = r; writeJson(INVITES_F, m);
+  logActivity('invite-sent', { email, name: name || email }, '');
+}
+// Zaznamená přihlášení; při prvním přihlášení nastaví acceptedAt (= „přijal pozvánku / je aktivní").
+function markLogin(email, name, via) {
+  email = (email || '').toLowerCase(); if (!email) return;
+  const m = readInvites(); const r = m[email] || {};
+  const firstAccept = !r.acceptedAt;
+  if (firstAccept) r.acceptedAt = Date.now();
+  r.lastLoginAt = Date.now(); if (name) r.name = name;
+  m[email] = r; writeJson(INVITES_F, m);
+  logActivity('login', { email, name: name || email }, via || '');
+  if (firstAccept && r.invitedAt) logActivity('invite-accepted', { email, name: name || email }, '');
+}
 
 /* ---------- bezpečnost / přihlášení ---------- */
 let SEC = readJson(SECRET_F, null);
@@ -354,6 +387,7 @@ function recordGrit(a) {
   const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
   if (i >= 0) results[i] = rec; else results.push(rec);
   writeJson(GRIT_F, results);
+  logActivity('survey', { email, name }, 'Test houževnatosti (Grit)');
   return rec;
 }
 // Uloží (upsert podle e-mailu) výsledek dotazníku spokojenosti (JSS) vč. demografie.
@@ -371,6 +405,7 @@ function recordJss(a) {
   const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
   if (i >= 0) results[i] = rec; else results.push(rec);
   writeJson(JSS_F, results);
+  logActivity('survey', { email, name }, 'Dotazník pracovní spokojenosti (JSS)');
   return rec;
 }
 // Uloží (upsert podle e-mailu) výsledek testu kognitivní zátěže TW44.
@@ -389,6 +424,7 @@ function recordTw44(a) {
   const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
   if (i >= 0) results[i] = rec; else results.push(rec);
   writeJson(TW44_F, results);
+  logActivity('survey', { email, name }, 'Test kognitivní zátěže (TW44)');
   return rec;
 }
 // Klíče modulů, ke kterým má zaměstnanec přístup (přiděluje správce v administraci).
@@ -723,9 +759,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/login' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
-      if ((b.password || '') === SEC.password) { const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''; return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_auth=' + token() + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure }); }
+      if ((b.password || '') === SEC.password) { const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''; logActivity('admin-login', { email: '', name: 'Správce (heslo)' }, ''); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_auth=' + token() + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure }); }
       return send(res, 401, { error: 'Nesprávné heslo.' });
     }
+    if (p === '/api/activity' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); const log = readJson(ACTLOG_F, []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 200); return send(res, 200, { events: log }); }
+    if (p === '/api/invites' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, { invites: readInvites() }); }
     if (p === '/api/state' && req.method === 'GET') return send(res, 200, getState());
     if (p === '/api/state' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(STATE_F, { categories: b.categories || [], employees: b.employees || [], directives: b.directives || [], profiles: b.profiles || [], candidates: b.candidates || [], settings: b.settings || {} }); return send(res, 200, { ok: true }); }
     if (p === '/api/config' && req.method === 'GET') return send(res, 200, configStatus());
@@ -781,7 +819,7 @@ const server = http.createServer(async (req, res) => {
       const url = baseUrl(req); const results = []; const useResend = !!process.env.RESEND_API_KEY;
       const queue = recipients.slice();
       async function worker() { while (queue.length) { const r = queue.shift(); const m = intranetInviteMail(r.name, url, b.tpl);
-        try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName || 'Intranet ELKOPLAST', subject: m.subject, text: m.text, html: m.html }); results.push({ email: r.email, ok: true }); }
+        try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName || 'Intranet ELKOPLAST', subject: m.subject, text: m.text, html: m.html }); markInvited(r.email, r.name); results.push({ email: r.email, ok: true }); }
         catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
       await Promise.all(Array.from({ length: useResend ? 1 : Math.min(3, recipients.length || 1) }, worker));
       return send(res, 200, { results });
@@ -820,6 +858,7 @@ const server = http.createServer(async (req, res) => {
       if (wanted) {
         // Přihlášení za konkrétního zaměstnance (kvůli testování schvalování apod.).
         const emp = emps.find(x => (x.email || '').toLowerCase() === wanted) || { email: wanted, name: u.query.name || wanted };
+        markLogin(emp.email, emp.name, 'demo');
         const sess = empSign({ email: emp.email, name: emp.name });
         res.writeHead(302, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400', 'Location': '/' });
         return res.end();
@@ -974,6 +1013,7 @@ const server = http.createServer(async (req, res) => {
         const email = (pl.email || '').toLowerCase();
         if (!email) throw new Error('Token neobsahuje e-mail.');
         const emp = ensureEmployee(email, pl.name || email);
+        markLogin(emp.email, emp.name, 'Google');
         const sess = empSign({ email: emp.email, name: emp.name });
         const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
         const nx = cookieVal(req, 'sm_next');

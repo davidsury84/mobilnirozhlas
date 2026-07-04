@@ -362,6 +362,7 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
       <button data-view="org">Organizační struktura</button>
       <button data-view="stats">Statistiky</button>
       <button data-view="grit">Průzkumy</button>
+      <button data-view="activity">Aktivita</button>
       <button data-view="settings">Nastavení</button>
     </nav>
   </div>
@@ -505,6 +506,18 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
       <p>Rozešli dotazník zaměstnancům (i po jednotlivých odděleních). Výsledky se ukládají a škálují podle oddělení.</p>
     </div>
     <div id="gritAdmin"></div>
+  </section>
+
+  <!-- ===== Aktivita ===== -->
+  <section id="view-activity" class="view">
+    <div class="view-head spread">
+      <div>
+        <h2>Aktivita</h2>
+        <p>Přehled dění v intranetu — přihlášení, odeslané a přijaté pozvánky, vyplněné průzkumy.</p>
+      </div>
+      <button class="btn ghost sm" onclick="renderActivity()">↻ Obnovit</button>
+    </div>
+    <div id="activityBox"></div>
   </section>
 
   <!-- ===== Nastavení ===== -->
@@ -1309,14 +1322,54 @@ document.getElementById("tabs").addEventListener("click", e=>{
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("active",b===e.target));
   document.querySelectorAll(".view").forEach(s=>s.classList.toggle("active", s.id==="view-"+v));
   if(v==="stats") renderStats();
-  if(v==="employees") renderEmployees();
+  if(v==="employees") refreshInvites().then(renderEmployees);
   if(v==="candidates") renderCandidates();
   if(v==="library") renderLibAdmin(null);
   if(v==="access") renderAccess();
   if(v==="org") renderOrg();
   if(v==="grit") renderGritAdmin();
+  if(v==="activity") renderActivity();
   if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); }
 });
+
+/* ---------- Pozvánky do intranetu: stav odesláno / přijato ---------- */
+let INVITES={};
+async function refreshInvites(){ try{ const r=await fetch('/api/invites',{cache:'no-store'}); if(r.status===401){ showLogin(); return; } if(r.ok){ const j=await r.json(); INVITES=j.invites||{}; } }catch(e){} }
+function inviteBadge(email){
+  const r=INVITES[(email||'').toLowerCase()]; if(!r) return '<span class="muted" style="font-size:12px">—</span>';
+  if(r.acceptedAt) return '<span class="pill green" title="Přihlásil(a) se '+esc(fmtDate(r.acceptedAt))+'">✓ Přijato</span>';
+  if(r.invitedAt) return '<span class="pill amber" title="Odesláno '+esc(fmtDate(r.invitedAt))+'">✉ Odesláno</span>';
+  return '<span class="muted" style="font-size:12px">—</span>';
+}
+
+/* ---------- Aktivita (jednoduchý log) ---------- */
+const ACT_META={
+  'login':{i:'🔑',l:'Přihlášení'},
+  'admin-login':{i:'🛡️',l:'Přihlášení do správy'},
+  'invite-sent':{i:'✉',l:'Pozvánka odeslána'},
+  'invite-accepted':{i:'✓',l:'Pozvánka přijata'},
+  'survey':{i:'📊',l:'Vyplnil(a) průzkum'}
+};
+async function renderActivity(){
+  const box=document.getElementById("activityBox");
+  box.innerHTML='<p class="muted">Načítám…</p>';
+  let ev=[];
+  try{ const r=await fetch("/api/activity",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } ev=(await r.json()).events||[]; }
+  catch(e){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nepodařilo se načíst aktivitu.</p></div>'; return; }
+  if(!ev.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Zatím žádná aktivita. Události se začnou zaznamenávat při přihlašování a odesílání pozvánek.</p></div>'; return; }
+  let h='<div class="matrix-wrap" style="max-height:none"><table class="matrix"><thead><tr><th style="min-width:150px">Kdy</th><th style="min-width:200px">Kdo</th><th>Akce</th></tr></thead><tbody>';
+  ev.forEach(e=>{
+    const m=ACT_META[e.type]||{i:'•',l:e.type};
+    const who=e.name||e.email||'—';
+    const sub=(e.email&&e.name&&e.email!==e.name)?'<div class="muted" style="font-size:12px">'+esc(e.email)+'</div>':'';
+    const det=e.detail?' <span class="muted">· '+esc(e.detail)+'</span>':'';
+    h+='<tr><td style="white-space:nowrap;font-size:13px;color:var(--ink-soft)">'+esc(fmtDate(e.ts))+'</td>'+
+       '<td>'+esc(who)+sub+'</td>'+
+       '<td>'+m.i+' '+esc(m.l)+det+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  box.innerHTML=h;
+}
 
 /* ============================================================
    POMOCNÉ
@@ -2124,7 +2177,7 @@ function renderEmployees(){
     t.innerHTML=`<tbody><tr><td class="empty">Žádní zaměstnanci. Přidej je tlačítkem nebo importem.</td></tr></tbody>`;
     const c=document.getElementById("empCount"); if(c) c.textContent=""; return;
   }
-  t.innerHTML=`<thead><tr><th style="min-width:150px">Jméno</th><th style="min-width:190px">E-mail</th><th style="min-width:150px">Jazyk</th><th style="min-width:170px">Oddělení</th><th style="min-width:180px">Tagy</th><th></th></tr></thead><tbody>${
+  t.innerHTML=`<thead><tr><th style="min-width:150px">Jméno</th><th style="min-width:190px">E-mail</th><th style="min-width:150px">Jazyk</th><th style="min-width:170px">Oddělení</th><th style="min-width:180px">Tagy</th><th style="min-width:110px">Pozvánka</th><th></th></tr></thead><tbody>${
     DB.employees.slice().sort((a,b)=>a.name.localeCompare(b.name,"cs")).map(e=>{
       const deptStr=e.cats.map(c=>catName(c)).filter(Boolean).join(', ');
       const tagStr=(e.tags||[]).join(', ');
@@ -2134,6 +2187,7 @@ function renderEmployees(){
         <td><select class="ec" onchange="updEmp('${e.id}','lang',this)">${empLangOpts(e.lang)}</select></td>
         <td><input class="ec" list="empDeptList" placeholder="—" value="${esc(deptStr)}" onchange="updEmpCats('${e.id}',this)"></td>
         <td><input class="ec" list="empTagList" placeholder="—" value="${esc(tagStr)}" onchange="updEmpTags('${e.id}',this)"></td>
+        <td style="white-space:nowrap">${inviteBadge(e.email)}</td>
         <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" onclick="inviteOne('${e.id}')" title="Poslat pozvánku do intranetu">✉ Pozvat</button> <button class="btn danger sm" onclick="deleteEmployee('${e.id}')">Smazat</button></td>
       </tr>`;
     }).join("")
@@ -2216,6 +2270,7 @@ async function inviteToIntranet(list, tpl){
     const ok=(j.results||[]).filter(x=>x.ok).length, bad=(j.results||[]).filter(x=>!x.ok);
     toast('Pozvánka odeslána: '+ok+(bad.length?(' · chyb: '+bad.length):''));
     if(bad.length) console.warn('Invite chyby:', bad);
+    await refreshInvites(); if(document.getElementById("view-employees").classList.contains("active")) renderEmployees();
   }catch(e){ alert('Chyba spojení: '+e.message); }
 }
 
