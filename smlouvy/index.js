@@ -39,6 +39,13 @@ function mount(host) {
 
   function smiCist(req) { const e = host.empSession(req); return e ? e.email : null; }
   function smiPsat(req) { return host.isAdmin(req); }
+  // Řešit plnění smlouvy smí admin/správce vždy; jinak jen garant TÉTO smlouvy.
+  function smiResit(req, smlouva) {
+    if (host.isAdmin(req)) return true;
+    const e = host.empSession(req);
+    return !!(e && smlouva && smlouva.garant_email && e.email &&
+      e.email.toLowerCase() === String(smlouva.garant_email).toLowerCase());
+  }
   function maModul(req) {
     if (host.isAdmin(req)) return true;
     const e = host.empSession(req); if (!e) return false;
@@ -163,13 +170,27 @@ function mount(host) {
         if (!s) { json(res, 404, { chyba: 'Nenalezeno.' }); return true; }
         const terminy = M.termin.listBySmlouva(s.id);
         const historie = {}; terminy.forEach((t) => { historie[t.id] = M.notifikace.historieProTermin(t.id); });
-        json(res, 200, { smlouva: s, dodatky: M.dodatek.listBySmlouva(s.id), terminy, historie }); return true;
+        json(res, 200, {
+          smlouva: s, dodatky: M.dodatek.listBySmlouva(s.id), terminy, historie,
+          reseni: M.reseni.listBySmlouva(s.id), muzuResit: smiResit(req, s),
+        }); return true;
       }
       if (p === '/api/smlouvy/kalendar' && req.method === 'GET') {
         const dnes = todayPrague();
         const rows = M.db.prepare(`SELECT t.id,t.typ,t.datum,t.popis,t.stav,t.smlouva_id,s.cislo_smlouvy,s.protistrana_nazev
           FROM termin t JOIN smlouva s ON s.id=t.smlouva_id WHERE t.stav IN ('ceka','eskalovano') ORDER BY t.datum`).all();
         json(res, 200, rows.map((x) => ({ ...x, dny: daysUntil(x.datum, dnes) }))); return true;
+      }
+
+      // Řešení plnění: přidat záznam (admin/správce nebo garant TÉTO smlouvy).
+      if (p === '/api/smlouvy/reseni' && req.method === 'POST') {
+        const s = M.smlouva.getById(Number(u.query.id));
+        if (!s) { json(res, 404, { chyba: 'Smlouva nenalezena.' }); return true; }
+        if (!smiResit(req, s)) { json(res, 403, { chyba: 'Řešit plnění smí správce, admin nebo garant této smlouvy.' }); return true; }
+        const b = await body(req);
+        if (!b.text || !String(b.text).trim()) { json(res, 400, { chyba: 'Chybí text záznamu.' }); return true; }
+        const who = (host.empSession(req) || {}).email;
+        json(res, 201, M.reseni.create({ smlouva_id: s.id, text: String(b.text).trim(), autor_email: who })); return true;
       }
 
       // zápisové akce → jen admin/správce

@@ -78,6 +78,19 @@ test('sqlite: catch-up importované smlouvy (40 dní → d60)', async () => {
   assert.equal(rows[0].milnik, 'd60', 'nejbližší aktuální milník, ne d90');
 });
 
+test('řešení plnění: log záznamů (create + list DESC)', () => {
+  const M = openDb(':memory:');
+  const s = M.smlouva.create({ cislo_smlouvy: 'R-1', kategorie: 'zavazek', protistrana_nazev: 'X',
+    garant_email: 'g@x.cz', stav: 'aktivni' });
+  assert.equal(M.reseni.listBySmlouva(s.id).length, 0);
+  M.reseni.create({ smlouva_id: s.id, text: 'zahájeno jednání', autor_email: 'g@x.cz' });
+  M.reseni.create({ smlouva_id: s.id, text: 'odesláno protistraně', autor_email: 'g@x.cz' });
+  const list = M.reseni.listBySmlouva(s.id);
+  assert.equal(list.length, 2);
+  assert.equal(list[0].text, 'odesláno protistraně', 'nejnovější první (DESC)');
+  assert.equal(list[0].autor_email, 'g@x.cz');
+});
+
 test('import: KS placeholder, km-limit, nedořešený garant, expozice', () => {
   const M = openDb(':memory:');
   const radky = [

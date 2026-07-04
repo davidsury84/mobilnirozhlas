@@ -78,6 +78,15 @@ CREATE TABLE IF NOT EXISTS notifikace (
 CREATE INDEX IF NOT EXISTS ix_notifikace_token ON notifikace(token);
 CREATE INDEX IF NOT EXISTS ix_notifikace_msgid ON notifikace(resend_message_id);
 
+CREATE TABLE IF NOT EXISTS reseni (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  smlouva_id INTEGER NOT NULL REFERENCES smlouva(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  autor_email TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_reseni_smlouva ON reseni(smlouva_id);
+
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
 `;
 
@@ -213,12 +222,23 @@ function openDb(file) {
     },
   };
 
+  const reseni = {
+    listBySmlouva(id) {
+      return db.prepare('SELECT * FROM reseni WHERE smlouva_id=? ORDER BY created_at DESC, id DESC').all(id);
+    },
+    create(r) {
+      const info = db.prepare('INSERT INTO reseni (smlouva_id, text, autor_email) VALUES (?,?,?)')
+        .run(r.smlouva_id, r.text, r.autor_email || null);
+      return db.prepare('SELECT * FROM reseni WHERE id=?').get(Number(info.lastInsertRowid));
+    },
+  };
+
   const meta = {
     get(k) { const r = db.prepare('SELECT v FROM meta WHERE k=?').get(k); return r ? r.v : null; },
     set(k, v) { db.prepare('INSERT INTO meta (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run(k, String(v)); },
   };
 
-  return { db, smlouva, dodatek, termin, notifikace, meta };
+  return { db, smlouva, dodatek, termin, notifikace, reseni, meta };
 }
 
 module.exports = { openDb, SCHEMA };

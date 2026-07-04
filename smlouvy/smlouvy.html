@@ -43,7 +43,8 @@
   <button data-tab="dash" class="act">Dashboard</button>
   <button data-tab="list">Seznam</button>
   <button data-tab="kal">Kalendář</button>
-  <span style="margin-left:auto" class="muted" id="whoami"></span>
+  <button id="navodBtn" style="margin-left:auto">❔ Návod</button>
+  <span class="muted" id="whoami"></span>
 </header>
 <main id="app"><p class="muted">Načítám…</p></main>
 
@@ -58,10 +59,11 @@ function pill(dny){return dny<0?['cerv','PO TERMÍNU']:dny<30?['cerv','do 30']:d
 
 let ADMIN=false;
 const app = $('#app');
-document.querySelectorAll('header button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('header button').forEach(x=>x.classList.remove('act'));
+document.querySelectorAll('header button[data-tab]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('header button[data-tab]').forEach(x=>x.classList.remove('act'));
   b.classList.add('act'); render(b.dataset.tab);
 });
+$('#navodBtn').onclick=()=>navod();
 
 async function render(tab){
   app.innerHTML='<p class="muted">Načítám…</p>';
@@ -168,6 +170,26 @@ async function detail(id){
   const db=el('tbody');(d.dodatky.length?d.dodatky:[]).forEach(x=>db.append(el('tr',{},el('td',{},x.cislo||''),el('td',{},czd(x.datum)),el('td',{},x.co_meni||''))));
   if(!d.dodatky.length)db.append(el('tr',{},el('td',{colspan:3,class:'muted'},'Bez dodatků.')));
   dt.append(db);app.append(el('div',{class:'card'},el('h1',{style:'font-size:16px'},'Dodatky'),dt));
+
+  // Řešení plnění (log záznamů)
+  const rcard=el('div',{class:'card'});
+  rcard.append(el('h1',{style:'font-size:16px'},'Řešení plnění'),
+    el('p',{class:'muted',style:'margin-top:-6px'},'Průběžné záznamy, jak se plnění smlouvy řeší — kdo, kdy, co.'));
+  if(d.muzuResit){
+    const ta=el('textarea',{rows:2,style:'width:100%',placeholder:'Nový záznam — co se stalo / jak se to řeší…'});
+    const err=el('span',{class:'warn',style:'margin-left:10px'});
+    const btn=el('button',{class:'btn',style:'margin-top:8px',on:{click:async()=>{
+      try{ if(!ta.value.trim())return; await api('/api/smlouvy/reseni?id='+s.id,{method:'POST',body:JSON.stringify({text:ta.value})}); detail(s.id);}
+      catch(e){ err.textContent=e.message; }}}},'Přidat záznam');
+    rcard.append(el('div',{},ta),el('div',{},btn,err));
+  }
+  const rlist=el('div',{style:'margin-top:12px'});
+  if(!(d.reseni||[]).length)rlist.append(el('p',{class:'muted'},'Zatím žádné záznamy řešení.'));
+  (d.reseni||[]).forEach(r=>rlist.append(el('div',{style:'border-top:1px solid var(--lin);padding:8px 0'},
+    el('div',{style:'white-space:pre-wrap'},r.text),
+    el('div',{class:'muted',style:'font-size:12px;margin-top:2px'},(r.autor_email||'—')+' · '+String(r.created_at||'').replace('T',' ').slice(0,16)))));
+  rcard.append(rlist);
+  app.append(rcard);
 }
 
 async function kal(){
@@ -229,11 +251,64 @@ function importPanel(){
   document.body.append(dlg);dlg.showModal();dlg.addEventListener('close',()=>dlg.remove());
 }
 
+// ---- Interaktivní návod: co má kdo vyplnit a proč ----
+const NAVOD={
+  jak:{t:'⚙️ Jak to funguje',h:`
+    <p><b>K čemu modul je:</b> eviduje smlouvy a hlídá jejich <b>termíny</b> (konec platnosti, deadline výpovědi, indexace ceny, audit, konec záruky, SLA, kontrola km…). Jedna smlouva má typicky 2–4 hlídané termíny.</p>
+    <p><b>Proč to nestačí řešit kalendářem:</b> systém posílá <b>vyžádané potvrzení s eskalací</b>, ne jen připomínku, kterou lze odkliknout:</p>
+    <ul>
+      <li><b>D−90 / D−60 / D−30</b> — e-mail garantovi a správci, že se termín blíží.</li>
+      <li><b>D−14 bez potvrzení</b> — eskalace na admina, termín zčervená.</li>
+      <li><b>Po termínu</b> — červené na dashboardu + denní připomínka, dokud se nevyřeší.</li>
+    </ul>
+    <p>Termín se uzavře kliknutím na <b>„Vyřešeno"</b> v e-mailu (zapíše se kdo a kdy). PDF smluv zůstávají na Disku — modul drží jen odkaz.</p>`},
+  spravce:{t:'👤 Správce (Simona)',h:`
+    <p>Zakládá a edituje <b>všechny</b> smlouvy, dodatky a termíny.</p>
+    <p><b>Co vyplnit u smlouvy:</b> číslo, kategorie a směr (příjem/výdaj), protistrana + IČO, předmět, platnost do (nebo podmínka, např. „710 000 km"), výpovědní lhůta, prolongace, hodnota + typ + měna, <b>garant (e-mail)</b>, stav, odkaz na Disk.</p>
+    <p><b>Proč garant e-mail:</b> bez něj nemají termíny komu posílat upozornění — smlouva na dashboardu svítí „garant nedořešen".</p>
+    <p><b>Termíny:</b> u každé smlouvy založ hlídané termíny (2–4). Odvozený „deadline výpovědi" se dopočítá z platnosti a výpovědní lhůty. Opakující (indexace, audit) se po vyřešení samy založí na další období.</p>
+    <p><b>Import:</b> tlačítko „Import registru" v Seznamu (KS balíky se založí jako placeholder, termíny z volného textu jen navrhne k ruční kontrole).</p>`},
+  garant:{t:'🎯 Garant',h:`
+    <p>Garant = odpovědná osoba za konkrétní smlouvu (pole „garant" na smlouvě).</p>
+    <p><b>Co děláš:</b></p>
+    <ul>
+      <li>Dostáváš e-maily <b>D−90/60/30</b> na termíny svých smluv.</li>
+      <li>Až je termín vyřešený, klikni v e-mailu na <b>„Vyřešeno"</b>. <b>Proč:</b> zavře termín, zapíše kdo/kdy; jinak jde v D−14 eskalace na admina a smlouva zčervená.</li>
+      <li>Do panelu <b>„Řešení plnění"</b> na detailu své smlouvy piš průběžné záznamy — co se stalo / jak se to řeší.</li>
+    </ul>`},
+  admin:{t:'🛡️ Admin (David)',h:`
+    <p>Vidí a edituje vše jako správce, navíc:</p>
+    <ul>
+      <li>Dostává <b>eskalace D−14</b> a upozornění na <b>nedoručené e-maily</b> (bounce).</li>
+      <li>Ve správě zaměstnanců přiřazuje uživatelům modul <b>„smlouvy"</b> (jinak ho v menu nevidí).</li>
+      <li>Doplňuje garanty tam, kde je v registru jen oddělení (logistika, marketing…) → konkrétní e-mail.</li>
+    </ul>`},
+  ctenar:{t:'👁️ Čtenář',h:`
+    <p>Vidí všechny smlouvy, termíny a kalendář. <b>Needituje</b> a <b>nepotvrzuje</b> — jen náhled a přehled.</p>`},
+};
+function navod(){
+  const dlg=el('dialog',{style:'max-width:700px'});
+  const nav=el('div',{style:'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'});
+  const content=el('div',{style:'line-height:1.5;font-size:14px'});
+  function show(k){
+    content.innerHTML=NAVOD[k].h;
+    nav.querySelectorAll('button').forEach(b=>b.style.outline=(b.dataset.k===k?'2px solid var(--zel)':'none'));
+  }
+  Object.entries(NAVOD).forEach(([k,v])=>nav.append(el('button',{class:'btn sec','data-k':k,style:'padding:6px 12px',on:{click:()=>show(k)}},v.t)));
+  dlg.append(el('div',{class:'hd'},'Návod — co má kdo vyplnit a proč'),
+    el('div',{class:'bd'},nav,content),
+    el('div',{class:'ft'},el('button',{class:'btn',on:{click:()=>dlg.close()}},'Rozumím')));
+  document.body.append(dlg);dlg.showModal();
+  dlg.addEventListener('close',()=>{dlg.remove();try{localStorage.setItem('smlouvy_navod_seen','1')}catch(e){}});
+  show(ADMIN?'admin':'jak');
+}
+
 // bootstrap
 (async()=>{
   try{const me=await api('/api/smlouvy/me');ADMIN=!!me.admin;$('#whoami').textContent=(me.email||'')+(me.admin?' · správce':' · čtenář');}
   catch(e){$('#whoami').textContent='';}
   render('dash');
+  try{ if(!localStorage.getItem('smlouvy_navod_seen')) setTimeout(navod,400); }catch(e){}
 })();
 </script>
 </body>
