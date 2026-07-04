@@ -200,6 +200,23 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
 .cell-no{color:var(--line-strong);text-align:center}
 .cell-na{color:#cfcec6;text-align:center}
 
+/* ---------- Organizační plátno (drag & drop) ---------- */
+.org-canvas{position:relative;overflow:auto;height:540px;border:1px solid var(--line);border-radius:12px;
+  background:radial-gradient(circle,#dfe5dc 1px,transparent 1.4px) 0 0/24px 24px, var(--bg-2);
+  touch-action:none;-webkit-user-select:none;user-select:none}
+.org-inner{position:relative}
+.org-node{position:absolute;width:172px;background:var(--paper);border:1px solid var(--line-strong);border-radius:11px;
+  box-shadow:0 1px 3px rgba(15,21,18,.10);padding:9px 11px;cursor:grab;z-index:2;transition:box-shadow .12s,border-color .12s}
+.org-node:active{cursor:grabbing}
+.org-node.ved{border-color:var(--green-2);box-shadow:0 0 0 2px var(--green-soft),0 1px 3px rgba(15,21,18,.10)}
+.org-node .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.org-node .sub{color:var(--ink-soft);font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.org-node .crown{position:absolute;top:-9px;right:-6px;font-size:11px;background:var(--green-2);color:#fff;border-radius:999px;height:18px;line-height:18px;padding:0 6px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.org-node.drag{opacity:.35}
+.org-node.drop{border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.org-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 12px 30px rgba(8,18,12,.3);transform:rotate(1.5deg)}
+svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-events:none}
+
 /* ---------- Modal ---------- */
 .overlay{position:fixed;inset:0;background:rgba(28,29,26,.45);display:none;z-index:60;padding:24px;overflow:auto}
 .overlay.show{display:flex;align-items:flex-start;justify-content:center}
@@ -471,8 +488,20 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
       <h2>Organizační struktura</h2>
       <p>Kdo je čí nadřízený. Přímý nadřízený schvaluje dovolenou. Není-li přiřazen, schvaluje ředitel střediska, jinak jednatel. Zde nastavíš i roční nárok dovolené.</p>
     </div>
-    <div id="orgEditor"></div>
-    <div class="view-head" style="margin-top:28px"><h2 style="font-size:20px">Přehled hierarchie</h2><p>Nadřazené větve zleva doprava (nadřízený → jeho nadřízený → …).</p></div>
+    <div class="card pad" style="margin-bottom:18px">
+      <div class="spread" style="margin-bottom:6px">
+        <strong>Organizační schéma (plátno)</strong>
+        <div class="inline-actions">
+          <button class="btn ghost sm" onclick="renderOrgCanvas()" title="Znovu uspořádat schéma">↻ Uspořádat</button>
+        </div>
+      </div>
+      <p class="muted" style="margin:0 0 12px;font-size:13px">Překresli strukturu tažením: <strong>přetáhni osobu na jinou</strong> = stane se jejím podřízeným · <strong>přetáhni do prázdna</strong> = bez nadřízeného (nejvýš) · <strong>dvojklik</strong> = přepnout vedoucí. Změny se ukládají hned.</p>
+      <div id="orgCanvas" class="org-canvas"></div>
+    </div>
+    <details style="margin-bottom:18px"><summary style="cursor:pointer;font-weight:600;padding:6px 0">Podrobná tabulka (střediska, nárok dovolené, ruční nastavení)</summary>
+      <div id="orgEditor" style="margin-top:12px"></div>
+    </details>
+    <div class="view-head" style="margin-top:28px"><h2 style="font-size:20px">Přehled hierarchie</h2><p>Nadřazené větve shora dolů (nadřízený → jeho podřízení).</p></div>
     <div id="orgTree"></div>
   </section>
 
@@ -882,7 +911,7 @@ const MUJ_MODS = [
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { grp:"Rozvoj a nástup" },
-  { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace", soon:true },
+  { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace" },
   { key:"skoleni", icon:MUJ_IC.school, label:"Školení", soon:true },
   { key:"pruzkumy", icon:MUJ_IC.poll, label:"Průzkumy" },
   { grp:"Volno a žádosti" },
@@ -957,7 +986,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="smlouvy");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="smlouvy"||MUJ.view==="adaptace");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
 function mjGo(key){
@@ -967,6 +996,7 @@ function mjGo(key){
   else if(key==="kalkulace") showKalkulace();
   else if(key==="svozesa") showSvozEsa();
   else if(key==="smlouvy") showSmlouvy();
+  else if(key==="adaptace") showAdaptace();
   else if(key==="dovolena") showDovolena();
   else if(key==="pruzkumy") showPruzkumy();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
@@ -1005,6 +1035,12 @@ function showSmlouvy(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("smlouvy")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/smlouvy" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Smlouvy — Hlídač smluv"></iframe>';
+  window.scrollTo(0,0);
+}
+function showAdaptace(){
+  MUJ.view="adaptace"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML='<iframe src="/adaptace" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Adaptace — onboarding nováčků"></iframe>';
   window.scrollTo(0,0);
 }
 /* ---------- Modul Průzkumy (dotazníky a testy) ---------- */
@@ -1811,7 +1847,108 @@ function renderOrg(){
   });
   h+='</tbody></table></div>';
   box.innerHTML=h;
+  renderOrgCanvas();
   renderOrgTree();
+}
+/* ---------- Organizační plátno (drag & drop editor) ---------- */
+const ORG_NW=172, ORG_NH=54, ORG_HGAP=26, ORG_VGAP=104, ORG_PAD=26;
+// Potomci daného uzlu (dle managerId), bez sebe sama.
+function orgChildren(id){ return DB.employees.filter(e=>e.managerId===id && e.id!==id); }
+// Množina id uzlu a všech jeho potomků (na ochranu proti smyčce při přetažení).
+function orgDescendants(id){ const set=new Set([id]); const st=[id]; while(st.length){ const c=st.pop(); DB.employees.forEach(e=>{ if(e.managerId===c && !set.has(e.id)){ set.add(e.id); st.push(e.id); } }); } return set; }
+// Rozmístění uzlů: uspořádaný strom shora dolů (listy vedle sebe, rodič nad středem potomků).
+function orgLayout(){
+  const byId={}; DB.employees.forEach(e=>byId[e.id]=e);
+  const pos={}; const seen=new Set(); let nextX=0;
+  function walk(e,depth){
+    if(seen.has(e.id)){ return; } seen.add(e.id);
+    const kids=orgChildren(e.id);
+    let x;
+    if(!kids.length){ x=nextX; nextX+=ORG_NW+ORG_HGAP; }
+    else { kids.forEach(k=>walk(k,depth+1)); const first=pos[kids[0].id], last=pos[kids[kids.length-1].id]; x=(first.x+last.x)/2; }
+    pos[e.id]={x,y:depth*ORG_VGAP,depth};
+  }
+  // kořeny = bez platného nadřízeného
+  const roots=DB.employees.filter(e=>!e.managerId || !byId[e.managerId] || e.managerId===e.id);
+  roots.forEach(r=>walk(r,0));
+  // pojistka: kdo zbyl (smyčka) → doplnit jako kořen
+  DB.employees.forEach(e=>{ if(!seen.has(e.id)) walk(e,0); });
+  return pos;
+}
+function orgElbow(x1,y1,x2,y2){ const my=(y1+y2)/2; return '<path d="M'+x1+' '+y1+' V'+my.toFixed(1)+' H'+x2+' V'+y2+'" fill="none" stroke="#aebaad" stroke-width="1.6"/>'; }
+function renderOrgCanvas(){
+  const cv=document.getElementById("orgCanvas"); if(!cv) return;
+  if(!DB.employees.length){ cv.innerHTML='<div class="muted" style="padding:22px">Nejprve přidej zaměstnance v záložce Zaměstnanci.</div>'; return; }
+  const pos=orgLayout();
+  let maxX=0,maxY=0; Object.keys(pos).forEach(id=>{ maxX=Math.max(maxX,pos[id].x); maxY=Math.max(maxY,pos[id].y); });
+  const W=Math.max(maxX+ORG_NW+ORG_PAD*2, cv.clientWidth), H=maxY+ORG_NH+ORG_PAD*2;
+  let lines='';
+  DB.employees.forEach(e=>{ const m=e.managerId && DB.employees.find(x=>x.id===e.managerId && x.id!==e.id); if(m && pos[e.id] && pos[m.id]){ const c=pos[e.id], pm=pos[m.id];
+    lines+=orgElbow(pm.x+ORG_NW/2+ORG_PAD, pm.y+ORG_NH+ORG_PAD, c.x+ORG_NW/2+ORG_PAD, c.y+ORG_PAD); } });
+  let nodes='';
+  DB.employees.forEach(e=>{ const p=pos[e.id]; if(!p) return;
+    nodes+='<div class="org-node'+(e.vedouci?' ved':'')+'" data-id="'+e.id+'" style="left:'+(p.x+ORG_PAD)+'px;top:'+(p.y+ORG_PAD)+'px">'+
+      (e.vedouci?'<span class="crown">vedoucí</span>':'')+
+      '<div class="nm">'+esc(e.name||e.email)+'</div>'+
+      '<div class="sub">'+esc(e.stredisko||'—')+'</div></div>'; });
+  cv.innerHTML='<div class="org-inner" style="width:'+W+'px;height:'+H+'px"><svg class="org-lines" width="'+W+'" height="'+H+'">'+lines+'</svg>'+nodes+'</div>';
+  orgBindDrag(cv);
+}
+function orgBindDrag(cv){
+  cv.querySelectorAll('.org-node').forEach(node=>{
+    node.addEventListener('dblclick', ev=>{ ev.preventDefault(); const e=DB.employees.find(x=>x.id===node.dataset.id); if(e) toggleVedouci(e.id,!e.vedouci); });
+    node.addEventListener('pointerdown', ev=>{
+      if(ev.button!==0) return;
+      const dragId=node.dataset.id;
+      const startX=ev.clientX, startY=ev.clientY;
+      const rect=node.getBoundingClientRect(); const offX=ev.clientX-rect.left, offY=ev.clientY-rect.top;
+      const descend=orgDescendants(dragId);
+      let ghost=null, curTarget=null, moved=false;
+      try{ node.setPointerCapture(ev.pointerId); }catch(_){}
+      const onMove=em=>{
+        if(!moved && Math.abs(em.clientX-startX)+Math.abs(em.clientY-startY)>4){
+          moved=true; node.classList.add('drag'); node.style.pointerEvents='none';
+          ghost=node.cloneNode(true); ghost.className='org-node'+(node.classList.contains('ved')?' ved':'')+' org-ghost';
+          ghost.style.width=rect.width+'px'; document.body.appendChild(ghost);
+        }
+        if(!moved) return;
+        ghost.style.left=(em.clientX-offX)+'px'; ghost.style.top=(em.clientY-offY)+'px';
+        // Cílový uzel = ten, nad jehož obdélníkem je kurzor (mimo sebe a své potomky).
+        let tnode=null;
+        cv.querySelectorAll('.org-node').forEach(n=>{ if(descend.has(n.dataset.id)) return;
+          const r=n.getBoundingClientRect();
+          if(em.clientX>=r.left && em.clientX<=r.right && em.clientY>=r.top && em.clientY<=r.bottom) tnode=n; });
+        if(curTarget && curTarget!==tnode) curTarget.classList.remove('drop');
+        if(tnode){ tnode.classList.add('drop'); curTarget=tnode; } else { curTarget=null; }
+      };
+      const onUp=()=>{
+        node.removeEventListener('pointermove',onMove); node.removeEventListener('pointerup',onUp);
+        try{ node.releasePointerCapture(ev.pointerId); }catch(_){}
+        node.style.pointerEvents=''; node.classList.remove('drag');
+        if(ghost) ghost.remove();
+        if(curTarget) curTarget.classList.remove('drop');
+        if(moved){ orgReparent(dragId, curTarget?curTarget.dataset.id:null); }
+      };
+      node.addEventListener('pointermove',onMove); node.addEventListener('pointerup',onUp);
+      ev.preventDefault();
+    });
+  });
+}
+// Přepojení: dragId dostane nového nadřízeného targetId (null = kořen). Cíl se stane vedoucím.
+function orgReparent(dragId, targetId){
+  const e=DB.employees.find(x=>x.id===dragId); if(!e) return;
+  if(targetId===dragId) return;
+  if(targetId){
+    if(orgDescendants(dragId).has(targetId)){ toast('Nelze — vznikla by smyčka.'); return; }
+    if(e.managerId===targetId) return;
+    const t=DB.employees.find(x=>x.id===targetId); if(!t) return;
+    if(!t.vedouci) t.vedouci=true;   // kdo má podřízeného, je vedoucí
+    e.managerId=targetId;
+  } else {
+    if(!e.managerId) return;
+    e.managerId=null;
+  }
+  save(); renderOrg();
 }
 function renderOrgTree(){
   const box=document.getElementById("orgTree"); if(!box) return;
