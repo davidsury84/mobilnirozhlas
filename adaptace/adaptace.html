@@ -62,6 +62,7 @@ const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':
 let ME = { email:null, admin:false, isMentor:false };
 let TAB = null;
 let GUEST = null; // hash z magic-linku /adaptace/uvod/<hash>
+let ADMIN_MODE = false; // true jen v admin sekci (/adaptace?admin=1)
 
 async function api(path, opts) {
   const r = await fetch(path, Object.assign({ headers:{'Content-Type':'application/json'} }, opts));
@@ -89,14 +90,20 @@ async function init(){
   const m = location.pathname.match(/^\/adaptace\/uvod\/([a-f0-9]+)/);
   if (m) { GUEST = m[1]; $('#tabs').style.display='none'; return viewGuest(); }
   try { ME = await api('/api/adaptace/me'); } catch(e){}
+  ADMIN_MODE = new URLSearchParams(location.search).has('admin') && ME.admin;
   const t = [];
-  if (ME.admin) { t.push(['scenare','Scénáře'], ['dashboard','Adaptace']); }
-  t.push(['moje','Moje adaptace']);
-  if (ME.isMentor || ME.admin) t.push(['mentor','Svěřenci']);
-  t.push(['zpravy', ME.admin?'Zprávy':'Oznámení']);
+  if (ADMIN_MODE) {
+    // ADMIN sekce (/admin): pouze správa
+    t.push(['scenare','Scénáře'], ['dashboard','Adaptace'], ['zpravy','Zprávy']);
+  } else {
+    // Zaměstnanecká sekce: pouze vlastní adaptace + oznámení (+ svěřenci u mentora)
+    t.push(['moje','Moje adaptace']);
+    if (ME.isMentor) t.push(['mentor','Svěřenci']);
+    t.push(['zpravy','Oznámení']);
+  }
   $('#tabs').innerHTML = t.map(([k,l])=>`<button class="tab" data-k="${k}">${l}</button>`).join('');
   $('#tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>go(b.dataset.k));
-  go(location.hash.startsWith('#a=') && !ME.admin ? 'moje' : t[0][0]);
+  go(t[0][0]);
 }
 function go(k){
   TAB=k;
@@ -372,7 +379,7 @@ async function addComment(pid){
 
 /* ---------------- ZPRÁVY / OZNÁMENÍ ---------------- */
 async function viewMessages(){
-  if(ME.admin) return viewMessagesAdmin();
+  if(ADMIN_MODE) return viewMessagesAdmin();
   const list = await api('/api/adaptace/my-messages');
   $('#view').innerHTML = `<h2>Oznámení</h2>` + (list.length? list.map(m=>`
     <div class="card"><div class="row"><h3>${esc(m.label)}</h3><div class="sp"></div>

@@ -377,6 +377,7 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
       <button data-view="candidates">Uchazeči</button>
       <button data-view="access">Přístupy</button>
       <button data-view="org">Organizační struktura</button>
+      <button data-view="adaptace">Adaptace</button>
       <button data-view="stats">Statistiky</button>
       <button data-view="grit">Průzkumy</button>
       <button data-view="activity">Aktivita</button>
@@ -503,6 +504,11 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
     </details>
     <div class="view-head" style="margin-top:28px"><h2 style="font-size:20px">Přehled hierarchie</h2><p>Nadřazené větve shora dolů (nadřízený → jeho podřízení).</p></div>
     <div id="orgTree"></div>
+  </section>
+
+  <!-- ===== Adaptace (onboarding — správa) ===== -->
+  <section id="view-adaptace" class="view">
+    <iframe id="adaptaceAdminFrame" style="width:100%;height:calc(100vh - 150px);border:0;display:block;background:#fff;border-radius:10px" title="Adaptace — správa onboardingu"></iframe>
   </section>
 
   <!-- ===== Statistiky ===== -->
@@ -1372,6 +1378,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="library") renderLibAdmin(null);
   if(v==="access") renderAccess();
   if(v==="org") renderOrg();
+  if(v==="adaptace"){ const f=document.getElementById("adaptaceAdminFrame"); if(f && !f.src) f.src="/adaptace?admin=1"; }
   if(v==="grit") renderGritAdmin();
   if(v==="activity") renderActivity();
   if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); }
