@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adaptace — onboarding</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --line:#e5e8eb; --tx:#1f2933; --mut:#7b8794; --pri:#2d6cdf; --ok:#27ae60; --warn:#e67e22; --err:#c0392b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--tx); font-size:14.5px; }
+  .wrap { max-width:1080px; margin:0 auto; padding:18px 16px 60px; }
+  h1 { font-size:20px; margin:4px 0 14px; }
+  h2 { font-size:16px; margin:0 0 10px; }
+  h3 { font-size:14px; margin:0; }
+  .tabs { display:flex; gap:6px; border-bottom:1px solid var(--line); margin-bottom:18px; flex-wrap:wrap; }
+  .tab { padding:9px 16px; cursor:pointer; border:0; background:none; font:inherit; color:var(--mut); border-bottom:2px solid transparent; }
+  .tab.act { color:var(--pri); border-bottom-color:var(--pri); font-weight:600; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:12px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .sp { flex:1; }
+  .mut { color:var(--mut); }
+  .sm { font-size:12.5px; }
+  button.btn, a.btn { background:var(--pri); color:#fff; border:0; padding:9px 16px; border-radius:6px; cursor:pointer; font:inherit; font-weight:600; text-decoration:none; display:inline-block; }
+  button.btn.ghost { background:#eef1f6; color:var(--tx); font-weight:500; }
+  button.btn.mini { padding:5px 10px; font-size:12.5px; }
+  button.btn.ok { background:var(--ok); }
+  button.btn.del { background:#fbeaea; color:var(--err); }
+  input, select, textarea { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:6px; width:100%; background:#fff; }
+  label.f { display:block; margin:0 0 10px; }
+  label.f > span { display:block; font-size:12.5px; color:var(--mut); margin-bottom:3px; }
+  .chk { display:inline-flex; align-items:center; gap:6px; margin-right:14px; }
+  .chk input { width:auto; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .bar { height:8px; background:#eceff3; border-radius:5px; overflow:hidden; }
+  .bar > i { display:block; height:100%; background:var(--ok); }
+  .pill { display:inline-block; padding:2px 9px; border-radius:20px; font-size:12px; font-weight:600; }
+  .pill.ok { background:#e4f6ea; color:var(--ok); }
+  .pill.wait { background:#fdf0e4; color:var(--warn); }
+  .pill.late { background:#fbeaea; color:var(--err); }
+  .task { border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:8px; }
+  .phase-h { margin:18px 0 8px; font-weight:700; color:#3a4a5c; }
+  .empty { text-align:center; color:var(--mut); padding:36px 12px; }
+  .modal-bg { position:fixed; inset:0; background:rgba(20,26,34,.44); display:flex; align-items:flex-start; justify-content:center; padding:40px 14px; overflow:auto; z-index:50; }
+  .modal { background:#fff; border-radius:12px; max-width:560px; width:100%; padding:20px; }
+  .link { color:var(--pri); cursor:pointer; }
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#1f2933; color:#fff; padding:10px 18px; border-radius:8px; opacity:0; transition:.2s; z-index:80; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎯 Adaptace nováčků</h1>
+  <div class="tabs" id="tabs"></div>
+  <div id="view"><div class="empty">Načítám…</div></div>
+</div>
+<div id="modal"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let ME = { email:null, admin:false, isMentor:false };
+let TAB = null;
+let GUEST = null; // hash z magic-linku /adaptace/uvod/<hash>
+
+async function api(path, opts) {
+  const r = await fetch(path, Object.assign({ headers:{'Content-Type':'application/json'} }, opts));
+  const t = await r.text(); let d; try { d = t?JSON.parse(t):{}; } catch { d = {}; }
+  if (!r.ok) throw new Error(d.chyba || ('Chyba '+r.status));
+  return d;
+}
+function toast(m) { const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1900); }
+function closeModal(){ $('#modal').innerHTML=''; }
+function modal(html){ $('#modal').innerHTML = '<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">'+html+'</div></div>'; }
+function today(){ return new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Prague'}); }
+function fmtCz(d){ if(!d) return '—'; const [y,m,dd]=d.split('-'); return +dd+'. '+ +m+'. '+y; }
+function daysUntil(d){ if(!d) return null; return Math.round((Date.parse(d+'T00:00:00Z')-Date.parse(today()+'T00:00:00Z'))/864e5); }
+
+function taskState(t){
+  if (t.complete) return {cls:'ok', txt:'Hotovo'};
+  const dn = daysUntil(t.deadline_date);
+  if (dn!=null && dn<0) return {cls:'late', txt:(-dn)+' dní po termínu'};
+  if (dn!=null && dn<=3) return {cls:'wait', txt:'termín '+fmtCz(t.deadline_date)};
+  return {cls:'wait', txt:'čeká'};
+}
+
+/* ---------------- init ---------------- */
+async function init(){
+  const m = location.pathname.match(/^\/adaptace\/uvod\/([a-f0-9]+)/);
+  if (m) { GUEST = m[1]; $('#tabs').style.display='none'; return viewGuest(); }
+  try { ME = await api('/api/adaptace/me'); } catch(e){}
+  const t = [];
+  if (ME.admin) { t.push(['scenare','Scénáře'], ['dashboard','Adaptace']); }
+  t.push(['moje','Moje adaptace']);
+  if (ME.isMentor || ME.admin) t.push(['mentor','Svěřenci']);
+  t.push(['zpravy', ME.admin?'Zprávy':'Oznámení']);
+  $('#tabs').innerHTML = t.map(([k,l])=>`<button class="tab" data-k="${k}">${l}</button>`).join('');
+  $('#tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>go(b.dataset.k));
+  go(location.hash.startsWith('#a=') && !ME.admin ? 'moje' : t[0][0]);
+}
+function go(k){
+  TAB=k;
+  $('#tabs').querySelectorAll('.tab').forEach(b=>b.classList.toggle('act', b.dataset.k===k));
+  ({ scenare:viewScenare, dashboard:viewDashboard, moje:viewMoje, mentor:viewMentor, zpravy:viewMessages }[k]||viewMoje)();
+}
+
+/* ---------------- GUEST (magic-link pozvánka) ---------------- */
+async function viewGuest(){
+  let a; try { a = await api('/api/adaptace/guest?hash='+encodeURIComponent(GUEST)); }
+  catch(e){ $('#view').innerHTML='<div class="empty">Odkaz je neplatný nebo vypršel.</div>'; return; }
+  const done=a.tasks.filter(t=>t.complete).length, tot=a.tasks.length, pct=tot?Math.round(done/tot*100):0;
+  $('#view').innerHTML = `<div class="card">
+    <div class="row"><h2 style="margin:0">${esc(a.scenario_label||'Adaptace')}</h2><div class="sp"></div>
+      <span class="mut sm">${esc(a.emp_name||a.emp_email)}</span></div>
+    <div class="bar" style="margin:8px 0 4px"><i style="width:${pct}%"></i></div>
+    <div class="mut sm">${done}/${tot} · ${pct}%</div>
+    ${renderTaskList(a.tasks,{mine:true, guest:true})}
+  </div>`;
+}
+
+/* ---------------- SCÉNÁŘE (admin) ---------------- */
+async function viewScenare(){
+  const list = await api('/api/adaptace/scenarios');
+  $('#view').innerHTML = `
+    <div class="row" style="margin-bottom:12px"><h2>Scénáře adaptace</h2><div class="sp"></div>
+      <button class="btn" onclick="editScenario()">+ Nový scénář</button></div>
+    ${list.length? list.map(s=>`
+      <div class="card"><div class="row">
+        <div><h3>${esc(s.label)} ${s.active?'':'<span class="mut sm">(neaktivní)</span>'}</h3>
+          <div class="mut sm">${esc(s.category||'bez kategorie')}</div></div>
+        <div class="sp"></div>
+        <button class="btn ghost mini" onclick="editScenario(${s.id})">Upravit obsah</button>
+        <button class="btn del mini" onclick="delScenario(${s.id})">Smazat</button>
+      </div></div>`).join('') : '<div class="empty">Zatím žádné scénáře. Vytvořte první.</div>'}`;
+}
+function editScenario(id){
+  if (!id) return modal(`<h2>Nový scénář</h2>
+    <label class="f"><span>Název</span><input id="s_label" placeholder="např. CNC operátor"></label>
+    <label class="f"><span>Kategorie</span><input id="s_cat" placeholder="Výroba / Administrativa…"></label>
+    <div class="row"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
+      <button class="btn" onclick="saveNewScenario()">Vytvořit</button></div>`);
+  openEditor(id);
+}
+async function saveNewScenario(){
+  const label=$('#s_label').value.trim(); if(!label) return toast('Zadej název.');
+  const s = await api('/api/adaptace/scenario-create',{method:'POST',body:JSON.stringify({label,category:$('#s_cat').value.trim()})});
+  closeModal(); openEditor(s.id);
+}
+async function delScenario(id){
+  if(!confirm('Smazat scénář včetně všech fází a úkolů?')) return;
+  await api('/api/adaptace/scenario-delete?id='+id,{method:'POST',body:'{}'}); viewScenare();
+}
+
+/* ---- editor scénáře: fáze → úkoly (náhrada tree-editable) ---- */
+async function openEditor(id){
+  const s = await api('/api/adaptace/scenario?id='+id);
+  $('#view').innerHTML = `
+    <div class="row" style="margin-bottom:12px"><button class="btn ghost mini" onclick="viewScenare()">← Zpět</button>
+      <h2 style="margin:0 0 0 8px">${esc(s.label)}</h2><div class="sp"></div>
+      <button class="btn ghost mini" onclick="editScenarioMeta(${s.id},${JSON.stringify(esc(s.label))},${JSON.stringify(esc(s.category||''))})">Přejmenovat</button></div>
+    <div id="phases"></div>
+    <button class="btn ghost" onclick="addPhase(${s.id})">+ Přidat fázi</button>`;
+  renderPhases(s);
+}
+function renderPhases(s){
+  $('#phases').innerHTML = (s.phases||[]).map(ph=>`
+    <div class="card">
+      <div class="row"><h3>📁 ${esc(ph.label)}</h3><div class="sp"></div>
+        <button class="btn ghost mini" onclick="renamePhase(${s.id},${ph.id},${JSON.stringify(esc(ph.label))})">Přejmenovat</button>
+        <button class="btn del mini" onclick="delPhase(${s.id},${ph.id})">Smazat fázi</button></div>
+      ${ph.description?`<div class="mut sm" style="margin:4px 0">${esc(ph.description)}</div>`:''}
+      <div style="margin-top:10px">
+        ${(ph.tasks||[]).map(t=>taskRow(s.id,t)).join('') || '<div class="mut sm" style="padding:6px 0">Žádné úkoly.</div>'}
+      </div>
+      <button class="btn ghost mini" style="margin-top:8px" onclick="editTask(${s.id},${ph.id})">+ Přidat úkol</button>
+    </div>`).join('') || '<div class="empty">Přidejte první fázi.</div>';
+}
+function taskRow(sid,t){
+  const req=[]; if(t.needs_understanding)req.push('rozumím'); if(t.needs_acquaintance)req.push('seznámen'); if(t.needs_mentor_ok)req.push('mentor OK');
+  return `<div class="task"><div class="row">
+    <div><strong>${esc(t.label)}</strong>
+      <div class="mut sm">${req.join(' · ')||'bez potvrzení'}${t.deadline_days!=null?' · termín +'+t.deadline_days+' dní':''}${t.mentor_default_email?' · mentor '+esc(t.mentor_default_email):''}</div></div>
+    <div class="sp"></div>
+    <button class="btn ghost mini" onclick='editTask(${sid},${t.phase_id},${JSON.stringify(t)})'>Upravit</button>
+    <button class="btn del mini" onclick="delTask(${sid},${t.id})">×</button>
+  </div></div>`;
+}
+function editScenarioMeta(id,label,cat){
+  modal(`<h2>Scénář</h2>
+    <label class="f"><span>Název</span><input id="e_label" value="${label}"></label>
+    <label class="f"><span>Kategorie</span><input id="e_cat" value="${cat}"></label>
+    <label class="chk"><input type="checkbox" id="e_active" checked> aktivní</label>
+    <div class="row" style="margin-top:12px"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
+      <button class="btn" onclick="(async()=>{await api('/api/adaptace/scenario-update?id=${id}',{method:'POST',body:JSON.stringify({label:$('#e_label').value.trim(),category:$('#e_cat').value.trim(),active:$('#e_active').checked})});closeModal();openEditor(${id});})()">Uložit</button></div>`);
+}
+function addPhase(sid){
+  modal(`<h2>Nová fáze</h2>
+    <label class="f"><span>Název fáze</span><input id="ph_label" placeholder="např. První týden"></label>
+    <label class="f"><span>Popis (nepovinné)</span><textarea id="ph_desc" rows="2"></textarea></label>
+    <div class="row"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
+      <button class="btn" onclick="(async()=>{const l=$('#ph_label').value.trim();if(!l)return toast('Zadej název.');await api('/api/adaptace/phase-create',{method:'POST',body:JSON.stringify({scenario_id:${sid},label:l,description:$('#ph_desc').value.trim()})});closeModal();openEditor(${sid});})()">Přidat</button></div>`);
+}
+function renamePhase(sid,id,label){
+  modal(`<h2>Fáze</h2><label class="f"><span>Název</span><input id="rp_label" value="${label}"></label>
+    <div class="row"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
+      <button class="btn" onclick="(async()=>{await api('/api/adaptace/phase-update?id=${id}',{method:'POST',body:JSON.stringify({label:$('#rp_label').value.trim()})});closeModal();openEditor(${sid});})()">Uložit</button></div>`);
+}
+async function delPhase(sid,id){ if(!confirm('Smazat fázi a její úkoly?'))return; await api('/api/adaptace/phase-delete?id='+id,{method:'POST',body:'{}'}); openEditor(sid); }
+async function delTask(sid,id){ if(!confirm('Smazat úkol?'))return; await api('/api/adaptace/task-delete?id='+id,{method:'POST',body:'{}'}); openEditor(sid); }
+
+function editTask(sid,phaseId,t){
+  t = t||{};
+  const ck=(k,def)=>((t[k]!==undefined?t[k]:def)?'checked':'');
+  modal(`<h2>${t.id?'Upravit úkol':'Nový úkol'}</h2>
+    <label class="f"><span>Název úkolu</span><input id="t_label" value="${esc(t.label||'')}"></label>
+    <label class="f"><span>Popis / obsah</span><textarea id="t_desc" rows="3">${esc(t.description||'')}</textarea></label>
+    <div class="grid2">
+      <label class="f"><span>Termín (dnů od startu, prázdné = žádný)</span><input id="t_dl" type="number" min="0" value="${t.deadline_days!=null?t.deadline_days:''}"></label>
+      <label class="f"><span>Výchozí mentor (e-mail)</span><input id="t_mentor" value="${esc(t.mentor_default_email||'')}"></label>
+    </div>
+    <div style="margin:2px 0 12px">
+      <label class="chk"><input type="checkbox" id="t_u" ${ck('needs_understanding',1)}> vyžaduje „Rozumím"</label>
+      <label class="chk"><input type="checkbox" id="t_a" ${ck('needs_acquaintance',0)}> vyžaduje „Seznámen"</label>
+      <label class="chk"><input type="checkbox" id="t_m" ${ck('needs_mentor_ok',0)}> potvrzení mentorem</label>
+    </div>
+    <div style="margin:0 0 12px">
+      <label class="chk"><input type="checkbox" id="t_em" ${ck('email_employee',0)}> e-mail nováčkovi</label>
+      <label class="chk"><input type="checkbox" id="t_mm" ${ck('email_mentor',0)}> e-mail mentorovi</label>
+    </div>
+    <div class="row"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
+      <button class="btn" onclick="saveTask(${sid},${phaseId},${t.id||0})">Uložit</button></div>`);
+}
+async function saveTask(sid,phaseId,id){
+  const d = { label:$('#t_label').value.trim(), description:$('#t_desc').value.trim(),
+    deadline_days:$('#t_dl').value, mentor_default_email:$('#t_mentor').value.trim(),
+    needs_understanding:$('#t_u').checked, needs_acquaintance:$('#t_a').checked, needs_mentor_ok:$('#t_m').checked,
+    email_employee:$('#t_em').checked, email_mentor:$('#t_mm').checked };
+  if(!d.label) return toast('Zadej název úkolu.');
+  if(id) await api('/api/adaptace/task-update?id='+id,{method:'POST',body:JSON.stringify(d)});
+  else { d.phase_id=phaseId; await api('/api/adaptace/task-create',{method:'POST',body:JSON.stringify(d)}); }
+  closeModal(); openEditor(sid);
+}
+
+/* ---------------- DASHBOARD (admin) ---------------- */
+async function viewDashboard(){
+  const list = await api('/api/adaptace/assignments');
+  $('#view').innerHTML = `
+    <div class="row" style="margin-bottom:12px"><h2>Probíhající adaptace</h2><div class="sp"></div>
+      <button class="btn" onclick="assignForm()">+ Spustit adaptaci</button></div>
+    ${list.length? list.map(a=>`
+      <div class="card"><div class="row">
+        <div style="min-width:220px"><h3>${esc(a.emp_name||a.emp_email)}</h3>
+          <div class="mut sm">${esc(a.scenario_label||'')} · start ${fmtCz(a.start_date)}${a.mentor_email?' · mentor '+esc(a.mentor_email):''}</div></div>
+        <div style="flex:1;min-width:160px">
+          <div class="bar"><i style="width:${a.percentage}%"></i></div>
+          <div class="mut sm">${a.done}/${a.total} úkolů · ${a.percentage}%</div></div>
+        ${a.complete?'<span class="pill ok">Dokončeno</span>':''}
+        <button class="btn ghost mini" onclick="assignDetail(${a.id})">Detail</button>
+        <button class="btn del mini" onclick="delAssign(${a.id})">×</button>
+      </div></div>`).join('') : '<div class="empty">Zatím žádná spuštěná adaptace.</div>'}`;
+}
+async function assignForm(){
+  const [emps, scs] = await Promise.all([api('/api/adaptace/employees'), api('/api/adaptace/scenarios')]);
+  const opt = a => a.map(e=>`<option value="${esc(e.email)}">${esc(e.name)} (${esc(e.email)})</option>`).join('');
+  modal(`<h2>Spustit adaptaci</h2>
+    <label class="f"><span>Nováček</span><select id="a_emp"><option value="">— vyber —</option>${opt(emps)}</select></label>
+    <label class="f"><span>Scénář</span><select id="a_sc"><option value="">— vyber —</option>${scs.filter(s=>s.active).map(s=>`<option value="${s.id}">${esc(s.label)}</option>`).join('')}</select></label>
+    <label class="f"><span>Mentor (nepovinné)</span><select id="a_mentor"><option value="">— bez mentora —</option>${opt(emps)}</select></label>
+    <label class="f"><span>Datum startu</span><input id="a_start" type="date" value="${today()}"></label>
+    <label class="chk"><input type="checkbox" id="a_mail" checked> poslat nováčkovi e-mail</label>
+    <div class="row" style="margin-top:12px"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
+      <button class="btn" onclick="doAssign()">Spustit</button></div>`);
+}
+async function doAssign(){
+  const empEmail=$('#a_emp').value, scenarioId=$('#a_sc').value;
+  if(!empEmail||!scenarioId) return toast('Vyber nováčka i scénář.');
+  await api('/api/adaptace/assign',{method:'POST',body:JSON.stringify({
+    empEmail, scenarioId, mentorEmail:$('#a_mentor').value, startDate:$('#a_start').value, sendEmail:$('#a_mail').checked })});
+  closeModal(); toast('Adaptace spuštěna.'); viewDashboard();
+}
+async function delAssign(id){ if(!confirm('Smazat tuto adaptaci i s postupem?'))return; await api('/api/adaptace/assignment-delete?id='+id,{method:'POST',body:'{}'}); viewDashboard(); }
+async function assignDetail(id){
+  const a = await api('/api/adaptace/assignment?id='+id);
+  modal(`<h2>${esc(a.emp_name||a.emp_email)}</h2>
+    <div class="mut sm" style="margin-bottom:10px">${esc(a.scenario_label||'')} · start ${fmtCz(a.start_date)}</div>
+    ${renderTaskList(a.tasks,{readonly:true})}
+    <div class="row" style="margin-top:12px"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zavřít</button></div>`);
+}
+
+/* ---------------- MOJE ADAPTACE (zaměstnanec) ---------------- */
+async function viewMoje(){
+  const list = await api('/api/adaptace/my');
+  if(!list.length){ $('#view').innerHTML='<div class="empty">Nemáš přiřazenou žádnou adaptaci. 🎉</div>'; return; }
+  $('#view').innerHTML = list.map(a=>{
+    const done=a.tasks.filter(t=>t.complete).length, tot=a.tasks.length, pct=tot?Math.round(done/tot*100):0;
+    return `<div class="card">
+      <div class="row"><h2 style="margin:0">${esc(a.scenario_label||'Adaptace')}</h2><div class="sp"></div>
+        ${a.complete?'<span class="pill ok">Dokončeno</span>':`<span class="mut sm">${done}/${tot} · ${pct}%</span>`}</div>
+      <div class="bar" style="margin:8px 0 4px"><i style="width:${pct}%"></i></div>
+      ${renderTaskList(a.tasks,{mine:true})}
+    </div>`;
+  }).join('');
+}
+/* ---------------- SVĚŘENCI (mentor) ---------------- */
+async function viewMentor(){
+  const list = await api('/api/adaptace/mentees');
+  if(!list.length){ $('#view').innerHTML='<div class="empty">Nemáš přiřazené žádné svěřence.</div>'; return; }
+  $('#view').innerHTML = list.map(a=>`<div class="card">
+    <div class="row"><h2 style="margin:0">${esc(a.emp_name||a.emp_email)}</h2><div class="sp"></div>
+      <span class="mut sm">${esc(a.scenario_label||'')}</span></div>
+    ${renderTaskList(a.tasks,{mentor:true})}
+  </div>`).join('');
+}
+
+/* ---- společný render seznamu úkolů po fázích ---- */
+function renderTaskList(tasks, mode){
+  mode = mode||{};
+  let html='', lastPhase=null;
+  tasks.forEach(t=>{
+    if(t.phase_label!==lastPhase){ lastPhase=t.phase_label; html+=`<div class="phase-h">📁 ${esc(t.phase_label)}</div>`; }
+    const st=taskState(t);
+    let actions='';
+    if(mode.mine && !t.complete){
+      if(t.needs_understanding) actions+=btnFlag(t,'understood',t.understood,'Rozumím');
+      if(t.needs_acquaintance) actions+=btnFlag(t,'acquainted',t.acquainted,'Seznámen');
+      if(t.needs_mentor_ok) actions+=`<span class="mut sm">${t.mentor_ok?'✓ potvrzeno mentorem':'čeká na mentora'}</span>`;
+    } else if(mode.mentor){
+      if(t.needs_mentor_ok) actions+=btnFlag(t,'mentor_ok',t.mentor_ok,'Potvrdit');
+      else actions+='<span class="mut sm">bez potvrzení mentora</span>';
+    }
+    html+=`<div class="task"><div class="row">
+      <div style="flex:1;min-width:180px"><strong>${esc(t.label)}</strong>
+        ${t.description?`<div class="mut sm" style="margin-top:2px">${esc(t.description)}</div>`:''}
+        ${linksHtml(t.links_json)}</div>
+      <span class="pill ${st.cls}">${st.txt}</span>
+      <div class="row" style="gap:6px">${actions}</div>
+    </div>${mode.guest?'':`<div style="margin-top:8px"><span class="link sm" onclick="toggleDisc(${t.id})">💬 Diskuze</span><div id="disc_${t.id}" style="display:none;margin-top:6px"></div></div>`}</div>`;
+  });
+  return html || '<div class="mut sm">Žádné úkoly.</div>';
+}
+function btnFlag(t,flag,val,label){
+  return `<button class="btn mini ${val?'ok':'ghost'}" onclick="flag(${t.id},'${flag}',${val?'false':'true'})">${val?'✓ '+label:label}</button>`;
+}
+function linksHtml(j){ try{ const a=JSON.parse(j||'[]'); return a.length?'<div class="sm" style="margin-top:4px">'+a.map(l=>`<a class="link" href="${esc(l.url)}" target="_blank">🔗 ${esc(l.label||l.url)}</a>`).join(' · ')+'</div>':''; }catch{return '';} }
+async function flag(progressId, flag, value){
+  try{
+    if(GUEST){ await api('/api/adaptace/guest-flag',{method:'POST',body:JSON.stringify({hash:GUEST,progressId,flag,value})}); return viewGuest(); }
+    await api('/api/adaptace/progress-flag',{method:'POST',body:JSON.stringify({progressId,flag,value})});
+    if(TAB==='mentor')viewMentor(); else viewMoje();
+  }catch(e){ toast(e.message); }
+}
+
+/* ---------------- diskuze u úkolu ---------------- */
+async function toggleDisc(pid){
+  const el=$('#disc_'+pid); if(!el) return;
+  if(el.style.display==='none'){ el.style.display='block'; await loadDisc(pid); } else el.style.display='none';
+}
+async function loadDisc(pid){
+  const el=$('#disc_'+pid); if(!el) return;
+  let list=[]; try{ list=await api('/api/adaptace/discussion?progressId='+pid); }catch(e){ el.innerHTML='<div class="mut sm">'+esc(e.message)+'</div>'; return; }
+  el.innerHTML = (list.map(c=>`<div style="padding:6px 0;border-top:1px solid var(--line)">
+      <div class="sm"><strong>${esc(c.author_name||c.author_email||'—')}</strong> <span class="mut">${esc((c.created_at||'').slice(0,16))}</span></div>
+      <div class="sm">${esc(c.text).replace(/\n/g,'<br>')}</div></div>`).join(''))
+    + `<div class="row" style="margin-top:8px;gap:6px"><input id="dc_${pid}" placeholder="Napsat komentář…" style="flex:1">
+       <button class="btn mini" onclick="addComment(${pid})">Odeslat</button></div>`;
+}
+async function addComment(pid){
+  const inp=$('#dc_'+pid); const text=(inp.value||'').trim(); if(!text) return;
+  try{ await api('/api/adaptace/discussion',{method:'POST',body:JSON.stringify({progressId:pid,text})}); await loadDisc(pid); }
+  catch(e){ toast(e.message); }
+}
+
+/* ---------------- ZPRÁVY / OZNÁMENÍ ---------------- */
+async function viewMessages(){
+  if(ME.admin) return viewMessagesAdmin();
+  const list = await api('/api/adaptace/my-messages');
+  $('#view').innerHTML = `<h2>Oznámení</h2>` + (list.length? list.map(m=>`
+    <div class="card"><div class="row"><h3>${esc(m.label)}</h3><div class="sp"></div>
+      ${m.read_at?'<span class="pill ok">přečteno</span>':''}</div>
+    ${m.body?`<div class="sm" style="margin:6px 0">${esc(m.body).replace(/\n/g,'<br>')}</div>`:''}
+    ${!m.read_at?`<div class="row" style="margin-top:8px"><div class="sp"></div>
+      <button class="btn mini" onclick="readMsg(${m.id},false)">Označit přečtené</button>
+      ${m.needs_understanding?`<button class="btn mini ok" onclick="readMsg(${m.id},true)">Rozumím</button>`:''}</div>`:''}
+    </div>`).join('') : '<div class="empty">Žádná oznámení.</div>');
+}
+async function readMsg(id, understood){ await api('/api/adaptace/message-read',{method:'POST',body:JSON.stringify({messageId:id,understood})}); viewMessages(); }
+async function viewMessagesAdmin(){
+  const list = await api('/api/adaptace/messages');
+  $('#view').innerHTML = `<div class="row" style="margin-bottom:12px"><h2>Zprávy zaměstnancům</h2><div class="sp"></div>
+      <button class="btn" onclick="composeMsg()">+ Nová zpráva</button></div>
+    ${list.length? list.map(m=>`<div class="card"><div class="row">
+      <div><h3>${esc(m.label)}</h3><div class="mut sm">${esc((m.created_at||'').slice(0,16))} · přečteno ${m.read_cnt}/${m.total}</div></div>
+      <div class="sp"></div><button class="btn del mini" onclick="delMsg(${m.id})">×</button></div>
+      ${m.body?`<div class="sm" style="margin-top:6px">${esc(m.body).replace(/\n/g,'<br>')}</div>`:''}</div>`).join('')
+      : '<div class="empty">Zatím žádné zprávy.</div>'}`;
+}
+function composeMsg(){
+  modal(`<h2>Nová zpráva všem zaměstnancům</h2>
+    <label class="f"><span>Předmět</span><input id="m_label"></label>
+    <label class="f"><span>Text</span><textarea id="m_body" rows="4"></textarea></label>
+    <label class="chk"><input type="checkbox" id="m_und"> vyžadovat potvrzení „Rozumím"</label>
+    <label class="chk"><input type="checkbox" id="m_mail" checked> odeslat i e-mailem</label>
+    <div class="row" style="margin-top:12px"><div class="sp"></div><button class="btn ghost" onclick="closeModal()">Zrušit</button>
+      <button class="btn" onclick="sendMsg()">Odeslat</button></div>`);
+}
+async function sendMsg(){
+  const label=$('#m_label').value.trim(); if(!label) return toast('Zadej předmět.');
+  const r = await api('/api/adaptace/message-create',{method:'POST',body:JSON.stringify({
+    label, body:$('#m_body').value.trim(), needs_understanding:$('#m_und').checked, audience:'all', sendEmail:$('#m_mail').checked })});
+  closeModal(); toast('Odesláno '+r.sent+' příjemcům.'); viewMessages();
+}
+async function delMsg(id){ if(!confirm('Smazat zprávu?'))return; await api('/api/adaptace/message-delete?id='+id,{method:'POST',body:'{}'}); viewMessages(); }
+
+init();
+</script>
+</body>
+</html>

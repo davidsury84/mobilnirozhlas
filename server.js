@@ -704,6 +704,19 @@ try {
   console.error('[smlouvy] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Adaptace" (onboarding nováčků) — samostatná složka ./adaptace ----
+// Nativní přepis aplikace Adaptlink. Izolované načtení (kdyby selhal, běží zbytek).
+let adaptaceMod = null;
+try {
+  adaptaceMod = require('./adaptace').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, ensureEmployee,
+    dataDir: DATA_DIR,
+    publicBaseUrl: (CFG.publicUrl || process.env.PUBLIC_URL || ''),
+  });
+} catch (e) {
+  console.error('[adaptace] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -714,12 +727,14 @@ const server = http.createServer(async (req, res) => {
   const inviteOk = !!(invite && INVITE_ROUTES.indexOf(p) >= 0);
   // Veřejné cesty modulu Smlouvy (mimo SSO závoru): potvrzení termínu tokenem + Resend webhook.
   const smlouvyPublic = p.startsWith('/smlouvy/potvrdit') || p === '/api/smlouvy/webhook/resend';
+  // Veřejné cesty modulu Adaptace: magic-link pozvánka, guest plnění, import z náboru.
+  const adaptacePublic = p.startsWith('/adaptace/uvod/') || p === '/api/adaptace/guest' || p === '/api/adaptace/guest-flag' || p === '/api/adaptace/import-user';
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -746,6 +761,8 @@ const server = http.createServer(async (req, res) => {
   try {
     // Modul „Smlouvy" si obslouží vlastní cesty (/smlouvy*, /api/smlouvy*).
     if (smlouvyMod && await smlouvyMod.handle(req, res)) return;
+    // Modul „Adaptace" si obslouží vlastní cesty (/adaptace*, /api/adaptace*).
+    if (adaptaceMod && await adaptaceMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
@@ -1121,6 +1138,11 @@ if (require.main === module) {
     if (smlouvyMod) {
       smlouvyMod.tick();
       setInterval(() => smlouvyMod.tick(), 6 * 3600 * 1000);
+    }
+    // Adaptace: deadline notifikace úkolů (stejný 6h interval).
+    if (adaptaceMod) {
+      adaptaceMod.tick();
+      setInterval(() => adaptaceMod.tick(), 6 * 3600 * 1000);
     }
   });
 }
