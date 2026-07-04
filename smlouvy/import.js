@@ -70,6 +70,10 @@ function zpracujRadek(radek) {
     stav: P.mapStav(cell(radek, COL.stav)), stav_popis: cell(radek, COL.stav),
     drive_url: cell(radek, COL.odkaz) || null, je_placeholder: false,
   };
+  // Závazek typu „majetek v zahraničí" = hodnota je majetek, ne roční tok.
+  if (draft.hodnota != null && /majetek/i.test(draft.podtyp || '') && draft.hodnota_typ === 'jednorazova') {
+    draft.hodnota_typ = 'majetek';
+  }
   return { typ: 'smlouva', draft, navrhyTerminu: navrhniTerminy(radek, draft) };
 }
 

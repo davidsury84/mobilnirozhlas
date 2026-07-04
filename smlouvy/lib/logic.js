@@ -63,8 +63,40 @@ function expoziceZavazku(smlouvy) {
   return podleMeny;
 }
 
+// Roční toky = jen opakované závazky (měsíční ×12, roční). Ostatní typy
+// (jednorázová, expozice/ručení, majetek) nejsou roční tok.
+function jeRocniTok(typ) { return typ === 'mesicni' || typ === 'rocni'; }
+
+/**
+ * Auditovatelný rozpad závazků (§6). NEmíchá roční toky s jednorázovými /
+ * podmíněnými. Vrací dva součty po měnách + položkový seznam + nevyčíslené.
+ * smlouvy = aktivní závazky (i s hodnota=null).
+ */
+function rozpadZavazku(smlouvy) {
+  const rocni = {};       // opakované roční toky (kvóty, paušály)
+  const podmineno = {};   // jednorázové + ručení/expozice + majetek
+  const polozky = [];
+  const nevycisleno = [];
+  for (const s of smlouvy) {
+    if (s.kategorie !== 'zavazek') continue;
+    if (s.hodnota == null) {
+      nevycisleno.push({ cislo_smlouvy: s.cislo_smlouvy, protistrana_nazev: s.protistrana_nazev, hodnota_popis: s.hodnota_popis });
+      continue;
+    }
+    const tok = jeRocniTok(s.hodnota_typ);
+    const castka = s.hodnota_typ === 'mesicni' ? Number(s.hodnota) * 12 : Number(s.hodnota);
+    const cil = tok ? rocni : podmineno;
+    cil[s.mena] = (cil[s.mena] || 0) + castka;
+    polozky.push({
+      cislo_smlouvy: s.cislo_smlouvy, protistrana_nazev: s.protistrana_nazev,
+      castka, mena: s.mena, hodnota_typ: s.hodnota_typ, skupina: tok ? 'rocni' : 'podmineno',
+    });
+  }
+  return { rocni, podmineno, polozky, nevycisleno };
+}
+
 module.exports = {
   odvozenyDeadlineVypovedi, dalsiVyskyt,
   PORADI, decideMilnik, planNotifikace, prijemci,
-  rocniEkvivalent, expoziceZavazku,
+  rocniEkvivalent, expoziceZavazku, rozpadZavazku, jeRocniTok,
 };

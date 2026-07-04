@@ -121,6 +121,12 @@ function openDb(file) {
       return db.prepare(`SELECT kategorie, hodnota, hodnota_typ, mena FROM smlouva
         WHERE stav='aktivni' AND je_placeholder=0 AND hodnota IS NOT NULL`).all();
     },
+    // Aktivní závazky pro rozpad na dashboardu (vč. těch bez vyčíslené hodnoty).
+    zavazky() {
+      return db.prepare(`SELECT cislo_smlouvy, protistrana_nazev, hodnota, hodnota_typ, mena, hodnota_popis, kategorie
+        FROM smlouva WHERE stav='aktivni' AND je_placeholder=0 AND kategorie='zavazek'
+        ORDER BY cislo_smlouvy`).all();
+    },
     create(data, by) {
       const cols = SMLOUVA_COLS.filter((c) => data[c] !== undefined);
       const vals = cols.map((c) => (c === 'je_placeholder' ? b(data[c]) : data[c] ?? null));

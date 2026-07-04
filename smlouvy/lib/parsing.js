@@ -66,8 +66,9 @@ function parseHodnota(text) {
   const maMenu = /kc|kč|eur|€|usd|\$|tenge/.test(norm);
   const perJednotku = /\/\s*(ks|den|hod|h|km|vyvoz)\b/.test(norm) && !/\/\s*(rok|mes)/.test(norm);
 
-  // typ plnění
-  if (/\/\s*mes|měs/.test(norm)) out.hodnota_typ = 'mesicni';
+  // typ plnění (expozice/ručení = podmíněný závazek, ne tok)
+  if (/expozice|rucen|ručen/.test(norm)) out.hodnota_typ = 'expozice';
+  else if (/\/\s*mes|měs/.test(norm)) out.hodnota_typ = 'mesicni';
   else if (/\/\s*rok|\brocn|ročn/.test(norm)) out.hodnota_typ = 'rocni';
   else out.hodnota_typ = 'jednorazova';
 

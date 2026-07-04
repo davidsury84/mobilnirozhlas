@@ -73,15 +73,18 @@ async function render(tab){
 
 async function dash(){
   const d = await api('/api/smlouvy/dashboard');
-  const meny = Object.keys(d.expozice);
+  const z = d.zavazky || {rocni:{},podmineno:{},polozky:[],nevycisleno:[]};
+  const sumStr = o => { const k=Object.keys(o); return k.length ? k.map(m=>o[m].toLocaleString('cs-CZ')+' '+m).join(' + ') : '—'; };
   app.innerHTML='';
   app.append(el('h1',{},'Dashboard — ',el('span',{class:'muted'},'stav k '+czd(d.dnes))));
   const cards = el('div',{class:'cards'});
   cards.append(
     el('div',{class:'card'}, el('div',{class:'muted'},'Červené (po termínu / do 30 dní)'), el('div',{class:'metr',style:'color:var(--cerv)'},String(d.cervene.length))),
     el('div',{class:'card'}, el('div',{class:'muted'},'Žluté (do 90 dní)'), el('div',{class:'metr',style:'color:var(--zlut)'},String(d.zlute.length))),
-    el('div',{class:'card'}, el('div',{class:'muted'},'Finanční expozice (roční)'),
-      meny.length? el('div',{}, ...meny.map(m=>el('div',{class:'metr',style:'font-size:22px'},d.expozice[m].toLocaleString('cs-CZ')+' '+m))) : el('div',{class:'metr'},'—'))
+    el('div',{class:'card'}, el('div',{class:'muted'},'Roční závazky (opakované toky)'),
+      el('div',{class:'metr',style:'font-size:20px;color:var(--tm)'},sumStr(z.rocni)),
+      el('div',{class:'muted',style:'margin-top:10px'},'Jednorázové / podmíněné'),
+      el('div',{style:'font-size:15px;font-weight:700;color:var(--sed)'},sumStr(z.podmineno)))
   );
   app.append(cards);
   if(d.eskalovane||d.bounced){
@@ -90,8 +93,30 @@ async function dash(){
       d.eskalovane?el('p',{},el('span',{class:'pill cerv'},'Eskalováno'),' '+d.eskalovane+' termínů (D−14 bez potvrzení).'):'',
       d.bounced?el('p',{},el('span',{class:'pill cerv'},'Nedoručeno'),' '+d.bounced+' notifikací (bounce).'):''));
   }
+  // Auditovatelný rozpad závazků — které smlouvy do součtů vstupují
+  const rz=el('div',{class:'card'});
+  rz.append(el('h1',{style:'font-size:16px'},'Rozpad finančních závazků'),
+    el('p',{class:'muted',style:'margin-top:-6px'},'Podmíněná expozice (ručení) a majetek se NEsčítají s ročními toky — jsou to nesourodé veličiny.'));
+  const TYP={mesicni:'měsíční (×12)',rocni:'roční',jednorazova:'jednorázová',expozice:'ručení / expozice',majetek:'majetek'};
+  const rt=el('table',{},el('thead',{},el('tr',{},...['Smlouva','Částka','Typ','Skupina'].map(h=>el('th',{},h)))));
+  const rtb=el('tbody');
+  z.polozky.forEach(p=>rtb.append(el('tr',{'data-clic':1,on:{click:()=>seznamHledat(p.cislo_smlouvy)}},
+    el('td',{html:`<strong>${esc(p.cislo_smlouvy)}</strong> · ${esc(p.protistrana_nazev||'')}`}),
+    el('td',{},p.castka.toLocaleString('cs-CZ')+' '+p.mena),
+    el('td',{},TYP[p.hodnota_typ]||p.hodnota_typ),
+    el('td',{},el('span',{class:'pill '+(p.skupina==='rocni'?'zel':'sed')},p.skupina==='rocni'?'roční tok':'podmíněné / jednoráz.')))));
+  z.nevycisleno.forEach(n=>rtb.append(el('tr',{style:'opacity:.65'},
+    el('td',{html:`<strong>${esc(n.cislo_smlouvy)}</strong> · ${esc(n.protistrana_nazev||'')}`}),
+    el('td',{},'—'),el('td',{class:'muted'},esc(n.hodnota_popis||'bez čísla')),
+    el('td',{},el('span',{class:'pill sed'},'nevyčísleno')))));
+  if(!z.polozky.length&&!z.nevycisleno.length)rtb.append(el('tr',{},el('td',{colspan:4,class:'muted'},'Žádné aktivní závazky.')));
+  rt.append(rtb);rz.append(rt);
+  app.append(rz);
+
   app.append(tabulkaTerminu([...d.cervene,...d.zlute],true));
 }
+// otevře Seznam s předvyplněným filtrem (z rozpadu na dashboardu)
+function seznamHledat(q){ $('header button[data-tab=list]').click(); setTimeout(()=>{ const i=document.querySelector('main input'); if(i){i.value=q; i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));} },50); }
 
 function tabulkaTerminu(rows,klik){
   const t=el('table',{},el('thead',{},el('tr',{},...['Pásmo','Smlouva','Typ','Datum','Za dní','Stav'].map(h=>el('th',{},h)))));

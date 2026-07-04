@@ -78,6 +78,22 @@ test('sqlite: catch-up importované smlouvy (40 dní → d60)', async () => {
   assert.equal(rows[0].milnik, 'd60', 'nejbližší aktuální milník, ne d90');
 });
 
+test('rozpad závazků: roční toky odděleně od podmíněných/majetku', () => {
+  const zav = [
+    { kategorie: 'zavazek', cislo_smlouvy: 'A', protistrana_nazev: 'Baroclean', hodnota: 400000, hodnota_typ: 'rocni', mena: 'EUR' },
+    { kategorie: 'zavazek', cislo_smlouvy: 'B', protistrana_nazev: 'Contenur', hodnota: 150000, hodnota_typ: 'expozice', mena: 'EUR' },
+    { kategorie: 'zavazek', cislo_smlouvy: 'C', protistrana_nazev: 'Zhejiang', hodnota: 50000, hodnota_typ: 'majetek', mena: 'USD' },
+    { kategorie: 'zavazek', cislo_smlouvy: 'D', protistrana_nazev: 'MP', hodnota: null, hodnota_typ: null, mena: 'CZK', hodnota_popis: 'dle objednávek' },
+    { kategorie: 'zavazek', cislo_smlouvy: 'E', protistrana_nazev: 'Pausal', hodnota: 1000, hodnota_typ: 'mesicni', mena: 'CZK' },
+  ];
+  const r = L.rozpadZavazku(zav);
+  assert.deepEqual(r.rocni, { EUR: 400000, CZK: 12000 }, 'roční = Baroclean + měsíční×12');
+  assert.deepEqual(r.podmineno, { EUR: 150000, USD: 50000 }, 'podmíněné = expozice + majetek, NEmíchá se s ročními');
+  assert.equal(r.polozky.length, 4);
+  assert.equal(r.nevycisleno.length, 1);
+  assert.equal(r.nevycisleno[0].cislo_smlouvy, 'D');
+});
+
 test('řešení plnění: log záznamů (create + list DESC)', () => {
   const M = openDb(':memory:');
   const s = M.smlouva.create({ cislo_smlouvy: 'R-1', kategorie: 'zavazek', protistrana_nazev: 'X',

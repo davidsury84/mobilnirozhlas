@@ -31,6 +31,9 @@ function mount(host) {
   // Jednorázové doplnění odkazů na Disk k naimportovaným smlouvám.
   try { require('./seed-drive-urls').seedDriveUrls(M); }
   catch (e) { console.error('[smlouvy] seed drive_url selhal:', e.message); }
+  // Jednorázová reklasifikace podmíněných závazků (expozice/majetek).
+  try { require('./seed-hodnota-typ').seedHodnotaTyp(M); }
+  catch (e) { console.error('[smlouvy] seed hodnota_typ selhal:', e.message); }
 
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);
@@ -68,7 +71,7 @@ function mount(host) {
     }
     return {
       dnes, cervene, zlute,
-      expozice: L.expoziceZavazku(M.smlouva.proExpozici()),
+      zavazky: L.rozpadZavazku(M.smlouva.zavazky()),
       eskalovane: rows.filter((x) => x.stav === 'eskalovano').length,
       bounced: M.notifikace.bouncenute().length,
     };
