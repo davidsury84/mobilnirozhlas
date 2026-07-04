@@ -52,6 +52,7 @@ input:focus,select:focus{outline:none;border-color:var(--green-2);box-shadow:0 0
 .prog{flex:1;min-width:160px;font-size:13px;color:var(--ink-soft)} .prog b{color:var(--ink)} .err{color:#c23636;font-size:13px}
 #result{display:none;background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:28px;margin-bottom:20px}
 #result.show{display:block}
+.save-note{background:#fff7e6;border:1px solid #f3e0a0;color:#8a6d3b;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px;line-height:1.5}
 .hs{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
 .hs .v{font-family:"IBM Plex Mono";font-size:42px;font-weight:600;color:var(--green-d);letter-spacing:-.02em}
 .hs .pct{font-size:26px;font-weight:700} .hs .lbl{color:var(--ink-soft);font-size:13px}
@@ -217,9 +218,13 @@ async function vyhodnotit(){
   if(answers.filter(a=>a>0).length<36){ const i=answers.findIndex(a=>!a); if(i>=0){ PAGE=Math.floor(i/PER); renderQuiz(); } document.getElementById('err').textContent='Zodpovězte prosím všech 36 výroků (chybí výrok '+(i+1)+').'; return; }
   const dem={ pozice:document.getElementById('dPozice').value.trim(), delka:DEM.delka, stredisko:document.getElementById('dStredisko').value.trim(), zarazeni:DEM.zarazeni };
   const r=compute();
+  let saveNote='';
   if(RESP.token||RESP.email){
     const btn=document.getElementById('evalBtn'); if(btn){btn.disabled=true;btn.textContent='Ukládám…';}
-    try{ const res=await fetch('/api/jss'+(RESP.token?('?i='+encodeURIComponent(RESP.token)):''),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({email:RESP.email,total:r.total,pct:r.pct,subs:r.subs},dem))}); const j=await res.json(); if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; } }catch(e){}
+    try{ const res=await fetch('/api/jss'+(RESP.token?('?i='+encodeURIComponent(RESP.token)):''),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({email:RESP.email,total:r.total,pct:r.pct,subs:r.subs},dem))}); const j=await res.json();
+      if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; }
+      else if(j&&j.blocked){ saveNote='<div class="save-note">Tento dotazník jste už tento měsíc vyplnil(a) — výsledek se proto znovu neuložil'+(j.nextAt?(' (další vyplnění '+new Date(j.nextAt).toLocaleDateString('cs-CZ')+')'):'')+'. Níže vidíte vyhodnocení vašich nynějších odpovědí.</div>'; }
+    }catch(e){}
     if(btn){btn.textContent='Vyhodnotit';}
   }
   const itemAvg=r.total/36;
@@ -228,7 +233,7 @@ async function vyhodnotit(){
   const demLine=[dem.pozice,dem.zarazeni,dem.stredisko,dem.delka].filter(Boolean).map(esc).join(' · ');
   const whoLine=(RESP.name||demLine)?('<div class="who-line">'+(RESP.name?'<b>'+esc(RESP.name)+'</b>'+(RESP.dept&&RESP.dept!=='—'?(' · '+esc(RESP.dept)):''):'')+(demLine?((RESP.name?'<br>':'')+demLine):'')+'</div>'):'';
   const printHead='<div id="printHead"><h2>Dotazník pracovní spokojenosti (JSS)</h2><div class="pd">'+(RESP.name?esc(RESP.name)+' · ':'')+today+'</div></div>';
-  let h=printHead+'<h2 style="margin:0 0 14px;font-size:20px">Vaše pracovní spokojenost</h2>'+whoLine+
+  let h=printHead+saveNote+'<h2 style="margin:0 0 14px;font-size:20px">Vaše pracovní spokojenost</h2>'+whoLine+
     '<div class="hs"><span class="v">'+r.total+'</span><span class="pct">'+r.pct+' %</span>'+
     '<span class="lbl">celkové skóre (36–216) · '+label+'</span></div>'+
     '<div style="margin:18px 0 6px;font-weight:600">Oblasti spokojenosti</div>';

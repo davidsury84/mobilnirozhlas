@@ -357,6 +357,8 @@ function myLibrary(email) {
   const folders = (lib.folders || []).map(f => ({ id: f.id, name: f.name, parentId: f.parentId || null }));
   return { folders, docs };
 }
+// Nejbližší termín, kdy lze průzkum vyplnit znovu = měsíc od posledního vyplnění (limit 1× měsíčně).
+function nextFillAt(ts) { const d = new Date(ts); d.setMonth(d.getMonth() + 1); return d.getTime(); }
 // Průzkumy/testy dostupné zaměstnanci + jestli (a kdy) je vyplnil. Datum vyplnění = ts posledního záznamu (upsert dle e-mailu).
 function mySurveys(email) {
   email = (email || '').toLowerCase();
@@ -367,7 +369,10 @@ function mySurveys(email) {
   ];
   return DEFS.map(d => {
     const rec = readJson(d.file, []).find(r => (r.email || '').toLowerCase() === email);
-    return { id: d.id, title: d.title, desc: d.desc, mins: d.mins, filled: !!rec, filledAt: rec ? (rec.ts || null) : null };
+    const filledAt = rec ? (rec.ts || null) : null;
+    const nextAt = filledAt ? nextFillAt(filledAt) : null;
+    const canFill = !filledAt || Date.now() >= nextAt;   // vyplnit lze max 1× měsíčně
+    return { id: d.id, title: d.title, desc: d.desc, mins: d.mins, filled: !!rec, filledAt, nextAt, canFill };
   });
 }
 // Test houževnatosti (Grit) – percentil populace ČR z průměru (HS 1,0–5,0)
@@ -385,6 +390,7 @@ function recordGrit(a) {
   const rec = { email, name, dept, hs, pct: gritPct(hs), ts: Date.now() };
   const results = readJson(GRIT_F, []);
   const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0 && results[i].ts && Date.now() < nextFillAt(results[i].ts)) return { blocked: true, nextAt: nextFillAt(results[i].ts) };
   if (i >= 0) results[i] = rec; else results.push(rec);
   writeJson(GRIT_F, results);
   logActivity('survey', { email, name }, 'Test houževnatosti (Grit)');
@@ -403,6 +409,7 @@ function recordJss(a) {
     pozice: (a.pozice || '').trim(), delka: (a.delka || '').trim(), stredisko: (a.stredisko || '').trim(), zarazeni: (a.zarazeni || '').trim(), ts: Date.now() };
   const results = readJson(JSS_F, []);
   const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0 && results[i].ts && Date.now() < nextFillAt(results[i].ts)) return { blocked: true, nextAt: nextFillAt(results[i].ts) };
   if (i >= 0) results[i] = rec; else results.push(rec);
   writeJson(JSS_F, results);
   logActivity('survey', { email, name }, 'Dotazník pracovní spokojenosti (JSS)');
@@ -422,6 +429,7 @@ function recordTw44(a) {
     indices: (a.indices && typeof a.indices === 'object') ? a.indices : {}, ts: Date.now() };
   const results = readJson(TW44_F, []);
   const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0 && results[i].ts && Date.now() < nextFillAt(results[i].ts)) return { blocked: true, nextAt: nextFillAt(results[i].ts) };
   if (i >= 0) results[i] = rec; else results.push(rec);
   writeJson(TW44_F, results);
   logActivity('survey', { email, name }, 'Test kognitivní zátěže (TW44)');
@@ -793,13 +801,13 @@ const server = http.createServer(async (req, res) => {
     if (p.indexOf('/s/') === 0) { const id = p.slice(3).replace(/[^a-z0-9]/gi, ''); const f = path.join(PUB_DIR, id + '.html'); if (fs.existsSync(f)) return send(res, 200, fs.readFileSync(f, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' }); return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' }); }
     if (p === '/api/ack' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.dirId || !b.email) return send(res, 400, { error: 'Chybí data.' }); recordAck(b); return send(res, 200, { ok: true }, { 'Access-Control-Allow-Origin': '*' }); }
     // ---- test houževnatosti (Grit) ----
-    if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/grit-results' && req.method === 'GET') return send(res, 200, readJson(GRIT_F, []));
     // ---- dotazník pracovní spokojenosti (JSS) ----
-    if (p === '/api/jss' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordJss(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, total: rec.total, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/jss' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordJss(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, total: rec.total, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/jss-results' && req.method === 'GET') return send(res, 200, readJson(JSS_F, []));
     // ---- test kognitivní zátěže (TW44) ----
-    if (p === '/api/tw44' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordTw44(b); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/tw44' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordTw44(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/tw44-results' && req.method === 'GET') return send(res, 200, readJson(TW44_F, []));
     // podepsané pozvánkové odkazy (hash) pro dávku příjemců — jen pro správce
     if (p === '/api/invite-links' && req.method === 'POST') {

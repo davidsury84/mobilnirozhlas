@@ -65,9 +65,24 @@ main{max-width:780px;margin:0 auto;padding:26px 20px 90px}
 .who-line{font-size:14px;color:var(--ink-soft);margin:-4px 0 14px}
 .who-line b{color:var(--ink)}
 .pdfbtn{margin-top:20px;margin-left:10px;background:linear-gradient(150deg,var(--yellow),var(--yellow-2));border:none;color:#11271c;padding:9px 16px;border-radius:10px;cursor:pointer;font-family:inherit;font-weight:600}
+.save-note{background:#fff7e6;border:1px solid #f3e0a0;color:#8a6d3b;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px;line-height:1.5}
+.about{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin:0 0 18px}
+.about h2{margin:0 0 8px;font-size:17px;font-weight:700}
+.about p{margin:0 0 8px;font-size:14px;line-height:1.6}
+.about p:last-child{margin-bottom:0}
+.about .src{color:var(--ink-soft);font-size:12.5px}
+.effort{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:24px;font-size:14px;line-height:1.6}
+.effort b{color:var(--green-d)}
+.pillars{margin-top:24px}
+.pillars h3{margin:0 0 4px;font-size:16px;font-weight:700}
+.pillars .sub{color:var(--ink-soft);font-size:13px;margin:0 0 12px}
+.pillars .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.pcard{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.pcard .pt{font-weight:700;font-size:14px;margin-bottom:4px;color:var(--green-d)}
+.pcard .pd2{font-size:13px;color:var(--ink-soft);line-height:1.5}
 #printHead{display:none}
 @media print{
-  header,.intro,.scale-hint,#quiz,.bar,.again,.pdfbtn,.err{display:none!important}
+  header,.intro,.scale-hint,#quiz,.bar,.again,.pdfbtn,.err,.about{display:none!important}
   body{background:#fff}
   main{padding:0}
   #result{box-shadow:none;border:none;margin:0;padding:0}
@@ -81,6 +96,11 @@ main{max-width:780px;margin:0 auto;padding:26px 20px 90px}
 <header><div class="wrap"><h1>Test houževnatosti (Grit)</h1><p>10 otázek · cca 3 minuty · vyhodnocení vůči populaci ČR</p></div></header>
 <main>
   <div id="result"></div>
+  <div class="about">
+    <h2>Co je houževnatost (grit)?</h2>
+    <p>Houževnatost spojuje <b>vášeň</b> — dlouhodobý, stálý zájem — a <b>vytrvalost</b>, tedy schopnost nevzdávat se, když to nejde. Nejde o intenzitu jednoho výkonu, ale o <b>stálost směru v čase</b>: jít za smysluplným cílem roky, ne dny.</p>
+    <p>Psycholožka <b>Angela Duckworthová</b> ve svém výzkumu zjistila, že u náročných, dlouhodobých cílů předpovídá jejich dotažení často líp než samotný talent. Dobrá zpráva: houževnatost není pevně daná — dá se pěstovat. Jak, se dozvíte ve vyhodnocení.</p>
+  </div>
   <p class="intro">U každého tvrzení vyber, jak moc se ti podobá. Neexistují správné ani špatné odpovědi — odpovídej spontánně.</p>
   <div class="scale-hint"><span>← vůbec se mi to nepodobá</span><span>to jsem celý/celá já →</span></div>
   <div id="quiz"></div>
@@ -147,9 +167,13 @@ async function vyhodnotit(){
   const intens = d===0?'':(Math.abs(d)<=12?'mírně ':'výrazně ');
   const hsStr = avg.toFixed(1).replace('.',',');
 
+  let saveNote='';
   if(RESP.token||RESP.email){
     const btn=document.getElementById('evalBtn'); if(btn){btn.disabled=true;btn.textContent='Ukládám…';}
-    try{ const rr=await fetch('/api/grit'+(RESP.token?('?i='+encodeURIComponent(RESP.token)):''),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:RESP.email,hs:avg})}); const j=await rr.json(); if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; RESP.email=RESP.email||''; } }catch(e){}
+    try{ const rr=await fetch('/api/grit'+(RESP.token?('?i='+encodeURIComponent(RESP.token)):''),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:RESP.email,hs:avg})}); const j=await rr.json();
+      if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; RESP.email=RESP.email||''; }
+      else if(j&&j.blocked){ saveNote='<div class="save-note">Tento test jste už tento měsíc vyplnil(a) — výsledek se proto znovu neuložil'+(j.nextAt?(' (další vyplnění '+new Date(j.nextAt).toLocaleDateString('cs-CZ')+')'):'')+'. Níže vidíte vyhodnocení vašich nynějších odpovědí.</div>'; }
+    }catch(e){}
     if(btn){btn.textContent='Vyhodnotit';}
   }
   const today=new Date().toLocaleDateString('cs-CZ');
@@ -158,7 +182,7 @@ async function vyhodnotit(){
   const printHead='<div id="printHead"><h2>Test houževnatosti (Grit)</h2><div class="pd">'+(RESP.name?(esc(RESP.name)+dep+' · '):'')+today+'</div></div>';
 
   const mark=(val,label)=>'<div class="gmark" style="left:'+val+'%"><i></i>'+label+'</div>';
-  const html = printHead+
+  const html = printHead+ saveNote+
     '<h2 style="margin:0 0 14px;font-size:20px">Vaše houževnatost</h2>'+ whoLine+
     '<div class="hs"><span class="v">'+hsStr+'</span><span class="pct">'+p+' %</span>'+
       '<span class="lbl">hrubé skóre (HS) · percentil populace ČR</span></div>'+
@@ -171,6 +195,15 @@ async function vyhodnotit(){
       '<div class="ref"><div class="rv">'+VS+' %</div><div class="rl">Vysokoškoláci nabývají hodnot</div></div>'+
       '<div class="ref"><div class="rv">'+MGR+' %</div><div class="rl">Obchodní manažeři a majitelé firem</div></div>'+
     '</div>'+
+    '<div class="effort"><b>Úsilí se počítá dvakrát.</b> Podle A. Duckworthové platí: talent × úsilí = dovednost a dovednost × úsilí = výsledek. Úsilí tedy do výsledku vstupuje dvakrát — proto vytrvalý přístup často předčí čistý talent. Skóre není osud: houževnatost roste tím, co děláte dál.</div>'+
+    '<div class="pillars"><h3>Jak houževnatost pěstovat</h3>'+
+      '<p class="sub">Čtyři věci, které houževnatost podle výzkumu posilují — dají se budovat postupně.</p>'+
+      '<div class="grid">'+
+        '<div class="pcard"><div class="pt">1 · Zájem</div><div class="pd2">Dělejte věci, které vás baví a dávají vám smysl. Vášeň nepřichází naráz — vzniká a prohlubuje se zkoušením a časem.</div></div>'+
+        '<div class="pcard"><div class="pt">2 · Cvičení</div><div class="pd2">Záměrná praxe: opakovaně pracovat právě na tom, co vám zatím nejde, s jasným cílem a zpětnou vazbou. Ne jen odpracovat, ale zlepšovat se.</div></div>'+
+        '<div class="pcard"><div class="pt">3 · Smysl</div><div class="pd2">Vědomí, že vaše práce pomáhá i druhým, dodává vytrvalosti hloubku a udrží vás u věci, i když je to náročné.</div></div>'+
+        '<div class="pcard"><div class="pt">4 · Naděje</div><div class="pd2">Přesvědčení, že zítřek můžu zlepšit vlastním úsilím. Houževnatost = vstát po každém pádu a jít dál.</div></div>'+
+      '</div></div>'+
     '<button class="again" onclick="restart()">Vyplnit znovu</button>'+
     '<button class="pdfbtn" onclick="window.print()">⬇ Stáhnout PDF</button>';
   const r=document.getElementById('result');
