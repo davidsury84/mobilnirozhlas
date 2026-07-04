@@ -953,8 +953,7 @@ const MUJ_MODS = [
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { grp:"Rozvoj a nástup" },
   { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace" },
-  { key:"skoleni", icon:MUJ_IC.school, label:"Školení", soon:true },
-  { key:"abroll", icon:MUJ_IC.school, label:"Školení ABROLL" },
+  { key:"skoleni", icon:MUJ_IC.school, label:"Školení" },
   { key:"pruzkumy", icon:MUJ_IC.poll, label:"Průzkumy" },
   { grp:"Volno a žádosti" },
   { key:"dovolena", icon:MUJ_IC.cal, label:"Dovolená" },
@@ -1028,7 +1027,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="abroll");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="smlouvy"||MUJ.view==="adaptace");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
 function mjGo(key){
@@ -1041,7 +1040,7 @@ function mjGo(key){
   else if(key==="adaptace") showAdaptace();
   else if(key==="dovolena") showDovolena();
   else if(key==="pruzkumy") showPruzkumy();
-  else if(key==="abroll") showAbroll();
+  else if(key==="skoleni") showSkoleni();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
 }
@@ -1073,11 +1072,36 @@ function showSvozEsa(){
   body.innerHTML='<iframe src="/svoz-esa-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka svoz ESA"></iframe>';
   window.scrollTo(0,0);
 }
-function showAbroll(){
-  MUJ.view="abroll"; renderSidebar();
+/* ---------- Modul Školení (seznam školení + testy) ---------- */
+async function showSkoleni(){
+  MUJ.view="skoleni"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML='<div class="dash-hero"><h2>Školení</h2><p>Načítám…</p></div>';
+  let st={attemptsUsed:0,attemptsLeft:3,best:0,passed:false};
+  try{ st=await (await fetch('/api/abroll?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
+  const used=st.attemptsUsed||0, best=st.best||0;
+  const badge = st.passed ? '<span class="pill green">✓ Splněno '+best+' %</span>'
+    : (used>=3 ? '<span class="pill red">✕ Nesplněno ('+best+' %)</span>'
+    : (used>0 ? '<span class="pill amber">Rozpracováno · '+used+'/3 pokusů</span>' : '<span class="pill amber">○ Nezahájeno</span>'));
+  const btnLabel = st.passed ? 'Otevřít znovu' : (used>=3 ? 'Prohlédnout' : (used>0 ? 'Pokračovat' : 'Spustit'));
+  let h='<div class="dash-hero"><h2>Školení</h2><p>Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).</p></div>';
+  h+='<div class="dash-sec">Dostupná školení</div>';
+  h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
+     '<div class="li-t">ABROLL — kódování a konfigurace</div>'+
+     '<div class="muted" style="font-size:12px;margin-top:2px">Interaktivní výuka názvů a konfigurace kontejnerů ABROLL + závěrečný test</div></div></div>'+
+     '<div style="display:flex;align-items:center;gap:10px">'+badge+
+     '<button class="btn sm" onclick="openAbroll()">'+btnLabel+'</button></div></div>';
+  body.innerHTML=h; window.scrollTo(0,0);
+}
+function openAbroll(){
+  MUJ.view="skoleni"; renderSidebar();
+  const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
   const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
-  body.innerHTML='<iframe src="/abroll-app'+q+'" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Školení ABROLL"></iframe>';
+  body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
+      '<button class="btn ghost sm" onclick="showSkoleni()">← Zpět na školení</button>'+
+      '<span class="muted" style="font-size:13px">Na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy.</span></div>'+
+    '<iframe src="/abroll-app'+q+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#fff" title="Školení ABROLL"></iframe>';
   window.scrollTo(0,0);
 }
 function showSmlouvy(){
