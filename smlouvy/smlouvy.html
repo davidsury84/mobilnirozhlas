@@ -87,6 +87,7 @@ async function dash(){
       el('div',{style:'font-size:15px;font-weight:700;color:var(--sed)'},sumStr(z.podmineno)))
   );
   app.append(cards);
+  const wp = await wikiPanel(); if(wp) app.append(wp);
   if(d.eskalovane||d.bounced){
     app.append(el('div',{class:'card',style:'margin-bottom:16px'},
       el('h1',{style:'font-size:16px'},'Vyžaduje pozornost'),
@@ -114,6 +115,31 @@ async function dash(){
   app.append(rz);
 
   app.append(tabulkaTerminu([...d.cervene,...d.zlute],true));
+}
+// Panel „Termíny z wiki" — čte sdílený registr lhůt z LLM-wiki (WIKI_TERMINY_URL).
+async function wikiPanel(){
+  let d; try{ d = await api('/api/smlouvy/wiki-terminy'); }catch(e){ return null; }
+  if(!d.configured) return null; // funkce vypnutá (WIKI_TERMINY_URL není nastaveno)
+  const card = el('div',{class:'card',style:'margin-bottom:16px'});
+  card.append(el('h1',{style:'font-size:16px'},'Termíny z wiki ',
+    el('span',{class:'muted',style:'font-size:12px;font-weight:400'},'(BOZP/PO + smlouvy — sdílený registr)')));
+  if(d.chyba){ card.append(el('p',{class:'warn',style:'margin-top:-6px'},'Nepodařilo se načíst registr: '+esc(d.chyba))); return card; }
+  const items = d.items||[];
+  if(!items.length){ card.append(el('p',{class:'muted',style:'margin-top:-6px'},'Žádné aktivní lhůty v registru.')); return card; }
+  const t = el('table',{},el('thead',{},el('tr',{},...['Termín','Za','Doména','Subjekt','Popis','Odpovědný'].map(h=>el('th',{},h)))));
+  const tb = el('tbody');
+  items.forEach(x=>{ const cls = pill(x.dny)[0];
+    tb.append(el('tr',{},
+      el('td',{},czd(x.termin)),
+      el('td',{},el('span',{class:'pill '+cls}, x.dny<0 ? ('po '+(-x.dny)+' d') : (x.dny+' d'))),
+      el('td',{},el('span',{class:'pill sed'}, esc(x.domena||''))),
+      el('td',{},esc(x.subjekt||'')),
+      el('td',{},esc(x.popis||'')),
+      el('td',{class:'muted'},esc(x.odpovedny||'—'))));
+  });
+  t.append(tb); card.append(t);
+  card.append(el('p',{class:'muted',style:'font-size:11px;margin-top:8px'},'Zdroj: '+esc(d.source||'')));
+  return card;
 }
 // otevře Seznam s předvyplněným filtrem (z rozpadu na dashboardu)
 function seznamHledat(q){ $('header button[data-tab=list]').click(); setTimeout(()=>{ const i=document.querySelector('main input'); if(i){i.value=q; i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));} },50); }
