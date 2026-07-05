@@ -375,7 +375,19 @@ const NAVOD={
       <li><b>Po termínu</b> — červené na dashboardu + denní připomínka, dokud se nevyřeší.</li>
     </ul>
     <p>Termín se uzavře kliknutím na <b>„Vyřešeno"</b> v e-mailu (zapíše se kdo a kdy). PDF smluv zůstávají na Disku — modul drží jen odkaz.</p>
-    <p><b>Dva zdroje termínů:</b> ručně zadané smlouvy (níže) <b>a</b> lhůty z LLM-wiki (záložka <b>„📚 Termíny z wiki"</b>).</p>`},
+    <p><b>Jak se sem smlouvy dostávají:</b> nové PDF na Disku si systém najde sám (záložka <b>„📥 Nové z Disku"</b>); lhůty umí číst i z LLM-wiki (záložka <b>„📚 Termíny z wiki"</b>).</p>`},
+  disk:{t:'📥 Nové z Disku',h:`
+    <p><b>Novou smlouvu nikam nezadáváte ručně — stačí ji nahrát na Disk.</b> Systém hlídá sdílenou složku smluv (podsložky <i>Dodavatelské</i> / <i>Odběratelské</i>, klidně i ročníky uvnitř).</p>
+    <p><b>Co se stane automaticky:</b></p>
+    <ol>
+      <li>Každých <b>6 hodin</b> systém složku zkontroluje (admin může kdykoli ručně tlačítkem <b>„↻ Zkontrolovat Disk teď"</b> na dashboardu).</li>
+      <li>Nový soubor → založí se <b>návrh smlouvy</b> s odkazem na PDF. Kategorie se předvyplní podle složky (Odběratelské → odběratelská).</li>
+      <li>Správci (Simoně) přijde <b>e-mail</b> s výzvou k doplnění.</li>
+      <li>Na dashboardu se objeví karta <b>„Nové z Disku — čeká na doplnění"</b>.</li>
+    </ol>
+    <p><b>Co udělá Simona:</b> u položky klikne <b>„Doplnit údaje"</b> → otevře se formulář (vedle je odkaz <i>Otevřít PDF</i>). Doplní: protistranu + IČO, předmět, platnost, výpovědní lhůtu, prolongaci, hodnotu, <b>garanta (e-mail)</b>. <b>Uložením se smlouva zařadí do hlídání</b> a z fronty zmizí.</p>
+    <p><b>Potom:</b> v detailu smlouvy založí 2–4 <b>hlídané termíny</b> (konec platnosti, deadline výpovědi…). Od té chvíle chodí upozornění D−90/60/30 garantovi.</p>
+    <p class="muted"><b>Pozn.:</b> smlouvy, které ve složce byly už před spuštěním téhle funkce, se berou jako archiv a návrhy se z nich nezakládají. Duplicitně se nic nezaloží — každý soubor se pozná podle svého ID.</p>`},
   wiki:{t:'📚 Termíny z wiki',h:`
     <p><b>Co to je:</b> vedle ručně zadaných smluv umí hlídač číst lhůty z <b>LLM-wiki</b> — samostatného repozitáře, kde si AI z nahraných PDF (smlouvy, BOZP/PO) udržuje strukturovanou wiki a z ní generuje strojově čitelný registr lhůt <code>terminy.md</code>.</p>
     <p><b>Jeden zdroj pravdy:</b> místo dvou databází sdílí wiki a hlídač jeden soubor. Na dashboardu je panel <b>„Termíny z wiki"</b> (červené do 30 dní, žluté do 90 dní) a hlídač jednou denně posílá <b>digest e-mail</b> lhůt do 30 dnů.</p>
@@ -388,10 +400,11 @@ const NAVOD={
     <p class="muted">Nastavení (admin): proměnné <code>WIKI_TERMINY_URL</code> a <code>WIKI_TERMINY_TOKEN</code> na Railway (production). Bez nich se panel nezobrazuje.</p>`},
   spravce:{t:'👤 Správce (Simona)',h:`
     <p>Zakládá a edituje <b>všechny</b> smlouvy, dodatky a termíny.</p>
-    <p><b>Co vyplnit u smlouvy:</b> číslo, kategorie a směr (příjem/výdaj), protistrana + IČO, předmět, platnost do (nebo podmínka, např. „710 000 km"), výpovědní lhůta, prolongace, hodnota + typ + měna, <b>garant (e-mail)</b>, stav, odkaz na Disk.</p>
+    <p><b>Běžný postup u nové smlouvy (od 7/2026):</b> smlouvu stačí <b>nahrát do složky na Disku</b> — systém ji sám najde, založí návrh a pošle vám e-mail. Vy pak na dashboardu v kartě <b>„Nové z Disku — čeká na doplnění"</b> kliknete <b>„Doplnit údaje"</b> a vyplníte formulář (PDF máte na kliknutí vedle). Podrobně v záložce <b>„📥 Nové z Disku"</b>.</p>
+    <p><b>Co vyplnit:</b> číslo, kategorie a směr (příjem/výdaj), protistrana + IČO, předmět, platnost do (nebo podmínka, např. „710 000 km"), výpovědní lhůta, prolongace, hodnota + typ + měna, <b>garant (e-mail)</b>.</p>
     <p><b>Proč garant e-mail:</b> bez něj nemají termíny komu posílat upozornění — smlouva na dashboardu svítí „garant nedořešen".</p>
-    <p><b>Termíny:</b> u každé smlouvy založ hlídané termíny (2–4). Odvozený „deadline výpovědi" se dopočítá z platnosti a výpovědní lhůty. Opakující (indexace, audit) se po vyřešení samy založí na další období.</p>
-    <p><b>Import:</b> tlačítko „Import registru" v Seznamu (KS balíky se založí jako placeholder, termíny z volného textu jen navrhne k ruční kontrole).</p>`},
+    <p><b>Termíny:</b> po doplnění údajů založte v detailu smlouvy hlídané termíny (2–4). Odvozený „deadline výpovědi" se dopočítá z platnosti a výpovědní lhůty. Opakující (indexace, audit) se po vyřešení samy založí na další období.</p>
+    <p><b>Ruční založení a import</b> zůstávají: „+ Nová smlouva" v Seznamu, případně „Import registru" (KS balíky jako placeholder, termíny z volného textu jen navrhne ke kontrole).</p>`},
   garant:{t:'🎯 Garant',h:`
     <p>Garant = odpovědná osoba za konkrétní smlouvu (pole „garant" na smlouvě).</p>
     <p><b>Co děláš:</b></p>
