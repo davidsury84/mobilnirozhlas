@@ -204,9 +204,12 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
 .org-seg{display:inline-flex;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:18px;gap:3px}
 .org-seg button{border:none;background:none;padding:7px 18px;border-radius:8px;font:inherit;font-weight:600;font-size:14px;color:var(--ink-soft);cursor:pointer;transition:.12s}
 .org-seg button.active{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(15,21,18,.1)}
+.org-zoom{display:inline-flex;align-items:center;gap:4px;margin-right:6px}
+.org-zoom .btn{padding:6px 10px;font-weight:700}
 .org-canvas{position:relative;overflow:auto;height:560px;border:1px solid var(--line);border-radius:12px;
   background:radial-gradient(circle,#dfe5dc 1px,transparent 1.4px) 0 0/24px 24px, var(--paper);
   touch-action:none;-webkit-user-select:none;user-select:none}
+.org-viewport{position:relative}
 .org-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink-soft);font-size:14px;padding:20px}
 .org-inner{position:relative;min-width:100%;min-height:100%}
 .org-node{position:absolute;width:198px;background:var(--paper);border:1px solid var(--line-strong);border-radius:11px;
@@ -518,6 +521,11 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
         <div class="spread" style="margin-bottom:6px">
           <strong>Organizační schéma (plátno)</strong>
           <div class="inline-actions">
+            <div class="org-zoom">
+              <button class="btn ghost sm" onclick="orgZoomStep(-0.1)" title="Oddálit">−</button>
+              <button class="btn ghost sm" id="orgZoomLbl" onclick="orgSetZoom(1)" title="Obnovit 100 %" style="min-width:56px">100 %</button>
+              <button class="btn ghost sm" onclick="orgZoomStep(0.1)" title="Přiblížit">+</button>
+            </div>
             <button class="btn sm" onclick="orgAddBox()" title="Přidat nový box">+ Přidat box</button>
             <button class="btn ghost sm" onclick="orgClearBoxes()" title="Smazat všechny boxy">Vyčistit</button>
           </div>
@@ -1915,6 +1923,16 @@ function renderOrg(){
 }
 /* ---------- Organizační plátno (drag & drop editor) ---------- */
 let ORG_MODE='table';
+let ORG_ZOOM=1;
+function orgClampZoom(z){ return Math.max(0.4, Math.min(2, Math.round(z*100)/100)); }
+function orgApplyZoom(cv){
+  const inner=cv.querySelector('.org-inner'), vp=cv.querySelector('.org-viewport'); if(!inner||!vp) return;
+  const W=parseFloat(inner.style.width)||0, H=parseFloat(inner.style.height)||0;
+  inner.style.transformOrigin='0 0'; inner.style.transform='scale('+ORG_ZOOM+')';
+  vp.style.width=(W*ORG_ZOOM)+'px'; vp.style.height=(H*ORG_ZOOM)+'px';
+}
+function orgSetZoom(z){ ORG_ZOOM=orgClampZoom(z); const cv=document.getElementById('orgCanvas'); if(cv) orgApplyZoom(cv); const l=document.getElementById('orgZoomLbl'); if(l) l.textContent=Math.round(ORG_ZOOM*100)+' %'; }
+function orgZoomStep(d){ orgSetZoom(ORG_ZOOM+d); }
 // Přepínání pohledů: klasická tabulka × plátno.
 function orgMode(m){
   ORG_MODE=m;
@@ -1964,9 +1982,11 @@ function renderOrgCanvas(){
       '<span class="obx-handle" title="Táhni na jiný box = spojnice (podřízená sekce)"></span>'+
       '</div>';
   });
-  cv.innerHTML='<div class="org-inner" style="width:'+W+'px;height:'+H+'px"><svg class="org-lines" width="'+W+'" height="'+H+'"></svg>'+nodes+'</div>';
+  cv.innerHTML='<div class="org-viewport"><div class="org-inner" style="width:'+W+'px;height:'+H+'px"><svg class="org-lines" width="'+W+'" height="'+H+'"></svg>'+nodes+'</div></div>';
   orgRedrawLines(cv);
   orgBindBoxes(cv);
+  orgApplyZoom(cv);
+  if(!cv.__wheelBound){ cv.__wheelBound=true; cv.addEventListener('wheel', e=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); orgZoomStep(e.deltaY<0?0.1:-0.1); } }, {passive:false}); }
 }
 function orgBindBoxes(cv){
   const inner=cv.querySelector('.org-inner'); if(!inner) return;
@@ -1983,7 +2003,7 @@ function orgBindBoxes(cv){
       node.classList.add('moving');
       const onMove=em=>{
         moved=true; const ir=inner.getBoundingClientRect();
-        let x=Math.max(0, em.clientX-ir.left-grabX), y=Math.max(0, em.clientY-ir.top-grabY);
+        let x=Math.max(0,(em.clientX-ir.left-grabX)/ORG_ZOOM), y=Math.max(0,(em.clientY-ir.top-grabY)/ORG_ZOOM);
         node.style.left=x+'px'; node.style.top=y+'px'; orgRedrawLines(cv);
       };
       const onUp=()=>{
@@ -1999,12 +2019,12 @@ function orgBindBoxes(cv){
     const handle=node.querySelector('.obx-handle');
     if(handle) handle.addEventListener('pointerdown', ev=>{
       if(ev.button!==0) return; ev.stopPropagation(); ev.preventDefault();
-      const ir=inner.getBoundingClientRect(); const hr=handle.getBoundingClientRect();
-      const sx=hr.left+hr.width/2-ir.left, sy=hr.top+hr.height/2-ir.top;
+      const ir=inner.getBoundingClientRect();
+      const sx=node.offsetLeft+handle.offsetLeft+handle.offsetWidth/2, sy=node.offsetTop+handle.offsetTop+handle.offsetHeight/2;
       let curTarget=null;
       try{ handle.setPointerCapture(ev.pointerId); }catch(_){}
       const onMove=em=>{
-        const ex=em.clientX-ir.left, ey=em.clientY-ir.top;
+        const ex=(em.clientX-ir.left)/ORG_ZOOM, ey=(em.clientY-ir.top)/ORG_ZOOM;
         orgRedrawLines(cv,'<path d="M'+sx+' '+sy+' L'+ex+' '+ey+'" stroke="var(--green)" stroke-width="2" stroke-dasharray="5 4" fill="none"/>');
         let tnode=null; cv.querySelectorAll('.org-node').forEach(n=>{ if(n===node) return; const r=n.getBoundingClientRect(); if(em.clientX>=r.left&&em.clientX<=r.right&&em.clientY>=r.top&&em.clientY<=r.bottom) tnode=n; });
         if(curTarget && curTarget!==tnode) curTarget.classList.remove('drop');
