@@ -161,6 +161,19 @@ async function list(){
   go.onclick=nacti;q.addEventListener('keydown',e=>{if(e.key==='Enter')nacti();});await nacti();
 }
 
+function terminAkce(t, smlouvaId){
+  const td=el('td');
+  const call=async(stav)=>{ try{ await api('/api/smlouvy/termin-stav?id='+t.id,{method:'POST',body:JSON.stringify({stav})}); detail(smlouvaId);}catch(e){} };
+  const bs='padding:4px 9px;font-size:12px';
+  if(t.stav==='vyreseno'||t.stav==='neaktivni'){
+    td.append(el('button',{class:'btn sec',style:bs,on:{click:()=>call('ceka')}},'Aktivovat'));
+  } else {
+    td.append(
+      el('button',{class:'btn',style:bs+';margin-right:5px',on:{click:()=>call('vyreseno')}},'Hotovo'),
+      el('button',{class:'btn sec',style:bs,on:{click:()=>call('neaktivni')}},'Neaktivní'));
+  }
+  return td;
+}
 async function detail(id){
   const d=await api('/api/smlouvy/detail?id='+id);const s=d.smlouva;
   app.innerHTML='';
@@ -181,14 +194,16 @@ async function detail(id){
     el('button',{class:'btn sec',on:{click:()=>novyTermin(s.id)}},'+ Termín'),
     el('button',{class:'btn sec',on:{click:()=>novyDodatek(s.id)}},'+ Dodatek')));
 
-  const tt=el('table',{},el('thead',{},el('tr',{},...['Typ','Datum','Stav','Opakování','Notifikace'].map(h=>el('th',{},h)))));
+  const thT=['Typ','Datum','Stav','Opakování','Notifikace'].concat(d.muzuResit?['Akce']:[]);
+  const tt=el('table',{},el('thead',{},el('tr',{},...thT.map(h=>el('th',{},h)))));
   const tb=el('tbody');
-  if(!d.terminy.length)tb.append(el('tr',{},el('td',{colspan:5,class:'muted'},'Zatím žádné termíny — zakládají se ručně.')));
+  if(!d.terminy.length)tb.append(el('tr',{},el('td',{colspan:thT.length,class:'muted'},'Zatím žádné termíny — zakládají se ručně.')));
   d.terminy.forEach(t=>{const h=(d.historie[t.id]||[]).map(n=>`${n.milnik} → ${esc(n.komu_email||'')} · ${n.stav_doruceni}`).join('<br>')||'—';
-    const row=el('tr',{},el('td',{},t.typ+(t.odvozeny?' (odvozený)':'')),el('td',{},czd(t.datum)),
+    const bunky=[el('td',{},t.typ+(t.odvozeny?' (odvozený)':'')),el('td',{},czd(t.datum)),
       el('td',{html:`<span class="pill ${t.stav==='vyreseno'?'zel':(t.stav==='eskalovano'?'cerv':'sed')}">${t.stav}</span>`}),
-      el('td',{},t.opakovani),el('td',{class:'muted',html:h}));
-    tb.append(row);});
+      el('td',{},t.opakovani),el('td',{class:'muted',html:h})];
+    if(d.muzuResit)bunky.push(terminAkce(t,s.id));
+    tb.append(el('tr',{},...bunky));});
   tt.append(tb);app.append(el('div',{class:'card'},el('h1',{style:'font-size:16px'},'Termíny'),tt));
 
   const dt=el('table',{},el('thead',{},el('tr',{},...['Číslo','Datum','Co mění'].map(h=>el('th',{},h)))));

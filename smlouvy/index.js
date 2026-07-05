@@ -185,6 +185,20 @@ function mount(host) {
         json(res, 200, rows.map((x) => ({ ...x, dny: daysUntil(x.datum, dnes) }))); return true;
       }
 
+      // Změna stavu termínu: Hotovo (vyřešeno) / Neaktivní / zpět Aktivní.
+      if (p === '/api/smlouvy/termin-stav' && req.method === 'POST') {
+        const t = M.termin.getById(Number(u.query.id));
+        if (!t) { json(res, 404, { chyba: 'Termín nenalezen.' }); return true; }
+        const s = M.smlouva.getById(t.smlouva_id);
+        if (!smiResit(req, s)) { json(res, 403, { chyba: 'Měnit stav termínu smí správce, admin nebo garant této smlouvy.' }); return true; }
+        const b = await body(req); const stav = b.stav;
+        if (!['vyreseno', 'neaktivni', 'ceka'].includes(stav)) { json(res, 400, { chyba: 'Neplatný stav.' }); return true; }
+        const who = (host.empSession(req) || {}).email;
+        if (stav === 'vyreseno') engine.uzavriTermin(M, t.id, who); // uzavře + u opakujícího založí další výskyt
+        else M.termin.nastavStav(t.id, stav);
+        json(res, 200, M.termin.getById(t.id)); return true;
+      }
+
       // Řešení plnění: přidat záznam (admin/správce nebo garant TÉTO smlouvy).
       if (p === '/api/smlouvy/reseni' && req.method === 'POST') {
         const s = M.smlouva.getById(Number(u.query.id));

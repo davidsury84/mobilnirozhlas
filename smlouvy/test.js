@@ -94,6 +94,22 @@ test('rozpad závazků: roční toky odděleně od podmíněných/majetku', () =
   assert.equal(r.nevycisleno[0].cislo_smlouvy, 'D');
 });
 
+test('termín: ruční stav neaktivní ↔ zpět na čeká (vyčistí potvrzení)', () => {
+  const M = openDb(':memory:');
+  const s = M.smlouva.create({ cislo_smlouvy: 'TS-1', kategorie: 'dodavatelska', protistrana_nazev: 'X', stav: 'aktivni' });
+  const t = M.termin.create({ smlouva_id: s.id, typ: 'sla', datum: '2027-01-01' });
+  M.termin.nastavStav(t.id, 'neaktivni');
+  assert.equal(M.termin.getById(t.id).stav, 'neaktivni');
+  // neaktivní termín cron nebere
+  assert.equal(M.termin.aktivniCekajici('2026-12-01').length, 0);
+  // zpět na čeká
+  M.termin.oznacVyreseny(t.id, 'a@x.cz');
+  M.termin.nastavStav(t.id, 'ceka');
+  const back = M.termin.getById(t.id);
+  assert.equal(back.stav, 'ceka');
+  assert.equal(back.potvrzeno_by, null, 'reaktivace vyčistí potvrzení');
+});
+
 test('řešení plnění: log záznamů (create + list DESC)', () => {
   const M = openDb(':memory:');
   const s = M.smlouva.create({ cislo_smlouvy: 'R-1', kategorie: 'zavazek', protistrana_nazev: 'X',

@@ -178,6 +178,14 @@ function openDb(file) {
         .run(at || new Date().toISOString(), by || null, id);
     },
     oznacEskalovany(id) { db.prepare(`UPDATE termin SET stav='eskalovano', updated_at=datetime('now') WHERE id=? AND stav='ceka'`).run(id); },
+    // Ruční změna stavu termínu (hotovo=vyreseno řeší engine.uzavriTermin; tady neaktivni / zpět na ceka).
+    nastavStav(id, stav) {
+      if (stav === 'ceka') {
+        db.prepare(`UPDATE termin SET stav='ceka', potvrzeno_at=NULL, potvrzeno_by=NULL, updated_at=datetime('now') WHERE id=?`).run(id);
+      } else {
+        db.prepare(`UPDATE termin SET stav=?, updated_at=datetime('now') WHERE id=?`).run(stav, id);
+      }
+    },
     snooze(id, doD) { db.prepare(`UPDATE termin SET snooze_do=?, updated_at=datetime('now') WHERE id=?`).run(doD, id); },
     updateDatumOdvozenych(smlouvaId, typ, datum) {
       db.prepare(`UPDATE termin SET datum=?, updated_at=datetime('now')
