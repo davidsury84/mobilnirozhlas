@@ -11,16 +11,23 @@ const fs = require('fs');
 let _cache = { at: 0, rows: [], src: '' };
 const TTL_MS = 30 * 60 * 1000; // 30 min
 
-function fetchText(src, redirects = 0) {
+// Pro PRIVÁTNÍ repo použij GitHub API contents URL + token:
+//   WIKI_TERMINY_URL=https://api.github.com/repos/<owner>/<repo>/contents/wiki/registry/terminy.md?ref=main
+//   WIKI_TERMINY_TOKEN=<fine-grained PAT s právem číst obsah tohoto repa>
+// Token přepne Accept na application/vnd.github.raw, takže odpověď je přímo obsah souboru.
+function fetchText(src, opts = {}, redirects = 0) {
+  const token = opts.token || '';
   return new Promise((resolve, reject) => {
     if (!src) return resolve('');
     if (/^https?:\/\//i.test(src)) {
       if (redirects > 4) return reject(new Error('Příliš mnoho přesměrování.'));
       const mod = src.toLowerCase().startsWith('https') ? https : http;
-      const req = mod.get(src, { headers: { 'User-Agent': 'elko-intranet', 'Accept': 'text/plain' } }, (res) => {
+      const headers = { 'User-Agent': 'elko-intranet', 'Accept': 'text/plain' };
+      if (token) { headers['Authorization'] = 'Bearer ' + token; headers['Accept'] = 'application/vnd.github.raw'; }
+      const req = mod.get(src, { headers }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          return fetchText(new URL(res.headers.location, src).toString(), redirects + 1).then(resolve, reject);
+          return fetchText(new URL(res.headers.location, src).toString(), opts, redirects + 1).then(resolve, reject);
         }
         if (res.statusCode !== 200) { res.resume(); return reject(new Error('HTTP ' + res.statusCode)); }
         let d = ''; res.setEncoding('utf8'); res.on('data', (c) => (d += c)); res.on('end', () => resolve(d));
@@ -53,7 +60,7 @@ async function nacti(src, { force = false } = {}) {
   const now = Date.now();
   if (!force && _cache.src === src && _cache.rows.length && (now - _cache.at) < TTL_MS) return _cache.rows;
   try {
-    const rows = parse(await fetchText(src));
+    const rows = parse(await fetchText(src, { token: process.env.WIKI_TERMINY_TOKEN || '' }));
     _cache = { at: now, rows, src };
     return rows;
   } catch (e) {
