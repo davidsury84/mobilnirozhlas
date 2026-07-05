@@ -763,7 +763,10 @@ const server = http.createServer(async (req, res) => {
   const adaptacePublic = p.startsWith('/adaptace/uvod/') || p === '/api/adaptace/guest' || p === '/api/adaptace/guest-flag' || p === '/api/adaptace/import-user';
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
-  if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME }, { 'Cache-Control': 'no-store' });
+  if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
+
+  // Healthcheck (veřejný, vždy 200) – pro Railway healthcheck a jednoznačnou identifikaci běžícího nasazení.
+  if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
   if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic) {
