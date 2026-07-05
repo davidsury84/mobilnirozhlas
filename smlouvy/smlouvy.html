@@ -327,7 +327,18 @@ const NAVOD={
       <li><b>D−14 bez potvrzení</b> — eskalace na admina, termín zčervená.</li>
       <li><b>Po termínu</b> — červené na dashboardu + denní připomínka, dokud se nevyřeší.</li>
     </ul>
-    <p>Termín se uzavře kliknutím na <b>„Vyřešeno"</b> v e-mailu (zapíše se kdo a kdy). PDF smluv zůstávají na Disku — modul drží jen odkaz.</p>`},
+    <p>Termín se uzavře kliknutím na <b>„Vyřešeno"</b> v e-mailu (zapíše se kdo a kdy). PDF smluv zůstávají na Disku — modul drží jen odkaz.</p>
+    <p><b>Dva zdroje termínů:</b> ručně zadané smlouvy (níže) <b>a</b> lhůty z LLM-wiki (záložka <b>„📚 Termíny z wiki"</b>).</p>`},
+  wiki:{t:'📚 Termíny z wiki',h:`
+    <p><b>Co to je:</b> vedle ručně zadaných smluv umí hlídač číst lhůty z <b>LLM-wiki</b> — samostatného repozitáře, kde si AI z nahraných PDF (smlouvy, BOZP/PO) udržuje strukturovanou wiki a z ní generuje strojově čitelný registr lhůt <code>terminy.md</code>.</p>
+    <p><b>Jeden zdroj pravdy:</b> místo dvou databází sdílí wiki a hlídač jeden soubor. Na dashboardu je panel <b>„Termíny z wiki"</b> (červené do 30 dní, žluté do 90 dní) a hlídač jednou denně posílá <b>digest e-mail</b> lhůt do 30 dnů.</p>
+    <p><b>Jak přibude termín do wiki:</b></p>
+    <ol>
+      <li>Nové PDF hodíš do složky <code>inbox/</code> ve wiki repozitáři.</li>
+      <li>V Claude Code spustíš <code>/ingest</code> — AI dokument zkompiluje do wiki stránky s citacemi na zdroj a doplní řádek do <code>terminy.md</code>.</li>
+      <li>Hlídač registr přečte a lhůtu ukáže v panelu (hlídá ji stejně jako smluvní termíny).</li>
+    </ol>
+    <p class="muted">Nastavení (admin): proměnné <code>WIKI_TERMINY_URL</code> a <code>WIKI_TERMINY_TOKEN</code> na Railway (production). Bez nich se panel nezobrazuje.</p>`},
   spravce:{t:'👤 Správce (Simona)',h:`
     <p>Zakládá a edituje <b>všechny</b> smlouvy, dodatky a termíny.</p>
     <p><b>Co vyplnit u smlouvy:</b> číslo, kategorie a směr (příjem/výdaj), protistrana + IČO, předmět, platnost do (nebo podmínka, např. „710 000 km"), výpovědní lhůta, prolongace, hodnota + typ + měna, <b>garant (e-mail)</b>, stav, odkaz na Disk.</p>
