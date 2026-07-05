@@ -19,6 +19,7 @@ const importSvc = require('./import');
 const { todayPrague, daysUntil, formatCz } = require('./lib/datum');
 const L = require('./lib/logic');
 const wikiTerminy = require('./lib/wikiTerminy');
+const drive = require('./lib/drive');
 
 const HTML_FILE = path.join(__dirname, 'smlouvy.html');
 
@@ -78,7 +79,45 @@ function mount(host) {
       zavazky: L.rozpadZavazku(M.smlouva.zavazky()),
       eskalovane: rows.filter((x) => x.stav === 'eskalovano').length,
       bounced: M.notifikace.bouncenute().length,
+      // Nové soubory stažené z Disku, u kterých Simona ještě nedoplnila údaje.
+      kDoplneni: M.db.prepare(`SELECT id, cislo_smlouvy, drive_url, created_at FROM smlouva
+        WHERE created_by='drive-sync' AND je_placeholder=1 AND stav='aktivni' ORDER BY created_at DESC`).all(),
+      driveSync: !!(process.env.SMLOUVY_DRIVE_FOLDER_ID && drive.configured()),
     };
+  }
+
+  // ---- synchronizace složky na Disku: nové PDF → návrh smlouvy + e-mail správci ----
+  async function driveSync() {
+    const folderId = process.env.SMLOUVY_DRIVE_FOLDER_ID || '';
+    if (!folderId || !drive.configured()) return { skipped: true };
+    const files = await drive.listFolder(folderId);
+    const existuje = M.db.prepare(`SELECT COUNT(*) n FROM smlouva WHERE drive_url LIKE ?`);
+    const nove = [];
+    for (const f of files) {
+      if (existuje.get('%' + f.id + '%').n > 0) continue;   // už evidováno (dle ID souboru v odkazu)
+      const nazev = String(f.name || '').replace(/\.[a-z0-9]{2,5}$/i, '').trim().slice(0, 80) || f.id;
+      const s = M.smlouva.create({
+        cislo_smlouvy: nazev,
+        kategorie: 'dodavatelska',   // výchozí; Simona upraví v dialogu „Doplnit údaje"
+        protistrana_nazev: '(doplnit — nové z Disku)',
+        stav: 'aktivni', je_placeholder: 1,
+        stav_popis: 'Staženo z Disku ' + todayPrague() + ' — čeká na doplnění údajů.',
+        drive_url: f.webViewLink || ('https://drive.google.com/file/d/' + f.id + '/view'),
+      }, 'drive-sync');
+      nove.push({ id: s.id, name: f.name, url: f.webViewLink });
+    }
+    if (nove.length) {
+      const to = process.env.SMLOUVY_SPRAVCE_EMAIL || host.eskalaceEmail;
+      if (to) {
+        const base = host.publicBaseUrl || '';
+        const lines = nove.map((n) => `• ${n.name}\n  PDF: ${n.url || '(odkaz v intranetu)'}`).join('\n');
+        try {
+          await host.deliver({ to, subject: `[Smlouvy] ${nove.length === 1 ? 'Nová smlouva na Disku — doplňte údaje' : nove.length + ' nových smluv na Disku — doplňte údaje'}`,
+            text: `Dobrý den,\n\nve složce smluv na Disku ${nove.length === 1 ? 'přibyl nový soubor' : 'přibyly nové soubory'}:\n\n${lines}\n\nProsíme o doplnění klíčových údajů (protistrana, platnost, výpovědní lhůta, hodnota, garant) v intranetu:\n${base ? base + '/smlouvy' : 'modul Smlouvy v intranetu'} — panel „Nové z Disku — čeká na doplnění".\n\nJakmile údaje uložíte, termíny smlouvy se začnou automaticky hlídat.` });
+        } catch (e) { console.error('[smlouvy] e-mail o nových z Disku selhal:', e.message); }
+      }
+    }
+    return { nove: nove.length, celkem: files.length };
   }
 
   // ---- webhook (veřejné) ------------------------------------------
@@ -247,6 +286,12 @@ function mount(host) {
         if (p === '/api/smlouvy/termin') { json(res, 201, M.termin.create({ smlouva_id: Number(u.query.id), ...b })); return true; }
         if (p === '/api/smlouvy/termin-snooze') { M.termin.snooze(Number(u.query.id), b.do); json(res, 200, M.termin.getById(Number(u.query.id))); return true; }
 
+        // Ruční spuštění synchronizace složky na Disku (jinak běží v ticku co 6 h).
+        if (p === '/api/smlouvy/drive-sync') {
+          try { json(res, 200, await driveSync()); } catch (e) { json(res, 200, { chyba: e.message }); }
+          return true;
+        }
+
         if (p === '/api/smlouvy/import-nahled') { json(res, 200, importSvc.nahled(b.radky || [], b.garantMapa || {})); return true; }
         if (p === '/api/smlouvy/import-uloz') {
           const v = importSvc.uloz({ smlouva: M.smlouva, termin: M.termin }, b.plan, { by: who, zakladatOdvozeneTerminy: true });
@@ -295,6 +340,8 @@ function mount(host) {
     catch (e) { console.error('[smlouvy] tick chyba:', e.message); }
     try { await wikiUpozorneni(); }
     catch (e) { console.error('[smlouvy] wiki tick chyba:', e.message); }
+    try { await driveSync(); }
+    catch (e) { console.error('[smlouvy] drive sync chyba:', e.message); }
   }
 
   return { handle, tick, _models: M, _dashboardData: dashboardData };

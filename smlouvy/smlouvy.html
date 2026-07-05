@@ -87,6 +87,30 @@ async function dash(){
       el('div',{style:'font-size:15px;font-weight:700;color:var(--sed)'},sumStr(z.podmineno)))
   );
   app.append(cards);
+  // Nové soubory z Disku čekající na doplnění údajů správcem
+  if((d.kDoplneni&&d.kDoplneni.length) || (ADMIN&&d.driveSync)){
+    const dc = el('div',{class:'card',style:'margin-bottom:16px'});
+    const hd = el('div',{style:'display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap'},
+      el('h1',{style:'font-size:16px;margin:0'},'Nové z Disku — čeká na doplnění'),
+      ADMIN&&d.driveSync ? el('button',{class:'ghost-btn',on:{click:async ev=>{ ev.target.disabled=true; ev.target.textContent='Kontroluji…';
+        try{ const r=await api('/api/smlouvy/drive-sync',{method:'POST',body:'{}'}); alert(r.chyba?('Chyba: '+r.chyba):('Nalezeno nových: '+(r.nove??0)+' (souborů ve složce: '+(r.celkem??'?')+')')); dash(); }
+        catch(e){ alert('Chyba: '+e.message); ev.target.disabled=false; ev.target.textContent='↻ Zkontrolovat Disk teď'; } }}},'↻ Zkontrolovat Disk teď') : '');
+    dc.append(hd);
+    if(d.kDoplneni&&d.kDoplneni.length){
+      dc.append(el('p',{class:'muted',style:'margin:6px 0 8px'},'U těchto souborů je potřeba doplnit klíčové údaje (protistrana, platnost, výpovědní lhůta, hodnota, garant). Uložením formuláře se smlouva zařadí do hlídání.'));
+      const t = el('table',{},el('thead',{},el('tr',{},...['Soubor','Staženo','',''].map(h=>el('th',{},h)))));
+      const tb = el('tbody');
+      d.kDoplneni.forEach(x=>tb.append(el('tr',{},
+        el('td',{},el('strong',{},esc(x.cislo_smlouvy))),
+        el('td',{class:'muted'},(x.created_at||'').slice(0,10)),
+        el('td',{}, x.drive_url?el('a',{href:x.drive_url,target:'_blank'},'Otevřít PDF'):''),
+        el('td',{}, el('button',{class:'primary-btn',style:'padding:6px 12px',on:{click:()=>doplnUdaje(x.id).catch(e=>alert('Chyba: '+e.message))}},'Doplnit údaje')))));
+      t.append(tb); dc.append(t);
+    } else {
+      dc.append(el('p',{class:'muted',style:'margin:6px 0 0'},'Žádné soubory nečekají na doplnění.'));
+    }
+    app.append(dc);
+  }
   const wp = await wikiPanel(); if(wp) app.append(wp);
   if(d.eskalovane||d.bounced){
     app.append(el('div',{class:'card',style:'margin-bottom:16px'},
@@ -292,6 +316,25 @@ function novaSmlouva(){dialog('Nová smlouva',[
   {k:'hodnota',l:'Hodnota (číslo)',type:'number'},{k:'hodnota_typ',l:'Typ hodnoty',opts:['jednorazova','rocni','mesicni']},{k:'mena',l:'Měna',opts:['CZK','EUR','USD']},
   {k:'garant_email',l:'Garant (e-mail)'},{k:'drive_url',l:'Odkaz na Disk'}],
   async v=>{v.platnost_typ=v.platnost_do?'urcita':'neurcita';await api('/api/smlouvy/create',{method:'POST',body:JSON.stringify(v)});$('header button[data-tab=list]').click();});}
+// Doplnění klíčových údajů u návrhu staženého z Disku (Simona). Uložením se smlouva zařadí do hlídání.
+async function doplnUdaje(id){
+  const d=await api('/api/smlouvy/detail?id='+id);const s=d.smlouva;
+  dialog('Doplnit údaje — '+(s.cislo_smlouvy||''),[
+    {k:'cislo_smlouvy',l:'Číslo smlouvy',val:s.cislo_smlouvy},
+    {k:'kategorie',l:'Kategorie',opts:['odberatelska','dodavatelska','zavazek','plneni'],val:s.kategorie},
+    {k:'protistrana_nazev',l:'Protistrana',val:(s.protistrana_nazev&&s.protistrana_nazev.indexOf('(doplnit')<0)?s.protistrana_nazev:''},
+    {k:'protistrana_ico',l:'IČO',val:s.protistrana_ico},
+    {k:'predmet',l:'Předmět',ta:1,val:s.predmet},
+    {k:'platnost_do',l:'Platnost do (YYYY-MM-DD; prázdné = neurčitá)',val:s.platnost_do},
+    {k:'vypovedni_lhuta_mesice',l:'Výpovědní lhůta (měs.)',type:'number',val:s.vypovedni_lhuta_mesice},
+    {k:'prolongace',l:'Prolongace',opts:['zadna','auto','jednani'],val:s.prolongace},
+    {k:'hodnota',l:'Hodnota (číslo)',type:'number',val:s.hodnota},
+    {k:'hodnota_typ',l:'Typ hodnoty',opts:['jednorazova','rocni','mesicni'],val:s.hodnota_typ},
+    {k:'mena',l:'Měna',opts:['CZK','EUR','USD'],val:s.mena},
+    {k:'garant_email',l:'Garant (e-mail) — komu chodí upozornění',val:s.garant_email}],
+    async v=>{v.platnost_typ=v.platnost_do?'urcita':'neurcita';v.je_placeholder=0;v.stav_popis=null;
+      await api('/api/smlouvy/update?id='+id,{method:'POST',body:JSON.stringify(v)});detail(id);});
+}
 function upravSmlouvu(s){dialog('Upravit smlouvu',[
   {k:'stav',l:'Stav',opts:['aktivni','vypovezena','ukoncena','archivovana'],val:s.stav},
   {k:'garant_email',l:'Garant (e-mail)',val:s.garant_email},{k:'spravce_email',l:'Správce (e-mail)',val:s.spravce_email},
