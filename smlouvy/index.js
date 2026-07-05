@@ -91,21 +91,35 @@ function mount(host) {
     const folderId = process.env.SMLOUVY_DRIVE_FOLDER_ID || '';
     if (!folderId || !drive.configured()) return { skipped: true };
     const files = await drive.listFolder(folderId);
+    // První běh: stávající obsah složky je archiv — jen si zapamatujeme čas (baseline).
+    // Návrhy se zakládají až pro soubory nahrané POTOM (jinak by se založilo 166 návrhů naráz).
+    const BASE_KEY = 'drive_sync_baseline';
+    const baseline = M.meta.get(BASE_KEY);
+    if (!baseline) {
+      M.meta.set(BASE_KEY, new Date().toISOString());
+      console.log('[smlouvy] drive sync: první běh — baseline nastavena, ' + files.length + ' stávajících souborů bráno jako archiv');
+      return { baseline: true, celkem: files.length };
+    }
+    const novejsi = files.filter((f) => f.createdTime && new Date(f.createdTime) > new Date(baseline));
     const existuje = M.db.prepare(`SELECT COUNT(*) n FROM smlouva WHERE drive_url LIKE ?`);
     const nove = [];
-    for (const f of files) {
+    for (const f of novejsi) {
       if (existuje.get('%' + f.id + '%').n > 0) continue;   // už evidováno (dle ID souboru v odkazu)
       const nazev = String(f.name || '').replace(/\.[a-z0-9]{2,5}$/i, '').trim().slice(0, 80) || f.id;
+      // Kategorii předvyplní název podsložky na Disku (Dodavatelské/Odběratelské); Simona může upravit.
+      const slozka = String(f.folder || '').toLowerCase();
+      const kategorie = slozka.startsWith('odb') ? 'odberatelska' : 'dodavatelska';
       const s = M.smlouva.create({
         cislo_smlouvy: nazev,
-        kategorie: 'dodavatelska',   // výchozí; Simona upraví v dialogu „Doplnit údaje"
+        kategorie,
         protistrana_nazev: '(doplnit — nové z Disku)',
         stav: 'aktivni', je_placeholder: 1,
-        stav_popis: 'Staženo z Disku ' + todayPrague() + ' — čeká na doplnění údajů.',
+        stav_popis: 'Staženo z Disku ' + todayPrague() + (f.folder ? ' (složka ' + f.folder + ')' : '') + ' — čeká na doplnění údajů.',
         drive_url: f.webViewLink || ('https://drive.google.com/file/d/' + f.id + '/view'),
       }, 'drive-sync');
       nove.push({ id: s.id, name: f.name, url: f.webViewLink });
     }
+    console.log('[smlouvy] drive sync: ve složce ' + files.length + ' souborů, od baseline nových ' + novejsi.length + ', založeno ' + nove.length);
     if (nove.length) {
       const to = process.env.SMLOUVY_SPRAVCE_EMAIL || host.eskalaceEmail;
       if (to) {

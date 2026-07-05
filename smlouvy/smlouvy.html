@@ -93,7 +93,11 @@ async function dash(){
     const hd = el('div',{style:'display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap'},
       el('h1',{style:'font-size:16px;margin:0'},'Nové z Disku — čeká na doplnění'),
       ADMIN&&d.driveSync ? el('button',{class:'ghost-btn',on:{click:async ev=>{ ev.target.disabled=true; ev.target.textContent='Kontroluji…';
-        try{ const r=await api('/api/smlouvy/drive-sync',{method:'POST',body:'{}'}); alert(r.chyba?('Chyba: '+r.chyba):('Nalezeno nových: '+(r.nove??0)+' (souborů ve složce: '+(r.celkem??'?')+')')); dash(); }
+        try{ const r=await api('/api/smlouvy/drive-sync',{method:'POST',body:'{}'});
+          alert(r.chyba?('Chyba: '+r.chyba)
+            : r.baseline?('První spuštění: '+(r.celkem??'?')+' stávajících souborů vzato jako archiv. Hlídají se soubory nahrané od teď.')
+            : r.skipped?'Synchronizace není nakonfigurovaná (chybí klíč nebo složka).'
+            : ('Nalezeno nových: '+(r.nove??0)+' (souborů ve složce: '+(r.celkem??'?')+')')); dash(); }
         catch(e){ alert('Chyba: '+e.message); ev.target.disabled=false; ev.target.textContent='↻ Zkontrolovat Disk teď'; } }}},'↻ Zkontrolovat Disk teď') : '');
     dc.append(hd);
     if(d.kDoplneni&&d.kDoplneni.length){

@@ -45,18 +45,35 @@ async function accessToken() {
   return _tok.val;
 }
 
-// Vypíše soubory ve složce (bez podsložek, bez smazaných). Vrací {id,name,mimeType,webViewLink,createdTime}.
-async function listFolder(folderId) {
-  const tok = await accessToken();
-  const files = []; let pageToken = '';
+const FOLDER_MIME = 'application/vnd.google-apps.folder';
+
+async function listOne(tok, folderId) {
+  const out = []; let pageToken = '';
   do {
     const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
     const fields = encodeURIComponent('nextPageToken,files(id,name,mimeType,webViewLink,createdTime)');
     const path = `/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true` + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
     const j = await httpsJson('GET', 'www.googleapis.com', path, { headers: { Authorization: 'Bearer ' + tok } });
-    (j.files || []).forEach((f) => { if (f.mimeType !== 'application/vnd.google-apps.folder') files.push(f); });
+    out.push(...(j.files || []));
     pageToken = j.nextPageToken || '';
   } while (pageToken);
+  return out;
+}
+
+// Vypíše soubory ve složce VČETNĚ podsložek (do hloubky 3). U každého souboru přidá
+// `folder` = relativní cesta podsložek (např. "Dodavatelské/2026"; kořen = '').
+// Vrací {id,name,mimeType,webViewLink,createdTime,folder}.
+async function listFolder(folderId) {
+  const tok = await accessToken();
+  const files = [];
+  async function walk(id, cesta, depth) {
+    const items = await listOne(tok, id);
+    for (const f of items) {
+      if (f.mimeType === FOLDER_MIME) { if (depth < 3) await walk(f.id, cesta ? cesta + '/' + f.name : f.name, depth + 1); }
+      else files.push({ ...f, folder: cesta });
+    }
+  }
+  await walk(folderId, '', 0);
   return files;
 }
 
