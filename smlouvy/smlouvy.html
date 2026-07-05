@@ -123,7 +123,7 @@ async function wikiPanel(){
   const card = el('div',{class:'card',style:'margin-bottom:16px'});
   card.append(el('h1',{style:'font-size:16px'},'Termíny z wiki ',
     el('span',{class:'muted',style:'font-size:12px;font-weight:400'},'(BOZP/PO + smlouvy — sdílený registr)')));
-  if(d.chyba){ card.append(el('p',{class:'warn',style:'margin-top:-6px'},'Nepodařilo se načíst registr: '+esc(d.chyba))); return card; }
+  if(d.chyba){ card.append(el('p',{class:'muted',style:'margin-top:-6px'},'Registr zatím nelze načíst ('+esc(d.chyba)+'). Zkontroluj WIKI_TERMINY_URL a WIKI_TERMINY_TOKEN.')); return card; }
   const items = d.items||[];
   if(!items.length){ card.append(el('p',{class:'muted',style:'margin-top:-6px'},'Žádné aktivní lhůty v registru.')); return card; }
   const t = el('table',{},el('thead',{},el('tr',{},...['Termín','Za','Doména','Subjekt','Popis','Odpovědný'].map(h=>el('th',{},h)))));
