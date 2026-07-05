@@ -218,10 +218,18 @@ table.matrix tbody tr:hover td.who{background:#eef3ef}
 .org-node .obx-grip{height:13px;margin:-2px 0 3px;text-align:center;color:var(--line-strong);font-size:12px;letter-spacing:3px;cursor:grab;line-height:12px;user-select:none}
 .org-node.ved{border-color:var(--green-2);box-shadow:0 0 0 2px var(--green-soft),0 1px 3px rgba(15,21,18,.10)}
 .org-node.drop{border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
-.org-node .obx-label{width:100%;border:1px solid transparent;background:transparent;font-family:inherit;font-weight:600;font-size:13px;color:var(--ink);padding:4px 5px;border-radius:6px}
-.org-node .obx-label::placeholder{color:var(--ink-soft);font-weight:400}
-.org-node .obx-label:focus{border-color:var(--line-strong);background:#fff;outline:none;cursor:text}
-.org-node .obx-foot{display:flex;align-items:center;justify-content:flex-start;margin-top:7px;padding:0 3px}
+.org-node .obx-title{width:100%;border:1px solid transparent;background:transparent;font-family:inherit;font-weight:700;font-size:13.5px;color:var(--ink);padding:4px 5px;border-radius:6px}
+.org-node .obx-title::placeholder{color:var(--ink-soft);font-weight:500}
+.org-node .obx-title:focus{border-color:var(--line-strong);background:#fff;outline:none;cursor:text}
+.org-node .obx-positions{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.org-node .obx-positions:empty{margin-top:0}
+.org-node .obx-pos{display:flex;align-items:center;gap:3px}
+.org-node .obx-pos input{flex:1;min-width:0;border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 6px;font-size:12px;font-family:inherit;color:var(--ink)}
+.org-node .obx-pos input:focus{border-color:var(--green-2);outline:none}
+.org-node .obx-pos-del{border:none;background:none;color:#b3261e;cursor:pointer;font-size:14px;font-weight:700;line-height:1;padding:0 3px}
+.org-node .obx-addpos{width:100%;margin-top:6px;border:1px dashed var(--line-strong);background:#fff;color:var(--green-d);border-radius:7px;padding:4px 8px;font-size:12px;font-weight:600;cursor:pointer}
+.org-node .obx-addpos:hover{border-color:var(--green);background:var(--green-soft)}
+.org-node .obx-foot{display:flex;align-items:center;justify-content:flex-start;margin-top:8px;padding:0 3px}
 .org-node .obx-ved{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);cursor:pointer;user-select:none}
 .org-node .obx-ved input{width:15px;height:15px;accent-color:var(--green-2);cursor:pointer}
 .org-node .rm{position:absolute;top:-9px;left:-8px;width:19px;height:19px;line-height:17px;text-align:center;border-radius:999px;background:var(--paper);border:1px solid var(--line-strong);color:#b3261e;cursor:pointer;font-size:13px;font-weight:700;display:none;z-index:6}
@@ -1947,14 +1955,18 @@ function orgBoxes(){ if(!DB.settings) DB.settings={}; if(!Array.isArray(DB.setti
 function orgBoxById(id){ return orgBoxes().find(b=>b.id===id); }
 function orgAddBox(){
   const boxes=orgBoxes(); const n=boxes.length;
-  const b={ id:'b'+uid(), label:'', vedouci:false, x:40+(n%6)*38, y:28+(n%6)*30, parent:null };
+  const b={ id:'b'+uid(), title:'', vedouci:false, x:40+(n%6)*38, y:28+(n%6)*30, parent:null, positions:[] };
   boxes.push(b); save(); renderOrgCanvas();
-  const inp=document.querySelector('.org-node[data-id="'+b.id+'"] .obx-label'); if(inp){ inp.focus(); }
+  const inp=document.querySelector('.org-node[data-id="'+b.id+'"] .obx-title'); if(inp){ inp.focus(); }
 }
 function orgClearBoxes(){ if(!orgBoxes().length) return; if(!confirm('Smazat všechny boxy z plátna?')) return; DB.settings.orgBoxes=[]; save(); renderOrgCanvas(); }
 function orgBoxDelete(id){ const boxes=orgBoxes(); const i=boxes.findIndex(b=>b.id===id); if(i<0) return; boxes.splice(i,1); boxes.forEach(b=>{ if(b.parent===id) b.parent=null; }); save(); renderOrgCanvas(); }
-function orgBoxRename(id,val){ const b=orgBoxById(id); if(b){ b.label=val; save(); } }   // bez překreslení (aby nezmizel fokus)
+function orgBoxTitle(id,val){ const b=orgBoxById(id); if(b){ b.title=val; save(); } }   // bez překreslení (aby nezmizel fokus)
 function orgBoxSetVed(id,on){ const b=orgBoxById(id); if(b){ b.vedouci=!!on; save(); renderOrgCanvas(); } }
+// Pozice/oblasti pod boxem (např. marketing).
+function orgAddPos(id){ const b=orgBoxById(id); if(!b) return; if(!Array.isArray(b.positions)) b.positions=[]; const p={ id:'p'+uid(), label:'' }; b.positions.push(p); save(); renderOrgCanvas(); const inp=document.querySelector('.org-node[data-id="'+id+'"] .obx-pos[data-pid="'+p.id+'"] input'); if(inp) inp.focus(); }
+function orgPosRename(boxId,posId,val){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const p=b.positions.find(x=>x.id===posId); if(p){ p.label=val; save(); } }
+function orgPosDelete(boxId,posId){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const i=b.positions.findIndex(x=>x.id===posId); if(i>=0){ b.positions.splice(i,1); save(); renderOrgCanvas(); } }
 function orgBoxDescendants(id){ const set=new Set([id]); const st=[id]; const boxes=orgBoxes(); while(st.length){ const c=st.pop(); boxes.forEach(b=>{ if(b.parent===c && !set.has(b.id)){ set.add(b.id); st.push(b.id); } }); } return set; }
 function orgLink(childId,parentId){ if(childId===parentId){ renderOrgCanvas(); return; } const child=orgBoxById(childId); if(!child) return; if(orgBoxDescendants(childId).has(parentId)){ toast('Nelze — vznikla by smyčka.'); renderOrgCanvas(); return; } child.parent=parentId; save(); renderOrgCanvas(); }
 function orgElbow(x1,y1,x2,y2){ const my=(y1+y2)/2; return '<path d="M'+x1+' '+y1+' V'+my.toFixed(1)+' H'+x2+' V'+y2+'" fill="none" stroke="#aebaad" stroke-width="1.6"/>'; }
@@ -1969,15 +1981,23 @@ function orgRedrawLines(cv,extra){
 function renderOrgCanvas(){
   const cv=document.getElementById("orgCanvas"); if(!cv) return;
   const boxes=orgBoxes();
-  if(!boxes.length){ cv.innerHTML='<div class="org-empty">Zatím žádný box. Klikni na <strong>„+ Přidat box"</strong> a napiš, o jakou sekci jde.</div>'; return; }
+  if(!boxes.length){ cv.innerHTML='<div class="org-empty">Zatím žádný box. Klikni na <strong>„+ Přidat box"</strong>, pojmenuj ho a přidej pozice/oblasti.</div>'; return; }
   let maxX=0,maxY=0; boxes.forEach(b=>{ maxX=Math.max(maxX,b.x||0); maxY=Math.max(maxY,b.y||0); });
-  const W=Math.max(maxX+198+60, cv.clientWidth), H=Math.max(maxY+130+40, 420);
+  const W=Math.max(maxX+210+60, cv.clientWidth), H=Math.max(maxY+220+40, 420);
   let nodes='';
   boxes.forEach(b=>{
+    const title=(b.title!=null?b.title:(b.label||''));
+    const positions=Array.isArray(b.positions)?b.positions:[];
+    let posHtml='';
+    positions.forEach(p=>{
+      posHtml+='<div class="obx-pos" data-pid="'+p.id+'"><input placeholder="Pozice / oblast (např. marketing)…" value="'+esc(p.label||'')+'" oninput="orgPosRename(\''+b.id+'\',\''+p.id+'\',this.value)" onpointerdown="event.stopPropagation()"><button class="obx-pos-del" title="Smazat pozici" onpointerdown="event.stopPropagation()" onclick="orgPosDelete(\''+b.id+'\',\''+p.id+'\')">×</button></div>';
+    });
     nodes+='<div class="org-node'+(b.vedouci?' ved':'')+'" data-id="'+b.id+'" style="left:'+(b.x||0)+'px;top:'+(b.y||0)+'px">'+
       '<span class="rm" title="Smazat box" onpointerdown="event.stopPropagation()" onclick="orgBoxDelete(\''+b.id+'\')">×</span>'+
       '<div class="obx-grip" title="Přesunout box">• • •</div>'+
-      '<input class="obx-label" placeholder="Napiš, o jakou sekci jde…" value="'+esc(b.label||'')+'" oninput="orgBoxRename(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+      '<input class="obx-title" placeholder="Název boxu…" value="'+esc(title)+'" oninput="orgBoxTitle(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+      '<div class="obx-positions">'+posHtml+'</div>'+
+      '<button class="obx-addpos" onpointerdown="event.stopPropagation()" onclick="orgAddPos(\''+b.id+'\')">+ pozice</button>'+
       '<div class="obx-foot"><label class="obx-ved" onpointerdown="event.stopPropagation()"><input type="checkbox" '+(b.vedouci?'checked':'')+' onchange="orgBoxSetVed(\''+b.id+'\',this.checked)"> vedoucí</label></div>'+
       '<span class="obx-handle" title="Táhni na jiný box = spojnice (podřízená sekce)"></span>'+
       '</div>';
@@ -1996,7 +2016,7 @@ function orgBindBoxes(cv){
     node.addEventListener('pointerdown', ev=>{
       if(ev.button!==0) return;
       const t=ev.target;
-      if(t.closest('.obx-handle')||t.closest('.rm')||t.closest('.obx-ved')||t.tagName==='INPUT') return;
+      if(t.closest('.obx-handle')||t.closest('.rm')||t.closest('.obx-ved')||t.closest('.obx-addpos')||t.closest('.obx-pos')||t.tagName==='INPUT'||t.tagName==='BUTTON') return;
       const nr=node.getBoundingClientRect(); const grabX=ev.clientX-nr.left, grabY=ev.clientY-nr.top;
       let moved=false;
       try{ node.setPointerCapture(ev.pointerId); }catch(_){}
