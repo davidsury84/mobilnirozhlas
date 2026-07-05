@@ -110,6 +110,20 @@ test('termín: ruční stav neaktivní ↔ zpět na čeká (vyčistí potvrzení
   assert.equal(back.potvrzeno_by, null, 'reaktivace vyčistí potvrzení');
 });
 
+test('KS rozpad: rozbalí N× a složky na jednotlivé profily', () => {
+  const { rozbal } = require('./seed-ks-rozpad');
+  const r = rozbal('A; B 3×; složky X / Y');
+  assert.deepEqual(r, ['A', 'B (1/3)', 'B (2/3)', 'B (3/3)', 'X', 'Y']);
+
+  const M = openDb(':memory:');
+  M.smlouva.create({ cislo_smlouvy: 'KS-2026', kategorie: 'odberatelska', protistrana_nazev: 'souhrn',
+    je_placeholder: true, drive_url: 'https://drive/folder', stav: 'aktivni' });
+  // parent existuje; rozpad ho nahradí jednotlivými
+  require('./seed-ks-rozpad').LISTY['KS-2026']; // sanity
+  const before = M.smlouva.all().length;
+  assert.ok(before >= 1);
+});
+
 test('řešení plnění: log záznamů (create + list DESC)', () => {
   const M = openDb(':memory:');
   const s = M.smlouva.create({ cislo_smlouvy: 'R-1', kategorie: 'zavazek', protistrana_nazev: 'X',

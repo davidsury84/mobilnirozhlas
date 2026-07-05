@@ -34,6 +34,9 @@ function mount(host) {
   // Jednorázová reklasifikace podmíněných závazků (expozice/majetek).
   try { require('./seed-hodnota-typ').seedHodnotaTyp(M); }
   catch (e) { console.error('[smlouvy] seed hodnota_typ selhal:', e.message); }
+  // Rozpad souhrnných KS bloků na jednotlivé profily smluv.
+  try { require('./seed-ks-rozpad').seedKsRozpad(M); }
+  catch (e) { console.error('[smlouvy] seed KS rozpad selhal:', e.message); }
 
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);

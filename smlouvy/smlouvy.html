@@ -156,7 +156,7 @@ async function list(){
       el('td',{},money(s.hodnota,s.mena)||s.hodnota_popis||'—'),
       el('td',{html:s.garant_email?esc(s.garant_email):'<span class="warn">nedořešen</span>'}),
       el('td',{},el('span',{class:'pill '+(s.stav==='aktivni'?'zel':'sed')},s.stav_popis||s.stav)))));
-    t.append(tb);wrap.innerHTML='';wrap.append(t,el('p',{class:'muted'},'📦 = souhrnný balík KS (fáze 2b).'));
+    t.append(tb);wrap.innerHTML='';wrap.append(t);
   }
   go.onclick=nacti;q.addEventListener('keydown',e=>{if(e.key==='Enter')nacti();});await nacti();
 }
