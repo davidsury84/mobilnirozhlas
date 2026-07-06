@@ -39,11 +39,11 @@
   .leg span{display:flex;align-items:center;gap:5px}
   .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
   .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
-  .sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:6px 26px;margin-bottom:14px}
-  .sl{display:flex;align-items:center;gap:10px}
-  .sl label{font-size:13px;color:var(--sed);width:135px;flex-shrink:0}
-  .sl output{font-size:13px;font-weight:700;min-width:80px;text-align:right}
-  input[type=range]{flex:1}
+  .sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:10px 34px;margin-bottom:14px}
+  .sl{display:flex;align-items:center;gap:10px;min-width:0;overflow:hidden}
+  .sl label{font-size:13px;color:var(--sed);width:130px;flex-shrink:0}
+  .sl output{font-size:13px;font-weight:700;flex:0 0 auto;min-width:86px;text-align:right;white-space:nowrap;display:inline-block}
+  input[type=range]{flex:1 1 60px;min-width:60px;margin:0}
   select,input{padding:7px 9px;border:1px solid #cfd6dd;border-radius:6px;font:inherit}
   footer{max-width:1150px;margin:0 auto;padding:6px 20px 26px;color:var(--sed);font-size:12px;display:flex;gap:14px;align-items:center}
 </style>
@@ -343,8 +343,8 @@ function tabCitlivost(){
       dMyto=-(myto-(N.myto||0))*m.KM, dMzdy=-(mzdy-(N.mzdyRidicu||0))*m.KM, dFix=-(voz-m.NVOZ)*m.FIXV*mes;
     const parts=[dSaz,dNaj,dNafta,dMyto,dMzdy,dFix];
     const combo=delta-parts.reduce((a,b)=>a+b,0);
-    const all=[...parts,combo];
-    CH.chImp.data.datasets[0].data=all.map(v=>v/1e6);
+    const all=[...parts,combo].map(v=>Math.abs(v)<1e4?0:v);   // zbytky plovoucí čárky → 0
+    CH.chImp.data.datasets[0].data=all.map(v=>Math.round(v/1e4)/100);
     CH.chImp.data.datasets[0].backgroundColor=all.map(v=>v>=0?G:R);
     CH.chImp.update('none');
     let a='';
