@@ -53,6 +53,7 @@ const SMI_APP_FILE = path.join(ROOT, 'SMI_aplikace.html');   // hotová SMI apli
 const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu Kalkulace-lisy (napojí se později)
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
 const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
+const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace „Hlídač sortimentu" (repo ranges-watchdog)
 const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativně lokální soubor
 // Dovolená: úložiště žádostí + (volitelně) zápis do sdíleného Google kalendáře přes service account
 const VAC_F = path.join(DATA_DIR, 'vacation.json');
@@ -776,6 +777,28 @@ const server = http.createServer(async (req, res) => {
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
 
+  // ---- Registr termínů z wiki: hostovaný na NAŠÍ infrastruktuře (žádný GitHub) ----
+  // Nahrání (po ingestu wiki) i čtení jinou službou chrání sdílené tajemství (Bearer = SSO_SHARED_SECRET).
+  if (p === '/api/wiki-registr') {
+    const auth = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    let okAuth = false;
+    try { okAuth = auth.length > 0 && crypto.timingSafeEqual(Buffer.from(auth), Buffer.from(SSO_SHARED_SECRET)); } catch (_) { okAuth = false; }
+    if (!okAuth) return send(res, 401, { error: 'Neplatné tajemství.' });
+    const regFile = path.join(DATA_DIR, 'wiki-terminy.md');
+    if (req.method === 'POST') {
+      const body = await readBody(req);
+      if (!body || body.length < 10 || body.indexOf('|') < 0) return send(res, 400, { error: 'Tělo nevypadá jako registr (markdown tabulka).' });
+      fs.writeFileSync(regFile, body, 'utf8');
+      const radku = (body.match(/^\|\s*\d{4}-\d{2}-\d{2}/gm) || []).length;
+      return send(res, 200, { ok: true, radku, ulozeno: new Date().toISOString() });
+    }
+    if (req.method === 'GET') {
+      if (!fs.existsSync(regFile)) return send(res, 404, { error: 'Registr zatím nebyl nahrán.' });
+      return send(res, 200, fs.readFileSync(regFile, 'utf8'), { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-store' });
+    }
+    return send(res, 405, { error: 'Jen GET/POST.' });
+  }
+
   // Healthcheck (veřejný, vždy 200) – pro Railway healthcheck a jednoznačnou identifikaci běžícího nasazení.
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
@@ -958,7 +981,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/bozp-terminy' && req.method === 'GET') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
-      const src = process.env.WIKI_TERMINY_URL || '';
+      const lokalniRegistr = path.join(DATA_DIR, 'wiki-terminy.md');
+      const src = process.env.WIKI_TERMINY_URL || (fs.existsSync(lokalniRegistr) ? lokalniRegistr : '');
       if (!src) return send(res, 200, { configured: false, items: [] });
       try {
         const wt = require('./smlouvy/lib/wikiTerminy');
@@ -1169,6 +1193,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { 'Location': target }); return res.end();
       }
       if (fs.existsSync(SVOZ_ESA_FILE)) return send(res, 200, fs.readFileSync(SVOZ_ESA_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
+      // (placeholder níže)
       const ph = '<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
         + '<title>Kalkulačka svoz ESA</title><style>body{margin:0;font-family:system-ui,sans-serif;background:#eef1ec;color:#0f1512;display:grid;place-items:center;min-height:100vh}'
         + '.c{max-width:520px;text-align:center;background:#fff;border:1px solid #e3e7e0;border-radius:16px;padding:34px 30px;box-shadow:0 10px 30px rgba(15,21,18,.07)}'
@@ -1176,6 +1201,19 @@ const server = http.createServer(async (req, res) => {
         + '<body><div class="c"><h1>🚛 Kalkulačka svoz ESA</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
         + '<p style="margin-top:12px;font-size:13px">Pro napojení nastav proměnnou <code>SVOZ_ESA_URL</code> na adresu nasazené aplikace, nebo vlož soubor <code>kalkulacka-svoz-esa.html</code> do projektu.</p></div></body></html>';
       return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- Hlídač sortimentu (modul): za přihlášením, přístup řídí správce, Google identita přes SSO token ----
+    if (p === '/sortiment-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('sortiment') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k Hlídači sortimentu nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (RANGES_WATCHDOG_URL) {
+        let target = RANGES_WATCHDOG_URL;
+        if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += (RANGES_WATCHDOG_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+        res.writeHead(302, { 'Location': target }); return res.end();
+      }
+      return send(res, 200, '<!doctype html><meta charset="utf-8"><div style="font-family:system-ui;max-width:520px;margin:60px auto;text-align:center"><h1>🛰️ Hlídač sortimentu</h1><p>Pro napojení nastav proměnnou <code>RANGES_WATCHDOG_URL</code>.</p></div>', { 'Content-Type': 'text/html; charset=utf-8' });
     }
 
     // ---- měsíční vyhodnocení (admin) ----

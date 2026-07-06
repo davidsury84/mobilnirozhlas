@@ -26,6 +26,12 @@ const HTML_FILE = path.join(__dirname, 'smlouvy.html');
 function mount(host) {
   const dbFile = path.join(host.dataDir || __dirname, 'smlouvy.db');
   const M = openDb(dbFile);
+  // Zdroj registru lhůt z wiki: env, jinak lokální soubor nahraný přes /api/wiki-registr (bez GitHubu).
+  function wikiSrc() {
+    if (process.env.WIKI_TERMINY_URL) return process.env.WIKI_TERMINY_URL;
+    const f = path.join(host.dataDir || __dirname, 'wiki-terminy.md');
+    return fs.existsSync(f) ? f : '';
+  }
 
   // Jednorázový import registru (1× přes meta guard, idempotentní).
   try { require('./seed-registr').seedOnce(M); }
@@ -224,7 +230,7 @@ function mount(host) {
 
       // Lhůty z LLM-wiki (terminy.md) — jeden zdroj pravdy sdílený s wiki repozitářem.
       if (p === '/api/smlouvy/wiki-terminy' && req.method === 'GET') {
-        const src = process.env.WIKI_TERMINY_URL || '';
+        const src = wikiSrc();
         if (!src) { json(res, 200, { configured: false, items: [] }); return true; }
         try {
           const rows = await wikiTerminy.nacti(src, { force: u.query.force === '1' });
@@ -327,7 +333,7 @@ function mount(host) {
 
   // ---- lhůty z wiki: digest e-mail (max 1× denně na změněnou sadu) ----
   async function wikiUpozorneni() {
-    const src = process.env.WIKI_TERMINY_URL || ''; if (!src) return;
+    const src = wikiSrc(); if (!src) return;
     const to = process.env.WIKI_TERMINY_EMAIL || host.eskalaceEmail; if (!to) return;
     let rows; try { rows = await wikiTerminy.nacti(src, { force: true }); } catch { return; }
     const dnes = todayPrague();
