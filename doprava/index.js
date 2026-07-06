@@ -19,12 +19,16 @@ const VYKONY_ID = () => process.env.DOPRAVA_SHEET_VYKONY_ID || '1Na7nDmIdSkbpviG
 const NAKLADY_ID = () => process.env.DOPRAVA_SHEET_NAKLADY_ID || '1sVQBx0Weo2Ds9Gfgqwd-LyTVvQ_cBQBtUh7QzDSmnOE';
 
 /* ---------- parsování čísel z formátovaných buněk ---------- */
-// "197 800 Kč" → 197800; "13,45 Kč" → 13.45; "29,3" → 29.3; prázdné/nečíselné → null
+// Zvládá český i americký zápis: "197 800 Kč" → 197800; "13,45 Kč" → 13.45;
+// "48,000.00 Kč" → 48000; "10,000" → 10000; "29,3" i "29.3" → 29.3; jiné → null
 function parseNum(v) {
   if (v == null) return null;
-  let s = String(v).replace(/ /g, ' ').replace(/Kč/gi, '').replace(/%/g, '').trim();
+  let s = String(v).replace(/\u00a0/g, ' ').replace(/K\u010d/gi, '').trim();
   if (!s || /^#/.test(s)) return null;              // #DIV/0! apod.
-  s = s.replace(/ /g, '').replace(',', '.');
+  s = s.replace(/ /g, '');
+  if (s.includes(',') && s.includes('.')) s = s.replace(/,/g, '');            // 129,430.76 -> 129430.76
+  else if (/,\d{3}(,\d{3})*$/.test(s)) s = s.replace(/,/g, '');               // 10,000 -> 10000 (oddelovac tisicu)
+  else s = s.replace(',', '.');                                               // 29,3 -> 29.3 (desetinna carka)
   if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
   return Number(s);
 }
