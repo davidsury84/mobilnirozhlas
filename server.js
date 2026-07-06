@@ -335,7 +335,7 @@ function myDirectives(email) {
     .filter(d => assignedTo(d, emp))
     .map(d => {
       const ack = d.acks && d.acks[email];
-      return { id: d.id, title: d.title, ack: !!ack, ackTs: ack ? ack.ts : null, published: fs.existsSync(path.join(PUB_DIR, String(d.id).replace(/[^a-z0-9]/gi, '') + '.html')) };
+      return { id: d.id, title: d.title, kategorie: d.kategorie || null, ack: !!ack, ackTs: ack ? ack.ts : null, published: fs.existsSync(path.join(PUB_DIR, String(d.id).replace(/[^a-z0-9]/gi, '') + '.html')) };
     });
 }
 

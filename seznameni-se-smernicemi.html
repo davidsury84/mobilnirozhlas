@@ -418,6 +418,18 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
       </div>
       <button class="btn" onclick="openDirectiveModal()">+ Nová směrnice</button>
     </div>
+    <div class="card pad" style="margin-bottom:18px">
+      <div class="spread">
+        <strong>Kategorie směrnic</strong>
+        <div class="chip-row" style="gap:8px">
+          <input type="text" id="newDirKat" placeholder="Nová kategorie…" style="width:220px" onkeydown="if(event.key==='Enter')addDirKat()">
+          <button class="btn sm" onclick="addDirKat()">Přidat</button>
+        </div>
+      </div>
+      <p class="muted" style="margin:6px 0 0;font-size:13px">Skupiny pro členění směrnic (např. podle střediska). Kategorii přiřadíš směrnici při úpravě.</p>
+      <div class="divider"></div>
+      <div id="dirKatChips" class="chip-row"></div>
+    </div>
     <div id="directiveList"></div>
   </section>
 
@@ -1480,15 +1492,24 @@ function showDirectives(){
   const dirs = (MUJ.data&&MUJ.data.directives)||[], email = MUJ.email;
   let h = '<div class="dash-hero"><h2>Směrnice</h2><p>Interní směrnice k seznámení a potvrzení.</p></div>';
   if(!dirs.length){ h += '<div class="card pad"><p class="muted" style="margin:0">Aktuálně se vás netýká žádná směrnice.</p></div>'; body.innerHTML=h; window.scrollTo(0,0); return; }
-  dirs.forEach(d=>{
+  const radek=(d)=>{
     const date = d.ackTs ? new Date(d.ackTs).toLocaleDateString("cs-CZ") : "";
     const status = d.ack ? '<span class="pill green">✓ Přečteno '+esc(date)+'</span>' : '<span class="pill amber">○ Nepřečteno</span>';
     const link = location.origin+"/s/"+encodeURIComponent(d.id)+"#kdo="+encodeURIComponent(email);
     const action = d.published ? '<a class="btn '+(d.ack?'ghost ':'')+'sm" href="'+link+'">'+(d.ack?'Otevřít':'Přečíst a potvrdit')+'</a>'
                                : '<span class="muted" style="font-size:13px">Připravuje se…</span>';
-    h += '<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.file)+'</div><div><div class="li-t">'+esc(d.title||"Směrnice")+'</div>'+
+    return '<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.file)+'</div><div><div class="li-t">'+esc(d.title||"Směrnice")+'</div>'+
       '<div style="margin-top:4px">'+status+'</div></div></div>'+action+'</div>';
-  });
+  };
+  // členění podle kategorií (bez kategorie = „Obecné", jen když existuje víc skupin)
+  const kats=[...new Set(dirs.map(d=>d.kategorie).filter(Boolean))];
+  if(!kats.length){ dirs.forEach(d=>h+=radek(d)); }
+  else {
+    kats.forEach(k=>{ const rows=dirs.filter(d=>d.kategorie===k);
+      h+='<div class="dash-sec">'+esc(k)+' ('+rows.length+')</div>'; rows.forEach(d=>h+=radek(d)); });
+    const bez=dirs.filter(d=>!d.kategorie);
+    if(bez.length){ h+='<div class="dash-sec">Obecné ('+bez.length+')</div>'; bez.forEach(d=>h+=radek(d)); }
+  }
   body.innerHTML=h; window.scrollTo(0,0);
 }
 
@@ -1682,14 +1703,41 @@ function toast(msg){
 /* ============================================================
    SMĚRNICE — render
    ============================================================ */
+/* ---------- Kategorie směrnic (číselník; členění seznamu) ---------- */
+function dirKategorie(){
+  if(!DB.settings) DB.settings={};
+  if(!Array.isArray(DB.settings.dirKategorie)) DB.settings.dirKategorie=["Směrnice Zlín"];  // výchozí kategorie
+  return DB.settings.dirKategorie;
+}
+function renderDirKat(){
+  const box=document.getElementById("dirKatChips"); if(!box) return;
+  const list=dirKategorie();
+  box.innerHTML = list.length ? list.map((k,i)=>'<span class="pill gray" style="gap:8px">'+esc(k)+
+    ' <a href="#" onclick="removeDirKat('+i+');return false" title="Smazat kategorii" style="text-decoration:none;color:#b3261e">✕</a></span>').join(" ")
+    : '<span class="muted" style="font-size:13px">Zatím žádná kategorie.</span>';
+}
+function addDirKat(){
+  const inp=document.getElementById("newDirKat"); const name=(inp&&inp.value||"").trim(); if(!name) return;
+  const list=dirKategorie();
+  if(list.some(k=>k.toLowerCase()===name.toLowerCase())){ toast("Tato kategorie už existuje"); return; }
+  list.push(name); inp.value=""; save(); renderDirKat(); renderDirectives();
+}
+function removeDirKat(i){
+  const list=dirKategorie(); const k=list[i]; if(k==null) return;
+  const used=DB.directives.filter(d=>d.kategorie===k).length;
+  if(!confirm('Smazat kategorii „'+k+'"?'+(used?(' Je přiřazena u '+used+' směrnic — zůstanou bez kategorie.'):''))) return;
+  list.splice(i,1); DB.directives.forEach(d=>{ if(d.kategorie===k) d.kategorie=null; });
+  save(); renderDirKat(); renderDirectives();
+}
 function renderDirectives(){
   const wrap=document.getElementById("directiveList");
+  renderDirKat();
   if(!DB.directives.length){
     wrap.innerHTML=`<div class="card empty"><div class="big">📄</div><div>Zatím žádná směrnice. Klikni na <strong>+ Nová směrnice</strong> a nahraj Word dokument.</div></div>`;
     return;
   }
   wrap.innerHTML="";
-  DB.directives.slice().sort((a,b)=>b.createdAt-a.createdAt).forEach(d=>{
+  const card=(d)=>{
     const s=ackStats(d);
     const cats = (d.assignAll? '<span class="tag">Všichni zaměstnanci</span>'
       : (d.assignCats.map(c=>`<span class="tag">${esc(catName(c))}</span>`).join("")||'<span class="tag">— nepřiřazeno —</span>'))
@@ -1711,7 +1759,21 @@ function renderDirectives(){
         <button class="btn ghost sm" onclick="openDirectiveModal('${d.id}')">Upravit</button>
         <button class="btn danger sm" onclick="deleteDirective('${d.id}')">Smazat</button>
       </div>`;
-    wrap.appendChild(el);
+    return el;
+  };
+  // členění: kategorie dle číselníku (v jeho pořadí) → případné neznámé → bez kategorie
+  const sorted=DB.directives.slice().sort((a,b)=>b.createdAt-a.createdAt);
+  const znama=dirKategorie();
+  const cizi=[...new Set(sorted.map(d=>d.kategorie).filter(k=>k&&znama.indexOf(k)<0))];
+  const skupiny=[...znama, ...cizi, null];
+  skupiny.forEach(k=>{
+    const rows=sorted.filter(d=>(d.kategorie||null)===(k||null));
+    if(!rows.length) return;
+    const head=document.createElement("div");
+    head.className="spread"; head.style.cssText="margin:18px 0 8px";
+    head.innerHTML='<h3 style="margin:0;font-size:15px">'+(k?esc(k):'Nezařazené')+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3>';
+    wrap.appendChild(head);
+    rows.forEach(d=>wrap.appendChild(card(d)));
   });
 }
 
@@ -1741,6 +1803,12 @@ function openDirectiveModal(id){
   document.getElementById("modalBody").innerHTML=`
     <label class="field"><span>Název směrnice</span>
       <input type="text" id="dTitle" value="${d?esc(d.title):''}" placeholder="např. Směrnice BOZP 2026"></label>
+
+    <label class="field"><span>Kategorie (skupina směrnic)</span>
+      <select id="dKat">
+        <option value="">— bez kategorie —</option>
+        ${dirKategorie().map(k=>`<option value="${esc(k)}" ${d&&d.kategorie===k?'selected':''}>${esc(k)}</option>`).join("")}
+      </select></label>
 
     <label class="field"><span>Dokument</span>
       <input type="file" id="docFile" accept=".docx,.html,.htm,.txt" onchange="parseDoc(this)">
@@ -1840,11 +1908,12 @@ function saveDirective(id){
   const all=document.getElementById("dAll").checked;
   const cats=[...document.querySelectorAll(".dcat:checked")].map(c=>c.value);
   const tags=(document.getElementById("dTags").value||"").split(",").map(s=>s.trim()).filter(Boolean);
+  const kat=(document.getElementById("dKat")&&document.getElementById("dKat").value)||null;
   if(id){
     const d=DB.directives.find(x=>x.id===id);
-    d.title=title; d.html=pendingHtml; d.assignAll=all; d.assignCats=cats; d.assignTags=tags;
+    d.title=title; d.html=pendingHtml; d.assignAll=all; d.assignCats=cats; d.assignTags=tags; d.kategorie=kat;
   } else {
-    DB.directives.push({id:uid(),title,html:pendingHtml,createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,acks:{}});
+    DB.directives.push({id:uid(),title,html:pendingHtml,createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,kategorie:kat,acks:{}});
   }
   save(); closeModal(); renderDirectives();
   toast(id?"Směrnice upravena":"Směrnice uložena");
