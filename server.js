@@ -78,6 +78,7 @@ const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
 const ACTLOG_F  = path.join(DATA_DIR, 'activity.json');   // jednoduchý log aktivity (přihlášení, pozvánky, průzkumy)
 const INVITES_F = path.join(DATA_DIR, 'invites.json');    // stav pozvánek dle e-mailu: {invitedAt, acceptedAt, lastLoginAt}
+const UKOLY_F   = path.join(DATA_DIR, 'smernice-ukoly.json'); // úkoly vyplývající ze směrnic (záložka „Úkoly ze směrnic")
 for (const d of [DATA_DIR, PUB_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 
 /* ---------- malé util ---------- */
@@ -477,6 +478,146 @@ function employeeModules(email) {
   const s = readJson(STATE_F, { employees: [] });
   const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
   return (e && Array.isArray(e.modules)) ? e.modules : [];
+}
+
+/* ============================================================
+   Úkoly ze směrnic (záložka „Úkoly ze směrnic")
+   ------------------------------------------------------------
+   Závazky vytažené ze směrnic a vnitřních pokynů na Disku
+   (Pracovní řád, E-IS-*, P-*). Seed = výchozí seznam; stav plnění
+   a poznámky mění správce v intranetu → data/smernice-ukoly.json.
+   kat: jednorazove (zavést/napravit) | rocni | prubezne
+   stav: '' (neověřeno) | plni | neplni | splneno
+   ============================================================ */
+const UKOLY_SEED = [
+  // — jednorázové: zavést či napravit —
+  { id: 'eticky-dotaznik', kat: 'jednorazove', termin: '2025-12-31',
+    ukol: 'Zavést etický dotazník pro klíčové dodavatele',
+    jak: 'Sestavit dotazník (zákaz dětské a nucené práce, pracovní standardy), rozeslat klíčovým dodavatelům a vyhodnotit odpovědi. Termín byl „nejpozději do konce roku 2025".',
+    kdo: 'Vedení + oddělení nákupu', zdroj: 'P-04 Prevence dětské a nucené práce' },
+  { id: 'cile-bozp', kat: 'jednorazove',
+    ukol: 'Aktualizovat kvantitativní cíle BOZP (stanovené jen pro rok 2024)',
+    jak: 'Revize směrnice: stanovit cíle pro aktuální rok (počet úrazů, % proškolených, prověrky) a nechat schválit vedením.',
+    kdo: 'Vedoucí BOZP + vedení', zdroj: 'E-IS-15 Politika BOZP' },
+  { id: 'gdpr-revize', kat: 'jednorazove',
+    ukol: 'Provést roční revizi směrnice o ochraně osobních údajů (od 2021 bez aktualizace)',
+    jak: 'Směrnice ukládá roční kontrolu a aktualizaci pověřeným zaměstnancem — provést revizi a zapsat datum aktualizace do hlavičky.',
+    kdo: 'Mzdové účetní', zdroj: 'E-IS-10 GDPR, bod 1.3' },
+  { id: 'hlaseni-energii', kat: 'jednorazove',
+    ukol: 'Zavést systém hlášení spotřeby energií (cíl z roku 2018)',
+    jak: 'Ověřit, zda systém vznikl; pokud ne, nastavit pravidelné hlášení spotřeby po střediscích.',
+    kdo: 'Vedení / správci provozů', zdroj: 'E-IS-09 Energy Policy' },
+  { id: 'hesla-interval', kat: 'jednorazove',
+    ukol: 'Stanovit interval povinné změny hesel',
+    jak: 'Směrnice vyžaduje „pravidelnou" změnu hesel, ale neurčuje interval — doplnit do směrnice a technicky vynutit.',
+    kdo: 'IT — Lucie Sedláčková', zdroj: 'E-IS-17 Informační bezpečnost' },
+  { id: 'zalohy-test', kat: 'jednorazove',
+    ukol: 'Definovat frekvenci testů obnovitelnosti záloh',
+    jak: 'Určit interval (např. čtvrtletně), provést zkušební obnovu ze zálohy a vést záznam o výsledku.',
+    kdo: 'IT — Lucie Sedláčková / Jaroslav Ježek', zdroj: 'E-IS-17 Informační bezpečnost' },
+  { id: 'prohlidky-evidence', kat: 'jednorazove',
+    ukol: 'Zavést evidenci termínů periodických lékařských prohlídek',
+    jak: 'Pracovní řád prohlídky vyžaduje (vstupní, periodická, mimořádná, výstupní), ale termíny se nikde nesledují — vést evidenci po zaměstnancích a hlídat expiraci.',
+    kdo: 'Personální oddělení', zdroj: 'Pracovní řád, čl. BOZP' },
+  { id: 'certifikace-terminy', kat: 'jednorazove',
+    ukol: 'Dohledat termíny recertifikace EcoVadis a ISO 14001',
+    jak: 'Zjistit platnost certifikátů, na které se směrnice odvolává, a zavést hlídání termínů recertifikačních auditů.',
+    kdo: 'Lucie Sedláčková / vedení', zdroj: 'E-IS-14 Prohlášení o udržitelnosti' },
+  { id: 'zaznam-zmen', kat: 'jednorazove',
+    ukol: 'Obnovit Záznam změn ve směrnicích (poslední zápis 12. 5. 2017)',
+    jak: 'Doplnit změny od roku 2017 a při každé nové či aktualizované směrnici provést zápis.',
+    kdo: 'Lucie Sedláčková', zdroj: 'Záznam změn ve směrnicích a formulářích' },
+  { id: 'rad-vyplata', kat: 'jednorazove',
+    ukol: 'Doplnit den výplaty mzdy do Pracovního řádu (číslo dne v textu chybí)',
+    jak: 'V kapitole Mzda doplnit konkrétní výplatní den („vyplácena vždy X. dne kalendářního měsíce"); opravit i překlep u pozdních příchodů („0 30 minut").',
+    kdo: 'Personální oddělení', zdroj: 'Pracovní řád, kap. Mzda' },
+  { id: 'stravovani-novela', kat: 'jednorazove',
+    ukol: 'Revidovat směrnici o stravování podle novely zákona o daních z příjmů',
+    jak: 'Směrnice cituje znění před rokem 2024 (55 % ceny jídla / 70 % limitu stravného) — sladit s aktuální úpravou stravovacího paušálu.',
+    kdo: 'Mzdová účetní', zdroj: 'E-IS-01 Závodní stravování' },
+  { id: 'cislovani-eis15', kat: 'jednorazove',
+    ukol: 'Opravit duplicitní číslo směrnice E-IS-15 (Komunikace vs. BOZP)',
+    jak: 'Soubor „E-IS-16 Komunikace s vedením" má uvnitř hlavičku E-IS-15 Komunikace a dialog — sjednotit číslování a opravit hlavičku; opravit také e-mail s mezerou v E-IS-13.',
+    kdo: 'Lucie Sedláčková', zdroj: 'E-IS-16 / E-IS-15 / E-IS-13' },
+  // — pravidelné: ročně —
+  { id: 'proverka-bozp', kat: 'rocni', frekvence: '1× ročně',
+    ukol: 'Prověrka BOZP na všech výrobních pracovištích',
+    jak: 'Provést prověrku na každém pracovišti (Zlín, Bruntál, Supíkovice, Chomutov), zjištění zapsat a předat vedení.',
+    kdo: 'Vedoucí BOZP + vedoucí středisek', zdroj: 'E-IS-15 Politika BOZP' },
+  { id: 'skoleni-bozp', kat: 'rocni', frekvence: '1× ročně',
+    ukol: 'Školení BOZP a první pomoci — 100 % zaměstnanců',
+    jak: 'Proškolit všechny zaměstnance a vést prezenční listiny; nováčky školit při nástupu.',
+    kdo: 'Vedoucí BOZP (+ externí bezpečák)', zdroj: 'E-IS-15 + Pracovní řád' },
+  { id: 'skoleni-kyber', kat: 'rocni', frekvence: '1× ročně + při nástupu',
+    ukol: 'Školení kyberbezpečnosti pro všechny uživatele systémů',
+    jak: 'Každoroční připomenutí a aktualizace znalostí (interní komunikace nebo online školení); noví zaměstnanci při nástupu.',
+    kdo: 'Lucie Sedláčková / Jaroslav Ježek', zdroj: 'E-IS-17 + P-05' },
+  { id: 'skoronehody-vyhodnoceni', kat: 'rocni', frekvence: 'min. 1× ročně',
+    ukol: 'Vyhodnocení knihy skoronehod',
+    jak: 'Vyhodnotit evidenci skoronehod po pobočkách a zahrnout výsledky do přezkoumání vedením (ISO 45001).',
+    kdo: 'Oddělení BOZP → vedení', zdroj: 'E-IS-18 Skoronehody' },
+  { id: 'cile-bozp-report', kat: 'rocni', frekvence: '1× ročně',
+    ukol: 'Vyhodnocení cílů BOZP a report vedení',
+    jak: 'Vyhodnotit plnění kvantitativních cílů (úrazy, školení, prověrky), reportovat vedení a promítnout do cílů dalšího období.',
+    kdo: 'Vedoucí BOZP', zdroj: 'E-IS-15 Politika BOZP' },
+  { id: 'odpocet-meridel', kat: 'rocni', frekvence: 'ročně k 1. 1.',
+    ukol: 'Odpočet všech měřidel energií v Bruntále',
+    jak: 'Odpočet hlavních i podružných měřidel nejbližší pracovní den k 1. 1.; zápis papírově i do excel tabulky u vedoucího výrobního úseku.',
+    kdo: 'Vedoucí výrobního úseku Bruntál', zdroj: 'E-IS-08 Rozpočet energií' },
+  { id: 'revize-pomeru', kat: 'rocni', frekvence: 'ročně do konce února',
+    ukol: 'Revize rozúčtovacího poměru energií mezi střediska',
+    jak: 'Podle skutečných odpočtů k 1. 1. upravit procentuální poměr v tabulce Bruntal-energie.xls.',
+    kdo: 'Účtárna (Jarmila Šimová)', zdroj: 'E-IS-08 Rozpočet energií' },
+  { id: 'vyuctovani-najemnici', kat: 'rocni', frekvence: 'ročně do března',
+    ukol: 'Vyúčtování energií externím odběratelům (nájemníkům)',
+    jak: 'Podle odpočtu k 1. 1. předložit nájemníkům vyúčtování za předchozí rok; při velkém nárůstu spotřeby zvýšit zálohy.',
+    kdo: 'Účtárna', zdroj: 'E-IS-08 Rozpočet energií' },
+  { id: 'inventarizace-pohledavek', kat: 'rocni', frekvence: 'ročně k 31. 12.',
+    ukol: 'Inventarizace pohledávek',
+    jak: 'K 31. 12. zaslat odběratelům seznam neuhrazených faktur.',
+    kdo: 'Mirka (účtárna)', zdroj: 'E-IS-03 Pohledávky po splatnosti' },
+  // — pravidelné: měsíčně a průběžně —
+  { id: 'kontrola-splatnosti', kat: 'prubezne', frekvence: '1× měsíčně',
+    ukol: 'Kontrola faktur po splatnosti nad 30 dní',
+    jak: 'Rozeslat obchodníkům seznam faktur po splatnosti (ČR i zahraničí), řešit upomínky a zapisovat do tabulky; nad 45 dní předžalobní upomínka, bez úhrady do 10 dnů předat právničce.',
+    kdo: 'Jana / Lucka (účtárna)', zdroj: 'E-IS-03 Pohledávky po splatnosti' },
+  { id: 'helios-dluznici', kat: 'prubezne', frekvence: 'každých 14 dní',
+    ukol: 'Aktualizace skupiny dlužníků v Heliosu',
+    jak: 'Aktualizovat skupinu organizací s fakturami nad 30 dní po splatnosti (upozornění při vystavování nové faktury).',
+    kdo: 'Lucka (účtárna)', zdroj: 'E-IS-03 Pohledávky po splatnosti' },
+  { id: 'insolvence-kontrola', kat: 'prubezne', frekvence: '1× měsíčně',
+    ukol: 'Kontrola odběratelů se saldem po splatnosti v insolvenčním rejstříku',
+    jak: 'Prověřit insolvenční rejstřík; na velké pohledávky a firmy v insolvenci nastavit hlídacího psa (CESR).',
+    kdo: 'Lucka (účtárna)', zdroj: 'E-IS-03 Pohledávky po splatnosti' },
+  { id: 'stravovani-podklady', kat: 'prubezne', frekvence: 'měsíčně po uzávěrce',
+    ukol: 'Podklady o stravování pro mzdovou účetní',
+    jak: 'Po ukončení kalendářního měsíce předložit evidenci strávníků mzdové účetní; úhrada srážkou ze mzdy.',
+    kdo: 'Pověřené osoby středisek', zdroj: 'E-IS-01 Závodní stravování' },
+  { id: 'dodavatele-proverky', kat: 'prubezne', frekvence: 'průběžně (nový dodavatel)',
+    ukol: 'Prověřování nových klíčových dodavatelů',
+    jak: 'U nových dodavatelů (zejména mimo EU) prověřit sídlo, právní formu a etické chování; vyžádat potvrzení o dodržování pracovních standardů.',
+    kdo: 'Oddělení nákupu', zdroj: 'P-04 Prevence dětské a nucené práce' },
+  { id: 'gdpr-pouceni', kat: 'prubezne', frekvence: 'průběžně (při změně)',
+    ukol: 'Poučení oprávněných osob o GDPR při změně pracovního zařazení',
+    jak: 'Při změně zařazení s dopadem na práci s osobními údaji osobu znovu poučit a sepsat písemný záznam.',
+    kdo: 'Mzdové účetní', zdroj: 'E-IS-10 GDPR, bod 2.10' }
+];
+// Uložený stav + doplnění nových úkolů ze seedu (podle id) — úpravy stavu/poznámek zůstávají.
+function readUkoly() {
+  const saved = readJson(UKOLY_F, null);
+  const items = (saved && Array.isArray(saved.items)) ? saved.items.slice() : [];
+  for (const s of UKOLY_SEED) if (!items.find(x => x.id === s.id)) items.push(Object.assign({ stav: '', pozn: '' }, s));
+  return { items };
+}
+function updateUkol(id, patch) {
+  const cur = readUkoly();
+  const it = cur.items.find(x => x.id === id);
+  if (!it) return null;
+  if (patch.stav !== undefined && ['', 'plni', 'neplni', 'splneno'].indexOf(patch.stav) >= 0) it.stav = patch.stav;
+  if (patch.pozn !== undefined) it.pozn = String(patch.pozn).slice(0, 500);
+  if (patch.kdo !== undefined && String(patch.kdo).trim()) it.kdo = String(patch.kdo).slice(0, 200);
+  writeJson(UKOLY_F, cur);
+  return it;
 }
 
 /* ============================================================
@@ -886,8 +1027,25 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { results });
     }
     // veřejné cesty
-    if (p.indexOf('/s/') === 0) { const id = p.slice(3).replace(/[^a-z0-9]/gi, ''); const f = path.join(PUB_DIR, id + '.html'); if (fs.existsSync(f)) return send(res, 200, fs.readFileSync(f, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' }); return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' }); }
-    if (p === '/api/ack' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (!b.dirId || !b.email) return send(res, 400, { error: 'Chybí data.' }); recordAck(b); return send(res, 200, { ok: true }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p.indexOf('/s/') === 0) {
+      const id = p.slice(3).replace(/[^a-z0-9]/gi, ''); const f = path.join(PUB_DIR, id + '.html');
+      if (!fs.existsSync(f)) return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      // Přihlášený zaměstnanec potvrzuje bez e-mailového odkazu: vložený skript doplní identitu
+      // ze session (/api/me) do globálů stránky (who/emp) a překreslí potvrzení. Kdo v systému
+      // není přihlášen, vidí původní chování (ruční e-mail / odkaz z e-mailu).
+      const boot = '<script>(function(){try{if(typeof who==="undefined"||who)return;fetch("/api/me",{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){if(!(j&&j.employee))return;try{who=j.employee.email;emp=null;for(var i=0;i<DATA.aud.length;i++){if(DATA.aud[i].email.toLowerCase()===who.toLowerCase()){emp=DATA.aud[i];}}if(!emp){emp={name:j.employee.name||who,email:who};}if(document.readyState==="complete"){render();}else{window.addEventListener("load",render);}}catch(e){}}).catch(function(){});}catch(e){}})();</script>';
+      const html = fs.readFileSync(f, 'utf8').replace('</body>', boot + '</body>');
+      return send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+    if (p === '/api/ack' && req.method === 'POST') {
+      const b = JSON.parse(await readBody(req));
+      // Přihlášený zaměstnanec může potvrdit i bez e-mailu v těle — identita ze session.
+      const e = empSession(req);
+      if (!b.email && e) { b.email = e.email; b.name = b.name || e.name; }
+      if (!b.dirId || !b.email) return send(res, 400, { error: 'Chybí data.' });
+      recordAck(b);
+      return send(res, 200, { ok: true }, { 'Access-Control-Allow-Origin': '*' });
+    }
     // ---- test houževnatosti (Grit) ----
     if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/grit-results' && req.method === 'GET') return send(res, 200, readJson(GRIT_F, []));
@@ -993,6 +1151,20 @@ const server = http.createServer(async (req, res) => {
           .sort((a, b) => a.dny - b.dny);
         return send(res, 200, { configured: true, dnes, items });
       } catch (err) { return send(res, 200, { configured: true, chyba: err.message, items: [] }); }
+    }
+
+    // Úkoly ze směrnic — závazky vytažené ze směrnic na Disku (záložka „Úkoly ze směrnic").
+    if (p === '/api/smernice-ukoly' && req.method === 'GET') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      return send(res, 200, Object.assign({ dnes: new Date().toISOString().slice(0, 10), canEdit: isAdmin(req) }, readUkoly()));
+    }
+    if (p === '/api/smernice-ukoly' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Stav úkolů může měnit jen správce.' });
+      const b = JSON.parse(await readBody(req));
+      const it = updateUkol(b.id, b);
+      if (!it) return send(res, 404, { error: 'Úkol nenalezen.' });
+      return send(res, 200, { ok: true, item: it });
     }
 
     if (p === '/api/my' && req.method === 'GET') {
