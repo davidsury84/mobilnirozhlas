@@ -807,6 +807,14 @@ function save(){
   }, 400);
 }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+// Okamžité uložení (bez debounce) — pro kritické změny (nová verze), kde nesmí dojít k závodu s přenačtením.
+function saveNow(){
+  if(!booted || DEMO) return Promise.resolve();
+  clearTimeout(saveTimer);
+  return fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({categories:DB.categories, employees:DB.employees, directives:DB.directives, profiles:DB.profiles, candidates:DB.candidates, settings:DB.settings})})
+    .then(r=>{ if(r.status===401) showLogin(); });
+}
 
 async function boot(){
   try{
@@ -1826,7 +1834,10 @@ async function saveNovaVerze(id){
   d.verze=(d.verze||1)+1;
   d.html=pendingHtml;
   d.acks={};
-  save(); closeModal(); renderDirectives();
+  closeModal(); renderDirectives();
+  await saveNow();
+  // smazat i serverová potvrzení (acks.json) — jinak by se stará potvrzení přimíchala zpět
+  try{ await fetch("/api/ack-reset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dirId:d.id})}); }catch(e){}
   try{ await ensurePublished(id); toast("Verze v"+d.verze+" vydána a publikována. Nezapomeň rozeslat."); }
   catch(e){ toast("Verze v"+d.verze+" uložena; publikace selhala: "+e.message); }
 }
@@ -1983,14 +1994,18 @@ function saveDirective(id){
   const cats=[...document.querySelectorAll(".dcat:checked")].map(c=>c.value);
   const tags=(document.getElementById("dTags").value||"").split(",").map(s=>s.trim()).filter(Boolean);
   const kat=(document.getElementById("dKat")&&document.getElementById("dKat").value)||null;
+  let did=id;
   if(id){
     const d=DB.directives.find(x=>x.id===id);
     d.title=title; d.html=pendingHtml; d.assignAll=all; d.assignCats=cats; d.assignTags=tags; d.kategorie=kat;
   } else {
-    DB.directives.push({id:uid(),title,html:pendingHtml,createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,kategorie:kat,acks:{}});
+    did=uid();
+    DB.directives.push({id:did,title,html:pendingHtml,createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,kategorie:kat,verze:1,acks:{}});
   }
   save(); closeModal(); renderDirectives();
   toast(id?"Směrnice upravena":"Směrnice uložena");
+  // publikovat hned — aby se zaměstnanci mohli seznámit i bez „Rozeslat" (stránka /s/…)
+  ensurePublished(did).catch(()=>{});
 }
 
 /* ============================================================

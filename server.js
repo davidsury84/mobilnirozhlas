@@ -1064,7 +1064,7 @@ const server = http.createServer(async (req, res) => {
       // Přihlášený zaměstnanec potvrzuje bez e-mailového odkazu: vložený skript doplní identitu
       // ze session (/api/me) do globálů stránky (who/emp) a překreslí potvrzení. Kdo v systému
       // není přihlášen, vidí původní chování (ruční e-mail / odkaz z e-mailu).
-      const boot = '<script>(function(){try{if(typeof who==="undefined"||who)return;fetch("/api/me",{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){if(!(j&&j.employee))return;try{who=j.employee.email;emp=null;for(var i=0;i<DATA.aud.length;i++){if(DATA.aud[i].email.toLowerCase()===who.toLowerCase()){emp=DATA.aud[i];}}if(!emp){emp={name:j.employee.name||who,email:who};}if(document.readyState==="complete"){render();}else{window.addEventListener("load",render);}}catch(e){}}).catch(function(){});}catch(e){}})();</script>';
+      const boot = '<script>(function(){try{if(typeof DATA==="object"&&DATA)DATA.api="";}catch(e){}try{if(typeof who==="undefined"||who)return;fetch("/api/me",{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){if(!(j&&j.employee))return;try{who=j.employee.email;emp=null;for(var i=0;i<DATA.aud.length;i++){if(DATA.aud[i].email.toLowerCase()===who.toLowerCase()){emp=DATA.aud[i];}}if(!emp){emp={name:j.employee.name||who,email:who};}if(document.readyState==="complete"){render();}else{window.addEventListener("load",render);}}catch(e){}}).catch(function(){});}catch(e){}})();</script>';
       const html = fs.readFileSync(f, 'utf8').replace('</body>', boot + '</body>');
       return send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8' });
     }
@@ -1076,6 +1076,16 @@ const server = http.createServer(async (req, res) => {
       if (!b.dirId || !b.email) return send(res, 400, { error: 'Chybí data.' });
       recordAck(b);
       return send(res, 200, { ok: true }, { 'Access-Control-Allow-Origin': '*' });
+    }
+    // Vynulování potvrzení směrnice (nová verze) — smaže i řádky v acks.json, jinak by je getState() přimíchal zpět.
+    if (p === '/api/ack-reset' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req));
+      if (!b.dirId) return send(res, 400, { error: 'Chybí dirId.' });
+      const acks = readJson(ACKS_F, []);
+      const zbyva = acks.filter(x => x.dirId !== b.dirId);
+      writeJson(ACKS_F, zbyva);
+      return send(res, 200, { ok: true, smazano: acks.length - zbyva.length });
     }
     // ---- test houževnatosti (Grit) ----
     if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
