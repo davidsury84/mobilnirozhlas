@@ -139,12 +139,17 @@ function mount(host) {
   async function refresh() {
     if (_refreshing) return _refreshing;   // souběžné požadavky sdílí jedno stažení
     _refreshing = (async () => {
-      const [vykRows, nakRows] = await Promise.all([
+      // Tabulky se čtou nezávisle: výkony jsou povinné, náklady volitelné (bez nich
+      // dashboard běží v omezeném režimu a stránka na chybějící kalkulaci upozorní).
+      const [vyk, nak] = await Promise.allSettled([
         sheets.readValues(VYKONY_ID(), 'A1:Z300'),
         sheets.readValues(NAKLADY_ID(), 'A1:Z120'),
       ]);
-      const data = { ts: Date.now(), vozidla: parseVykony(vykRows), naklady: parseNaklady(nakRows) };
+      if (vyk.status === 'rejected') throw new Error('tabulka výkonů: ' + vyk.reason.message);
+      const data = { ts: Date.now(), vozidla: parseVykony(vyk.value), naklady: null, nakladyChyba: null };
       if (!data.vozidla.length) throw new Error('V tabulce výkonů se nepodařilo najít žádné vozidlo — zkontrolujte strukturu listu.');
+      if (nak.status === 'fulfilled') data.naklady = parseNaklady(nak.value);
+      else { data.nakladyChyba = nak.reason.message; console.error('[doprava] nákladová tabulka se nenačetla:', nak.reason.message); }
       cache = data;
       try { fs.writeFileSync(CACHE_F, JSON.stringify(data)); } catch (_) {}
       return data;
@@ -168,8 +173,13 @@ function mount(host) {
     }
 
     if (p === '/api/doprava/data' && req.method === 'GET') {
+      // Odpověď z cache + případná upozornění (nedostupná nákladová tabulka, stará data…)
+      const zCache = (varovani) => {
+        const upozorneni = [varovani, cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null].filter(Boolean).join(' ');
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, varovani: upozorneni || undefined });
+      };
       if (!sheets.configured()) {
-        if (cache) json(res, 200, { konfigurace: true, saEmail: '', aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, varovani: 'Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).' });
+        if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
         else json(res, 200, { konfigurace: false, saEmail: '', hint: 'Nastavte GOOGLE_SA_CLIENT_EMAIL a GOOGLE_SA_PRIVATE_KEY a nasdílejte obě tabulky service accountu (Prohlížející).' });
         return true;
       }
@@ -177,10 +187,10 @@ function mount(host) {
       const stale = !cache || (Date.now() - cache.ts) > 6 * 3600 * 1000;
       try {
         if (force || stale) await refresh();
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady });
+        zCache('');
       } catch (e) {
-        if (cache) json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, varovani: 'Obnovení z Google Sheets selhalo (' + e.message + ') — zobrazuji poslední stažená data.' });
-        else json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), chyba: 'Nepodařilo se načíst data z Google Sheets: ' + e.message + ' Nasdíleli jste obě tabulky účtu ' + sheets.saEmail() + '?' });
+        if (cache) zCache('Obnovení z Google Sheets selhalo (' + e.message + ') — zobrazuji poslední stažená data.');
+        else json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), chyba: 'Nepodařilo se načíst data z Google Sheets: ' + e.message + ' Nasdíleli jste tabulky účtu ' + sheets.saEmail() + '?' });
       }
       return true;
     }
