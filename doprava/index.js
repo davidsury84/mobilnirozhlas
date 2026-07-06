@@ -153,19 +153,27 @@ function mount(host) {
   async function refresh() {
     if (_refreshing) return _refreshing;   // souběžné požadavky sdílí jedno stažení
     _refreshing = (async () => {
-      // Tabulky se čtou nezávisle: výkony jsou povinné, náklady volitelné (bez nich
-      // dashboard běží v omezeném režimu a stránka na chybějící kalkulaci upozorní).
+      // Tabulky se čtou a ukládají nezávisle: co se povede, použije se hned;
+      // co selže, zůstane z poslední úspěšné verze (cache) a nahlásí se ve varování.
       const [vyk, nak] = await Promise.allSettled([
         sheets.readValues(VYKONY_ID(), 'A1:Z300'),
         sheets.readValues(NAKLADY_ID(), 'A1:Z120'),
       ]);
-      if (vyk.status === 'rejected') throw new Error('tabulka výkonů: ' + vyk.reason.message);
-      const data = { ts: Date.now(), vozidla: parseVykony(vyk.value), naklady: null, nakladyChyba: null };
-      if (!data.vozidla.length) throw new Error('V tabulce výkonů se nepodařilo najít žádné vozidlo — zkontrolujte strukturu listu.');
+      const data = { ts: Date.now(), vozidla: null, naklady: null, vykonyChyba: null, nakladyChyba: null };
+      if (vyk.status === 'fulfilled') {
+        data.vozidla = parseVykony(vyk.value);
+        if (!data.vozidla.length) { data.vozidla = null; data.vykonyChyba = 'v listu se nepodařilo najít žádné vozidlo — zkontrolujte strukturu'; }
+      } else data.vykonyChyba = vyk.reason.message;
       if (nak.status === 'fulfilled') data.naklady = parseNaklady(nak.value);
-      else { data.nakladyChyba = nak.reason.message; console.error('[doprava] nákladová tabulka se nenačetla:', nak.reason.message); }
+      else data.nakladyChyba = nak.reason.message;
+      if (data.vykonyChyba) { data.vozidla = (cache && cache.vozidla) || null; console.error('[doprava] tabulka výkonů se nenačetla:', data.vykonyChyba); }
+      if (data.nakladyChyba) { data.naklady = (cache && cache.naklady) || null; console.error('[doprava] nákladová tabulka se nenačetla:', data.nakladyChyba); }
+      if (!data.vozidla) throw new Error('tabulka výkonů: ' + data.vykonyChyba);
       cache = data;
       try { fs.writeFileSync(CACHE_F, JSON.stringify(data)); } catch (_) {}
+      // Výkony určují čerstvost dat — když selžou, hlásíme chybu (a retry za 10 minut),
+      // čerstvě stažené náklady už ale zůstávají uložené a zobrazí se.
+      if (data.vykonyChyba) throw new Error('tabulka výkonů: ' + data.vykonyChyba);
       return data;
     })();
     try { return await _refreshing; } finally { _refreshing = null; }
