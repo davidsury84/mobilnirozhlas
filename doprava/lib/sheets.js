@@ -45,7 +45,8 @@ async function accessToken() {
   return _tok.val;
 }
 
-// Vrátí hodnoty prvního listu tabulky jako pole řádků (formátované řetězce, jak je vidí uživatel).
+// Vrátí hodnoty listu jako pole řádků (formátované řetězce, jak je vidí uživatel).
+// Range bez názvu listu čte první list; s názvem `'List'!A1:Z100` konkrétní list.
 async function readValues(spreadsheetId, range) {
   const tok = await accessToken();
   const r = encodeURIComponent(range || 'A1:Z300');
@@ -53,4 +54,11 @@ async function readValues(spreadsheetId, range) {
   return j.values || [];
 }
 
-module.exports = { configured, saEmail, readValues };
+// Názvy listů tabulky (v pořadí, bez skrytých).
+async function listSheets(spreadsheetId) {
+  const tok = await accessToken();
+  const j = await httpsJson('GET', 'sheets.googleapis.com', `/v4/spreadsheets/${spreadsheetId}?fields=${encodeURIComponent('sheets.properties(title,hidden)')}`, { headers: { Authorization: 'Bearer ' + tok } });
+  return (j.sheets || []).map((s) => s.properties || {}).filter((p) => !p.hidden).map((p) => p.title || '');
+}
+
+module.exports = { configured, saEmail, readValues, listSheets };

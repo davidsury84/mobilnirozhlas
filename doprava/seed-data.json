@@ -693,5 +693,223 @@
   "celkemVar": 26.11,
   "nakladNaKm": 39.56
  },
- "zdroj": "snapshot 6.7.2026 (jednorázový otisk obou tabulek)"
+ "zdroj": "snapshot 6.7.2026 (jednorázový otisk tabulek: výkony + kalkulace + evidence vozů)",
+ "evidence": [
+  {
+   "spz": "2TL2080",
+   "znacka": "Scania R420 · Tautliner",
+   "ridic": "Tunkl",
+   "pozn": "",
+   "pausal": 6959,
+   "smlouvaDo": {
+    "m": 11,
+    "y": 2027
+   },
+   "prodano": false
+  },
+  {
+   "spz": "1TN2072",
+   "znacka": "Scania R450 · Tautliner",
+   "ridic": "Buček",
+   "pozn": "",
+   "pausal": 2544,
+   "smlouvaDo": {
+    "m": 4,
+    "y": 2026
+   },
+   "prodano": false
+  },
+  {
+   "spz": "2TL2087",
+   "znacka": "Scania R420 · Tautliner",
+   "ridic": "Lešniowski",
+   "pozn": "",
+   "pausal": 6959,
+   "smlouvaDo": {
+    "m": 11,
+    "y": 2027
+   },
+   "prodano": false
+  },
+  {
+   "spz": "2TL2089",
+   "znacka": "Scania R420 · Tautliner",
+   "ridic": "Hampl",
+   "pozn": "",
+   "pausal": 6959,
+   "smlouvaDo": {
+    "m": 11,
+    "y": 2027
+   },
+   "prodano": false
+  },
+  {
+   "spz": "1TN2451",
+   "znacka": "Scania R450 · Tautliner",
+   "ridic": "Pavlíček",
+   "pozn": "",
+   "pausal": 2711,
+   "smlouvaDo": {
+    "m": 11,
+    "y": 2024
+   },
+   "prodano": false
+  },
+  {
+   "spz": "2TV7862",
+   "znacka": "Scania R460 · Tautliner",
+   "ridic": "Ptačník",
+   "pozn": "",
+   "pausal": null,
+   "smlouvaDo": null,
+   "prodano": false
+  },
+  {
+   "spz": "1TN2906",
+   "znacka": "Scania R450 · Tautliner",
+   "ridic": "Hamp R",
+   "pozn": "",
+   "pausal": 4470,
+   "smlouvaDo": {
+    "m": 6,
+    "y": 2025
+   },
+   "prodano": false
+  },
+  {
+   "spz": "1TN2784",
+   "znacka": "DAF XF 480 · Tautliner",
+   "ridic": "Krywda",
+   "pozn": "",
+   "pausal": null,
+   "smlouvaDo": null,
+   "prodano": false
+  },
+  {
+   "spz": "1TN2447",
+   "znacka": "DAF XF 480 · Tautliner",
+   "ridic": "",
+   "pozn": "depozit",
+   "pausal": null,
+   "smlouvaDo": null,
+   "prodano": false
+  },
+  {
+   "spz": "1TN2905",
+   "znacka": "Scania R450 · 3-stranka",
+   "ridic": "Mlčúch",
+   "pozn": "",
+   "pausal": 4635,
+   "smlouvaDo": {
+    "m": 6,
+    "y": 2025
+   },
+   "prodano": false
+  },
+  {
+   "spz": "2TL2129",
+   "znacka": "Scania R450 · 3-stranka",
+   "ridic": "Hoffmann",
+   "pozn": "",
+   "pausal": 6959,
+   "smlouvaDo": {
+    "m": 12,
+    "y": 2027
+   },
+   "prodano": false
+  },
+  {
+   "spz": "1TN2246",
+   "znacka": "Scania R450 · Tandem 120cbm",
+   "ridic": "Uroševič",
+   "pozn": "",
+   "pausal": 11944,
+   "smlouvaDo": {
+    "m": 6,
+    "y": 2024
+   },
+   "prodano": false
+  },
+  {
+   "spz": "1TN2247",
+   "znacka": "Scania R450 · Tandem 120cbm",
+   "ridic": "Kutálek",
+   "pozn": "",
+   "pausal": 11944,
+   "smlouvaDo": {
+    "m": 6,
+    "y": 2024
+   },
+   "prodano": false
+  },
+  {
+   "spz": "1TN2248",
+   "znacka": "Scania R450 · Tandem 120cbm",
+   "ridic": "Gilg",
+   "pozn": "",
+   "pausal": 11944,
+   "smlouvaDo": {
+    "m": 6,
+    "y": 2024
+   },
+   "prodano": false
+  },
+  {
+   "spz": "1TP5325",
+   "znacka": "Scania R450 · Tandem 120cbm",
+   "ridic": "Pojsl",
+   "pozn": "",
+   "pausal": 11944,
+   "smlouvaDo": {
+    "m": 6,
+    "y": 2024
+   },
+   "prodano": false
+  },
+  {
+   "spz": "2TR0655",
+   "znacka": "Scania R450 · Tandem 120cbm",
+   "ridic": "Raida",
+   "pozn": "",
+   "pausal": null,
+   "smlouvaDo": null,
+   "prodano": false
+  },
+  {
+   "spz": "6Z39970",
+   "znacka": "MAN TGL",
+   "ridic": "Defler",
+   "pozn": "",
+   "pausal": null,
+   "smlouvaDo": null,
+   "prodano": false
+  },
+  {
+   "spz": "7Z24184",
+   "znacka": "MAN TGL",
+   "ridic": "JIgum",
+   "pozn": "",
+   "pausal": null,
+   "smlouvaDo": null,
+   "prodano": false
+  },
+  {
+   "spz": "7Z55663",
+   "znacka": "MAN TGL",
+   "ridic": "Cosma",
+   "pozn": "",
+   "pausal": null,
+   "smlouvaDo": null,
+   "prodano": false
+  },
+  {
+   "spz": "1TN2074",
+   "znacka": "Scania R450 · Tautliner",
+   "ridic": "",
+   "pozn": "",
+   "pausal": null,
+   "smlouvaDo": null,
+   "prodano": true
+  }
+ ]
 }

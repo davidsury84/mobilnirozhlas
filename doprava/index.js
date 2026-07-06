@@ -17,6 +17,7 @@ const sheets = require('./lib/sheets');
 const HTML_FILE = path.join(__dirname, 'doprava.html');
 const VYKONY_ID = () => process.env.DOPRAVA_SHEET_VYKONY_ID || '1Na7nDmIdSkbpviGfVDRHWsC6kcQacFIFLVx7vaBGVy4';
 const NAKLADY_ID = () => process.env.DOPRAVA_SHEET_NAKLADY_ID || '1sVQBx0Weo2Ds9Gfgqwd-LyTVvQ_cBQBtUh7QzDSmnOE';
+const VOZY_ID = () => process.env.DOPRAVA_SHEET_VOZY_ID || '1nWnbtWffoyeaSyy4pEqiHEIIcw0L1dhnLunIyzZLJhg';
 
 /* ---------- parsování čísel z formátovaných buněk ---------- */
 // Zvládá český i americký zápis: "197 800 Kč" → 197800; "13,45 Kč" → 13.45;
@@ -124,6 +125,46 @@ function parseNaklady(rows) {
   return out;
 }
 
+/* ---------- evidence vozů: SPZ, řidič, značka, Scania paušál, smlouva do ---------- */
+// Normalizovaná SPZ pro párování s výkazem: "2TL 20-80" i "2TL 2080" → "2TL2080".
+function normSpz(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function parseVozy(rows) {
+  let col = null;   // mapování sloupců podle hlavičky
+  const out = [];
+  for (const r of rows) {
+    const labels = (r || []).map(norm);
+    if (!col) {
+      const iSpz = labels.findIndex((l) => l.startsWith('spz vozidla'));
+      if (iSpz >= 0) {
+        col = { spz: iSpz,
+          znacka: labels.findIndex((l) => l.startsWith('znacka vozidlo')),
+          ridic: labels.findIndex((l) => l === 'ridic'),
+          pozn: labels.findIndex((l) => l.startsWith('pozn')),
+          pausal: labels.findIndex((l) => l.includes('pausal')),
+          smlouva: labels.findIndex((l) => l.startsWith('smlouva do')) };
+      }
+      continue;
+    }
+    const spz = normSpz((r || [])[col.spz]);
+    if (!/^[0-9][A-Z][A-Z0-9]\d{4}$/.test(spz)) continue;          // řádky bez SPZ vozidla (vleky, prázdné) přeskočit
+    const cely = (r || []).map((c) => norm(c)).join(' | ');
+    const znacka = col.znacka >= 0 ? String(r[col.znacka] || '').trim() : '';
+    const nastavba = col.znacka >= 0 ? String(r[col.znacka + 1] || '').trim() : '';
+    const smlText = col.smlouva >= 0 ? String(r[col.smlouva] || '').trim() : '';
+    const smlM = smlText.match(/^(\d{1,2})\s*\/\s*(\d{2,4})$/);
+    out.push({
+      spz,
+      znacka: (znacka + (nastavba ? ' · ' + nastavba : '')).trim(),
+      ridic: (() => { const j = col.ridic >= 0 ? String(r[col.ridic] || '').trim() : ''; return /\d{3}|km/i.test(j) ? '' : j; })(),   // do sloupce občas zatéká poznámka („najeto 535.000km")
+      pozn: col.pozn >= 0 ? String(r[col.pozn] || '').trim() : '',
+      pausal: col.pausal >= 0 ? parseNum(String(r[col.pausal] || '').replace(/\./g, ' ').replace(/,?\s*-\s*$/, '')) : null,
+      smlouvaDo: smlM ? { m: Number(smlM[1]), y: Number(smlM[2]) + (Number(smlM[2]) < 100 ? 2000 : 0) } : null,
+      prodano: /prodan/.test(cely),
+    });
+  }
+  return out;
+}
+
 function mount(host) {
   const CACHE_F = path.join(host.dataDir || __dirname, 'doprava-cache.json');
   let cache = null;
@@ -151,23 +192,41 @@ function mount(host) {
     try { return (host.employeeModules(e.email) || []).includes('doprava'); } catch { return false; }
   }
 
-  // Stáhne a naparsuje obě tabulky; při úspěchu uloží cache na disk.
+  // Načte tabulku a najde list s daty: zkusí první list, pak postupně všechny pojmenované.
+  async function readParsed(id, range, parseFn, maSmysl) {
+    let prvniChyba = null;
+    try { const d = parseFn(await sheets.readValues(id, range)); if (maSmysl(d)) return d; }
+    catch (e) { prvniChyba = e; }
+    const listy = await sheets.listSheets(id).catch(() => []);
+    for (const t of listy.slice(0, 8)) {
+      try { const d = parseFn(await sheets.readValues(id, "'" + t.replace(/'/g, "''") + "'!" + range)); if (maSmysl(d)) return d; }
+      catch (_) {}
+    }
+    throw prvniChyba || new Error('data se nepodařilo najít na žádném listu — zkontrolujte strukturu tabulky');
+  }
+
+  // Stáhne a naparsuje tabulky; při úspěchu uloží cache na disk.
   let _refreshing = null;
   async function refresh() {
     if (_refreshing) return _refreshing;   // souběžné požadavky sdílí jedno stažení
     _refreshing = (async () => {
       // Tabulky se čtou a ukládají nezávisle: co se povede, použije se hned;
       // co selže, zůstane z poslední úspěšné verze (cache) a nahlásí se ve varování.
-      const [vyk, nak] = await Promise.allSettled([
-        sheets.readValues(VYKONY_ID(), 'A1:Z300'),
-        sheets.readValues(NAKLADY_ID(), 'A1:Z120'),
+      const [vyk, nak, evi] = await Promise.allSettled([
+        readParsed(VYKONY_ID(), 'A1:Z300', parseVykony, (d) => d.length > 0),
+        readParsed(NAKLADY_ID(), 'A1:Z120', parseNaklady, (d) => d.celkemVar != null || d.celkemFix != null),
+        readParsed(VOZY_ID(), 'A1:Z120', parseVozy, (d) => d.length > 0),
       ]);
-      const data = { ts: Date.now(), vozidla: null, naklady: null, vykonyChyba: null, nakladyChyba: null };
-      if (vyk.status === 'fulfilled') {
-        data.vozidla = parseVykony(vyk.value);
-        if (!data.vozidla.length) { data.vozidla = null; data.vykonyChyba = 'v listu se nepodařilo najít žádné vozidlo — zkontrolujte strukturu'; }
-      } else data.vykonyChyba = vyk.reason.message;
-      if (nak.status === 'fulfilled') data.naklady = parseNaklady(nak.value);
+      const data = { ts: Date.now(), vozidla: null, naklady: null, evidence: null, vykonyChyba: null, nakladyChyba: null, evidenceChyba: null };
+      if (evi.status === 'fulfilled') data.evidence = evi.value;
+      else {
+        data.evidenceChyba = evi.reason.message;
+        data.evidence = (cache && cache.evidence) || null;
+        console.error('[doprava] evidence vozů se nenačetla:', data.evidenceChyba);
+      }
+      if (vyk.status === 'fulfilled') data.vozidla = vyk.value;
+      else data.vykonyChyba = vyk.reason.message;
+      if (nak.status === 'fulfilled') data.naklady = nak.value;
       else data.nakladyChyba = nak.reason.message;
       if (data.vykonyChyba) { data.vozidla = (cache && cache.vozidla) || null; console.error('[doprava] tabulka výkonů se nenačetla:', data.vykonyChyba); }
       if (data.nakladyChyba) { data.naklady = (cache && cache.naklady) || null; console.error('[doprava] nákladová tabulka se nenačetla:', data.nakladyChyba); }
@@ -200,8 +259,11 @@ function mount(host) {
     if (p === '/api/doprava/data' && req.method === 'GET') {
       // Odpověď z cache + případná upozornění (nedostupná nákladová tabulka, stará data…)
       const zCache = (varovani) => {
-        const upozorneni = [varovani, cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        const upozorneni = [varovani,
+          cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
+          cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
+        ].filter(Boolean).join(' ');
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
@@ -228,8 +290,9 @@ function mount(host) {
       const cislo = String(b.cislo || '').trim();
       if (!cislo) { json(res, 400, { chyba: 'Chybí číslo vozu.' }); return true; }
       const info = readInfo();
-      info[cislo] = { ridic: String(b.ridic || '').trim().slice(0, 60), typ: String(b.typ || '').trim().slice(0, 60) };
-      if (!info[cislo].ridic && !info[cislo].typ) delete info[cislo];
+      const fixMes = parseNum(String(b.fixMes == null ? '' : b.fixMes));
+      info[cislo] = { ridic: String(b.ridic || '').trim().slice(0, 60), typ: String(b.typ || '').trim().slice(0, 60), fixMes: fixMes != null && fixMes >= 0 ? fixMes : null };
+      if (!info[cislo].ridic && !info[cislo].typ && info[cislo].fixMes == null) delete info[cislo];
       try { fs.writeFileSync(INFO_F, JSON.stringify(info, null, 2)); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
       json(res, 200, { ok: true, info }); return true;
     }
