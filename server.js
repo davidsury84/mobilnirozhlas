@@ -752,6 +752,14 @@ try {
   console.error('[adaptace] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Doprava" (výkony a náklady vozového parku, data z Google Sheets) ----
+let dopravaMod = null;
+try {
+  dopravaMod = require('./doprava').mount({ send, readBody, empSession, isAdmin, employeeModules, dataDir: DATA_DIR });
+} catch (e) {
+  console.error('[doprava] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -801,6 +809,8 @@ const server = http.createServer(async (req, res) => {
     if (smlouvyMod && await smlouvyMod.handle(req, res)) return;
     // Modul „Adaptace" si obslouží vlastní cesty (/adaptace*, /api/adaptace*).
     if (adaptaceMod && await adaptaceMod.handle(req, res)) return;
+    // Modul „Doprava" si obslouží vlastní cesty (/doprava*, /api/doprava*).
+    if (dopravaMod && await dopravaMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
@@ -1193,6 +1203,11 @@ if (require.main === module) {
     if (adaptaceMod) {
       adaptaceMod.tick();
       setInterval(() => adaptaceMod.tick(), 6 * 3600 * 1000);
+    }
+    // Doprava: předehřátí dat z Google Sheets (stejný 6h interval).
+    if (dopravaMod) {
+      dopravaMod.tick();
+      setInterval(() => dopravaMod.tick(), 6 * 3600 * 1000);
     }
   });
 }

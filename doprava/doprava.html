@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doprava — ELKOPLAST</title>
+<style>
+  :root{--cerv:#c0392b;--zlut:#e67e22;--zel:#27ae60;--tm:#2c3e50;--sed:#7f8c8d;--lin:#e5e8eb;--modra:#2a78d6;}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#f6f7f9;color:#1a1a1a}
+  header{background:var(--tm);color:#fff;padding:12px 20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  header b{margin-right:16px;letter-spacing:.3px}
+  header button{background:transparent;border:none;color:#cfd8e3;font:inherit;font-weight:600;cursor:pointer;padding:6px 10px;border-radius:6px}
+  header button.act,header button:hover{background:rgba(255,255,255,.14);color:#fff}
+  main{max-width:1150px;margin:0 auto;padding:20px}
+  h1{font-size:20px;margin:0 0 14px}
+  h2{font-size:16px;margin:22px 0 10px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px}
+  .card{background:#fff;border-radius:8px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .metr{font-size:26px;font-weight:800}
+  .muted{color:var(--sed);font-size:13px}
+  .neg{color:var(--cerv)} .pos{color:var(--zel)}
+  table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  th,td{text-align:right;padding:8px 12px;border-bottom:1px solid var(--lin);font-size:14px}
+  th{background:#f0f2f5;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--sed)}
+  th:first-child,td:first-child{text-align:left}
+  tr[data-clic]{cursor:pointer} tr[data-clic]:hover td{background:#fafbfc}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:#fff}
+  .cerv{background:var(--cerv)}.zlut{background:var(--zlut)}.zel{background:var(--zel)}.sed{background:var(--sed)}
+  .btn{background:var(--zel);color:#fff;border:none;padding:9px 16px;border-radius:6px;font-weight:700;cursor:pointer}
+  .btn.sec{background:#eef1f4;color:#2c3e50}
+  .alert{display:flex;gap:9px;align-items:flex-start;border-radius:8px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin-bottom:8px}
+  .alert.danger{background:#fdecea;color:#a32d2d}
+  .alert.warn{background:#fdf3e3;color:#8a5a12}
+  .alert.ok{background:#e9f7ef;color:#1d7a45}
+  .alert.info{background:#eaf1fb;color:#1f5699}
+  .chartbox{background:#fff;border-radius:8px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px}
+  .leg{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--sed);margin-bottom:8px}
+  .leg span{display:flex;align-items:center;gap:5px}
+  .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+  .sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:6px 26px;margin-bottom:14px}
+  .sl{display:flex;align-items:center;gap:10px}
+  .sl label{font-size:13px;color:var(--sed);width:135px;flex-shrink:0}
+  .sl output{font-size:13px;font-weight:700;min-width:80px;text-align:right}
+  input[type=range]{flex:1}
+  select,input{padding:7px 9px;border:1px solid #cfd6dd;border-radius:6px;font:inherit}
+  footer{max-width:1150px;margin:0 auto;padding:6px 20px 26px;color:var(--sed);font-size:12px;display:flex;gap:14px;align-items:center}
+</style>
+</head>
+<body>
+<header>
+  <b>ELKOPLAST · Doprava</b>
+  <button data-tab="prehled" class="act">Přehled</button>
+  <button data-tab="vozidla">Vozidla</button>
+  <button data-tab="zvrat">Bod zvratu</button>
+  <button data-tab="citlivost">Citlivost</button>
+  <button data-tab="bonus">Bonus za spotřebu</button>
+  <span class="muted" id="stav" style="margin-left:auto"></span>
+</header>
+<main id="app"><p class="muted">Načítám data z Google Sheets…</p></main>
+<footer>
+  <span id="ftInfo"></span>
+  <button class="btn sec" style="padding:5px 12px;font-size:12px" onclick="načti(true)">↻ Obnovit z tabulek</button>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+'use strict';
+const $ = (s,r=document)=>r.querySelector(s);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const kc = v => Math.round(v).toLocaleString('cs-CZ')+' Kč';
+const tis = v => Math.round(v/1000).toLocaleString('cs-CZ')+' tis. Kč';
+const mil = v => (v/1e6).toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})+' mil. Kč';
+const d2 = v => v.toFixed(2).replace('.',',');
+const sgn = (v,f)=> (v>=0?'+':'−')+f(Math.abs(v));
+const mesLbl = m => { const [y,mm]=m.split('-'); return (+mm)+'/'+y.slice(2); };
+const B='#2a78d6', G='#1baf7a', R='#e34948', Y='#eda100', V='#4a3aa7', O='#eb6834', GR='#888780', GRN='#008300';
+
+let DATA=null, M=null;           // surová data + spočítaný model
+const CH={};                      // instance grafů (id → Chart)
+function chart(id,cfg){ if(CH[id]){CH[id].destroy();delete CH[id];} const el=document.getElementById(id); if(el) CH[id]=new Chart(el,cfg); return CH[id]; }
+function box(tit,inner,leg){ return '<div class="chartbox">'+(tit?'<h2 style="margin:0 0 8px">'+tit+'</h2>':'')+(leg||'')+inner+'</div>'; }
+function cv(id,h){ return '<div style="position:relative;width:100%;height:'+h+'px"><canvas id="'+id+'"></canvas></div>'; }
+function legenda(items){ return '<div class="leg">'+items.map(i=>'<span><span class="sw" style="background:'+i[0]+'"></span>'+i[1]+'</span>').join('')+'</div>'; }
+function alertHtml(kind,text){ return '<div class="alert '+kind+'"><span>'+({danger:'⛔',warn:'⚠️',ok:'✅',info:'ℹ️'})[kind]+'</span><span>'+text+'</span></div>'; }
+const AXC = {grid:{color:'#e5e8eb'},ticks:{color:'#7f8c8d'}};
+const NOLEG = {legend:{display:false}};
+
+/* ---------- model z dat ---------- */
+function spočítej(){
+  const N = DATA.naklady||{};
+  const VAR = N.celkemVar!=null?N.celkemVar:null;
+  const FIXV = N.celkemFix!=null?N.celkemFix:null;
+  const mesAll = [...new Set(DATA.vozidla.flatMap(v=>Object.keys(v.mesice)))].sort();
+  const sum = {}; mesAll.forEach(m=>{ sum[m]={km:0,trzby:0}; DATA.vozidla.forEach(v=>{const x=v.mesice[m]; if(x){sum[m].km+=x.km; sum[m].trzby+=x.trzby;}}); });
+  const maxKm = Math.max(1,...mesAll.map(m=>sum[m].km));
+  const mesice = mesAll.filter(m=>sum[m].km>0.35*maxKm && sum[m].trzby>0);   // kompletní měsíce
+  const vyloucene = mesAll.filter(m=>!mesice.includes(m) && (sum[m].km>0||sum[m].trzby>0));
+  const voz = DATA.vozidla.map(v=>{
+    let km=0,trz=0,akt=0; const rates=[];
+    mesice.forEach(m=>{const x=v.mesice[m]; if(x){km+=x.km;trz+=x.trzby; if(x.km>0){akt++; if(x.trzby>0) rates.push(x.trzby/x.km);}}});
+    const pausal = rates.length>=2 && (Math.max(...rates)-Math.min(...rates))<0.02;
+    return {...v, km, trz, akt, sazba: km>0?trz/km:null, pausal,
+      prispevek: VAR!=null? trz-VAR*km : null,
+      vysledek: (VAR!=null&&FIXV!=null)? trz-VAR*km-FIXV*mesice.length : null};
+  });
+  const KM = voz.reduce((a,v)=>a+v.km,0), TRZ = voz.reduce((a,v)=>a+v.trz,0);
+  const NVOZ = N.pocetVozidel || voz.filter(v=>v.km>0).length;
+  const FIXTOT = FIXV!=null? NVOZ*FIXV*mesice.length : null;
+  return { N, VAR, FIXV, NVOZ, mesAll, mesice, vyloucene, sum, voz, KM, TRZ,
+    SAZBA: KM>0?TRZ/KM:0,
+    VARTOT: VAR!=null?VAR*KM:null, FIXTOT,
+    VYSLEDEK: (VAR!=null&&FIXV!=null)? TRZ-VAR*KM-FIXTOT : null,
+    aktivni: voz.filter(v=>v.km>0), stojici: voz.filter(v=>v.km===0) };
+}
+
+/* ---------- načtení ---------- */
+async function načti(force){
+  $('#stav').textContent = force?'Obnovuji…':'';
+  try{
+    const r = await fetch('/api/doprava/data'+(force?'?refresh=1':''),{cache:'no-store'});
+    DATA = await r.json();
+  }catch(e){ $('#app').innerHTML='<div class="alert danger">Nepodařilo se spojit se serverem: '+esc(e.message)+'</div>'; return; }
+  $('#stav').textContent='';
+  if(DATA.konfigurace===false){
+    $('#app').innerHTML = '<h1>Doprava</h1>'+alertHtml('warn','Modul zatím není napojený na Google Sheets. Správce musí nastavit proměnné <b>GOOGLE_SA_CLIENT_EMAIL</b> a <b>GOOGLE_SA_PRIVATE_KEY</b> (stejný service account jako u kalendáře dovolených) a obě tabulky nasdílet tomuto účtu jako „Prohlížející".');
+    return;
+  }
+  if(DATA.chyba){ $('#app').innerHTML='<h1>Doprava</h1>'+alertHtml('danger',esc(DATA.chyba)); return; }
+  M = spočítej();
+  $('#ftInfo').textContent = 'Data živě z Google Sheets · staženo '+new Date(DATA.aktualizovano).toLocaleString('cs-CZ')+' · vyhodnoceno měsíců: '+M.mesice.length;
+  render(document.querySelector('header button.act').dataset.tab);
+}
+document.querySelectorAll('header button[data-tab]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('header button[data-tab]').forEach(x=>x.classList.remove('act'));
+  b.classList.add('act'); render(b.dataset.tab);
+});
+function render(tab){
+  if(!M) return;
+  Object.keys(CH).forEach(k=>{CH[k].destroy();delete CH[k];});
+  if(tab==='prehled') tabPrehled();
+  else if(tab==='vozidla') tabVozidla();
+  else if(tab==='zvrat') tabZvrat();
+  else if(tab==='citlivost') tabCitlivost();
+  else if(tab==='bonus') tabBonus();
+  window.scrollTo(0,0);
+}
+
+/* ================= PŘEHLED ================= */
+function tabPrehled(){
+  const m=M, N=m.N;
+  let h='<h1>Přehled — výkony vs. náklady <span class="muted">('+m.mesice.map(mesLbl).join(', ')+')</span></h1>';
+  // upozornění
+  let al='';
+  if(DATA.varovani) al+=alertHtml('warn',esc(DATA.varovani));
+  if(m.vyloucene.length) al+=alertHtml('info','Měsíce <b>'+m.vyloucene.map(mesLbl).join(', ')+'</b> vypadají neúplně zapsané (chybí km nebo tržby) — do vyhodnocení nejsou zahrnuty.');
+  if(m.VYSLEDEK!=null){
+    al += m.VYSLEDEK<0
+      ? alertHtml('danger','Podle nákladového modelu je flotila za hodnocené období ve ztrátě <b>'+sgn(m.VYSLEDEK,mil)+'</b> (výnos '+d2(m.SAZBA)+' Kč/km vs. plný náklad '+d2(m.VAR+m.FIXTOT/Math.max(1,m.KM))+' Kč/km).')
+      : alertHtml('ok','Flotila je podle modelu v zisku <b>'+sgn(m.VYSLEDEK,mil)+'</b>.');
+    const pausalPod = m.voz.filter(v=>v.pausal && v.sazba!=null && v.sazba < m.VAR);
+    if(pausalPod.length) al+=alertHtml('danger','Vozy <b>'+pausalPod.map(v=>v.cislo).join(', ')+'</b> jezdí za paušál '+d2(pausalPod[0].sazba)+' Kč/km, který je pod variabilními náklady '+d2(m.VAR)+' Kč/km — každý ujetý km prohlubuje ztrátu.');
+  }
+  if(m.stojici.length) al+=alertHtml('warn','Vozy <b>'+m.stojici.map(v=>v.cislo).join(', ')+'</b> nemají za hodnocené období ani kilometr'+(m.FIXV!=null?' — dle modelu spálí '+tis(m.stojici.length*m.FIXV*m.mesice.length)+' fixních nákladů':'')+'.');
+  const malo = m.aktivni.filter(v=>v.km/m.mesice.length<3000);
+  if(malo.length) al+=alertHtml('warn','Málo vytížené vozy (pod 3 000 km/měs): <b>'+malo.map(v=>v.cislo).join(', ')+'</b>.');
+  if(m.mesice.length>=3){
+    const last=m.mesice[m.mesice.length-1];
+    const prev=m.mesice.slice(0,-1);
+    const rL=m.sum[last].trzby/m.sum[last].km, rP=prev.reduce((a,x)=>a+m.sum[x].trzby,0)/prev.reduce((a,x)=>a+m.sum[x].km,0);
+    if(Math.abs(rL-rP)>=2) al+=alertHtml(rL>rP?'ok':'warn','Významná změna v posledním měsíci ('+mesLbl(last)+'): výnos '+d2(rL)+' Kč/km proti průměru '+d2(rP)+' Kč/km předchozích měsíců ('+sgn(rL-rP,x=>d2(x)+' Kč/km')+').');
+  }
+  h+=al;
+  // KPI
+  h+='<div class="cards">'
+    +'<div class="card"><div class="muted">Tržby</div><div class="metr">'+mil(m.TRZ)+'</div><div class="muted">'+m.KM.toLocaleString('cs-CZ')+' km</div></div>'
+    +'<div class="card"><div class="muted">Výnos na km</div><div class="metr">'+d2(m.SAZBA)+' Kč</div><div class="muted">'+(m.VAR!=null?'variabilní náklad '+d2(m.VAR)+' Kč/km':'')+'</div></div>'
+    +(m.VAR!=null?'<div class="card"><div class="muted">Krycí příspěvek</div><div class="metr">'+mil(m.TRZ-m.VARTOT)+'</div><div class="muted">tržby − variabilní náklady</div></div>':'')
+    +(m.VYSLEDEK!=null?'<div class="card"><div class="muted">Výsledek dle modelu</div><div class="metr '+(m.VYSLEDEK<0?'neg':'pos')+'">'+sgn(m.VYSLEDEK,mil)+'</div><div class="muted">fixy '+m.NVOZ+' vozů × '+tis(m.FIXV)+'/měs</div></div>':'')
+    +'</div>';
+  // grafy
+  const lgN=legenda([[GR,'Fixní'],[B,'Mzdy řidičů'],[Y,'Nafta'],[V,'Mýto'],[O,'Opravy'],[G,'Pneu + AdBlue'],[GRN,'Tržby (čára)']]);
+  h+=box('Měsíční struktura nákladů vs. tržby (mil. Kč)',cv('chStack',280),m.VAR!=null?lgN:'');
+  h+='<div class="grid2">'+box('Výnos vs. náklad na km po měsících',cv('chGap',240),legenda([[G,'Výnos Kč/km'],[R,'Náklad Kč/km (dle reálného nájezdu)']]))
+    +box('Měsíční nájezd (km)',cv('chKm',240))+'</div>';
+  $('#app').innerHTML=h;
+
+  const lb=m.mesice.map(mesLbl);
+  if(m.VAR!=null&&m.FIXV!=null){
+    const items=[['Fixní',GR,()=>m.NVOZ*m.FIXV],['Mzdy řidičů',B,k=>(m.N.mzdyRidicu||0)*k],['Nafta',Y,k=>(m.N.nafta||0)*k],['Mýto',V,k=>(m.N.myto||0)*k],['Opravy',O,k=>(m.N.opravy||0)*k],['Pneu + AdBlue',G,k=>((m.N.pneu||0)+(m.N.adblue||0))*k]];
+    chart('chStack',{data:{labels:lb,datasets:[
+      ...items.map(it=>({type:'bar',label:it[0],data:m.mesice.map(x=>it[2](m.sum[x].km)/1e6),backgroundColor:it[1],stack:'n',maxBarThickness:42})),
+      {type:'line',label:'Tržby',data:m.mesice.map(x=>m.sum[x].trzby/1e6),borderColor:GRN,borderWidth:3,pointRadius:4,pointBackgroundColor:GRN,tension:.2}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>c.dataset.label+': '+kc(c.parsed.y*1e6)}}},
+        scales:{x:{stacked:true,...AXC,grid:{display:false}},y:{stacked:true,...AXC,ticks:{...AXC.ticks,callback:v=>v.toFixed(1)+' M'}}}}});
+    chart('chGap',{type:'line',data:{labels:lb,datasets:[
+      {data:m.mesice.map(x=>m.sum[x].trzby/m.sum[x].km),borderColor:G,borderWidth:2,pointRadius:4,pointBackgroundColor:G,tension:.2},
+      {data:m.mesice.map(x=>m.VAR+m.NVOZ*m.FIXV/m.sum[x].km),borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:4,pointBackgroundColor:R,tension:.2}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>(c.datasetIndex?'Náklad: ':'Výnos: ')+d2(c.parsed.y)+' Kč/km'}}},
+        scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' Kč'}}}}});
+  } else {
+    $('#chStack')?.closest('.chartbox')?.insertAdjacentHTML('beforeend','<p class="muted">Nákladová kalkulace se nenačetla — grafy nákladů nejsou k dispozici.</p>');
+  }
+  chart('chKm',{type:'bar',data:{labels:lb,datasets:[{data:m.mesice.map(x=>m.sum[x].km),backgroundColor:B,borderRadius:4,maxBarThickness:42}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>c.parsed.y.toLocaleString('cs-CZ')+' km'}}},
+      scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v=>(v/1000)+' tis.'}}}}});
+}
+
+/* ================= VOZIDLA ================= */
+function tabVozidla(){
+  const m=M;
+  const akt=m.aktivni.slice().sort((a,b)=>b.trz-a.trz);
+  let h='<h1>Vozidla <span class="muted">('+m.mesice.map(mesLbl).join(', ')+')</span></h1>';
+  h+=box('Tržby podle vozidla',cv('chTrz',akt.length*30+70),legenda([[B,'Variabilní sazba'],[GR,'Paušál']]));
+  h+=box('Výnos Kč/km podle vozidla'+(m.SAZBA?' <span class="muted">(průměr flotily '+d2(m.SAZBA)+' Kč/km)</span>':''),cv('chEf',akt.length*30+70));
+  h+='<h2>Detail vozidla — měsíční výsledovka</h2><div class="chartbox"><div class="sl" style="margin-bottom:10px"><label>Vozidlo</label><select id="selVoz">'
+    +m.voz.map(v=>'<option value="'+esc(v.cislo)+'">č. '+esc(v.cislo)+(v.spz?' · '+esc(v.spz):'')+'</option>').join('')
+    +'</select><span class="muted" id="vozInfo"></span></div>'+cv('chVoz',240)+'<div id="vozTab" style="margin-top:12px"></div></div>';
+  h+='<h2>Souhrn</h2><table><thead><tr><th>Vůz</th><th>km</th><th>Tržby</th><th>Kč/km</th>'+(m.VAR!=null?'<th>Krycí příspěvek</th>':'')+(m.FIXV!=null?'<th>Výsledek po fixech</th>':'')+'<th></th></tr></thead><tbody>'
+    +m.voz.slice().sort((a,b)=>b.trz-a.trz).map(v=>'<tr data-clic onclick="ukazVoz(\''+esc(v.cislo)+'\')"><td>'+esc(v.cislo)+' <span class="muted">'+esc(v.spz)+'</span></td>'
+      +'<td>'+v.km.toLocaleString('cs-CZ')+'</td><td>'+kc(v.trz)+'</td><td>'+(v.sazba!=null?d2(v.sazba):'—')+'</td>'
+      +(m.VAR!=null?'<td class="'+(v.prispevek<0?'neg':'')+'">'+sgn(v.prispevek,kc)+'</td>':'')
+      +(m.FIXV!=null?'<td class="'+(v.vysledek<0?'neg':'pos')+'">'+sgn(v.vysledek,kc)+'</td>':'')
+      +'<td>'+(v.pausal?'<span class="pill sed">paušál</span>':(v.km===0?'<span class="pill cerv">stojí</span>':''))+'</td></tr>').join('')
+    +'</tbody></table>';
+  $('#app').innerHTML=h;
+
+  chart('chTrz',{type:'bar',data:{labels:akt.map(v=>v.cislo),datasets:[{data:akt.map(v=>v.trz/1e6),backgroundColor:akt.map(v=>v.pausal?GR:B),borderRadius:4,maxBarThickness:20}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>{const v=akt[c.dataIndex];return [kc(v.trz), v.km.toLocaleString('cs-CZ')+' km'];}}}},
+      scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v.toFixed(1)+' M'}},y:{...AXC,grid:{display:false}}}}});
+  const ef=akt.slice().sort((a,b)=>(b.sazba||0)-(a.sazba||0));
+  chart('chEf',{type:'bar',data:{labels:ef.map(v=>v.cislo),datasets:[{data:ef.map(v=>v.sazba||0),backgroundColor:ef.map(v=>v.pausal?GR:B),borderRadius:4,maxBarThickness:20}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>d2(c.parsed.x)+' Kč/km'}}},
+      scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' Kč'}},y:{...AXC,grid:{display:false}}}}});
+  $('#selVoz').onchange=e=>vozDetail(e.target.value);
+  vozDetail(akt[0]?akt[0].cislo:m.voz[0].cislo);
+}
+function ukazVoz(c){ const s=$('#selVoz'); if(s){s.value=c; vozDetail(c); s.scrollIntoView({behavior:'smooth',block:'center'});} }
+function vozDetail(cislo){
+  const m=M, v=m.voz.find(x=>x.cislo===cislo); if(!v) return;
+  const sel=$('#selVoz'); if(sel&&sel.value!==cislo) sel.value=cislo;
+  $('#vozInfo').textContent=(v.spz?('SPZ '+v.spz+' · '):'')+(v.sazba!=null?d2(v.sazba)+' Kč/km':'bez výkonů')+(v.pausal?' · paušál':'');
+  const nakl=m.mesice.map(x=>{const d=v.mesice[x]||{km:0,trzby:0}; return (m.FIXV!=null&&m.VAR!=null)? m.FIXV+m.VAR*d.km : null;});
+  chart('chVoz',{data:{labels:m.mesice.map(mesLbl),datasets:[
+    {type:'bar',data:m.mesice.map(x=>(v.mesice[x]||{}).trzby||0),backgroundColor:B,borderRadius:4,maxBarThickness:38},
+    ...(nakl[0]!=null?[{type:'line',data:nakl,borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:3,pointBackgroundColor:R,tension:.1}]:[])]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>(c.datasetIndex?'Náklady: ':'Tržby: ')+kc(c.parsed.y)}}},
+      scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v2=>Math.round(v2/1000)+' tis.'}}}}});
+  let t='<table><thead><tr><th>Měsíc</th><th>km</th><th>Tržby</th>'+(nakl[0]!=null?'<th>Náklady</th><th>Výsledek</th>':'')+'</tr></thead><tbody>';
+  m.mesice.forEach((x,i)=>{ const d=v.mesice[x]||{km:0,trzby:0}; const r=nakl[i]!=null?d.trzby-nakl[i]:null;
+    t+='<tr><td>'+mesLbl(x)+'</td><td>'+d.km.toLocaleString('cs-CZ')+'</td><td>'+kc(d.trzby)+'</td>'
+      +(r!=null?'<td>'+kc(nakl[i])+'</td><td class="'+(r<0?'neg':'pos')+'">'+sgn(r,kc)+'</td>':'')+'</tr>'; });
+  $('#vozTab').innerHTML=t+'</tbody></table>';
+}
+
+/* ================= BOD ZVRATU ================= */
+function tabZvrat(){
+  const m=M;
+  if(m.VAR==null||m.FIXV==null){ $('#app').innerHTML='<h1>Bod zvratu</h1>'+alertHtml('warn','Nákladová kalkulace se nenačetla — analýza bodu zvratu není k dispozici.'); return; }
+  const mes=m.mesice.length;
+  const body=m.aktivni.map(v=>({x:v.km/mes,y:v.sazba,v:v.cislo,p:v.pausal}));
+  const be=r=>m.FIXV/(r-m.VAR);
+  let h='<h1>Bod zvratu</h1>';
+  h+=alertHtml('info','Křivka rentability: sazba = '+d2(m.VAR)+' Kč/km (variabilní) + '+tis(m.FIXV)+' fixů / měsíční nájezd. Při průměrné sazbě '+d2(m.SAZBA)+' Kč/km je bod zvratu <b>'+(m.SAZBA>m.VAR?Math.round(be(m.SAZBA)).toLocaleString('cs-CZ')+' km/měs na vůz':'—')+'</b>.');
+  const nad=body.filter(p=>p.y!=null&&p.y>m.VAR+m.FIXV/p.x);
+  h+= nad.length? alertHtml('ok','Nad křivkou rentability: vozy <b>'+nad.map(p=>p.v).join(', ')+'</b>.')
+    : alertHtml('danger','Žádné vozidlo aktuálně nedosahuje na křivku rentability — nejblíž jsou vozy s vysokým nájezdem i sazbou.');
+  h+=box('Sazba vs. měsíční nájezd',cv('chBE',340),legenda([[B,'Vozidlo'],[GR,'Paušál'],[R,'Hranice rentability']]));
+  const pr=m.aktivni.slice().sort((a,b)=>b.prispevek-a.prispevek);
+  h+=box('Krycí příspěvek na fixní náklady <span class="muted">(cíl pro zisk: '+tis(m.FIXV*mes)+'/vůz za období)</span>',cv('chPr',pr.length*30+70),legenda([[B,'Kladný'],[R,'Záporný']]));
+  $('#app').innerHTML=h;
+
+  const maxX=Math.max(15000,...body.map(p=>p.x*1.15));
+  const curve=[]; for(let x=Math.max(600,m.FIXV/60);x<=maxX;x+=200) curve.push({x,y:m.VAR+m.FIXV/x});
+  chart('chBE',{type:'scatter',data:{datasets:[
+    {data:body,pointRadius:6,pointBackgroundColor:body.map(p=>p.p?GR:B),pointBorderColor:'#fff',pointBorderWidth:2},
+    {data:curve,showLine:true,borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{filter:c=>c.datasetIndex===0,callbacks:{label:c=>'Vůz '+c.raw.v+': '+d2(c.raw.y)+' Kč/km, '+Math.round(c.raw.x).toLocaleString('cs-CZ')+' km/měs'}}},
+      scales:{x:{min:0,max:maxX,...AXC,title:{display:true,text:'průměrný měsíční nájezd (km)',color:'#7f8c8d'},ticks:{...AXC.ticks,callback:v=>(v/1000)+' tis.'}},
+        y:{min:Math.floor(m.VAR*0.8),max:Math.ceil(Math.max(...body.map(p=>p.y||0),m.VAR)+22),...AXC,title:{display:true,text:'Kč/km',color:'#7f8c8d'}}}}});
+  chart('chPr',{type:'bar',data:{labels:pr.map(v=>v.cislo),datasets:[{data:pr.map(v=>v.prispevek/1000),backgroundColor:pr.map(v=>v.prispevek<0?R:B),borderRadius:4,maxBarThickness:20}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>{const v=pr[c.dataIndex];return [sgn(v.prispevek,kc),'chybí do fixů: '+kc(Math.max(0,m.FIXV*mes-v.prispevek))];}}}},
+      scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' tis.'}},y:{...AXC,grid:{display:false}}}}});
+}
+
+/* ================= CITLIVOST ================= */
+function tabCitlivost(){
+  const m=M, N=m.N;
+  if(m.VAR==null||m.FIXV==null){ $('#app').innerHTML='<h1>Citlivost</h1>'+alertHtml('warn','Nákladová kalkulace se nenačetla.'); return; }
+  const mes=m.mesice.length;
+  const def={cena:N.cenaPhm||28, spotr:N.spotreba||29.3, myto:N.myto||0, mzdy:N.mzdyRidicu||0, saz:0, naj:0, voz:m.NVOZ};
+  const OST=(N.pneu||0)+(N.adblue||0)+(N.opravy||0);
+  const sl=(id,lab,min,max,step,val)=>'<div class="sl"><label>'+lab+'</label><input type="range" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+val+'"><output id="o'+id+'"></output></div>';
+  let h='<h1>Citlivostní analýza <span class="muted">(hodnocené období: '+mes+' měsíců)</span></h1>';
+  h+='<div class="chartbox"><div class="sliders">'
+    +sl('cCena','Cena nafty',Math.max(15,def.cena-8),def.cena+14,0.5,def.cena)
+    +sl('cSpotr','Spotřeba',def.spotr-5,def.spotr+4,0.1,def.spotr)
+    +sl('cMyto','Mýto',Math.max(0,def.myto-3),def.myto+4,0.05,def.myto)
+    +sl('cMzdy','Mzdy řidičů',Math.max(0,def.mzdy-3),def.mzdy+4,0.05,def.mzdy)
+    +sl('cSaz','Sazba tržeb',-10,30,1,0)
+    +sl('cNaj','Nájezd',-20,50,1,0)
+    +sl('cVoz','Vozy s fixy',Math.max(1,m.NVOZ-8),m.NVOZ+2,1,m.NVOZ)
+    +'<div class="sl"><button class="btn sec" id="cReset">Vrátit na model</button></div></div>'
+    +'<div class="cards" style="margin-bottom:10px">'
+    +'<div class="card"><div class="muted">Výsledek (scénář)</div><div class="metr" id="cRes">–</div></div>'
+    +'<div class="card"><div class="muted">Rozdíl proti modelu</div><div class="metr" id="cDelta">–</div></div>'
+    +'<div class="card"><div class="muted">Náklad na km</div><div class="metr" id="cNakl">–</div></div>'
+    +'<div class="card"><div class="muted">Sazba: máme / potřeba</div><div class="metr" id="cSazKpi" style="font-size:21px">–</div></div></div>'
+    +'<div id="cAlerts"></div></div>';
+  h+=box('Rozklad rozdílu podle parametru (mil. Kč)',cv('chImp',260),legenda([[G,'Zlepšuje'],[R,'Zhoršuje']]));
+  h+=box('Citlivost výsledku na ±10 % parametru',cv('chTor',260),'<p class="muted" style="margin:0 0 8px">Delší pruh = citlivější parametr. Výchozí bod: '+(m.VYSLEDEK!=null?sgn(m.VYSLEDEK,mil):'—')+'.</p>');
+  $('#app').innerHTML=h;
+
+  const base={ km:m.KM, trz:m.TRZ, varKm:m.VAR, res:m.VYSLEDEK };
+  const nafta0=N.nafta!=null?N.nafta:Math.round(def.spotr*def.cena)/100;
+  const impLb=['Sazba tržeb','Nájezd','Nafta + spotřeba','Mýto','Mzdy řidičů','Fixní vozy','Kombinace'];
+  chart('chImp',{type:'bar',data:{labels:impLb,datasets:[{data:impLb.map(()=>0),backgroundColor:[],borderRadius:4,maxBarThickness:20}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>sgn(c.parsed.x*1e6,mil)}}},
+      scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' M'}},y:{...AXC,grid:{display:false}}}}});
+  // tornado (statické, z dat)
+  const t10=[['Sazba tržeb',m.TRZ*0.1],['Fixní náklady',m.FIXTOT*0.1],['Nájezd',(m.TRZ-m.VARTOT)*0.1],['Mzdy řidičů',(N.mzdyRidicu||0)*m.KM*0.1],['Nafta / spotřeba',nafta0*m.KM*0.1],['Mýto',(N.myto||0)*m.KM*0.1],['Opravy',(N.opravy||0)*m.KM*0.1]].sort((a,b)=>b[1]-a[1]);
+  chart('chTor',{type:'bar',data:{labels:t10.map(x=>x[0]),datasets:[{data:t10.map(x=>[(m.VYSLEDEK-x[1])/1e6,(m.VYSLEDEK+x[1])/1e6]),backgroundColor:B,borderRadius:4,maxBarThickness:20}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>'výsledek '+d2(c.raw[0])+' až '+d2(c.raw[1])+' mil. Kč'}}},
+      scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' M'}},y:{...AXC,grid:{display:false}}}}});
+
+  const V=id=>Number($('#'+id).value);
+  function upd(){
+    const cena=V('cCena'),spotr=V('cSpotr'),myto=V('cMyto'),mzdy=V('cMzdy'),saz=V('cSaz'),naj=V('cNaj'),voz=V('cVoz');
+    $('#ocCena').textContent=d2(cena)+' Kč/l'; $('#ocSpotr').textContent=spotr.toFixed(1).replace('.',',')+' l'; $('#ocMyto').textContent=d2(myto)+' Kč/km';
+    $('#ocMzdy').textContent=d2(mzdy)+' Kč/km'; $('#ocSaz').textContent=(saz>=0?'+':'')+saz+' %'; $('#ocNaj').textContent=(naj>=0?'+':'')+naj+' %'; $('#ocVoz').textContent=voz+' vozů';
+    const km=m.KM*(1+naj/100), sazba=m.SAZBA*(1+saz/100), trz=km*sazba;
+    const nafta=Math.round(spotr*cena)/100;
+    const varKm=nafta+myto+mzdy+OST;
+    const fix=voz*m.FIXV*mes;
+    const res=trz-varKm*km-fix, delta=res-base.res;
+    const naklKm=varKm+fix/km;
+    $('#cRes').textContent=sgn(res,mil); $('#cRes').className='metr '+(res<0?'neg':'pos');
+    $('#cDelta').textContent=sgn(delta,mil); $('#cDelta').className='metr '+(delta<0?'neg':'pos');
+    $('#cNakl').textContent=d2(naklKm)+' Kč';
+    $('#cSazKpi').textContent=d2(sazba)+' / '+d2(naklKm);
+    const dSaz=m.TRZ*saz/100, dNaj=(naj/100)*(m.TRZ-m.VARTOT), dNafta=-(nafta-nafta0)*m.KM,
+      dMyto=-(myto-(N.myto||0))*m.KM, dMzdy=-(mzdy-(N.mzdyRidicu||0))*m.KM, dFix=-(voz-m.NVOZ)*m.FIXV*mes;
+    const parts=[dSaz,dNaj,dNafta,dMyto,dMzdy,dFix];
+    const combo=delta-parts.reduce((a,b)=>a+b,0);
+    const all=[...parts,combo];
+    CH.chImp.data.datasets[0].data=all.map(v=>v/1e6);
+    CH.chImp.data.datasets[0].backgroundColor=all.map(v=>v>=0?G:R);
+    CH.chImp.update('none');
+    let a='';
+    if(res>=0) a+=alertHtml('ok','Scénář dostává flotilu do zisku: <b>'+sgn(res,mil)+'</b>.');
+    if(sazba<varKm) a+=alertHtml('danger','Sazba '+d2(sazba)+' Kč/km nepokrývá ani variabilní náklady '+d2(varKm)+' Kč/km.');
+    if(delta<=-1e6) a+=alertHtml('danger','Významné zhoršení proti modelu: '+sgn(delta,mil)+'.');
+    if(delta>=1e6&&res<0) a+=alertHtml('warn','Významné zlepšení o '+sgn(delta,mil)+', ztráta ale trvá ('+sgn(res,mil)+').');
+    const nm=['Sazba tržeb','Nájezd','Nafta/spotřeba','Mýto','Mzdy řidičů','Fixní náklady'];
+    parts.forEach((d,i)=>{ if(Math.abs(d)>=5e5) a+=alertHtml(d>0?'ok':'warn',nm[i]+': významný vliv '+sgn(d,mil)+'.'); });
+    if(!a) a=alertHtml('info','Žádný parametr zatím nevytváří významný rozdíl (hranice 0,5 mil. Kč). Posuňte některý z posuvníků.');
+    $('#cAlerts').innerHTML=a;
+  }
+  ['cCena','cSpotr','cMyto','cMzdy','cSaz','cNaj','cVoz'].forEach(id=>$('#'+id).addEventListener('input',upd));
+  $('#cReset').onclick=()=>{ $('#cCena').value=def.cena; $('#cSpotr').value=def.spotr; $('#cMyto').value=def.myto; $('#cMzdy').value=def.mzdy; $('#cSaz').value=0; $('#cNaj').value=0; $('#cVoz').value=m.NVOZ; upd(); };
+  upd();
+}
+
+/* ================= BONUS ZA ÚSPORNOU JÍZDU ================= */
+function tabBonus(){
+  const m=M, N=m.N;
+  if(m.VAR==null||m.FIXV==null||!N.spotreba){ $('#app').innerHTML='<h1>Bonus za spotřebu</h1>'+alertHtml('warn','Nákladová kalkulace (spotřeba, cena PHM) se nenačetla.'); return; }
+  const mes=m.mesice.length, SPO0=N.spotreba, avgKm=m.KM/Math.max(1,m.aktivni.length)/mes;
+  const topKm=Math.max(...m.aktivni.map(v=>v.km/mes));
+  const sl=(id,lab,min,max,step,val)=>'<div class="sl"><label>'+lab+'</label><input type="range" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+val+'"><output id="o'+id+'"></output></div>';
+  let h='<h1>Scénář: bonus řidičům za úspornou jízdu</h1>';
+  h+=alertHtml('info','Výchozí spotřeba dle kalkulace: <b>'+SPO0.toFixed(1).replace('.',',')+' l/100 km</b>. Každý ušetřený litr/100 km = <b>'+tis((N.cenaPhm||28)/100*m.KM)+'</b> za hodnocené období. Měření po vozech už platíte (telematika Scania/Orbtrack v režiích).');
+  h+='<div class="chartbox"><div class="sliders">'
+    +sl('bSpo','Dosažená spotřeba',SPO0-4.5,SPO0,0.1,Math.round((SPO0-1.8)*10)/10)
+    +sl('bPod','Podíl řidiče',0,70,5,40)
+    +sl('bCena','Cena nafty',Math.max(15,(N.cenaPhm||28)-6),(N.cenaPhm||28)+12,0.5,N.cenaPhm||28)
+    +'<div class="sl"><label>Výplata bonusu</label><select id="bRez" style="flex:1"><option value="1.82">čistý bonus přes mzdu (náklad ×1,82)</option><option value="1.18" selected>dohoda / DPP do limitu (×1,18)</option><option value="1">bez odvodů — zjednodušeně (×1,0)</option></select></div>'
+    +'</div>'
+    +'<div class="cards" style="margin-bottom:10px">'
+    +'<div class="card"><div class="muted">Úspora PHM</div><div class="metr" id="bUsp">–</div><div class="muted" id="bUspKm"></div></div>'
+    +'<div class="card"><div class="muted">Bonus na ruku / řidič / měs</div><div class="metr" id="bBon">–</div><div class="muted" id="bBonTop"></div></div>'
+    +'<div class="card"><div class="muted">Čistý přínos firmy</div><div class="metr" id="bFir">–</div><div class="muted" id="bRes2"></div></div>'
+    +'<div class="card"><div class="muted">Bod zvratu km/měs</div><div class="metr" id="bBE">–</div><div class="muted">při sazbě '+d2(m.SAZBA)+' Kč/km</div></div></div>'
+    +'<div id="bAlerts"></div></div>';
+  h+=box('Rozdělení úspory',cv('chSplit',110),legenda([[B,'Firma'],[G,'Řidiči na ruku'],[GR,'Odvody a daně']]));
+  h+=box('Posun křivky bodu zvratu',cv('chBE2',320),legenda([[B,'Vozidlo'],[GR,'Paušál'],[R,'Rentabilita dnes'],[G,'Rentabilita se scénářem']]));
+  $('#app').innerHTML=h;
+
+  const OSTV=m.VAR-(N.nafta!=null?N.nafta:Math.round(SPO0*(N.cenaPhm||28))/100);
+  const body=m.aktivni.map(v=>({x:v.km/mes,y:v.sazba,v:v.cislo,p:v.pausal}));
+  const maxX=Math.max(15000,...body.map(p=>p.x*1.15));
+  const curve=vk=>{const c=[];for(let x=Math.max(600,m.FIXV/60);x<=maxX;x+=200)c.push({x,y:vk+m.FIXV/x});return c;};
+  chart('chSplit',{type:'bar',data:{labels:['Úspora'],datasets:[[B,'Firma'],[G,'Řidiči'],[GR,'Odvody']].map(x=>({label:x[1],data:[0],backgroundColor:x[0],stack:'s',maxBarThickness:36}))},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>c.dataset.label+': '+tis(c.parsed.x*1000)}}},
+      scales:{x:{stacked:true,...AXC,ticks:{...AXC.ticks,callback:v=>v+' tis.'}},y:{stacked:true,...AXC,grid:{display:false}}}}});
+  chart('chBE2',{type:'scatter',data:{datasets:[
+    {data:body,pointRadius:6,pointBackgroundColor:body.map(p=>p.p?GR:B),pointBorderColor:'#fff',pointBorderWidth:2},
+    {data:curve(m.VAR),showLine:true,borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:0},
+    {data:curve(m.VAR),showLine:true,borderColor:G,borderWidth:2,borderDash:[6,4],pointRadius:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{filter:c=>c.datasetIndex===0,callbacks:{label:c=>'Vůz '+c.raw.v+': '+d2(c.raw.y)+' Kč/km'}}},
+      scales:{x:{min:0,max:maxX,...AXC,ticks:{...AXC.ticks,callback:v=>(v/1000)+' tis.'}},y:{min:Math.floor(m.VAR*0.8),max:Math.ceil(Math.max(...body.map(p=>p.y||0))+22),...AXC}}}});
+
+  const V=id=>Number($('#'+id).value);
+  function upd(){
+    const spo=V('bSpo'), pod=V('bPod')/100, cena=V('bCena'), mult=Number($('#bRez').value);
+    $('#obSpo').textContent=spo.toFixed(1).replace('.',',')+' l/100'; $('#obPod').textContent=Math.round(pod*100)+' %'; $('#obCena').textContent=d2(cena)+' Kč/l';
+    const uspKm=(SPO0-spo)/100*cena;
+    const varBase=OSTV+Math.round(SPO0*cena)/100;
+    const varEff=varBase-uspKm+mult*pod*uspKm;
+    const total=uspKm*m.KM, ridici=pod*total, odvody=(mult-1)*pod*total, firma=total-ridici-odvody;
+    const bonus=pod*uspKm*avgKm, bonusTop=pod*uspKm*topKm;
+    $('#bUsp').textContent=tis(total); $('#bUspKm').textContent='−'+d2(uspKm)+' Kč/km';
+    $('#bBon').textContent=kc(bonus); $('#bBonTop').textContent='vytížený vůz ('+Math.round(topKm).toLocaleString('cs-CZ')+' km): '+kc(bonusTop);
+    $('#bFir').textContent=sgn(firma,tis); $('#bFir').className='metr '+(firma>0?'pos':'neg');
+    $('#bRes2').textContent=m.VYSLEDEK!=null?('výsledek: '+sgn(m.VYSLEDEK+firma,mil)):'';
+    const beB=m.SAZBA>varBase?m.FIXV/(m.SAZBA-varBase):null, beS=m.SAZBA>varEff?m.FIXV/(m.SAZBA-varEff):null;
+    $('#bBE').textContent=(beB&&beS)?Math.round(beB).toLocaleString('cs-CZ')+' → '+Math.round(beS).toLocaleString('cs-CZ'):'—';
+    CH.chSplit.data.datasets[0].data=[firma/1000]; CH.chSplit.data.datasets[1].data=[ridici/1000]; CH.chSplit.data.datasets[2].data=[odvody/1000]; CH.chSplit.update('none');
+    CH.chBE2.data.datasets[1].data=curve(varBase); CH.chBE2.data.datasets[2].data=curve(varEff); CH.chBE2.update('none');
+    let a='';
+    if(mult*pod>=1) a+=alertHtml('danger','Bonus s odvody stojí víc, než kolik nafta ušetří — program by prodělával.');
+    else if(mult*pod>0.6) a+=alertHtml('warn','Z každé ušetřené koruny zbyde firmě jen '+Math.round((1-mult*pod)*100)+' hal. — většinu spolknou bonusy a odvody.');
+    if(spo<SPO0&&bonus<1500) a+=alertHtml('warn','Slabá motivace: průměrný řidič dostane jen '+kc(bonus)+'/měsíc — pod ~1 500 Kč jízdu nezmění.');
+    if(bonus>=2500) a+=alertHtml('ok','Citelný bonus '+kc(bonus)+' na ruku měsíčně — dost na změnu návyků.');
+    if(firma>=5e5) a+=alertHtml('ok','Významný přínos pro firmu: +'+tis(firma)+' za období.');
+    else if(spo<SPO0&&firma>0&&firma<2e5&&m.VYSLEDEK<0) a+=alertHtml('warn','Přínos '+tis(firma)+' je proti ztrátě '+sgn(m.VYSLEDEK,mil)+' zanedbatelný — program dává smysl, ale ztrátu řeší sazby a fixy.');
+    if(odvody>=1e5) a+=alertHtml('warn','Režim výplaty: přes mzdu odvedete státu '+tis(odvody)+' — zvažte DPP do limitu.');
+    if(beB&&beS&&beB-beS>=300) a+=alertHtml('ok','Bod zvratu klesl o '+Math.round(beB-beS).toLocaleString('cs-CZ')+' km/měs na vůz.');
+    if(spo>=SPO0) a+=alertHtml('info','Spotřeba je na výchozí hodnotě — posuňte první posuvník.');
+    $('#bAlerts').innerHTML=a;
+  }
+  ['bSpo','bPod','bCena'].forEach(id=>$('#'+id).addEventListener('input',upd));
+  $('#bRez').addEventListener('change',upd);
+  upd();
+}
+
+načti(false);
+</script>
+</body>
+</html>
