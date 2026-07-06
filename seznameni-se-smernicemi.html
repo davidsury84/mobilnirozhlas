@@ -937,7 +937,8 @@ const MUJ_IC = {
   gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
   cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.3 12.2a1.5 1.5 0 0 0 1.5 1.2h8a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/>',
   calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7.5" x2="16" y2="7.5"/><circle cx="9" cy="12" r="0.5"/><circle cx="12" cy="12" r="0.5"/><circle cx="15" cy="12" r="0.5"/><circle cx="9" cy="15" r="0.5"/><circle cx="12" cy="15" r="0.5"/><circle cx="15" cy="15" r="0.5"/><circle cx="9" cy="18" r="0.5"/><circle cx="12" cy="18" r="0.5"/><circle cx="15" cy="18" r="0.5"/>',
-  truck:'<path d="M3 6.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V16H3V6.5z"/><path d="M14 9h3.6l2.4 3v4H14V9z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>'
+  truck:'<path d="M3 6.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V16H3V6.5z"/><path d="M14 9h3.6l2.4 3v4H14V9z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>',
+  tasks:'<rect x="8" y="2.5" width="8" height="3.5" rx="1"/><path d="M16 4.5h2a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/><path d="M8.5 13.5l2.2 2.2 4.8-5.2"/>'
 };
 const MUJ_MODS = [
   { key:"dash", icon:MUJ_IC.dash, label:"Můj přehled" },
@@ -945,6 +946,7 @@ const MUJ_MODS = [
   { key:"directives", icon:MUJ_IC.file, label:"Směrnice" },
   { key:"library", icon:MUJ_IC.book, label:"Knihovna" },
   { key:"bozp", icon:MUJ_IC.shield, label:"BOZP" },
+  { key:"ukoly", icon:MUJ_IC.tasks, label:"Úkoly ze směrnic" },
   { grp:"Provozy" },
   { key:"sklady", icon:MUJ_IC.warehouse, label:"Sklady", gated:true },
   { key:"plasty", icon:MUJ_IC.droplet, label:"Plasty", gated:true },
@@ -1048,6 +1050,7 @@ function mjGo(key){
   else if(key==="dovolena") showDovolena();
   else if(key==="pruzkumy") showPruzkumy();
   else if(key==="bozp") showBozp();
+  else if(key==="ukoly") showUkoly();
   else if(key==="skoleni") showSkoleni();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
@@ -1181,6 +1184,80 @@ async function showBozp(){
   });
   h+='<p class="muted" style="font-size:12px;margin-top:14px">Termíny udržuje znalostní wiki (kompilováno z dokumentace na Disku). Nové dokumenty se do wiki přidávají ingestem — neaktualizují se samy.</p>';
   body.innerHTML=h; window.scrollTo(0,0);
+}
+/* ---------- Modul Úkoly ze směrnic (závazky ze směrnic: kdo je plní a jak) ---------- */
+const UKOLY_KAT = { jednorazove:"Jednorázové — zavést či napravit", rocni:"Pravidelné — ročně", prubezne:"Pravidelné — měsíčně a průběžně" };
+const UKOLY_STAV = { "":["○ Neověřeno","amber"], plni:["✓ Plní se","green"], neplni:["✕ Neplní se","red"], splneno:["✓ Splněno","green"] };
+let UKOLY_DATA=null;
+async function showUkoly(){
+  MUJ.view="ukoly"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML='<div class="dash-hero"><h2>Úkoly ze směrnic</h2><p>Načítám…</p></div>';
+  try{ UKOLY_DATA=await (await fetch("/api/smernice-ukoly",{cache:"no-store"})).json(); }
+  catch(e){ UKOLY_DATA={items:[]}; }
+  renderUkoly();
+}
+function renderUkoly(){
+  const body=document.getElementById("mujBody");
+  const d=UKOLY_DATA||{items:[]};
+  const items=d.items||[];
+  const dnes=d.dnes||new Date().toISOString().slice(0,10);
+  let h='<div class="dash-hero"><h2>Úkoly ze směrnic</h2><p>Závazky a povinnosti vyplývající ze směrnic a vnitřních pokynů — u každého je vidět kdo ho plní, jak se plní a v jakém je stavu. '+
+    (d.canEdit?'Jako správce můžete měnit stav plnění a přidávat poznámky.':'Stav plnění udržují správci.')+'</p></div>';
+  if(!items.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Žádné úkoly.</p></div>'; body.innerHTML=h; return; }
+  const prosle=items.filter(x=>x.termin&&x.termin<dnes&&x.stav!=="splneno").length;
+  const nespl=items.filter(x=>x.kat==="jednorazove"&&x.stav!=="splneno").length;
+  const plni=items.filter(x=>x.stav==="plni"||x.stav==="splneno").length;
+  h+='<div class="card pad" style="margin-bottom:18px;display:flex;gap:28px;flex-wrap:wrap">'+
+    '<div><div class="muted" style="font-size:12px">Úkolů celkem</div><strong style="font-size:20px">'+items.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Po termínu</div><strong style="font-size:20px;color:#b3261e">'+prosle+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Jednorázové nesplněné</div><strong style="font-size:20px;color:#b7791f">'+nespl+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Plní se / splněno</div><strong style="font-size:20px;color:#12752f">'+plni+'</strong></div></div>';
+  Object.keys(UKOLY_KAT).forEach(k=>{
+    const rows=items.filter(x=>(x.kat||"jednorazove")===k);
+    if(!rows.length) return;
+    h+='<div class="dash-sec">'+esc(UKOLY_KAT[k])+' ('+rows.length+')</div>';
+    rows.forEach(x=>{ h+=ukolRow(x,dnes,!!d.canEdit); });
+  });
+  h+='<p class="muted" style="font-size:12px;margin-top:14px">Sestaveno ze složky Směrnice na Disku (Pracovní řád, směrnice E-IS, vnitřní pokyny P). Stav plnění a poznámky se ukládají na serveru.</p>';
+  body.innerHTML=h; window.scrollTo(0,0);
+}
+function ukolRow(x,dnes,canEdit){
+  const st=UKOLY_STAV[x.stav||""]||UKOLY_STAV[""];
+  const overdue=x.termin&&x.termin<dnes&&x.stav!=="splneno";
+  let pills='';
+  if(x.termin) pills+='<span class="pill '+(overdue?'red':'green')+'">'+(overdue?'✕ termín prošel ':'termín ')+esc(new Date(x.termin+"T00:00:00").toLocaleDateString("cs-CZ"))+'</span>';
+  if(x.frekvence) pills+='<span class="pill gray">'+esc(x.frekvence)+'</span>';
+  const stav = canEdit
+    ? '<select onchange="ukolStav(\''+esc(x.id)+'\',this.value)" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:12px;font-weight:600;background:#fff">'+
+      Object.keys(UKOLY_STAV).map(v=>'<option value="'+v+'"'+((x.stav||"")===v?' selected':'')+'>'+UKOLY_STAV[v][0]+'</option>').join('')+'</select>'+
+      '<button class="btn ghost sm" onclick="ukolPozn(\''+esc(x.id)+'\')" title="Poznámka ke plnění">✎</button>'
+    : '<span class="pill '+st[1]+'">'+st[0]+'</span>';
+  const pozn=x.pozn?'<div class="muted" style="font-size:12px;margin-top:4px;font-style:italic">Poznámka: '+esc(x.pozn)+'</div>':'';
+  return '<div class="li-item" style="align-items:flex-start"><div class="li-left" style="align-items:flex-start"><div class="li-ic">'+mujIcon(MUJ_IC.tasks)+'</div><div style="min-width:0">'+
+    '<div class="li-t">'+esc(x.ukol)+'</div>'+
+    '<div class="muted" style="font-size:13px;margin-top:3px;line-height:1.45"><strong style="color:var(--ink)">Jak se plní:</strong> '+esc(x.jak||'')+'</div>'+
+    '<div class="muted" style="font-size:12px;margin-top:5px"><strong>Kdo:</strong> '+esc(x.kdo||'—')+' &nbsp;·&nbsp; <strong>Zdroj:</strong> '+esc(x.zdroj||'')+'</div>'+pozn+
+    '</div></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex:none;max-width:40%">'+pills+stav+'</div></div>';
+}
+async function ukolStav(id,stav){
+  try{
+    const r=await fetch("/api/smernice-ukoly",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,stav})});
+    if(!r.ok) throw new Error((await r.json()).error||r.status);
+    const it=(UKOLY_DATA.items||[]).find(x=>x.id===id); if(it) it.stav=stav;
+    renderUkoly();
+  }catch(e){ alert("Uložení se nepovedlo: "+e.message); }
+}
+async function ukolPozn(id){
+  const it=(UKOLY_DATA.items||[]).find(x=>x.id===id); if(!it) return;
+  const pozn=prompt("Poznámka ke plnění úkolu:", it.pozn||"");
+  if(pozn===null) return;
+  try{
+    const r=await fetch("/api/smernice-ukoly",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,pozn})});
+    if(!r.ok) throw new Error((await r.json()).error||r.status);
+    it.pozn=pozn; renderUkoly();
+  }catch(e){ alert("Uložení se nepovedlo: "+e.message); }
 }
 /* ---------- Modul Průzkumy (dotazníky a testy) ---------- */
 function survDate(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLocaleDateString('cs-CZ')+' '+d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
