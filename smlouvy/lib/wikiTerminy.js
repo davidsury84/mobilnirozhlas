@@ -40,17 +40,23 @@ function fetchText(src, opts = {}, redirects = 0) {
   });
 }
 
-// Rozparsuje markdown tabulku na pole řádků. Ignoruje hlavičku, oddělovač a nekompletní řádky.
+// Rozparsuje markdown tabulku na pole řádků. Podporuje DVA formáty:
+//  A) elkoplast-wiki (5 sloupců): | YYYY-MM-DD | doména | slug | popis | stránka |
+//  B) starší (9 sloupců):        | id | doména | subjekt | popis | YYYY-MM-DD | perioda | odpovědný | stav | zdroj |
+const ISO_DATUM = /^\d{4}-\d{2}-\d{2}$/;
 function parse(md) {
   const out = [];
   for (const ln of String(md || '').split(/\r?\n/)) {
     const s = ln.trim();
     if (!s.startsWith('|')) continue;
     const cells = s.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
-    if (cells.length < 9) continue;
-    const [id, domena, subjekt, popis, termin, perioda, odpovedny, stav, zdroj] = cells;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(termin)) continue; // jen řádky s reálným datem (přeskočí hlavičku/oddělovač)
-    out.push({ id, domena, subjekt, popis, termin, perioda, odpovedny, stav: (stav || '').toLowerCase(), zdroj });
+    if (cells.length >= 9 && ISO_DATUM.test(cells[4])) {
+      const [id, domena, subjekt, popis, termin, perioda, odpovedny, stav, zdroj] = cells;
+      out.push({ id, domena, subjekt, popis, termin, perioda, odpovedny, stav: (stav || 'aktivni').toLowerCase(), zdroj });
+    } else if (cells.length >= 5 && ISO_DATUM.test(cells[0])) {
+      const [termin, domena, slug, popis, zdroj] = cells;
+      out.push({ id: slug, domena, subjekt: slug, popis, termin, perioda: '', odpovedny: '', stav: 'aktivni', zdroj });
+    }
   }
   return out;
 }
