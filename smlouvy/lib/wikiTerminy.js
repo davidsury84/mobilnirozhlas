@@ -55,7 +55,8 @@ function parse(md) {
       out.push({ id, domena, subjekt, popis, termin, perioda, odpovedny, stav: (stav || 'aktivni').toLowerCase(), zdroj });
     } else if (cells.length >= 5 && ISO_DATUM.test(cells[0])) {
       const [termin, domena, slug, popis, zdroj] = cells;
-      out.push({ id: slug, domena, subjekt: slug, popis, termin, perioda: '', odpovedny: '', stav: 'aktivni', zdroj });
+      const odkaz = (cells[5] && /^https?:\/\//.test(cells[5])) ? cells[5] : '';
+      out.push({ id: slug, domena, subjekt: slug, popis, termin, perioda: '', odpovedny: '', stav: 'aktivni', zdroj, odkaz });
     }
   }
   return out;
