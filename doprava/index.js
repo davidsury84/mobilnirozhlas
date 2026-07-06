@@ -138,6 +138,9 @@ function mount(host) {
     } catch (_) {}
   }
   let lastFail = 0;   // neúspěšná obnova → další automatický pokus nejdřív za 10 minut
+  // Evidence řidičů a typů vozidel (v tabulkách není; plní správce přímo v modulu).
+  const INFO_F = path.join(host.dataDir || __dirname, 'doprava-vozidla.json');
+  function readInfo() { try { const i = JSON.parse(fs.readFileSync(INFO_F, 'utf8')); return (i && typeof i === 'object') ? i : {}; } catch { return {}; } }
 
   const json = (res, code, obj) => host.send(res, code, obj);
   const html = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -198,7 +201,7 @@ function mount(host) {
       // Odpověď z cache + případná upozornění (nedostupná nákladová tabulka, stará data…)
       const zCache = (varovani) => {
         const upozorneni = [varovani, cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
@@ -216,6 +219,19 @@ function mount(host) {
         else json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), chyba: 'Nepodařilo se načíst data z Google Sheets: ' + e.message + ' Nasdíleli jste tabulky účtu ' + sheets.saEmail() + '?' });
       }
       return true;
+    }
+
+    // Uložení řidiče / typu vozidla k číslu vozu (jen správce).
+    if (p === '/api/doprava/vozidlo' && req.method === 'POST') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Upravovat řidiče a vozidla smí jen správce.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+      const cislo = String(b.cislo || '').trim();
+      if (!cislo) { json(res, 400, { chyba: 'Chybí číslo vozu.' }); return true; }
+      const info = readInfo();
+      info[cislo] = { ridic: String(b.ridic || '').trim().slice(0, 60), typ: String(b.typ || '').trim().slice(0, 60) };
+      if (!info[cislo].ridic && !info[cislo].typ) delete info[cislo];
+      try { fs.writeFileSync(INFO_F, JSON.stringify(info, null, 2)); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
+      json(res, 200, { ok: true, info }); return true;
     }
 
     json(res, 404, { chyba: 'Neznámá cesta modulu.' }); return true;

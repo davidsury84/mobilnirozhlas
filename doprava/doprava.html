@@ -78,6 +78,10 @@ const mesLbl = m => { const [y,mm]=m.split('-'); return (+mm)+'/'+y.slice(2); };
 const B='#2a78d6', G='#1baf7a', R='#e34948', Y='#eda100', V='#4a3aa7', O='#eb6834', GR='#888780', GRN='#008300';
 
 let DATA=null, M=null;           // surová data + spočítaný model
+let INFO={}, ADMIN=false;        // evidence řidičů/typů vozidel + role správce
+const jmR = c => (INFO[c]&&INFO[c].ridic)||'';
+const jmT = c => (INFO[c]&&INFO[c].typ)||'';
+const vozLbl = c => 'č. '+c+(jmR(c)?' · '+jmR(c):'');
 const CH={};                      // instance grafů (id → Chart)
 function chart(id,cfg){ if(CH[id]){CH[id].destroy();delete CH[id];} const el=document.getElementById(id); if(el) CH[id]=new Chart(el,cfg); return CH[id]; }
 function box(tit,inner,leg){ return '<div class="chartbox">'+(tit?'<h2 style="margin:0 0 8px">'+tit+'</h2>':'')+(leg||'')+inner+'</div>'; }
@@ -128,6 +132,7 @@ async function načti(force){
     return;
   }
   if(DATA.chyba){ $('#app').innerHTML='<h1>Doprava</h1>'+alertHtml('danger',esc(DATA.chyba)); return; }
+  INFO = DATA.info||{}; ADMIN = !!DATA.admin;
   M = spočítej();
   $('#ftInfo').textContent = 'Data živě z Google Sheets · staženo '+new Date(DATA.aktualizovano).toLocaleString('cs-CZ')+' · vyhodnoceno měsíců: '+M.mesice.length;
   render(document.querySelector('header button.act').dataset.tab);
@@ -215,25 +220,41 @@ function tabVozidla(){
   h+=box('Tržby podle vozidla',cv('chTrz',akt.length*30+70),legenda([[B,'Variabilní sazba'],[GR,'Paušál']]));
   h+=box('Výnos Kč/km podle vozidla'+(m.SAZBA?' <span class="muted">(průměr flotily '+d2(m.SAZBA)+' Kč/km)</span>':''),cv('chEf',akt.length*30+70));
   h+='<h2>Detail vozidla — měsíční výsledovka</h2><div class="chartbox"><div class="sl" style="margin-bottom:10px"><label>Vozidlo</label><select id="selVoz">'
-    +m.voz.map(v=>'<option value="'+esc(v.cislo)+'">č. '+esc(v.cislo)+(v.spz?' · '+esc(v.spz):'')+'</option>').join('')
-    +'</select><span class="muted" id="vozInfo"></span></div>'+cv('chVoz',240)+'<div id="vozTab" style="margin-top:12px"></div></div>';
-  h+='<h2>Souhrn</h2><table><thead><tr><th>Vůz</th><th>km</th><th>Tržby</th><th>Kč/km</th>'+(m.VAR!=null?'<th>Krycí příspěvek</th>':'')+(m.FIXV!=null?'<th>Výsledek po fixech</th>':'')+'<th></th></tr></thead><tbody>'
+    +m.voz.map(v=>'<option value="'+esc(v.cislo)+'">'+esc(vozLbl(v.cislo))+(v.spz?' · '+esc(v.spz):'')+'</option>').join('')
+    +'</select><span class="muted" id="vozInfo"></span></div>'
+    +'<div class="sl" style="margin-bottom:10px;max-width:640px"><label>Řidič</label><input id="vozRidic" '+(ADMIN?'':'disabled')+' placeholder="jméno řidiče" style="flex:1;min-width:0">'
+    +'<label style="width:auto">Vozidlo</label><input id="vozTyp" '+(ADMIN?'':'disabled')+' placeholder="např. Scania R450 + návěs" style="flex:1;min-width:0">'
+    +(ADMIN?'<button class="btn sm" id="vozSave" style="padding:7px 14px">Uložit</button>':'')+'</div>'
+    +cv('chVoz',240)+'<div id="vozTab" style="margin-top:12px"></div></div>';
+  h+='<h2>Souhrn</h2><table><thead><tr><th>Vůz</th><th style="text-align:left">Řidič</th><th style="text-align:left">Vozidlo</th><th>km</th><th>Tržby</th><th>Kč/km</th>'+(m.VAR!=null?'<th>Krycí příspěvek</th>':'')+(m.FIXV!=null?'<th>Výsledek po fixech</th>':'')+'<th></th></tr></thead><tbody>'
     +m.voz.slice().sort((a,b)=>b.trz-a.trz).map(v=>'<tr data-clic onclick="ukazVoz(\''+esc(v.cislo)+'\')"><td>'+esc(v.cislo)+' <span class="muted">'+esc(v.spz)+'</span></td>'
+      +'<td style="text-align:left">'+(jmR(v.cislo)?esc(jmR(v.cislo)):'<span class="muted">—</span>')+'</td>'
+      +'<td style="text-align:left">'+(jmT(v.cislo)?esc(jmT(v.cislo)):'<span class="muted">—</span>')+'</td>'
       +'<td>'+v.km.toLocaleString('cs-CZ')+'</td><td>'+kc(v.trz)+'</td><td>'+(v.sazba!=null?d2(v.sazba):'—')+'</td>'
       +(m.VAR!=null?'<td class="'+(v.prispevek<0?'neg':'')+'">'+sgn(v.prispevek,kc)+'</td>':'')
       +(m.FIXV!=null?'<td class="'+(v.vysledek<0?'neg':'pos')+'">'+sgn(v.vysledek,kc)+'</td>':'')
       +'<td>'+(v.pausal?'<span class="pill sed">paušál</span>':(v.km===0?'<span class="pill cerv">stojí</span>':''))+'</td></tr>').join('')
-    +'</tbody></table>';
+    +'</tbody></table>'
+    +(ADMIN?'<p class="muted" style="font-size:12px">Řidiče a typ vozidla doplníš v detailu vozu výše — uloží se na serveru a uvidí je všichni.</p>':'');
   $('#app').innerHTML=h;
 
   chart('chTrz',{type:'bar',data:{labels:akt.map(v=>v.cislo),datasets:[{data:akt.map(v=>v.trz/1e6),backgroundColor:akt.map(v=>v.pausal?GR:B),borderRadius:4,maxBarThickness:20}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>{const v=akt[c.dataIndex];return [kc(v.trz), v.km.toLocaleString('cs-CZ')+' km'];}}}},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{title:c=>vozLbl(akt[c[0].dataIndex].cislo),label:c=>{const v=akt[c.dataIndex];return [kc(v.trz), v.km.toLocaleString('cs-CZ')+' km'];}}}},
       scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v.toFixed(1)+' M'}},y:{...AXC,grid:{display:false}}}}});
   const ef=akt.slice().sort((a,b)=>(b.sazba||0)-(a.sazba||0));
   chart('chEf',{type:'bar',data:{labels:ef.map(v=>v.cislo),datasets:[{data:ef.map(v=>v.sazba||0),backgroundColor:ef.map(v=>v.pausal?GR:B),borderRadius:4,maxBarThickness:20}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>d2(c.parsed.x)+' Kč/km'}}},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{title:c=>vozLbl(ef[c[0].dataIndex].cislo),label:c=>d2(c.parsed.x)+' Kč/km'}}},
       scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' Kč'}},y:{...AXC,grid:{display:false}}}}});
   $('#selVoz').onchange=e=>vozDetail(e.target.value);
+  if(ADMIN) $('#vozSave').onclick=async()=>{
+    const cislo=$('#selVoz').value, ridic=$('#vozRidic').value, typ=$('#vozTyp').value;
+    const b=$('#vozSave'); b.disabled=true; b.textContent='Ukládám…';
+    try{
+      const r=await fetch('/api/doprava/vozidlo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cislo,ridic,typ})});
+      const j=await r.json(); if(!r.ok) throw new Error(j.chyba||r.status);
+      INFO=j.info||INFO; tabVozidla(); ukazVoz(cislo);
+    }catch(e){ alert('Uložení selhalo: '+e.message); b.disabled=false; b.textContent='Uložit'; }
+  };
   vozDetail(akt[0]?akt[0].cislo:m.voz[0].cislo);
 }
 function ukazVoz(c){ const s=$('#selVoz'); if(s){s.value=c; vozDetail(c); s.scrollIntoView({behavior:'smooth',block:'center'});} }
@@ -241,6 +262,8 @@ function vozDetail(cislo){
   const m=M, v=m.voz.find(x=>x.cislo===cislo); if(!v) return;
   const sel=$('#selVoz'); if(sel&&sel.value!==cislo) sel.value=cislo;
   $('#vozInfo').textContent=(v.spz?('SPZ '+v.spz+' · '):'')+(v.sazba!=null?d2(v.sazba)+' Kč/km':'bez výkonů')+(v.pausal?' · paušál':'');
+  $('#vozRidic').value=jmR(cislo); $('#vozTyp').value=jmT(cislo);
+  const sv=$('#vozSave'); if(sv){ sv.disabled=false; sv.textContent='Uložit'; }
   const nakl=m.mesice.map(x=>{const d=v.mesice[x]||{km:0,trzby:0}; return (m.FIXV!=null&&m.VAR!=null)? m.FIXV+m.VAR*d.km : null;});
   chart('chVoz',{data:{labels:m.mesice.map(mesLbl),datasets:[
     {type:'bar',data:m.mesice.map(x=>(v.mesice[x]||{}).trzby||0),backgroundColor:B,borderRadius:4,maxBarThickness:38},
@@ -267,6 +290,20 @@ function tabZvrat(){
   h+= nad.length? alertHtml('ok','Nad křivkou rentability: vozy <b>'+nad.map(p=>p.v).join(', ')+'</b>.')
     : alertHtml('danger','Žádné vozidlo aktuálně nedosahuje na křivku rentability — nejblíž jsou vozy s vysokým nájezdem i sazbou.');
   h+=box('Sazba vs. měsíční nájezd',cv('chBE',340),legenda([[B,'Vozidlo'],[GR,'Paušál'],[R,'Hranice rentability']]));
+  h+='<div class="chartbox"><h2 style="margin:0 0 8px">Cenotvorba: za kolik jezdit při daném nájezdu</h2>'
+    +'<div class="sliders" style="margin-bottom:10px">'
+    +'<div class="sl"><label>Cílová marže z obratu</label><input type="range" id="zMar" min="0" max="15" step="0.5" value="5"><output id="ozMar"></output></div>'
+    +'<div class="sl"><label>Scénářový nájezd</label><input type="range" id="zNaj" min="6000" max="14000" step="250" value="10000"><output id="ozNaj"></output></div>'
+    +'</div>'
+    +'<div class="cards" style="margin-bottom:10px">'
+    +'<div class="card"><div class="muted">Cena při scénáři (s marží)</div><div class="metr" id="zCena">–</div><div class="muted" id="zCenaP"></div></div>'
+    +'<div class="card"><div class="muted">Cena na nule (bez marže)</div><div class="metr" id="zNula">–</div></div>'
+    +'<div class="card"><div class="muted">Dnešní průměrná sazba</div><div class="metr">'+d2(m.SAZBA)+' Kč</div><div class="muted" id="zRozdil"></div></div>'
+    +'</div>'
+    +'<div id="zAlerts"></div>'
+    +legenda([[B,'Cena s marží'],[GR,'Cena na nule (čárkovaně)'],[G,'Vůz nad cenou s marží'],[R,'Vůz pod cenou']])
+    +cv('chCenik',300)
+    +'<div id="zTab" style="margin-top:12px"></div></div>';
   const pr=m.aktivni.slice().sort((a,b)=>b.prispevek-a.prispevek);
   h+=box('Krycí příspěvek na fixní náklady <span class="muted">(cíl pro zisk: '+tis(m.FIXV*mes)+'/vůz za období)</span>',cv('chPr',pr.length*30+70),legenda([[B,'Kladný'],[R,'Záporný']]));
   $('#app').innerHTML=h;
@@ -276,12 +313,58 @@ function tabZvrat(){
   chart('chBE',{type:'scatter',data:{datasets:[
     {data:body,pointRadius:6,pointBackgroundColor:body.map(p=>p.p?GR:B),pointBorderColor:'#fff',pointBorderWidth:2},
     {data:curve,showLine:true,borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{filter:c=>c.datasetIndex===0,callbacks:{label:c=>'Vůz '+c.raw.v+': '+d2(c.raw.y)+' Kč/km, '+Math.round(c.raw.x).toLocaleString('cs-CZ')+' km/měs'}}},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{filter:c=>c.datasetIndex===0,callbacks:{title:c=>vozLbl(c[0].raw.v),label:c=>d2(c.raw.y)+' Kč/km, '+Math.round(c.raw.x).toLocaleString('cs-CZ')+' km/měs'}}},
       scales:{x:{min:0,max:maxX,...AXC,title:{display:true,text:'průměrný měsíční nájezd (km)',color:'#7f8c8d'},ticks:{...AXC.ticks,callback:v=>(v/1000)+' tis.'}},
         y:{min:Math.floor(m.VAR*0.8),max:Math.ceil(Math.max(...body.map(p=>p.y||0),m.VAR)+22),...AXC,title:{display:true,text:'Kč/km',color:'#7f8c8d'}}}}});
   chart('chPr',{type:'bar',data:{labels:pr.map(v=>v.cislo),datasets:[{data:pr.map(v=>v.prispevek/1000),backgroundColor:pr.map(v=>v.prispevek<0?R:B),borderRadius:4,maxBarThickness:20}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>{const v=pr[c.dataIndex];return [sgn(v.prispevek,kc),'chybí do fixů: '+kc(Math.max(0,m.FIXV*mes-v.prispevek))];}}}},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{title:c=>vozLbl(pr[c[0].dataIndex].cislo),label:c=>{const v=pr[c.dataIndex];return [sgn(v.prispevek,kc),'chybí do fixů: '+kc(Math.max(0,m.FIXV*mes-v.prispevek))];}}}},
       scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' tis.'}},y:{...AXC,grid:{display:false}}}}});
+
+  /* --- cenotvorba: minimální cena/km podle nájezdu a cílové marže --- */
+  const cenaKm=(K,mar)=>(m.VAR+m.FIXV/K)/(1-mar/100);
+  const najX=[]; for(let x=6000;x<=14000;x+=250) najX.push(x);
+  chart('chCenik',{data:{labels:najX.map(x=>x/1000),datasets:[
+    {type:'line',data:[],borderColor:B,borderWidth:2,pointRadius:0,tension:.15},
+    {type:'line',data:[],borderColor:GR,borderWidth:2,borderDash:[6,4],pointRadius:0,tension:.15},
+    {type:'scatter',data:[],pointRadius:6,pointBackgroundColor:[],pointBorderColor:'#fff',pointBorderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{...NOLEG,tooltip:{callbacks:{title:c=>c[0].datasetIndex===2?vozLbl(c[0].raw.v):(c[0].label+' tis. km/měs'),
+        label:c=>c.datasetIndex===2?(d2(c.raw.y)+' Kč/km při '+Math.round(c.raw.km).toLocaleString('cs-CZ')+' km/měs'+(c.raw.p?' · paušál':'')):((c.datasetIndex?'Na nule: ':'S marží: ')+d2(c.parsed.y)+' Kč/km')}}},
+      scales:{x:{type:'linear',min:6,max:14,...AXC,title:{display:true,text:'měsíční nájezd (tis. km)',color:'#7f8c8d',font:{size:12}},ticks:{...AXC.ticks,callback:v=>v+' tis.'}},
+        y:{...AXC,title:{display:true,text:'Kč/km',color:'#7f8c8d',font:{size:12}},ticks:{...AXC.ticks,callback:v=>v+' Kč'}}}}});
+  function zUpd(){
+    const mar=Number($('#zMar').value), naj=Number($('#zNaj').value);
+    $('#ozMar').textContent=mar.toFixed(1).replace('.',',')+' %';
+    $('#ozNaj').textContent=naj.toLocaleString('cs-CZ')+' km';
+    const cs=cenaKm(naj,mar), c0=cenaKm(naj,0);
+    $('#zCena').textContent=d2(cs)+' Kč/km';
+    $('#zCenaP').textContent='při '+naj.toLocaleString('cs-CZ')+' km/měs a marži '+mar.toFixed(1).replace('.',',')+' %';
+    $('#zNula').textContent=d2(c0)+' Kč/km';
+    $('#zRozdil').textContent=(m.SAZBA>=cs?'nad cenou s marží o ':'chybí do ceny s marží ')+d2(Math.abs(m.SAZBA-cs))+' Kč/km';
+    CH.chCenik.data.datasets[0].data=najX.map(x=>({x:x/1000,y:cenaKm(x,mar)}));
+    CH.chCenik.data.datasets[1].data=najX.map(x=>({x:x/1000,y:cenaKm(x,0)}));
+    const pts=m.aktivni.filter(v=>v.sazba!=null).map(v=>({x:Math.min(14,Math.max(6,v.km/mes/1000)),y:v.sazba,km:v.km/mes,v:v.cislo,p:v.pausal,ok:v.sazba>=cenaKm(Math.max(1000,v.km/mes),mar)}));
+    CH.chCenik.data.datasets[2].data=pts;
+    CH.chCenik.data.datasets[2].pointBackgroundColor=pts.map(p=>p.ok?G:R);
+    CH.chCenik.update('none');
+    const kroky=[7000,8000,9000,10000,11000,12000,13000];
+    let t='<table><thead><tr><th>Nájezd km/měs</th><th>Cena na nule</th><th>Cena s marží '+mar.toFixed(1).replace('.',',')+' %</th><th>Vs. dnešní sazba '+d2(m.SAZBA)+'</th><th>Sleva oproti −1 000 km</th></tr></thead><tbody>';
+    kroky.forEach((K,i)=>{
+      const c=cenaKm(K,mar), dif=m.SAZBA-c, sleva=i?cenaKm(kroky[i-1],mar)-c:null;
+      t+='<tr'+(K===naj?' style="background:#eaf1fb;font-weight:700"':'')+'><td>'+K.toLocaleString('cs-CZ')+'</td><td>'+d2(cenaKm(K,0))+'</td><td>'+d2(c)+'</td>'
+        +'<td class="'+(dif>=0?'pos':'neg')+'">'+sgn(dif,x=>d2(x)+' Kč')+'</td>'
+        +'<td>'+(sleva!=null?'−'+d2(sleva)+' Kč/km':'—')+'</td></tr>';
+    });
+    $('#zTab').innerHTML=t+'</tbody></table>';
+    const nadC=pts.filter(p=>p.ok).length;
+    let a=alertHtml('info','Čti opačně než bod zvratu: při nájezdu <b>'+naj.toLocaleString('cs-CZ')+' km/měs</b> je potřeba fakturovat <b>'+d2(cs)+' Kč/km</b> (na nule '+d2(c0)+'). Každých +1 000 km dovolí slevit ~'+d2(cenaKm(naj,mar)-cenaKm(naj+1000,mar))+' Kč/km — čím víc jezdíme, tím míň agresivní cena stačí.');
+    if(m.SAZBA<cs) a+=alertHtml('warn','Dnešní průměrná sazba '+d2(m.SAZBA)+' Kč/km je pod scénářovou cenou — při '+naj.toLocaleString('cs-CZ')+' km/měs by bylo potřeba zdražit o '+d2(cs-m.SAZBA)+' Kč/km, nebo navýšit nájezd.');
+    a+=alertHtml(nadC?'ok':'danger',nadC?('Cenu s marží při svém skutečném nájezdu plní '+nadC+' z '+pts.length+' vozů (zelené body).'):'Cenu s marží při svém skutečném nájezdu neplní žádný vůz.');
+    $('#zAlerts').innerHTML=a;
+  }
+  $('#zMar').addEventListener('input',zUpd);
+  $('#zNaj').addEventListener('input',zUpd);
+  zUpd();
 }
 
 /* ================= CITLIVOST ================= */
