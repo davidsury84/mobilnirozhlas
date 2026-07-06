@@ -335,7 +335,7 @@ function myDirectives(email) {
     .filter(d => assignedTo(d, emp))
     .map(d => {
       const ack = d.acks && d.acks[email];
-      return { id: d.id, title: d.title, kategorie: d.kategorie || null, ack: !!ack, ackTs: ack ? ack.ts : null, published: fs.existsSync(path.join(PUB_DIR, String(d.id).replace(/[^a-z0-9]/gi, '') + '.html')) };
+      return { id: d.id, title: d.title, kategorie: d.kategorie || null, verze: d.verze || 1, ack: !!ack, ackTs: ack ? ack.ts : null, published: fs.existsSync(path.join(PUB_DIR, String(d.id).replace(/[^a-z0-9]/gi, '') + '.html')) };
     });
 }
 
@@ -917,6 +917,37 @@ const server = http.createServer(async (req, res) => {
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
+
+  // ---- Jednorázový import směrnic (server-to-server; Bearer = SSO_SHARED_SECRET) ----
+  // Tělo: { items: [{ title, html, kategorie?, zdrojUrl? }] }. Dedupe dle názvu; publikuje ihned.
+  if (p === '/api/smernice-import' && req.method === 'POST') {
+    const auth = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    let okAuth = false;
+    try { okAuth = auth.length > 0 && crypto.timingSafeEqual(Buffer.from(auth), Buffer.from(SSO_SHARED_SECRET)); } catch (_) { okAuth = false; }
+    if (!okAuth) return send(res, 401, { error: 'Neplatné tajemství.' });
+    let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+    const items = Array.isArray(b.items) ? b.items : [];
+    const s = getState(); s.directives = s.directives || []; s.settings = s.settings || {};
+    const { buildPublished } = require('./smernice-pub');
+    let pridano = 0, preskoceno = 0; const chyby = [];
+    for (const it of items) {
+      if (!it || !it.title || !it.html) { chyby.push('položka bez title/html'); continue; }
+      if (s.directives.some(d => (d.title || '').trim().toLowerCase() === String(it.title).trim().toLowerCase())) { preskoceno++; continue; }
+      const id = 'imp' + crypto.randomBytes(5).toString('hex');
+      const html = String(it.html) + (it.zdrojUrl ? '<p style="margin-top:2.5em;font-size:12px;color:#8a8d86">Originál dokumentu: <a href="' + esc(it.zdrojUrl) + '" target="_blank" rel="noopener">soubor na Disku</a></p>' : '');
+      const d = { id, title: String(it.title).trim(), html, createdAt: Date.now(), assignAll: true, assignCats: [], assignTags: [], kategorie: it.kategorie || null, verze: 1, acks: {} };
+      s.directives.push(d);
+      try {
+        const aud = (s.employees || []).filter(e => assignedTo(d, e)).map(e => ({ email: e.email, name: e.name }));
+        const pub = buildPublished(d, { audience: aud, hrEmail: s.settings.hrEmail || '', apiUrl: s.settings.apiUrl || '', baseUrl: s.settings.baseUrl || baseUrl(req) });
+        fs.writeFileSync(path.join(PUB_DIR, id + '.html'), pub, 'utf8');
+      } catch (e) { chyby.push(d.title + ': publikace selhala — ' + e.message); }
+      pridano++;
+    }
+    writeJson(STATE_F, s);
+    logActivity('import', { email: '', name: 'server' }, 'Import směrnic z Disku: +' + pridano + ' (přeskočeno ' + preskoceno + ')');
+    return send(res, 200, { ok: true, pridano, preskoceno, chyby });
+  }
 
   // ---- Registr termínů z wiki: hostovaný na NAŠÍ infrastruktuře (žádný GitHub) ----
   // Nahrání (po ingestu wiki) i čtení jinou službou chrání sdílené tajemství (Bearer = SSO_SHARED_SECRET).

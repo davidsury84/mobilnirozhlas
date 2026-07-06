@@ -1498,7 +1498,8 @@ function showDirectives(){
     const link = location.origin+"/s/"+encodeURIComponent(d.id)+"#kdo="+encodeURIComponent(email);
     const action = d.published ? '<a class="btn '+(d.ack?'ghost ':'')+'sm" href="'+link+'">'+(d.ack?'Otevřít':'Přečíst a potvrdit')+'</a>'
                                : '<span class="muted" style="font-size:13px">Připravuje se…</span>';
-    return '<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.file)+'</div><div><div class="li-t">'+esc(d.title||"Směrnice")+'</div>'+
+    const verze=(d.verze&&d.verze>1)?' <span class="muted" style="font-size:12px;font-weight:400">· verze '+d.verze+'</span>':'';
+    return '<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.file)+'</div><div><div class="li-t">'+esc(d.title||"Směrnice")+verze+'</div>'+
       '<div style="margin-top:4px">'+status+'</div></div></div>'+action+'</div>';
   };
   // členění podle kategorií (bez kategorie = „Obecné", jen když existuje víc skupin)
@@ -1747,7 +1748,7 @@ function renderDirectives(){
     el.innerHTML=`
       <div class="dir-main">
         <h3>${esc(d.title)}</h3>
-        <div class="dir-meta">Vytvořeno ${fmtDate(d.createdAt)} · ${cats}</div>
+        <div class="dir-meta">Vytvořeno ${fmtDate(d.createdAt)} · <span class="tag" title="Verze směrnice">v${d.verze||1}</span> ${cats}</div>
         <div class="spread" style="max-width:420px">
           <div class="progress" style="flex:1"><i style="width:${s.pct}%"></i></div>
           <span class="pill ${s.pct===100?'green':s.done?'amber':'gray'}">${s.done}/${s.total} · ${s.pct}%</span>
@@ -1757,6 +1758,8 @@ function renderDirectives(){
         <button class="btn sm" onclick="openSendModal('${d.id}')">Rozeslat</button>
         <button class="btn ghost sm" onclick="openReaderTab('${d.id}')">Náhled čtení</button>
         <button class="btn ghost sm" onclick="openDirectiveModal('${d.id}')">Upravit</button>
+        <button class="btn ghost sm" onclick="openNovaVerze('${d.id}')">Nová verze</button>
+        ${(d.historie&&d.historie.length)?`<button class="btn ghost sm" onclick="openHistorie('${d.id}')">Historie (${d.historie.length})</button>`:''}
         <button class="btn danger sm" onclick="deleteDirective('${d.id}')">Smazat</button>
       </div>`;
     return el;
@@ -1787,6 +1790,77 @@ function deleteDirective(id){
   const d=DB.directives.find(x=>x.id===id);
   if(!confirm(`Smazat směrnici „${d.title}" včetně potvrzení?`)) return;
   DB.directives=DB.directives.filter(x=>x.id!==id); save(); renderDirectives();
+}
+
+/* ---------- Verzování směrnic ---------- */
+function openNovaVerze(id){
+  const d=DB.directives.find(x=>x.id===id); if(!d) return;
+  pendingHtml=null;
+  document.getElementById("modalTitle").textContent="Nová verze: "+d.title;
+  document.getElementById("modalBody").innerHTML=`
+    <div class="hint" style="margin-bottom:14px">Stávající verze <strong>v${d.verze||1}</strong> se uloží do historie (včetně toho, kdo ji potvrdil).
+      Potvrzení se <strong>vynulují</strong> — všichni přiřazení zaměstnanci se musí seznámit s novou verzí.</div>
+    <label class="field"><span>Co se změnilo (poznámka k verzi)</span>
+      <input type="text" id="vNote" placeholder="např. aktualizace limitů, nový článek 5"></label>
+    <label class="field"><span>Nový dokument</span>
+      <input type="file" id="docFile" accept=".docx,.html,.htm,.txt" onchange="parseDoc(this)">
+    </label>
+    <div class="hint">Nahraj nový <strong>.docx</strong> — nebo nech prázdné a uprav stávající text níže.</div>
+    <div id="docPreviewWrap">
+      <div class="spread" style="margin-bottom:6px"><span style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase">Náhled · klikni a uprav</span></div>
+      <div id="docPreview" class="doc-paper" contenteditable="true" spellcheck="true" oninput="pendingHtml=this.innerHTML" style="padding:24px 28px;max-height:360px;overflow:auto;margin:0 0 14px;font-size:14px;outline:none">${d.html||""}</div>
+    </div>`;
+  pendingHtml=d.html||"";
+  document.getElementById("modalFoot").innerHTML=`
+    <button class="btn ghost" onclick="closeModal()">Zrušit</button>
+    <button class="btn" onclick="saveNovaVerze('${d.id}')">Vydat novou verzi</button>`;
+  showModal();
+}
+async function saveNovaVerze(id){
+  const d=DB.directives.find(x=>x.id===id); if(!d) return;
+  if(!pendingHtml || !String(pendingHtml).trim()){ alert("Nová verze nemá žádný obsah."); return; }
+  const note=document.getElementById("vNote").value.trim();
+  if(String(pendingHtml)===String(d.html) && !confirm("Text se nezměnil. Opravdu vydat novou verzi (potvrzení se vynulují)?")) return;
+  d.historie=d.historie||[];
+  d.historie.push({ v:d.verze||1, html:d.html, acks:d.acks||{}, platnostDo:Date.now(), note:note||"" });
+  d.verze=(d.verze||1)+1;
+  d.html=pendingHtml;
+  d.acks={};
+  save(); closeModal(); renderDirectives();
+  try{ await ensurePublished(id); toast("Verze v"+d.verze+" vydána a publikována. Nezapomeň rozeslat."); }
+  catch(e){ toast("Verze v"+d.verze+" uložena; publikace selhala: "+e.message); }
+}
+function openHistorie(id){
+  const d=DB.directives.find(x=>x.id===id); if(!d) return;
+  const rows=(d.historie||[]).slice().reverse().map(h=>{
+    const acks=Object.entries(h.acks||{});
+    const seznam=acks.length? acks.map(([em,a])=>`<tr><td>${esc((a&&a.name)||em)}</td><td class="mono" style="font-size:12px">${esc(em)}</td><td>${a&&a.ts?fmtDate(a.ts):"—"}</td></tr>`).join("") : "";
+    return `<div class="card" style="margin-bottom:10px">
+      <div class="spread">
+        <div><strong>v${h.v}</strong> <span class="muted">· platila do ${fmtDate(h.platnostDo)}</span>${h.note?`<div class="muted" style="font-size:13px;margin-top:2px">${esc(h.note)}</div>`:""}</div>
+        <button class="btn ghost sm" onclick="openStaraVerze('${d.id}',${h.v})">Zobrazit text</button>
+      </div>
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px">Potvrdilo ${acks.length} zaměstnanců</summary>
+        ${acks.length?`<table class="tbl" style="margin-top:8px;font-size:13px"><thead><tr><th>Jméno</th><th>E-mail</th><th>Kdy</th></tr></thead><tbody>${seznam}</tbody></table>`:'<p class="muted" style="font-size:13px">Nikdo nepotvrdil.</p>'}
+      </details>
+    </div>`;
+  }).join("");
+  document.getElementById("modalTitle").textContent="Historie verzí: "+d.title;
+  document.getElementById("modalBody").innerHTML=`
+    <div class="hint" style="margin-bottom:12px">Aktuální verze: <strong>v${d.verze||1}</strong> (potvrzení se počítají k ní).</div>
+    ${rows||'<p class="muted">Žádné starší verze.</p>'}`;
+  document.getElementById("modalFoot").innerHTML=`<button class="btn ghost" onclick="closeModal()">Zavřít</button>`;
+  showModal();
+}
+function openStaraVerze(id,v){
+  const d=DB.directives.find(x=>x.id===id); if(!d) return;
+  const h=(d.historie||[]).find(x=>x.v===v); if(!h) return;
+  document.getElementById("modalTitle").textContent=d.title+" — v"+v+" (archiv)";
+  document.getElementById("modalBody").innerHTML=`<div class="doc-paper" style="padding:24px 28px;max-height:60vh;overflow:auto">${h.html||"<p class='muted'>Prázdný obsah.</p>"}</div>`;
+  document.getElementById("modalFoot").innerHTML=`
+    <button class="btn ghost" onclick="openHistorie('${d.id}')">← Zpět na historii</button>
+    <button class="btn ghost" onclick="closeModal()">Zavřít</button>`;
+  showModal();
 }
 
 /* ---------- Modal směrnice ---------- */
