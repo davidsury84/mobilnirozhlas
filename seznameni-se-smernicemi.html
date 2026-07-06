@@ -944,7 +944,7 @@ const MUJ_MODS = [
   { grp:"Dokumenty" },
   { key:"directives", icon:MUJ_IC.file, label:"Směrnice" },
   { key:"library", icon:MUJ_IC.book, label:"Knihovna" },
-  { key:"bozp", icon:MUJ_IC.shield, label:"BOZP", soon:true },
+  { key:"bozp", icon:MUJ_IC.shield, label:"BOZP" },
   { grp:"Provozy" },
   { key:"sklady", icon:MUJ_IC.warehouse, label:"Sklady", gated:true },
   { key:"plasty", icon:MUJ_IC.droplet, label:"Plasty", gated:true },
@@ -1045,6 +1045,7 @@ function mjGo(key){
   else if(key==="adaptace") showAdaptace();
   else if(key==="dovolena") showDovolena();
   else if(key==="pruzkumy") showPruzkumy();
+  else if(key==="bozp") showBozp();
   else if(key==="skoleni") showSkoleni();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
@@ -1128,6 +1129,43 @@ function showAdaptace(){
   const body=document.getElementById("mujBody");
   body.innerHTML='<iframe src="/adaptace" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Adaptace — onboarding nováčků"></iframe>';
   window.scrollTo(0,0);
+}
+/* ---------- Modul BOZP (termíny z wiki registru, po pracovištích) ---------- */
+const BOZP_PRAC = { supikovice:"Supíkovice", zlin:"Zlín", bruntal:"Bruntál", chomutov:"Chomutov" };
+async function showBozp(){
+  MUJ.view="bozp"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML='<div class="dash-hero"><h2>BOZP</h2><p>Načítám…</p></div>';
+  let d={configured:false,items:[]};
+  try{ d=await (await fetch("/api/bozp-terminy",{cache:"no-store"})).json(); }catch(e){}
+  let h='<div class="dash-hero"><h2>BOZP</h2><p>Hlídané termíny BOZP a požární ochrany podle pracovišť. Zdroj: znalostní wiki (revize, školení, nedostatky z auditů).</p></div>';
+  if(!d.configured){ h+='<div class="card pad"><p class="muted" style="margin:0">Napojení na znalostní wiki zatím není nastaveno (WIKI_TERMINY_URL).</p></div>'; body.innerHTML=h; return; }
+  if(d.chyba){ h+='<div class="card pad"><p class="muted" style="margin:0">Registr termínů nyní nelze načíst ('+esc(d.chyba)+').</p></div>'; body.innerHTML=h; return; }
+  const items=d.items||[];
+  if(!items.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Žádné aktivní BOZP termíny v registru.</p></div>'; body.innerHTML=h; return; }
+  // seskupení dle pracoviště (prefix slugu před první pomlčkou)
+  const groups={};
+  items.forEach(x=>{ const k=(x.id||'').split('-')[0]; (groups[k]=groups[k]||[]).push(x); });
+  const prosle=items.filter(x=>x.dny<0).length;
+  h+='<div class="card pad" style="margin-bottom:18px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Termínů celkem</div><strong style="font-size:20px">'+items.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Po termínu</div><strong style="font-size:20px;color:#b3261e">'+prosle+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Do 90 dnů</div><strong style="font-size:20px;color:#b7791f">'+items.filter(x=>x.dny>=0&&x.dny<=90).length+'</strong></div></div>';
+  Object.keys(groups).sort().forEach(k=>{
+    const rows=groups[k];
+    h+='<div class="dash-sec">'+esc(BOZP_PRAC[k]||k)+' ('+rows.length+')</div>';
+    rows.forEach(x=>{
+      const pill = x.dny<0 ? '<span class="pill red">✕ po termínu '+(-x.dny)+' d</span>'
+        : x.dny<=90 ? '<span class="pill amber">⏳ za '+x.dny+' d</span>'
+        : '<span class="pill green">za '+x.dny+' d</span>';
+      h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.shield)+'</div><div>'+
+        '<div class="li-t">'+esc(x.popis)+'</div>'+
+        '<div class="muted" style="font-size:12px;margin-top:2px">termín '+esc(new Date(x.termin).toLocaleDateString("cs-CZ"))+'</div></div></div>'+
+        '<div style="display:flex;align-items:center;gap:10px">'+pill+'</div></div>';
+    });
+  });
+  h+='<p class="muted" style="font-size:12px;margin-top:14px">Termíny udržuje znalostní wiki (kompilováno z dokumentace na Disku). Nové dokumenty se do wiki přidávají ingestem — neaktualizují se samy.</p>';
+  body.innerHTML=h; window.scrollTo(0,0);
 }
 /* ---------- Modul Průzkumy (dotazníky a testy) ---------- */
 function survDate(ts){ if(!ts) return ''; try{ const d=new Date(ts); return d.toLocaleDateString('cs-CZ')+' '+d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }

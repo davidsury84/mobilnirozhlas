@@ -229,8 +229,9 @@ function mount(host) {
         try {
           const rows = await wikiTerminy.nacti(src, { force: u.query.force === '1' });
           const dnes = todayPrague();
+          // Jen doména smluv — BOZP má vlastní modul v intranetu, sortiment hlídá ranges-watchdog.
           const items = rows
-            .filter((r) => r.stav === 'aktivni')
+            .filter((r) => (r.stav === 'aktivni' || !r.stav) && /^smlouv/.test((r.domena || '').toLowerCase()))
             .map((r) => ({ ...r, dny: daysUntil(r.termin, dnes) }))
             .sort((a, b) => a.dny - b.dny);
           json(res, 200, { configured: true, source: src, dnes, items }); return true;

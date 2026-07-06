@@ -954,6 +954,23 @@ const server = http.createServer(async (req, res) => {
         + rows + '</div></body></html>';
       return send(res, 200, page, { 'Content-Type': 'text/html; charset=utf-8' });
     }
+    // BOZP termíny z wiki registru (doména bozp) — pro modul BOZP v intranetu, seskupeno dle pracoviště.
+    if (p === '/api/bozp-terminy' && req.method === 'GET') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const src = process.env.WIKI_TERMINY_URL || '';
+      if (!src) return send(res, 200, { configured: false, items: [] });
+      try {
+        const wt = require('./smlouvy/lib/wikiTerminy');
+        const rows = await wt.nacti(src, { force: u.query.force === '1' });
+        const dnes = new Date().toISOString().slice(0, 10);
+        const items = rows.filter((r) => (r.domena || '').toLowerCase() === 'bozp' && (r.stav === 'aktivni' || !r.stav))
+          .map((r) => { const dny = Math.round((new Date(r.termin) - new Date(dnes)) / 86400e3); return { ...r, dny }; })
+          .sort((a, b) => a.dny - b.dny);
+        return send(res, 200, { configured: true, dnes, items });
+      } catch (err) { return send(res, 200, { configured: true, chyba: err.message, items: [] }); }
+    }
+
     if (p === '/api/my' && req.method === 'GET') {
       const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
       const emps = getState().employees || []; const eml = e.email.toLowerCase();
