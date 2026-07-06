@@ -124,6 +124,16 @@ function mount(host) {
   const CACHE_F = path.join(host.dataDir || __dirname, 'doprava-cache.json');
   let cache = null;
   try { cache = JSON.parse(fs.readFileSync(CACHE_F, 'utf8')); } catch (_) {}
+  // Bez cache (čerstvé nasazení) se použije přibalený snapshot dat — modul tak má
+  // co zobrazit i předtím, než dostane service account práva k tabulkám.
+  if (!cache) {
+    try {
+      cache = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed-data.json'), 'utf8'));
+      try { fs.writeFileSync(CACHE_F, JSON.stringify(cache)); } catch (_) {}
+      console.log('[doprava] cache založena z přibaleného snapshotu (' + (cache.zdroj || '') + ')');
+    } catch (_) {}
+  }
+  let lastFail = 0;   // neúspěšná obnova → další automatický pokus nejdřív za 10 minut
 
   const json = (res, code, obj) => host.send(res, code, obj);
   const html = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -186,9 +196,10 @@ function mount(host) {
       const force = u.query.refresh === '1';
       const stale = !cache || (Date.now() - cache.ts) > 6 * 3600 * 1000;
       try {
-        if (force || stale) await refresh();
+        if (force || (stale && Date.now() - lastFail > 10 * 60 * 1000)) await refresh();
         zCache('');
       } catch (e) {
+        lastFail = Date.now();
         if (cache) zCache('Obnovení z Google Sheets selhalo (' + e.message + ') — zobrazuji poslední stažená data.');
         else json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), chyba: 'Nepodařilo se načíst data z Google Sheets: ' + e.message + ' Nasdíleli jste tabulky účtu ' + sheets.saEmail() + '?' });
       }
