@@ -54,6 +54,8 @@ const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
 const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
 const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace „Hlídač sortimentu" (repo ranges-watchdog)
+const PREKLADISTE_APP_URL = process.env.PREKLADISTE_APP_URL || 'https://tridici-linka.up.railway.app'; // aplikace „Kalkulace překladiště" — digitální dvojče třídicí linky (repo tridici-linka-railway); lze přepsat proměnnou
+const PREKLADISTE_APP_FILE = path.join(ROOT, 'kalkulace-prekladiste.html'); // alternativně lokální soubor (stejně jako u Kalkulace-lisy)
 const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativně lokální soubor
 // Dovolená: úložiště žádostí + (volitelně) zápis do sdíleného Google kalendáře přes service account
 const VAC_F = path.join(DATA_DIR, 'vacation.json');
@@ -1438,6 +1440,29 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { 'Location': target }); return res.end();
       }
       return send(res, 200, '<!doctype html><meta charset="utf-8"><div style="font-family:system-ui;max-width:520px;margin:60px auto;text-align:center"><h1>🛰️ Hlídač sortimentu</h1><p>Pro napojení nastav proměnnou <code>RANGES_WATCHDOG_URL</code>.</p></div>', { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- Aplikace modulu Kalkulace překladiště: za přihlášením, přístup řídí správce (vzor Kalkulace-lisy) ----
+    if (p === '/prekladiste-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('prekladiste') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup ke Kalkulaci překladiště nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (PREKLADISTE_APP_URL) {
+        // Přihlášený zaměstnanec → přidej krátkodobý SSO token, aby se dvojče v iframu přihlásilo SAMO
+        // (Google login v iframu Google odmítá; tímhle se mu vyhneme úplně).
+        let target = PREKLADISTE_APP_URL;
+        if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += (PREKLADISTE_APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+        res.writeHead(302, { 'Location': target }); return res.end();
+      }
+      if (fs.existsSync(PREKLADISTE_APP_FILE)) return send(res, 200, fs.readFileSync(PREKLADISTE_APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
+      // aplikace zatím nenapojena – přátelský placeholder
+      const ph = '<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<title>Kalkulace překladiště</title><style>body{margin:0;font-family:system-ui,sans-serif;background:#eef1ec;color:#0f1512;display:grid;place-items:center;min-height:100vh}'
+        + '.c{max-width:520px;text-align:center;background:#fff;border:1px solid #e3e7e0;border-radius:16px;padding:34px 30px;box-shadow:0 10px 30px rgba(15,21,18,.07)}'
+        + 'h1{font-size:20px;margin:0 0 8px}p{color:#5b635c;margin:0 0 6px;line-height:1.55}code{background:#eef1ec;padding:2px 6px;border-radius:6px;font-size:13px}</style></head>'
+        + '<body><div class="c"><h1>⚖️ Kalkulace překladiště</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
+        + '<p style="margin-top:12px;font-size:13px">Pro napojení nastav proměnnou <code>PREKLADISTE_APP_URL</code> na adresu nasazené aplikace (třídicí linka), nebo vlož soubor <code>kalkulace-prekladiste.html</code> do projektu.</p></div></body></html>';
+      return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
     }
 
     // ---- měsíční vyhodnocení (admin) ----
