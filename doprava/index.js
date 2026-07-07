@@ -15,7 +15,10 @@ const urlLib = require('url');
 const sheets = require('./lib/sheets');
 
 const HTML_FILE = path.join(__dirname, 'doprava.html');
-const VYKONY_ID = () => process.env.DOPRAVA_SHEET_VYKONY_ID || '1Na7nDmIdSkbpviGfVDRHWsC6kcQacFIFLVx7vaBGVy4';
+// Výkony můžou být ve více souborech (ročníky „Daily report ECZ"); čte se ze všech
+// nasdílených a použije se ten s nejnovějšími měsíci. Víc ID odděl čárkou.
+const VYKONY_IDS = () => (process.env.DOPRAVA_SHEET_VYKONY_ID || '1Na7nDmIdSkbpviGfVDRHWsC6kcQacFIFLVx7vaBGVy4,1ZTPTuRdZvbOWOiHuVwdoMOhs_r3rS6OmBCabKJ8dmio')
+  .split(',').map((s) => s.trim()).filter(Boolean);
 const NAKLADY_ID = () => process.env.DOPRAVA_SHEET_NAKLADY_ID || '1sVQBx0Weo2Ds9Gfgqwd-LyTVvQ_cBQBtUh7QzDSmnOE';
 const VOZY_ID = () => process.env.DOPRAVA_SHEET_VOZY_ID || '1nWnbtWffoyeaSyy4pEqiHEIIcw0L1dhnLunIyzZLJhg';
 
@@ -205,6 +208,28 @@ function mount(host) {
     throw prvniChyba || new Error('data se nepodařilo najít na žádném listu — zkontrolujte strukturu tabulky');
   }
 
+  // Výkony: projde všechny soubory (ročníky) i jejich listy a vybere data s NEJNOVĚJŠÍM měsícem.
+  const posledniMesic = (voz) => voz.reduce((m, v) => Object.keys(v.mesice).reduce((x, k) => (k > x ? k : x), m), '');
+  async function readVykonyBest() {
+    let best = null; const chyby = [];
+    for (const id of VYKONY_IDS()) {
+      const kandidati = [null, ...(await sheets.listSheets(id).catch(() => []))].slice(0, 9);
+      let chybaSouboru = null;
+      for (const list of kandidati) {
+        try {
+          const range = list == null ? 'A1:Z300' : ("'" + list.replace(/'/g, "''") + "'!A1:Z300");
+          const d = parseVykony(await sheets.readValues(id, range));
+          if (!d.length) continue;
+          const mes = posledniMesic(d);
+          if (!best || mes > best.mesic) best = { vozidla: d, mesic: mes, id, list: list || '(první list)' };
+        } catch (e) { if (!chybaSouboru) chybaSouboru = e.message; }
+      }
+      if (chybaSouboru) chyby.push(chybaSouboru);
+    }
+    if (!best) throw new Error(chyby[0] || 'výkaz se nepodařilo najít v žádném z nasdílených souborů');
+    return best;
+  }
+
   // Stáhne a naparsuje tabulky; při úspěchu uloží cache na disk.
   let _refreshing = null;
   async function refresh() {
@@ -213,18 +238,18 @@ function mount(host) {
       // Tabulky se čtou a ukládají nezávisle: co se povede, použije se hned;
       // co selže, zůstane z poslední úspěšné verze (cache) a nahlásí se ve varování.
       const [vyk, nak, evi] = await Promise.allSettled([
-        readParsed(VYKONY_ID(), 'A1:Z300', parseVykony, (d) => d.length > 0),
+        readVykonyBest(),
         readParsed(NAKLADY_ID(), 'A1:Z120', parseNaklady, (d) => d.celkemVar != null || d.celkemFix != null),
         readParsed(VOZY_ID(), 'A1:Z120', parseVozy, (d) => d.length > 0),
       ]);
-      const data = { ts: Date.now(), vozidla: null, naklady: null, evidence: null, vykonyChyba: null, nakladyChyba: null, evidenceChyba: null };
+      const data = { ts: Date.now(), vozidla: null, naklady: null, evidence: null, vykonyZdroj: null, vykonyChyba: null, nakladyChyba: null, evidenceChyba: null };
       if (evi.status === 'fulfilled') data.evidence = evi.value;
       else {
         data.evidenceChyba = evi.reason.message;
         data.evidence = (cache && cache.evidence) || null;
         console.error('[doprava] evidence vozů se nenačetla:', data.evidenceChyba);
       }
-      if (vyk.status === 'fulfilled') data.vozidla = vyk.value;
+      if (vyk.status === 'fulfilled') { data.vozidla = vyk.value.vozidla; data.vykonyZdroj = { id: vyk.value.id, list: vyk.value.list, mesic: vyk.value.mesic }; }
       else data.vykonyChyba = vyk.reason.message;
       if (nak.status === 'fulfilled') data.naklady = nak.value;
       else data.nakladyChyba = nak.reason.message;
@@ -259,11 +284,19 @@ function mount(host) {
     if (p === '/api/doprava/data' && req.method === 'GET') {
       // Odpověď z cache + případná upozornění (nedostupná nákladová tabulka, stará data…)
       const zCache = (varovani) => {
-        const upozorneni = [varovani,
+        // Výkaz starší než ~2 měsíce = nejspíš je nasdílený jen starý ročník souboru.
+        let zastarale = null;
+        if (cache.vykonyZdroj && cache.vykonyZdroj.mesic) {
+          const [ry, rm] = cache.vykonyZdroj.mesic.split('-').map(Number);
+          const ted = new Date();
+          if ((ted.getFullYear() - ry) * 12 + (ted.getMonth() + 1 - rm) > 2)
+            zastarale = 'Pozor: nejnovější dostupný výkaz je za ' + rm + '/' + ry + ' — robot nejspíš nemá nasdílený aktuální ročník „Daily report ECZ".';
+        }
+        const upozorneni = [varovani, zastarale,
           cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
           cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
         ].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');

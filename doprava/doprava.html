@@ -153,7 +153,8 @@ async function načti(force){
   if(DATA.chyba){ $('#app').innerHTML='<h1>Doprava</h1>'+alertHtml('danger',esc(DATA.chyba)); return; }
   INFO = DATA.info||{}; ADMIN = !!DATA.admin;
   M = spočítej();
-  $('#ftInfo').textContent = 'Data živě z Google Sheets · staženo '+new Date(DATA.aktualizovano).toLocaleString('cs-CZ')+' · vyhodnoceno měsíců: '+M.mesice.length;
+  $('#ftInfo').textContent = 'Data živě z Google Sheets · staženo '+new Date(DATA.aktualizovano).toLocaleString('cs-CZ')+' · vyhodnoceno měsíců: '+M.mesice.length
+    +(DATA.vykonyZdroj?' · výkony: list '+DATA.vykonyZdroj.list+' (do '+DATA.vykonyZdroj.mesic.split('-').reverse().join('/')+')':'');
   render(document.querySelector('header button.act').dataset.tab);
 }
 document.querySelectorAll('header button[data-tab]').forEach(b=>b.onclick=()=>{
