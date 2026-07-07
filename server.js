@@ -832,7 +832,7 @@ function vocCs(name) {
   return name;
 }
 function renderTpl(t, v) { return (t || '').replace(/\{(jmeno5|jmeno|smernice|odkaz)\}/g, (m, k) => (v[k] != null ? v[k] : m)); }
-function toHtml(text, link) { let h = esc(text).replace(/\n/g, '<br>'); if (link) { const s = esc(link); h = h.split(s).join('<a href="' + s + '" style="color:#1f5d3f">' + s + '</a>') + '<div style="margin-top:18px"><a href="' + s + '" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-family:Arial,sans-serif;font-weight:bold">Otevřít a potvrdit seznámení</a></div>'; } return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55">' + h + '</div>'; }
+function toHtml(text, link, btnLabel) { let h = esc(text).replace(/\n/g, '<br>'); if (link) { const s = esc(link); h = h.split(s).join('<a href="' + s + '" style="color:#1f5d3f">' + s + '</a>') + '<div style="margin-top:18px"><a href="' + s + '" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-family:Arial,sans-serif;font-weight:bold">' + esc(btnLabel || 'Otevřít a potvrdit seznámení') + '</a></div>'; } return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55">' + h + '</div>'; }
 function baseUrl(req) { return (CFG.publicUrl || (((req.headers['x-forwarded-proto'] || 'http')) + '://' + req.headers.host)).replace(/\/$/, ''); }
 /* Uvítací (pozvánkový) e-mail do intranetu — hezky nastylovaný, firemní barvy. Text (subject+body) je editovatelný. */
 const DEFAULT_INVITE_SUBJECT = 'Pozvánka do intranetu ELKOPLAST CZ';
@@ -1056,7 +1056,7 @@ const server = http.createServer(async (req, res) => {
       if (!process.env.RESEND_API_KEY && (!CFG.host || !CFG.user)) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
       const recipients = b.recipients || []; const results = []; const queue = recipients.slice();
       const useResend = !!process.env.RESEND_API_KEY;
-      async function worker() { while (queue.length) { const r = queue.shift(); const fn = ((r.name || '').split(' ')[0] || r.name || ''); const vars = { jmeno: fn, jmeno5: vocCs(fn), smernice: b.dirTitle || '', odkaz: r.link || '' }; const subject = renderTpl(b.subject, vars), text = renderTpl(b.body, vars); try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName, subject, text, html: toHtml(text, r.link) }); results.push({ email: r.email, ok: true }); } catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
+      async function worker() { while (queue.length) { const r = queue.shift(); const fn = ((r.name || '').split(' ')[0] || r.name || ''); const vars = { jmeno: fn, jmeno5: vocCs(fn), smernice: b.dirTitle || '', odkaz: r.link || '' }; const subject = renderTpl(b.subject, vars), text = renderTpl(b.body, vars); try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName, subject, text, html: toHtml(text, r.link, b.btnLabel) }); results.push({ email: r.email, ok: true }); } catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
       await Promise.all(Array.from({ length: useResend ? 1 : Math.min(3, recipients.length || 1) }, worker));
       return send(res, 200, { results });
     }
@@ -1150,7 +1150,7 @@ const server = http.createServer(async (req, res) => {
       const fn = ((b.name || '').split(' ')[0]) || b.name || '';
       const link = b.link || '';
       const vars = { jmeno: fn, jmeno5: vocCs(fn), smernice: b.dirTitle || '', odkaz: link };
-      return send(res, 200, { subject: renderTpl(b.subject || '', vars), html: toHtml(renderTpl(b.body || '', vars), link), mailReady: emailConfigured() });
+      return send(res, 200, { subject: renderTpl(b.subject || '', vars), html: toHtml(renderTpl(b.body || '', vars), link, b.btnLabel), mailReady: emailConfigured() });
     }
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----

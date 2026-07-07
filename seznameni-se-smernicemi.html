@@ -2434,6 +2434,16 @@ async function loadInvites(id, aud){
     if(r.ok){ const j=await r.json(); INVITE_MAP=j.links||{}; } }catch(e){}
 }
 function inviteLinkFor(id,email){ return INVITE_MAP[(email||"").toLowerCase()] || (location.origin+"/"+surveyKind(id)+"#kdo="+encodeURIComponent(email)); }
+/* Výchozí předmět a text e-mailu podle typu (směrnice / průzkum) */
+function sendDefaults(S){
+  if(S&&S.isSurvey) return {
+    subj:"Průzkum: "+S.title,
+    body:"Dobrý den, {jmeno5},\n\nprosíme Vás o vyplnění průzkumu „{smernice}\". Otevřete prosím svůj osobní odkaz:\n\n{odkaz}\n\nDěkujeme." };
+  return {
+    subj:"K seznámení: "+(S?S.title:""),
+    body:"Dobrý den, {jmeno5},\n\nprosíme Vás o seznámení se směrnicí „{smernice}\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n{odkaz}\n\nDěkujeme." };
+}
+
 /* Deskriptor pro společný send modal: funguje pro směrnici i průzkum */
 function sendableOf(id){
   if(id==="survey-grit"){
@@ -3164,11 +3174,11 @@ async function publishToServer(id){
 }
 
 /* Klientský fallback náhledu e-mailu (když server /api/send-preview neodpoví) */
-function clientEmailHtml(subject, body, name, title, link){
+function clientEmailHtml(subject, body, name, title, link, btnLabel){
   const fn=(name||"").split(" ")[0]||name||"";
   const sub=v=>String(v||"").replace(/{jmeno5}/g,fn).replace(/{jmeno}/g,fn).replace(/{smernice}/g,title||"").replace(/{odkaz}/g,link||"");
   let h=esc(sub(body)).replace(/\n/g,"<br>");
-  if(link){ const s=esc(link); h=h.split(s).join('<a href="'+s+'" style="color:#1f5d3f">'+s+'</a>')+'<div style="margin-top:18px"><a href="'+s+'" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold">Otevřít a potvrdit</a></div>'; }
+  if(link){ const s=esc(link); h=h.split(s).join('<a href="'+s+'" style="color:#1f5d3f">'+s+'</a>')+'<div style="margin-top:18px"><a href="'+s+'" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold">'+esc(btnLabel||"Otevřít a potvrdit")+'</a></div>'; }
   return { subject:sub(subject), html:'<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55;padding:20px">'+h+'</div>' };
 }
 const INVITE_DEFAULT={ subject:"Pozvánka do intranetu ELKOPLAST CZ", body:"Dobrý den {jmeno5},\n\nbyli jste pozváni do firemního intranetu ELKOPLAST CZ — jedno místo pro všechno pracovní." };
@@ -3188,7 +3198,7 @@ function clientInviteHtml(name, url, body){
 }
 async function fetchEmailPreview(payload){
   try{ const r=await fetch(apiBase()+"/api/send-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); const j=await r.json(); if(j&&!j.error&&j.html) return j; }catch(e){}
-  const pv=clientEmailHtml(payload.subject,payload.body,payload.name,payload.dirTitle,payload.link); pv.fallback=true; return pv;
+  const pv=clientEmailHtml(payload.subject,payload.body,payload.name,payload.dirTitle,payload.link,payload.btnLabel); pv.fallback=true; return pv;
 }
 async function previewBulk(id){
   const S=sendableOf(id); if(!S) return; const aud=sendAudience(S);
@@ -3197,7 +3207,7 @@ async function previewBulk(id){
   if(S.isSurvey) await loadInvites(id, aud);
   const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
   const sample=aud[0], link=S.linkFor(sample.email);
-  const pv=await fetchEmailPreview({subject,body,name:sample.name,link,dirTitle:S.title});
+  const pv=await fetchEmailPreview({subject,body,name:sample.name,link,dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"});
   if(!out) return;
   out.innerHTML='<div class="card pad" style="margin-top:4px">'
     +'<div class="spread" style="margin-bottom:8px"><b>Náhled e-mailu</b><span class="muted" style="font-size:12px">vzorový příjemce: '+esc(sample.name||sample.email)+'</span></div>'
@@ -3228,7 +3238,7 @@ async function sendBulk(id){
     if(S.isSurvey) await loadInvites(id, aud);  // podepsané hash odkazy (bez přihlášení)
     const recipients=aud.map(e=>({email:e.email,name:e.name,link:S.linkFor(e.email)}));
     out.innerHTML='<p class="muted">Odesílám '+recipients.length+' e-mailů'+(prof?' (profil „'+esc(prof.label)+'")':"")+'…</p>';
-    const payload={subject,body,recipients,dirTitle:S.title};
+    const payload={subject,body,recipients,dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"};
     if(prof){ payload.fromEmail=prof.fromEmail; payload.fromName=prof.fromName; }
     const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
     let j={}; try{ j=await res.json(); }catch(_){ }
@@ -3253,13 +3263,10 @@ function applyProfileToSend(dirId){
   const p=DB.profiles.find(x=>x.id===sel.value);
   const S=sendableOf(dirId);
   const mSubj=document.getElementById("mSubj"), mBody=document.getElementById("mBody");
-  if(!p){ // bez profilu — vrať výchozí (podle typu: směrnice / průzkum)
-    mSubj.value=(S&&S.isSurvey?"Dotazník: ":"K seznámení: ")+(S?S.title:"");
-    mBody.value=(S&&S.isSurvey)
-      ? "Dobrý den, {jmeno5},\n\nprosíme Vás o vyplnění dotazníku „{smernice}\". Otevřete prosím svůj osobní odkaz:\n\n{odkaz}\n\nDěkujeme."
-      : "Dobrý den, {jmeno5},\n\nprosíme Vás o seznámení se směrnicí „{smernice}\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n{odkaz}\n\nDěkujeme.";
-    return;
-  }
+  const DEF=sendDefaults(S);
+  // U průzkumů se šablony profilu nepoužijí (jsou psané pro směrnice — „prosíme o seznámení…").
+  // Profil pak určuje jen odesílatele; text zůstává průzkumový.
+  if(!p || (S&&S.isSurvey)){ mSubj.value=DEF.subj; mBody.value=DEF.body; return; }
   // pokud má profil šablony, použij je
   if(p.subjectTpl) mSubj.value=p.subjectTpl;
   if(p.bodyTpl) mBody.value=p.bodyTpl;
@@ -3504,9 +3511,8 @@ function openSendModal(id){
       <div class="chip-row" id="sendTagWrap">${ tags.length ? tags.map(t=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0"><input type="checkbox" class="stag" value="'+esc(t)+'" onchange="onSendTags(\''+id+'\')"> '+esc(t)+'</label>').join("") : '<span class="muted">Zatím žádné tagy — přidej je u zaměstnanců.</span>' }</div>
     </div>`;
   document.getElementById("modalTitle").textContent="Rozeslat – "+S.title;
-  const defBody = S.isSurvey
-    ? "Dobrý den, {jmeno5},\n\nprosíme Vás o vyplnění dotazníku „{smernice}\". Otevřete prosím svůj osobní odkaz:\n\n{odkaz}\n\nDěkujeme."
-    : "Dobrý den, {jmeno5},\n\nprosíme Vás o seznámení se směrnicí „{smernice}\". Otevřete prosím svůj osobní odkaz, dokument si přečtěte a dole potvrďte seznámení:\n\n{odkaz}\n\nDěkujeme.";
+  const DEF = sendDefaults(S);
+  const defBody = DEF.body;
   const lastProfId = DB.settings.lastProfileId || (DB.profiles[0]&&DB.profiles[0].id) || "";
   const profOpts = '<option value="">— Výchozí (bez profilu) —</option>' +
     DB.profiles.map(p=>'<option value="'+p.id+'" '+(p.id===lastProfId?'selected':'')+'>'+esc(p.label)+(p.fromEmail?' · '+esc(p.fromEmail):'')+'</option>').join("");
@@ -3534,7 +3540,7 @@ function openSendModal(id){
       <label class="field"><span>Odesílací profil</span>
         <select id="mProfile" onchange="applyProfileToSend('${id}')">${profOpts}</select></label>
       <label class="field"><span>Předmět e-mailu</span>
-        <input type="text" id="mSubj" value="${(S.isSurvey?'Dotazník: ':'K seznámení: ')+esc(S.title)}"></label>
+        <input type="text" id="mSubj" value="${esc(DEF.subj)}"></label>
       <label class="field" style="margin-bottom:6px"><span>Text e-mailu</span>
         <textarea id="mBody" style="min-height:140px">${esc(defBody)}</textarea></label>
       <div class="muted" style="font-size:12px;margin-bottom:12px">Značky: <span class="mono">{jmeno}</span> (1. pád) · <span class="mono">{jmeno5}</span> (5. pád, oslovení – „Davide") · <span class="mono">{smernice}</span> · <span class="mono">{odkaz}</span></div>
