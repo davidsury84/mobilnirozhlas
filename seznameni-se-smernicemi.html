@@ -1716,6 +1716,28 @@ function sendAudience(S){
 function onSendTags(id){ SEND_TAGS=[...document.querySelectorAll(".stag:checked")].map(c=>c.value); const S=sendableOf(id); if(S&&S.isSurvey){ loadInvites(id,sendAudience(S)).then(()=>renderSendList(id)); } else renderSendList(id); }
 function onSendCands(id){ SEND_CAND=[...document.querySelectorAll(".scand:checked")].map(c=>c.value); const S=sendableOf(id); if(S&&S.isSurvey){ loadInvites(id,sendAudience(S)).then(()=>renderSendList(id)); } else renderSendList(id); }
 function toggleAllCands(id,on){ document.querySelectorAll(".scand").forEach(c=>c.checked=on); onSendCands(id); }
+// Seznam uchazečů v rozesílacím okně (zaškrtnutí drží SEND_CAND — přežije překreslení)
+function candChips(id){
+  const cands=(DB.candidates||[]).slice().sort((a,b)=>(a.name||"").localeCompare(b.name||"","cs"));
+  if(!cands.length) return '<span class="muted">Zatím žádní uchazeči — přidej ho rovnou níže (jméno + e-mail).</span>';
+  return cands.map(c=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 14px 6px 0"><input type="checkbox" class="scand" value="'+c.id+'" '+(SEND_CAND.includes(c.id)?'checked':'')+' onchange="onSendCands(\''+id+'\')"> '+esc(c.name)+(c.position?' <span class="muted" style="font-size:12px">('+esc(c.position)+')</span>':'')+'</label>').join("");
+}
+// Rychlé založení uchazeče přímo z rozesílacího okna — přidá ho do záložky Uchazeči a rovnou vybere.
+function addCandidateInline(id){
+  const nameEl=document.getElementById("qcName"), emEl=document.getElementById("qcEmail");
+  const name=(nameEl&&nameEl.value||"").trim(), email=(emEl&&emEl.value||"").trim().toLowerCase();
+  if(email.indexOf("@")<0){ alert("Zadej platný e-mail uchazeče."); return; }
+  if(!DB.candidates) DB.candidates=[];
+  let c=DB.candidates.find(x=>(x.email||"").toLowerCase()===email);
+  if(!c){ c={id:uid(),name:name||email,email,position:"",tags:[]}; DB.candidates.push(c); save(); }
+  else if(name && c.name!==name){ c.name=name; save(); }
+  if(!SEND_CAND.includes(c.id)) SEND_CAND.push(c.id);
+  nameEl.value=""; emEl.value="";
+  const wrap=document.getElementById("sendCandWrap"); if(wrap) wrap.innerHTML=candChips(id);
+  const S=sendableOf(id);
+  if(S&&S.isSurvey){ loadInvites(id,sendAudience(S)).then(()=>renderSendList(id)); } else renderSendList(id);
+  toast("Uchazeč "+(c.name||email)+" přidán a vybrán");
+}
 function ackStats(dir){
   const aud = audienceOf(dir);
   const done = aud.filter(e => dir.acks[e.email.toLowerCase()]);
@@ -3511,7 +3533,12 @@ function openSendModal(id){
     <div class="card pad" style="margin-bottom:14px">
       <div class="spread"><strong>Uchazeči o práci</strong>${ cands.length ? '<button type="button" class="btn ghost sm" onclick="toggleAllCands(\''+id+'\',true)">Vybrat všechny</button>' : '' }</div>
       <p class="muted" style="margin:4px 0 10px;font-size:13px">Zaškrtnutí uchazeči dostanou ${S.isSurvey?'dotazník/test':'tuto zprávu'} navíc k zaměstnancům — i když nejsou ve firmě.</p>
-      <div class="chip-row" id="sendCandWrap">${ cands.length ? cands.map(c=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 14px 6px 0"><input type="checkbox" class="scand" value="'+c.id+'" onchange="onSendCands(\''+id+'\')"> '+esc(c.name)+(c.position?' <span class="muted" style="font-size:12px">('+esc(c.position)+')</span>':'')+'</label>').join("") : '<span class="muted">Zatím žádní uchazeči — přidej je v záložce Uchazeči.</span>' }</div>
+      <div class="chip-row" id="sendCandWrap">${candChips(id)}</div>
+      <div class="inline-actions" style="margin-top:10px;flex-wrap:wrap;gap:6px">
+        <input type="text" id="qcName" placeholder="Jméno uchazeče" style="max-width:180px">
+        <input type="email" id="qcEmail" placeholder="jmeno@email.cz" style="max-width:210px">
+        <button type="button" class="btn ghost sm" onclick="addCandidateInline('${id}')">+ Přidat a vybrat</button>
+      </div>
     </div>`;
   const tagFilter = `
     <div class="card pad" style="margin-bottom:14px">
