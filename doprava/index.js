@@ -17,7 +17,8 @@ const sheets = require('./lib/sheets');
 const HTML_FILE = path.join(__dirname, 'doprava.html');
 // Výkony můžou být ve více souborech (ročníky „Daily report ECZ"); čte se ze všech
 // nasdílených a použije se ten s nejnovějšími měsíci. Víc ID odděl čárkou.
-const VYKONY_IDS = () => (process.env.DOPRAVA_SHEET_VYKONY_ID || '1Na7nDmIdSkbpviGfVDRHWsC6kcQacFIFLVx7vaBGVy4,1ZTPTuRdZvbOWOiHuVwdoMOhs_r3rS6OmBCabKJ8dmio')
+// Historické ročníky (2021…) sem NEPATŘÍ — ty jsou jen pro srovnávací analytiku.
+const VYKONY_IDS = () => (process.env.DOPRAVA_SHEET_VYKONY_ID || '1Na7nDmIdSkbpviGfVDRHWsC6kcQacFIFLVx7vaBGVy4')
   .split(',').map((s) => s.trim()).filter(Boolean);
 const NAKLADY_ID = () => process.env.DOPRAVA_SHEET_NAKLADY_ID || '1sVQBx0Weo2Ds9Gfgqwd-LyTVvQ_cBQBtUh7QzDSmnOE';
 const VOZY_ID = () => process.env.DOPRAVA_SHEET_VOZY_ID || '1nWnbtWffoyeaSyy4pEqiHEIIcw0L1dhnLunIyzZLJhg';
