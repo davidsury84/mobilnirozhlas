@@ -1119,9 +1119,20 @@ function showTridiciLinka(){
   MUJ.view="tridicilinka"; renderSidebar();
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("tridicilinka")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
-  body.innerHTML='<iframe src="/tridici-linka-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Design třídicí linky"></iframe>';
+  body.innerHTML='<div id="tlWrap" style="position:relative;background:#fff">'
+    +'<button id="tlFs" onclick="tlCeleOkno()" title="Roztáhnout na celé okno (Esc zavře)" style="position:absolute;top:10px;right:14px;z-index:5;display:flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid #cdd3ca;border-radius:999px;background:rgba(255,255,255,.92);backdrop-filter:blur(4px);color:#1c1d1a;font:600 13px system-ui;cursor:pointer;box-shadow:0 2px 10px rgba(15,21,18,.12)">⛶ Na celé okno</button>'
+    +'<iframe src="/tridici-linka-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Design třídicí linky"></iframe></div>';
   window.scrollTo(0,0);
 }
+// Přepnutí dvojčete třídicí linky na celé okno prohlížeče (a zpět; zavře i Esc).
+function tlCeleOkno(){
+  const w=document.getElementById("tlWrap"); if(!w) return;
+  const f=w.querySelector("iframe"), b=document.getElementById("tlFs");
+  const zapnout = w.style.position!=="fixed";
+  if(zapnout){ w.style.position="fixed"; w.style.inset="0"; w.style.zIndex="9999"; f.style.height="100vh"; b.innerHTML="✕ Ukončit celé okno"; document.body.style.overflow="hidden"; }
+  else { w.style.position="relative"; w.style.inset=""; w.style.zIndex=""; f.style.height="calc(100vh - 69px)"; b.innerHTML="⛶ Na celé okno"; document.body.style.overflow=""; }
+}
+document.addEventListener("keydown",function(e){ const w=document.getElementById("tlWrap"); if(e.key==="Escape"&&w&&w.style.position==="fixed") tlCeleOkno(); });
 function showPrekladiste(){
   MUJ.view="prekladiste"; renderSidebar();
   const body=document.getElementById("mujBody");
@@ -1270,8 +1281,10 @@ function renderUkoly(){
 }
 function ukolRow(x,dnes,canEdit){
   const st=UKOLY_STAV[x.stav||""]||UKOLY_STAV[""];
-  const overdue=x.termin&&x.termin<dnes&&x.stav!=="splneno";
+  const done=(x.stav==="splneno");
+  const overdue=x.termin&&x.termin<dnes&&!done;
   let pills='';
+  if(done) pills+='<span class="pill green" style="background:#12752f;color:#fff;font-weight:700">✓ SPLNĚNO</span>';
   if(x.termin) pills+='<span class="pill '+(overdue?'red':'green')+'">'+(overdue?'✕ termín prošel ':'termín ')+esc(new Date(x.termin+"T00:00:00").toLocaleDateString("cs-CZ"))+'</span>';
   if(x.frekvence) pills+='<span class="pill gray">'+esc(x.frekvence)+'</span>';
   const stav = canEdit
@@ -1280,8 +1293,10 @@ function ukolRow(x,dnes,canEdit){
       '<button class="btn ghost sm" onclick="ukolPozn(\''+esc(x.id)+'\')" title="Poznámka ke plnění">✎</button>'
     : '<span class="pill '+st[1]+'">'+st[0]+'</span>';
   const pozn=x.pozn?'<div class="muted" style="font-size:12px;margin-top:4px;font-style:italic">Poznámka: '+esc(x.pozn)+'</div>':'';
-  return '<div class="li-item" style="align-items:flex-start"><div class="li-left" style="align-items:flex-start"><div class="li-ic">'+mujIcon(MUJ_IC.tasks)+'</div><div style="min-width:0">'+
-    '<div class="li-t">'+esc(x.ukol)+'</div>'+
+  const rowStyle='align-items:flex-start'+(done?';background:var(--green-soft);border-color:#9fc7ae;box-shadow:inset 4px 0 0 #12752f, var(--shadow)':'');
+  const ic=done?'<div class="li-ic" style="background:#12752f;color:#fff;font-size:20px;font-weight:700">✓</div>':'<div class="li-ic">'+mujIcon(MUJ_IC.tasks)+'</div>';
+  return '<div class="li-item" style="'+rowStyle+'"><div class="li-left" style="align-items:flex-start">'+ic+'<div style="min-width:0">'+
+    '<div class="li-t"'+(done?' style="color:#12752f"':'')+'>'+esc(x.ukol)+'</div>'+
     '<div class="muted" style="font-size:13px;margin-top:3px;line-height:1.45"><strong style="color:var(--ink)">Jak se plní:</strong> '+esc(x.jak||'')+'</div>'+
     '<div class="muted" style="font-size:12px;margin-top:5px"><strong>Kdo:</strong> '+esc(x.kdo||'—')+' &nbsp;·&nbsp; <strong>Zdroj:</strong> '+esc(x.zdroj||'')+'</div>'+pozn+
     '</div></div>'+
