@@ -58,6 +58,8 @@ const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://trid
 const TRIDICI_LINKA_APP_FILE = path.join(ROOT, 'design-tridici-linky.html'); // alternativně lokální soubor (stejně jako u Kalkulace-lisy)
 const PREKLADISTE_APP_URL = process.env.PREKLADISTE_APP_URL || ''; // aplikace „Kalkulačka překladiště" — prodejní kalkulačka (repo prekladiste-kalkulacka); doplň URL nasazení
 const PREKLADISTE_APP_FILE = path.join(ROOT, 'kalkulacka-prekladiste.html'); // alternativně lokální soubor
+const FREELO_EMAIL = process.env.FREELO_EMAIL || '';     // modul Freelo: e-mail účtu (basic auth)
+const FREELO_API_KEY = process.env.FREELO_API_KEY || ''; // modul Freelo: API klíč (Freelo → Nastavení profilu → API)
 const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativně lokální soubor
 // Dovolená: úložiště žádostí + (volitelně) zápis do sdíleného Google kalendáře přes service account
 const VAC_F = path.join(DATA_DIR, 'vacation.json');
@@ -690,6 +692,21 @@ function calApi(method, apiPath, token, bodyObj) {
     if (body) r.write(body); r.end();
   });
 }
+/* ---------- Freelo (modul Freelo: projekty přes REST API, basic auth) ---------- */
+function freeloConfigured() { return !!(FREELO_EMAIL && FREELO_API_KEY); }
+let freeloCache = { at: 0, data: null }; // 5min cache, ať se Freelo nevolá při každém otevření záložky
+function freeloApi(apiPath) {
+  return new Promise((resolve, reject) => {
+    const auth = Buffer.from(FREELO_EMAIL + ':' + FREELO_API_KEY).toString('base64');
+    const r = https.request({ method: 'GET', hostname: 'api.freelo.io', path: apiPath, headers: { 'Authorization': 'Basic ' + auth, 'User-Agent': 'ElkoplastIntranet (' + FREELO_EMAIL + ')' } }, resp => {
+      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j); reject(new Error('Freelo ' + resp.statusCode + ': ' + d.slice(0, 200))); });
+    });
+    r.on('error', e => reject(new Error('Spojení s Freelem: ' + e.message)));
+    r.setTimeout(20000, () => { try { r.destroy(new Error('Freelo: časový limit spojení.')); } catch (_) {} });
+    r.end();
+  });
+}
+
 // Vloží celodenní událost dovolené do sdíleného kalendáře; vrací id události nebo null.
 async function calInsertVacation(rq) {
   if (!calendarConfigured()) return null;
@@ -1221,6 +1238,24 @@ const server = http.createServer(async (req, res) => {
       const it = updateUkol(b.id, b);
       if (!it) return send(res, 404, { error: 'Úkol nenalezen.' });
       return send(res, 200, { ok: true, item: it });
+    }
+
+    // ---- Freelo: projekty (živě z Freelo API, pro zaměstnance s modulem „freelo") ----
+    if (p === '/api/freelo/projects' && req.method === 'GET') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req) && employeeModules(e.email).indexOf('freelo') < 0) return send(res, 403, { error: 'K modulu Freelo nemáte přístup.' });
+      if (!freeloConfigured()) return send(res, 200, { configured: false, projects: [] });
+      if (freeloCache.data && Date.now() - freeloCache.at < 5 * 60 * 1000) return send(res, 200, freeloCache.data);
+      try {
+        const list = await freeloApi('/v1/projects');
+        const projects = (Array.isArray(list) ? list : []).map(pr => ({
+          id: pr.id, name: pr.name, editedAt: pr.date_edited_at || pr.date_add || null,
+          tasklists: (pr.tasklists || []).map(t => ({ id: t.id, name: t.name }))
+        }));
+        const out = { configured: true, projects };
+        freeloCache = { at: Date.now(), data: out };
+        return send(res, 200, out);
+      } catch (err) { return send(res, 502, { error: err.message }); }
     }
 
     if (p === '/api/my' && req.method === 'GET') {

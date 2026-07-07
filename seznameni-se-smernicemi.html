@@ -985,7 +985,7 @@ const MUJ_MODS = [
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
   { key:"doprava", icon:MUJ_IC.truck, label:"Doprava", gated:true },
-  { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true, ext:true },
+  { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
@@ -1058,8 +1058,7 @@ function renderSidebar(){
     const active = MUJ.view===m.key ? ' active':'';
     const cls = 'mj-link'+active+(m.soon?' soon':'')+((!m.soon&&counts[m.key])?' has-todo':'');
     let right='';
-    if(m.ext) right='<span class="mj-soon">&#8599;</span>';
-    else if(m.soon) right='<span class="mj-soon">brzy</span>';
+    if(m.soon) right='<span class="mj-soon">brzy</span>';
     else if(counts[m.key]) right='<span class="mj-badge">'+counts[m.key]+'</span>';
     const onclick = m.soon ? 'onclick="mujSoon(\''+m.label+'\')"' : 'onclick="mjGo(\''+m.key+'\')"';
     h+='<button class="'+cls+'" '+onclick+'>'+mujIcon(m.icon)+'<span class="lbl">'+m.label+'</span>'+right+'</button>';
@@ -1071,7 +1070,7 @@ function renderSidebar(){
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
 const FREELO_URL="https://app.freelo.io/dashboard";
 function mjGo(key){
-  if(key==="freelo"){ window.open(FREELO_URL,"_blank","noopener"); return; }
+  if(key==="freelo"){ showFreelo(); return; }
   if(key==="directives") showDirectives();
   else if(key==="library") showLibrary(null);
   else if(key==="eshop") showEshop();
@@ -1149,6 +1148,32 @@ function showDoprava(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("doprava")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/doprava" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f6f7f9" title="Doprava — výkony a náklady vozového parku"></iframe>';
+  window.scrollTo(0,0);
+}
+/* ---------- Modul Freelo (projekty živě z Freelo API) ---------- */
+async function showFreelo(){
+  MUJ.view="freelo"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("freelo")<0){ body.innerHTML='<div class="card pad"><p class="muted" style="margin:0">K tomuto modulu nemáte přístup.</p></div>'; return; }
+  const hero='<div class="dash-hero" style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap"><div><h2>Freelo</h2><p>Projekty načtené živě z Freela.</p></div>'+
+    '<a class="btn ghost sm" href="'+FREELO_URL+'" target="_blank" rel="noopener">Otevřít Freelo ↗</a></div>';
+  body.innerHTML=hero+'<p class="muted">Načítám projekty…</p>';
+  let r=null, err=null;
+  try{ const resp=await fetch("/api/freelo/projects",{cache:"no-store"}); r=await resp.json(); if(!resp.ok) err=(r&&r.error)||("Chyba "+resp.status); }
+  catch(e){ err="Nepodařilo se spojit se serverem."; }
+  if(err){ body.innerHTML=hero+'<div class="card pad"><p class="muted" style="margin:0">Projekty se nepodařilo načíst: '+esc(err)+'</p></div>'; return; }
+  if(!r.configured){ body.innerHTML=hero+'<div class="card pad"><p class="muted" style="margin:0">Napojení na Freelo zatím není nastavené — na serveru chybí proměnné <code>FREELO_EMAIL</code> a <code>FREELO_API_KEY</code>.</p></div>'; return; }
+  const projs=r.projects||[];
+  let h=hero+'<div class="dash-sec">Projekty ('+projs.length+')</div>';
+  if(!projs.length) h+='<div class="card pad"><p class="muted" style="margin:0">Ve Freelu teď nejsou žádné aktivní projekty.</p></div>';
+  projs.forEach(p=>{
+    const ed=p.editedAt?new Date(p.editedAt.replace(" ","T")).toLocaleDateString("cs-CZ"):"";
+    const lists=(p.tasklists||[]).map(t=>esc(t.name)).join(" · ");
+    h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.tasks)+'</div><div><div class="li-t">'+esc(p.name)+'</div>'+
+      '<div class="muted" style="font-size:13px;margin-top:2px">'+(lists||"Bez to-do listů")+(ed?' <span style="opacity:.7">· změna '+esc(ed)+'</span>':'')+'</div></div></div>'+
+      '<a class="btn ghost sm" href="https://app.freelo.io/project/'+p.id+'" target="_blank" rel="noopener">Otevřít ↗</a></div>';
+  });
+  body.innerHTML=h;
   window.scrollTo(0,0);
 }
 /* ---------- Modul Školení (seznam školení + testy) ---------- */
@@ -1528,7 +1553,7 @@ function showDashboard(){
   }
   h += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo ↗",MUJ_IC.tasks,"Projekty a úkoly — otevře se ve Freelu"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     h += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
     provoz.forEach(p=> h += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
