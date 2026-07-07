@@ -335,7 +335,8 @@ function myDirectives(email) {
     .filter(d => assignedTo(d, emp))
     .map(d => {
       const ack = d.acks && d.acks[email];
-      return { id: d.id, title: d.title, kategorie: d.kategorie || null, verze: d.verze || 1, ack: !!ack, ackTs: ack ? ack.ts : null, published: fs.existsSync(path.join(PUB_DIR, String(d.id).replace(/[^a-z0-9]/gi, '') + '.html')) };
+      // published: stránka /s/<id> existuje, nebo ji server umí vygenerovat z obsahu (lazy publikace)
+      return { id: d.id, title: d.title, kategorie: d.kategorie || null, verze: d.verze || 1, ack: !!ack, ackTs: ack ? ack.ts : null, published: !!(d.html) || fs.existsSync(path.join(PUB_DIR, String(d.id).replace(/[^a-z0-9]/gi, '') + '.html')) };
     });
 }
 
@@ -1079,7 +1080,17 @@ const server = http.createServer(async (req, res) => {
     // veřejné cesty
     if (p.indexOf('/s/') === 0) {
       const id = p.slice(3).replace(/[^a-z0-9]/gi, ''); const f = path.join(PUB_DIR, id + '.html');
-      if (!fs.existsSync(f)) return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!fs.existsSync(f)) {
+        // Stránka zatím nebyla publikována (správce jen uložil) → vygenerovat na serveru z aktuálního stavu.
+        const s = getState(); const d = (s.directives || []).find(x => String(x.id) === id);
+        if (!d || !d.html) return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+        try {
+          const { buildPublished } = require('./smernice-pub');
+          const aud = (s.employees || []).filter(e => assignedTo(d, e)).map(e => ({ email: e.email, name: e.name }));
+          const pub = buildPublished(d, { audience: aud, hrEmail: (s.settings || {}).hrEmail || '', apiUrl: '', baseUrl: baseUrl(req) });
+          fs.writeFileSync(f, pub, 'utf8');
+        } catch (e) { return send(res, 500, '<h1>Stránku se nepodařilo vygenerovat</h1>', { 'Content-Type': 'text/html; charset=utf-8' }); }
+      }
       // Přihlášený zaměstnanec potvrzuje bez e-mailového odkazu: vložený skript doplní identitu
       // ze session (/api/me) do globálů stránky (who/emp) a překreslí potvrzení. Kdo v systému
       // není přihlášen, vidí původní chování (ruční e-mail / odkaz z e-mailu).
