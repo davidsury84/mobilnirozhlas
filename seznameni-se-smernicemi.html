@@ -958,8 +958,7 @@ const MUJ_IC = {
   cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.3 12.2a1.5 1.5 0 0 0 1.5 1.2h8a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/>',
   calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7.5" x2="16" y2="7.5"/><circle cx="9" cy="12" r="0.5"/><circle cx="12" cy="12" r="0.5"/><circle cx="15" cy="12" r="0.5"/><circle cx="9" cy="15" r="0.5"/><circle cx="12" cy="15" r="0.5"/><circle cx="15" cy="15" r="0.5"/><circle cx="9" cy="18" r="0.5"/><circle cx="12" cy="18" r="0.5"/><circle cx="15" cy="18" r="0.5"/>',
   truck:'<path d="M3 6.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V16H3V6.5z"/><path d="M14 9h3.6l2.4 3v4H14V9z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>',
-  tasks:'<rect x="8" y="2.5" width="8" height="3.5" rx="1"/><path d="M16 4.5h2a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/><path d="M8.5 13.5l2.2 2.2 4.8-5.2"/>',
-  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/>'
+  tasks:'<rect x="8" y="2.5" width="8" height="3.5" rx="1"/><path d="M16 4.5h2a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/><path d="M8.5 13.5l2.2 2.2 4.8-5.2"/>'
 };
 const MUJ_MODS = [
   { key:"dash", icon:MUJ_IC.dash, label:"Můj přehled" },
@@ -979,8 +978,6 @@ const MUJ_MODS = [
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
-  { grp:"Obchod" },
-  { key:"klienti", icon:MUJ_IC.globe, label:"Klientské stránky", gated:true },
   { grp:"Rozvoj a nástup" },
   { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace" },
   { key:"skoleni", icon:MUJ_IC.school, label:"Školení" },
@@ -1057,7 +1054,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="doprava"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="klienti");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="doprava"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
 function mjGo(key){
@@ -1067,7 +1064,6 @@ function mjGo(key){
   else if(key==="kalkulace") showKalkulace();
   else if(key==="svozesa") showSvozEsa();
   else if(key==="doprava") showDoprava();
-  else if(key==="klienti") showKlienti();
   else if(key==="smlouvy") showSmlouvy();
   else if(key==="sortiment") showSortiment();
   else if(key==="adaptace") showAdaptace();
@@ -1112,13 +1108,6 @@ function showDoprava(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("doprava")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/doprava" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f6f7f9" title="Doprava — výkony a náklady vozového parku"></iframe>';
-  window.scrollTo(0,0);
-}
-function showKlienti(){
-  MUJ.view="klienti"; renderSidebar();
-  const body=document.getElementById("mujBody");
-  if(!MUJ.admin && (MUJ.modules||[]).indexOf("klienti")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
-  body.innerHTML='<iframe src="/klienti" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f2f5f1" title="Klientské stránky — interaktivní stránky pro potenciální klienty"></iframe>';
   window.scrollTo(0,0);
 }
 /* ---------- Modul Školení (seznam školení + testy) ---------- */
@@ -1494,7 +1483,7 @@ function showDashboard(){
   }
   h += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["klienti","Klientské stránky",MUJ_IC.globe,"Stránky pro potenciální klienty"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     h += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
     provoz.forEach(p=> h += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
@@ -2156,7 +2145,7 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["klienti","Klientské stránky"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 function renderAccess(){
   const box=document.getElementById("accessMatrix");
