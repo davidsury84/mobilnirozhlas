@@ -2298,7 +2298,9 @@ function accessModulyHtml(emps){
       (has?'color:#0d5424;font-weight:700':'color:var(--ink)')+
       (e.vedouci?';box-shadow:inset 4px 0 0 #b7791f':'')+
       (lock?';opacity:.8':'')+'" '+
-      'onclick="accessTogglePerson(\''+e.id+'\')">'+(has?'✓ ':'')+esc(e.name||e.email)+'</button>';
+      'onclick="accessTogglePerson(\''+e.id+'\')">'+(has?'✓ ':'')+esc(e.name||e.email)+
+      // jednoslovné jméno nestačí k rozlišení → doplnit e-mail přímo na štítek
+      (((e.name||'').trim()&&(e.name||'').trim().indexOf(' ')<0&&e.email)?' <span style="opacity:.6;font-size:11px;font-weight:400">'+esc(e.email)+'</span>':'')+'</button>';
   });
   h+='</div></div>';
   return h;
