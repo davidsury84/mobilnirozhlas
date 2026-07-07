@@ -198,6 +198,14 @@ table.matrix tbody tr:hover td{background:#f6f8f6}
 table.matrix tbody tr:hover td.who{background:#eef3ef}
 .cell-ok{color:var(--green);font-weight:700;text-align:center}
 .cell-no{color:var(--line-strong);text-align:center}
+/* Přístupy: úzké sloupce se svislými popisky, skupinové hlavičky */
+table.matrix th.mod{padding:10px 3px 6px;text-align:center;min-width:34px}
+table.matrix th.mod .vlab{display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-size:11px;letter-spacing:.02em;max-height:120px;text-transform:none}
+table.matrix th.mod .cnt{display:block;font-size:10px;color:var(--ink-soft);font-weight:400;margin-top:4px}
+table.matrix tr.grp th{position:sticky;top:0;z-index:2;background:var(--green-soft);color:var(--green-2);font-size:10px;text-transform:uppercase;letter-spacing:.06em;text-align:center;padding:4px 6px;border-bottom:1px solid var(--line)}
+table.matrix td.mod{text-align:center;padding:6px 3px}
+table.matrix td.mod:hover{background:#eaf2ec}
+table.matrix .grp-l{border-left:2px solid var(--line-strong)}
 .cell-na{color:#cfcec6;text-align:center}
 
 /* ---------- Organizační plátno (drag & drop) ---------- */
@@ -2187,20 +2195,71 @@ async function saveLibDoc(id){
    ============================================================ */
 const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
+/* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
+const ACCESS_GROUPS=[
+  ["Provoz",["sklady","plasty","kovo","eshop"]],
+  ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
+  ["Agendy",["doprava","smlouvy","sortiment","adaptace"]]
+];
+let ACCESS_FILTER="";
+function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }
+function accessVisibleEmps(){
+  const q=ACCESS_FILTER.trim().toLowerCase();
+  const emps=DB.employees.slice().sort((a,b)=>(a.name||a.email||"").localeCompare(b.name||b.email||"","cs"));
+  return q? emps.filter(e=>((e.name||"")+" "+(e.email||"")).toLowerCase().includes(q)) : emps;
+}
 function renderAccess(){
   const box=document.getElementById("accessMatrix");
   if(!DB.employees.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nejprve přidej zaměstnance v záložce Zaměstnanci.</p></div>'; return; }
-  let h='<div class="matrix-wrap"><table class="matrix"><thead><tr><th class="who">Zaměstnanec</th><th style="text-align:center;color:var(--green-2)">Admin</th>'+
-    ACCESS_MODULES.map(m=>'<th style="text-align:center">'+m[1]+'</th>').join('')+'</tr></thead><tbody>';
-  DB.employees.forEach(e=>{
+  const wasSearch=document.activeElement&&document.activeElement.id==="accessSearch";
+  const emps=accessVisibleEmps();
+  // skupiny: jen klíče, které v ACCESS_MODULES existují; moduly mimo skupiny na konec do „Ostatní"
+  const grouped=ACCESS_GROUPS.map(g=>[g[0],g[1].filter(k=>ACCESS_MODULES.some(m=>m[0]===k))]).filter(g=>g[1].length);
+  const inGroups=new Set(grouped.flatMap(g=>g[1]));
+  const rest=ACCESS_MODULES.map(m=>m[0]).filter(k=>!inGroups.has(k));
+  if(rest.length) grouped.push(["Ostatní",rest]);
+  const cols=grouped.flatMap(g=>g[1]);
+  const cnt={}; cols.forEach(k=>cnt[k]=DB.employees.filter(e=>(e.modules||[]).indexOf(k)>=0).length);
+  const adminCnt=DB.employees.filter(e=>e.admin||(e.email||'').toLowerCase()===SUPERADMIN_EMAIL).length;
+
+  let h='<div class="card pad" style="margin-bottom:14px"><div class="spread" style="gap:12px;flex-wrap:wrap">'+
+    '<input type="search" id="accessSearch" placeholder="Hledat zaměstnance…" value="'+esc(ACCESS_FILTER)+'" style="max-width:280px" oninput="ACCESS_FILTER=this.value;renderAccess();">'+
+    '<span class="muted" style="font-size:13px">'+emps.length+' z '+DB.employees.length+' zaměstnanců · zaškrtnutí v hlavičce sloupce nastaví modul všem zobrazeným</span></div></div>';
+
+  h+='<div class="matrix-wrap"><table class="matrix"><thead>';
+  // 1. řádek: skupiny
+  h+='<tr class="grp"><th class="who" style="background:var(--bg-2)"></th><th style="background:var(--bg-2)"></th>'+
+    grouped.map(g=>'<th colspan="'+g[1].length+'" class="grp-l">'+esc(g[0])+'</th>').join('')+'</tr>';
+  // 2. řádek: svislé popisky + počet + hromadné zaškrtnutí
+  h+='<tr><th class="who">Zaměstnanec</th>'+
+    '<th class="mod" style="color:var(--green-2)"><span class="vlab" style="font-weight:700">Admin</span><span class="cnt">'+adminCnt+'</span></th>'+
+    grouped.map(g=>g[1].map((k,i)=>'<th class="mod'+(i===0?' grp-l':'')+'" title="'+esc(accessLabel(k))+'"><span class="vlab">'+esc(accessLabel(k))+'</span><span class="cnt">'+cnt[k]+'</span>'+
+      '<input type="checkbox" style="width:14px;height:14px;accent-color:var(--green-2);margin-top:3px" '+(emps.length&&emps.every(e=>(e.modules||[]).indexOf(k)>=0)?'checked':'')+' onchange="toggleAccessColumn(\''+k+'\',this.checked)" title="Nastavit všem zobrazeným">'+
+      '</th>').join('')).join('')+'</tr>';
+  h+='</thead><tbody>';
+  if(!emps.length) h+='<tr><td class="who" colspan="'+(cols.length+2)+'">Nikdo neodpovídá hledání.</td></tr>';
+  emps.forEach(e=>{
     const mset=e.modules||[];
     const isSuper=(e.email||'').toLowerCase()===SUPERADMIN_EMAIL;
-    const adminTd='<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+((isSuper||e.admin)?'checked':'')+(isSuper?' disabled title="Superadmin – nelze odebrat"':'')+' onchange="toggleAdmin(\''+e.id+'\',this.checked)"></td>';
-    h+='<tr><td class="who">'+esc(e.name||e.email)+'<div class="muted" style="font-size:12px">'+esc(e.email||'')+'</div></td>'+adminTd+
-      ACCESS_MODULES.map(m=>'<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(mset.indexOf(m[0])>=0?'checked':'')+' onchange="toggleAccess(\''+e.id+'\',\''+m[0]+'\',this.checked)"></td>').join('')+'</tr>';
+    const adminTd='<td class="mod"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+((isSuper||e.admin)?'checked':'')+(isSuper?' disabled title="Superadmin – nelze odebrat"':'')+' onchange="toggleAdmin(\''+e.id+'\',this.checked)"></td>';
+    h+='<tr><td class="who">'+esc(e.name||e.email)+'<div class="muted" style="font-size:12px">'+esc(e.email||'')+
+      (mset.length?'':' · <span style="color:var(--amber)">bez modulů</span>')+'</div></td>'+adminTd+
+      grouped.map(g=>g[1].map((k,i)=>'<td class="mod'+(i===0?' grp-l':'')+'" title="'+esc((e.name||e.email)+' – '+accessLabel(k))+'"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(mset.indexOf(k)>=0?'checked':'')+' onchange="toggleAccess(\''+e.id+'\',\''+k+'\',this.checked)"></td>').join('')).join('')+'</tr>';
   });
   h+='</tbody></table></div>';
   box.innerHTML=h;
+  if(wasSearch){ const s=document.getElementById("accessSearch"); if(s){ s.focus(); try{ s.setSelectionRange(s.value.length,s.value.length); }catch(_){} } }
+}
+/* Hromadné nastavení modulu všem právě zobrazeným (respektuje vyhledávání) */
+function toggleAccessColumn(key,on){
+  const emps=accessVisibleEmps();
+  if(!confirm((on?'Povolit':'Odebrat')+' modul „'+accessLabel(key)+'" '+(on?'':'u ')+'všem zobrazeným ('+emps.length+')?')){ renderAccess(); return; }
+  emps.forEach(e=>{
+    e.modules=Array.isArray(e.modules)?e.modules:[];
+    if(on){ if(e.modules.indexOf(key)<0) e.modules.push(key); }
+    else { e.modules=e.modules.filter(k=>k!==key); }
+  });
+  save(); renderAccess();
 }
 function toggleAccess(empId, key, on){
   const e=DB.employees.find(x=>x.id===empId); if(!e) return;
