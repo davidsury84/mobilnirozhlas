@@ -3534,11 +3534,11 @@ function openSendModal(id){
       <div class="spread"><strong>Uchazeči o práci</strong>${ cands.length ? '<button type="button" class="btn ghost sm" onclick="toggleAllCands(\''+id+'\',true)">Vybrat všechny</button>' : '' }</div>
       <p class="muted" style="margin:4px 0 10px;font-size:13px">Zaškrtnutí uchazeči dostanou ${S.isSurvey?'dotazník/test':'tuto zprávu'} navíc k zaměstnancům — i když nejsou ve firmě.</p>
       <div class="chip-row" id="sendCandWrap">${candChips(id)}</div>
-      <div class="inline-actions" style="margin-top:10px;flex-wrap:wrap;gap:6px">
+      ${cands.length?'':`<div class="inline-actions" style="margin-top:10px;flex-wrap:wrap;gap:6px">
         <input type="text" id="qcName" placeholder="Jméno uchazeče" style="max-width:180px">
         <input type="email" id="qcEmail" placeholder="jmeno@email.cz" style="max-width:210px">
         <button type="button" class="btn ghost sm" onclick="addCandidateInline('${id}')">+ Přidat a vybrat</button>
-      </div>
+      </div>`}
     </div>`;
   const tagFilter = `
     <div class="card pad" style="margin-bottom:14px">
@@ -3623,10 +3623,33 @@ function renderSendList(id){
         '<td style="text-align:right;white-space:nowrap">'+
         (done?'<span class="pill green">'+doneLbl+'</span> ':'')+
         '<button class="btn ghost sm" onclick="copyOneFor(\''+id+'\',\''+e.email+'\')">Kopírovat odkaz</button> '+
-        '<button class="btn ghost sm" onclick="oneMailto(\''+id+'\',\''+e.email+'\')">✉ E-mail</button></td></tr>';
+        '<button class="btn sm" onclick="sendOne(\''+id+'\',\''+e.email+'\')">✉ Odeslat</button></td></tr>';
     }).join("")+'</tbody></table>';
 }
 function copyOneFor(id,email){ const S=sendableOf(id); copyText(S?S.linkFor(email):personalLink(email)); toast("Odkaz zkopírován"); }
+/* Odeslání jednomu příjemci (uchazeč i zaměstnanec) — použije aktuální předmět/text/profil z okna */
+async function sendOne(id,email){
+  const S=sendableOf(id); if(!S) return;
+  const aud=sendAudience(S);
+  let r=aud.find(e=>(e.email||"").toLowerCase()===email.toLowerCase());
+  if(!r){ const c=(DB.candidates||[]).find(x=>(x.email||"").toLowerCase()===email.toLowerCase())||DB.employees.find(x=>(x.email||"").toLowerCase()===email.toLowerCase()); if(!c){ alert("Příjemce nenalezen."); return; } r={name:c.name,email:c.email}; }
+  if(DEMO){ toast("Ukázkový režim – e-maily se neodesílají"); return; }
+  if(!confirm("Odeslat e-mail?\n\n"+r.name+" <"+r.email+">")) return;
+  const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
+  const profSel=document.getElementById("mProfile"); const prof=profSel&&profSel.value? DB.profiles.find(p=>p.id===profSel.value):null;
+  try{
+    if(!S.isSurvey) await ensurePublished(id);
+    if(S.isSurvey) await loadInvites(id,[r]);
+    const payload={subject,body,recipients:[{email:r.email,name:r.name,link:S.linkFor(r.email)}],dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"};
+    if(prof){ payload.fromEmail=prof.fromEmail; payload.fromName=prof.fromName; }
+    const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    let j={}; try{ j=await res.json(); }catch(_){ }
+    if(!res.ok||j.error) throw new Error(j.error||("HTTP "+res.status));
+    const bad=(j.results||[]).find(x=>!x.ok);
+    if(bad) throw new Error(bad.error||"odeslání selhalo");
+    toast("Odesláno: "+r.email);
+  }catch(e){ alert("Odeslání selhalo: "+e.message+"\n\n"+(interpretMailError(e.message)||"")); }
+}
 function oneMailto(id,email){
   const S=sendableOf(id); if(!S) return;
   const emp=DB.employees.find(x=>x.email.toLowerCase()===email.toLowerCase());
