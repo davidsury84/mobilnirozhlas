@@ -3539,6 +3539,11 @@ function openSendModal(id){
         <input type="email" id="qcEmail" placeholder="jmeno@email.cz" style="max-width:210px">
         <button type="button" class="btn ghost sm" onclick="addCandidateInline('${id}')">+ Přidat a vybrat</button>
       </div>`}
+      <div class="inline-actions" style="margin-top:12px">
+        <button type="button" class="btn sm" onclick="previewCand('${id}')">👁 Zobrazit náhled</button>
+        <button type="button" class="btn sm" onclick="sendToCands('${id}')">✉ Odeslat vybraným uchazečům</button>
+      </div>
+      <div id="candResults" style="margin-top:12px"></div>
     </div>`;
   const tagFilter = `
     <div class="card pad" style="margin-bottom:14px">
@@ -3627,6 +3632,53 @@ function renderSendList(id){
     }).join("")+'</tbody></table>';
 }
 function copyOneFor(id,email){ const S=sendableOf(id); copyText(S?S.linkFor(email):personalLink(email)); toast("Odkaz zkopírován"); }
+/* Zaškrtnutí uchazeči (objekty) */
+function pickedCands(){ return (DB.candidates||[]).filter(c=>SEND_CAND.includes(c.id)); }
+/* Náhled e-mailu pro uchazeče — přímo v kartě Uchazeči o práci */
+async function previewCand(id){
+  const S=sendableOf(id); if(!S) return;
+  const picked=pickedCands();
+  if(!picked.length){ alert("Zaškrtni aspoň jednoho uchazeče."); return; }
+  const out=document.getElementById("candResults"); if(out) out.innerHTML='<p class="muted">Připravuji náhled…</p>';
+  if(S.isSurvey) await loadInvites(id,picked);
+  const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
+  const sample=picked[0], link=S.linkFor(sample.email);
+  const pv=await fetchEmailPreview({subject,body,name:sample.name,link,dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"});
+  if(!out) return;
+  out.innerHTML='<div class="card pad">'
+    +'<div class="spread" style="margin-bottom:8px"><b>Náhled e-mailu</b><span class="muted" style="font-size:12px">příjemce: '+esc(sample.name||sample.email)+'</span></div>'
+    +(pv.mailReady===false?'<div class="hint" style="margin-bottom:10px;background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><b>Pošta není nastavená</b> — vyplň ji v záložce Nastavení.</div>':'')
+    +'<div style="font-size:13px;margin-bottom:8px"><b>Předmět:</b> '+esc(pv.subject||subject)+'</div>'
+    +'<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden"><iframe id="candPrev" style="width:100%;height:38vh;border:0;background:#fff" title="Náhled e-mailu"></iframe></div>'
+    +'<div class="inline-actions" style="margin-top:12px"><button class="btn" onclick="sendToCands(\''+id+'\')">✉ Odeslat uchazečům ('+picked.length+')</button>'
+    +'<button class="btn ghost" onclick="document.getElementById(\'candResults\').innerHTML=\'\'">Zavřít náhled</button></div></div>';
+  const ifr=document.getElementById("candPrev"); if(ifr) ifr.srcdoc=pv.html||'<p style="font-family:sans-serif;color:#777;padding:20px">Náhled se nepodařilo načíst.</p>';
+  out.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+/* Odeslání jen zaškrtnutým uchazečům (bez zaměstnanců) */
+async function sendToCands(id){
+  const S=sendableOf(id); if(!S) return;
+  const picked=pickedCands();
+  if(!picked.length){ alert("Zaškrtni aspoň jednoho uchazeče."); return; }
+  if(DEMO){ toast("Ukázkový režim – e-maily se neodesílají"); return; }
+  if(!confirm("Odeslat e-mail "+picked.length+" uchazečům?\n\n"+picked.map(c=>c.name+" <"+c.email+">").join("\n"))) return;
+  const out=document.getElementById("candResults"); if(out) out.innerHTML='<p class="muted">Odesílám…</p>';
+  const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
+  const profSel=document.getElementById("mProfile"); const prof=profSel&&profSel.value? DB.profiles.find(p=>p.id===profSel.value):null;
+  try{
+    if(!S.isSurvey) await ensurePublished(id);
+    if(S.isSurvey) await loadInvites(id,picked);
+    const payload={subject,body,recipients:picked.map(c=>({email:c.email,name:c.name,link:S.linkFor(c.email)})),dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"};
+    if(prof){ payload.fromEmail=prof.fromEmail; payload.fromName=prof.fromName; }
+    const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    let j={}; try{ j=await res.json(); }catch(_){ }
+    if(!res.ok||j.error) throw new Error(j.error||("HTTP "+res.status));
+    const ok=(j.results||[]).filter(r=>r.ok).length, bad=(j.results||[]).filter(r=>!r.ok);
+    if(out) out.innerHTML='<span class="pill '+(bad.length?'amber':'green')+'">Odesláno '+ok+'/'+(j.results||[]).length+'</span>'
+      +(bad.length?'<div class="mono" style="margin-top:8px;font-size:12px">'+bad.map(b=>esc(b.email)+": "+esc(b.error||"chyba")).join("<br>")+'</div>':'');
+    toast(bad.length?"Část odeslání selhala":"Odesláno "+ok+" uchazečům");
+  }catch(e){ if(out) out.innerHTML='<span class="pill red">Chyba</span> <span class="muted">'+esc(e.message)+'</span>'; alert("Odeslání selhalo: "+e.message+"\n\n"+(interpretMailError(e.message)||"")); }
+}
 /* Odeslání jednomu příjemci (uchazeč i zaměstnanec) — použije aktuální předmět/text/profil z okna */
 async function sendOne(id,email){
   const S=sendableOf(id); if(!S) return;
