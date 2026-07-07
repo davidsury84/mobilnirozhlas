@@ -985,6 +985,7 @@ const MUJ_MODS = [
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
   { key:"doprava", icon:MUJ_IC.truck, label:"Doprava", gated:true },
+  { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true, ext:true },
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
@@ -1057,7 +1058,8 @@ function renderSidebar(){
     const active = MUJ.view===m.key ? ' active':'';
     const cls = 'mj-link'+active+(m.soon?' soon':'')+((!m.soon&&counts[m.key])?' has-todo':'');
     let right='';
-    if(m.soon) right='<span class="mj-soon">brzy</span>';
+    if(m.ext) right='<span class="mj-soon">&#8599;</span>';
+    else if(m.soon) right='<span class="mj-soon">brzy</span>';
     else if(counts[m.key]) right='<span class="mj-badge">'+counts[m.key]+'</span>';
     const onclick = m.soon ? 'onclick="mujSoon(\''+m.label+'\')"' : 'onclick="mjGo(\''+m.key+'\')"';
     h+='<button class="'+cls+'" '+onclick+'>'+mujIcon(m.icon)+'<span class="lbl">'+m.label+'</span>'+right+'</button>';
@@ -1067,7 +1069,9 @@ function renderSidebar(){
   const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="doprava"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
+const FREELO_URL="https://app.freelo.io/dashboard";
 function mjGo(key){
+  if(key==="freelo"){ window.open(FREELO_URL,"_blank","noopener"); return; }
   if(key==="directives") showDirectives();
   else if(key==="library") showLibrary(null);
   else if(key==="eshop") showEshop();
@@ -1524,7 +1528,7 @@ function showDashboard(){
   }
   h += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo ↗",MUJ_IC.tasks,"Projekty a úkoly — otevře se ve Freelu"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     h += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
     provoz.forEach(p=> h += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
@@ -2208,13 +2212,13 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
-  ["Agendy",["doprava","smlouvy","sortiment","adaptace"]]
+  ["Agendy",["doprava","smlouvy","sortiment","adaptace","freelo"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }
@@ -2223,25 +2227,86 @@ function accessVisibleEmps(){
   const emps=DB.employees.slice().sort((a,b)=>(a.name||a.email||"").localeCompare(b.name||b.email||"","cs"));
   return q? emps.filter(e=>((e.name||"")+" "+(e.email||"")).toLowerCase().includes(q)) : emps;
 }
+let ACCESS_VIEW="moduly", ACCESS_SEL="";
+/* Skupiny + „Ostatní" pro moduly mimo skupiny */
+function accessGrouped(){
+  const grouped=ACCESS_GROUPS.map(g=>[g[0],g[1].filter(k=>ACCESS_MODULES.some(m=>m[0]===k))]).filter(g=>g[1].length);
+  const inGroups=new Set(grouped.flatMap(g=>g[1]));
+  const rest=ACCESS_MODULES.map(m=>m[0]).filter(k=>!inGroups.has(k));
+  if(rest.length) grouped.push(["Ostatní",rest]);
+  return grouped;
+}
 function renderAccess(){
   const box=document.getElementById("accessMatrix");
   if(!DB.employees.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nejprve přidej zaměstnance v záložce Zaměstnanci.</p></div>'; return; }
   const wasSearch=document.activeElement&&document.activeElement.id==="accessSearch";
   const emps=accessVisibleEmps();
-  // skupiny: jen klíče, které v ACCESS_MODULES existují; moduly mimo skupiny na konec do „Ostatní"
-  const grouped=ACCESS_GROUPS.map(g=>[g[0],g[1].filter(k=>ACCESS_MODULES.some(m=>m[0]===k))]).filter(g=>g[1].length);
-  const inGroups=new Set(grouped.flatMap(g=>g[1]));
-  const rest=ACCESS_MODULES.map(m=>m[0]).filter(k=>!inGroups.has(k));
-  if(rest.length) grouped.push(["Ostatní",rest]);
+  let h='<div class="card pad" style="margin-bottom:14px"><div class="spread" style="gap:12px;flex-wrap:wrap">'+
+    '<div class="inline-actions" style="gap:6px">'+
+      '<button class="btn sm'+(ACCESS_VIEW==="moduly"?'':' ghost')+'" onclick="ACCESS_VIEW=\'moduly\';renderAccess()">Podle modulů</button>'+
+      '<button class="btn sm'+(ACCESS_VIEW==="matrix"?'':' ghost')+'" onclick="ACCESS_VIEW=\'matrix\';renderAccess()">Tabulka (matice)</button>'+
+    '</div>'+
+    '<input type="search" id="accessSearch" placeholder="Hledat zaměstnance…" value="'+esc(ACCESS_FILTER)+'" style="max-width:260px" oninput="ACCESS_FILTER=this.value;renderAccess();">'+
+    '<span class="muted" style="font-size:13px">'+emps.length+' z '+DB.employees.length+' zaměstnanců</span></div></div>';
+  h+= ACCESS_VIEW==="moduly" ? accessModulyHtml(emps) : accessMatrixHtml(emps);
+  box.innerHTML=h;
+  if(wasSearch){ const s=document.getElementById("accessSearch"); if(s){ s.focus(); try{ s.setSelectionRange(s.value.length,s.value.length); }catch(_){} } }
+}
+/* Pohled „Podle modulů": vyber sekci → lidi přiřazuješ klikáním na jména */
+function accessModulyHtml(emps){
+  const grouped=accessGrouped();
+  const cnt=k=>DB.employees.filter(e=>(e.modules||[]).indexOf(k)>=0).length;
+  const adminCnt=DB.employees.filter(e=>e.admin||(e.email||'').toLowerCase()===SUPERADMIN_EMAIL).length;
+  if(!ACCESS_SEL) ACCESS_SEL=grouped[0][1][0];
+  const selBtn=(k,label,n)=>'<button class="btn sm'+(ACCESS_SEL===k?'':' ghost')+'" style="border-radius:999px" onclick="ACCESS_SEL=\''+k+'\';renderAccess()">'+esc(label)+' <span style="opacity:.7;font-weight:400">'+n+'</span></button>';
+  let h='<div class="card pad" style="margin-bottom:14px">';
+  grouped.forEach(g=>{
+    h+='<div style="margin-bottom:10px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">'+esc(g[0])+'</div>'+
+      '<div class="inline-actions" style="flex-wrap:wrap;gap:6px">'+g[1].map(k=>selBtn(k,accessLabel(k),cnt(k))).join('')+'</div></div>';
+  });
+  h+='<div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Správa</div>'+
+    '<div class="inline-actions">'+selBtn("_admin","Admin (správa intranetu)",adminCnt)+'</div></div></div>';
+
+  const isAdminSel=ACCESS_SEL==="_admin";
+  const selLabel=isAdminSel?"Admin (správa intranetu)":accessLabel(ACCESS_SEL);
+  const selCnt=isAdminSel?adminCnt:cnt(ACCESS_SEL);
+  h+='<div class="card pad"><div class="spread" style="flex-wrap:wrap;gap:10px">'+
+    '<strong style="font-size:16px">'+esc(selLabel)+'</strong>'+
+    '<span class="pill '+(selCnt?'green':'gray')+'">'+selCnt+' z '+DB.employees.length+' má přístup</span></div>'+
+    '<p class="muted" style="margin:6px 0 14px;font-size:13px">Klikni na jméno — <span style="display:inline-block;background:#12752f;color:#fff;border-radius:999px;padding:1px 10px;font-size:12px">zelené ✓</span> přístup mají, šedé ne.</p>'+
+    '<div class="chip-row" style="gap:8px">';
+  if(!emps.length) h+='<span class="muted">Nikdo neodpovídá hledání.</span>';
+  emps.forEach(e=>{
+    const isSuper=(e.email||'').toLowerCase()===SUPERADMIN_EMAIL;
+    const has=isAdminSel?(isSuper||!!e.admin):((e.modules||[]).indexOf(ACCESS_SEL)>=0);
+    const lock=isAdminSel&&isSuper;
+    h+='<button title="'+esc(e.email||'')+(lock?' · Superadmin – nelze odebrat':'')+'" '+(lock?'disabled ':'')+
+      'style="font-family:inherit;font-size:13px;padding:7px 14px;border-radius:999px;cursor:'+(lock?'default':'pointer')+';border:1.5px solid '+(has?'#12752f':'var(--line-strong)')+';'+
+      (has?'background:#12752f;color:#fff;font-weight:600':'background:#fff;color:var(--ink)')+(lock?';opacity:.75':'')+'" '+
+      'onclick="accessTogglePerson(\''+e.id+'\')">'+(has?'✓ ':'')+esc(e.name||e.email)+'</button>';
+  });
+  h+='</div></div>';
+  return h;
+}
+function accessTogglePerson(empId){
+  const e=DB.employees.find(x=>x.id===empId); if(!e) return;
+  if(ACCESS_SEL==="_admin"){
+    if((e.email||'').toLowerCase()===SUPERADMIN_EMAIL) return;
+    e.admin=!e.admin;
+  } else {
+    e.modules=Array.isArray(e.modules)?e.modules:[];
+    const i=e.modules.indexOf(ACCESS_SEL);
+    if(i<0) e.modules.push(ACCESS_SEL); else e.modules.splice(i,1);
+  }
+  save(); renderAccess();
+}
+/* Pohled „Tabulka (matice)" */
+function accessMatrixHtml(emps){
+  const grouped=accessGrouped();
   const cols=grouped.flatMap(g=>g[1]);
   const cnt={}; cols.forEach(k=>cnt[k]=DB.employees.filter(e=>(e.modules||[]).indexOf(k)>=0).length);
   const adminCnt=DB.employees.filter(e=>e.admin||(e.email||'').toLowerCase()===SUPERADMIN_EMAIL).length;
-
-  let h='<div class="card pad" style="margin-bottom:14px"><div class="spread" style="gap:12px;flex-wrap:wrap">'+
-    '<input type="search" id="accessSearch" placeholder="Hledat zaměstnance…" value="'+esc(ACCESS_FILTER)+'" style="max-width:280px" oninput="ACCESS_FILTER=this.value;renderAccess();">'+
-    '<span class="muted" style="font-size:13px">'+emps.length+' z '+DB.employees.length+' zaměstnanců · zaškrtnutí v hlavičce sloupce nastaví modul všem zobrazeným</span></div></div>';
-
-  h+='<div class="matrix-wrap"><table class="matrix"><thead>';
+  let h='<div class="matrix-wrap"><table class="matrix"><thead>';
   // 1. řádek: skupiny
   h+='<tr class="grp"><th class="who" style="background:var(--bg-2)"></th><th style="background:var(--bg-2)"></th>'+
     grouped.map(g=>'<th colspan="'+g[1].length+'" class="grp-l">'+esc(g[0])+'</th>').join('')+'</tr>';
@@ -2262,8 +2327,7 @@ function renderAccess(){
       grouped.map(g=>g[1].map((k,i)=>'<td class="mod'+(i===0?' grp-l':'')+'" title="'+esc((e.name||e.email)+' – '+accessLabel(k))+'"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(mset.indexOf(k)>=0?'checked':'')+' onchange="toggleAccess(\''+e.id+'\',\''+k+'\',this.checked)"></td>').join('')).join('')+'</tr>';
   });
   h+='</tbody></table></div>';
-  box.innerHTML=h;
-  if(wasSearch){ const s=document.getElementById("accessSearch"); if(s){ s.focus(); try{ s.setSelectionRange(s.value.length,s.value.length); }catch(_){} } }
+  return h;
 }
 /* Hromadné nastavení modulu všem právě zobrazeným (respektuje vyhledávání) */
 function toggleAccessColumn(key,on){
