@@ -56,6 +56,7 @@
   <button data-tab="zvrat">Bod zvratu</button>
   <button data-tab="citlivost">Citlivost</button>
   <button data-tab="bonus">Bonus za spotřebu</button>
+  <button data-tab="historie">Historie</button>
   <span class="muted" id="stav" style="margin-left:auto"></span>
 </header>
 <main id="app"><p class="muted">Načítám data z Google Sheets…</p></main>
@@ -169,7 +170,95 @@ function render(tab){
   else if(tab==='zvrat') tabZvrat();
   else if(tab==='citlivost') tabCitlivost();
   else if(tab==='bonus') tabBonus();
+  else if(tab==='historie') tabHistorie();
   window.scrollTo(0,0);
+}
+
+/* ================= HISTORIE (meziroční srovnání) ================= */
+const ROK_BARVY={2021:'#b4b2a9',2022:'#888780',2023:'#eda100',2024:'#eb6834',2025:'#4a3aa7'};
+const rokBarva=(rok,aktualni)=>aktualni?B:(ROK_BARVY[rok]||GR);
+// Měsíční součty flotily po ročnících (historie + aktuální rok z kompletních měsíců).
+function rokySerie(){
+  const mapa={};
+  (DATA.historie||[]).forEach(r=>{
+    const mes={};
+    r.vozidla.forEach(v=>Object.entries(v.mesice).forEach(([k,d])=>{
+      if(!k.startsWith(String(r.rok))) return;
+      const mm=+k.slice(5); if(!mes[mm]) mes[mm]={km:0,trz:0};
+      mes[mm].km+=d.km; mes[mm].trz+=d.trzby;
+    }));
+    Object.keys(mes).forEach(mm=>{ if(mes[mm].km===0&&mes[mm].trz===0) delete mes[mm]; });
+    const akt=r.vozidla.filter(v=>Object.values(v.mesice).some(d=>d.km>0)).length;
+    if(Object.keys(mes).length) mapa[r.rok]={rok:r.rok,mes,akt,aktualni:false};
+  });
+  if(M.mesice.length){
+    const rok=+M.mesice[0].slice(0,4), mes={};
+    M.mesice.forEach(k=>{ mes[+k.slice(5)]={km:M.sum[k].km,trz:M.sum[k].trzby}; });
+    mapa[rok]={rok,mes,akt:M.aktivni.length,aktualni:true};   // aktuální rok má přednost před historií
+  }
+  return Object.values(mapa).sort((a,b)=>a.rok-b.rok);
+}
+function tabHistorie(){
+  const serie=rokySerie();
+  const hist=serie.filter(s=>!s.aktualni);
+  let h='<h1>Historie — meziroční srovnání</h1>';
+  if(!hist.length){
+    h+=alertHtml('info','Historické ročníky zatím nejsou k dispozici. Nasdílejte robotovi <b>elko-intranet-drive@…</b> soubory „Daily report ECZ 2021/2023/2025" (jako Prohlížející) — načtou se samy do 24 hodin, nebo hned po „Obnovit z tabulek".');
+    if(serie.length) h+=alertHtml('warn','K dispozici je zatím jen aktuální ročník — srovnávat není s čím.');
+    $('#app').innerHTML=h; return;
+  }
+  const rocni=serie.map(s=>{
+    const kms=Object.values(s.mes).reduce((a,x)=>a+x.km,0), trz=Object.values(s.mes).reduce((a,x)=>a+x.trz,0);
+    const n=Object.keys(s.mes).length;
+    return {...s, kms, trz, n, sazba:kms>0?trz/kms:null, naVuz:s.akt&&n?trz/s.akt/n:null};
+  });
+  const prvni=rocni[0], posledni=rocni[rocni.length-1];
+  if(prvni.sazba&&posledni.sazba&&prvni.rok!==posledni.rok){
+    const rust=(posledni.sazba/prvni.sazba-1)*100;
+    h+=alertHtml(rust>=0?'ok':'danger','Průměrná sazba narostla z <b>'+d2(prvni.sazba)+' Kč/km ('+prvni.rok+')</b> na <b>'+d2(posledni.sazba)+' Kč/km ('+posledni.rok+')</b>, tj. '+sgn(rust,x=>x.toFixed(0)+' %')+' — argument pro vyjednávání o cenách.');
+  }
+  // sezónnost z historických ročníků (index tržeb měsíce vs. průměr roku)
+  const idx={};
+  hist.forEach(s=>{
+    const prum=Object.values(s.mes).reduce((a,x)=>a+x.trz,0)/Object.keys(s.mes).length;
+    Object.entries(s.mes).forEach(([mm,x])=>{ (idx[mm]=idx[mm]||[]).push(x.trz/prum); });
+  });
+  const sez={}; Object.entries(idx).forEach(([mm,arr])=>{ sez[mm]=arr.reduce((a,b)=>a+b,0)/arr.length; });
+  const sezRadek=Object.entries(sez).sort((a,b)=>b[1]-a[1]);
+  if(sezRadek.length>=6) h+=alertHtml('info','Sezónnost z let '+hist.map(s=>s.rok).join(', ')+': nejsilnější bývá <b>'+sezRadek[0][0]+'. měsíc</b> ('+Math.round((sezRadek[0][1]-1)*100)+' % nad průměrem), nejslabší <b>'+sezRadek[sezRadek.length-1][0]+'. měsíc</b> ('+Math.round((1-sezRadek[sezRadek.length-1][1])*100)+' % pod průměrem).');
+  const legRoky=legenda(rocni.map(s=>[rokBarva(s.rok,s.aktualni),String(s.rok)+(s.aktualni?' (aktuální)':'')]));
+  h+=box('Sazba Kč/km po měsících — roky přes sebe',cv('chYoY',300),legRoky);
+  h+='<div class="grid2">'
+    +box('Tržby po měsících (mil. Kč)',cv('chYoYtrz',260),legRoky)
+    +box('Sezónní index tržeb <span class="muted">(1,0 = průměr roku)</span>',cv('chSez',260),legenda([[GR,'Průměr historických let'],[B,'Aktuální rok']]))
+    +'</div>';
+  h+='<h2>Ročníky</h2><table><thead><tr><th>Rok</th><th>Měsíců</th><th>km</th><th>Tržby</th><th>Ø Kč/km</th><th>Δ sazby</th><th>Aktivních vozů</th><th>Tržby/vůz/měs</th></tr></thead><tbody>'
+    +rocni.map((s,i)=>{
+      const dS=i>0&&rocni[i-1].sazba?(s.sazba/rocni[i-1].sazba-1)*100:null;
+      return '<tr><td>'+s.rok+(s.aktualni?' <span class="pill zel">běží</span>':'')+'</td><td>'+s.n+'</td><td>'+s.kms.toLocaleString('cs-CZ')+'</td><td>'+mil(s.trz)+'</td><td>'+d2(s.sazba)+'</td>'
+        +'<td class="'+(dS==null?'':(dS>=0?'pos':'neg'))+'">'+(dS==null?'—':sgn(dS,x=>x.toFixed(1).replace('.',',')+' %'))+'</td>'
+        +'<td>'+s.akt+'</td><td>'+(s.naVuz?kc(s.naVuz):'—')+'</td></tr>';
+    }).join('')+'</tbody></table>'
+    +'<p class="muted" style="font-size:12px">Chybějící ročníky (2022, 2024…) se objeví automaticky, jakmile budou soubory „Daily report ECZ" nasdílené robotovi. Ziskovost se historicky nesrovnává — nákladová kalkulace platí jen pro současnost.</p>';
+  $('#app').innerHTML=h;
+
+  const mesLabels=['1','2','3','4','5','6','7','8','9','10','11','12'];
+  const ds=(f)=>rocni.map(s=>({label:String(s.rok),data:mesLabels.map((_,i)=>{const x=s.mes[i+1];return x?f(x):null;}),
+    borderColor:rokBarva(s.rok,s.aktualni),backgroundColor:rokBarva(s.rok,s.aktualni),borderWidth:s.aktualni?3:2,
+    pointRadius:s.aktualni?4:2.5,tension:.2,spanGaps:true}));
+  chart('chYoY',{type:'line',data:{labels:mesLabels,datasets:ds(x=>x.km>0?x.trz/x.km:null)},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{title:c=>c[0].dataset.label+' · '+c[0].label+'. měsíc',label:c=>d2(c.parsed.y)+' Kč/km'}}},
+      scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' Kč'}}}}});
+  chart('chYoYtrz',{type:'line',data:{labels:mesLabels,datasets:ds(x=>x.trz/1e6)},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{title:c=>c[0].dataset.label+' · '+c[0].label+'. měsíc',label:c=>kc(c.parsed.y*1e6)}}},
+      scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v=>v.toFixed(1)+' M'}}}}});
+  const cur=rocni.find(s=>s.aktualni);
+  const curPrum=cur?Object.values(cur.mes).reduce((a,x)=>a+x.trz,0)/Object.keys(cur.mes).length:null;
+  chart('chSez',{data:{labels:mesLabels,datasets:[
+    {type:'bar',data:mesLabels.map((_,i)=>sez[i+1]!=null?Math.round(sez[i+1]*100)/100:null),backgroundColor:GR,borderRadius:4,maxBarThickness:26},
+    ...(cur?[{type:'line',data:mesLabels.map((_,i)=>{const x=cur.mes[i+1];return x&&curPrum?Math.round(x.trz/curPrum*100)/100:null;}),borderColor:B,borderWidth:2,pointRadius:3,pointBackgroundColor:B,tension:.2,spanGaps:true}]:[])]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>'index '+String(c.parsed.y).replace('.',',')}}},
+      scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v=>String(v).replace('.',',')}}}}});
 }
 
 /* ================= PŘEHLED ================= */
@@ -251,7 +340,8 @@ function tabVozidla(){
     +'<label style="width:auto">Fix Kč/měs</label><input id="vozFix" '+(ADMIN?'':'disabled')+' style="width:110px" inputmode="numeric">'
     +(ADMIN?'<button class="btn sm" id="vozSave" style="padding:7px 14px">Uložit</button>':'')+'</div>'
     +'<p class="muted" id="vozEvid" style="margin:0 0 10px;font-size:12px"></p>'
-    +cv('chVoz',240)+'<div id="vozTab" style="margin-top:12px"></div></div>';
+    +cv('chVoz',240)+'<div id="vozTab" style="margin-top:12px"></div>'
+    +'<div id="vozHistBox" style="display:none"><h2 style="font-size:15px;margin:18px 0 8px">Historie vozu napříč ročníky <span class="muted" id="vozHistInfo"></span></h2>'+cv('chVozHist',220)+'</div></div>';
   h+='<h2>Souhrn</h2><table><thead><tr><th>Vůz</th><th style="text-align:left">Řidič</th><th style="text-align:left">Vozidlo</th><th>km</th><th>Tržby</th><th>Kč/km</th>'+(m.FIXV!=null?'<th>Fix/měs</th>':'')+(m.VAR!=null?'<th>Krycí příspěvek</th>':'')+(m.FIXV!=null?'<th>Výsledek po fixech</th>':'')+'<th></th></tr></thead><tbody>'
     +m.voz.slice().sort((a,b)=>b.trz-a.trz).map(v=>'<tr data-clic onclick="ukazVoz(\''+esc(v.cislo)+'\')"><td>'+esc(v.cislo)+' <span class="muted">'+esc(v.spz)+'</span></td>'
       +'<td style="text-align:left">'+(v.ridic?esc(v.ridic):'<span class="muted">—</span>')+'</td>'
@@ -310,6 +400,20 @@ function vozDetail(cislo){
     t+='<tr><td>'+mesLbl(x)+'</td><td>'+d.km.toLocaleString('cs-CZ')+'</td><td>'+kc(d.trzby)+'</td>'
       +(r!=null?'<td>'+kc(nakl[i])+'</td><td class="'+(r<0?'neg':'pos')+'">'+sgn(r,kc)+'</td>':'')+'</tr>'; });
   $('#vozTab').innerHTML=t+'</tbody></table>';
+  // dlouhodobý příběh vozu: sazba Kč/km ze všech ročníků (párování přes SPZ)
+  const spzN=nSpz(v.spz); const hist=[];
+  (DATA.historie||[]).forEach(r=>{ const hv=r.vozidla.find(x=>nSpz(x.spz)===spzN); if(hv) Object.entries(hv.mesice).forEach(([k,d])=>{ if(k.startsWith(String(r.rok))) hist.push({k,...d}); }); });
+  m.mesice.forEach(k=>{ const d=v.mesice[k]; if(d) hist.push({k,...d}); });
+  const body2=hist.filter(x=>x.km>0&&x.trzby>0).sort((a,b)=>a.k<b.k?-1:1);
+  const roky=[...new Set(body2.map(x=>x.k.slice(0,4)))];
+  if(spzN && roky.length>1){
+    $('#vozHistBox').style.display='';
+    $('#vozHistInfo').textContent='('+roky.join(', ')+' · párováno přes SPZ '+v.spz+')';
+    chart('chVozHist',{type:'line',data:{labels:body2.map(x=>mesLbl(x.k)),datasets:[
+      {data:body2.map(x=>x.trzby/x.km),borderColor:B,borderWidth:2,pointRadius:2.5,pointBackgroundColor:B,tension:.2}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>{const x=body2[c.dataIndex];return [d2(c.parsed.y)+' Kč/km',x.km.toLocaleString('cs-CZ')+' km · '+kc(x.trzby)];}}}},
+        scales:{x:{...AXC,grid:{display:false},ticks:{...AXC.ticks,maxTicksLimit:14}},y:{...AXC,ticks:{...AXC.ticks,callback:v2=>v2+' Kč'}}}}});
+  } else { $('#vozHistBox').style.display='none'; if(CH.chVozHist){CH.chVozHist.destroy();delete CH.chVozHist;} }
 }
 
 /* ================= BOD ZVRATU ================= */

@@ -20,6 +20,11 @@ const HTML_FILE = path.join(__dirname, 'doprava.html');
 // Historické ročníky (2021…) sem NEPATŘÍ — ty jsou jen pro srovnávací analytiku.
 const VYKONY_IDS = () => (process.env.DOPRAVA_SHEET_VYKONY_ID || '1Na7nDmIdSkbpviGfVDRHWsC6kcQacFIFLVx7vaBGVy4')
   .split(',').map((s) => s.trim()).filter(Boolean);
+// Historické ročníky pro záložku Historie (meziroční srovnání, sezónnost, vývoj vozů).
+// Načte se, co je robotovi nasdílené; nenasdílené ročníky se tiše přeskočí.
+const HISTORIE_IDS = () => (process.env.DOPRAVA_SHEET_HISTORIE_IDS
+  || '1ZTPTuRdZvbOWOiHuVwdoMOhs_r3rS6OmBCabKJ8dmio,1TBPZVRkjzbKjqiDi5YvxxfMoFVmRi8tCzXiejLYpFl0,1CHrbCwh7txbw9RPdZbOFYM89vxuIeoEyhTxqrLnQXok')
+  .split(',').map((s) => s.trim()).filter(Boolean);
 const NAKLADY_ID = () => process.env.DOPRAVA_SHEET_NAKLADY_ID || '1sVQBx0Weo2Ds9Gfgqwd-LyTVvQ_cBQBtUh7QzDSmnOE';
 const VOZY_ID = () => process.env.DOPRAVA_SHEET_VOZY_ID || '1nWnbtWffoyeaSyy4pEqiHEIIcw0L1dhnLunIyzZLJhg';
 
@@ -231,6 +236,31 @@ function mount(host) {
     return best;
   }
 
+  // Historické ročníky: z každého souboru list s nejvíce měsíci; rok = převažující rok v datech.
+  async function readHistorie() {
+    const roky = [];
+    for (const id of HISTORIE_IDS()) {
+      try {
+        const kandidati = [null, ...(await sheets.listSheets(id).catch(() => []))].slice(0, 9);
+        let best = null;
+        for (const list of kandidati) {
+          try {
+            const range = list == null ? 'A1:Z300' : ("'" + list.replace(/'/g, "''") + "'!A1:Z300");
+            const d = parseVykony(await sheets.readValues(id, range));
+            if (!d.length) continue;
+            const mes = new Set(); d.forEach((v) => Object.keys(v.mesice).forEach((k) => mes.add(k)));
+            if (!best || mes.size > best.n) best = { vozidla: d, n: mes.size, list: list || '(první list)' };
+          } catch (_) {}
+        }
+        if (!best) continue;
+        const cnt = {}; best.vozidla.forEach((v) => Object.keys(v.mesice).forEach((k) => { const y = k.slice(0, 4); cnt[y] = (cnt[y] || 0) + 1; }));
+        const rok = Number(Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0]);
+        roky.push({ rok, id, list: best.list, vozidla: best.vozidla });
+      } catch (e) { console.error('[doprava] historický ročník ' + id.slice(0, 10) + '… se nenačetl:', e.message); }
+    }
+    return roky.sort((a, b) => a.rok - b.rok);
+  }
+
   // Stáhne a naparsuje tabulky; při úspěchu uloží cache na disk.
   let _refreshing = null;
   async function refresh() {
@@ -256,6 +286,14 @@ function mount(host) {
       else data.nakladyChyba = nak.reason.message;
       if (data.vykonyChyba) { data.vozidla = (cache && cache.vozidla) || null; console.error('[doprava] tabulka výkonů se nenačetla:', data.vykonyChyba); }
       if (data.nakladyChyba) { data.naklady = (cache && cache.naklady) || null; console.error('[doprava] nákladová tabulka se nenačetla:', data.nakladyChyba); }
+      // Historické ročníky se mění zřídka — obnova max 1× denně, jinak z cache.
+      const staraHist = cache && cache.historie;
+      if (!staraHist || (Date.now() - (staraHist.ts || 0)) > 24 * 3600 * 1000) {
+        try {
+          const roky = await readHistorie();
+          data.historie = (roky.length || !staraHist) ? { ts: Date.now(), roky } : staraHist;
+        } catch (e) { data.historie = staraHist || null; }
+      } else data.historie = staraHist;
       if (!data.vozidla) throw new Error('tabulka výkonů: ' + data.vykonyChyba);
       cache = data;
       try { fs.writeFileSync(CACHE_F, JSON.stringify(data)); } catch (_) {}
@@ -297,7 +335,7 @@ function mount(host) {
           cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
           cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
         ].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
