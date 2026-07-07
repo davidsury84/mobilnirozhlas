@@ -3708,6 +3708,30 @@ function renderSendList(id){
 function copyOneFor(id,email){ const S=sendableOf(id); copyText(S?S.linkFor(email):personalLink(email)); toast("Odkaz zkopírován"); }
 /* Zaškrtnutí uchazeči (objekty) */
 function pickedCands(){ return (DB.candidates||[]).filter(c=>SEND_CAND.includes(c.id)); }
+/* Vlastní potvrzovací dialog (místo systémového confirm) — vrací Promise<bool> */
+function appConfirm(title, bodyHtml, okLabel){
+  return new Promise(resolve=>{
+    const old=document.getElementById("appConfirm"); if(old) old.remove();
+    const o=document.createElement("div");
+    o.id="appConfirm";
+    o.style.cssText="position:fixed;inset:0;background:rgba(28,29,26,.45);z-index:300;display:grid;place-items:center;padding:20px";
+    o.innerHTML='<div style="background:var(--paper);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.28);max-width:480px;width:100%;padding:22px 26px">'+
+      '<h3 style="margin:0 0 10px;font-size:17px">'+title+'</h3>'+
+      '<div style="font-size:14px;color:var(--ink-soft);max-height:40vh;overflow:auto">'+bodyHtml+'</div>'+
+      '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px">'+
+      '<button class="btn ghost" id="acNo">Zrušit</button>'+
+      '<button class="btn" id="acYes">'+(okLabel||"Potvrdit")+'</button></div></div>';
+    document.body.appendChild(o);
+    const done=v=>{ o.remove(); document.removeEventListener("keydown",onKey); resolve(v); };
+    function onKey(e){ if(e.key==="Escape") done(false); if(e.key==="Enter") done(true); }
+    o.querySelector("#acNo").onclick=()=>done(false);
+    o.querySelector("#acYes").onclick=()=>done(true);
+    o.addEventListener("click",e=>{ if(e.target===o) done(false); });
+    document.addEventListener("keydown",onKey);
+    o.querySelector("#acYes").focus();
+  });
+}
+function ucSklon(n){ return n===1?"uchazeči":"uchazečům"; }
 /* Náhled e-mailu pro uchazeče — přímo v kartě Uchazeči o práci */
 async function previewCand(id){
   const S=sendableOf(id); if(!S) return;
@@ -3735,7 +3759,8 @@ async function sendToCands(id){
   const picked=pickedCands();
   if(!picked.length){ alert("Zaškrtni aspoň jednoho uchazeče."); return; }
   if(DEMO){ toast("Ukázkový režim – e-maily se neodesílají"); return; }
-  if(!confirm("Odeslat e-mail "+picked.length+" uchazečům?\n\n"+picked.map(c=>c.name+" <"+c.email+">").join("\n"))) return;
+  const seznam='<ul style="margin:6px 0 0;padding-left:18px;line-height:1.7">'+picked.map(c=>'<li>'+esc(c.name)+' <span class="mono" style="font-size:12px">&lt;'+esc(c.email)+'&gt;</span></li>').join('')+'</ul>';
+  if(!(await appConfirm("Odeslat e-mail "+picked.length+" "+ucSklon(picked.length)+"?", seznam, "✉ Odeslat"))) return;
   const out=document.getElementById("candResults"); if(out) out.innerHTML='<p class="muted">Odesílám…</p>';
   const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
   const profSel=document.getElementById("mProfile"); const prof=profSel&&profSel.value? DB.profiles.find(p=>p.id===profSel.value):null;
@@ -3760,7 +3785,7 @@ async function sendOne(id,email){
   let r=aud.find(e=>(e.email||"").toLowerCase()===email.toLowerCase());
   if(!r){ const c=(DB.candidates||[]).find(x=>(x.email||"").toLowerCase()===email.toLowerCase())||DB.employees.find(x=>(x.email||"").toLowerCase()===email.toLowerCase()); if(!c){ alert("Příjemce nenalezen."); return; } r={name:c.name,email:c.email}; }
   if(DEMO){ toast("Ukázkový režim – e-maily se neodesílají"); return; }
-  if(!confirm("Odeslat e-mail?\n\n"+r.name+" <"+r.email+">")) return;
+  if(!(await appConfirm("Odeslat e-mail?", esc(r.name)+' <span class="mono" style="font-size:12px">&lt;'+esc(r.email)+'&gt;</span>', "✉ Odeslat"))) return;
   const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
   const profSel=document.getElementById("mProfile"); const prof=profSel&&profSel.value? DB.profiles.find(p=>p.id===profSel.value):null;
   try{
