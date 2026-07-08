@@ -58,6 +58,7 @@ const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://trid
 const TRIDICI_LINKA_APP_FILE = path.join(ROOT, 'design-tridici-linky.html'); // alternativně lokální soubor (stejně jako u Kalkulace-lisy)
 const PREKLADISTE_APP_URL = process.env.PREKLADISTE_APP_URL || ''; // aplikace „Kalkulačka překladiště" — prodejní kalkulačka (repo prekladiste-kalkulacka); doplň URL nasazení
 const PREKLADISTE_APP_FILE = path.join(ROOT, 'kalkulacka-prekladiste.html'); // alternativně lokální soubor
+const KOVOKALK_APP_FILE = path.join(ROOT, 'kalkulacka-kovo.html'); // modul „Kalkulace KOVO" — variabilní kalkulačka nacenění výrobků kovovýroby
 const FREELO_EMAIL = process.env.FREELO_EMAIL || '';     // modul Freelo: e-mail účtu (basic auth)
 const FREELO_API_KEY = process.env.FREELO_API_KEY || ''; // modul Freelo: API klíč (Freelo → Nastavení profilu → API)
 const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativně lokální soubor
@@ -83,8 +84,10 @@ const ABROLL_F = path.join(DATA_DIR, 'abroll-results.json'); // výsledky testu 
 const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
 const ACTLOG_F  = path.join(DATA_DIR, 'activity.json');   // jednoduchý log aktivity (přihlášení, pozvánky, průzkumy)
+const CENMON_F  = path.join(DATA_DIR, 'cenmon.json');     // cenový monitoring: naše položky (export SMI), katalog MEVA, ruční páry
 const INVITES_F = path.join(DATA_DIR, 'invites.json');    // stav pozvánek dle e-mailu: {invitedAt, acceptedAt, lastLoginAt}
 const UKOLY_F   = path.join(DATA_DIR, 'smernice-ukoly.json'); // úkoly vyplývající ze směrnic (záložka „Úkoly ze směrnic")
+const KOVOKALK_F = path.join(DATA_DIR, 'kovo-kalkulace.json'); // Kalkulace KOVO: parametry (s historií změn) + výrobky
 for (const d of [DATA_DIR, PUB_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 
 /* ---------- malé util ---------- */
@@ -102,6 +105,96 @@ function logActivity(type, who, detail) {
   } catch (e) {}
 }
 function readInvites() { const m = readJson(INVITES_F, {}); return (m && typeof m === 'object') ? m : {}; }
+
+/* ---------- Cenový monitoring (ESHOP × MEVA) ----------
+   Naše položky = ruční nahrání exportu ze SMI (kód, název, cena).
+   Ceny MEVA = crawl veřejného webu mevatec.cz (sitemap → produktové stránky …-P/).
+   Párování = podobnost názvů (tokeny bez diakritiky + shoda čísel, např. objem 120/240 l). */
+function cenmonRead() {
+  const d = readJson(CENMON_F, {});
+  return { polozky: d.polozky || [], polozkyMeta: d.polozkyMeta || null, meva: d.meva || [], mevaMeta: d.mevaMeta || null, pary: d.pary || {} };
+}
+function cenmonWrite(d) { writeJson(CENMON_F, d); }
+
+const CENMON_SCAN = { bezi: false, hotovo: 0, celkem: 0, chyb: 0, od: null };
+async function cenmonMevaScan() {
+  if (CENMON_SCAN.bezi) return;
+  CENMON_SCAN.bezi = true; CENMON_SCAN.hotovo = 0; CENMON_SCAN.chyb = 0; CENMON_SCAN.od = Date.now();
+  try {
+    const UA = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36' };
+    const sm = await (await fetch('https://www.mevatec.cz/sitemaps/sitemap.xml', { headers: UA })).text();
+    const urls = [...sm.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]).filter(u => /-P\/$/.test(u));
+    CENMON_SCAN.celkem = urls.length;
+    const vysledky = [];
+    let i = 0;
+    async function worker() {
+      while (i < urls.length) {
+        const url = urls[i++];
+        try {
+          const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(15000) });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const h = await r.text();
+          const nazev = ((h.match(/<h1[^>]*>([\s\S]*?)<\/h1>/) || [])[1] || '').replace(/<[^>]+>/g, '').trim();
+          const bezDph = parseFloat(((h.match(/class="price-value">\s*([\d\s]+[.,]?\d*)\s*Kč/) || [])[1] || '').replace(/\s/g, '').replace(',', '.'));
+          const sDph = parseFloat((h.match(/itemprop="price"\s+content="([\d.]+)"/) || [])[1] || '');
+          if (nazev && (bezDph || sDph)) vysledky.push({ url, nazev, cenaBezDph: bezDph || null, cenaSDph: sDph || null });
+        } catch (_) { CENMON_SCAN.chyb++; }
+        CENMON_SCAN.hotovo++;
+        await sleep(120);   // šetrné tempo (~4 souběžně × 120 ms)
+      }
+    }
+    await Promise.all(Array.from({ length: 4 }, worker));
+    const d = cenmonRead();
+    d.meva = vysledky;
+    d.mevaMeta = { kdy: Date.now(), celkem: urls.length, nacteno: vysledky.length, chyb: CENMON_SCAN.chyb };
+    cenmonWrite(d);
+    logActivity('cenmon', { email: '', name: 'server' }, 'MEVA crawl: ' + vysledky.length + ' produktů (' + CENMON_SCAN.chyb + ' chyb)');
+  } catch (e) {
+    logActivity('cenmon-chyba', { email: '', name: 'server' }, String(e.message || e).slice(0, 120));
+  } finally { CENMON_SCAN.bezi = false; }
+}
+
+function cenmonNorm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+function cenmonTokeny(s) {
+  const n = cenmonNorm(s);
+  const tokeny = new Set(n.split(/[^a-z0-9]+/).filter(t => t.length > 1));
+  const cisla = new Set((n.match(/\d+/g) || []).map(Number).filter(x => x > 1));
+  return { tokeny, cisla };
+}
+function cenmonSkore(a, b) {
+  let spol = 0; a.tokeny.forEach(t => { if (b.tokeny.has(t)) spol++; });
+  const uni = a.tokeny.size + b.tokeny.size - spol;
+  let s = uni ? spol / uni : 0;
+  if (a.cisla.size && b.cisla.size) {
+    let cs = 0; a.cisla.forEach(c => { if (b.cisla.has(c)) cs++; });
+    s = cs ? s + 0.2 * Math.min(1, cs / a.cisla.size) : s * 0.35;   // čísla (objemy) se musí potkat
+  }
+  return s;
+}
+// Pro každou naši položku najde nejlepší kandidáty z MEVA (top 4) + aplikuje ruční páry.
+function cenmonSrovnani() {
+  const d = cenmonRead();
+  const mevaTok = d.meva.map(m => ({ m, t: cenmonTokeny(m.nazev) }));
+  const out = [];
+  for (const p of d.polozky) {
+    const pt = cenmonTokeny(p.nazev);
+    const kandidati = [];
+    for (const { m, t } of mevaTok) {
+      const s = cenmonSkore(pt, t);
+      if (s >= 0.25) kandidati.push({ s: Math.round(s * 100) / 100, url: m.url, nazev: m.nazev, cenaBezDph: m.cenaBezDph, cenaSDph: m.cenaSDph });
+    }
+    kandidati.sort((x, y) => y.s - x.s);
+    const par = d.pary[p.kod || p.nazev] || null;
+    let vybrany = null;
+    if (par && par.stav === 'zamitnuto') vybrany = null;
+    else if (par && par.mevaUrl) vybrany = kandidati.find(k => k.url === par.mevaUrl) || (d.meva.filter(m => m.url === par.mevaUrl).map(m => ({ s: 1, url: m.url, nazev: m.nazev, cenaBezDph: m.cenaBezDph, cenaSDph: m.cenaSDph }))[0] || null);
+    else if (kandidati.length && kandidati[0].s >= 0.45) vybrany = kandidati[0];
+    out.push({ kod: p.kod || '', nazev: p.nazev, cena: p.cena, meva: vybrany, kandidati: kandidati.slice(0, 4), stavParu: par ? par.stav : (vybrany ? 'auto' : 'neparovano') });
+  }
+  return out;
+}
 // Označí, že jsme pozvánku odeslali (nastaví invitedAt) a zaloguje ji.
 function markInvited(email, name) {
   email = (email || '').toLowerCase(); if (!email) return;
@@ -603,6 +696,120 @@ function employeeModules(email) {
   const s = readJson(STATE_F, { employees: [] });
   const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
   return (e && Array.isArray(e.modules)) ? e.modules : [];
+}
+
+/* ============================================================
+   Kalkulace KOVO (modul „kovokalk") — variabilní kalkulačka nacenění
+   ------------------------------------------------------------
+   Jeden výpočetní motor pro všechny řady: materiál (+odpad) → mzdy
+   (×odvody) → režie → povrch (zinek/lak) → VPC → PC → EUR.
+   Parametry i výrobky spravuje správce v aplikaci; každá změna
+   hodnoty parametru dostane razítko (updatedAt/updatedBy), z něhož
+   kalkulačka počítá semafor aktuálnosti. Seed = hodnoty a data
+   zdrojových sešitů z auditu složky PRODUCTS (7/2026).
+   ============================================================ */
+const KOVOKALK_SEED = {
+  params: {
+    kurzEUR:    { label: 'Kurz EUR', unit: 'CZK/EUR', v: 24.5, src: 'Kalkulace průměr Muldy DIN+CH / bedny Contracts', note: 'jinde 23,5–26; tlačítkem lze převzít denní kurz ČNB', updatedAt: Date.UTC(2024, 7, 15), updatedBy: 'seed (audit 7/2026)' },
+    kurzPLN:    { label: 'Kurz PLN', unit: 'CZK/PLN', v: 5.9, src: 'Kalkulace muldy DIN 2024', note: '', updatedAt: Date.UTC(2024, 7, 15), updatedBy: 'seed (audit 7/2026)' },
+    matS235:    { label: 'Ocel S235', unit: 'Kč/kg', v: 24, src: 'Kalkulace ABR-DSD / AFS', note: 'rozpor 17,5 (HBI) až 25 (CSD) napříč sešity', updatedAt: Date.UTC(2026, 5, 3), updatedBy: 'seed (audit 7/2026)' },
+    matHardox:  { label: 'Hardox 450', unit: 'Kč/kg', v: 44, src: 'Kalkulace ABR-HBI-TSR', note: '', updatedAt: Date.UTC(2025, 0, 21), updatedBy: 'seed (audit 7/2026)' },
+    matQstE:    { label: 'QStE 690', unit: 'Kč/kg', v: 40, src: 'Kalkulace ABR-HBI-TSR', note: '', updatedAt: Date.UTC(2025, 0, 21), updatedBy: 'seed (audit 7/2026)' },
+    matProfily: { label: 'Profily / IPN / UPN', unit: 'Kč/kg', v: 25, src: 'Kalkulace ABR-HBI-TSR (IPN/UPN 22, profily 25)', note: '', updatedAt: Date.UTC(2025, 0, 21), updatedBy: 'seed (audit 7/2026)' },
+    matVypalky: { label: 'Výpalky', unit: 'Kč/kg', v: 37.5, src: 'Kalkulace ABR-HBI-TSR (35–40)', note: '', updatedAt: Date.UTC(2025, 0, 21), updatedBy: 'seed (audit 7/2026)' },
+    odpad:      { label: 'Odpad materiálu', unit: '%', v: 5, src: 'konvence všech kalkulací (skutečnost 3–15 % dle rozborů odpadu)', note: '', updatedAt: Date.UTC(2026, 5, 3), updatedBy: 'seed (audit 7/2026)' },
+    odvody:     { label: 'Odvody z mezd', unit: '%', v: 50, src: 'všechny sešity (×1,5)', note: 'legislativní', updatedAt: Date.UTC(2026, 5, 3), updatedBy: 'seed (audit 7/2026)' },
+    rezieCZ:    { label: 'Režie výroba CZ', unit: '% z hrubých mezd', v: 150, src: 'ABR / CITY-CSD / GSK', note: 'jinde 75–130 % — 4 modely bez psané metodiky', updatedAt: Date.UTC(2026, 5, 3), updatedBy: 'seed (audit 7/2026)' },
+    reziePL:    { label: 'Režie výroba PL', unit: '% z hrubých mezd', v: 110, src: 'CITY WDG/CSD (Elkoplast PL)', note: '', updatedAt: Date.UTC(2026, 3, 16), updatedBy: 'seed (audit 7/2026)' },
+    zinek:      { label: 'Zinkování', unit: 'Kč/kg', v: 15, src: 'Kalkulace bedny Contracts (vč. dopravy do zinkovny)', note: 'starší řady počítají 12,5 (2022) a 11 (2019)', updatedAt: Date.UTC(2026, 4, 12), updatedBy: 'seed (audit 7/2026)' },
+    barvaZaklad:{ label: 'Barva — základ', unit: 'Kč/kg', v: 65, src: 'Kalkulace ABR-DSD', note: 'rozptyl 50–80 napříč živými sešity', updatedAt: Date.UTC(2026, 5, 3), updatedBy: 'seed (audit 7/2026)' },
+    barvaVrch:  { label: 'Barva — vrchní lak', unit: 'Kč/kg', v: 110, src: 'Kalkulace ABR-DSD', note: 'rozptyl 100–120', updatedAt: Date.UTC(2026, 5, 3), updatedBy: 'seed (audit 7/2026)' },
+    dopravaPL:  { label: 'Doprava PL → Bruntál', unit: 'Kč/ks', v: 1500, src: 'Kalkulace muldy DIN 2024', note: '', updatedAt: Date.UTC(2026, 3, 21), updatedBy: 'seed (audit 7/2026)' },
+    marzeVPC:   { label: 'Marže VPC', unit: '%', v: 10, src: 'ABR 10 % · CITY/bedny 12 % · PL 10 % · Bruntál dolak. 3–5 %', note: 'nepsaná politika', updatedAt: Date.UTC(2026, 5, 3), updatedBy: 'seed (audit 7/2026)' },
+    prirazkaPC: { label: 'Ceníková přirážka PC', unit: '%', v: 10, src: 'per zákazník 3–15 % (Renewi 15, Geesink 3–5)', note: 'historicky vyjednáno, bez pravidla', updatedAt: Date.UTC(2018, 5, 1), updatedBy: 'seed (audit 7/2026)' },
+  },
+  products: [
+    { id: 'najezd5000', name: 'Nájezd kontejnerový 5000', rada: 'Nájezdy', mat: [{ p: 'matS235', kg: 336 }], nakup: 0, mzdy: 1050, misto: 'CZ', povrch: 'zinek', znGain: 1.03, barvaKg: 0, dopravaKc: 0, dataDate: '2026-03', src: 'Najezdy kalkkulace guiding rails.xlsx', refCzk: 18497, refLabel: 'VPC', refDate: '2026-03' },
+    { id: 'cpr8', name: 'Bedna CPR 8/2,5 öla', rada: 'Bedny Contracts', mat: [{ p: 'matS235', kg: 111 }], nakup: 350, mzdy: 850, misto: 'CZ', povrch: 'zinek', znGain: 1.08, barvaKg: 0, dopravaKc: 0, dataDate: '2026-05', src: 'Kalkulace bedny Contracts (hmotnosti: Hmotnosti zinku 3/2018)', refCzk: null, refLabel: '', refDate: '' },
+    { id: 'amch95', name: 'Mulda AM-CH-9,5 (644 kg)', rada: 'Muldy CH', mat: [{ p: 'matS235', kg: 644 }], nakup: 400, mzdy: 1900, misto: 'CZ', povrch: 'lak', znGain: 1, barvaKg: 18, dopravaKc: 0, dataDate: '2026-06', src: 'Kalkulace muldy CH 2024 + Správné značení muld', refCzk: null, refLabel: '', refDate: '' },
+    { id: 'sld35', name: 'SLD SM 3,5', rada: 'SLD', mat: [{ p: 'matS235', kg: 720 }], nakup: 600, mzdy: 1320, misto: 'CZ', povrch: 'lak', znGain: 1, barvaKg: 25, dopravaKc: 0, dataDate: '2025-04', src: 'Kalkulace SLD ver 201902 (normy práce 1 320 Kč/ks)', refCzk: 16000, refLabel: 'VPC (odhad z ceníku 2019)', refDate: '2019-02' },
+    { id: 'asp800', name: 'ASP 800 pozink', rada: 'ASP', mat: [{ p: 'matS235', kg: 182 }], nakup: 500, mzdy: 2000, misto: 'CZ', povrch: 'zinek', znGain: 1.05, barvaKg: 0, dopravaKc: 0, dataDate: '2019-03', src: 'Kalkulace ASP 800 ver 201902 (poslední nákladový rozpad!)', refCzk: 14460, refLabel: 'VPC ceník', refDate: '2026-06' },
+    { id: 'cla1100', name: 'CLA 1100 pozink', rada: 'CLA 1100', mat: [{ p: 'matS235', kg: 104 }], nakup: 600, mzdy: 342, misto: 'CZ', povrch: 'zinek', znGain: 1.06, barvaKg: 0, dopravaKc: 0, dataDate: '2016-07', src: 'Kalkulace 1100 l bez vík stohovatelné (2016)', refCzk: 6076, refLabel: 'PC ceník 248 €', refDate: '2018-06' },
+    { id: 'hbi18', name: 'ABR-HBI-TSR 18 m³ (Hardox)', rada: 'ABR / hardox', mat: [{ p: 'matHardox', kg: 1700 }, { p: 'matS235', kg: 510 }], nakup: 2500, mzdy: 23000, misto: 'CZ', povrch: 'lak', znGain: 1, barvaKg: 85, dopravaKc: 0, dataDate: '2025-01', src: 'Kalkulace ABR-HBI-TSR-18+36cbm (ceny mat. 21.1.2025)', refCzk: 190000, refLabel: 'VPC', refDate: '2025-01' },
+  ],
+};
+function readKovoKalk() {
+  let d = readJson(KOVOKALK_F, null);
+  if (!d || !d.params || !Array.isArray(d.products)) { d = JSON.parse(JSON.stringify(KOVOKALK_SEED)); writeJson(KOVOKALK_F, d); }
+  return d;
+}
+// Uloží parametry/výrobky; parametr se změněnou hodnotou dostane razítko změny (kdo + kdy).
+function saveKovoKalk(body, who) {
+  const cur = readKovoKalk();
+  if (body.params && typeof body.params === 'object') {
+    for (const k of Object.keys(body.params)) {
+      const n = body.params[k]; if (!n || typeof n !== 'object') continue;
+      const o = cur.params[k] || {};
+      const nv = Number(n.v);
+      if (!isFinite(nv)) continue;
+      const changed = !o.updatedAt || Number(o.v) !== nv;
+      cur.params[k] = {
+        label: (n.label !== undefined ? n.label : o.label) || k,
+        unit: (n.unit !== undefined ? n.unit : o.unit) || '',
+        v: nv,
+        src: (n.src !== undefined ? n.src : o.src) || '',
+        note: (n.note !== undefined ? n.note : o.note) || '',
+        updatedAt: changed ? Date.now() : o.updatedAt,
+        updatedBy: changed ? (who || 'admin') : (o.updatedBy || ''),
+      };
+    }
+  }
+  if (Array.isArray(body.products)) {
+    cur.products = body.products
+      .filter(x => x && typeof x === 'object' && x.name)
+      .map(x => ({
+        id: String(x.id || ('p' + crypto.randomBytes(4).toString('hex'))),
+        name: String(x.name).slice(0, 120), rada: String(x.rada || '').slice(0, 80),
+        mat: (Array.isArray(x.mat) ? x.mat : []).map(m => ({ p: String(m.p || 'matS235'), kg: Number(m.kg) || 0 })),
+        nakup: Number(x.nakup) || 0, mzdy: Number(x.mzdy) || 0,
+        misto: x.misto === 'PL' ? 'PL' : 'CZ',
+        povrch: (x.povrch === 'lak' || x.povrch === 'zadny') ? x.povrch : 'zinek',
+        znGain: Number(x.znGain) || 1.05, barvaKg: Number(x.barvaKg) || 0, dopravaKc: Number(x.dopravaKc) || 0,
+        dataDate: String(x.dataDate || '').slice(0, 7), src: String(x.src || '').slice(0, 200),
+        refCzk: (x.refCzk === null || x.refCzk === undefined || x.refCzk === '') ? null : Number(x.refCzk),
+        refLabel: String(x.refLabel || '').slice(0, 80), refDate: String(x.refDate || '').slice(0, 7),
+      }));
+  }
+  writeJson(KOVOKALK_F, cur);
+  return cur;
+}
+// Denní kurzovní lístek ČNB (EUR, PLN) — cache 6 h; při výpadku vrací null a kalkulačka
+// zůstane u ručně nastaveného kurzu.
+let cnbCache = { at: 0, data: null };
+function fetchCnbKurz() {
+  return new Promise((resolve) => {
+    if (cnbCache.data && Date.now() - cnbCache.at < 6 * 3600 * 1000) return resolve(cnbCache.data);
+    const rq = https.get('https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt', (r) => {
+      let d = ''; r.on('data', c => d += c);
+      r.on('end', () => {
+        try {
+          const lines = d.split('\n');
+          const out = { date: (lines[0] || '').split(' ')[0] || '' };
+          for (const ln of lines) {
+            const p = ln.split('|'); if (p.length < 5) continue;
+            const mn = parseFloat(String(p[2]).replace(',', '.')) || 1;
+            const kurz = parseFloat(String(p[4]).replace(',', '.'));
+            if (p[3] === 'EUR' && isFinite(kurz)) out.eur = Math.round(kurz / mn * 1000) / 1000;
+            if (p[3] === 'PLN' && isFinite(kurz)) out.pln = Math.round(kurz / mn * 1000) / 1000;
+          }
+          if (out.eur) { cnbCache = { at: Date.now(), data: out }; return resolve(out); }
+          resolve(null);
+        } catch (_) { resolve(null); }
+      });
+    });
+    rq.on('error', () => resolve(null));
+    rq.setTimeout(10000, () => { try { rq.destroy(); } catch (_) {} resolve(null); });
+  });
 }
 
 /* ============================================================
@@ -1251,6 +1458,45 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(ABROLL_F, [])); }
     // podepsané pozvánkové odkazy (hash) pro dávku příjemců — jen pro správce
+    // ---- Cenový monitoring (ESHOP × MEVA) — jen správce ----
+    if (p === '/api/cenmon' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const d = cenmonRead();
+      return send(res, 200, { polozkyMeta: d.polozkyMeta, polozek: d.polozky.length, mevaMeta: d.mevaMeta, mevaPolozek: d.meva.length, scan: CENMON_SCAN, srovnani: cenmonSrovnani() });
+    }
+    if (p === '/api/cenmon/polozky' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req));
+      const items = (Array.isArray(b.items) ? b.items : []).map(x => ({ kod: String(x.kod || '').trim(), nazev: String(x.nazev || '').trim(), cena: Number(x.cena) || null })).filter(x => x.nazev);
+      if (!items.length) return send(res, 400, { error: 'Žádné položky (zkontroluj mapování sloupců).' });
+      const d = cenmonRead();
+      d.polozky = items;
+      d.polozkyMeta = { soubor: String(b.soubor || ''), kdy: Date.now(), radku: items.length };
+      cenmonWrite(d);
+      logActivity('cenmon', { email: '', name: 'admin' }, 'Nahrán export položek: ' + items.length + ' (' + (b.soubor || '') + ')');
+      return send(res, 200, { ok: true, polozek: items.length });
+    }
+    if (p === '/api/cenmon/meva-scan' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (CENMON_SCAN.bezi) return send(res, 200, { ok: true, uzBezi: true, scan: CENMON_SCAN });
+      cenmonMevaScan();   // běží na pozadí
+      return send(res, 200, { ok: true, scan: CENMON_SCAN });
+    }
+    if (p === '/api/cenmon/scan-stav' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      return send(res, 200, { scan: CENMON_SCAN, mevaMeta: cenmonRead().mevaMeta });
+    }
+    if (p === '/api/cenmon/par' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req));
+      if (!b.klic) return send(res, 400, { error: 'Chybí klíč položky.' });
+      const d = cenmonRead();
+      if (b.stav === 'reset') delete d.pary[b.klic];
+      else d.pary[b.klic] = { mevaUrl: b.mevaUrl || null, stav: b.stav || 'potvrzeno' };
+      cenmonWrite(d);
+      return send(res, 200, { ok: true });
+    }
+
     if (p === '/api/invite-links' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const b = JSON.parse(await readBody(req));
@@ -1356,6 +1602,23 @@ const server = http.createServer(async (req, res) => {
       const it = updateUkol(b.id, b);
       if (!it) return send(res, 404, { error: 'Úkol nenalezen.' });
       return send(res, 200, { ok: true, item: it });
+    }
+
+    // ---- Kalkulace KOVO: parametry + výrobky + denní kurz ČNB (modul „kovokalk") ----
+    if (p === '/api/kovo-kalk' && req.method === 'GET') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req) && employeeModules(e.email).indexOf('kovokalk') < 0) return send(res, 403, { error: 'K modulu Kalkulace KOVO nemáte přístup.' });
+      const d = readKovoKalk();
+      const cnb = await fetchCnbKurz();
+      return send(res, 200, { params: d.params, products: d.products, cnb, canEdit: isAdmin(req) });
+    }
+    if (p === '/api/kovo-kalk' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Parametry a výrobky může měnit jen správce.' });
+      const b = JSON.parse(await readBody(req));
+      const who = (empSession(req) || {}).email || 'admin';
+      const cur = saveKovoKalk(b, who);
+      return send(res, 200, { ok: true, params: cur.params, products: cur.products });
     }
 
     // ---- Freelo: projekty (živě z Freelo API, pro zaměstnance s modulem „freelo") ----
@@ -1641,6 +1904,15 @@ const server = http.createServer(async (req, res) => {
         + '<body><div class="c"><h1>♻️ Kalkulačka překladiště</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
         + '<p style="margin-top:12px;font-size:13px">Pro napojení nastav proměnnou <code>PREKLADISTE_APP_URL</code> na adresu nasazené aplikace (kalkulačka překladiště), nebo vlož soubor <code>kalkulacka-prekladiste.html</code> do projektu.</p></div></body></html>';
       return send(res, 200, ph2, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- Aplikace modulu Kalkulace KOVO: lokální variabilní kalkulačka nacenění ----
+    if (p === '/kovokalk-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('kovokalk') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup ke Kalkulaci KOVO nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (fs.existsSync(KOVOKALK_APP_FILE)) return send(res, 200, fs.readFileSync(KOVOKALK_APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 404, { error: 'Soubor kalkulacka-kovo.html chybí v projektu.' });
     }
 
     // ---- měsíční vyhodnocení (admin) ----

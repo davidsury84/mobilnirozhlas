@@ -410,6 +410,7 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
       <button data-view="adaptace">Adaptace</button>
       <button data-view="stats">Statistiky</button>
       <button data-view="grit">Průzkumy</button>
+      <button data-view="cenmon">Cenový monitoring</button>
       <button data-view="activity">Aktivita</button>
       <button data-view="settings">Nastavení</button>
     </nav>
@@ -593,6 +594,15 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
   </section>
 
   <!-- ===== Průzkumy ===== -->
+  <!-- ===== Cenový monitoring (ESHOP × MEVA) ===== -->
+  <section id="view-cenmon" class="view">
+    <div class="view-head">
+      <h2>Cenový monitoring — MEVA</h2>
+      <p>Porovnání našich e-shopových položek s veřejnými cenami mevatec.cz. Nahraj export ze SMI, stáhni ceny MEVA a zkontroluj rozdíly u spárovaných produktů.</p>
+    </div>
+    <div id="cenmonBox"></div>
+  </section>
+
   <section id="view-grit" class="view">
     <div class="view-head">
       <h2>Průzkumy</h2>
@@ -984,6 +994,7 @@ const MUJ_MODS = [
   { key:"svozesa", icon:MUJ_IC.truck, label:"Kalkulačka svoz ESA", gated:true },
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
+  { key:"kovokalk", icon:MUJ_IC.calc, label:"Kalkulace KOVO", gated:true },
   { key:"doprava", icon:MUJ_IC.truck, label:"Doprava", gated:true },
   { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
   { grp:"Smlouvy" },
@@ -1065,7 +1076,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="doprava"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovokalk"||MUJ.view==="doprava"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty", kovo:"Kovo" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1078,6 +1089,7 @@ function mjGo(key){
   else if(key==="svozesa") showSvozEsa();
   else if(key==="tridicilinka") showTridiciLinka();
   else if(key==="prekladiste") showPrekladiste();
+  else if(key==="kovokalk") showKovoKalk();
   else if(key==="doprava") showDoprava();
   else if(key==="smlouvy") showSmlouvy();
   else if(key==="sortiment") showSortiment();
@@ -1141,6 +1153,13 @@ function showPrekladiste(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("prekladiste")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/prekladiste-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka překladiště"></iframe>';
+  window.scrollTo(0,0);
+}
+function showKovoKalk(){
+  MUJ.view="kovokalk"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("kovokalk")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<iframe src="/kovokalk-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulace KOVO"></iframe>';
   window.scrollTo(0,0);
 }
 function showDoprava(){
@@ -1553,7 +1572,7 @@ function showDashboard(){
   }
   h += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Provozní modul"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["kovokalk","Kalkulace KOVO",MUJ_IC.calc,"Nacenění výrobků kovovýroby"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     h += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
     provoz.forEach(p=> h += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
@@ -1690,6 +1709,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="org") renderOrg();
   if(v==="adaptace"){ const f=document.getElementById("adaptaceAdminFrame"); if(f && !f.src) f.src="/adaptace?admin=1"; }
   if(v==="grit") renderGritAdmin();
+  if(v==="cenmon") renderCenmon();
   if(v==="activity") renderActivity();
   if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); }
 });
@@ -2237,12 +2257,12 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["kovokalk","Kalkulace KOVO"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop"]],
-  ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
+  ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste","kovokalk"]],
   ["Agendy",["doprava","smlouvy","sortiment","adaptace","freelo"]]
 ];
 let ACCESS_FILTER="";
@@ -2844,6 +2864,179 @@ function openVysledekDetail(kind,email){
   document.getElementById("modalFoot").innerHTML='<button class="btn ghost" onclick="closeModal()">Zavřít</button>';
   showModal();
 }
+/* ============================================================
+   CENOVÝ MONITORING — naše položky (export SMI) × mevatec.cz
+   ============================================================ */
+let CENMON=null, CENMON_UPLOAD=null, CENMON_FILTR={q:'',jen:''};
+async function renderCenmon(){
+  const box=document.getElementById("cenmonBox");
+  box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám…</p></div>';
+  try{ const r=await fetch('/api/cenmon',{cache:'no-store'}); if(r.status===401){ showLogin(); return; } CENMON=await r.json(); }
+  catch(e){ box.innerHTML='<div class="card pad"><p style="color:var(--red);margin:0">Chyba: '+esc(e.message)+'</p></div>'; return; }
+  cenmonDraw();
+}
+function cenmonDraw(){
+  const box=document.getElementById("cenmonBox"); const d=CENMON;
+  const pm=d.polozkyMeta, mm=d.mevaMeta;
+  let h='<div class="card pad" style="margin-bottom:16px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">'+
+    '<div style="min-width:260px;flex:1"><strong>1 · Naše položky (export ze SMI)</strong>'+
+    '<p class="muted" style="margin:6px 0 10px;font-size:13px">'+(pm?('Nahráno <strong>'+d.polozek+'</strong> položek ze souboru „'+esc(pm.soubor)+'" ('+fmtDate(pm.kdy)+').'):'Zatím nic — nahraj XLSX/CSV export položek (kód, název, cena).')+'</p>'+
+    '<input type="file" id="cenmonFile" accept=".xlsx,.csv" onchange="cenmonParseFile(this)"><div id="cenmonMap" style="margin-top:10px"></div></div>'+
+    '<div style="min-width:260px;flex:1"><strong>2 · Ceny MEVA (mevatec.cz)</strong>'+
+    '<p class="muted" style="margin:6px 0 10px;font-size:13px">'+(mm?('Staženo <strong>'+d.mevaPolozek+'</strong> produktů ('+fmtDate(mm.kdy)+', chyb '+(mm.chyb||0)+').'):'Zatím nestaženo.')+'</p>'+
+    (d.scan&&d.scan.bezi
+      ? '<span class="pill amber">Stahuji… '+d.scan.hotovo+' / '+d.scan.celkem+'</span> <button class="btn ghost sm" onclick="cenmonHlidejScan()">Obnovit stav</button>'
+      : '<button class="btn sm" onclick="cenmonScan()">↻ Stáhnout ceny z mevatec.cz</button> <span class="muted" style="font-size:12px">(~4 000 stránek, cca 10–15 min)</span>')+'</div></div>';
+  // srovnání
+  const rows=(d.srovnani||[]);
+  const sparovane=rows.filter(x=>x.meva);
+  const drazsi=sparovane.filter(x=>x.cena!=null&&x.meva.cenaBezDph!=null&&x.cena>x.meva.cenaBezDph);
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+    '<div><div class="muted" style="font-size:12px">Našich položek</div><strong style="font-size:20px">'+rows.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Spárováno s MEVA</div><strong style="font-size:20px">'+sparovane.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Jsme dražší než MEVA</div><strong style="font-size:20px;color:var(--red)">'+drazsi.length+'</strong></div></div>';
+  if(rows.length){
+    h+='<div class="card pad"><div class="spread" style="flex-wrap:wrap;gap:10px"><strong>Srovnání cen (bez DPH)</strong>'+
+      '<span style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<input type="search" id="cmq" placeholder="Hledat…" value="'+esc(CENMON_FILTR.q)+'" oninput="CENMON_FILTR.q=this.value;cenmonTab()">'+
+      '<select onchange="CENMON_FILTR.jen=this.value;cenmonTab()">'+
+        '<option value="">— vše —</option>'+
+        '<option value="drazsi"'+(CENMON_FILTR.jen==='drazsi'?' selected':'')+'>Jen kde jsme dražší</option>'+
+        '<option value="levnejsi"'+(CENMON_FILTR.jen==='levnejsi'?' selected':'')+'>Jen kde jsme levnější</option>'+
+        '<option value="sparovane"'+(CENMON_FILTR.jen==='sparovane'?' selected':'')+'>Jen spárované</option>'+
+        '<option value="nesparovane"'+(CENMON_FILTR.jen==='nesparovane'?' selected':'')+'>Jen nespárované</option></select>'+
+      '<button class="btn ghost sm" onclick="cenmonXlsx()">⬇ Export XLSX</button></span></div>'+
+      '<div id="cenmonTab" style="margin-top:12px"></div></div>';
+  }
+  box.innerHTML=h;
+  cenmonTab();
+}
+function cenmonRadky(){
+  let rows=(CENMON.srovnani||[]);
+  const q=CENMON_FILTR.q.trim().toLowerCase();
+  if(q) rows=rows.filter(x=>(x.kod+' '+x.nazev+' '+(x.meva?x.meva.nazev:'')).toLowerCase().includes(q));
+  if(CENMON_FILTR.jen==='drazsi') rows=rows.filter(x=>x.meva&&x.cena!=null&&x.meva.cenaBezDph!=null&&x.cena>x.meva.cenaBezDph);
+  if(CENMON_FILTR.jen==='levnejsi') rows=rows.filter(x=>x.meva&&x.cena!=null&&x.meva.cenaBezDph!=null&&x.cena<x.meva.cenaBezDph);
+  if(CENMON_FILTR.jen==='sparovane') rows=rows.filter(x=>x.meva);
+  if(CENMON_FILTR.jen==='nesparovane') rows=rows.filter(x=>!x.meva);
+  return rows;
+}
+function cenmonTab(){
+  const el=document.getElementById('cenmonTab'); if(!el) return;
+  const rows=cenmonRadky().slice(0,500);
+  if(!rows.length){ el.innerHTML='<p class="muted">Nic neodpovídá filtru.</p>'; cenmonFocus(); return; }
+  let h='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Kód</th><th>Naše položka</th><th class="num">Naše cena</th><th>MEVA produkt</th><th class="num">MEVA cena</th><th class="num">Rozdíl</th><th>Stav</th><th></th></tr></thead><tbody>';
+  rows.forEach((x,i)=>{
+    const klic=x.kod||x.nazev;
+    let rozdil='—', barva='';
+    if(x.meva&&x.cena!=null&&x.meva.cenaBezDph!=null){
+      const dif=x.cena-x.meva.cenaBezDph, pct=x.meva.cenaBezDph?Math.round(dif/x.meva.cenaBezDph*100):0;
+      barva=dif>0?'var(--red)':(dif<0?'#12752f':'');
+      rozdil=(dif>0?'+':'')+Math.round(dif)+' Kč ('+(pct>0?'+':'')+pct+' %)';
+    }
+    const stav=x.stavParu==='potvrzeno'?'<span class="pill green">potvrzeno</span>':x.stavParu==='auto'?'<span class="pill amber" title="skóre '+(x.meva?x.meva.s:'')+'">auto</span>':x.stavParu==='zamitnuto'?'<span class="pill gray">zamítnuto</span>':'<span class="pill gray">—</span>';
+    h+='<tr><td class="mono" style="font-size:12px">'+esc(x.kod)+'</td><td>'+esc(x.nazev)+'</td>'+
+      '<td class="num">'+(x.cena!=null?Math.round(x.cena)+' Kč':'—')+'</td>'+
+      '<td style="font-size:13px">'+(x.meva?'<a href="'+esc(x.meva.url)+'" target="_blank">'+esc(x.meva.nazev)+' ↗</a>':'<span class="muted">nespárováno</span>')+'</td>'+
+      '<td class="num">'+(x.meva&&x.meva.cenaBezDph!=null?Math.round(x.meva.cenaBezDph)+' Kč':'—')+'</td>'+
+      '<td class="num" style="font-weight:700;color:'+barva+'">'+rozdil+'</td>'+
+      '<td>'+stav+'</td>'+
+      '<td style="text-align:right;white-space:nowrap">'+(x.kandidati&&x.kandidati.length?'<button class="btn ghost sm" onclick="cenmonVyber('+i+')">Spárovat</button>':'')+
+      (x.meva?' <button class="btn ghost sm" title="Potvrdit pár" onclick="cenmonPar(\''+esc(klic)+'\',\''+esc(x.meva.url)+'\',\'potvrzeno\')">✓</button> <button class="btn ghost sm" title="Zamítnout pár" onclick="cenmonPar(\''+esc(klic)+'\',null,\'zamitnuto\')">✕</button>':'')+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(cenmonRadky().length>500) h+='<p class="muted" style="font-size:12px">Zobrazeno prvních 500 řádků — zužte filtr.</p>';
+  el.innerHTML=h; cenmonFocus();
+}
+function cenmonFocus(){ const q=document.getElementById('cmq'); if(q&&CENMON_FILTR.q&&document.activeElement!==q){ q.focus(); try{q.setSelectionRange(q.value.length,q.value.length);}catch(_){}} }
+function cenmonVyber(i){
+  const x=cenmonRadky().slice(0,500)[i]; if(!x) return;
+  const klic=x.kod||x.nazev;
+  document.getElementById("modalTitle").textContent='Spárovat: '+x.nazev;
+  document.getElementById("modalBody").innerHTML='<p class="muted" style="font-size:13px">Vyber odpovídající produkt MEVA (skóre = podobnost názvů):</p>'+
+    x.kandidati.map(k=>'<div class="li-item" style="margin-top:8px"><div><a href="'+esc(k.url)+'" target="_blank">'+esc(k.nazev)+' ↗</a><div class="muted" style="font-size:12px">'+(k.cenaBezDph!=null?Math.round(k.cenaBezDph)+' Kč bez DPH · ':'')+'skóre '+k.s+'</div></div>'+
+    '<button class="btn sm" onclick="cenmonPar(\''+esc(klic)+'\',\''+esc(k.url)+'\',\'potvrzeno\');closeModal()">Vybrat</button></div>').join('');
+  document.getElementById("modalFoot").innerHTML='<button class="btn ghost" onclick="cenmonPar(\''+esc(klic)+'\',null,\'zamitnuto\');closeModal()">Bez páru (zamítnout)</button><button class="btn ghost" onclick="closeModal()">Zavřít</button>';
+  showModal();
+}
+async function cenmonPar(klic,mevaUrl,stav){
+  try{ await fetch('/api/cenmon/par',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({klic,mevaUrl,stav})}); }catch(e){}
+  renderCenmon();
+}
+async function cenmonScan(){
+  if(!confirm('Stáhnout aktuální ceny z mevatec.cz? Běží na pozadí ~10–15 minut.')) return;
+  await fetch('/api/cenmon/meva-scan',{method:'POST'});
+  cenmonHlidejScan();
+}
+async function cenmonHlidejScan(){
+  try{ const r=await fetch('/api/cenmon/scan-stav',{cache:'no-store'}); const j=await r.json();
+    if(j.scan&&j.scan.bezi){ const b=document.getElementById('cenmonBox').querySelector('.pill.amber'); if(b) b.textContent='Stahuji… '+j.scan.hotovo+' / '+j.scan.celkem; else renderCenmon(); setTimeout(cenmonHlidejScan,4000); }
+    else renderCenmon();
+  }catch(e){}
+}
+function cenmonParseFile(input){
+  const f=input.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    let aoa=[];
+    try{
+      if(f.name.toLowerCase().endsWith('.csv')){
+        const txt=new TextDecoder('utf-8').decode(new Uint8Array(e.target.result));
+        const odd=(txt.split(';').length>txt.split(',').length)?';':',';
+        aoa=txt.split(/\r?\n/).filter(Boolean).map(l=>l.split(odd).map(c=>c.replace(/^"|"$/g,'')));
+      } else {
+        if(typeof XLSX==='undefined'){ alert('Knihovna XLSX není načtena.'); return; }
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      }
+    }catch(err){ alert('Soubor se nepodařilo přečíst: '+err.message); return; }
+    aoa=aoa.filter(r=>r.some(c=>String(c).trim()!==''));
+    if(aoa.length<2){ alert('Soubor je prázdný.'); return; }
+    CENMON_UPLOAD={soubor:f.name,aoa};
+    cenmonMapUi();
+  };
+  reader.readAsArrayBuffer(f);
+}
+function cenmonMapUi(){
+  const aoa=CENMON_UPLOAD.aoa;
+  const sloupcu=Math.max(...aoa.slice(0,5).map(r=>r.length));
+  const hlavicka=aoa[0].map(c=>String(c));
+  const opts=(sel)=>Array.from({length:sloupcu},(_,i)=>'<option value="'+i+'"'+(i===sel?' selected':'')+'>'+(i+1)+'. '+esc(hlavicka[i]||'(bez názvu)')+'</option>').join('');
+  const tip=(re)=>hlavicka.findIndex(hh=>re.test(String(hh).toLowerCase()));
+  const tKod=tip(/k[óo]d|sku|\bid\b/), tNaz=tip(/n[áa]zev|name|popis/), tCen=tip(/cena|price|kč/);
+  document.getElementById('cenmonMap').innerHTML=
+    '<div class="hint">Soubor „'+esc(CENMON_UPLOAD.soubor)+'" — '+(aoa.length-1)+' řádků. Urči sloupce:</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">'+
+    '<label style="font-size:12px">Kód <select id="cmKod"><option value="-1">—</option>'+opts(tKod)+'</select></label>'+
+    '<label style="font-size:12px">Název <select id="cmNaz">'+opts(tNaz>=0?tNaz:0)+'</select></label>'+
+    '<label style="font-size:12px">Cena <select id="cmCen"><option value="-1">—</option>'+opts(tCen)+'</select></label>'+
+    '<label style="font-size:12px;display:inline-flex;gap:4px;align-items:center"><input type="checkbox" id="cmHl" checked> 1. řádek je hlavička</label>'+
+    '<button class="btn sm" onclick="cenmonUpload()">Nahrát položky</button></div>';
+}
+async function cenmonUpload(){
+  const aoa=CENMON_UPLOAD.aoa;
+  const iK=Number(document.getElementById('cmKod').value), iN=Number(document.getElementById('cmNaz').value), iC=Number(document.getElementById('cmCen').value);
+  const start=document.getElementById('cmHl').checked?1:0;
+  const items=aoa.slice(start).map(r=>({kod:iK>=0?r[iK]:'',nazev:r[iN],cena:iC>=0?parseFloat(String(r[iC]).replace(/\s/g,'').replace(',','.')):null})).filter(x=>String(x.nazev||'').trim());
+  if(!items.length){ alert('Podle zvolených sloupců nevyšly žádné položky.'); return; }
+  const r=await fetch('/api/cenmon/polozky',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,soubor:CENMON_UPLOAD.soubor})});
+  const j=await r.json();
+  if(!r.ok||j.error){ alert('Chyba: '+(j.error||r.status)); return; }
+  toast('Nahráno '+j.polozek+' položek'); CENMON_UPLOAD=null; renderCenmon();
+}
+function cenmonXlsx(){
+  if(typeof XLSX==='undefined'){ alert('Knihovna XLSX není načtena.'); return; }
+  const rows=cenmonRadky();
+  const aoa=[['Kód','Naše položka','Naše cena','MEVA produkt','MEVA cena bez DPH','MEVA cena s DPH','Rozdíl Kč','Rozdíl %','Stav','MEVA odkaz']];
+  rows.forEach(x=>{
+    const dif=(x.meva&&x.cena!=null&&x.meva.cenaBezDph!=null)?x.cena-x.meva.cenaBezDph:null;
+    aoa.push([x.kod,x.nazev,x.cena??'',x.meva?x.meva.nazev:'',x.meva?x.meva.cenaBezDph??'':'',x.meva?x.meva.cenaSDph??'':'',dif!=null?Math.round(dif):'',dif!=null&&x.meva.cenaBezDph?Math.round(dif/x.meva.cenaBezDph*100)+' %':'',x.stavParu,x.meva?x.meva.url:'']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa), wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Cenový monitoring');
+  XLSX.writeFile(wb,'cenovy-monitoring-meva.xlsx');
+}
+
 async function renderGritAdmin(){
   const box=document.getElementById("gritAdmin");
   try{ const r=await fetch("/api/grit-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } GRIT_RESULTS=await r.json(); }
