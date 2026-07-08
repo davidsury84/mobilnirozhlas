@@ -1458,9 +1458,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(ABROLL_F, [])); }
     // podepsané pozvánkové odkazy (hash) pro dávku příjemců — jen pro správce
-    // ---- Cenový monitoring (ESHOP × MEVA) — jen správce ----
+    // ---- Cenový monitoring (ESHOP × MEVA) — čtení i pro modul E-shop, zápisy jen správce ----
     if (p === '/api/cenmon' && req.method === 'GET') {
-      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const eCm = empSession(req);
+      if (!isAdmin(req) && !(eCm && employeeModules(eCm.email).indexOf('eshop') >= 0)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const d = cenmonRead();
       return send(res, 200, { polozkyMeta: d.polozkyMeta, polozek: d.polozky.length, mevaMeta: d.mevaMeta, mevaPolozek: d.meva.length, scan: CENMON_SCAN, srovnani: cenmonSrovnani() });
     }
