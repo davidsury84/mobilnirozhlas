@@ -458,22 +458,35 @@ const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník praco
 function gritPasmo(v) { return v < 3 ? 'nizke' : (v < 4 ? 'stredni' : 'vysoke'); }
 const GRIT_TXT = {
   celkove: {
-    nizke: 'Nižší pásmo. Kandidát může být citlivější na delší období bez viditelného pokroku nebo na úkoly vyžadující dlouhodobé držení stejného směru. Lépe funguje s cíli členěnými do kratších etap, průběžným upřesňováním očekávání a pravidelnou zpětnou vazbou. Výsledek nevypovídá o schopnostech ani potenciálu.',
-    stredni: 'Střední pásmo — běžná úroveň dlouhodobého úsilí a stability směru. Kandidát pravděpodobně vytrvá, pokud rozumí smyslu práce a dostává přiměřeně jasné cíle. Pro přesnější obraz porovnejte subškály.',
-    vysoke: 'Vyšší pásmo — silnější tendence držet dlouhodobý směr a pokračovat i při ztížení podmínek. Výhoda v rolích s delším cyklem učení a potřebou dotahování; sledovat riziko přetěžování či setrvávání v nefunkčním postupu.',
+    nizke: 'Celkové skóre GRIT se nachází v nižším pásmu. Výsledek naznačuje, že kandidát může být citlivější na delší období bez viditelného pokroku nebo na úkoly, které vyžadují dlouhodobé držení stejného směru. V pracovním prostředí proto pravděpodobně bude fungovat lépe tam, kde jsou cíle členěné do kratších etap, očekávání jsou průběžně upřesňována a zpětná vazba přichází pravidelně. Výsledek sám o sobě nevypovídá o schopnostech ani potenciálu; spíše ukazuje, že pro stabilní výkon bude důležitý dobrý role-fit, jasná priorizace a kvalitní vedení.',
+    stredni: 'Celkové skóre GRIT se nachází ve středním pásmu. Výsledek odpovídá běžné úrovni dlouhodobého pracovního úsilí a stability směru. Kandidát pravděpodobně dokáže vytrvat, pokud rozumí smyslu práce, dostává přiměřeně jasné cíle a má odpovídající podmínky pro výkon. Pro přesnější interpretaci je vhodné sledovat zejména rozdíl mezi dílčími složkami — konzistencí zájmů a vytrvalostí úsilí.',
+    vysoke: 'Celkové skóre GRIT se nachází ve vyšším pásmu. Výsledek naznačuje silnější tendenci držet dlouhodobý směr a pokračovat i při ztížení podmínek nebo dočasném neúspěchu. V pracovním prostředí to může být výhoda zejména v rolích s delším cyklem učení, vyšší náročností a potřebou dotahování. Současně je vhodné sledovat, zda se tato vytrvalost neobrací do přetěžování, přílišného setrvávání v nefunkčním postupu nebo nižší ochoty opustit neefektivní cestu.',
   },
   kz: {
-    nizke: 'Konzistence zájmů nižší — tendence častěji přehodnocovat priority a nechat se přitáhnout novými podněty. Nevadí v dynamických rolích; u pozic s dlouhým tahem na branku pomůže prioritizace a vyjasnění „co je teď hlavní".',
-    stredni: 'Konzistence zájmů střední — směr drží, část energie může přesouvat k novým tématům. Ověřit vazbu na smysl role a rozhodování mezi prioritami.',
-    vysoke: 'Konzistence zájmů vyšší — stabilní směr, méně přeskakování mezi prioritami; spolehlivost v rolích s tematickou soustředěností. Hlídat flexibilitu při změně strategie.',
+    nizke: 'Konzistence zájmů je nižší. Kandidát může mít tendenci častěji přehodnocovat priority, nechávat se více přitahovat novými podněty a hůře držet jeden dlouhodobý směr. V dynamických rolích to nemusí být slabina, ale v pozicích vyžadujících stabilní tematické zaměření, rutinní follow-through nebo dlouhé dotažení jedné linie práce bude důležité více pracovat s prioritizací a vyjasněním „co je teď hlavní".',
+    stredni: 'Konzistence zájmů je ve středním pásmu. Kandidát pravděpodobně zvládá držet směr, ale podle kontextu může část energie přesouvat i k novým tématům. Vhodné je průběžně ověřovat, jak silně je vázán na smysl role, jak se rozhoduje mezi konkurenčními prioritami a jak pracuje s dlouhodobou motivací.',
+    vysoke: 'Konzistence zájmů je vyšší. Kandidát pravděpodobně drží dlouhodobý směr stabilněji, méně často přeskakuje mezi prioritami a může být spolehlivější v rolích, kde je potřeba tematická soustředěnost a dlouhodobé budování expertizy. Výhodou je menší rozptylování; hlídat je třeba dostatečnou flexibilitu při změně strategie nebo zadání.',
   },
   vu: {
-    nizke: 'Vytrvalost úsilí nižší — citlivější na překážky a pomalý pokrok. Pomáhá krátký feedback loop, viditelné mezikroky a vedení, které pomůže obnovit tempo po neúspěchu. Znamená vyšší potřebu struktury, ne nízkou schopnost.',
-    stredni: 'Vytrvalost úsilí střední — běžně drží tempo i přes dílčí komplikace; reakce na náročná období závisí na vedení a srozumitelnosti očekávání.',
-    vysoke: 'Vytrvalost úsilí vyšší — dobře pokračuje i při obtížích, po neúspěchu se vrací k cíli, vyšší pracovní stamina. Hlídat hranici mezi vytrvalostí a přepalováním.',
+    nizke: 'Vytrvalost úsilí je nižší. Kandidát může být citlivější na překážky, pomalejší výsledný pokrok nebo opakované zádrhely. Lépe proto funguje s kratším feedback loopem, jasně viditelnými mezikroky a vedením, které umí rychle pomoci obnovit tempo po neúspěchu. Výsledek neznamená nízkou schopnost, ale vyšší potřebu struktury a podpory při delších či náročnějších úkolech.',
+    stredni: 'Vytrvalost úsilí je ve středním pásmu. Kandidát pravděpodobně běžně zvládá držet pracovní tempo i přes dílčí komplikace; reakce na náročnější období bude záležet na kvalitě vedení, srozumitelnosti očekávání a smysluplnosti úkolu. Doptejte se na konkrétní příklady práce po neúspěchu.',
+    vysoke: 'Vytrvalost úsilí je vyšší. Kandidát pravděpodobně dobře pokračuje i při obtížích, vrací se po setbacku k cíli a má vyšší pracovní staminu — cenné v prostředí s náročnou adaptací, vysokou odpovědností nebo opakovanými překážkami. Vedení by mělo sledovat i hranici mezi vytrvalostí a přepalováním či setrváváním v neefektivním postupu.',
   },
 };
-const GRIT_DISCLAIMER = 'Doplňková informace ze sebehodnocení — dle autorky škály (A. Duckworth) není určena k výběru zaměstnanců a nemá publikované normy. Nepoužívat jako jediné kritérium; sloužit má k vedení rozhovoru, onboardingu a rozvoji.';
+const GRIT_AKCE_SRV = {
+  nizke: { obraz: 'kratší tah na branku, citlivější na překážky nebo nízkou smysluplnost úkolu', kom: 'stručně, konkrétně, časté mezníky, rychlá zpětná vazba', onb: 'rozdělit práci na kratší sprinty; jasné priority; časté check-iny', fit: 'vhodnější tam, kde je rychlá zpětná vazba, pestrost a kratší cykly dokončení', ot: '„Popište projekt, který se protáhl. Co vás udrželo?" · „Kdy jste změnil(a) směr a proč?"', cile: '30/60/90denní cíle; definovat 3 kritické návyky follow-through', mer: 'dochvilnost k termínům, uzavírání úkolů, počet nedokončených aktivit' },
+  stredni: { obraz: 'běžná úroveň; výsledek silně závisí na smyslu role, manažerovi a systému práce', kom: 'standardně, ale ověřovat, co kandidáta dlouhodobě drží', onb: 'standardní onboarding + 1–2 cílené podpory podle subškál', fit: 'široké spektrum rolí', ot: '„Co vás drží u obtížných úkolů déle než ostatní?"', cile: 'jeden delší cíl + dva kratší milníky', mer: 'plnění milníků, kvalita follow-upu, stabilita priorit' },
+  vysoke: { obraz: 'dobrá pracovní stamina, vyšší pravděpodobnost dotahování a držení směru', kom: 'dávat smysl, autonomii a dlouhodobý rámec, ne mikromanagement', onb: 'stretch cíle, ownership, ale hlídat přetížení', fit: 'role s delším cyklem učení, náročnou adaptací, odborným růstem', ot: '„Kdy jste měl(a) pokračovat, a kdy bylo správné přestat?"', cile: 'delší projekt s jasným business výsledkem; vedle toho limit na kapacitu', mer: 'dokončení dlouhých úkolů, míra samostatnosti, riziko overcommitmentu' },
+};
+function gritProfilVetaSrv(kz, vu) {
+  if (kz == null || vu == null) return '';
+  const d = vu - kz;
+  if (d >= 0.4) return 'Relativně silnější je vytrvalost úsilí, slabší konzistence zájmů: kandidát spíše „doběhne", co je rozběhnuté, ale hrozí rozptylování mezi tématy. Pomůže jasná prioritizace a menší počet souběžných cílů.';
+  if (d <= -0.4) return 'Relativně silnější je konzistence zájmů, slabší vytrvalost úsilí: kandidát drží tematický směr, ale při zádrhelech může polevit. Pomůže krátký feedback loop a podpora rychlého návratu do tempa po neúspěchu.';
+  return 'Obě složky (konzistence zájmů i vytrvalost úsilí) jsou vyrovnané — profil bez výrazné vnitřní disproporce.';
+}
+const GRIT_BENCHMARK_SRV = 'Orientační kontext: ve výzkumech dospělých bývá průměr zhruba 3,2–3,7; česká adaptace Grit-S měla průměr 3,29. Oficiální normy publikovány nejsou.';
+const GRIT_DISCLAIMER = 'Limity: dle autorky škály (A. Duckworth) není Grit Scale určena k výběru zaměstnanců a nemá publikované normy — percentil je jen orientační. Skóre se výrazně překrývá s pečlivostí; prediktivně bývá užitečnější vytrvalost úsilí. Výsledek je sebehodnocení — používat jako doplňkový podklad k rozhovoru a adaptaci, nikdy jako cut-off či jediné kritérium (čl. 22 GDPR).';
 function jssPasmoFacet(s) { return s <= 12 ? 'nespokojenost' : (s >= 16 ? 'spokojenost' : 'neutrální'); }
 function jssPasmoTotal(t) { return t <= 108 ? 'převažuje nespokojenost' : (t >= 144 ? 'převažuje spokojenost' : 'smíšený / neutrální postoj'); }
 function tw44UspesnostSrv(rec) {
@@ -492,14 +505,27 @@ function tw44Interpretace(ix) {
 }
 function surveyVysledekRadky(kind, rec) {
   if (kind === 'grit') {
+    const pc = gritPasmo(rec.hs); const ak = GRIT_AKCE_SRV[pc];
     const r = [
-      ['Celkové GRIT (1–5)', String(rec.hs).replace('.', ',') + ' — pásmo ' + ({ nizke: 'nízké (1,0–2,9)', stredni: 'střední (3,0–3,9)', vysoke: 'vysoké (4,0–5,0)' })[gritPasmo(rec.hs)]],
-      ['Interpretace celku', GRIT_TXT.celkove[gritPasmo(rec.hs)]],
+      ['Celkové GRIT (1–5)', String(rec.hs).replace('.', ',') + ' — pásmo ' + ({ nizke: 'nízké (1,0–2,9)', stredni: 'střední (3,0–3,9)', vysoke: 'vysoké (4,0–5,0)' })[pc]],
+      ['Text do reportu — celkové skóre', GRIT_TXT.celkove[pc]],
     ];
-    if (rec.kz != null) r.push(['Konzistence zájmů (1–5)', String(rec.kz).replace('.', ',')], ['— výklad', GRIT_TXT.kz[gritPasmo(rec.kz)]]);
-    if (rec.vu != null) r.push(['Vytrvalost úsilí (1–5)', String(rec.vu).replace('.', ',')], ['— výklad', GRIT_TXT.vu[gritPasmo(rec.vu)]]);
-    r.push(['Orientační percentil', rec.pct + ' % (bez publikovaných norem — jen orientačně)']);
-    r.push(['Upozornění', GRIT_DISCLAIMER]);
+    if (rec.kz != null) r.push(['Konzistence zájmů (1–5)', String(rec.kz).replace('.', ',')], ['Text do reportu — konzistence', GRIT_TXT.kz[gritPasmo(rec.kz)]]);
+    if (rec.vu != null) r.push(['Vytrvalost úsilí (1–5)', String(rec.vu).replace('.', ',')], ['Text do reportu — vytrvalost', GRIT_TXT.vu[gritPasmo(rec.vu)]]);
+    const profil = gritProfilVetaSrv(rec.kz, rec.vu);
+    if (profil) r.push(['Profil subškál', profil]);
+    r.push(
+      ['Pravděpodobný obraz kandidáta', ak.obraz],
+      ['Jak komunikovat', ak.kom],
+      ['Rozvoj / onboarding', ak.onb],
+      ['Role-fit', ak.fit],
+      ['Otázky do rozhovoru', ak.ot],
+      ['Cíle ve zkušební době', ak.cile],
+      ['Co měřit', ak.mer],
+      ['Orientační percentil', rec.pct + ' % (bez publikovaných norem — jen orientačně)'],
+      ['Benchmark', GRIT_BENCHMARK_SRV],
+      ['Upozornění', GRIT_DISCLAIMER]
+    );
     return r;
   }
   if (kind === 'jss') {
