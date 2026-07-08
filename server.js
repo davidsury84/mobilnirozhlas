@@ -449,6 +449,75 @@ function recordTw44(a) {
   logActivity('survey', { email, name }, 'Test kognitivní zátěže (TW44)');
   return rec;
 }
+/* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
+const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)' };
+function gritInterpretace(pct) {
+  if (pct >= 75) return 'Vysoká houževnatost — patří mezi čtvrtinu nejvytrvalejších v populaci. Dlouhodobé cíle dotahuje i přes překážky.';
+  if (pct >= 50) return 'Nadprůměrná houževnatost — vytrvalost a stálost zájmů nad úrovní většiny populace.';
+  if (pct >= 25) return 'Mírně podprůměrná houževnatost — u dlouhodobých cílů pomůže vnější podpora a rozdělení práce na kratší etapy s milníky.';
+  return 'Nízká houževnatost — snadněji ztrácí zájem a mění cíle; pomáhá častá zpětná vazba, kratší úkoly a průběžné uznání.';
+}
+function jssPasmoFacet(s) { return s <= 12 ? 'nespokojenost' : (s >= 16 ? 'spokojenost' : 'neutrální'); }
+function jssPasmoTotal(t) { return t <= 108 ? 'převažuje nespokojenost' : (t >= 144 ? 'převažuje spokojenost' : 'smíšený / neutrální postoj'); }
+function tw44UspesnostSrv(rec) {
+  let f = 0, a = 0; const st = rec.subtests || {};
+  Object.keys(st).forEach(k => { const s = st[k] || {}; f += (s.found || 0); a += (s.found || 0) + (s.miss || 0) + (s.notfound || 0); });
+  return { found: f, pct: a ? Math.round(f / a * 100) : 0 };
+}
+function tw44Interpretace(ix) {
+  const v = [];
+  if (ix.zatizeni != null) v.push('Stupeň zátěže ' + ix.zatizeni + ' — ' + (ix.zatizeni <= 0 ? 'pod časovým tlakem výkon neklesá (odolnost vůči stresu)' : ix.zatizeni <= 2 ? 'mírný pokles výkonu pod tlakem (běžná reakce)' : 'výraznější pokles výkonu pod časovým tlakem — na stres reaguje citlivěji'));
+  if (ix.uceni != null) v.push('Vliv učení ' + (ix.uceni > 0 ? '+' : '') + ix.uceni + ' % — ' + (ix.uceni >= 10 ? 'výrazné zlepšení opakováním, rychle se učí' : ix.uceni >= 0 ? 'stabilní výkon, mírný efekt učení' : 'výkon v čase klesal (možná únava či pokles soustředění)'));
+  if (ix.produktivita != null) v.push('Produktivita v průběhu testu: ' + (ix.produktivita > 0 ? '+' : '') + ix.produktivita + ' %');
+  if (ix.rychlost != null) v.push('Zrychlení reakcí: ' + (ix.rychlost > 0 ? '+' : '') + ix.rychlost + ' %');
+  if (ix.stabilita != null) v.push('Stabilita výkonu: ' + (ix.stabilita > 0 ? '+' : '') + ix.stabilita + ' %');
+  return v;
+}
+function surveyVysledekRadky(kind, rec) {
+  if (kind === 'grit') return [
+    ['Hrubé skóre (1–5)', String(rec.hs).replace('.', ',')],
+    ['Percentil ČR', rec.pct + ' %'],
+    ['Interpretace', gritInterpretace(rec.pct)],
+  ];
+  if (kind === 'jss') {
+    const r = [
+      ['Celkové skóre (36–216)', rec.total + ' — ' + jssPasmoTotal(rec.total)],
+      ['Spokojenost', rec.pct + ' %'],
+      ['Pozice', rec.pozice || '—'], ['Zařazení', rec.zarazeni || '—'], ['Středisko', rec.stredisko || '—'], ['Na pozici', rec.delka || '—'],
+    ];
+    (rec.subs || []).forEach(s => r.push([s.name + ' (4–24)', s.score + ' — ' + jssPasmoFacet(s.score)]));
+    return r;
+  }
+  const su = tw44UspesnostSrv(rec); const ix = rec.indices || {};
+  const r = [['Varianta', rec.variant || '—'], ['Nalezené cíle', String(su.found)], ['Úspěšnost hledání', su.pct + ' %']];
+  tw44Interpretace(ix).forEach(t => r.push(['Index', t]));
+  if (rec.attr) r.push(['Doplněk – hledání písmene „' + (rec.attr.letter || '?') + '"', (rec.attr.found || 0) + ' z ' + (rec.attr.total || 0) + (rec.attr.miss ? ' (chybně ' + rec.attr.miss + ')' : '')]);
+  return r;
+}
+async function poslatHrVysledek(kind, rec) {
+  try {
+    if (!emailConfigured() || !rec || rec.blocked) return;
+    const s = getState(); const hr = ((s.settings || {}).hrEmail || '').trim();
+    if (!hr) return;
+    const nazev = SURVEY_NAZVY[kind] || kind;
+    const radky = surveyVysledekRadky(kind, rec);
+    const subject = 'Výsledek: ' + (rec.name || rec.email) + ' — ' + nazev;
+    const text = nazev + '\n' + (rec.name || '') + ' <' + rec.email + '>' + (rec.dept && rec.dept !== '—' ? ' · ' + rec.dept : '') + '\n' +
+      new Date(rec.ts).toLocaleString('cs-CZ') + '\n\n' + radky.map(x => x[0] + ': ' + x[1]).join('\n') +
+      '\n\nDetail s interpretací: https://intranet.elkoplast.cz/admin (Průzkumy)';
+    const html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1c1d1a;line-height:1.5">' +
+      '<h2 style="font-size:17px;margin:0 0 4px">' + esc(nazev) + '</h2>' +
+      '<p style="margin:0 0 14px"><strong>' + esc(rec.name || rec.email) + '</strong> &lt;' + esc(rec.email) + '&gt;' +
+      (rec.dept && rec.dept !== '—' ? ' · ' + esc(rec.dept) : '') + '<br><span style="color:#77796f">' + new Date(rec.ts).toLocaleString('cs-CZ') + '</span></p>' +
+      '<table style="border-collapse:collapse">' + radky.map(x =>
+        '<tr><td style="border:1px solid #dcdbd4;padding:6px 10px;background:#faf9f6;font-weight:bold;white-space:nowrap">' + esc(x[0]) + '</td>' +
+        '<td style="border:1px solid #dcdbd4;padding:6px 10px">' + esc(x[1]) + '</td></tr>').join('') + '</table>' +
+      '<p style="margin-top:14px;font-size:12px;color:#77796f">Automatická zpráva intranetu — plný detail v administraci, záložka Průzkumy.</p></div>';
+    await deliver({ to: hr, subject, text, html });
+    logActivity('survey-mail', { email: rec.email, name: rec.name }, 'Výsledek (' + nazev + ') odeslán na HR: ' + hr);
+  } catch (e) { try { logActivity('survey-mail-chyba', { email: (rec || {}).email || '', name: '' }, String(e.message || e)); } catch (_) {} }
+}
+
 // ABROLL školení – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
 const ABROLL_MAX = 3;
 function abrollStatus(email) {
@@ -1120,13 +1189,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, smazano: acks.length - zbyva.length });
     }
     // ---- test houževnatosti (Grit) ----
-    if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/grit' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordGrit(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('grit', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, hs: rec.hs, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/grit-results' && req.method === 'GET') return send(res, 200, readJson(GRIT_F, []));
     // ---- dotazník pracovní spokojenosti (JSS) ----
-    if (p === '/api/jss' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordJss(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, total: rec.total, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/jss' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordJss(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('jss', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, total: rec.total, pct: rec.pct }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/jss-results' && req.method === 'GET') return send(res, 200, readJson(JSS_F, []));
     // ---- test kognitivní zátěže (TW44) ----
-    if (p === '/api/tw44' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordTw44(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/tw44' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordTw44(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('tw44', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/tw44-results' && req.method === 'GET') return send(res, 200, readJson(TW44_F, []));
     // ABROLL test: GET = stav pokusů dané osoby, POST = odeslání pokusu (max 3)
     if (p === '/api/abroll' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, abrollStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }

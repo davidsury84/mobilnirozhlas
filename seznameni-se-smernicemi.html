@@ -2689,6 +2689,61 @@ function sendableOf(id){
 function gritAssignAll(on){ GRIT_ASSIGN.all=on; const w=document.getElementById("gCatWrap"); if(w) w.style.opacity=on?.4:1; }
 function gritReadCats(){ GRIT_ASSIGN.cats=[...document.querySelectorAll(".gcat:checked")].map(c=>c.value); }
 
+/* ---- Detail výsledku konkrétního člověka + interpretace (Grit / JSS / TW44) ---- */
+function gritInterpretace(pct){
+  if(pct>=75) return ['Vysoká houževnatost','green','Patří mezi čtvrtinu nejvytrvalejších v populaci. Dlouhodobé cíle dotahuje i přes překážky; hodí se pro dlouhé projekty a samostatnou práci.'];
+  if(pct>=50) return ['Nadprůměrná houževnatost','green','Vytrvalost a stálost zájmů nad úrovní většiny populace.'];
+  if(pct>=25) return ['Mírně podprůměrná houževnatost','amber','U dlouhodobých cílů pomůže vnější podpora, rozdělení práce na kratší etapy a průběžné milníky.'];
+  return ['Nízká houževnatost','red','Snadněji ztrácí zájem a mění cíle. Pomáhá častá zpětná vazba, kratší úkoly a průběžné uznání.'];
+}
+function jssPasmoFacet(s){ return s<=12?['nespokojenost','red']:(s>=16?['spokojenost','green']:['neutrální','amber']); }
+function jssPasmoTotal(t){ return t<=108?['převažuje nespokojenost','red']:(t>=144?['převažuje spokojenost','green']:['smíšený / neutrální postoj','amber']); }
+function tw44InterpRadky(ix){
+  const v=[];
+  if(ix.zatizeni!=null) v.push(['Stupeň zátěže', ix.zatizeni, ix.zatizeni<=0?['pod tlakem výkon neklesá — odolnost vůči stresu','green']:ix.zatizeni<=2?['mírný pokles pod tlakem (běžná reakce)','amber']:['výraznější pokles pod časovým tlakem — citlivější na stres','red']]);
+  if(ix.uceni!=null) v.push(['Vliv učení', (ix.uceni>0?'+':'')+ix.uceni+' %', ix.uceni>=10?['výrazné zlepšení opakováním — rychle se učí','green']:ix.uceni>=0?['stabilní výkon, mírný efekt učení','amber']:['výkon v čase klesal (únava / pokles soustředění)','red']]);
+  if(ix.produktivita!=null) v.push(['Produktivita v průběhu', (ix.produktivita>0?'+':'')+ix.produktivita+' %', null]);
+  if(ix.rychlost!=null) v.push(['Zrychlení reakcí', (ix.rychlost>0?'+':'')+ix.rychlost+' %', null]);
+  if(ix.stabilita!=null) v.push(['Stabilita výkonu', (ix.stabilita>0?'+':'')+ix.stabilita+' %', null]);
+  if(ix.adaptace!=null) v.push(['Adaptace', (ix.adaptace>0?'+':'')+ix.adaptace+' %', null]);
+  if(ix.kompenzace!=null) v.push(['Kompenzace', (ix.kompenzace>0?'+':'')+ix.kompenzace+' %', null]);
+  return v;
+}
+function openVysledekDetail(kind,email){
+  const list = kind==='grit'?GRIT_RESULTS : kind==='jss'?JSS_RESULTS : TW44_RESULTS;
+  const r=(list||[]).find(x=>(x.email||'').toLowerCase()===email.toLowerCase()); if(!r) return;
+  const nazev = kind==='grit'?'Test houževnatosti (Grit)' : kind==='jss'?'Dotazník pracovní spokojenosti (JSS)' : 'Test kognitivní zátěže (TW44)';
+  const hlava='<div class="muted" style="font-size:13px;margin-bottom:14px">'+esc(r.email)+(r.dept&&r.dept!=='—'?' · '+esc(r.dept):'')+' · vyplněno '+fmtDate(r.ts)+'</div>';
+  const big=(label,val)=>'<div><div class="muted" style="font-size:12px">'+label+'</div><strong style="font-size:22px">'+val+'</strong></div>';
+  let h='';
+  if(kind==='grit'){
+    const it=gritInterpretace(r.pct);
+    h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:14px">'+big('Hrubé skóre (1–5)',String(r.hs).replace('.',','))+big('Percentil ČR',r.pct+' %')+'</div>'+
+      '<div class="card pad"><span class="pill '+it[1]+'" style="margin-bottom:8px;display:inline-block">'+it[0]+'</span><p style="margin:8px 0 0;font-size:14px;line-height:1.55">'+it[2]+'</p>'+
+      '<p class="muted" style="margin:10px 0 0;font-size:12px">Percentil = kolik % populace ČR má nižší skóre. Skóre spojuje vytrvalost a stálost dlouhodobých zájmů (A. Duckworth).</p></div>';
+  } else if(kind==='jss'){
+    const it=jssPasmoTotal(r.total);
+    h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:14px">'+big('Celkem (36–216)',r.total)+big('Spokojenost',r.pct+' %')+
+      '<div><div class="muted" style="font-size:12px">Celkové vyznění</div><span class="pill '+it[1]+'" style="font-size:14px">'+it[0]+'</span></div></div>'+
+      ((r.pozice||r.zarazeni||r.stredisko||r.delka)?'<div class="muted" style="font-size:13px;margin-bottom:12px">'+[r.pozice&&('Pozice: '+esc(r.pozice)),r.zarazeni&&('Zařazení: '+esc(r.zarazeni)),r.stredisko&&('Středisko: '+esc(r.stredisko)),r.delka&&('Na pozici: '+esc(r.delka))].filter(Boolean).join(' · ')+'</div>':'')+
+      '<table class="tbl" style="font-size:13px;width:100%"><thead><tr><th>Oblast</th><th class="num">Skóre (4–24)</th><th>Pásmo</th></tr></thead><tbody>'+
+      (r.subs||[]).map(s=>{const p=jssPasmoFacet(s.score);return '<tr><td>'+esc(s.name)+'</td><td class="num">'+s.score+'</td><td><span class="pill '+p[1]+'">'+p[0]+'</span></td></tr>';}).join('')+
+      '</tbody></table>'+
+      '<p class="muted" style="margin:10px 0 0;font-size:12px">Pásma dle Spectora: oblast ≤ 12 nespokojenost · 13–15 neutrální · ≥ 16 spokojenost. Reverzní položky jsou přepočtené.</p>';
+  } else {
+    const su=tw44Success(r), ix=r.indices||{};
+    h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:14px">'+big('Varianta',esc(r.variant||'—'))+big('Nalezené cíle',su.found)+big('Úspěšnost',su.pct+' %')+'</div>'+
+      '<table class="tbl" style="font-size:13px;width:100%"><thead><tr><th>Ukazatel</th><th class="num">Hodnota</th><th>Interpretace</th></tr></thead><tbody>'+
+      tw44InterpRadky(ix).map(x=>'<tr><td>'+x[0]+'</td><td class="num">'+x[1]+'</td><td>'+(x[2]?'<span class="pill '+x[2][1]+'">'+x[2][0]+'</span>':'—')+'</td></tr>').join('')+
+      '</tbody></table>'+
+      (r.attr?'<p style="font-size:13px;margin:12px 0 0">Doplněk — hledání písmene „'+esc(r.attr.letter||'?')+'": nalezeno '+(r.attr.found||0)+' z '+(r.attr.total||0)+(r.attr.miss?(', chybně '+r.attr.miss):'')+'</p>':'')+
+      '<p class="muted" style="margin:10px 0 0;font-size:12px">Subtesty I–V: hledání cílů v tabulce, subtest III pod časovým stresem. Indexy porovnávají výkon mezi fázemi.</p>';
+  }
+  document.getElementById("modalTitle").textContent=(r.name||r.email)+' — '+nazev;
+  document.getElementById("modalBody").innerHTML=h;
+  document.getElementById("modalFoot").innerHTML='<button class="btn ghost" onclick="closeModal()">Zavřít</button>';
+  showModal();
+}
 async function renderGritAdmin(){
   const box=document.getElementById("gritAdmin");
   try{ const r=await fetch("/api/grit-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } GRIT_RESULTS=await r.json(); }
@@ -2725,8 +2780,8 @@ async function renderGritAdmin(){
       const gHs=(rows.reduce((s,r)=>s+r.hs,0)/rows.length), gPct=Math.round(rows.reduce((s,r)=>s+r.pct,0)/rows.length);
       h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3>'+
          '<span class="pill green">Ø HS '+gHs.toFixed(1).replace(".",",")+' · '+gPct+' %</span></div>';
-      h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">HS</th><th class="num">Percentil</th><th>Datum</th></tr></thead><tbody>';
-      rows.forEach(r=>{ h+='<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.email)+'</td><td class="num">'+r.hs.toFixed(1).replace(".",",")+'</td><td class="num">'+r.pct+' %</td><td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td></tr>'; });
+      h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">HS</th><th class="num">Percentil</th><th>Datum</th><th></th></tr></thead><tbody>';
+      rows.forEach(r=>{ h+='<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.email)+'</td><td class="num">'+r.hs.toFixed(1).replace(".",",")+'</td><td class="num">'+r.pct+' %</td><td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td><td style="text-align:right"><button class="btn ghost sm" onclick="openVysledekDetail(\'grit\',\''+esc(r.email)+'\')">Detail</button></td></tr>'; });
       h+='</tbody></table></div>';
     });
   }
@@ -2812,8 +2867,8 @@ async function jssBlockHtml(){
     const gP=Math.round(rows.reduce((s,r)=>s+r.pct,0)/rows.length);
     h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3>'+
        '<span class="pill green">Ø '+gP+' %</span></div>';
-    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>Pozice</th><th>Zařazení</th><th>Středisko</th><th>Délka</th><th class="num">Skóre</th><th class="num">%</th></tr></thead><tbody>';
-    rows.forEach(r=>{ h+='<tr><td>'+esc(r.name)+'<br><span class="muted mono" style="font-size:11px">'+esc(r.email)+'</span></td><td>'+esc(r.pozice||"—")+'</td><td>'+esc(r.zarazeni||"—")+'</td><td>'+esc(r.stredisko||"—")+'</td><td class="muted">'+esc(r.delka||"—")+'</td><td class="num">'+r.total+'</td><td class="num">'+r.pct+' %</td></tr>'; });
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>Pozice</th><th>Zařazení</th><th>Středisko</th><th>Délka</th><th class="num">Skóre</th><th class="num">%</th><th></th></tr></thead><tbody>';
+    rows.forEach(r=>{ h+='<tr><td>'+esc(r.name)+'<br><span class="muted mono" style="font-size:11px">'+esc(r.email)+'</span></td><td>'+esc(r.pozice||"—")+'</td><td>'+esc(r.zarazeni||"—")+'</td><td>'+esc(r.stredisko||"—")+'</td><td class="muted">'+esc(r.delka||"—")+'</td><td class="num">'+r.total+'</td><td class="num">'+r.pct+' %</td><td style="text-align:right"><button class="btn ghost sm" onclick="openVysledekDetail(\'jss\',\''+esc(r.email)+'\')">Detail</button></td></tr>'; });
     h+='</tbody></table></div>';
   });
   return h;
@@ -2895,13 +2950,14 @@ async function tw44BlockHtml(){
     const gP=Math.round(rows.reduce((s,r)=>s+tw44Success(r).pct,0)/rows.length);
     h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3>'+
        '<span class="pill green">Ø úspěšnost '+gP+' %</span></div>';
-    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>Varianta</th><th class="num">Nalezeno</th><th class="num">Úspěšnost</th><th class="num">Stupeň zátěže</th><th class="num">Vliv učení</th><th>Datum</th></tr></thead><tbody>';
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>Varianta</th><th class="num">Nalezeno</th><th class="num">Úspěšnost</th><th class="num">Stupeň zátěže</th><th class="num">Vliv učení</th><th>Datum</th><th></th></tr></thead><tbody>';
     rows.forEach(r=>{ const su=tw44Success(r), ix=r.indices||{};
       h+='<tr><td>'+esc(r.name)+'<br><span class="muted mono" style="font-size:11px">'+esc(r.email)+'</span></td>'+
          '<td>'+esc(r.variant||"—")+'</td><td class="num">'+su.found+'</td><td class="num">'+su.pct+' %</td>'+
          '<td class="num">'+(ix.zatizeni!=null?ix.zatizeni:"—")+'</td>'+
          '<td class="num">'+(ix.uceni!=null?(ix.uceni>0?"+":"")+ix.uceni+" %":"—")+'</td>'+
-         '<td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td></tr>'; });
+         '<td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td>'+
+         '<td style="text-align:right"><button class="btn ghost sm" onclick="openVysledekDetail(\'tw44\',\''+esc(r.email)+'\')">Detail</button></td></tr>'; });
     h+='</tbody></table></div>';
   });
   return h;
