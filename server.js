@@ -401,7 +401,10 @@ function recordGrit(a) {
   const name = emp ? (emp.name || email) : (a.name || email);
   let dept = '—';
   if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
-  const rec = { email, name, dept, hs, pct: gritPct(hs), ts: Date.now() };
+  // subškály (nepovinné — starší vyplnění je nemají): konzistence zájmů a vytrvalost úsilí, 1–5
+  const kz = (a.kz != null && isFinite(a.kz)) ? Math.round(Math.max(1, Math.min(5, Number(a.kz))) * 10) / 10 : null;
+  const vu = (a.vu != null && isFinite(a.vu)) ? Math.round(Math.max(1, Math.min(5, Number(a.vu))) * 10) / 10 : null;
+  const rec = { email, name, dept, hs, kz, vu, pct: gritPct(hs), ts: Date.now() };
   const results = readJson(GRIT_F, []);
   const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
   if (i >= 0 && results[i].ts && Date.now() < nextFillAt(results[i].ts)) return { blocked: true, nextAt: nextFillAt(results[i].ts) };
@@ -451,12 +454,26 @@ function recordTw44(a) {
 }
 /* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
 const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)' };
-function gritInterpretace(pct) {
-  if (pct >= 75) return 'Vysoká houževnatost — patří mezi čtvrtinu nejvytrvalejších v populaci. Dlouhodobé cíle dotahuje i přes překážky.';
-  if (pct >= 50) return 'Nadprůměrná houževnatost — vytrvalost a stálost zájmů nad úrovní většiny populace.';
-  if (pct >= 25) return 'Mírně podprůměrná houževnatost — u dlouhodobých cílů pomůže vnější podpora a rozdělení práce na kratší etapy s milníky.';
-  return 'Nízká houževnatost — snadněji ztrácí zájem a mění cíle; pomáhá častá zpětná vazba, kratší úkoly a průběžné uznání.';
-}
+// Pracovní pásma dle skóre 1–5 (publikované normy neexistují — percentil je jen orientační).
+function gritPasmo(v) { return v < 3 ? 'nizke' : (v < 4 ? 'stredni' : 'vysoke'); }
+const GRIT_TXT = {
+  celkove: {
+    nizke: 'Nižší pásmo. Kandidát může být citlivější na delší období bez viditelného pokroku nebo na úkoly vyžadující dlouhodobé držení stejného směru. Lépe funguje s cíli členěnými do kratších etap, průběžným upřesňováním očekávání a pravidelnou zpětnou vazbou. Výsledek nevypovídá o schopnostech ani potenciálu.',
+    stredni: 'Střední pásmo — běžná úroveň dlouhodobého úsilí a stability směru. Kandidát pravděpodobně vytrvá, pokud rozumí smyslu práce a dostává přiměřeně jasné cíle. Pro přesnější obraz porovnejte subškály.',
+    vysoke: 'Vyšší pásmo — silnější tendence držet dlouhodobý směr a pokračovat i při ztížení podmínek. Výhoda v rolích s delším cyklem učení a potřebou dotahování; sledovat riziko přetěžování či setrvávání v nefunkčním postupu.',
+  },
+  kz: {
+    nizke: 'Konzistence zájmů nižší — tendence častěji přehodnocovat priority a nechat se přitáhnout novými podněty. Nevadí v dynamických rolích; u pozic s dlouhým tahem na branku pomůže prioritizace a vyjasnění „co je teď hlavní".',
+    stredni: 'Konzistence zájmů střední — směr drží, část energie může přesouvat k novým tématům. Ověřit vazbu na smysl role a rozhodování mezi prioritami.',
+    vysoke: 'Konzistence zájmů vyšší — stabilní směr, méně přeskakování mezi prioritami; spolehlivost v rolích s tematickou soustředěností. Hlídat flexibilitu při změně strategie.',
+  },
+  vu: {
+    nizke: 'Vytrvalost úsilí nižší — citlivější na překážky a pomalý pokrok. Pomáhá krátký feedback loop, viditelné mezikroky a vedení, které pomůže obnovit tempo po neúspěchu. Znamená vyšší potřebu struktury, ne nízkou schopnost.',
+    stredni: 'Vytrvalost úsilí střední — běžně drží tempo i přes dílčí komplikace; reakce na náročná období závisí na vedení a srozumitelnosti očekávání.',
+    vysoke: 'Vytrvalost úsilí vyšší — dobře pokračuje i při obtížích, po neúspěchu se vrací k cíli, vyšší pracovní stamina. Hlídat hranici mezi vytrvalostí a přepalováním.',
+  },
+};
+const GRIT_DISCLAIMER = 'Doplňková informace ze sebehodnocení — dle autorky škály (A. Duckworth) není určena k výběru zaměstnanců a nemá publikované normy. Nepoužívat jako jediné kritérium; sloužit má k vedení rozhovoru, onboardingu a rozvoji.';
 function jssPasmoFacet(s) { return s <= 12 ? 'nespokojenost' : (s >= 16 ? 'spokojenost' : 'neutrální'); }
 function jssPasmoTotal(t) { return t <= 108 ? 'převažuje nespokojenost' : (t >= 144 ? 'převažuje spokojenost' : 'smíšený / neutrální postoj'); }
 function tw44UspesnostSrv(rec) {
@@ -474,11 +491,17 @@ function tw44Interpretace(ix) {
   return v;
 }
 function surveyVysledekRadky(kind, rec) {
-  if (kind === 'grit') return [
-    ['Hrubé skóre (1–5)', String(rec.hs).replace('.', ',')],
-    ['Percentil ČR', rec.pct + ' %'],
-    ['Interpretace', gritInterpretace(rec.pct)],
-  ];
+  if (kind === 'grit') {
+    const r = [
+      ['Celkové GRIT (1–5)', String(rec.hs).replace('.', ',') + ' — pásmo ' + ({ nizke: 'nízké (1,0–2,9)', stredni: 'střední (3,0–3,9)', vysoke: 'vysoké (4,0–5,0)' })[gritPasmo(rec.hs)]],
+      ['Interpretace celku', GRIT_TXT.celkove[gritPasmo(rec.hs)]],
+    ];
+    if (rec.kz != null) r.push(['Konzistence zájmů (1–5)', String(rec.kz).replace('.', ',')], ['— výklad', GRIT_TXT.kz[gritPasmo(rec.kz)]]);
+    if (rec.vu != null) r.push(['Vytrvalost úsilí (1–5)', String(rec.vu).replace('.', ',')], ['— výklad', GRIT_TXT.vu[gritPasmo(rec.vu)]]);
+    r.push(['Orientační percentil', rec.pct + ' % (bez publikovaných norem — jen orientačně)']);
+    r.push(['Upozornění', GRIT_DISCLAIMER]);
+    return r;
+  }
   if (kind === 'jss') {
     const r = [
       ['Celkové skóre (36–216)', rec.total + ' — ' + jssPasmoTotal(rec.total)],

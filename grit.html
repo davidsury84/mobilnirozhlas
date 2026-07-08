@@ -159,6 +159,11 @@ async function vyhodnotit(){
   if(answers.filter(a=>a>0).length<10){ document.getElementById('err').textContent='Zodpověz prosím všech 10 otázek.'; return; }
   let sum=0; for(let i=0;i<10;i++) sum+=scoreOf(i);
   const avg = sum/10;                       // hrubé skóre (HS)
+  // subškály (dvoufaktorový model Grit): reverzní položky = konzistence zájmů, přímé = vytrvalost úsilí
+  let kzS=0,kzN=0,vuS=0,vuN=0;
+  for(let i=0;i<10;i++){ const s=scoreOf(i); if(Q[i].rev){kzS+=s;kzN++;} else {vuS+=s;vuN++;} }
+  const kz = kzN? Math.round(kzS/kzN*10)/10 : null;   // konzistence zájmů (1–5)
+  const vu = vuN? Math.round(vuS/vuN*10)/10 : null;   // vytrvalost úsilí (1–5)
   const p = pctFor(avg);                    // percentil
   const AVGP=51, VS=61, MGR=75;             // referenční hodnoty
   const before = 100-p;
@@ -170,7 +175,7 @@ async function vyhodnotit(){
   let saveNote='';
   if(RESP.token||RESP.email){
     const btn=document.getElementById('evalBtn'); if(btn){btn.disabled=true;btn.textContent='Ukládám…';}
-    try{ const rr=await fetch('/api/grit'+(RESP.token?('?i='+encodeURIComponent(RESP.token)):''),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:RESP.email,hs:avg})}); const j=await rr.json();
+    try{ const rr=await fetch('/api/grit'+(RESP.token?('?i='+encodeURIComponent(RESP.token)):''),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:RESP.email,hs:avg,kz:kz,vu:vu})}); const j=await rr.json();
       if(j&&j.ok){ RESP.name=j.name||''; RESP.dept=j.dept||''; RESP.email=RESP.email||''; }
       else if(j&&j.blocked){ saveNote='<div class="save-note">Tento test jste už tento měsíc vyplnil(a) — výsledek se proto znovu neuložil'+(j.nextAt?(' (další vyplnění '+new Date(j.nextAt).toLocaleDateString('cs-CZ')+')'):'')+'. Níže vidíte vyhodnocení vašich nynějších odpovědí.</div>'; }
     }catch(e){}

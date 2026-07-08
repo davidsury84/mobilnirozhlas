@@ -2690,12 +2690,29 @@ function gritAssignAll(on){ GRIT_ASSIGN.all=on; const w=document.getElementById(
 function gritReadCats(){ GRIT_ASSIGN.cats=[...document.querySelectorAll(".gcat:checked")].map(c=>c.value); }
 
 /* ---- Detail výsledku konkrétního člověka + interpretace (Grit / JSS / TW44) ---- */
-function gritInterpretace(pct){
-  if(pct>=75) return ['Vysoká houževnatost','green','Patří mezi čtvrtinu nejvytrvalejších v populaci. Dlouhodobé cíle dotahuje i přes překážky; hodí se pro dlouhé projekty a samostatnou práci.'];
-  if(pct>=50) return ['Nadprůměrná houževnatost','green','Vytrvalost a stálost zájmů nad úrovní většiny populace.'];
-  if(pct>=25) return ['Mírně podprůměrná houževnatost','amber','U dlouhodobých cílů pomůže vnější podpora, rozdělení práce na kratší etapy a průběžné milníky.'];
-  return ['Nízká houževnatost','red','Snadněji ztrácí zájem a mění cíle. Pomáhá častá zpětná vazba, kratší úkoly a průběžné uznání.'];
-}
+/* Grit: pracovní pásma dle skóre 1–5 (publikované normy neexistují) + texty do reportu a doporučení (dle evaluační zprávy) */
+function gritPasmo(v){ return v<3?'nizke':(v<4?'stredni':'vysoke'); }
+const GRIT_PASMO_POPIS={nizke:['Nízké (1,0–2,9)','red'],stredni:['Střední (3,0–3,9)','amber'],vysoke:['Vysoké (4,0–5,0)','green']};
+const GRIT_TXT={
+  celkove:{
+    nizke:'Celkové skóre GRIT se nachází v nižším pásmu. Kandidát může být citlivější na delší období bez viditelného pokroku nebo na úkoly vyžadující dlouhodobé držení stejného směru. Lépe bude fungovat tam, kde jsou cíle členěné do kratších etap, očekávání se průběžně upřesňují a zpětná vazba přichází pravidelně. Výsledek sám o sobě nevypovídá o schopnostech ani potenciálu — důležitý bude role-fit, jasná priorizace a kvalitní vedení.',
+    stredni:'Celkové skóre GRIT je ve středním pásmu — běžná úroveň dlouhodobého pracovního úsilí a stability směru. Kandidát pravděpodobně dokáže vytrvat, pokud rozumí smyslu práce, dostává přiměřeně jasné cíle a má odpovídající podmínky. Pro přesnější interpretaci sledujte rozdíl mezi subškálami.',
+    vysoke:'Celkové skóre GRIT je ve vyšším pásmu — silnější tendence držet dlouhodobý směr a pokračovat i při ztížení podmínek či dočasném neúspěchu. Výhoda zejména v rolích s delším cyklem učení a potřebou dotahování. Sledujte, zda se vytrvalost neobrací do přetěžování nebo setrvávání v nefunkčním postupu.'},
+  kz:{
+    nizke:'Konzistence zájmů je nižší. Tendence častěji přehodnocovat priority a nechat se přitáhnout novými podněty. V dynamických rolích to nemusí být slabina; u pozic se stabilním tematickým zaměřením a dlouhým dotahováním bude důležitá prioritizace a vyjasnění „co je teď hlavní".',
+    stredni:'Konzistence zájmů je ve středním pásmu. Kandidát zvládá držet směr, část energie může přesouvat k novým tématům. Ověřujte, jak silně je vázán na smysl role a jak se rozhoduje mezi konkurenčními prioritami.',
+    vysoke:'Konzistence zájmů je vyšší. Stabilní dlouhodobý směr, méně přeskakování mezi prioritami — spolehlivost v rolích s tematickou soustředěností a budováním expertizy. Hlídejte dostatečnou flexibilitu při změně strategie.'},
+  vu:{
+    nizke:'Vytrvalost úsilí je nižší. Citlivější na překážky a pomalejší pokrok; lépe funguje s kratším feedback loopem, viditelnými mezikroky a vedením, které pomůže obnovit tempo po neúspěchu. Neznamená nízkou schopnost, ale vyšší potřebu struktury a podpory.',
+    stredni:'Vytrvalost úsilí je ve středním pásmu. Běžně drží tempo i přes dílčí komplikace; reakce na náročná období závisí na vedení, srozumitelnosti očekávání a smysluplnosti úkolu. Doptejte se na příklady práce po neúspěchu.',
+    vysoke:'Vytrvalost úsilí je vyšší. Dobře pokračuje i při obtížích, po neúspěchu se vrací k cíli, vyšší pracovní stamina — cenné při náročné adaptaci a opakovaných překážkách. Sledujte hranici mezi vytrvalostí a přepalováním.'},
+};
+const GRIT_AKCE={
+  nizke:{kom:'stručně a konkrétně, časté mezníky, rychlá zpětná vazba',onb:'práci rozdělit na kratší sprinty, jasné priority, časté check-iny; 30/60/90denní cíle',fit:'role s rychlou zpětnou vazbou, pestrostí a kratšími cykly dokončení',ot:['Popište projekt, který se protáhl. Co vás udrželo?','Kdy jste změnil(a) směr a proč?'],mer:'dochvilnost k termínům, uzavírání úkolů, počet nedokončených aktivit'},
+  stredni:{kom:'standardně; ověřovat, co kandidáta dlouhodobě drží',onb:'standardní onboarding + 1–2 cílené podpory podle slabší subškály; jeden delší cíl + dva kratší milníky',fit:'široké spektrum rolí',ot:['Co vás drží u obtížných úkolů déle než ostatní?'],mer:'plnění milníků, kvalita follow-upu, stabilita priorit'},
+  vysoke:{kom:'dávat smysl, autonomii a dlouhodobý rámec — ne mikromanagement',onb:'stretch cíle a ownership; delší projekt s jasným výsledkem + limit na kapacitu',fit:'role s delším cyklem učení, náročnou adaptací a odborným růstem',ot:['Kdy jste měl(a) pokračovat — a kdy bylo správné přestat?'],mer:'dokončování dlouhých úkolů, samostatnost, riziko overcommitmentu'},
+};
+const GRIT_DISCLAIMER='Doplňková informace ze sebehodnocení. Dle autorky škály (A. Duckworth) není Grit Scale určena k výběru zaměstnanců a nemá publikované normy — percentil je jen orientační. Používat k vedení rozhovoru, onboardingu a rozvoji, ne jako samostatné selekční kritérium.';
 function jssPasmoFacet(s){ return s<=12?['nespokojenost','red']:(s>=16?['spokojenost','green']:['neutrální','amber']); }
 function jssPasmoTotal(t){ return t<=108?['převažuje nespokojenost','red']:(t>=144?['převažuje spokojenost','green']:['smíšený / neutrální postoj','amber']); }
 function tw44InterpRadky(ix){
@@ -2717,10 +2734,26 @@ function openVysledekDetail(kind,email){
   const big=(label,val)=>'<div><div class="muted" style="font-size:12px">'+label+'</div><strong style="font-size:22px">'+val+'</strong></div>';
   let h='';
   if(kind==='grit'){
-    const it=gritInterpretace(r.pct);
-    h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:14px">'+big('Hrubé skóre (1–5)',String(r.hs).replace('.',','))+big('Percentil ČR',r.pct+' %')+'</div>'+
-      '<div class="card pad"><span class="pill '+it[1]+'" style="margin-bottom:8px;display:inline-block">'+it[0]+'</span><p style="margin:8px 0 0;font-size:14px;line-height:1.55">'+it[2]+'</p>'+
-      '<p class="muted" style="margin:10px 0 0;font-size:12px">Percentil = kolik % populace ČR má nižší skóre. Skóre spojuje vytrvalost a stálost dlouhodobých zájmů (A. Duckworth).</p></div>';
+    const pc=gritPasmo(r.hs), pp=GRIT_PASMO_POPIS[pc];
+    const sub=(label,val,typ)=>{ if(val==null) return '<div><div class="muted" style="font-size:12px">'+label+'</div><strong style="font-size:22px">—</strong><div class="muted" style="font-size:11px">u starších vyplnění není</div></div>';
+      const p=gritPasmo(val); return '<div><div class="muted" style="font-size:12px">'+label+'</div><strong style="font-size:22px">'+String(val).replace('.',',')+'</strong> <span class="pill '+GRIT_PASMO_POPIS[p][1]+'" style="font-size:11px">'+GRIT_PASMO_POPIS[p][0].split(' ')[0]+'</span></div>'; };
+    const subTxt=(typ,val)=> val==null?'':'<p style="margin:10px 0 0;font-size:14px;line-height:1.55">'+GRIT_TXT[typ][gritPasmo(val)]+'</p>';
+    const ak=GRIT_AKCE[pc];
+    h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:14px">'+
+      '<div><div class="muted" style="font-size:12px">Celkové GRIT (1–5)</div><strong style="font-size:26px">'+String(r.hs).replace('.',',')+'</strong> <span class="pill '+pp[1]+'">'+pp[0]+'</span></div>'+
+      sub('Konzistence zájmů',r.kz)+sub('Vytrvalost úsilí',r.vu)+
+      '<div><div class="muted" style="font-size:12px">Orientační percentil</div><strong style="font-size:22px">'+r.pct+' %</strong><div class="muted" style="font-size:11px">bez publikovaných norem</div></div></div>'+
+      '<div class="card pad" style="margin-bottom:14px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Text do reportu</strong>'+
+      '<p style="margin:10px 0 0;font-size:14px;line-height:1.55">'+GRIT_TXT.celkove[pc]+'</p>'+subTxt('kz',r.kz)+subTxt('vu',r.vu)+'</div>'+
+      '<div class="card pad" style="margin-bottom:14px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Doporučení pro personalistu (pásmo '+pp[0].split(' ')[0].toLowerCase()+')</strong>'+
+      '<table class="tbl" style="font-size:13px;width:100%;margin-top:10px"><tbody>'+
+      '<tr><td style="white-space:nowrap;font-weight:600">Komunikace</td><td>'+ak.kom+'</td></tr>'+
+      '<tr><td style="font-weight:600">Onboarding / zkušební doba</td><td>'+ak.onb+'</td></tr>'+
+      '<tr><td style="font-weight:600">Role-fit</td><td>'+ak.fit+'</td></tr>'+
+      '<tr><td style="font-weight:600">Otázky do rozhovoru</td><td>'+ak.ot.map(o=>'„'+o+'"').join('<br>')+'</td></tr>'+
+      '<tr><td style="font-weight:600">Co sledovat / měřit</td><td>'+ak.mer+'</td></tr>'+
+      '</tbody></table></div>'+
+      '<p class="muted" style="margin:0;font-size:12px;line-height:1.5">'+GRIT_DISCLAIMER+'</p>';
   } else if(kind==='jss'){
     const it=jssPasmoTotal(r.total);
     h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:14px">'+big('Celkem (36–216)',r.total)+big('Spokojenost',r.pct+' %')+
@@ -2780,8 +2813,8 @@ async function renderGritAdmin(){
       const gHs=(rows.reduce((s,r)=>s+r.hs,0)/rows.length), gPct=Math.round(rows.reduce((s,r)=>s+r.pct,0)/rows.length);
       h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3>'+
          '<span class="pill green">Ø HS '+gHs.toFixed(1).replace(".",",")+' · '+gPct+' %</span></div>';
-      h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">HS</th><th class="num">Percentil</th><th>Datum</th><th></th></tr></thead><tbody>';
-      rows.forEach(r=>{ h+='<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.email)+'</td><td class="num">'+r.hs.toFixed(1).replace(".",",")+'</td><td class="num">'+r.pct+' %</td><td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td><td style="text-align:right"><button class="btn ghost sm" onclick="openVysledekDetail(\'grit\',\''+esc(r.email)+'\')">Detail</button></td></tr>'; });
+      h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">Celkem</th><th class="num">Konzistence</th><th class="num">Vytrvalost</th><th class="num">Percentil*</th><th>Datum</th><th></th></tr></thead><tbody>';
+      rows.forEach(r=>{ h+='<tr><td>'+esc(r.name)+'</td><td class="muted">'+esc(r.email)+'</td><td class="num">'+r.hs.toFixed(1).replace(".",",")+'</td><td class="num">'+(r.kz!=null?String(r.kz).replace(".",","):"—")+'</td><td class="num">'+(r.vu!=null?String(r.vu).replace(".",","):"—")+'</td><td class="num">'+r.pct+' %</td><td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td><td style="text-align:right"><button class="btn ghost sm" onclick="openVysledekDetail(\'grit\',\''+esc(r.email)+'\')">Detail</button></td></tr>'; });
       h+='</tbody></table></div>';
     });
   }
@@ -2799,9 +2832,9 @@ async function copyGritLinks(){
 }
 function exportGrit(){
   if(typeof XLSX==="undefined"){ alert("Knihovna XLSX není načtená."); return; }
-  const aoa=[["Oddělení","Jméno","E-mail","HS","Percentil %","Datum"]];
+  const aoa=[["Oddělení","Jméno","E-mail","Celkem (1–5)","Konzistence zájmů","Vytrvalost úsilí","Pásmo","Percentil % (orientační)","Datum"]];
   (GRIT_RESULTS||[]).slice().sort((a,b)=>(a.dept||"").localeCompare(b.dept||"","cs")||b.hs-a.hs)
-    .forEach(r=>aoa.push([r.dept||"—",r.name,r.email,r.hs,r.pct,new Date(r.ts).toLocaleDateString("cs-CZ")]));
+    .forEach(r=>aoa.push([r.dept||"—",r.name,r.email,r.hs,r.kz!=null?r.kz:"",r.vu!=null?r.vu:"",GRIT_PASMO_POPIS[gritPasmo(r.hs)][0],r.pct,new Date(r.ts).toLocaleDateString("cs-CZ")]));
   const ws=XLSX.utils.aoa_to_sheet(aoa), wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,"Grit"); XLSX.writeFile(wb,"grit-vysledky.xlsx");
 }
