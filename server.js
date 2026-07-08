@@ -1609,7 +1609,8 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/kovo-kalk' && req.method === 'GET') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
-      if (!isAdmin(req) && employeeModules(e.email).indexOf('kovokalk') < 0) return send(res, 403, { error: 'K modulu Kalkulace KOVO nemáte přístup.' });
+      // kalkulačka je součástí modulu Kovo (starší klíč „kovokalk" zůstává platný)
+      if (!isAdmin(req) && employeeModules(e.email).indexOf('kovo') < 0 && employeeModules(e.email).indexOf('kovokalk') < 0) return send(res, 403, { error: 'K modulu Kovo nemáte přístup.' });
       const d = readKovoKalk();
       const cnb = await fetchCnbKurz();
       return send(res, 200, { params: d.params, products: d.products, cnb, canEdit: isAdmin(req) });
@@ -1910,8 +1911,8 @@ const server = http.createServer(async (req, res) => {
     // ---- Aplikace modulu Kalkulace KOVO: lokální variabilní kalkulačka nacenění ----
     if (p === '/kovokalk-app') {
       const e = empSession(req);
-      const allowed = (e && employeeModules(e.email).indexOf('kovokalk') >= 0) || isAdmin(req);
-      if (!allowed) return send(res, 403, '<h1>Přístup ke Kalkulaci KOVO nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      const allowed = (e && (employeeModules(e.email).indexOf('kovo') >= 0 || employeeModules(e.email).indexOf('kovokalk') >= 0)) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k modulu Kovo nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (fs.existsSync(KOVOKALK_APP_FILE)) return send(res, 200, fs.readFileSync(KOVOKALK_APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 404, { error: 'Soubor kalkulacka-kovo.html chybí v projektu.' });
     }
