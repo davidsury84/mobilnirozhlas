@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kalkulace KOVO — nacenění výrobků</title>
+<style>
+  :root{
+    --bg:#eef1ec; --card:#fff; --line:#e3e7e0; --ink:#0f1512; --muted:#5b635c;
+    --accent:#12a350; --accent-dark:#0a6b34;
+    --fresh:#1E7D46; --aging:#A96F00; --stale:#B3362B;
+    --fresh-bg:#E5F2EA; --aging-bg:#F7EEDC; --stale-bg:#F8E7E4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14.5px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1220px;margin:0 auto;padding:18px 18px 60px}
+  .top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .top h1{margin:0;font-size:21px;font-weight:750;letter-spacing:-.01em}
+  .top .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .cnb{font-size:12.5px;color:var(--muted);background:var(--card);border:1px solid var(--line);
+    border-radius:10px;padding:8px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .cnb b{color:var(--ink);font-variant-numeric:tabular-nums}
+  h2{font-size:17px;font-weight:700;margin:30px 0 4px}
+  h2+.sub{margin:0 0 12px;color:var(--muted);font-size:13px;max-width:88ch}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px}
+  .pad{padding:16px}
+  .grid{display:grid;grid-template-columns:330px 1fr;gap:16px;align-items:start}
+  @media(max-width:920px){.grid{grid-template-columns:1fr}}
+  h3{margin:0 0 4px;font-size:14px;font-weight:700}
+  .hint{margin:0 0 12px;font-size:12.5px;color:var(--muted)}
+  .plabel{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 3px}
+  .prow{display:grid;grid-template-columns:1fr 104px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .prow:last-child{border-bottom:0}
+  .prow .meta{font-size:11.5px;color:var(--muted);line-height:1.35}
+  input,select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fbfcfa;color:var(--ink)}
+  input[type=number]{width:100%;text-align:right;font-variant-numeric:tabular-nums}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+  .dot.f{background:var(--fresh)} .dot.a{background:var(--aging)} .dot.s{background:var(--stale)}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 8px;border-radius:99px;white-space:nowrap}
+  .chip.f{background:var(--fresh-bg);color:var(--fresh)}
+  .chip.a{background:var(--aging-bg);color:var(--aging)}
+  .chip.s{background:var(--stale-bg);color:var(--stale)}
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border:none;border-radius:9px;cursor:pointer;
+    background:linear-gradient(135deg,#15ab57,var(--accent-dark));color:#fff;font-weight:650;font-size:13.5px;font-family:inherit}
+  .btn.sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .btn.sec:hover{border-color:var(--accent)}
+  .btn.warn{background:#fff;color:var(--stale);border:1px solid var(--stale)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn:focus-visible{outline:2px solid var(--accent-dark);outline-offset:2px}
+  .prods{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .pbtn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font:inherit;font-size:13px;
+    cursor:pointer;display:flex;align-items:center;gap:7px;color:var(--ink)}
+  .pbtn:hover{border-color:var(--accent)}
+  .pbtn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+  .bd td{padding:7px 8px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:top}
+  .bd td.num{text-align:right;white-space:nowrap;font-weight:650}
+  .bd td.pct{text-align:right;color:var(--muted);width:50px;white-space:nowrap}
+  .bd .bar{height:5px;border-radius:3px;background:var(--accent);opacity:.8;margin-top:5px;min-width:2px;transition:width .2s}
+  .bd .note{color:var(--muted);font-size:12px}
+  .totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-top:12px}
+  .tot{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fbfcfa}
+  .tot .l{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .tot .v{font-size:18px;font-weight:750;margin-top:2px;white-space:nowrap}
+  .tot.hl{background:var(--accent);border-color:var(--accent)}
+  .tot.hl .l{color:#cdeeda}.tot.hl .v{color:#fff}
+  .refbox{margin-top:12px;font-size:13px;border-radius:9px;padding:10px 12px}
+  .refbox.f{background:var(--fresh-bg)} .refbox.a{background:var(--aging-bg)} .refbox.s{background:var(--stale-bg)}
+  .ft{overflow-x:auto}
+  .ft table{min-width:740px}
+  .ft th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+    text-align:left;padding:8px;border-bottom:2px solid var(--line);font-weight:700}
+  .ft td{padding:8px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+  .ft td.src{color:var(--muted);font-size:12px}
+  .matrow{display:grid;grid-template-columns:1fr 90px 30px;gap:8px;align-items:center;margin-bottom:6px}
+  .xbtn{border:none;background:none;color:var(--stale);cursor:pointer;font-size:16px;padding:2px}
+  .adm{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:10px}
+  .adm .fld label{display:block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .adm .fld input,.adm .fld select{width:100%}
+  .warnbox{border-left:3px solid var(--aging);background:var(--aging-bg);padding:11px 13px;border-radius:0 9px 9px 0;font-size:13px;margin-top:22px;max-width:92ch}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:8px 0 12px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:10px 18px;border-radius:10px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .25s}
+  .toast.show{opacity:1}
+  .err{max-width:560px;margin:60px auto;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p style="color:var(--muted)">Načítám kalkulačku…</p></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+let DATA = null;            // {params, products, cnb, canEdit}
+let current = null;         // vybraný výrobek (referenční objekt v DATA.products)
+let dirty = false;
+
+const CZK = n => (isFinite(n)?n:0).toLocaleString("cs-CZ",{maximumFractionDigits:0}) + " Kč";
+const EUR = n => (isFinite(n)?n:0).toLocaleString("cs-CZ",{maximumFractionDigits:0}) + " €";
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- aktuálnost: měsíce od změny → semafor ---------- */
+function months(ts){ if(!ts) return Infinity; return (Date.now()-ts)/(30.44*864e5); }
+function clsTs(ts){ const m = months(ts); return m<=12 ? "f" : m<=36 ? "a" : "s"; }
+function clsIso(iso){ if(!iso) return "s"; const [y,m]=String(iso).split("-").map(Number); if(!y) return "s"; return clsTs(Date.UTC(y,(m||1)-1,15)); }
+function fmtTs(ts){ if(!ts) return "—"; const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getFullYear(); }
+function fmtIso(iso){ if(!iso) return "—"; const p=String(iso).split("-"); return p[1]?(Number(p[1])+"/"+p[0]):p[0]; }
+function chipTs(ts,label){ const c=clsTs(ts); const t=label||(c==="f"?"aktuální":c==="a"?"stárnoucí":"zastaralé");
+  return '<span class="chip '+c+'"><span class="dot '+c+'"></span>'+esc(t)+'</span>'; }
+function chipIso(iso,label){ const c=clsIso(iso); const t=label||(c==="f"?"aktuální":c==="a"?"stárnoucí":"zastaralé");
+  return '<span class="chip '+c+'"><span class="dot '+c+'"></span>'+esc(t)+'</span>'; }
+
+/* ---------- aktuálnost po řadách — snímek z auditu složky PRODUCTS (7/2026) ---------- */
+const FT_LINES = [
+  ["Muldy CH","2026-06","2026-06","2026-06","FLM a velké AM nedopočtené (0 Kč)"],
+  ["Muldy DIN","2024-09","2024-09","2026-04","sešit editován 2026, data v něm 9/2024"],
+  ["Muldy FR / NL","2023-09","2023-03","2023-09","AM-FR-5,0 bez ceny"],
+  ["ABR-DSD / AFS","2026-06","2026-06","2026-06","TODO v živém sešitu: barvy, mzdy lakovna, odpad"],
+  ["ABR-HBI (hardox)","2025-01","2025-01","2025-01","druhý ceník HBI prázdný (0 Kč)"],
+  ["CITY CSD","2026-04","2026-04","2026-04",""],
+  ["CITY WDG / WDC","2023-10","2023-10","2024-07","ceník WDC: chyba 1 224 € (má být ~2 024 €)"],
+  ["Bedny CPR (Contracts)","2022-07","2025-09","2025-09","zákaznický ceník EUR neaktualizován od 2021"],
+  ["ASP 600–1500","2019-03","2019-03","2026-06","ceny 2026 stojí na nákladech 2019"],
+  ["SLD","2025-04","2019-02","2019-02","normy práce živé, ceník 7 let starý"],
+  ["CLA 1100","2016-07","2016-07","2018-06","„aktuální“ ceník = 2018; kusovník v 5 kopiích"],
+  ["GSK kontejnery","2019-01","2019-01","2021-02","poslední ceník Renewi 2021"],
+  ["USB / LSB bedny","2021-03","2021-05","2018-05","kalkulace skla jen v nečitelných .xls"],
+  ["Nájezdy","2026-03","2026-03","2026-03",""],
+  ["Underground","2025-11",null,null,"typologie živá, kalkulace neexistuje"],
+];
+
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2600); }
+function pv(k){ const p=DATA.params[k]; return p?Number(p.v)||0:0; }
+function matParams(){ return Object.keys(DATA.params).filter(k=>k.indexOf("mat")===0); }
+
+/* ---------- start ---------- */
+async function boot(){
+  const app = document.getElementById("app");
+  let r;
+  try{ r = await fetch("/api/kovo-kalk",{cache:"no-store"}); }
+  catch(e){ app.innerHTML='<div class="err card pad"><h3>Nepodařilo se spojit se serverem.</h3></div>'; return; }
+  if(!r.ok){
+    const j = await r.json().catch(()=>({}));
+    app.innerHTML='<div class="err card pad"><h3>'+esc(j.error||("Chyba "+r.status))+'</h3><p class="hint">Přístup k modulu přiděluje správce v záložce Přístupy.</p></div>';
+    return;
+  }
+  DATA = await r.json();
+  current = DATA.products[0] || null;
+  render();
+}
+
+/* ---------- hlavní render ---------- */
+function render(){
+  const cnb = DATA.cnb;
+  const app = document.getElementById("app");
+  app.innerHTML =
+    '<div class="top"><div><h1>Kalkulace KOVO</h1>'
+    + '<div class="sub">materiál → mzdy → režie → povrch → VPC → PC · každý vstup nese datum poslední změny</div></div>'
+    + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    + (cnb ? '<div class="cnb">ČNB '+esc(cnb.date||"")+': EUR <b>'+cnb.eur.toLocaleString("cs-CZ")+'</b>'
+        +(cnb.pln?' · PLN <b>'+cnb.pln.toLocaleString("cs-CZ")+'</b>':'')
+        +' <button class="btn sec" style="padding:5px 10px;font-size:12px" onclick="applyCnb()">Převzít kurz</button></div>'
+      : '<div class="cnb">Kurz ČNB se nepodařilo načíst — platí ručně nastavený kurz.</div>')
+    + (DATA.canEdit ? '<button class="btn" id="saveBtn" onclick="saveAll()" disabled>Uložit změny</button>' : '')
+    + '</div></div>'
+
+    + '<div class="grid">'
+    + '<div class="card pad"><h3>Kalkulační parametry</h3>'
+    + '<p class="hint">'+(DATA.canEdit?"Změny se uloží tlačítkem nahoře; každá změněná hodnota dostane nové razítko.":"Hodnoty můžete pro simulaci upravit — uložit je může jen správce.")+'</p>'
+    + '<div id="params"></div></div>'
+
+    + '<div>'
+    + '<div class="card pad"><h3>Výrobek</h3>'
+    + '<p class="hint">Vstupy výrobku lze upravit (what-if). Seed pochází z auditu produktové knihovny — před ostrým použitím ověřit proti živému sešitu řady.</p>'
+    + '<div class="prods" id="prods"></div><div id="pform"></div></div>'
+    + '<div class="card pad" style="margin-top:14px"><h3>Rozpad ceny</h3>'
+    + '<p class="hint" id="bdhint"></p><table class="bd"><tbody id="bd"></tbody></table>'
+    + '<div class="totals" id="totals"></div><div id="ref"></div></div>'
+    + '</div></div>'
+
+    + '<h2>Aktuálnost vstupů</h2>'
+    + '<p class="sub">Semafor: <b>zelená</b> ≤ 12 měsíců · <b>oranžová</b> 1–3 roky · <b>červená</b> starší 3 let. Razítka se aktualizují automaticky při každé uložené změně parametru.</p>'
+    + '<div class="card ft" style="padding:4px 12px 8px"><table><thead><tr>'
+    + '<th>Parametr</th><th>Hodnota</th><th>Zdroj</th><th>Změněno</th><th>Kým</th><th>Stav / poznámka</th></tr></thead>'
+    + '<tbody id="ftParams"></tbody></table></div>'
+
+    + '<h2>Aktuálnost po produktových řadách</h2>'
+    + '<p class="sub">Snímek z auditu složky PRODUCTS na Disku (7/2026): kusovníky &amp; normy · nákladové ceny · ceník.</p>'
+    + '<div class="card ft" style="padding:4px 12px 8px"><table><thead><tr>'
+    + '<th>Řada</th><th>Kusovníky &amp; normy</th><th>Nákladové ceny</th><th>Ceník</th><th>Poznámka</th></tr></thead>'
+    + '<tbody id="ftLines"></tbody></table></div>'
+
+    + '<div class="warnbox"><b>Metodická poznámka:</b> režie se ve zdrojových sešitech počítá čtyřmi různými modely (75–150 %, různé základy) '
+    + 'a ceníková přirážka 3–15 % nemá psané pravidlo. Kalkulačka používá jeden model: mzdy ×(1+odvody) + režie % z hrubých mezd. '
+    + 'Před ostrým nasazením potvrdit metodiku s autorem kalkulací.</div>';
+
+  renderParams(); renderProds(); renderPform(); renderFt(); calc();
+}
+
+function renderParams(){
+  const el = document.getElementById("params");
+  el.innerHTML = Object.keys(DATA.params).map(k=>{
+    const p = DATA.params[k];
+    return '<div class="prow"><div>'
+      + '<p class="plabel"><span class="dot '+clsTs(p.updatedAt)+'" title="změněno '+fmtTs(p.updatedAt)+'"></span>'
+      + esc(p.label)+' <span style="text-transform:none;letter-spacing:0">('+esc(p.unit)+')</span></p>'
+      + '<div class="meta">'+esc(p.src||"")+' · '+fmtTs(p.updatedAt)+(p.note?'<br>⚠︎ '+esc(p.note):'')+'</div></div>'
+      + '<div><input type="number" step="any" value="'+p.v+'" data-p="'+k+'" aria-label="'+esc(p.label)+'"></div></div>';
+  }).join("");
+}
+
+function renderProds(){
+  const el = document.getElementById("prods");
+  el.innerHTML = DATA.products.map((pr,i)=>
+    '<button type="button" class="pbtn'+(pr===current?' on':'')+'" onclick="pick('+i+')">'
+    + '<span class="dot '+clsIso(pr.dataDate)+'"></span>'+esc(pr.name)+'</button>').join("")
+    + (DATA.canEdit ? '<button type="button" class="pbtn" onclick="addProduct()" title="Přidat výrobek">＋ Nový výrobek</button>' : '');
+}
+function pick(i){ current = DATA.products[i]; renderProds(); renderPform(); calc(); }
+
+function renderPform(){
+  const el = document.getElementById("pform");
+  if(!current){ el.innerHTML='<p class="hint">Žádné výrobky. '+(DATA.canEdit?'Přidejte první tlačítkem výše.':'')+'</p>'; return; }
+  const pr = current;
+  const matSel = m => '<select data-mrow-p>'+matParams().map(k=>'<option value="'+k+'"'+(k===m.p?' selected':'')+'>'+esc(DATA.params[k].label)+'</option>').join("")+'</select>';
+  let h = '<div class="hint" style="margin-bottom:8px">'+chipIso(pr.dataDate,"data "+fmtIso(pr.dataDate))+' &nbsp;'+esc(pr.src||"")+' · řada '+esc(pr.rada||"—")+'</div>';
+  h += '<div id="matrows">'+pr.mat.map(m=>'<div class="matrow">'+matSel(m)+'<input type="number" step="any" value="'+m.kg+'" data-mrow-kg aria-label="kg"><button type="button" class="xbtn" data-mrow-x title="Odebrat materiál">✕</button></div>').join("")+'</div>';
+  if(DATA.canEdit) h += '<button type="button" class="btn sec" style="padding:5px 10px;font-size:12px;margin-bottom:8px" onclick="addMatRow()">＋ materiál</button>';
+  h += '<div class="prow"><div><p class="plabel">Nakupované díly (Kč)</p></div><div><input type="number" step="any" value="'+pr.nakup+'" data-f="nakup"></div></div>'
+    + '<div class="prow"><div><p class="plabel">Mzdy hrubé — normy (Kč/ks)</p></div><div><input type="number" step="any" value="'+pr.mzdy+'" data-f="mzdy"></div></div>'
+    + '<div class="prow"><div><p class="plabel">Místo výroby</p></div><div><select data-f="misto"><option'+(pr.misto!=="PL"?' selected':'')+'>CZ</option><option'+(pr.misto==="PL"?' selected':'')+'>PL</option></select></div></div>'
+    + '<div class="prow"><div><p class="plabel">Povrch</p></div><div><select data-f="povrch">'
+    + '<option value="zinek"'+(pr.povrch==="zinek"?' selected':'')+'>žárový zinek</option>'
+    + '<option value="lak"'+(pr.povrch==="lak"?' selected':'')+'>lakováno</option>'
+    + '<option value="zadny"'+(pr.povrch==="zadny"?' selected':'')+'>bez úpravy</option></select></div></div>'
+    + '<div class="prow" data-only="zinek"><div><p class="plabel">Přírůstek zinku (×)</p><div class="meta">hmotnost po zinku = kg × koeficient</div></div><div><input type="number" step="0.01" value="'+pr.znGain+'" data-f="znGain"></div></div>'
+    + '<div class="prow" data-only="lak"><div><p class="plabel">Spotřeba barvy (kg)</p></div><div><input type="number" step="any" value="'+pr.barvaKg+'" data-f="barvaKg"></div></div>'
+    + '<div class="prow"><div><p class="plabel">Doprava / kooperace navíc (Kč)</p></div><div><input type="number" step="any" value="'+pr.dopravaKc+'" data-f="dopravaKc"></div></div>';
+
+  if(DATA.canEdit){
+    h += '<div class="adm">'
+      + '<div class="fld"><label>Název</label><input value="'+esc(pr.name)+'" data-f="name"></div>'
+      + '<div class="fld"><label>Řada</label><input value="'+esc(pr.rada)+'" data-f="rada"></div>'
+      + '<div class="fld"><label>Data z (RRRR-MM)</label><input value="'+esc(pr.dataDate)+'" data-f="dataDate" placeholder="2026-06"></div>'
+      + '<div class="fld"><label>Zdroj dat</label><input value="'+esc(pr.src)+'" data-f="src"></div>'
+      + '<div class="fld"><label>Referenční cena (Kč)</label><input type="number" step="any" value="'+(pr.refCzk==null?"":pr.refCzk)+'" data-f="refCzk"></div>'
+      + '<div class="fld"><label>Popis reference</label><input value="'+esc(pr.refLabel)+'" data-f="refLabel" placeholder="VPC ceník"></div>'
+      + '<div class="fld"><label>Reference z (RRRR-MM)</label><input value="'+esc(pr.refDate)+'" data-f="refDate"></div>'
+      + '</div>'
+      + '<div style="margin-top:12px;display:flex;gap:8px"><button type="button" class="btn warn" onclick="delProduct()">Smazat výrobek</button></div>';
+  }
+  el.innerHTML = h;
+  togglePovrch();
+}
+function togglePovrch(){
+  const p = current ? readSel("povrch") : "zinek";
+  document.querySelectorAll('[data-only]').forEach(el=>{ el.style.display = (el.getAttribute('data-only')===p) ? "" : "none"; });
+}
+function readSel(f){ const el=document.querySelector('[data-f="'+f+'"]'); return el?el.value:""; }
+
+/* ---------- admin akce ---------- */
+function markDirty(){ dirty = true; const b=document.getElementById("saveBtn"); if(b) b.disabled=false; }
+function addMatRow(){ if(!current) return; current.mat.push({p:"matS235",kg:0}); renderPform(); calc(); markDirty(); }
+function addProduct(){
+  const pr = { id:"p"+Date.now().toString(36), name:"Nový výrobek", rada:"", mat:[{p:"matS235",kg:100}], nakup:0, mzdy:0,
+    misto:"CZ", povrch:"zinek", znGain:1.05, barvaKg:0, dopravaKc:0,
+    dataDate:new Date().toISOString().slice(0,7), src:"ručně založeno v kalkulačce", refCzk:null, refLabel:"", refDate:"" };
+  DATA.products.push(pr); current = pr; renderProds(); renderPform(); calc(); markDirty();
+}
+function delProduct(){
+  if(!current) return;
+  if(!confirm('Smazat výrobek „'+current.name+'“?')) return;
+  DATA.products = DATA.products.filter(x=>x!==current);
+  current = DATA.products[0]||null;
+  renderProds(); renderPform(); calc(); markDirty();
+}
+function applyCnb(){
+  if(!DATA.cnb) return;
+  const set=(k,v)=>{ const el=document.querySelector('[data-p="'+k+'"]'); if(el&&v){ el.value=v; DATA.params[k].v=v; } };
+  set("kurzEUR", DATA.cnb.eur); set("kurzPLN", DATA.cnb.pln);
+  calc(); if(DATA.canEdit){ markDirty(); toast("Kurz ČNB převzat — nezapomeňte uložit."); } else toast("Kurz ČNB použit pro tuto simulaci.");
+}
+async function saveAll(){
+  syncInputs();
+  const b=document.getElementById("saveBtn"); b.disabled=true; b.textContent="Ukládám…";
+  try{
+    const r = await fetch("/api/kovo-kalk",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({params:DATA.params, products:DATA.products})});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||("HTTP "+r.status));
+    const curId = current && current.id;
+    DATA.params = j.params; DATA.products = j.products;
+    current = DATA.products.find(x=>x.id===curId) || DATA.products[0] || null;
+    dirty = false; render(); toast("Uloženo — razítka změn aktualizována.");
+  }catch(e){ toast("Chyba: "+e.message); b.disabled=false; }
+  finally{ const b2=document.getElementById("saveBtn"); if(b2&&!dirty){ b2.textContent="Uložit změny"; b2.disabled=true; } }
+}
+
+/* ---------- čtení vstupů zpět do DATA ---------- */
+function syncInputs(){
+  document.querySelectorAll("[data-p]").forEach(i=>{ DATA.params[i.dataset.p].v = parseFloat(i.value)||0; });
+  if(!current) return;
+  const rows = document.querySelectorAll("#matrows .matrow");
+  const mat = [];
+  rows.forEach(r=>{ mat.push({ p: r.querySelector("[data-mrow-p]").value, kg: parseFloat(r.querySelector("[data-mrow-kg]").value)||0 }); });
+  current.mat = mat;
+  document.querySelectorAll("[data-f]").forEach(i=>{
+    const f=i.dataset.f;
+    if(["name","rada","dataDate","src","refLabel","refDate","misto","povrch"].indexOf(f)>=0) current[f]=i.value;
+    else if(f==="refCzk") current.refCzk = i.value===""?null:(parseFloat(i.value)||0);
+    else current[f]=parseFloat(i.value)||0;
+  });
+}
+
+/* ---------- výpočet ---------- */
+function calc(){
+  if(!DATA) return;
+  syncInputs();
+  const elBd=document.getElementById("bd"), elTot=document.getElementById("totals"),
+        elRef=document.getElementById("ref"), elHint=document.getElementById("bdhint");
+  if(!current){ elBd.innerHTML=""; elTot.innerHTML=""; elRef.innerHTML=""; elHint.textContent=""; return; }
+  const pr=current;
+  const matKc = pr.mat.reduce((s,m)=>s+m.kg*pv(m.p),0)*(1+pv("odpad")/100);
+  const kgCelkem = pr.mat.reduce((s,m)=>s+m.kg,0);
+  const mzdyCelk = pr.mzdy*(1+pv("odvody")/100);
+  const reziePct = pr.misto==="PL"?pv("reziePL"):pv("rezieCZ");
+  const rezie = pr.mzdy*reziePct/100;
+  let povrch=0, povrchL="Povrch", povrchN="";
+  if(pr.povrch==="zinek"){ povrch=kgCelkem*(pr.znGain||1.05)*pv("zinek"); povrchL="Zinkování";
+    povrchN=Math.round(kgCelkem*(pr.znGain||1.05))+" kg po zinku × "+pv("zinek")+" Kč/kg"; }
+  else if(pr.povrch==="lak"){ const cena=(pv("barvaZaklad")+pv("barvaVrch"))/2; povrch=pr.barvaKg*cena; povrchL="Lakování (barva)";
+    povrchN=pr.barvaKg+" kg × ⌀ "+cena.toLocaleString("cs-CZ")+" Kč/kg (základ+vrch)"; }
+  const doprava = (pr.dopravaKc||0) + (pr.misto==="PL"?pv("dopravaPL"):0);
+  const naklady = matKc+pr.nakup+mzdyCelk+rezie+povrch+doprava;
+  const vpc = naklady*(1+pv("marzeVPC")/100);
+  const pc  = vpc*(1+pv("prirazkaPC")/100);
+
+  const rows=[["Materiál (+"+pv("odpad")+" % odpad)",matKc,pr.mat.map(m=>m.kg+" kg × "+pv(m.p)+" Kč ("+esc(DATA.params[m.p].label)+")").join(" · ")],
+    ["Nakupované díly",pr.nakup,""],
+    ["Mzdy vč. odvodů",mzdyCelk,pr.mzdy.toLocaleString("cs-CZ")+" Kč × "+(1+pv("odvody")/100).toLocaleString("cs-CZ")],
+    ["Režie "+reziePct+" % ("+ (pr.misto==="PL"?"PL":"CZ") +")",rezie,""],
+    [povrchL,povrch,povrchN],
+    ["Doprava / kooperace",doprava,pr.misto==="PL"?"vč. paušálu PL → Bruntál":""]].filter(r=>r[1]>0||r[0].indexOf("Materiál")===0);
+  const max=Math.max(...rows.map(r=>r[1]),1);
+  elBd.innerHTML = rows.map(r=>'<tr><td>'+r[0]+(r[2]?'<div class="note">'+r[2]+'</div>':'')
+    +'<div class="bar" style="width:'+Math.max(2,r[1]/max*100)+'%"></div></td>'
+    +'<td class="num">'+CZK(r[1])+'</td><td class="pct">'+(naklady?(r[1]/naklady*100).toFixed(0):0)+' %</td></tr>').join("");
+
+  elTot.innerHTML =
+    '<div class="tot"><div class="l">Náklady</div><div class="v">'+CZK(naklady)+'</div></div>'
+    +'<div class="tot hl"><div class="l">VPC (+'+pv("marzeVPC")+' %)</div><div class="v">'+CZK(vpc)+'</div></div>'
+    +'<div class="tot"><div class="l">PC ceník (+'+pv("prirazkaPC")+' %)</div><div class="v">'+CZK(pc)+'</div></div>'
+    +'<div class="tot"><div class="l">PC v EUR (kurz '+pv("kurzEUR")+')</div><div class="v">'+EUR(pv("kurzEUR")?pc/pv("kurzEUR"):0)+'</div></div>';
+
+  elHint.textContent = pr.name+" · "+(pr.misto==="PL"?"výroba PL":"výroba CZ")
+    +" · model: mzdy ×"+(1+pv("odvody")/100).toLocaleString("cs-CZ")+" odvody + režie % z hrubých mezd";
+
+  if(pr.refCzk){
+    const d=(vpc-pr.refCzk)/pr.refCzk*100, c=clsIso(pr.refDate);
+    elRef.innerHTML='<div class="refbox '+c+'"><b>Kontrola proti poslední známé ceně:</b> '
+      +esc(pr.refLabel||"reference")+' '+CZK(pr.refCzk)+' ('+fmtIso(pr.refDate)+') → kalkulačka '
+      +(d>=0?"+":"")+d.toFixed(1)+' %.'+(c==="s"?" Reference je zastaralá — rozdíl ukazuje, o kolik ujely náklady.":"")+'</div>';
+  } else elRef.innerHTML="";
+}
+
+/* ---------- tabulky aktuálnosti ---------- */
+function renderFt(){
+  document.getElementById("ftParams").innerHTML = Object.keys(DATA.params).map(k=>{
+    const p=DATA.params[k];
+    return '<tr><td><b>'+esc(p.label)+'</b></td><td>'+(Number(p.v)||0).toLocaleString("cs-CZ")+' '+esc(p.unit)+'</td>'
+      +'<td class="src">'+esc(p.src||"")+'</td><td style="white-space:nowrap">'+fmtTs(p.updatedAt)+'</td>'
+      +'<td class="src">'+esc(p.updatedBy||"")+'</td>'
+      +'<td>'+chipTs(p.updatedAt)+(p.note?'<div class="src" style="margin-top:3px">'+esc(p.note)+'</div>':'')+'</td></tr>';
+  }).join("");
+  document.getElementById("ftLines").innerHTML = FT_LINES.map(r=>{
+    const cell=d=> d==null ? '<span class="chip s"><span class="dot s"></span>chybí</span>' : fmtIso(d)+'<br>'+chipIso(d);
+    return '<tr><td><b>'+esc(r[0])+'</b></td><td>'+cell(r[1])+'</td><td>'+cell(r[2])+'</td><td>'+cell(r[3])+'</td>'
+      +'<td class="src">'+esc(r[4])+'</td></tr>';
+  }).join("");
+}
+
+/* ---------- události ---------- */
+document.addEventListener("input", e=>{
+  if(e.target.matches("[data-p]")){ calc(); if(DATA.canEdit) markDirty(); }
+  else if(e.target.matches("[data-f],[data-mrow-p],[data-mrow-kg]")){
+    if(e.target.matches('[data-f="povrch"]')) { syncInputs(); togglePovrch(); }
+    calc(); if(DATA.canEdit) markDirty();
+  }
+});
+document.addEventListener("change", e=>{
+  if(e.target.matches("select[data-f],select[data-mrow-p]")){ if(e.target.matches('[data-f="povrch"]')){ syncInputs(); togglePovrch(); } calc(); if(DATA.canEdit) markDirty(); }
+});
+document.addEventListener("click", e=>{
+  const x = e.target.closest("[data-mrow-x]");
+  if(x && DATA.canEdit && current){ syncInputs(); const row=x.closest(".matrow"); const idx=[...document.querySelectorAll("#matrows .matrow")].indexOf(row);
+    current.mat.splice(idx,1); renderPform(); calc(); markDirty(); }
+});
+window.addEventListener("beforeunload", e=>{ if(dirty){ e.preventDefault(); e.returnValue=""; } });
+
+boot();
+</script>
+</body>
+</html>
