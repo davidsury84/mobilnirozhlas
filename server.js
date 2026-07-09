@@ -1605,6 +1605,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, item: it });
     }
 
+    // ---- Kovo: přehled výroby ze 4 závodů (Google Sheets přes service account) ----
+    if (p === '/api/kovo-vyroba' && req.method === 'GET') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req) && employeeModules(e.email).indexOf('kovo') < 0 && employeeModules(e.email).indexOf('kovokalk') < 0) return send(res, 403, { error: 'K modulu Kovo nemáte přístup.' });
+      try { return send(res, 200, await require('./kovo-vyroba').fetchVyroba({ force: u.query.force === '1' && isAdmin(req) }), { 'Cache-Control': 'no-store' }); }
+      catch (err) { return send(res, 500, { error: String(err.message || err).slice(0, 200) }); }
+    }
+
     // ---- Kalkulace KOVO: parametry + výrobky + denní kurz ČNB (modul „kovokalk") ----
     if (p === '/api/kovo-kalk' && req.method === 'GET') {
       const e = empSession(req);

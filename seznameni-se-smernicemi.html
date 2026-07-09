@@ -1108,6 +1108,78 @@ function showProvoz(key){
   body.innerHTML='<div class="dash-hero"><h2>'+esc(MUJ_PROVOZ[key]||key)+'</h2><p>Máte přístup k tomuto modulu.</p></div>'+
     '<div class="card pad" style="display:flex;align-items:center;gap:12px"><span class="pill green">✓ Přístup povolen</span><span class="muted">Obsah modulu se připravuje.</span></div>';
 }
+/* ---------- Kovo: přehled výroby ze 4 závodů (Google Sheets přes server) ---------- */
+let KOVO_VYROBA=null;
+async function kovoVyrobaNacti(){
+  try{ const r=await fetch("/api/kovo-vyroba",{cache:"no-store"}); if(!r.ok) throw new Error((await r.json()).error||("HTTP "+r.status)); KOVO_VYROBA=await r.json(); }
+  catch(e){ const el=document.getElementById("kovoVyroba"); if(el) el.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Přehled výroby se nepodařilo načíst: '+esc(e.message)+'</p></div>'; return; }
+  renderKovoVyroba();
+}
+function kvMesice(){ return ["led","úno","bře","dub","kvě","čvn","čvc","srp","zář","říj","lis","pro"]; }
+function kvBar(v,max,barva){ const pct=max?Math.round(v/max*100):0; return '<div style="background:#eef0ed;border-radius:6px;height:18px;position:relative;overflow:hidden"><div style="background:'+barva+';width:'+pct+'%;height:100%"></div></div>'; }
+function renderKovoVyroba(){
+  const el=document.getElementById("kovoVyroba"); if(!el||!KOVO_VYROBA) return;
+  const D=KOVO_VYROBA; const rok=D.rok; const z=D.zakazky||[];
+  const ZAVODY={chomutov:["Chomutov","#2d7a52"],polsko:["Polsko","#3b6ea5"],bruntal:["Bruntál","#b7791f"],brpopelnice:["Bruntál — popelnice","#7a4ba0"],supikovice:["Supíkovice","#a54353"]};
+  const aktivni=z.filter(x=>!x.storno);
+  const ks=x=>Number(x.ks)||0;
+  const celkemKs=aktivni.reduce((s,x)=>s+ks(x),0);
+  const hotove=aktivni.filter(x=>x.hotovo);
+  const dnes=new Date().toISOString().slice(0,10);
+  const skluz=aktivni.filter(x=>!x.hotovo&&x.termin&&x.termin<dnes);
+  const storna=z.filter(x=>x.storno).length;
+  let h='<div class="dash-hero" style="margin-bottom:16px"><h2>Výroba KOVO '+rok+'</h2><p>Souhrn ze 4 výrobních závodů (Chomutov · Polsko · Bruntál · Supíkovice) · živá data z knih zakázek na Google Sheets · aktualizováno '+(D.aktualizovano?new Date(D.aktualizovano).toLocaleString("cs-CZ"):"—")+'</p></div>';
+  if(!z.length){
+    const chybyTxt=Object.keys(D.chyby||{}).length?Object.entries(D.chyby).map(([k,v])=>'<li><strong>'+((k in {chomutov:1,polsko:1,bruntal:1,brpopelnice:1,supikovice:1})?k:'?')+':</strong> '+esc(v)+'</li>').join(''):'';
+    h+='<div class="card pad"><strong>⚠ Data zatím nejsou dostupná</strong>'+
+      '<p style="font-size:14px;line-height:1.6;margin:10px 0">Tabulky výroby je potřeba nasdílet robotímu účtu intranetu (role <strong>Čtenář</strong>):</p>'+
+      '<p class="mono" style="font-size:13px;background:var(--bg-2);padding:8px 12px;border-radius:8px;user-select:all">'+esc(D.saEmail||'')+'</p>'+
+      '<p style="font-size:13px;line-height:1.7;margin:10px 0 0">Otevři každou z tabulek → Sdílet → přidej adresu výše:</p>'+
+      '<ul style="font-size:13px;line-height:1.8;margin:6px 0 0">'+(D.zavody||[]).map(zv=>'<li><a href="'+esc(zv.url)+'" target="_blank">'+esc(zv.nazev)+' ↗</a></li>').join('')+'</ul>'+
+      (chybyTxt?'<details style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-size:12px">Detail chyb</summary><ul style="font-size:12px">'+chybyTxt+'</ul></details>':'')+
+      '<p class="muted" style="font-size:12px;margin:12px 0 0">Po nasdílení se přehled načte sám (obnova dat každých 30 minut).</p></div>';
+    el.innerHTML=h; return;
+  }
+  // souhrnné karty
+  h+='<div class="card pad" style="margin-bottom:16px;display:flex;gap:30px;flex-wrap:wrap">'+
+    '<div><div class="muted" style="font-size:12px">Zakázek '+rok+'</div><strong style="font-size:24px">'+aktivni.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Kusů celkem</div><strong style="font-size:24px">'+celkemKs.toLocaleString("cs-CZ")+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Vyrobeno / expedováno</div><strong style="font-size:24px;color:#12752f">'+hotove.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Ve skluzu (po termínu)</div><strong style="font-size:24px;color:'+(skluz.length?'#b3261e':'inherit')+'">'+skluz.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Storna</div><strong style="font-size:24px">'+storna+'</strong></div></div>';
+  // závody
+  const poZavodech={}; aktivni.forEach(x=>{ const k=x.zavod; (poZavodech[k]=poZavodech[k]||{zak:0,ks:0,hotovo:0,skluz:0}); poZavodech[k].zak++; poZavodech[k].ks+=ks(x); if(x.hotovo)poZavodech[k].hotovo++; if(!x.hotovo&&x.termin&&x.termin<dnes)poZavodech[k].skluz++; });
+  const maxKsZ=Math.max(1,...Object.values(poZavodech).map(v=>v.ks));
+  h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Závody — kusy '+rok+'</strong><table class="tbl" style="width:100%;font-size:13px;margin-top:10px"><thead><tr><th>Závod</th><th class="num">Zakázek</th><th class="num">Kusů</th><th style="width:34%"></th><th class="num">Hotovo</th><th class="num">Skluz</th></tr></thead><tbody>';
+  Object.keys(ZAVODY).forEach(k=>{ const v=poZavodech[k]; if(!v) return; const [naz,barva]=ZAVODY[k];
+    h+='<tr><td><strong>'+naz+'</strong>'+(D.chyby&&D.chyby[k]?' <span class="pill red" style="font-size:10px" title="'+esc(D.chyby[k])+'">!</span>':'')+'</td><td class="num">'+v.zak+'</td><td class="num"><strong>'+v.ks.toLocaleString("cs-CZ")+'</strong></td><td>'+kvBar(v.ks,maxKsZ,barva)+'</td><td class="num" style="color:#12752f">'+v.hotovo+'</td><td class="num" style="color:'+(v.skluz?'#b3261e':'inherit')+'">'+v.skluz+'</td></tr>'; });
+  h+='</tbody></table></div>';
+  // měsíční průběh (podle data přijetí)
+  const mes=Array.from({length:12},()=>({zak:0,ks:0}));
+  aktivni.forEach(x=>{ if(x.zeDne&&x.zeDne.slice(0,4)==String(rok)){ const m=Number(x.zeDne.slice(5,7))-1; if(m>=0&&m<12){ mes[m].zak++; mes[m].ks+=ks(x);} } });
+  const maxM=Math.max(1,...mes.map(m=>m.ks));
+  h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Přijaté zakázky po měsících (kusy)</strong>'+
+    '<div style="display:flex;gap:6px;align-items:flex-end;height:150px;margin-top:14px">'+
+    mes.map((m,i)=>'<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px" title="'+m.zak+' zakázek, '+m.ks+' ks">'+
+      (m.ks?'<span style="font-size:10.5px;color:var(--ink-soft)">'+m.ks+'</span>':'')+
+      '<div style="width:100%;background:var(--green-2);border-radius:4px 4px 0 0;height:'+Math.round(m.ks/maxM*110)+'px"></div>'+
+      '<span class="muted" style="font-size:10.5px">'+kvMesice()[i]+'</span></div>').join('')+'</div></div>';
+  // top výrobky + zákazníci
+  const topMap=(pole)=>{ const m={}; aktivni.forEach(x=>{ const k=(x[pole]||'—').trim()||'—'; m[k]=(m[k]||0)+ks(x); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10); };
+  const topV=topMap('vyrobek'), topZ=topMap('zakaznik');
+  const topTbl=(t,rows)=>{ const mx=Math.max(1,...rows.map(r=>r[1]));
+    return '<div class="card pad" style="flex:1;min-width:320px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">'+t+'</strong><table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><tbody>'+
+    rows.map(r=>'<tr><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r[0])+'">'+esc(r[0])+'</td><td class="num" style="white-space:nowrap"><strong>'+r[1].toLocaleString("cs-CZ")+'</strong> ks</td><td style="width:36%">'+kvBar(r[1],mx,'var(--green-2)')+'</td></tr>').join('')+'</tbody></table></div>'; };
+  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">'+topTbl('Top 10 výrobků (ks)',topV)+topTbl('Top 10 zákazníků (ks)',topZ)+'</div>';
+  // skluz detail
+  if(skluz.length){
+    h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:#b3261e">Zakázky po požadovaném termínu ('+skluz.length+')</strong>'+
+    '<table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><thead><tr><th>Závod</th><th>ČVZ</th><th>Výrobek</th><th class="num">ks</th><th>Termín</th><th>Zákazník</th></tr></thead><tbody>'+
+    skluz.sort((a,b)=>(a.termin||'').localeCompare(b.termin||'')).slice(0,30).map(x=>'<tr><td>'+(ZAVODY[x.zavod]?ZAVODY[x.zavod][0]:x.zavod)+'</td><td class="mono" style="font-size:11px">'+esc(x.cvz||'—')+'</td><td>'+esc(x.vyrobek||'—')+'</td><td class="num">'+ks(x)+'</td><td style="color:#b3261e">'+esc(x.termin||'')+'</td><td class="muted">'+esc(x.zakaznik||'')+'</td></tr>').join('')+
+    '</tbody></table>'+(skluz.length>30?'<p class="muted" style="font-size:12px">Zobrazeno 30 nejstarších.</p>':'')+'</div>';
+  }
+  el.innerHTML=h;
+}
 function showEshop(){
   MUJ.view="eshop"; renderSidebar();
   const body=document.getElementById("mujBody");
@@ -1154,11 +1226,21 @@ function showPrekladiste(){
   body.innerHTML='<iframe src="/prekladiste-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka překladiště"></iframe>';
   window.scrollTo(0,0);
 }
-function showKovoKalk(){
+let KOVO_TAB="vyroba";
+function showKovoKalk(tab){
+  if(tab) KOVO_TAB=tab;
   MUJ.view="kovo"; renderSidebar();
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("kovo")<0 && (MUJ.modules||[]).indexOf("kovokalk")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
-  body.innerHTML='<iframe src="/kovokalk-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kovo — kalkulace"></iframe>';
+  const tabBar='<div style="display:flex;gap:8px;padding:10px 22px;background:var(--paper);border-bottom:1px solid var(--line)">'+
+    '<button class="btn sm'+(KOVO_TAB==="vyroba"?'':' ghost')+'" onclick="showKovoKalk(\'vyroba\')">📊 Přehled výroby</button>'+
+    '<button class="btn sm'+(KOVO_TAB==="kalk"?'':' ghost')+'" onclick="showKovoKalk(\'kalk\')">🧮 Kalkulace</button></div>';
+  if(KOVO_TAB==="kalk"){
+    body.innerHTML=tabBar+'<iframe src="/kovokalk-app" style="width:100%;height:calc(100vh - 122px);border:0;display:block;background:#fff" title="Kovo — kalkulace"></iframe>';
+  } else {
+    body.innerHTML=tabBar+'<div id="kovoVyroba" style="padding:22px"><p class="muted">Načítám přehled výroby…</p></div>';
+    kovoVyrobaNacti();
+  }
   window.scrollTo(0,0);
 }
 function showDoprava(){
