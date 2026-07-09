@@ -1128,7 +1128,9 @@ function renderKovoVyroba(){
   const dnes=new Date().toISOString().slice(0,10);
   const skluz=aktivni.filter(x=>!x.hotovo&&x.termin&&x.termin<dnes);
   const storna=z.filter(x=>x.storno).length;
-  let h='<div class="dash-hero" style="margin-bottom:16px"><h2>Výroba KOVO '+rok+'</h2><p>Souhrn ze 4 výrobních závodů (Chomutov · Polsko · Bruntál · Supíkovice) · živá data z knih zakázek na Google Sheets · aktualizováno '+(D.aktualizovano?new Date(D.aktualizovano).toLocaleString("cs-CZ"):"—")+'</p></div>';
+  const zdroj = D.zivaData ? 'živá data z knih zakázek na Google Sheets'
+    : '⚠ jednorázový snímek dat (čeká na nasdílení tabulek service accountu → pak živě)';
+  let h='<div class="dash-hero" style="margin-bottom:16px"><h2>Výroba KOVO '+rok+'</h2><p>Souhrn ze 4 výrobních závodů (Chomutov · Polsko · Bruntál · Supíkovice) · '+zdroj+' · '+(D.zivaData?'aktualizováno ':'pořízeno ')+(D.aktualizovano?new Date(D.aktualizovano).toLocaleString("cs-CZ"):"—")+'</p></div>';
   if(!z.length){
     const chybyTxt=Object.keys(D.chyby||{}).length?Object.entries(D.chyby).map(([k,v])=>'<li><strong>'+((k in {chomutov:1,polsko:1,bruntal:1,brpopelnice:1,supikovice:1})?k:'?')+':</strong> '+esc(v)+'</li>').join(''):'';
     h+='<div class="card pad"><strong>⚠ Data zatím nejsou dostupná</strong>'+

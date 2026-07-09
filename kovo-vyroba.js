@@ -4,6 +4,9 @@
 // Normalizace: { zavod, cvz, vyrobek, ks, zeDne, termin, hotovo, zakaznik, storno }
 
 const sheets = require('./doprava/lib/sheets');
+const fs = require('node:fs');
+const path = require('node:path');
+const SNAPSHOT_FILE = path.join(__dirname, 'kovo-vyroba-snapshot.json');
 
 const ZAVODY = [
   { klic: 'chomutov',    nazev: 'Chomutov',            id: '1mh8Fhi39uClg0xXvKuWvEDqmFvF5-mWv_8IA1cStBQM' },
@@ -13,13 +16,19 @@ const ZAVODY = [
   { klic: 'supikovice',  nazev: 'Supíkovice',          id: '19ZskN-LJssZvGwRuEJ7rjfn19dsQqzZs-2z_sbXi-yY' },
 ];
 
-// Tolerantní datum: "5.1.2026", "05. 01. 2026", i s překlepy okolo — vrací YYYY-MM-DD nebo null.
+// Tolerantní datum: "5.1.2026", "05. 01. 2026" i Excel sériové číslo (46119) — vrací YYYY-MM-DD nebo null.
 function datum(s) {
-  const m = String(s || '').match(/(\d{1,2})\s*\.\s*(\d{1,2})\s*\.+\s*(20\d{2})/);
+  const str = String(s || '').trim();
+  if (/^\d{4,5}(\.\d+)?$/.test(str)) {                 // Excel serial (dny od 1899-12-30, vč. leap-bug)
+    const n = parseFloat(str);
+    if (n >= 20000 && n <= 60000) return new Date(Date.UTC(1899, 11, 30) + Math.round(n) * 86400000).toISOString().slice(0, 10);
+  }
+  const m = str.match(/(\d{1,2})\s*\.\s*(\d{1,2})\s*\.+\s*(20\d{2})/);
   if (!m) return null;
   return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
 }
-function cislo(s) { const n = parseInt(String(s || '').replace(/[^\d]/g, ''), 10); return isFinite(n) && n > 0 && n < 100000 ? n : 0; }
+// Počet kusů: první číslo (i „6.0", „48.0", „2+2" → 6/48/2). Ne prostý strip číslic (ten z „6.0" udělá 60).
+function cislo(s) { const m = String(s || '').replace(',', '.').match(/\d+(?:\.\d+)?/); if (!m) return 0; const n = Math.round(parseFloat(m[0])); return n > 0 && n < 100000 ? n : 0; }
 const STORNO_RE = /storno/i;
 
 // Řádek je zakázka, pokud má výrobek a (ks nebo datum) — přeskočí hlavičky, mezisoučty, roční předěly.
@@ -75,7 +84,7 @@ const PARSERY = {
     return out;
   },
 };
-function rokZPrefixu(s) { const m = String(s || '').match(/\b(2\d)[CSBP]\b/); return m ? 2000 + Number(m[1]) : null; }
+function rokZPrefixu(s) { const m = String(s || '').match(/(2\d)[A-Z]\s?\d/); return m ? 2000 + Number(m[1]) : null; }
 
 function knihaZakazek(rows, map) {
   const out = [];
@@ -143,7 +152,25 @@ async function fetchVyroba({ force = false } = {}) {
     aktualizovano: new Date().toISOString(),
   };
   if (zivych > 0) _cache = { at: now, data };
+  // žádný závod nešel načíst (SA zatím nemá přístup) → jednorázový snímek, pokud existuje
+  if (zivych === 0 && fs.existsSync(SNAPSHOT_FILE)) {
+    try { const snap = JSON.parse(fs.readFileSync(SNAPSHOT_FILE, 'utf8')); return fromSnapshot(snap); } catch (_) {}
+  }
   return data;
 }
 
-module.exports = { fetchVyroba, ZAVODY };
+// Sestaví data z předpřipravených zakázek (jednorázový snímek, když SA ještě nevidí do Sheets).
+function fromSnapshot(snap) {
+  const rok = new Date().getFullYear();
+  const zakazky = (snap.zakazky || []).filter((z) => z.rok === rok);
+  return {
+    rok, zakazky, chyby: {},
+    zivaData: false,
+    snapshot: snap.porizeno || null,
+    zavody: ZAVODY.map((z) => ({ klic: z.klic, nazev: z.nazev, url: 'https://docs.google.com/spreadsheets/d/' + z.id })),
+    saEmail: sheets.saEmail(),
+    aktualizovano: snap.porizeno || new Date().toISOString(),
+  };
+}
+
+module.exports = { fetchVyroba, fromSnapshot, ZAVODY, PARSERY };
