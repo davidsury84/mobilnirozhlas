@@ -1124,9 +1124,14 @@ function renderKovoVyroba(){
   const aktivni=z.filter(x=>!x.storno);
   const ks=x=>Number(x.ks)||0;
   const celkemKs=aktivni.reduce((s,x)=>s+ks(x),0);
-  const hotove=aktivni.filter(x=>x.hotovo);
   const dnes=new Date().toISOString().slice(0,10);
-  const skluz=aktivni.filter(x=>!x.hotovo&&x.termin&&x.termin<dnes);
+  // „Expedováno" = závody se skutečnou expedicí (Bruntál-popelnice, Supíkovice) → vyplněné datum expedice;
+  // ostatní (Chomutov, Bruntál, Polsko) → potvrzený termín expedice v minulosti.
+  const SLEDUJE=D.sledujeExpedici||{};
+  const expedovano=x=> SLEDUJE[x.zavod] ? !!x.expedice : !!(x.termin&&x.termin<=dnes);
+  const expDatum=x=> x.expedice || x.termin || null;   // datum použité pro „kdy expedováno / plán"
+  const hotove=aktivni.filter(expedovano);
+  const rozprac=aktivni.filter(x=>!expedovano(x));
   const storna=z.filter(x=>x.storno).length;
   const zdroj = D.zivaData ? 'živá data z knih zakázek na Google Sheets'
     : '⚠ jednorázový snímek dat (čeká na nasdílení tabulek service accountu → pak živě)';
@@ -1146,15 +1151,15 @@ function renderKovoVyroba(){
   h+='<div class="card pad" style="margin-bottom:16px;display:flex;gap:30px;flex-wrap:wrap">'+
     '<div><div class="muted" style="font-size:12px">Zakázek '+rok+'</div><strong style="font-size:24px">'+aktivni.length+'</strong></div>'+
     '<div><div class="muted" style="font-size:12px">Kusů celkem</div><strong style="font-size:24px">'+celkemKs.toLocaleString("cs-CZ")+'</strong></div>'+
-    '<div><div class="muted" style="font-size:12px">Vyrobeno / expedováno</div><strong style="font-size:24px;color:#12752f">'+hotove.length+'</strong></div>'+
-    '<div><div class="muted" style="font-size:12px">Ve skluzu (po termínu)</div><strong style="font-size:24px;color:'+(skluz.length?'#b3261e':'inherit')+'">'+skluz.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Expedováno</div><strong style="font-size:24px;color:#12752f">'+hotove.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Rozpracováno</div><strong style="font-size:24px;color:#b7791f">'+rozprac.length+'</strong></div>'+
     '<div><div class="muted" style="font-size:12px">Storna</div><strong style="font-size:24px">'+storna+'</strong></div></div>';
   // závody
-  const poZavodech={}; aktivni.forEach(x=>{ const k=x.zavod; (poZavodech[k]=poZavodech[k]||{zak:0,ks:0,hotovo:0,skluz:0}); poZavodech[k].zak++; poZavodech[k].ks+=ks(x); if(x.hotovo)poZavodech[k].hotovo++; if(!x.hotovo&&x.termin&&x.termin<dnes)poZavodech[k].skluz++; });
+  const poZavodech={}; aktivni.forEach(x=>{ const k=x.zavod; (poZavodech[k]=poZavodech[k]||{zak:0,ks:0,exp:0}); poZavodech[k].zak++; poZavodech[k].ks+=ks(x); if(expedovano(x))poZavodech[k].exp++; });
   const maxKsZ=Math.max(1,...Object.values(poZavodech).map(v=>v.ks));
-  h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Závody — kusy '+rok+'</strong><table class="tbl" style="width:100%;font-size:13px;margin-top:10px"><thead><tr><th>Závod</th><th class="num">Zakázek</th><th class="num">Kusů</th><th style="width:34%"></th><th class="num">Hotovo</th><th class="num">Skluz</th></tr></thead><tbody>';
+  h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Závody — kusy '+rok+'</strong><table class="tbl" style="width:100%;font-size:13px;margin-top:10px"><thead><tr><th>Závod</th><th class="num">Zakázek</th><th class="num">Kusů</th><th style="width:34%"></th><th class="num">Expedováno</th><th class="num">Rozprac.</th></tr></thead><tbody>';
   Object.keys(ZAVODY).forEach(k=>{ const v=poZavodech[k]; if(!v) return; const [naz,barva]=ZAVODY[k];
-    h+='<tr><td><strong>'+naz+'</strong>'+(D.chyby&&D.chyby[k]?' <span class="pill red" style="font-size:10px" title="'+esc(D.chyby[k])+'">!</span>':'')+'</td><td class="num">'+v.zak+'</td><td class="num"><strong>'+v.ks.toLocaleString("cs-CZ")+'</strong></td><td>'+kvBar(v.ks,maxKsZ,barva)+'</td><td class="num" style="color:#12752f">'+v.hotovo+'</td><td class="num" style="color:'+(v.skluz?'#b3261e':'inherit')+'">'+v.skluz+'</td></tr>'; });
+    h+='<tr><td><strong>'+naz+'</strong>'+(D.chyby&&D.chyby[k]?' <span class="pill red" style="font-size:10px" title="'+esc(D.chyby[k])+'">!</span>':'')+'</td><td class="num">'+v.zak+'</td><td class="num"><strong>'+v.ks.toLocaleString("cs-CZ")+'</strong></td><td>'+kvBar(v.ks,maxKsZ,barva)+'</td><td class="num" style="color:#12752f">'+v.exp+'</td><td class="num" style="color:#b7791f">'+(v.zak-v.exp)+'</td></tr>'; });
   h+='</tbody></table></div>';
   // měsíční průběh (podle data přijetí)
   const mes=Array.from({length:12},()=>({zak:0,ks:0}));
@@ -1173,13 +1178,23 @@ function renderKovoVyroba(){
     return '<div class="card pad" style="flex:1;min-width:320px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">'+t+'</strong><table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><tbody>'+
     rows.map(r=>'<tr><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r[0])+'">'+esc(r[0])+'</td><td class="num" style="white-space:nowrap"><strong>'+r[1].toLocaleString("cs-CZ")+'</strong> ks</td><td style="width:36%">'+kvBar(r[1],mx,'var(--green-2)')+'</td></tr>').join('')+'</tbody></table></div>'; };
   h+='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">'+topTbl('Top 10 výrobků (ks)',topV)+topTbl('Top 10 zákazníků (ks)',topZ)+'</div>';
-  // skluz detail
-  if(skluz.length){
-    h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:#b3261e">Zakázky po požadovaném termínu ('+skluz.length+')</strong>'+
-    '<table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><thead><tr><th>Závod</th><th>ČVZ</th><th>Výrobek</th><th class="num">ks</th><th>Termín</th><th>Zákazník</th></tr></thead><tbody>'+
-    skluz.sort((a,b)=>(a.termin||'').localeCompare(b.termin||'')).slice(0,30).map(x=>'<tr><td>'+(ZAVODY[x.zavod]?ZAVODY[x.zavod][0]:x.zavod)+'</td><td class="mono" style="font-size:11px">'+esc(x.cvz||'—')+'</td><td>'+esc(x.vyrobek||'—')+'</td><td class="num">'+ks(x)+'</td><td style="color:#b3261e">'+esc(x.termin||'')+'</td><td class="muted">'+esc(x.zakaznik||'')+'</td></tr>').join('')+
-    '</tbody></table>'+(skluz.length>30?'<p class="muted" style="font-size:12px">Zobrazeno 30 nejstarších.</p>':'')+'</div>';
+  // rozpracované — nejbližší plánovaná expedice (termín) + upozornění na po termínu bez expedice
+  const poTermínu=rozprac.filter(x=>x.termin&&x.termin<dnes);
+  const nadchazi=rozprac.filter(x=>x.termin&&x.termin>=dnes).sort((a,b)=>a.termin.localeCompare(b.termin));
+  if(poTermínu.length){
+    h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:#b3261e">Po termínu bez zaznamenané expedice ('+poTermínu.length+')</strong>'+
+    '<p class="muted" style="font-size:12px;margin:4px 0 8px">Potvrzený termín už uplynul, ale zakázka není označená jako expedovaná — ke kontrole.</p>'+
+    '<table class="tbl" style="width:100%;font-size:12.5px"><thead><tr><th>Závod</th><th>ČVZ</th><th>Výrobek</th><th class="num">ks</th><th>Termín</th><th>Zákazník</th></tr></thead><tbody>'+
+    poTermínu.sort((a,b)=>(a.termin||'').localeCompare(b.termin||'')).slice(0,30).map(x=>'<tr><td>'+(ZAVODY[x.zavod]?ZAVODY[x.zavod][0]:x.zavod)+'</td><td class="mono" style="font-size:11px">'+esc(x.cvz||'—')+'</td><td>'+esc(x.vyrobek||'—')+'</td><td class="num">'+ks(x)+'</td><td style="color:#b3261e">'+esc(x.termin||'')+'</td><td class="muted">'+esc(x.zakaznik||'')+'</td></tr>').join('')+
+    '</tbody></table>'+(poTermínu.length>30?'<p class="muted" style="font-size:12px">Zobrazeno 30 nejstarších.</p>':'')+'</div>';
   }
+  if(nadchazi.length){
+    h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Nadcházející expedice ('+nadchazi.length+' rozpracovaných)</strong>'+
+    '<table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><thead><tr><th>Termín</th><th>Závod</th><th>ČVZ</th><th>Výrobek</th><th class="num">ks</th><th>Zákazník</th></tr></thead><tbody>'+
+    nadchazi.slice(0,30).map(x=>'<tr><td><strong>'+esc(x.termin)+'</strong></td><td>'+(ZAVODY[x.zavod]?ZAVODY[x.zavod][0]:x.zavod)+'</td><td class="mono" style="font-size:11px">'+esc(x.cvz||'—')+'</td><td>'+esc(x.vyrobek||'—')+'</td><td class="num">'+ks(x)+'</td><td class="muted">'+esc(x.zakaznik||'')+'</td></tr>').join('')+
+    '</tbody></table>'+(nadchazi.length>30?'<p class="muted" style="font-size:12px">Zobrazeno 30 nejbližších.</p>':'')+'</div>';
+  }
+  h+='<p class="muted" style="font-size:12px">„Expedováno" u Bruntál-popelnice a Supíkovic = vyplněné skutečné datum expedice; u Chomutova, Bruntálu a Polska = potvrzený termín expedice už uplynul.</p>';
   el.innerHTML=h;
 }
 function showEshop(){
