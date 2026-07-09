@@ -2993,6 +2993,17 @@ function cenmonDraw(){
     '<div><div class="muted" style="font-size:12px">Našich položek</div><strong style="font-size:20px">'+rows.length+'</strong></div>'+
     '<div><div class="muted" style="font-size:12px">Spárováno s MEVA</div><strong style="font-size:20px">'+sparovane.length+'</strong></div>'+
     '<div><div class="muted" style="font-size:12px">Jsme dražší než MEVA</div><strong style="font-size:20px;color:var(--red)">'+drazsi.length+'</strong></div></div>';
+  if(!rows.length){
+    const missing=[];
+    if(!d.polozek) missing.push('nahraj <strong>náš export ze SMI</strong> (krok 1 vlevo nahoře)');
+    if(!d.mevaPolozek) missing.push('stáhni <strong>ceny MEVA</strong> (krok 2 vpravo nahoře)');
+    h+='<div class="card pad" style="border-left:3px solid #e6a23c">'+
+       '<strong>Zatím není co párovat.</strong> '+
+       (missing.length
+         ? ('Chybí: '+missing.join(' a ')+'.')
+         : ('Naše položky ('+d.polozek+') i ceny MEVA ('+d.mevaPolozek+') jsou nahrané, ale automaticky nesedla žádná dvojice — sniž práh podobnosti názvů nebo spáruj ručně.'))+
+       '</div>';
+  }
   if(rows.length){
     h+='<div class="card pad"><div class="spread" style="flex-wrap:wrap;gap:10px"><strong>Srovnání cen (bez DPH)</strong>'+
       '<span style="display:flex;gap:8px;flex-wrap:wrap">'+

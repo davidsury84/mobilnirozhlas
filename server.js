@@ -174,11 +174,12 @@ function cenmonSkore(a, b) {
   return s;
 }
 // Pro každou naši položku najde nejlepší kandidáty z MEVA (top 4) + aplikuje ruční páry.
-function cenmonSrovnani() {
+function cenmonSrovnani(items) {
   const d = cenmonRead();
+  const polozky = Array.isArray(items) ? items : d.polozky;   // volitelně spáruje položky poslané z klienta (SMI aplikace)
   const mevaTok = d.meva.map(m => ({ m, t: cenmonTokeny(m.nazev) }));
   const out = [];
-  for (const p of d.polozky) {
+  for (const p of polozky) {
     const pt = cenmonTokeny(p.nazev);
     const kandidati = [];
     for (const { m, t } of mevaTok) {
@@ -1464,6 +1465,17 @@ const server = http.createServer(async (req, res) => {
       if (!isAdmin(req) && !(eCm && employeeModules(eCm.email).indexOf('eshop') >= 0)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const d = cenmonRead();
       return send(res, 200, { polozkyMeta: d.polozkyMeta, polozek: d.polozky.length, mevaMeta: d.mevaMeta, mevaPolozek: d.meva.length, scan: CENMON_SCAN, srovnani: cenmonSrovnani() });
+    }
+    if (p === '/api/cenmon/srovnej' && req.method === 'POST') {
+      // Spáruje položky poslané z klienta (SMI aplikace) proti staženému katalogu MEVA — bez ukládání na server.
+      const eCm = empSession(req);
+      if (!isAdmin(req) && !(eCm && employeeModules(eCm.email).indexOf('eshop') >= 0)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req));
+      const items = (Array.isArray(b.items) ? b.items : []).slice(0, 5000)
+        .map(x => ({ kod: String(x.kod || '').trim(), nazev: String(x.nazev || '').trim(), cena: (x.cena == null || x.cena === '') ? null : (Number(x.cena) || null) }))
+        .filter(x => x.nazev);
+      const d = cenmonRead();
+      return send(res, 200, { mevaMeta: d.mevaMeta, mevaPolozek: d.meva.length, polozek: items.length, srovnani: cenmonSrovnani(items) });
     }
     if (p === '/api/cenmon/polozky' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
