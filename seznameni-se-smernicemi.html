@@ -349,6 +349,12 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .mj-hero .stat{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 16px;min-width:96px;backdrop-filter:blur(2px)}
 .mj-hero .stat b{display:block;font-size:23px;font-weight:800;line-height:1.05}
 .mj-hero .stat span{font-size:11.5px;opacity:.9;letter-spacing:.02em}
+/* Řada rychlých akcí (ploché barevné dlaždice jako moderní intranet) */
+.mj-quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:12px}
+.mj-quick button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;background:var(--grad-green);color:#fff;border-radius:15px;padding:17px 8px;font-size:12.5px;font-weight:600;text-align:center;line-height:1.2;box-shadow:0 7px 18px rgba(10,107,52,.18);transition:.16s;min-height:96px;border:none;cursor:pointer;font-family:inherit}
+.mj-quick button:hover{transform:translateY(-3px);box-shadow:0 13px 28px rgba(10,107,52,.3)}
+.mj-quick button svg{width:26px;height:26px;stroke:#fff;stroke-width:1.9;fill:none}
+.mj-quick .qbadge{position:absolute;top:7px;right:9px}
 .dash-sec{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:26px 0 12px}
 .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:16px}
 .tile{position:relative;display:flex;flex-direction:column;gap:11px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:20px 20px 18px;box-shadow:var(--shadow);transition:.18s;cursor:pointer;min-height:158px;text-align:left;font:inherit;color:inherit}
@@ -1658,6 +1664,12 @@ function showDashboard(){
       (vacPend0?'<div class="stat"><b>'+vacPend0+'</b><span>dovolená ke schválení</span></div>':'')+
       (MUJ.admin?'<div class="stat"><b>vše</b><span>plný přístup (správce)</span></div>':'<div class="stat"><b>'+nMod+'</b><span>'+plural(nMod,"dostupný modul","dostupné moduly","dostupných modulů")+'</span></div>')+
     '</div></div>';
+
+  // Rychlé akce — ploché barevné dlaždice na stálé sekce (jako moderní intranet)
+  const qacts=[["directives","Směrnice",MUJ_IC.file],["ukoly","Úkoly",MUJ_IC.tasks],["library","Knihovna",MUJ_IC.book],["bozp","BOZP",MUJ_IC.shield],["skoleni","Školení",MUJ_IC.school],["dovolena","Dovolená",MUJ_IC.cal],["pruzkumy","Průzkumy",MUJ_IC.poll]];
+  h += '<div class="mj-quick">'+qacts.map(q=>'<button onclick="mjGo(\''+q[0]+'\')">'+
+    (q[0]==="directives"&&c.dirTodo?'<span class="badge todo qbadge">'+c.dirTodo+'</span>':'')+
+    '<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">'+q[2]+'</svg><span class="lbl">'+q[1]+'</span></button>').join('')+'</div>';
 
   const pend=[];
   c.dirs.filter(d=>!d.ack && d.published).forEach(d=>{
