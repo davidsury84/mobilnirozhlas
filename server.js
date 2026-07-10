@@ -22,6 +22,7 @@ const path   = require('path');
 const url     = require('url');
 const os     = require('os');
 const crypto = require('crypto');
+const produktyFotky = require('./produkty-fotky'); // fotky produktů z Disku (widget „Fotka týdne")
 
 /* ---------- volitelný .env (bez závislostí) ---------- */
 (function loadEnv() {
@@ -89,7 +90,10 @@ const CENMON_F  = path.join(DATA_DIR, 'cenmon.json');     // cenový monitoring:
 const INVITES_F = path.join(DATA_DIR, 'invites.json');    // stav pozvánek dle e-mailu: {invitedAt, acceptedAt, lastLoginAt}
 const UKOLY_F   = path.join(DATA_DIR, 'smernice-ukoly.json'); // úkoly vyplývající ze směrnic (záložka „Úkoly ze směrnic")
 const KOVOKALK_F = path.join(DATA_DIR, 'kovo-kalkulace.json'); // Kalkulace KOVO: parametry (s historií změn) + výrobky
-for (const d of [DATA_DIR, PUB_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+const AKTUALITY_F = path.join(DATA_DIR, 'aktuality.json');    // aktuality (novinky) na intranetu: {posts:[{id,title,body,image,author,authorEmail,ts,likes:{email:ts}}]}
+const SITE_F      = path.join(DATA_DIR, 'site.json');         // nastavení vzhledu intranetu (např. vlastní hero banner)
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');           // nahrané obrázky (aktuality, banner) — persistentní volume
+for (const d of [DATA_DIR, PUB_DIR, UPLOADS_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 
 /* ---------- malé util ---------- */
 function readJson(f, def) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return def; } }
@@ -721,6 +725,24 @@ function employeeModules(email) {
   const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
   return (e && Array.isArray(e.modules)) ? e.modules : [];
 }
+// Smí uživatel zadávat aktuality a měnit banner? = má modul „aktuality" nebo je správce.
+function canPostAktuality(req) {
+  const e = empSession(req); if (!e) return false;
+  if (isAdmin(req)) return true;
+  return employeeModules(e.email).indexOf('aktuality') >= 0;
+}
+// Uloží obrázek z data URL (base64) do UPLOADS_DIR a vrátí veřejnou cestu /uploads/<jméno>. Vrací null pro neplatný vstup.
+function saveDataUrlImage(dataUrl) {
+  const m = /^data:image\/(png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
+  if (!m) return null;
+  const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length > 8e6) throw new Error('Obrázek je příliš velký (max 8 MB).');
+  const fn = crypto.randomBytes(8).toString('hex') + '.' + ext;
+  fs.writeFileSync(path.join(UPLOADS_DIR, fn), buf);
+  return '/uploads/' + fn;
+}
+function deleteUpload(pub) { if (pub && pub.indexOf('/uploads/') === 0) { try { fs.unlinkSync(path.join(UPLOADS_DIR, pub.slice(9).replace(/[^a-zA-Z0-9._-]/g, ''))); } catch (_) {} } }
 
 /* ============================================================
    Kalkulace KOVO (modul „kovokalk") — variabilní kalkulačka nacenění
@@ -1410,6 +1432,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
       return res.end(fs.readFileSync(f));
     }
+    // Nahrané obrázky (aktuality, banner) z persistentního DATA_DIR/uploads.
+    if (p.indexOf('/uploads/') === 0) {
+      const rel = p.slice(9).replace(/[^a-zA-Z0-9._-]/g, '');
+      const f = path.join(UPLOADS_DIR, rel);
+      if (!f.startsWith(UPLOADS_DIR + path.sep) || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
+      const ext = path.extname(f).toLowerCase();
+      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
+      res.writeHead(200, { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
+      return res.end(fs.readFileSync(f));
+    }
     if (p === '/api/login' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
       if ((b.password || '') === SEC.password) { const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''; logActivity('admin-login', { email: '', name: 'Správce (heslo)' }, ''); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_auth=' + token() + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure }); }
@@ -1733,7 +1765,79 @@ const server = http.createServer(async (req, res) => {
       // Je schvalovatelem? = je něčí přímý nadřízený, ředitel střediska, nebo jednatel.
       const isApprover = isAdmin(req) || emps.some(x => x.id !== (me && me.id) && (x.email || '').toLowerCase() !== eml && (approverFor(x, emps) || {}).id === (me && me.id));
       const vacPending = readVac().requests.filter(r => r.status === 'pending' && (isAdmin(req) || (r.approverEmail || '').toLowerCase() === eml)).length;
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), isApprover: !!isApprover, vacPending: vacPending });
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), heroImage: (readJson(SITE_F, {}).heroImage) || null });
+    }
+
+    // ---- Aktuality (novinky na intranetu) ----
+    if (p === '/api/aktuality' && req.method === 'GET') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const eml = e.email.toLowerCase();
+      const posts = (readJson(AKTUALITY_F, { posts: [] }).posts || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).map(x => ({
+        id: x.id, title: x.title, body: x.body || '', image: x.image || null, author: x.author || '', ts: x.ts || 0,
+        likes: Object.keys(x.likes || {}).length, liked: !!(x.likes && x.likes[eml]), mine: (x.authorEmail || '').toLowerCase() === eml
+      }));
+      return send(res, 200, { posts, canPost: canPostAktuality(req) });
+    }
+    if (p === '/api/aktuality' && req.method === 'POST') {
+      if (!canPostAktuality(req)) return send(res, 403, { error: 'Nemáte oprávnění zadávat aktuality.' });
+      const e = empSession(req);
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const title = (b.title || '').trim(); if (!title) return send(res, 400, { error: 'Chybí titulek.' });
+      let image = null; try { if (b.image) image = saveDataUrlImage(b.image); } catch (err) { return send(res, 400, { error: err.message }); }
+      const st = readJson(AKTUALITY_F, { posts: [] }); st.posts = st.posts || [];
+      const post = { id: crypto.randomBytes(6).toString('hex'), title, body: (b.body || '').trim(), image, author: e.name || e.email, authorEmail: e.email, ts: Date.now(), likes: {} };
+      st.posts.push(post); writeJson(AKTUALITY_F, st);
+      logActivity('aktuality', { email: e.email, name: e.name }, 'Přidal aktualitu: ' + title);
+      return send(res, 200, { ok: true, id: post.id });
+    }
+    if (p === '/api/aktuality/delete' && req.method === 'POST') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
+      const st = readJson(AKTUALITY_F, { posts: [] }); const post = (st.posts || []).find(x => x.id === b.id);
+      if (!post) return send(res, 404, { error: 'Aktualita nenalezena.' });
+      if (!isAdmin(req) && (post.authorEmail || '').toLowerCase() !== e.email.toLowerCase()) return send(res, 403, { error: 'Můžete mazat jen své aktuality.' });
+      st.posts = st.posts.filter(x => x.id !== b.id); deleteUpload(post.image); writeJson(AKTUALITY_F, st);
+      return send(res, 200, { ok: true });
+    }
+    if (p === '/api/aktuality/like' && req.method === 'POST') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const eml = e.email.toLowerCase();
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
+      const st = readJson(AKTUALITY_F, { posts: [] }); const post = (st.posts || []).find(x => x.id === b.id);
+      if (!post) return send(res, 404, { error: 'Aktualita nenalezena.' });
+      post.likes = post.likes || {};
+      if (post.likes[eml]) delete post.likes[eml]; else post.likes[eml] = Date.now();
+      writeJson(AKTUALITY_F, st);
+      return send(res, 200, { ok: true, likes: Object.keys(post.likes).length, liked: !!post.likes[eml] });
+    }
+    // ---- Fotky nových produktů z Disku (widget „Fotka týdne") ----
+    if (p === '/api/produkty-fotky' && req.method === 'GET') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!produktyFotky.configured()) return send(res, 200, { configured: false, photos: [] });
+      try { const items = await produktyFotky.list(); return send(res, 200, { configured: true, photos: items.map(x => ({ id: x.id, name: x.name })) }); }
+      catch (err) { return send(res, 200, { configured: true, photos: [], error: err.message }); }
+    }
+    if (p === '/api/produkty-fotky/img' && req.method === 'GET') {
+      const e = empSession(req); if (!e) { res.writeHead(401); return res.end(); }
+      const id = (u.query.id || '').trim(); if (!id) { res.writeHead(400); return res.end(); }
+      try { const { buf, ct } = await produktyFotky.media(id); res.writeHead(200, { 'Content-Type': ct || 'image/jpeg', 'Cache-Control': 'private, max-age=3600' }); return res.end(buf); }
+      catch (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
+    }
+    // ---- Banner (hero) intranetu ----
+    if (p === '/api/site/hero' && req.method === 'POST') {
+      if (!canPostAktuality(req)) return send(res, 403, { error: 'Nemáte oprávnění měnit banner.' });
+      const e = empSession(req);
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const site = readJson(SITE_F, {});
+      if (b.reset) { deleteUpload(site.heroImage); site.heroImage = null; }
+      else {
+        let img = null; try { img = saveDataUrlImage(b.image); } catch (err) { return send(res, 400, { error: err.message }); }
+        if (!img) return send(res, 400, { error: 'Chybí platný obrázek.' });
+        deleteUpload(site.heroImage); site.heroImage = img;
+      }
+      writeJson(SITE_F, site);
+      logActivity('aktuality', { email: e.email, name: e.name }, b.reset ? 'Obnovil výchozí banner' : 'Změnil banner intranetu');
+      return send(res, 200, { ok: true, hero: site.heroImage || null });
     }
 
     // ---- Dovolená: moje konto + žádosti (zaměstnanec) ----

@@ -388,6 +388,38 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .spotlight .sp-cap p{margin:0;font-size:12.5px;color:rgba(255,255,255,.9)}
 @media(max-width:980px){.hub-grid{grid-template-columns:1fr}.hub-side{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.hub-side{grid-template-columns:1fr}}
+/* Editace banneru */
+.mj-hero .hero-edit-btn{position:absolute;top:14px;right:14px;z-index:2;display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:var(--radius);border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);color:#fff;font-size:12.5px;font-weight:650;backdrop-filter:blur(3px);cursor:pointer}
+.mj-hero .hero-edit-btn:hover{background:rgba(255,255,255,.28)}
+.mj-hero .hero-edit-btn svg{width:16px;height:16px}
+/* Aktuality feed */
+.akt-feed{display:grid;gap:14px}
+.akt-card{display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);overflow:hidden}
+.akt-card:only-child,.akt-card{box-shadow:0 1px 2px rgba(15,21,18,.04)}
+.akt-media{background:var(--bg-2)}
+.akt-media img{width:100%;height:100%;min-height:118px;object-fit:cover;display:block}
+.akt-txt{padding:14px 14px 12px;min-width:0}
+.akt-card:not(:has(.akt-media)){grid-template-columns:1fr}
+.akt-txt h4{margin:0 0 5px;font-size:15.5px;line-height:1.25}
+.akt-txt p{margin:0 0 10px;font-size:13.5px;color:var(--ink-soft);line-height:1.5}
+.akt-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px}
+.akt-actions{display:inline-flex;align-items:center;gap:6px}
+.like-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);font-size:12.5px;font-weight:650;cursor:pointer;transition:.14s}
+.like-btn:hover{border-color:var(--line-strong);color:var(--ink)}
+.like-btn.on{background:var(--red-soft);border-color:#f3c6c0;color:var(--red)}
+.like-btn.on svg{fill:var(--red);stroke:var(--red)}
+.like-btn.del:hover{background:var(--red-soft);border-color:#f3c6c0;color:var(--red)}
+@media(max-width:520px){.akt-card{grid-template-columns:1fr}.akt-media img{min-height:150px}}
+/* Modál pro novou aktualitu */
+.akt-modal-ov{position:fixed;inset:0;z-index:120;background:rgba(15,21,18,.5);display:flex;align-items:center;justify-content:center;padding:18px}
+.akt-modal{width:min(520px,100%);max-height:90vh;overflow-y:auto;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:22px}
+.akt-modal h3{margin:0 0 16px;font-size:18px}
+.akt-modal .field{display:block;margin-bottom:14px}
+.akt-modal .field span{display:block;margin-bottom:6px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft)}
+.akt-prev:not(:empty){margin-bottom:14px}
+.akt-prev img{max-width:100%;border-radius:var(--radius-sm);border:1px solid var(--line)}
+.akt-msg{min-height:18px;font-size:13px;color:var(--red);margin-bottom:4px}
+.akt-modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
 .dash-sec{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:26px 0 12px}
 .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:16px}
 .tile{position:relative;display:flex;flex-direction:column;gap:11px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:20px 20px 18px;box-shadow:var(--shadow);transition:.18s;cursor:pointer;min-height:158px;text-align:left;font:inherit;color:inherit}
@@ -1692,7 +1724,11 @@ function showDashboard(){
   const nMod=((MUJ.modules||[]).length)||0;
   const initials=((MUJ.name||"").split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0]).join("")).toUpperCase()||"?";
   const roleStr = MUJ.admin ? "Správce · plný přístup" : (MUJ.email||"");
-  let h = '<div class="mj-hero">'+
+  const canPostAkt = !!(MUJ.data && MUJ.data.canPostAktuality);
+  const heroImg = (MUJ.data && MUJ.data.heroImage) || "";
+  let h = '<div class="mj-hero"'+(heroImg?' style="background-image:var(--hero-scrim),url(\''+heroImg.replace(/'/g,"%27")+'\')"':'')+'>'+
+    (canPostAkt?'<button class="hero-edit-btn" type="button" onclick="heroEdit()" title="Změnit obrázek banneru">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><path d="m21 15-5-5L5 21M8.5 8.5h.01"/></svg> Změnit obrázek</button>':'')+
     '<div class="hero-id"><span class="hero-ava">'+esc(initials)+'</span><div><div class="date">'+esc(dnesStr)+'</div><div class="hero-role">'+esc(roleStr)+'</div></div></div>'+
     '<h2>Dobrý den, '+esc(first)+'</h2>'+
     '<p>'+(totalTodo ? ('Čeká na vás <strong>'+totalTodo+'</strong> '+plural(totalTodo,"položka","položky","položek")+' k vyřízení. Vše zvládnete přímo odsud.') : 'Skvělá práce — nemáte nic nevyřízeného, vše je hotovo. ✓')+'</p>'+
@@ -1717,8 +1753,11 @@ function showDashboard(){
   c.libDocs.filter(d=>d.requireAck && !d.acked).forEach(d=>{
     pend.push({ icon:MUJ_IC.book, t:d.title||"Dokument", sub:"Knihovna · verze "+d.v, act:'<button class="btn sm" onclick="openLibDoc(\''+d.id+'\','+d.v+')">Přečíst a potvrdit</button>' });
   });
-  // ----- Levý sloupec hubu: K vyřízení + Rychlý přístup + Provozy -----
-  let mainH = '<div class="dash-sec">K vyřízení</div>';
+  // ----- Levý sloupec hubu: Aktuality + K vyřízení + Rychlý přístup + Provozy -----
+  let mainH = '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>Aktuality</h3>'+
+    (canPostAkt?'<button class="btn sm" type="button" onclick="aktNew()">+ Přidat</button>':'')+
+    '</div><div class="webpart-body" id="aktBody"><div class="muted">Načítám aktuality…</div></div></section>';
+  mainH += '<div class="dash-sec">K vyřízení</div>';
   if(pend.length){
     pend.forEach(p=> mainH+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(p.icon)+'</div><div><div class="li-t">'+esc(p.t)+'</div>'+
       '<div class="muted" style="font-size:12px;margin-top:2px">'+esc(p.sub)+'</div></div></div>'+p.act+'</div>');
@@ -1757,12 +1796,116 @@ function showDashboard(){
       '<div class="metric"><b>'+(MUJ.admin?'vše':nMod)+'</b><span>moduly</span></div>'+
       '<div class="metric"><b>'+totalTodo+'</b><span>k vyřízení</span></div>'+
     '</div></div></section>';
-  sideH += '<section class="spotlight"><span class="pill green sp-tag">Fotka týdne</span><div class="sp-cap"><h4>Výroba ELKOPLAST</h4><p>Expedice plastových kontejnerů.</p></div></section>';
+  sideH += '<section class="spotlight" id="prodSpot"><span class="pill green sp-tag">Nové produkty</span><div class="sp-cap"><h4>Výroba ELKOPLAST</h4><p>Fotky produktů z Disku.</p></div></section>';
 
   h += '<div class="hub-grid"><div class="hub-main">'+mainH+'</div><aside class="hub-side">'+sideH+'</aside></div>';
 
   body.innerHTML = h;
   window.scrollTo(0,0);
+  loadAktuality();
+  loadProdukty();
+}
+
+// ---------- Fotka týdne: fotky nových produktů z Google Disku ----------
+async function loadProdukty(){
+  const spot=document.getElementById("prodSpot"); if(!spot) return;
+  const cap=spot.querySelector(".sp-cap");
+  let d; try{ d=await (await fetch("/api/produkty-fotky",{cache:"no-store"})).json(); }catch(e){ d={configured:false,photos:[]}; }
+  if(!d.configured || !d.photos || !d.photos.length){
+    if(cap) cap.innerHTML='<h4>Výroba ELKOPLAST</h4><p>Expedice plastových kontejnerů.</p>';
+    return;
+  }
+  const photos=d.photos; let i=0;
+  function show(){
+    const ph=photos[i%photos.length];
+    spot.style.backgroundImage="linear-gradient(180deg,rgba(7,34,19,0) 34%,rgba(7,34,19,.86) 100%),url('/api/produkty-fotky/img?id="+encodeURIComponent(ph.id)+"')";
+    if(cap) cap.innerHTML='<h4>'+esc(prettyProdName(ph.name))+'</h4><p>Nový produkt · '+((i%photos.length)+1)+'/'+photos.length+'</p>';
+    i++;
+  }
+  show();
+  if(photos.length>1){ if(window._prodTimer) clearInterval(window._prodTimer); window._prodTimer=setInterval(show,6000); }
+}
+function prettyProdName(n){ return (n||"").replace(/\.[a-z0-9]+$/i,"").replace(/[_-]+/g," ").trim(); }
+
+// ---------- Aktuality (novinky) ----------
+async function loadAktuality(){
+  const body=document.getElementById("aktBody"); if(!body) return;
+  let d; try{ d=await (await fetch("/api/aktuality",{cache:"no-store"})).json(); }catch(e){ d={posts:[],canPost:false}; }
+  if(!d.posts||!d.posts.length){ body.innerHTML='<div class="muted">Zatím žádné aktuality.'+(d.canPost?' Přidejte první novinku tlačítkem <strong>+ Přidat</strong>.':'')+'</div>'; return; }
+  body.innerHTML='<div class="akt-feed">'+d.posts.map(aktCard).join('')+'</div>';
+}
+function aktCard(p){
+  const when=new Date(p.ts).toLocaleDateString("cs-CZ",{day:"numeric",month:"long",year:"numeric"});
+  return '<article class="akt-card">'+
+    (p.image?'<div class="akt-media"><img src="'+esc(p.image)+'" alt="" loading="lazy"></div>':'')+
+    '<div class="akt-txt"><h4>'+esc(p.title)+'</h4>'+
+    (p.body?'<p>'+esc(p.body).replace(/\n/g,"<br>")+'</p>':'')+
+    '<div class="akt-foot"><span class="muted">'+esc(p.author||"")+' · '+when+'</span><span class="akt-actions">'+
+      '<button class="like-btn'+(p.liked?" on":"")+'" type="button" onclick="aktLike(\''+p.id+'\',this)" aria-pressed="'+(p.liked?"true":"false")+'">'+
+        '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>'+
+        '<b>'+p.likes+'</b></button>'+
+      ((p.mine||MUJ.admin)?'<button class="like-btn del" type="button" title="Smazat" onclick="aktDelete(\''+p.id+'\')"><svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>':'')+
+    '</span></div></div></article>';
+}
+async function aktLike(id,btn){
+  btn.disabled=true;
+  try{ const j=await (await fetch("/api/aktuality/like",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})).json();
+    if(j.ok){ btn.classList.toggle("on",j.liked); btn.setAttribute("aria-pressed",j.liked?"true":"false"); btn.querySelector("b").textContent=j.likes; }
+  }catch(e){} finally{ btn.disabled=false; }
+}
+async function aktDelete(id){
+  if(!confirm("Opravdu smazat tuto aktualitu?")) return;
+  try{ const r=await fetch("/api/aktuality/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+    if(r.ok){ if(typeof toast==="function") toast("Aktualita smazána"); loadAktuality(); }
+    else { const j=await r.json().catch(()=>({})); if(typeof toast==="function") toast(j.error||"Chyba"); }
+  }catch(e){ if(typeof toast==="function") toast("Chyba spojení"); }
+}
+// Modální okno pro novou aktualitu (titulek, text, obrázek)
+function aktNew(){
+  const ov=document.createElement("div"); ov.className="akt-modal-ov";
+  ov.innerHTML='<div class="akt-modal" role="dialog" aria-modal="true">'+
+    '<h3>Nová aktualita</h3>'+
+    '<label class="field"><span>Titulek</span><input id="aktT" type="text" maxlength="140" placeholder="Např. Nový postup pro objednávky"></label>'+
+    '<label class="field"><span>Text</span><textarea id="aktB" rows="4" placeholder="Obsah novinky…"></textarea></label>'+
+    '<label class="field"><span>Obrázek (volitelně)</span><input id="aktImg" type="file" accept="image/*"></label>'+
+    '<div class="akt-prev" id="aktPrev"></div>'+
+    '<div class="akt-msg" id="aktMsg"></div>'+
+    '<div class="akt-modal-foot"><button class="btn ghost" type="button" onclick="this.closest(\'.akt-modal-ov\').remove()">Zrušit</button>'+
+    '<button class="btn" type="button" id="aktSave" onclick="aktSubmit(this)">Publikovat</button></div></div>';
+  ov.addEventListener("click",e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+  const fi=ov.querySelector("#aktImg"), pv=ov.querySelector("#aktPrev");
+  fi.addEventListener("change",()=>{ const f=fi.files&&fi.files[0]; if(!f){pv.innerHTML="";return;} const r=new FileReader(); r.onload=()=>{ pv.innerHTML='<img src="'+r.result+'" alt="">'; pv.dataset.url=r.result; }; r.readAsDataURL(f); });
+  ov.querySelector("#aktT").focus();
+}
+async function aktSubmit(btn){
+  const ov=btn.closest(".akt-modal-ov");
+  const title=ov.querySelector("#aktT").value.trim();
+  const bodyTxt=ov.querySelector("#aktB").value.trim();
+  const img=ov.querySelector("#aktPrev").dataset.url||"";
+  const msg=ov.querySelector("#aktMsg");
+  if(!title){ msg.textContent="Vyplňte titulek."; return; }
+  btn.disabled=true; msg.textContent="Publikuji…";
+  try{ const r=await fetch("/api/aktuality",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body:bodyTxt,image:img})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok&&j.ok){ ov.remove(); if(typeof toast==="function") toast("Aktualita publikována"); loadAktuality(); }
+    else { msg.textContent=j.error||"Nepodařilo se uložit."; btn.disabled=false; }
+  }catch(e){ msg.textContent="Chyba spojení."; btn.disabled=false; }
+}
+// Změna hero banneru (upload obrázku)
+function heroEdit(){
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*";
+  inp.addEventListener("change",()=>{ const f=inp.files&&inp.files[0]; if(!f) return;
+    const r=new FileReader(); r.onload=async()=>{
+      if(typeof toast==="function") toast("Nahrávám banner…");
+      try{ const resp=await fetch("/api/site/hero",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:r.result})});
+        const j=await resp.json().catch(()=>({}));
+        if(resp.ok&&j.ok){ if(MUJ.data) MUJ.data.heroImage=j.hero; const hero=document.querySelector(".mj-hero"); if(hero&&j.hero) hero.style.backgroundImage="var(--hero-scrim),url('"+j.hero.replace(/'/g,"%27")+"')"; if(typeof toast==="function") toast("Banner změněn"); }
+        else if(typeof toast==="function") toast(j.error||"Chyba");
+      }catch(e){ if(typeof toast==="function") toast("Chyba spojení"); }
+    }; r.readAsDataURL(f);
+  });
+  inp.click();
 }
 
 function showDirectives(){
@@ -2439,13 +2582,13 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
-  ["Agendy",["doprava","smlouvy","sortiment","adaptace","freelo"]]
+  ["Agendy",["doprava","smlouvy","sortiment","adaptace","freelo","aktuality"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }
