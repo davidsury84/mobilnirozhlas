@@ -496,7 +496,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <button class="btn" id="nkReport">📋 Sestava k nákupu</button>
       </div>
       <div style="margin:0 0 10px"><b id="nkCount" class="muted"></b></div>
-      <div class="tblwrap"><table id="nkTbl"></table></div>
+      <div id="nkOrderPanel" style="margin:0 0 16px">
+        <div class="kpis" id="nkOrderKpis"></div>
+        <div class="card" style="margin-top:10px">
+          <div class="spread" style="flex-wrap:wrap;gap:8px"><h3 style="margin:0">🛒 Objednací seznam — co a kolik objednat teď</h3>
+            <span class="muted" style="font-size:12px">Jen položky se stavem <b>Objednat teď / Před sezónou / Předzásobit</b>. Detailní výpočet (ROP, EOQ, obrátka…) je v tabulce níže.</span></div>
+          <div class="tblwrap" style="max-height:460px"><table id="nkOrderTbl"></table></div>
+        </div>
+      </div>
+      <details class="settings"><summary>🔬 Detailní tabulka (ROP, EOQ, obrátka, sezónnost…)</summary>
+        <div class="tblwrap" style="margin-top:10px"><table id="nkTbl"></table></div>
+      </details>
     </div>
     <div class="pane" id="pane-seg">
       <div class="note">Segmentační analýza z reálných objednávek (7 295 objednávek, 953 produktů). Na jednom místě: <b>přehled segmentů</b>, <b>sezónnost</b> (kdy se co nakupuje), <b>cross-sell</b> (co se kupuje společně) a <b>ABC / prodejní výkon</b>.</div>
@@ -1429,6 +1439,26 @@ function renderNakup(){
   const now=ROWS.filter(r=>r._nk&&(r._nk.status==='Objednat teď'||r._nk.status==='Před sezónou'||r._nk.status==='Předzásobit')).length;
   const recsum=ROWS.reduce((s,r)=>s+(r._nk?r._nk.rec:0),0);
   $('#nkCount').textContent='Efekt. sazba držení '+(P.effHold*100).toFixed(1)+' % (kapitál '+(P.cap*100).toFixed(0)+' % + sklad '+(P.whRate*100).toFixed(1)+' %, hodnota zásob '+fmt(Math.round(P.totVal))+' Kč) · '+now+' k objednání · doporučeno '+fmt(recsum)+' ks';
+  renderNakupOrder();
+}
+// Čitelný objednací seznam pro nákupčí — jen položky k objednání teď, s množstvím a hodnotou.
+function renderNakupOrder(){
+  const ordPrio={'Objednat teď':0,'Před sezónou':1,'Předzásobit':2};
+  const list=ROWS.filter(r=>r._nk&&r._nk.rec>0&&(r._nk.status in ordPrio))
+    .map(r=>({r,n:r._nk,val:(r.unitPrice!=null?r.unitPrice*r._nk.rec:null)}))
+    .sort((a,b)=>ordPrio[a.n.status]-ordPrio[b.n.status]||(b.val||0)-(a.val||0));
+  const totKs=list.reduce((s,o)=>s+o.n.rec,0), totVal=list.reduce((s,o)=>s+(o.val||0),0);
+  const kpis=$('#nkOrderKpis'); if(kpis) kpis.innerHTML=[
+    ['dead',fmt(list.length),'Položek k objednání'],
+    ['',fmt(totKs),'Kusů celkem'],
+    ['',fmt(Math.round(totVal))+' Kč','Hodnota objednávky'],
+    ['warn',fmt(list.filter(o=>o.n.status==='Objednat teď').length),'Z toho „Objednat teď"']
+  ].map(k=>`<div class="kpi ${k[0]}"><div class="v">${k[1]}</div><div class="l">${k[2]}</div></div>`).join('');
+  const sf={'Objednat teď':'c-dead','Před sezónou':'c-aging','Předzásobit':'c-slow'};
+  const tb=$('#nkOrderTbl'); if(!tb) return;
+  if(!list.length){tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Aktuálně není co objednávat — žádná položka není pod bodem objednání.</td></tr></tbody>';return;}
+  tb.innerHTML='<thead><tr><th>Priorita</th><th>Produkt</th><th>Kategorie</th><th class="num">Skladem</th><th class="num">Dní krytí</th><th class="num">Objednat (ks)</th><th class="num">Cena/ks</th><th class="num">Hodnota (Kč)</th><th>Kdy</th><th>Proč</th></tr></thead><tbody>'+
+    list.slice(0,1500).map(o=>{const r=o.r,n=o.n;return `<tr><td><span class="pill ${sf[n.status]}">${n.status}</span></td><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num"><b>${fmt(n.rec)}</b></td><td class="num">${r.unitPrice!=null?fmt(r.unitPrice)+' Kč':'—'}</td><td class="num">${o.val!=null?fmt(Math.round(o.val)):'—'}</td><td>${esc(n.when)}</td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+'</tbody>';
 }
 ['nkSearch','nkFilter'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=renderNakup;});
 (function(){const b=$('#nkApply');if(b)b.onclick=()=>{recalc();renderNakup();};})();
