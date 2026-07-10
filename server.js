@@ -1400,6 +1400,16 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(KONCEPT_FILE)) return send(res, 404, '<h1>Chybí intranet-koncept.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(KONCEPT_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
+    // Statické obrázky/ikony intranetu (např. hero fotka) z adresáře ./assets. Binárně, s cache.
+    if (p.indexOf('/assets/') === 0) {
+      const rel = p.slice(8).replace(/[^a-zA-Z0-9._-]/g, '');
+      const f = path.join(ROOT, 'assets', rel);
+      if (!f.startsWith(path.join(ROOT, 'assets') + path.sep) || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
+      const ext = path.extname(f).toLowerCase();
+      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.gif': 'image/gif' };
+      res.writeHead(200, { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
+      return res.end(fs.readFileSync(f));
+    }
     if (p === '/api/login' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
       if ((b.password || '') === SEC.password) { const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''; logActivity('admin-login', { email: '', name: 'Správce (heslo)' }, ''); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_auth=' + token() + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure }); }

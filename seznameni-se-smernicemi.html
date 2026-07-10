@@ -34,12 +34,13 @@
   --amber-soft:#fff6d2;
   --red:#c23636;
   --red-soft:#fbe9e7;
-  --shadow:0 1px 2px rgba(15,21,18,.04), 0 10px 30px rgba(15,21,18,.07);
-  --shadow-lg:0 12px 40px rgba(15,21,18,.14);
-  --radius:14px;
-  --radius-sm:10px;
+  --shadow:0 1px 2px rgba(15,21,18,.05), 0 12px 28px rgba(15,21,18,.08);
+  --shadow-lg:0 18px 54px rgba(15,21,18,.16);
+  --radius:8px;
+  --radius-sm:6px;
   --grad-green:linear-gradient(135deg,#15ab57,#0a6b34);
   --grad-dark:linear-gradient(135deg,#11271c,#0b1411 60%,#0d1f17);
+  --hero-scrim:linear-gradient(90deg,rgba(7,34,19,.92) 0%,rgba(7,54,26,.76) 36%,rgba(7,54,26,.24) 66%,rgba(7,54,26,.05) 100%);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -337,24 +338,56 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .dash-hero{margin:6px 0 24px}
 .dash-hero h2{margin:0;font-size:27px;font-weight:700;letter-spacing:-.025em}
 .dash-hero p{margin:8px 0 0;color:var(--ink-soft);font-size:14px}
-/* Uvítací banner (moderní intranetový portál) */
-.mj-hero{position:relative;overflow:hidden;border-radius:20px;padding:30px 32px;color:#fff;background:var(--grad-green);box-shadow:0 14px 40px rgba(10,107,52,.22);margin:2px 0 26px}
-.mj-hero::after{content:"";position:absolute;right:-50px;top:-70px;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,.09)}
-.mj-hero::before{content:"";position:absolute;right:90px;bottom:-110px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.055)}
-.mj-hero>*{position:relative;z-index:1}
-.mj-hero .date{font-size:12px;text-transform:uppercase;letter-spacing:.09em;opacity:.85;font-weight:600;margin-bottom:7px}
-.mj-hero h2{margin:0;font-size:27px;font-weight:800;letter-spacing:-.025em;color:#fff}
-.mj-hero p{margin:9px 0 0;font-size:14.5px;opacity:.96;max-width:580px;line-height:1.5}
-.mj-hero .stats{display:flex;gap:14px;margin-top:20px;flex-wrap:wrap}
-.mj-hero .stat{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 16px;min-width:96px;backdrop-filter:blur(2px)}
-.mj-hero .stat b{display:block;font-size:23px;font-weight:800;line-height:1.05}
-.mj-hero .stat span{font-size:11.5px;opacity:.9;letter-spacing:.02em}
-/* Řada rychlých akcí (ploché barevné dlaždice jako moderní intranet) */
-.mj-quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:12px}
-.mj-quick button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;background:var(--grad-green);color:#fff;border-radius:15px;padding:17px 8px;font-size:12.5px;font-weight:600;text-align:center;line-height:1.2;box-shadow:0 7px 18px rgba(10,107,52,.18);transition:.16s;min-height:96px;border:none;cursor:pointer;font-family:inherit}
-.mj-quick button:hover{transform:translateY(-3px);box-shadow:0 13px 28px rgba(10,107,52,.3)}
-.mj-quick button svg{width:26px;height:26px;stroke:#fff;stroke-width:1.9;fill:none}
-.mj-quick .qbadge{position:absolute;top:7px;right:9px}
+/* Uvítací banner s reálnou fotkou výroby (SharePoint hub) */
+.mj-hero{position:relative;overflow:hidden;border-radius:var(--radius);padding:34px;color:#fff;min-height:300px;display:flex;flex-direction:column;justify-content:center;gap:16px;background:#12351f center/cover no-repeat;background-image:var(--hero-scrim),url('/assets/intranet-hero.jpg');box-shadow:var(--shadow-lg);margin:2px 0 26px}
+.mj-hero>*{position:relative;z-index:1;max-width:640px}
+.mj-hero .hero-id{display:flex;align-items:center;gap:12px}
+.mj-hero .hero-ava{width:46px;height:46px;flex:none;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.34);color:#fff;font-weight:800;font-size:15px;box-shadow:0 6px 18px rgba(0,0,0,.22)}
+.mj-hero .date{font-size:12px;text-transform:uppercase;letter-spacing:.09em;opacity:.9;font-weight:700}
+.mj-hero .hero-role{margin-top:2px;font-size:13px;font-weight:600;opacity:.92}
+.mj-hero h2{margin:0;font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-.025em;color:#fff;line-height:1.05}
+.mj-hero p{margin:0;font-size:15px;opacity:.95;max-width:580px;line-height:1.5}
+.mj-hero .hero-search{display:flex;align-items:center;gap:12px;width:min(560px,100%);min-height:52px;padding:0 16px;border-radius:var(--radius);background:rgba(255,255,255,.95);color:var(--ink-soft);box-shadow:0 16px 38px rgba(0,0,0,.18)}
+.mj-hero .hero-search svg{width:21px;height:21px;color:var(--green-d);flex:none}
+.mj-hero .hero-search input{width:100%;border:0;outline:0;background:transparent;color:#172115;font-size:15px}
+.mj-hero .stats{display:flex;gap:10px;flex-wrap:wrap}
+.mj-hero .stat{display:inline-flex;align-items:baseline;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);border-radius:var(--radius);padding:8px 13px;backdrop-filter:blur(2px)}
+.mj-hero .stat b{font-size:16px;font-weight:800;line-height:1}
+.mj-hero .stat span{font-size:12px;opacity:.92;letter-spacing:.02em}
+/* Řada rychlých akcí — ploché barevné dlaždice (SharePoint hub) */
+.mj-quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.mj-quick button{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:11px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:14px;font-size:13px;font-weight:600;text-align:left;line-height:1.18;box-shadow:var(--shadow);transition:.16s;min-height:104px;cursor:pointer;font-family:inherit}
+.mj-quick button:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--line-strong)}
+.mj-quick .qic{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:var(--radius);background:var(--green-soft);color:var(--green-d)}
+.mj-quick button:nth-child(4n+2) .qic{background:#e5efff;color:#2369d1}
+.mj-quick button:nth-child(4n+3) .qic{background:#fff5cf;color:#6b520b}
+.mj-quick button:nth-child(4n+4) .qic{background:#ffe8df;color:#d95f45}
+.mj-quick button svg{width:20px;height:20px;stroke:currentColor;stroke-width:1.9;fill:none}
+.mj-quick .qbadge{position:absolute;top:10px;right:10px}
+/* Dvousloupcový hub + webparty + KPI kruh + fotka týdne */
+.hub-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start;margin-top:26px}
+.hub-main{min-width:0}.hub-side{display:grid;gap:18px;min-width:0}
+.webpart{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow);overflow:hidden;margin-bottom:18px}
+.webpart:last-child{margin-bottom:0}
+.webpart-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--bg-2)}
+.webpart-head h3{margin:0;font-size:15px;font-weight:700}
+.webpart-body{padding:16px}
+.kpi-hero{display:flex;align-items:center;gap:14px;padding:2px 2px 14px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.ring{position:relative;width:74px;height:74px;flex:none;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green-2) calc(var(--val,0)*1%),var(--green-soft) 0)}
+.ring::before{content:"";position:absolute;inset:8px;border-radius:50%;background:var(--paper)}
+.ring span{position:relative;z-index:1;font-weight:800;font-size:17px;color:var(--green-d)}
+.kpi-hero .kpi-txt b{display:block;font-size:14px}.kpi-hero .kpi-txt span{display:block;margin-top:3px;color:var(--ink-soft);font-size:12.5px}
+.metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.metric{padding:13px;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg-2)}
+.metric b{display:block;color:var(--green-d);font-size:22px;line-height:1;font-weight:800}
+.metric span{display:block;margin-top:5px;color:var(--ink-soft);font-size:12px;font-weight:600}
+.spotlight{position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);min-height:190px;display:flex;align-items:flex-end;background:#12351f center/cover no-repeat;background-image:linear-gradient(180deg,rgba(7,34,19,0) 34%,rgba(7,34,19,.86) 100%),url('/assets/intranet-hero.jpg')}
+.spotlight .sp-tag{position:absolute;top:12px;left:12px}
+.spotlight .sp-cap{position:relative;padding:14px;color:#fff}
+.spotlight .sp-cap h4{margin:0 0 3px;font-size:15px;color:#fff}
+.spotlight .sp-cap p{margin:0;font-size:12.5px;color:rgba(255,255,255,.9)}
+@media(max-width:980px){.hub-grid{grid-template-columns:1fr}.hub-side{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.hub-side{grid-template-columns:1fr}}
 .dash-sec{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:26px 0 12px}
 .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:16px}
 .tile{position:relative;display:flex;flex-direction:column;gap:11px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:20px 20px 18px;box-shadow:var(--shadow);transition:.18s;cursor:pointer;min-height:158px;text-align:left;font:inherit;color:inherit}
@@ -1657,19 +1690,24 @@ function showDashboard(){
   const dnesStr=new Date().toLocaleDateString("cs-CZ",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const vacPend0=(MUJ.data&&MUJ.data.vacPending)||0;
   const nMod=((MUJ.modules||[]).length)||0;
-  let h = '<div class="mj-hero"><div class="date">'+esc(dnesStr)+'</div><h2>Dobrý den, '+esc(first)+' 👋</h2>'+
+  const initials=((MUJ.name||"").split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0]).join("")).toUpperCase()||"?";
+  const roleStr = MUJ.admin ? "Správce · plný přístup" : (MUJ.email||"");
+  let h = '<div class="mj-hero">'+
+    '<div class="hero-id"><span class="hero-ava">'+esc(initials)+'</span><div><div class="date">'+esc(dnesStr)+'</div><div class="hero-role">'+esc(roleStr)+'</div></div></div>'+
+    '<h2>Dobrý den, '+esc(first)+'</h2>'+
     '<p>'+(totalTodo ? ('Čeká na vás <strong>'+totalTodo+'</strong> '+plural(totalTodo,"položka","položky","položek")+' k vyřízení. Vše zvládnete přímo odsud.') : 'Skvělá práce — nemáte nic nevyřízeného, vše je hotovo. ✓')+'</p>'+
+    '<label class="hero-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 21-4.4-4.4M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg><input type="search" placeholder="Co dnes potřebujete najít?" onkeydown="if(event.key===\'Enter\'){mjGo(\'directives\')}"></label>'+
     '<div class="stats">'+
       '<div class="stat"><b>'+totalTodo+'</b><span>k vyřízení</span></div>'+
       (vacPend0?'<div class="stat"><b>'+vacPend0+'</b><span>dovolená ke schválení</span></div>':'')+
-      (MUJ.admin?'<div class="stat"><b>vše</b><span>plný přístup (správce)</span></div>':'<div class="stat"><b>'+nMod+'</b><span>'+plural(nMod,"dostupný modul","dostupné moduly","dostupných modulů")+'</span></div>')+
+      (MUJ.admin?'<div class="stat"><b>vše</b><span>plný přístup</span></div>':'<div class="stat"><b>'+nMod+'</b><span>'+plural(nMod,"dostupný modul","dostupné moduly","dostupných modulů")+'</span></div>')+
     '</div></div>';
 
-  // Rychlé akce — ploché barevné dlaždice na stálé sekce (jako moderní intranet)
+  // Rychlé akce — ploché barevné dlaždice (SharePoint hub)
   const qacts=[["directives","Směrnice",MUJ_IC.file],["ukoly","Úkoly",MUJ_IC.tasks],["library","Knihovna",MUJ_IC.book],["bozp","BOZP",MUJ_IC.shield],["skoleni","Školení",MUJ_IC.school],["dovolena","Dovolená",MUJ_IC.cal],["pruzkumy","Průzkumy",MUJ_IC.poll]];
   h += '<div class="mj-quick">'+qacts.map(q=>'<button onclick="mjGo(\''+q[0]+'\')">'+
     (q[0]==="directives"&&c.dirTodo?'<span class="badge todo qbadge">'+c.dirTodo+'</span>':'')+
-    '<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">'+q[2]+'</svg><span class="lbl">'+q[1]+'</span></button>').join('')+'</div>';
+    '<span class="qic"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">'+q[2]+'</svg></span><span class="lbl">'+q[1]+'</span></button>').join('')+'</div>';
 
   const pend=[];
   c.dirs.filter(d=>!d.ack && d.published).forEach(d=>{
@@ -1679,33 +1717,49 @@ function showDashboard(){
   c.libDocs.filter(d=>d.requireAck && !d.acked).forEach(d=>{
     pend.push({ icon:MUJ_IC.book, t:d.title||"Dokument", sub:"Knihovna · verze "+d.v, act:'<button class="btn sm" onclick="openLibDoc(\''+d.id+'\','+d.v+')">Přečíst a potvrdit</button>' });
   });
-  h += '<div class="dash-sec">K vyřízení</div>';
+  // ----- Levý sloupec hubu: K vyřízení + Rychlý přístup + Provozy -----
+  let mainH = '<div class="dash-sec">K vyřízení</div>';
   if(pend.length){
-    pend.forEach(p=> h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(p.icon)+'</div><div><div class="li-t">'+esc(p.t)+'</div>'+
+    pend.forEach(p=> mainH+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(p.icon)+'</div><div><div class="li-t">'+esc(p.t)+'</div>'+
       '<div class="muted" style="font-size:12px;margin-top:2px">'+esc(p.sub)+'</div></div></div>'+p.act+'</div>');
   } else {
-    h+='<div class="card pad" style="display:flex;align-items:center;gap:12px"><span class="pill green">✓ Hotovo</span><span class="muted">Nemáte nic k potvrzení.</span></div>';
+    mainH+='<div class="card pad" style="display:flex;align-items:center;gap:12px"><span class="pill green">✓ Hotovo</span><span class="muted">Nemáte nic k potvrzení.</span></div>';
   }
 
-  h += '<div class="dash-sec">Rychlý přístup</div><div class="dash-grid">';
-  h += tile({ icon:MUJ_IC.file, title:"Směrnice", desc:"Interní směrnice k seznámení.", action:"mjGo('directives')", accent:c.dirTodo>0,
+  mainH += '<div class="dash-sec">Rychlý přístup</div><div class="dash-grid">';
+  mainH += tile({ icon:MUJ_IC.file, title:"Směrnice", desc:"Interní směrnice k seznámení.", action:"mjGo('directives')", accent:c.dirTodo>0,
     badge: c.dirTodo ? '<span class="badge todo">'+c.dirTodo+' k potvrzení</span>' : (c.dirs.length ? '<span class="badge ok">Vše potvrzeno</span>' : '<span class="badge soon">Žádné</span>') });
-  h += tile({ icon:MUJ_IC.book, title:"Knihovna", desc:"Pracovní řád, SOP, postupy.", action:"mjGo('library')", accent:c.libTodo>0,
+  mainH += tile({ icon:MUJ_IC.book, title:"Knihovna", desc:"Pracovní řád, SOP, postupy.", action:"mjGo('library')", accent:c.libTodo>0,
     badge: c.libTodo ? '<span class="badge todo">'+c.libTodo+' k potvrzení</span>' : (c.libDocs.length ? '<span class="badge ok">Vše v pořádku</span>' : '<span class="badge soon">Žádné</span>') });
   const vacPend=(MUJ.data&&MUJ.data.vacPending)||0;
-  h += tile({ icon:MUJ_IC.cal, title:"Dovolená", desc:"Žádost o dovolenou a konto.", action:"mjGo('dovolena')", accent:vacPend>0,
+  mainH += tile({ icon:MUJ_IC.cal, title:"Dovolená", desc:"Žádost o dovolenou a konto.", action:"mjGo('dovolena')", accent:vacPend>0,
     badge: vacPend ? '<span class="badge todo">'+vacPend+' ke schválení</span>' : '<span class="badge ok">Konto & žádosti</span>' });
   if(MUJ.admin || (MUJ.modules||[]).indexOf("smlouvy")>=0){
-    h += tile({ icon:MUJ_IC.file, title:"Smlouvy", desc:"Hlídač smluv a termínů.", action:"mjGo('smlouvy')", badge:'<span class="badge ok">Otevřít</span>' });
+    mainH += tile({ icon:MUJ_IC.file, title:"Smlouvy", desc:"Hlídač smluv a termínů.", action:"mjGo('smlouvy')", badge:'<span class="badge ok">Otevřít</span>' });
   }
-  h += '</div>';
+  mainH += '</div>';
 
   const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
-    h += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
-    provoz.forEach(p=> h += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
-    h += '</div>';
+    mainH += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
+    provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
+    mainH += '</div>';
   }
+
+  // ----- Pravý sloupec hubu: KPI „Dnes ve firmě" + Fotka týdne -----
+  const dirTot=c.dirs.length, confirmedPct = dirTot ? Math.round((dirTot-c.dirTodo)/dirTot*100) : 100;
+  let sideH = '<section class="webpart"><div class="webpart-head"><h3>Dnes ve firmě</h3><span class="pill green">živě</span></div><div class="webpart-body">'+
+    '<div class="kpi-hero"><div class="ring" style="--val:'+confirmedPct+'"><span>'+confirmedPct+'%</span></div>'+
+      '<div class="kpi-txt"><b>Potvrzené směrnice</b><span>'+(c.dirTodo? (c.dirTodo+' '+plural(c.dirTodo,"položka čeká","položky čekají","položek čeká")) : 'vše potvrzeno')+'</span></div></div>'+
+    '<div class="metric-grid">'+
+      '<div class="metric"><b>'+dirTot+'</b><span>aktivní směrnice</span></div>'+
+      '<div class="metric"><b>'+c.libDocs.length+'</b><span>dokumenty knihovny</span></div>'+
+      '<div class="metric"><b>'+(MUJ.admin?'vše':nMod)+'</b><span>moduly</span></div>'+
+      '<div class="metric"><b>'+totalTodo+'</b><span>k vyřízení</span></div>'+
+    '</div></div></section>';
+  sideH += '<section class="spotlight"><span class="pill green sp-tag">Fotka týdne</span><div class="sp-cap"><h4>Výroba ELKOPLAST</h4><p>Expedice plastových kontejnerů.</p></div></section>';
+
+  h += '<div class="hub-grid"><div class="hub-main">'+mainH+'</div><aside class="hub-side">'+sideH+'</aside></div>';
 
   body.innerHTML = h;
   window.scrollTo(0,0);
