@@ -295,19 +295,22 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="tblwrap"><table id="priceTbl"></table></div>
     </div>
     <div class="pane" id="pane-meva">
-      <div class="note">Srovnání s veřejnými cenami <b>mevatec.cz</b>. Páruje se <b>automaticky proti položkám načteným v této appce</b> (žádný zvláštní upload) proti staženému katalogu MEVA. Ceny MEVA se stahují ve Správě intranetu → Cenový monitoring. <b>„Naše cena"</b> = reálná prodejní cena z e-shopu (JC bez DPH, nejnovější dle Reg. čísla); u položek bez prodeje fallback modelová cena. <b>Rozdíl</b> = kladný (červeně) = jsme dražší než MEVA.</div>
-      <div class="toolbar">
-        <input type="text" id="mevaSearch" placeholder="Hledat (kód, název, MEVA)…" style="min-width:240px">
-        <select id="mevaFilter">
-          <option value="">Vše</option>
-          <option value="par">Jen spárované</option>
-          <option value="drazsi">Jsme dražší než MEVA</option>
-          <option value="levnejsi">Jsme levnější</option>
-          <option value="nepar">Nespárované</option>
+      <div class="note"><b>Vyhledávací náhled cen mevatec.cz.</b> Prohledávej stažený katalog MEVA (název → cena bez/s DPH + odkaz). Automatické párování dvou různých katalogů podle názvu je nespolehlivé, takže tady <b>nic nepárujeme automaticky</b> — místo toho si vyber naši položku a rovnou uvidíš <b>naši prodejní cenu</b> vedle nalezených produktů MEVA a porovnáš ručně. Ceny MEVA se stahují ve Správě intranetu → Cenový monitoring.</div>
+      <div class="toolbar" style="flex-wrap:wrap;gap:10px;align-items:center">
+        <input type="text" id="mevaSearch" placeholder="Hledat v katalogu MEVA…" style="min-width:220px">
+        <label style="font-size:12px">Naše položka:
+          <input type="text" id="mevaMine" list="mevaMineList" placeholder="vyber a porovnej…" style="min-width:240px">
+          <datalist id="mevaMineList"></datalist>
+        </label>
+        <select id="mevaSort">
+          <option value="rel">Řadit: relevance / název</option>
+          <option value="asc">Cena bez DPH ↑</option>
+          <option value="desc">Cena bez DPH ↓</option>
         </select>
         <button class="btn ghost" id="mevaReload">↻ Znovu načíst</button>
         <span class="muted" id="mevaMetaInfo" style="font-size:12px"></span>
       </div>
+      <div id="mevaCompare"></div>
       <div class="tblwrap"><table id="mevaTbl"></table></div>
     </div>
     <div class="pane" id="pane-mrtve">
@@ -986,93 +989,89 @@ async function mevaFetch(force){
   if(MEVA_DATA&&!force) return MEVA_DATA;
   MEVA_ERR=null;
   try{
-    // Párujeme položky načtené v této appce proti staženému katalogu MEVA (bez zvláštního uploadu).
-    // „Naše cena" = reálná prodejní cena z e-shopu (JC bez DPH dle Reg. čísla); fallback modelová/jednotková cena.
-    const items=ROWS.filter(r=>r.name).map(r=>{
-      const eshop=(ESHOP_PRICE&&r.reg!=null)?ESHOP_PRICE[String(r.reg).trim()]:null;
-      const cena=eshop!=null?eshop:(r.newPrice!=null?r.newPrice:r.unitPrice);
-      return {kod:String(r.ident||''),nazev:r.name,cena};
-    });
-    const r=await fetch('/api/cenmon/srovnej',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
+    // Vyhledávací náhled: načteme stažený katalog MEVA (automatické párování je nespolehlivé, tak ho neděláme).
+    const r=await fetch('/api/cenmon/meva-katalog',{cache:'no-store'});
     if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||('HTTP '+r.status));}
     MEVA_DATA=await r.json();
   }catch(e){MEVA_ERR=e.message;MEVA_DATA=null;}
   return MEVA_DATA;
 }
+function mevaNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function mevaToks(s){return mevaNorm(s).split(/[^a-z0-9]+/).filter(t=>t.length>1);}
+function mevaOurPrice(it){
+  if(!it) return null;
+  const eshop=(typeof ESHOP_PRICE!=='undefined'&&ESHOP_PRICE&&it.reg!=null)?ESHOP_PRICE[String(it.reg).trim()]:null;
+  return eshop!=null?eshop:(it.newPrice!=null?it.newPrice:it.unitPrice);
+}
 function mevaRows(){
-  const d=MEVA_DATA; if(!d||!Array.isArray(d.srovnani)) return [];
-  const q=(document.getElementById('mevaSearch').value||'').toLowerCase().trim();
-  const f=document.getElementById('mevaFilter').value;
-  let rows=d.srovnani;
-  if(q) rows=rows.filter(x=>((x.kod||'')+' '+(x.nazev||'')+' '+(x.meva?x.meva.nazev:'')).toLowerCase().includes(q));
-  if(f==='par') rows=rows.filter(x=>x.meva);
-  else if(f==='nepar') rows=rows.filter(x=>!x.meva);
-  else if(f==='drazsi') rows=rows.filter(x=>x.meva&&x.cena!=null&&x.meva.cenaBezDph!=null&&x.cena>x.meva.cenaBezDph);
-  else if(f==='levnejsi') rows=rows.filter(x=>x.meva&&x.cena!=null&&x.meva.cenaBezDph!=null&&x.cena<x.meva.cenaBezDph);
-  return rows;
+  const d=MEVA_DATA; if(!d||!Array.isArray(d.meva)) return [];
+  const q=(document.getElementById('mevaSearch').value||'').trim();
+  const sort=(document.getElementById('mevaSort')||{}).value||'rel';
+  let rows=d.meva.map(m=>({m,score:0}));
+  if(q){
+    const qt=mevaToks(q), qn=mevaNorm(q);
+    rows=rows.map(o=>{const nt=mevaToks(o.m.nazev);let sc=0;for(const t of qt)if(nt.includes(t))sc++;if(mevaNorm(o.m.nazev).includes(qn))sc+=0.5;return {m:o.m,score:sc};})
+             .filter(o=>o.score>0);
+  }
+  if(sort==='asc') rows.sort((a,b)=>((a.m.cenaBezDph==null?1e15:a.m.cenaBezDph)-(b.m.cenaBezDph==null?1e15:b.m.cenaBezDph)));
+  else if(sort==='desc') rows.sort((a,b)=>((b.m.cenaBezDph==null?-1:b.m.cenaBezDph)-(a.m.cenaBezDph==null?-1:a.m.cenaBezDph)));
+  else rows.sort((a,b)=>(b.score-a.score)||mevaNorm(a.m.nazev).localeCompare(mevaNorm(b.m.nazev)));
+  return rows.map(o=>o.m);
 }
 function mevaTab(){
   const tb=document.getElementById('mevaTbl');
   const rows=mevaRows();
-  const stavTxt={potvrzeno:'✓ potvrzeno',zamitnuto:'✗ zamítnuto',auto:'auto',neparovano:'—'};
-  let h='<thead><tr><th>Kód</th><th>Naše položka</th><th title="Reálná prodejní cena z e-shopu (JC bez DPH, nejnovější dle Reg. čísla); u položek bez prodeje fallback modelová cena">Naše cena bez DPH</th><th>MEVA produkt</th><th>MEVA bez DPH</th><th>MEVA s DPH</th><th>Rozdíl Kč</th><th>Rozdíl %</th><th>Shoda</th><th>Stav páru</th></tr></thead><tbody>';
-  for(const x of rows){
-    const m=x.meva;
-    const dif=(m&&x.cena!=null&&m.cenaBezDph!=null)?x.cena-m.cenaBezDph:null;
-    const difPct=(dif!=null&&m.cenaBezDph)?dif/m.cenaBezDph*100:null;
-    const difStyle=dif==null?'':(dif>0?'color:#c0392b;font-weight:700':(dif<0?'color:#1e8a4a;font-weight:600':''));
-    h+='<tr>'
-      +'<td>'+esc(x.kod)+'</td>'
-      +'<td>'+esc(x.nazev)+'</td>'
-      +'<td style="text-align:right">'+(x.cena!=null?fmt(x.cena)+' Kč':'—')+'</td>'
-      +'<td>'+(m?('<a href="'+escAttr(m.url)+'" target="_blank" rel="noopener">'+esc(m.nazev)+'</a>'):'<span class="muted">nespárováno</span>')+'</td>'
-      +'<td style="text-align:right">'+(m&&m.cenaBezDph!=null?fmt(m.cenaBezDph)+' Kč':'—')+'</td>'
-      +'<td style="text-align:right">'+(m&&m.cenaSDph!=null?fmt(m.cenaSDph)+' Kč':'—')+'</td>'
-      +'<td style="text-align:right;'+difStyle+'">'+(dif!=null?((dif>0?'+':'')+fmt(dif)+' Kč'):'—')+'</td>'
-      +'<td style="text-align:right;'+difStyle+'">'+(difPct!=null?((difPct>0?'+':'')+fmt(difPct,1)+' %'):'—')+'</td>'
-      +'<td style="text-align:right">'+(m&&m.s!=null?fmt(m.s*100)+' %':'—')+'</td>'
-      +'<td>'+(stavTxt[x.stavParu]||x.stavParu||'—')+'</td>'
-      +'</tr>';
+  const info=document.getElementById('mevaMetaInfo');
+  if(!rows.length){tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Nic nenalezeno v katalogu MEVA.</td></tr></tbody>';}
+  else{
+    const LIM=500;
+    let h='<thead><tr><th>MEVA produkt</th><th style="text-align:right">Cena bez DPH</th><th style="text-align:right">Cena s DPH</th></tr></thead><tbody>';
+    for(const m of rows.slice(0,LIM)){
+      h+='<tr><td><a href="'+escAttr(m.url)+'" target="_blank" rel="noopener">'+esc(m.nazev)+'</a></td>'
+        +'<td style="text-align:right">'+(m.cenaBezDph!=null?fmt(m.cenaBezDph)+' Kč':'—')+'</td>'
+        +'<td style="text-align:right">'+(m.cenaSDph!=null?fmt(m.cenaSDph)+' Kč':'—')+'</td></tr>';
+    }
+    h+='</tbody>';
+    tb.innerHTML=h;
   }
-  h+='</tbody>';
-  tb.innerHTML=h;
-  try{addColumnFilters(tb);}catch(e){}
+  if(info){const total=(MEVA_DATA&&MEVA_DATA.mevaPolozek)||0;const shown=Math.min(rows.length,500);
+    info.textContent='Katalog MEVA: '+total+' produktů'
+      +(MEVA_DATA&&MEVA_DATA.mevaMeta?(' (staženo '+new Date(MEVA_DATA.mevaMeta.kdy).toLocaleDateString('cs-CZ')+')'):'')
+      +' · zobrazeno '+shown+(rows.length>500?(' z '+rows.length+' — zužte hledání'):'');}
+}
+function mevaPickMine(){
+  const inp=document.getElementById('mevaMine'), box=document.getElementById('mevaCompare'); if(!box) return;
+  const q=(inp.value||'').trim().toLowerCase();
+  if(!q){box.innerHTML='';return;}
+  const it=ROWS.find(r=>String(r.ident).toLowerCase()===q)||ROWS.find(r=>(r.name||'').toLowerCase()===q)||ROWS.find(r=>(r.name||'').toLowerCase().includes(q));
+  if(!it){box.innerHTML='';return;}
+  const p=mevaOurPrice(it);
+  box.innerHTML='<div class="note" style="border-left-color:#5b8def;margin:0 0 10px">Naše položka: <b>'+esc(it.name)+'</b> · naše prodejní cena <b>'+(p!=null?fmt(p)+' Kč bez DPH':'—')+'</b>. Níže hledám odpovídající produkty v katalogu MEVA — porovnej ručně.</div>';
+  const s=document.getElementById('mevaSearch'); if(s){s.value=it.name;}
+  mevaTab();
 }
 async function renderMeva(force){
   const tb=document.getElementById('mevaTbl');
   const info=document.getElementById('mevaMetaInfo');
-  tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Načítám data cenového monitoringu…</td></tr></tbody>';
+  tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Načítám katalog MEVA…</td></tr></tbody>';
   const d=await mevaFetch(force);
-  if(!d){tb.innerHTML='<tbody><tr><td style="padding:14px;color:#c0392b">Data se nepodařilo načíst: '+esc(MEVA_ERR||'neznámá chyba')+'</td></tr></tbody>';info.textContent='';return;}
-  const sp=(d.srovnani||[]).filter(x=>x.meva);
-  const cmp=sp.filter(x=>x.cena!=null&&x.meva.cenaBezDph!=null);        // spárované s oběma cenami
-  const drazsi=cmp.filter(x=>x.cena>x.meva.cenaBezDph);
-  const levnejsi=cmp.filter(x=>x.cena<x.meva.cenaBezDph);
-  const avgPct=cmp.length?cmp.reduce((s,x)=>s+(x.cena-x.meva.cenaBezDph)/x.meva.cenaBezDph*100,0)/cmp.length:null;
-  const bm=document.getElementById('b_meva'); if(bm) bm.textContent=String(drazsi.length);
-  info.innerHTML='Položek: '+(d.polozek||0)
-    +' · MEVA produktů: '+(d.mevaPolozek||0)
-    +(d.mevaMeta?(' (staženo '+new Date(d.mevaMeta.kdy).toLocaleDateString('cs-CZ')+')'):'')
-    +' · spárováno '+sp.length+' · s cenou k porovnání '+cmp.length
-    +' · <span style="color:#c0392b;font-weight:600">dražší u '+drazsi.length+'</span>'
-    +' · <span style="color:#1e8a4a;font-weight:600">levnější u '+levnejsi.length+'</span>'
-    +(avgPct!=null?(' · průměrný rozdíl '+(avgPct>0?'+':'')+fmt(avgPct,1)+' % vs. MEVA'):'');
-  if(!(d.srovnani||[]).length){
-    const missing=[];
-    if(!d.polozek) missing.push('nahrát <b>náš export ze SMI</b>');
-    if(!d.mevaPolozek) missing.push('stáhnout <b>ceny MEVA</b>');
-    const msg=missing.length
-      ? ('Zatím není co zobrazit — ve Správě intranetu → Cenový monitoring je potřeba '+missing.join(' a ')+'.')
-      : 'Naše položky i ceny MEVA jsou nahrané, ale žádná dvojice zatím nesedí — spáruj ručně ve Správě intranetu → Cenový monitoring.';
-    tb.innerHTML='<tbody><tr><td style="padding:14px;color:var(--mut,#8a93a6)">'+msg+'</td></tr></tbody>';
+  if(!d){tb.innerHTML='<tbody><tr><td style="padding:14px;color:#c0392b">Data se nepodařilo načíst: '+esc(MEVA_ERR||'neznámá chyba')+'</td></tr></tbody>';if(info)info.textContent='';return;}
+  // datalist našich položek pro ruční porovnání
+  const dl=document.getElementById('mevaMineList');
+  if(dl&&!dl.children.length&&typeof ROWS!=='undefined') dl.innerHTML=ROWS.filter(r=>r.name).slice(0,3000).map(r=>'<option value="'+escAttr(r.name)+'">').join('');
+  if(!(d.meva||[]).length){
+    if(info)info.textContent='Katalog MEVA: 0 produktů';
+    tb.innerHTML='<tbody><tr><td style="padding:14px;color:var(--mut,#8a93a6)">Katalog MEVA je prázdný — stáhni ceny ve Správě intranetu → Cenový monitoring → „Stáhnout ceny z mevatec.cz".</td></tr></tbody>';
     return;
   }
   mevaTab();
 }
 (function(){
-  const s=document.getElementById('mevaSearch'), f=document.getElementById('mevaFilter'), r=document.getElementById('mevaReload');
+  const s=document.getElementById('mevaSearch'), so=document.getElementById('mevaSort'), r=document.getElementById('mevaReload'), mine=document.getElementById('mevaMine');
   if(s) s.addEventListener('input',()=>{if(MEVA_DATA)mevaTab();});
-  if(f) f.addEventListener('change',()=>{if(MEVA_DATA)mevaTab();});
+  if(so) so.addEventListener('change',()=>{if(MEVA_DATA)mevaTab();});
+  if(mine){ mine.addEventListener('change',mevaPickMine);
+    mine.addEventListener('input',()=>{if(!mine.value.trim()){const b=document.getElementById('mevaCompare');if(b)b.innerHTML='';}}); }
   if(r) r.addEventListener('click',()=>renderMeva(true));
 })();
 function cellVal(cell){const inp=cell.querySelector('input,select');return inp?String(inp.value):cell.textContent;}

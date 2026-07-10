@@ -1466,6 +1466,13 @@ const server = http.createServer(async (req, res) => {
       const d = cenmonRead();
       return send(res, 200, { polozkyMeta: d.polozkyMeta, polozek: d.polozky.length, mevaMeta: d.mevaMeta, mevaPolozek: d.meva.length, scan: CENMON_SCAN, srovnani: cenmonSrovnani() });
     }
+    if (p === '/api/cenmon/meva-katalog' && req.method === 'GET') {
+      // Vrátí stažený katalog MEVA (pro vyhledávací náhled v SMI aplikaci).
+      const eCm = empSession(req);
+      if (!isAdmin(req) && !(eCm && employeeModules(eCm.email).indexOf('eshop') >= 0)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const d = cenmonRead();
+      return send(res, 200, { mevaMeta: d.mevaMeta, mevaPolozek: d.meva.length, meva: d.meva });
+    }
     if (p === '/api/cenmon/srovnej' && req.method === 'POST') {
       // Spáruje položky poslané z klienta (SMI aplikace) proti staženému katalogu MEVA — bez ukládání na server.
       const eCm = empSession(req);
