@@ -661,6 +661,28 @@ async function poslatHrVysledek(kind, rec) {
   } catch (e) { try { logActivity('survey-mail-chyba', { email: (rec || {}).email || '', name: '' }, String(e.message || e)); } catch (_) {} }
 }
 
+// Report průzkumu jako HTML e-mail (ruční odeslání z detailu; sdílí řádky s automatickým HR mailem).
+function surveyReportHtml(kind, rec, poznamka) {
+  const nazev = SURVEY_NAZVY[kind] || kind;
+  const radky = surveyVysledekRadky(kind, rec);
+  const pozn = (poznamka || '').trim();
+  return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1c1d1a;line-height:1.55;max-width:720px">' +
+    '<div style="background:#11271c;color:#eef3ee;padding:16px 20px;border-radius:10px 10px 0 0"><h2 style="margin:0;font-size:18px">' + esc(nazev) + '</h2>' +
+    '<div style="color:#9fd9b6;font-size:13px;margin-top:3px">Report kandidáta / zaměstnance</div></div>' +
+    '<div style="border:1px solid #dcdbd4;border-top:0;border-radius:0 0 10px 10px;padding:18px 20px">' +
+    '<p style="margin:0 0 14px"><strong style="font-size:15px">' + esc(rec.name || rec.email) + '</strong> &lt;' + esc(rec.email) + '&gt;' +
+    (rec.dept && rec.dept !== '—' ? ' · ' + esc(rec.dept) : '') + '<br><span style="color:#77796f">vyplněno ' + new Date(rec.ts).toLocaleString('cs-CZ') + '</span></p>' +
+    (pozn ? '<p style="background:#f0f6f2;border-left:3px solid #2d7a52;padding:8px 12px;margin:0 0 14px;font-style:italic">' + esc(pozn) + '</p>' : '') +
+    '<table style="border-collapse:collapse;width:100%">' + radky.map(x =>
+      '<tr><td style="border:1px solid #dcdbd4;padding:7px 11px;background:#faf9f6;font-weight:bold;white-space:nowrap;vertical-align:top">' + esc(x[0]) + '</td>' +
+      '<td style="border:1px solid #dcdbd4;padding:7px 11px">' + esc(x[1]) + '</td></tr>').join('') + '</table>' +
+    '<p style="margin-top:16px;font-size:12px;color:#77796f">Interní podklad HR — ELKOPLAST CZ. Doplňková informace ze sebehodnocení, nikoli samostatné selekční kritérium. Plný interaktivní detail: intranet.elkoplast.cz → Průzkumy.</p></div></div>';
+}
+function surveyRec(kind, email) {
+  const f = kind === 'jss' ? JSS_F : kind === 'tw44' ? TW44_F : GRIT_F;
+  return readJson(f, []).find(r => (r.email || '').toLowerCase() === String(email || '').toLowerCase());
+}
+
 // ABROLL školení – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
 const ABROLL_MAX = 3;
 function abrollStatus(email) {
@@ -1458,6 +1480,26 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/abroll' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, abrollStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(ABROLL_F, [])); }
+    // ---- Odeslání reportu průzkumu e-mailem (z detailu; jen správce) ----
+    if (p === '/api/survey-report/send' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!emailConfigured()) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
+      const b = JSON.parse(await readBody(req));
+      const kind = (b.kind || '').toLowerCase();
+      if (['grit', 'jss', 'tw44'].indexOf(kind) < 0) return send(res, 400, { error: 'Neznámý typ testu.' });
+      const to = String(b.to || '').trim();
+      if (to.indexOf('@') < 0) return send(res, 400, { error: 'Neplatný e-mail příjemce.' });
+      const rec = surveyRec(kind, b.email);
+      if (!rec) return send(res, 404, { error: 'Výsledek nenalezen.' });
+      const nazev = SURVEY_NAZVY[kind] || kind;
+      const html = surveyReportHtml(kind, rec, b.poznamka);
+      const text = nazev + ' — ' + (rec.name || rec.email) + '\n\n' + surveyVysledekRadky(kind, rec).map(x => x[0] + ': ' + x[1]).join('\n');
+      try {
+        await deliver({ to, subject: 'Report: ' + (rec.name || rec.email) + ' — ' + nazev, text, html });
+        logActivity('survey-report', { email: rec.email, name: rec.name }, 'Report (' + nazev + ') odeslán na ' + to);
+        return send(res, 200, { ok: true });
+      } catch (e) { return send(res, 500, { error: e.message }); }
+    }
     // podepsané pozvánkové odkazy (hash) pro dávku příjemců — jen pro správce
     // ---- Cenový monitoring (ESHOP × MEVA) — čtení i pro modul E-shop, zápisy jen správce ----
     if (p === '/api/cenmon' && req.method === 'GET') {
