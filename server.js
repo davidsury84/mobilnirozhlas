@@ -71,6 +71,7 @@ const GRIT_FILE = path.join(ROOT, 'grit.html');              // test houževnato
 const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracovní spokojenosti (JSS)
 const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
 const ABROLL_FILE = path.join(ROOT, 'abroll-skoleni.html');  // interaktivní školení ABROLL + závěrečný test
+const KONCEPT_FILE = path.join(ROOT, 'intranet-koncept.html'); // náhledový koncept redesignu intranetu (SharePoint hub)
 const PUB_DIR  = path.join(DATA_DIR, 'published');
 const STATE_F  = path.join(DATA_DIR, 'state.json');
 const ACKS_F   = path.join(DATA_DIR, 'acks.json');
@@ -1394,6 +1395,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/jss' || p === '/jss.html') {
       if (!fs.existsSync(JSS_FILE)) return send(res, 404, '<h1>Chybí jss.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(JSS_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    if (p === '/koncept' || p === '/koncept.html') {
+      if (!fs.existsSync(KONCEPT_FILE)) return send(res, 404, '<h1>Chybí intranet-koncept.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(KONCEPT_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/api/login' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
