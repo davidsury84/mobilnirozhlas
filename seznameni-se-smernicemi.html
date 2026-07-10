@@ -64,26 +64,27 @@ code{font-family:"IBM Plex Mono",monospace;background:var(--bg-2);border:1px sol
 /* ---------- App shell ---------- */
 header.appbar{
   position:sticky;top:0;z-index:30;
-  background:var(--grad-dark);color:#eef3ee;
-  border-bottom:1px solid rgba(255,255,255,.06);
-  box-shadow:0 1px 0 rgba(255,210,26,.5), 0 6px 24px rgba(8,18,12,.28);
+  background:var(--paper);color:var(--ink);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 1px 0 var(--line), 0 6px 22px rgba(15,21,18,.05);
+  -webkit-backdrop-filter:saturate(1.1);backdrop-filter:saturate(1.1);
 }
-.appbar-inner{max-width:1180px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:13px}
+.appbar-inner{max-width:1240px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
 .brand .logo{
-  width:38px;height:38px;border-radius:11px;background:linear-gradient(150deg,var(--yellow),var(--yellow-2));
-  display:grid;place-items:center;font-weight:800;color:#11271c;font-size:20px;
-  box-shadow:0 4px 14px rgba(255,196,0,.4);
+  width:40px;height:40px;border-radius:12px;background:var(--grad-green);
+  display:grid;place-items:center;font-weight:800;color:#fff;font-size:21px;
+  box-shadow:0 6px 16px rgba(10,107,52,.28);
 }
-.brand h1{font-size:18px;font-weight:700;margin:0;letter-spacing:-.015em}
-.brand small{display:block;font-size:11px;color:#9fd9b6;font-weight:500;letter-spacing:.05em;text-transform:uppercase;margin-top:2px}
-nav.tabs{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap}
+.brand h1{font-size:17.5px;font-weight:700;margin:0;letter-spacing:-.02em;line-height:1.1}
+.brand small{display:block;font-size:10.5px;color:var(--ink-soft);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+nav.tabs{display:flex;gap:3px;margin-left:auto;flex-wrap:wrap;align-items:center}
 nav.tabs button{
-  background:transparent;border:1px solid transparent;color:#bcd4c4;
-  padding:8px 15px;border-radius:10px;font-weight:500;font-size:14px;transition:.18s;
+  background:transparent;border:1px solid transparent;color:var(--ink-soft);
+  padding:8px 14px;border-radius:9px;font-weight:600;font-size:13.5px;transition:.16s;letter-spacing:-.01em;
 }
-nav.tabs button:hover{background:rgba(255,255,255,.09);color:#fff}
-nav.tabs button.active{background:var(--grad-green);color:#fff;box-shadow:0 4px 14px rgba(10,107,52,.45)}
+nav.tabs button:hover{background:var(--bg-2);color:var(--ink)}
+nav.tabs button.active{background:var(--green-soft);color:var(--green-d);box-shadow:none;font-weight:700}
 
 main{max-width:1180px;margin:0 auto;padding:28px 22px 80px}
 .view{display:none}
@@ -383,7 +384,8 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .ec:focus{outline:none;border-color:var(--green-2);box-shadow:0 0 0 2px var(--green-soft)}
 .ec.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
 #employeeTable td{padding:6px 8px;vertical-align:middle}
-.app-foot{text-align:center;padding:22px 12px 34px;color:var(--ink-soft);font-size:12px}
+.app-foot{border-top:1px solid var(--line);background:var(--paper);margin-top:48px;padding:20px 24px;color:var(--ink-soft);font-size:12px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.app-foot .fmark{width:20px;height:20px;border-radius:6px;background:var(--grad-green);display:inline-grid;place-items:center;color:#fff;font-size:12px;font-weight:800;flex:none}
 .app-foot b{color:var(--ink);font-weight:600}
 </style>
 </head>
@@ -779,7 +781,7 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 <div id="themePop" class="no-print"></div>
 
 <!--VERSION-->
-<footer class="app-foot no-print"><span id="verInfo">Intranet ELKOPLAST CZ</span></footer>
+<footer class="app-foot no-print"><span class="fmark">✓</span><span id="verInfo">Intranet ELKOPLAST CZ</span></footer>
 <script>(function(){try{var v=window.__VER__||{};var el=document.getElementById("verInfo");if(!el)return;var when="";if(v.built){when=new Date(v.built).toLocaleString("cs-CZ",{day:"numeric",month:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"});}el.innerHTML="Intranet ELKOPLAST CZ"+(v.commit?(" · verze <b>"+v.commit+"</b>"):"")+(when?(" · aktualizováno <b>"+when+"</b>"):"");}catch(e){}})();</script>
 <script>
 /* Kontrola aktuálnosti: když server hlásí novější build, nabídneme obnovení (ať se neukazuje stará verze z cache). */
