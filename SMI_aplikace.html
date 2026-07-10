@@ -313,9 +313,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <datalist id="mevaMineList"></datalist>
         </label>
         <select id="mevaSort">
-          <option value="rel">Řadit: relevance / název</option>
-          <option value="asc">Cena bez DPH ↑</option>
-          <option value="desc">Cena bez DPH ↓</option>
+          <option value="desc" selected>Cena bez DPH ↓ (nejdražší)</option>
+          <option value="asc">Cena bez DPH ↑ (nejlevnější)</option>
+          <option value="rel">Relevance / název</option>
         </select>
         <button class="btn ghost" id="mevaReload">↻ Znovu načíst</button>
         <span class="muted" id="mevaMetaInfo" style="font-size:12px"></span>
@@ -1043,20 +1043,21 @@ function mevaTab(){
   const info=document.getElementById('mevaMetaInfo');
   if(!rows.length){tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Nic nenalezeno v katalogu MEVA.</td></tr></tbody>';}
   else{
-    const LIM=500;
-    let h='<thead><tr><th>MEVA produkt</th><th style="text-align:right">Cena bez DPH</th><th style="text-align:right">Cena s DPH</th></tr></thead><tbody>';
-    for(const m of rows.slice(0,LIM)){
-      h+='<tr><td><a href="'+escAttr(m.url)+'" target="_blank" rel="noopener">'+esc(m.nazev)+'</a></td>'
+    let h='<thead><tr><th>#</th><th>MEVA produkt</th><th style="text-align:right">Cena bez DPH</th><th style="text-align:right">Cena s DPH</th></tr></thead><tbody>';
+    let i=0;
+    for(const m of rows){
+      i++;
+      h+='<tr><td class="num muted">'+i+'</td><td><a href="'+escAttr(m.url)+'" target="_blank" rel="noopener">'+esc(m.nazev)+'</a></td>'
         +'<td style="text-align:right">'+(m.cenaBezDph!=null?fmt(m.cenaBezDph)+' Kč':'—')+'</td>'
         +'<td style="text-align:right">'+(m.cenaSDph!=null?fmt(m.cenaSDph)+' Kč':'—')+'</td></tr>';
     }
     h+='</tbody>';
     tb.innerHTML=h;
   }
-  if(info){const total=(MEVA_DATA&&MEVA_DATA.mevaPolozek)||0;const shown=Math.min(rows.length,500);
+  if(info){const total=(MEVA_DATA&&MEVA_DATA.mevaPolozek)||0;
     info.textContent='Katalog MEVA: '+total+' produktů'
       +(MEVA_DATA&&MEVA_DATA.mevaMeta?(' (staženo '+new Date(MEVA_DATA.mevaMeta.kdy).toLocaleDateString('cs-CZ')+')'):'')
-      +' · zobrazeno '+shown+(rows.length>500?(' z '+rows.length+' — zužte hledání'):'');}
+      +' · zobrazeno '+rows.length;}
 }
 function mevaPickMine(){
   const inp=document.getElementById('mevaMine'), box=document.getElementById('mevaCompare'); if(!box) return;
