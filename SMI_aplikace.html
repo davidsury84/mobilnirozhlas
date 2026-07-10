@@ -462,7 +462,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="tblwrap"><table id="elkoTbl"></table></div>
     </div>
     <div class="pane" id="pane-nakup">
-      <div class="note">Optimalizace nákupu „co a kdy koupit" pro nákupčího. Kombinuje <b>obrátku</b>, <b>sezónnost</b> (objednat před náběhem sezóny), <b>očekávané zdražení</b> (předzásobit, když růst ceny převýší náklad držení) a <b>reálné náklady skladu</b> (nájem+provoz → efektivní sazba držení, která vstupuje do EOQ). Položky bez prodeje nedoporučuje nakupovat. Sloupec „Zdražení %" lze u položky ručně upravit.</div>
+      <div class="note">Optimalizace nákupu „co a kolik objednat" pro nákupčího. Objednává <b>štíhle a včas</b>: doporučené množství pokryje poptávku jen na <b>dodací lhůtu + cílové pokrytí</b> měsíců dopředu <b>od aktuálního měsíce</b> — sezónně. Co se teď (ani v nejbližším okně) neprodává, <b>nedoporučí objednat</b> (stav „Mimo sezónu"), aby nevznikaly ležáky. Nepředzásobuje na rok dopředu.</div>
       <div class="period-tag" data-period="stock" style="font-size:12px;color:var(--mut);margin:2px 0 8px;font-weight:600"></div>
       <div class="bulkbar">
         <b>Parametry:</b>
@@ -471,8 +471,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Náklady na obj. [Kč]<input type="number" id="nkS" value="500" style="width:80px"></label>
         <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Kapitálová sazba [%/rok]<input type="number" id="nkCap" value="8" style="width:74px"></label>
         <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Roční náklady skladu (nájem+provoz) [Kč]<input type="number" id="nkWh" value="2713886" style="width:100px"></label>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Očekávané zdražení [%/rok]<input type="number" id="nkInfl" value="0" style="width:80px"></label>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Horizont předzásobení [měs.]<input type="number" id="nkHorizon" value="6" style="width:80px"></label>
+        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)" title="Na kolik měsíců dopředu (od aktuálního měsíce) chceme mít zásobu. Menší = štíhlejší sklad, méně ležáků.">Cílové pokrytí [měs.]<input type="number" id="nkHorizon" value="2" min="0.5" step="0.5" style="width:80px"></label>
         <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Min. obj. množství<input type="number" id="nkMOQ" value="1" style="width:74px"></label>
         <button class="btn" id="nkApply">Přepočítat</button>
       </div>
@@ -484,23 +483,23 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <p style="margin:4px 0"><b>Náklady na objednávku [Kč]</b> — fixní náklad na jednu objednávku (administrativa, doprava, příjem). Vyšší náklad → appka doporučí objednávat <b>větší dávky méně často</b> (vyšší EOQ).</p>
           <p style="margin:4px 0"><b>Kapitálová sazba [%/rok]</b> — kolik tě stojí peníze vázané v zásobách (úrok, náklady financování). Vstupuje do efektivní sazby držení.</p>
           <p style="margin:4px 0"><b>Roční náklady skladu (nájem+provoz) [Kč]</b> — celkové roční náklady skladu (nájem, energie, obsluha, pojištění). Appka je rozpočítá na hodnotu zásob a přičte ke kapitálové sazbě → vznikne <b>efektivní sazba držení</b> (zobrazená pod tabulkou), která určuje EOQ i hranici, kdy se vyplatí předzásobit. <b>Předvyplněno z reálných dat</b> (doplňkové/skladové náklady 2025 = 2 713 886 Kč; při hodnotě zásob ~20,8 mil. Kč → sazba skladu ~13 %, efektivní držení ~21 %).</p>
-          <p style="margin:4px 0"><b>Očekávané zdražení [%/rok]</b> — o kolik podle tebe poroste nákupní cena. Když je <b>vyšší než sazba držení</b>, vyplatí se předzásobit (forward-buy) a appka to doporučí (stav „Předzásobit"). Lze přepsat i u jednotlivé položky ve sloupci „✎ Zdražení %".</p>
-          <p style="margin:4px 0"><b>Horizont předzásobení [měs.]</b> — na kolik měsíců dopředu se smí předzásobit kvůli zdražení (strop, aby se nenakoupilo příliš).</p>
+          <p style="margin:4px 0"><b>Cílové pokrytí [měs.]</b> — na kolik měsíců dopředu (od aktuálního měsíce) chceme mít zásobu. <b>Menší = štíhlejší sklad a méně ležáků</b>, ale častější objednávky. Doporučené množství pokryje jen <b>dodací lhůtu + toto pokrytí</b> — nikdy ne celý rok.</p>
           <p style="margin:4px 0"><b>Min. obj. množství</b> — minimální objednací množství dodavatele (MOQ). Doporučené množství nikdy neklesne pod tuto hodnotu.</p>
-          <p style="margin:8px 0 2px;color:var(--mut)"><b>Jak appka rozhoduje:</b> spočítá <b>bod objednání</b> (poptávka za dodací lhůtu + pojistná zásoba) a <b>EOQ</b> (ekonomická dávka). Stav: <b>Objednat teď</b> (zásoba ≤ bod objednání), <b>Před sezónou</b> (blíží se sezónní špička), <b>Předzásobit</b> (zdražení &gt; náklad držení), <b>Brzy</b>, <b>OK</b>, nebo <b>Nenakupovat</b> (bez prodeje). Po změně parametrů klikni na <b>Přepočítat</b>.</p>
+          <p style="margin:8px 0 2px;color:var(--mut)"><b>Jak appka rozhoduje (proti ležákům):</b> spočítá <b>sezónní poptávku od TEĎ</b> za dodací lhůtu + cílové pokrytí. <b>Objednat teď</b> = zásoba ≤ bod objednání (dorovná na cílovou zásobu = poptávka v okně + pojistná). <b>Mimo sezónu</b> = v nejbližším okně se prakticky neprodává → neobjednávat (objedná se až před sezónou). <b>Brzy</b> / <b>OK</b> / <b>Nenakupovat</b> (bez ročního prodeje). Po změně parametrů klikni na <b>Přepočítat</b>.</p>
           <p style="margin:8px 0 2px;color:var(--mut)"><b>Vysvětlení sloupců:</b></p>
-          <p style="margin:2px 0"><b>Roční prodej</b> — kolik kusů se prodalo za 12 měsíců (poptávka).</p>
-          <p style="margin:2px 0"><b>Sez. index</b> — sezónnost aktuálního měsíce: 1,0× = průměr, &gt;1 = nad průměrem (sezóna), &lt;1 = pod průměrem.</p>
+          <p style="margin:2px 0"><b>Roční prodej</b> — kolik kusů se prodalo za 12 měsíců.</p>
+          <p style="margin:2px 0"><b>Sez. index (teď)</b> — sezónnost aktuálního měsíce: 1,0× = průměr, &gt;1 = sezóna, &lt;1 = mimo sezónu.</p>
+          <p style="margin:2px 0"><b>Poptávka (okno)</b> — očekávaná sezónní poptávka za dodací lhůtu + cílové pokrytí od aktuálního měsíce. Tohle je základ objednávky.</p>
           <p style="margin:2px 0"><b>Bod obj. (ROP)</b> — hladina zásoby, při které je třeba objednat, aby zboží nedošlo během dodací lhůty (poptávka za lhůtu + pojistná zásoba).</p>
-          <p style="margin:2px 0"><b>EOQ</b> (ekonomické objednací množství) — nejvýhodnější velikost jedné objednávky, která minimalizuje součet nákladů na <b>objednávání</b> a na <b>držení</b> zásoby. Počítá se jako √(2 × roční prodej × náklady na objednávku ÷ náklad držení na kus). Malé časté objednávky = vysoké náklady na objednávání; velké vzácné = vysoké náklady držení; EOQ je optimum mezi nimi.</p>
-          <p style="margin:2px 0"><b>Doporučeno obj.</b> — kolik kusů objednat teď (doplní zásobu nad bod objednání o EOQ, případně navýší kvůli sezóně nebo předzásobení).</p>
-          <p style="margin:2px 0"><b>Stav</b> — Objednat teď / Před sezónou / Předzásobit / Brzy / OK / Nenakupovat.</p>
+          <p style="margin:2px 0"><b>Cíl. zásoba</b> — na kolik se dorovná po objednávce (poptávka v okně + pojistná). Doporučeno obj. = Cíl. zásoba − Skladem.</p>
+          <p style="margin:2px 0"><b>Doporučeno obj.</b> — kolik kusů objednat teď, aby zásoba pokryla nejbližší okno (ne víc → bez ležáků).</p>
+          <p style="margin:2px 0"><b>Stav</b> — Objednat teď / Brzy / Mimo sezónu / OK / Nenakupovat.</p>
           <p style="margin:8px 0 2px;color:var(--mut)"><b>Filtrování:</b> v hlavičce každého sloupce je filtr (rozbalovací u textových sloupců, číselné porovnání u čísel — např. <code>&gt;100</code>). „Objemová sleva" je hodnota ve sloupci <b>Akce</b> (ne Kategorie) — najdeš ji ve filtrech sloupce Akce v záložkách Nové ceny, Mrtvé zásoby, SMI model a Vše.</p>
         </div>
       </details>
       <div class="toolbar">
         <input type="text" id="nkSearch" placeholder="Hledat položku…" style="min-width:240px">
-        <select id="nkFilter"><option value="">Vše</option><option value="now">Objednat teď</option><option value="season">Před sezónou</option><option value="fwd">Předzásobit (zdražení)</option><option value="soon">Brzy (≤30 dní)</option><option value="ok">OK</option><option value="no">Nenakupovat</option></select>
+        <select id="nkFilter"><option value="">Vše</option><option value="now">Objednat teď</option><option value="soon">Brzy</option><option value="season">Mimo sezónu</option><option value="ok">OK</option><option value="no">Nenakupovat</option></select>
         <span style="flex:1"></span>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)">Doba nákupu [měs.]<input type="number" id="nkHorizon2" value="3" min="1" max="24" style="width:64px"></label>
         <button class="btn" id="nkReport">📋 Sestava k nákupu</button>
@@ -510,7 +509,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <div class="kpis" id="nkOrderKpis"></div>
         <div class="card" style="margin-top:10px">
           <div class="spread" style="flex-wrap:wrap;gap:8px"><h3 style="margin:0">🛒 Objednací seznam — co a kolik objednat teď</h3>
-            <span class="muted" style="font-size:12px">Jen položky se stavem <b>Objednat teď / Před sezónou / Předzásobit</b>. Detailní výpočet (ROP, EOQ, obrátka…) je v tabulce níže.</span></div>
+            <span class="muted" style="font-size:12px">Jen položky se stavem <b>Objednat teď</b> (zásoba pod bodem objednání a prodávají se v nejbližším okně). Detailní výpočet je v tabulce níže.</span></div>
           <div class="tblwrap" style="max-height:460px"><table id="nkOrderTbl"></table></div>
         </div>
       </div>
@@ -1422,82 +1421,83 @@ function nkParams(){
   const cap=(+$('#nkCap').value||0)/100, wh=+$('#nkWh').value||0;
   const whRate=totVal>0?wh/totVal:0;
   NK_PARAMS={L:+$('#nkLead').value||30,Z:+$('#nkSL').value||1.65,S:+$('#nkS').value||500,
-    cap,wh,whRate,effHold:cap+whRate,inflG:(+$('#nkInfl').value||0)/100,
-    horizon:+$('#nkHorizon').value||6,MOQ:Math.max(1,+$('#nkMOQ').value||1),totVal};
+    cap,wh,whRate,effHold:cap+whRate,
+    cover:Math.max(0.5,+$('#nkHorizon').value||2),MOQ:Math.max(1,+$('#nkMOQ').value||1),totVal};
   return NK_PARAMS;
 }
 function nkSeasonDemand(sales,start,months){let s=0;for(let k=0;k<Math.ceil(months);k++){const fr=Math.min(1,months-k);s+=(sales[(start+k)%12]||0)*fr;}return s;}
 function nkCompute(){
   const P=nkParams();const m0=new Date().getMonth();
+  const Lm=P.L/30;                         // dodací lhůta v měsících
+  const coverM=Math.max(0.5,P.cover);      // cílové pokrytí v měsících
+  const windowM=Lm+coverM;                 // horizont plánování od TEĎ (lhůta + pokrytí)
   for(const r of ROWS){
     const sales=(r.sales||[]).map(x=>x||0);
-    const D=sales.reduce((s,x)=>s+x,0), avgM=D/12, sig=nkStd(sales);
+    const D=sales.reduce((s,x)=>s+x,0), avgM=D/12;
     const siCur=avgM>0?sales[m0]/avgM:0, siNext=avgM>0?(sales[(m0+1)%12]+sales[(m0+2)%12])/(2*avgM):0;
-    const Lm=P.L/30, leadDem=nkSeasonDemand(sales,m0,Lm), safety=P.Z*sig*Math.sqrt(Lm);
-    const rop=Math.round(leadDem+safety);
-    const unit=r.unitPrice, Hunit=(unit||0)*P.effHold;
-    const eoq=(D>0&&Hunit>0)?Math.sqrt(2*D*P.S/Hunit):0, Q=Math.max(P.MOQ,Math.round(eoq));
+    // Sezónní poptávka POUZE dopředu od aktuálního měsíce — neobjednáváme na to, co se prodává až za půl roku.
+    const leadDem=nkSeasonDemand(sales,m0,Lm);            // spotřeba během dodací lhůty
+    const windowDem=nkSeasonDemand(sales,m0,windowM);     // spotřeba za (lhůta + pokrytí) od teď
+    // Pojistná zásoba robustně přes Poissonův odhad (√ z poptávky) — nezveličuje sezónní výkyvy → štíhlejší sklad, méně ležáků.
+    const safety=P.Z*Math.sqrt(Math.max(0,windowDem));
+    const rop=Math.round(leadDem+P.Z*Math.sqrt(Math.max(0,leadDem)));   // bod objednání (pokryje dodací lhůtu + pojistná)
+    const target=Math.round(windowDem+safety);            // cílová zásoba po objednávce (jen na okno)
+    const Hunit=(r.unitPrice||0)*P.effHold;
+    const eoq=(D>0&&Hunit>0)?Math.sqrt(2*D*P.S/Hunit):0;  // jen informativně
     const stock=r.AZ||0, upDaily=nkSeasonDemand(sales,m0,1)/30;
-    const cover=upDaily>0?stock/upDaily:Infinity, daysToRop=upDaily>0?(stock-rop)/upDaily:Infinity;
-    let season='—';
-    if(D>0){if(siCur>=1.3)season='Sezóna';else if(siNext>=1.3&&siNext>siCur)season='Vstup do sezóny';else if(siCur<0.6)season='Mimo sezónu';}
-    const infl=(r._nkInfl!=null?r._nkInfl/100:P.inflG);
-    const fwdPays=D>0&&infl>P.effHold&&season!=='Mimo sezónu';
+    const cover=upDaily>0?stock/upDaily:(stock>0?Infinity:0), daysToRop=upDaily>0?(stock-rop)/upDaily:Infinity;
     let rec=0,status,when,reasons=[];
     if(D<=0){status='Nenakupovat';when='—';reasons.push('bez prodeje za rok');}
-    else{
-      const qReorder=stock<=rop?Math.max(P.MOQ,Math.round(rop+Q-stock)):0;
-      const qSeason=season==='Vstup do sezóny'?Math.max(0,Math.round(nkSeasonDemand(sales,(m0+1)%12,2)+safety-stock)):0;
-      const qForward=fwdPays?Math.max(0,Math.round(nkSeasonDemand(sales,m0,P.horizon)-stock)):0;
-      rec=Math.max(qReorder,qSeason,qForward);
-      if(qReorder>0&&qReorder>=qSeason&&qReorder>=qForward){status='Objednat teď';when='teď';reasons.push('zásoba ≤ bod objednání');}
-      else if(qSeason>0&&qSeason>=qForward){status='Před sezónou';when='objednat teď (náběh sezóny)';reasons.push('vstup do sezóny ('+fmt(siNext,1)+'×)');}
-      else if(qForward>0){status='Předzásobit';when='objednat teď (před zdražením)';reasons.push('zdražení '+Math.round(infl*100)+' % > držení '+(P.effHold*100).toFixed(1)+' %');}
-      else if(daysToRop<=30){status='Brzy';when='za '+Math.round(daysToRop)+' dní';rec=Q;reasons.push('blíží se bod objednání');}
-      else{status='OK';when=daysToRop===Infinity?'—':'za '+Math.round(daysToRop)+' dní';rec=0;}
-      if(fwdPays&&status!=='Předzásobit')reasons.push('cena poroste – zvážit předzásobu');
-      if(season==='Sezóna')reasons.push('v sezóně');
+    else if(windowDem<0.5){
+      // v příštích (lhůta+pokrytí) měsících se prakticky neprodává → NEobjednávat (sezóna je jinde)
+      status='Mimo sezónu';when='—';reasons.push('teď se neprodává — objednat až před sezónou (ne rok dopředu)');
     }
-    r._nk={D,avgM,sig,siCur,season,rop,eoq:Math.round(eoq),Q,stock,cover,daysToRop,turn:r.BA?D/r.BA:0,infl,rec,status,when,reason:reasons.join('; ')};
+    else if(stock<=rop){
+      rec=Math.max(P.MOQ,Math.round(target-stock));
+      status='Objednat teď';when='teď';
+      reasons.push('zásoba '+fmt(stock)+' ≤ bod obj. '+fmt(rop)+' · pokrýt '+(+coverM.toFixed(1))+' měs. dopředu');
+      if(siCur>=1.3)reasons.push('v sezóně ('+fmt(siCur,1)+'×)');
+      else if(siNext>=1.3)reasons.push('náběh sezóny');
+    }
+    else if(daysToRop<=coverM*30){status='Brzy';when='za '+Math.round(daysToRop)+' dní';reasons.push('brzy pod bodem objednání');}
+    else{status='OK';when=daysToRop===Infinity?'—':'za '+Math.round(daysToRop)+' dní';}
+    r._nk={D,avgM,siCur,siNext,rop,target,windowDem:Math.round(windowDem),eoq:Math.round(eoq),stock,cover,daysToRop,turn:r.BA?D/r.BA:0,rec,status,when,reason:reasons.join('; ')};
   }
 }
 function renderNakup(){
   try{nkCompute();}catch(e){console.error('nakup',e);return;}
   const q=$('#nkSearch').value.toLowerCase(),f=$('#nkFilter').value;
   let rows=ROWS.map((r,i)=>({r,i})).filter(o=>(o.r.name||'').toLowerCase().includes(q)||String(o.r.ident||'').includes(q));
-  const ord={'Objednat teď':0,'Před sezónou':1,'Předzásobit':2,'Brzy':3,'OK':4,'Nenakupovat':5};
+  const ord={'Objednat teď':0,'Brzy':1,'Mimo sezónu':2,'OK':3,'Nenakupovat':4};
   rows.sort((a,b)=>ord[a.r._nk.status]-ord[b.r._nk.status]||b.r._nk.rec-a.r._nk.rec);
-  const fmap={now:'Objednat teď',season:'Před sezónou',fwd:'Předzásobit',soon:'Brzy',ok:'OK',no:'Nenakupovat'};
+  const fmap={now:'Objednat teď',soon:'Brzy',season:'Mimo sezónu',ok:'OK',no:'Nenakupovat'};
   if(f)rows=rows.filter(o=>o.r._nk.status===fmap[f]);
-  const sf={'Objednat teď':'c-dead','Před sezónou':'c-aging','Předzásobit':'c-slow','Brzy':'c-aging','OK':'c-ok','Nenakupovat':'c-none'};
-  const ip=Math.round((NK_PARAMS.inflG||0)*100);
-  $('#nkTbl').innerHTML=`<thead><tr><th>Položka</th><th>Kategorie</th><th class="num">Roční prodej</th><th class="num">Sez. index</th><th class="num">Sklad ks</th><th class="num">Dní krytí</th><th class="num">Obrátka</th><th class="num">Bod obj.</th><th class="num">EOQ</th><th class="num">✎ Zdražení %</th><th class="num">Doporučeno obj.</th><th>Kdy</th><th>Stav</th><th>Důvod</th></tr></thead><tbody>`+
-    rows.slice(0,1500).map(o=>{const r=o.r,n=r._nk;return `<tr><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.D)}</td><td class="num">${fmt(n.siCur,1)}×</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.turn,1)}</td><td class="num">${fmt(n.rop)}</td><td class="num">${fmt(n.eoq)}</td><td class="num"><input type="number" step="1" class="nki edcell" data-i="${o.i}" value="${r._nkInfl!=null?r._nkInfl:''}" placeholder="${ip}" style="width:58px"></td><td class="num"><b>${n.rec?fmt(n.rec):'—'}</b></td><td>${esc(n.when)}</td><td><span class="pill ${sf[n.status]}">${n.status}</span></td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+`</tbody>`;
-  $$('#nkTbl .nki').forEach(inp=>inp.oninput=()=>{const i=+inp.dataset.i;const v=parseFloat(inp.value);ROWS[i]._nkInfl=(inp.value===''||isNaN(v))?null:v;renderNakup();});
+  const sf={'Objednat teď':'c-dead','Brzy':'c-aging','Mimo sezónu':'c-slow','OK':'c-ok','Nenakupovat':'c-none'};
+  $('#nkTbl').innerHTML=`<thead><tr><th>Položka</th><th>Kategorie</th><th class="num">Roční prodej</th><th class="num">Sez. index (teď)</th><th class="num">Sklad ks</th><th class="num">Dní krytí</th><th class="num" title="Očekávaná poptávka za dodací lhůtu + cílové pokrytí od aktuálního měsíce">Poptávka (okno)</th><th class="num">Bod obj.</th><th class="num" title="Cílová zásoba po objednávce (jen na plánovací okno)">Cíl. zásoba</th><th class="num">Doporučeno obj.</th><th>Kdy</th><th>Stav</th><th>Důvod</th></tr></thead><tbody>`+
+    rows.slice(0,1500).map(o=>{const r=o.r,n=r._nk;return `<tr><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.D)}</td><td class="num">${fmt(n.siCur,1)}×</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.windowDem)}</td><td class="num">${fmt(n.rop)}</td><td class="num">${fmt(n.target)}</td><td class="num"><b>${n.rec?fmt(n.rec):'—'}</b></td><td>${esc(n.when)}</td><td><span class="pill ${sf[n.status]}">${n.status}</span></td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+`</tbody>`;
   const P=NK_PARAMS;
-  const now=ROWS.filter(r=>r._nk&&(r._nk.status==='Objednat teď'||r._nk.status==='Před sezónou'||r._nk.status==='Předzásobit')).length;
+  const now=ROWS.filter(r=>r._nk&&r._nk.status==='Objednat teď').length;
   const recsum=ROWS.reduce((s,r)=>s+(r._nk?r._nk.rec:0),0);
   $('#nkCount').textContent='Efekt. sazba držení '+(P.effHold*100).toFixed(1)+' % (kapitál '+(P.cap*100).toFixed(0)+' % + sklad '+(P.whRate*100).toFixed(1)+' %, hodnota zásob '+fmt(Math.round(P.totVal))+' Kč) · '+now+' k objednání · doporučeno '+fmt(recsum)+' ks';
   renderNakupOrder();
 }
 // Čitelný objednací seznam pro nákupčí — jen položky k objednání teď, s množstvím a hodnotou.
 function renderNakupOrder(){
-  const ordPrio={'Objednat teď':0,'Před sezónou':1,'Předzásobit':2};
-  const list=ROWS.filter(r=>r._nk&&r._nk.rec>0&&(r._nk.status in ordPrio))
+  const list=ROWS.filter(r=>r._nk&&r._nk.rec>0&&r._nk.status==='Objednat teď')
     .map(r=>({r,n:r._nk,val:(r.unitPrice!=null?r.unitPrice*r._nk.rec:null)}))
-    .sort((a,b)=>ordPrio[a.n.status]-ordPrio[b.n.status]||(b.val||0)-(a.val||0));
+    .sort((a,b)=>(b.val||0)-(a.val||0));
   const totKs=list.reduce((s,o)=>s+o.n.rec,0), totVal=list.reduce((s,o)=>s+(o.val||0),0);
+  const vSez=list.filter(o=>o.n.siCur>=1.3).length;
   const kpis=$('#nkOrderKpis'); if(kpis) kpis.innerHTML=[
-    ['dead',fmt(list.length),'Položek k objednání'],
+    ['dead',fmt(list.length),'Položek k objednání teď'],
     ['',fmt(totKs),'Kusů celkem'],
     ['',fmt(Math.round(totVal))+' Kč','Hodnota objednávky'],
-    ['warn',fmt(list.filter(o=>o.n.status==='Objednat teď').length),'Z toho „Objednat teď"']
+    ['warn',fmt(vSez),'Z toho v sezóně']
   ].map(k=>`<div class="kpi ${k[0]}"><div class="v">${k[1]}</div><div class="l">${k[2]}</div></div>`).join('');
-  const sf={'Objednat teď':'c-dead','Před sezónou':'c-aging','Předzásobit':'c-slow'};
   const tb=$('#nkOrderTbl'); if(!tb) return;
-  if(!list.length){tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Aktuálně není co objednávat — žádná položka není pod bodem objednání.</td></tr></tbody>';return;}
-  tb.innerHTML='<thead><tr><th>Priorita</th><th>Produkt</th><th>Kategorie</th><th class="num">Skladem</th><th class="num">Dní krytí</th><th class="num">Objednat (ks)</th><th class="num">Cena/ks</th><th class="num">Hodnota (Kč)</th><th>Kdy</th><th>Proč</th></tr></thead><tbody>'+
-    list.slice(0,1500).map(o=>{const r=o.r,n=o.n;return `<tr><td><span class="pill ${sf[n.status]}">${n.status}</span></td><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num"><b>${fmt(n.rec)}</b></td><td class="num">${r.unitPrice!=null?fmt(r.unitPrice)+' Kč':'—'}</td><td class="num">${o.val!=null?fmt(Math.round(o.val)):'—'}</td><td>${esc(n.when)}</td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+'</tbody>';
+  if(!list.length){tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Aktuálně není co objednávat — žádná položka není pod bodem objednání pro nejbližší okno.</td></tr></tbody>';return;}
+  tb.innerHTML='<thead><tr><th>Produkt</th><th>Kategorie</th><th class="num">Skladem</th><th class="num">Dní krytí</th><th class="num" title="Očekávaná poptávka za dodací lhůtu + cílové pokrytí od teď">Poptávka (okno)</th><th class="num">Objednat (ks)</th><th class="num">Cena/ks</th><th class="num">Hodnota (Kč)</th><th>Proč</th></tr></thead><tbody>'+
+    list.slice(0,1500).map(o=>{const r=o.r,n=o.n;return `<tr><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.windowDem)}</td><td class="num"><b>${fmt(n.rec)}</b></td><td class="num">${r.unitPrice!=null?fmt(r.unitPrice)+' Kč':'—'}</td><td class="num">${o.val!=null?fmt(Math.round(o.val)):'—'}</td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+'</tbody>';
 }
 ['nkSearch','nkFilter'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=renderNakup;});
 (function(){const b=$('#nkApply');if(b)b.onclick=()=>{recalc();renderNakup();};})();
