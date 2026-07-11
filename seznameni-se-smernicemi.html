@@ -350,6 +350,17 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .mj-hero .hero-search{display:flex;align-items:center;gap:12px;width:min(560px,100%);min-height:52px;padding:0 16px;border-radius:var(--radius);background:rgba(255,255,255,.95);color:var(--ink-soft);box-shadow:0 16px 38px rgba(0,0,0,.18)}
 .mj-hero .hero-search svg{width:21px;height:21px;color:var(--green-d);flex:none}
 .mj-hero .hero-search input{width:100%;border:0;outline:0;background:transparent;color:#172115;font-size:15px}
+/* Rozbalovací výsledky vyhledávání (fixed, mimo ořez banneru) */
+#mjSearchBox{position:fixed;z-index:120;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);padding:6px;display:none;max-height:min(60vh,440px);overflow:auto}
+#mjSearchBox.show{display:block}
+#mjSearchBox .sr{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;cursor:pointer;text-align:left}
+#mjSearchBox .sr:hover,#mjSearchBox .sr.on{background:var(--bg-2)}
+#mjSearchBox .sic{width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:9px;background:var(--green-soft);color:var(--green-d)}
+#mjSearchBox .sic svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.9;fill:none}
+#mjSearchBox .st{font-weight:600;font-size:14px;color:var(--ink);line-height:1.2}
+#mjSearchBox .ss{font-size:12px;color:var(--ink-soft);margin-top:1px}
+#mjSearchBox .sk{margin-left:auto;font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;flex:none}
+#mjSearchBox .empty{padding:14px;color:var(--ink-soft);font-size:13px}
 .mj-hero .stats{display:flex;gap:10px;flex-wrap:wrap}
 .mj-hero .stat{display:inline-flex;align-items:baseline;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);border-radius:var(--radius);padding:8px 13px;backdrop-filter:blur(2px)}
 .mj-hero .stat b{font-size:16px;font-weight:800;line-height:1}
@@ -1157,7 +1168,71 @@ function renderSidebar(){
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
+/* ---------- Vestavěné vyhledávání intranetu (sekce + směrnice + knihovna) ---------- */
+let MJ_SEARCH_ITEMS=[], MJ_SEARCH_SEL=-1;
+function mjNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function mjSearchScore(q,text){
+  const t=mjNorm(text); q=mjNorm(q); if(!q) return 0;
+  const idx=t.indexOf(q);
+  if(idx>=0){ let s=100-Math.min(60,idx); if(idx===0||/\s/.test(t[idx-1])) s+=40; return s; }
+  // subsequence (překlepy / mezery)
+  let ti=0,last=-1,gap=0;
+  for(const ch of q){ const p=t.indexOf(ch,ti); if(p<0) return 0; if(last>=0) gap+=p-last-1; last=p; ti=p+1; }
+  return 22-Math.min(20,gap);
+}
+function mjSearchIndex(){
+  const out=[];
+  MUJ_MODS.forEach(m=>{ if(m.grp||m.soon||m.key==='dash'||!moduleVisible(m)) return;
+    out.push({label:m.label,sub:'Sekce intranetu',kind:'sekce',icon:m.icon,run:()=>{mjSearchClose();mjGo(m.key);}}); });
+  ((MUJ.data&&MUJ.data.directives)||[]).forEach(d=>{
+    out.push({label:d.title||'Směrnice',sub:'Směrnice'+(d.ack?' · přečteno':(d.published?' · k potvrzení':'')),kind:'směrnice',icon:MUJ_IC.file,
+      run:()=>{ mjSearchClose(); if(d.published) location.href=location.origin+'/s/'+encodeURIComponent(d.id)+'#kdo='+encodeURIComponent(MUJ.email); else mjGo('directives'); }}); });
+  (((MUJ.data&&MUJ.data.library)||{}).docs||[]).forEach(d=>{
+    out.push({label:d.title||'Dokument',sub:'Knihovna'+(d.v?(' · verze '+d.v):''),kind:'dokument',icon:MUJ_IC.book,
+      run:()=>{ mjSearchClose(); openLibDoc(d.id,d.v); }}); });
+  return out;
+}
+function mjSearchBox(){
+  let b=document.getElementById('mjSearchBox');
+  if(!b){ b=document.createElement('div'); b.id='mjSearchBox'; document.body.appendChild(b);
+    window.addEventListener('scroll',()=>{ if(b.classList.contains('show')) mjSearchPosition(); },true);
+    window.addEventListener('resize',()=>{ if(b.classList.contains('show')) mjSearchPosition(); });
+    document.addEventListener('click',e=>{ if(!e.target.closest('#mjSearchBox')&&!e.target.closest('.hero-search')) mjSearchClose(); });
+  } return b;
+}
+function mjSearchPosition(){
+  const inp=document.getElementById('mjSearchInput'); if(!inp) return;
+  const r=inp.closest('.hero-search').getBoundingClientRect(); const b=mjSearchBox();
+  b.style.left=r.left+'px'; b.style.top=(r.bottom+6)+'px'; b.style.width=r.width+'px';
+}
+function mjSearchRender(){
+  const b=mjSearchBox();
+  if(!MJ_SEARCH_ITEMS.length){ b.innerHTML='<div class="empty">Nic nenalezeno — zkuste jiný výraz.</div>'; return; }
+  b.innerHTML=MJ_SEARCH_ITEMS.map((it,i)=>'<div class="sr'+(i===MJ_SEARCH_SEL?' on':'')+'" onmousedown="event.preventDefault()" onclick="mjSearchOpen('+i+')">'+
+    '<div class="sic"><svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">'+it.icon+'</svg></div>'+
+    '<div style="min-width:0"><div class="st">'+esc(it.label)+'</div><div class="ss">'+esc(it.sub)+'</div></div>'+
+    '<span class="sk">'+esc(it.kind)+'</span></div>').join('');
+}
+function mjSearch(){
+  const inp=document.getElementById('mjSearchInput'); if(!inp) return;
+  const q=inp.value.trim();
+  if(q.length<1){ mjSearchClose(); return; }
+  MJ_SEARCH_ITEMS=mjSearchIndex().map(it=>({it,sc:Math.max(mjSearchScore(q,it.label),mjSearchScore(q,it.sub)*0.4)}))
+    .filter(x=>x.sc>0).sort((a,b)=>b.sc-a.sc).slice(0,8).map(x=>x.it);
+  MJ_SEARCH_SEL=MJ_SEARCH_ITEMS.length?0:-1;
+  mjSearchRender(); mjSearchPosition(); mjSearchBox().classList.add('show');
+}
+function mjSearchKey(ev){
+  const b=mjSearchBox();
+  if(ev.key==='ArrowDown'){ ev.preventDefault(); if(!b.classList.contains('show')){mjSearch();return;} MJ_SEARCH_SEL=Math.min(MJ_SEARCH_ITEMS.length-1,MJ_SEARCH_SEL+1); mjSearchRender(); }
+  else if(ev.key==='ArrowUp'){ ev.preventDefault(); MJ_SEARCH_SEL=Math.max(0,MJ_SEARCH_SEL-1); mjSearchRender(); }
+  else if(ev.key==='Enter'){ ev.preventDefault(); if(MJ_SEARCH_SEL>=0&&MJ_SEARCH_ITEMS[MJ_SEARCH_SEL]) mjSearchOpen(MJ_SEARCH_SEL); }
+  else if(ev.key==='Escape'){ mjSearchClose(); }
+}
+function mjSearchOpen(i){ const it=MJ_SEARCH_ITEMS[i]; if(it&&it.run) it.run(); }
+function mjSearchClose(){ const b=document.getElementById('mjSearchBox'); if(b) b.classList.remove('show'); MJ_SEARCH_SEL=-1; }
 function mjGo(key){
+  mjSearchClose();
   if(key==="freelo"){ showFreelo(); return; }
   if(key==="directives") showDirectives();
   else if(key==="library") showLibrary(null);
@@ -1729,7 +1804,7 @@ function showDashboard(){
     '<div class="hero-id"><span class="hero-ava">'+esc(initials)+'</span><div><div class="date">'+esc(dnesStr)+'</div><div class="hero-role">'+esc(roleStr)+'</div></div></div>'+
     '<h2>Dobrý den, '+esc(first)+'</h2>'+
     '<p>'+(totalTodo ? ('Čeká na vás <strong>'+totalTodo+'</strong> '+plural(totalTodo,"položka","položky","položek")+' k vyřízení. Vše zvládnete přímo odsud.') : 'Skvělá práce — nemáte nic nevyřízeného, vše je hotovo. ✓')+'</p>'+
-    '<label class="hero-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 21-4.4-4.4M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg><input type="search" placeholder="Co dnes potřebujete najít?" onkeydown="if(event.key===\'Enter\'){mjGo(\'directives\')}"></label>'+
+    '<label class="hero-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 21-4.4-4.4M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg><input type="search" id="mjSearchInput" autocomplete="off" placeholder="Co dnes potřebujete najít? (směrnice, dokumenty, sekce…)" oninput="mjSearch()" onkeydown="mjSearchKey(event)" onfocus="mjSearch()"></label>'+
     '<div class="stats">'+
       '<div class="stat"><b>'+totalTodo+'</b><span>k vyřízení</span></div>'+
       (vacPend0?'<div class="stat"><b>'+vacPend0+'</b><span>dovolená ke schválení</span></div>':'')+
