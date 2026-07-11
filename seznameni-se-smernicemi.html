@@ -41,6 +41,7 @@
   --grad-green:linear-gradient(135deg,#15ab57,#0a6b34);
   --grad-dark:linear-gradient(135deg,#11271c,#0b1411 60%,#0d1f17);
   --hero-scrim:linear-gradient(90deg,rgba(7,34,19,.92) 0%,rgba(7,54,26,.76) 36%,rgba(7,54,26,.24) 66%,rgba(7,54,26,.05) 100%);
+  --spot-scrim:linear-gradient(180deg,rgba(7,34,19,0) 34%,rgba(7,34,19,.86) 100%);
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -390,7 +391,7 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .metric{padding:13px;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg-2)}
 .metric b{display:block;color:var(--green-d);font-size:22px;line-height:1;font-weight:800}
 .metric span{display:block;margin-top:5px;color:var(--ink-soft);font-size:12px;font-weight:600}
-.spotlight{position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);min-height:190px;display:flex;align-items:flex-end;background:#12351f center/cover no-repeat;background-image:linear-gradient(180deg,rgba(7,34,19,0) 34%,rgba(7,34,19,.86) 100%),url('/assets/intranet-hero.jpg')}
+.spotlight{position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);min-height:190px;display:flex;align-items:flex-end;background:#12351f center/cover no-repeat;background-image:var(--spot-scrim),url('/assets/intranet-hero.jpg')}
 .spotlight .sp-tag{position:absolute;top:12px;left:12px}
 .spotlight .sp-cap{position:relative;padding:14px;color:#fff}
 .spotlight .sp-cap h4{margin:0 0 3px;font-size:15px;color:#fff}
@@ -1909,7 +1910,7 @@ async function loadProdukty(){
   const photos=d.photos; let i=0;
   function show(){
     const ph=photos[i%photos.length];
-    spot.style.backgroundImage="linear-gradient(180deg,rgba(7,34,19,0) 34%,rgba(7,34,19,.86) 100%),url('/api/produkty-fotky/img?id="+encodeURIComponent(ph.id)+"')";
+    spot.style.backgroundImage="var(--spot-scrim),url('/api/produkty-fotky/img?id="+encodeURIComponent(ph.id)+"')";
     if(cap) cap.innerHTML='<h4>'+esc(prettyProdName(ph.name))+'</h4><p>Nový produkt · '+((i%photos.length)+1)+'/'+photos.length+'</p>';
     i++;
   }
@@ -5092,6 +5093,17 @@ function applyTheme(key){
   const t = THEMES[key] || THEMES.zelena;
   document.documentElement.style.cssText="";   // reset zpět na :root defaulty, pak přepiš motivem
   Object.keys(t).forEach(k=>{ if(k.indexOf("--")===0) document.documentElement.style.setProperty(k, t[k]); });
+  // Přechod přes fotku na banneru + „Fotka týdne" = tmavý odstín primární barvy motivu
+  // (sladí barevnost banneru s ikonami/dlaždicemi; zelený motiv → zelený, grafit → šedý, modrý → modrý…)
+  try{
+    const hex=(t["--green"]||"#0e8a43").replace("#","");
+    if(hex.length===6){
+      const d=i=>Math.round(parseInt(hex.substr(i,2),16)*0.32);
+      const rgb=d(0)+","+d(2)+","+d(4);
+      document.documentElement.style.setProperty("--hero-scrim","linear-gradient(90deg,rgba("+rgb+",.92) 0%,rgba("+rgb+",.76) 36%,rgba("+rgb+",.24) 66%,rgba("+rgb+",.05) 100%)");
+      document.documentElement.style.setProperty("--spot-scrim","linear-gradient(180deg,rgba("+rgb+",0) 34%,rgba("+rgb+",.86) 100%)");
+    }
+  }catch(e){}
   try{ localStorage.setItem("intranetTheme", key); }catch(e){}
   renderThemePop(); renderThemeSettings();
 }
