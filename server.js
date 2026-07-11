@@ -1774,7 +1774,8 @@ const server = http.createServer(async (req, res) => {
       const eml = e.email.toLowerCase();
       const posts = (readJson(AKTUALITY_F, { posts: [] }).posts || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).map(x => ({
         id: x.id, title: x.title, body: x.body || '', image: x.image || null, author: x.author || '', ts: x.ts || 0,
-        likes: Object.keys(x.likes || {}).length, liked: !!(x.likes && x.likes[eml]), mine: (x.authorEmail || '').toLowerCase() === eml
+        likes: Object.keys(x.likes || {}).length, liked: !!(x.likes && x.likes[eml]), mine: (x.authorEmail || '').toLowerCase() === eml,
+        read: !!(x.reads && x.reads[eml])
       }));
       return send(res, 200, { posts, canPost: canPostAktuality(req) });
     }
@@ -1809,6 +1810,29 @@ const server = http.createServer(async (req, res) => {
       if (post.likes[eml]) delete post.likes[eml]; else post.likes[eml] = Date.now();
       writeJson(AKTUALITY_F, st);
       return send(res, 200, { ok: true, likes: Object.keys(post.likes).length, liked: !!post.likes[eml] });
+    }
+    // Označení aktuality za přečtenou (klik zaměstnance) — zaznamená se čas prvního přečtení.
+    if (p === '/api/aktuality/read' && req.method === 'POST') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const eml = e.email.toLowerCase();
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
+      const st = readJson(AKTUALITY_F, { posts: [] }); const post = (st.posts || []).find(x => x.id === b.id);
+      if (!post) return send(res, 404, { error: 'Aktualita nenalezena.' });
+      post.reads = post.reads || {};
+      if (!post.reads[eml]) { post.reads[eml] = { ts: Date.now(), name: e.name || e.email }; writeJson(AKTUALITY_F, st); }
+      return send(res, 200, { ok: true, reads: Object.keys(post.reads).length });
+    }
+    // Přehled aktualit pro administraci — kdo co četl a lajkoval (jen správce).
+    if (p === '/api/aktuality/admin' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const nameFor = (em) => { const emp = (getState().employees || []).find(x => (x.email || '').toLowerCase() === (em || '').toLowerCase()); return (emp && emp.name) || em; };
+      const posts = (readJson(AKTUALITY_F, { posts: [] }).posts || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).map(x => {
+        const reads = x.reads || {};
+        const readers = Object.keys(reads).map(em => ({ email: em, name: (reads[em] && reads[em].name) || nameFor(em), ts: (reads[em] && reads[em].ts) || 0 })).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        const likers = Object.keys(x.likes || {}).map(em => ({ email: em, name: nameFor(em) }));
+        return { id: x.id, title: x.title, image: x.image || null, author: x.author || '', ts: x.ts || 0, reads: readers.length, readers, likes: likers.length, likers };
+      });
+      return send(res, 200, { posts });
     }
     // ---- Fotky nových produktů z Disku (widget „Fotka týdne") ----
     if (p === '/api/produkty-fotky' && req.method === 'GET') {

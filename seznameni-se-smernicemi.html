@@ -308,10 +308,10 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .mj-side:hover .mj-grp:first-child{margin-top:2px}
 .mj-link{position:relative;display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:11px;color:var(--ink);font-weight:500;font-size:14px;cursor:pointer;transition:.15s;border:1px solid transparent;text-align:left;width:100%;background:transparent;font-family:inherit;justify-content:center}
 .mj-side:hover .mj-link{justify-content:flex-start}
-.mj-link svg{width:21px;height:21px;color:var(--ink-soft);flex:none}
+.mj-link svg{width:21px;height:21px;color:var(--ink);flex:none}
 .mj-link:hover{background:var(--bg-2)}
 .mj-link.active{background:var(--green-soft);color:var(--green-d);border-color:#cfe9d8}
-.mj-link.active svg{color:var(--green-2)}
+.mj-link.active svg{color:var(--ink)}
 .mj-link.soon{color:var(--ink-soft);cursor:default}
 .mj-link.soon:hover{background:transparent}
 .mj-link.has-todo::after{content:"";position:absolute;top:7px;right:9px;width:8px;height:8px;border-radius:50%;background:var(--yellow-2);box-shadow:0 0 0 2px var(--bg)}
@@ -369,8 +369,8 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .mj-quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
 .mj-quick button{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:11px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:14px;font-size:13px;font-weight:600;text-align:left;line-height:1.18;box-shadow:var(--shadow);transition:.16s;min-height:104px;cursor:pointer;font-family:inherit}
 .mj-quick button:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--line-strong)}
-.mj-quick .qic{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:12px;background:var(--grad-green);color:#fff;box-shadow:0 4px 12px rgba(10,107,52,.24)}
-.mj-quick button svg{width:22px;height:22px;stroke:#fff;stroke-width:2;fill:none}
+.mj-quick .qic{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:12px;background:var(--bg-2);color:var(--ink)}
+.mj-quick button svg{width:22px;height:22px;stroke:currentColor;stroke-width:2;fill:none}
 .mj-quick .qbadge{position:absolute;top:10px;right:10px}
 /* Dvousloupcový hub + webparty + KPI kruh + fotka týdne */
 .hub-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start;margin-top:26px}
@@ -408,7 +408,12 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .akt-media img{width:100%;height:100%;min-height:118px;object-fit:cover;display:block}
 .akt-txt{padding:14px 14px 12px;min-width:0}
 .akt-card:not(:has(.akt-media)){grid-template-columns:1fr}
-.akt-txt h4{margin:0 0 5px;font-size:15.5px;line-height:1.25}
+.akt-txt h4{margin:0 0 5px;font-size:15.5px;line-height:1.25;cursor:pointer}
+.akt-txt h4:hover{color:var(--green-d)}
+.akt-media{cursor:pointer}
+.akt-read{display:inline-block;margin-left:6px;vertical-align:middle;font-size:11px;font-weight:700;color:var(--green-d);background:var(--green-soft);border-radius:999px;padding:2px 8px}
+.akt-card.is-read{opacity:.86}
+.akt-detail-img{width:100%;max-height:280px;object-fit:cover;border-radius:var(--radius-sm);margin-bottom:14px}
 .akt-txt p{margin:0 0 10px;font-size:13.5px;color:var(--ink-soft);line-height:1.5}
 .akt-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px}
 .akt-actions{display:inline-flex;align-items:center;gap:6px}
@@ -434,9 +439,9 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .tile:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--line-strong)}
 .tile.soon{cursor:default}
 .tile.soon:hover{transform:none;box-shadow:var(--shadow);border-color:var(--line)}
-.tile-ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;background:var(--green-soft);color:var(--green-d)}
+.tile-ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;background:var(--bg-2);color:var(--ink)}
 .tile-ic svg{width:24px;height:24px}
-.tile.accent .tile-ic{background:linear-gradient(150deg,var(--yellow),var(--yellow-2));color:#11271c}
+.tile.accent .tile-ic{background:var(--bg-2);color:var(--ink)}
 .tile h3{margin:0;font-size:16px;font-weight:600}
 .tile p{margin:0;font-size:13px;color:var(--ink-soft);line-height:1.45}
 .tile-foot{margin-top:auto;padding-top:4px}
@@ -456,9 +461,9 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .li-item + .li-item{margin-top:10px}
 .li-item .li-t{font-weight:600;font-size:15px}
 .li-left{display:flex;align-items:center;gap:14px;min-width:0}
-.li-ic{width:42px;height:42px;border-radius:12px;background:var(--green-soft);color:var(--green-d);display:grid;place-items:center;flex:none}
+.li-ic{width:42px;height:42px;border-radius:12px;background:var(--bg-2);color:var(--ink);display:grid;place-items:center;flex:none}
 .li-ic svg{width:22px;height:22px}
-.li-ic.folder{background:linear-gradient(150deg,var(--yellow),var(--yellow-2));color:#11271c}
+.li-ic.folder{background:var(--bg-2);color:var(--ink)}
 .li-chev{color:var(--line-strong);flex:none}
 .li-chev svg{width:20px;height:20px}
 .read-shell-mj{max-width:880px;margin:0 auto}
@@ -500,6 +505,7 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
       <button data-view="stats">Statistiky</button>
       <button data-view="grit">Průzkumy</button>
       <button data-view="cenmon">Cenový monitoring</button>
+      <button data-view="aktuality">Aktuality</button>
       <button data-view="activity">Aktivita</button>
       <button data-view="settings">Nastavení</button>
     </nav>
@@ -710,6 +716,18 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
       <button class="btn ghost sm" onclick="renderActivity()">↻ Obnovit</button>
     </div>
     <div id="activityBox"></div>
+  </section>
+
+  <!-- ===== Aktuality (přehled čtenosti) ===== -->
+  <section id="view-aktuality" class="view">
+    <div class="view-head spread">
+      <div>
+        <h2>Aktuality</h2>
+        <p>Přehled zveřejněných novinek — kdo je přečetl a kolik má lajků.</p>
+      </div>
+      <button class="btn ghost sm" onclick="renderAktualityAdmin()">↻ Obnovit</button>
+    </div>
+    <div id="aktAdminBox"></div>
   </section>
 
   <!-- ===== Nastavení ===== -->
@@ -1904,13 +1922,14 @@ async function loadAktuality(){
   const body=document.getElementById("aktBody"); if(!body) return;
   let d; try{ d=await (await fetch("/api/aktuality",{cache:"no-store"})).json(); }catch(e){ d={posts:[],canPost:false}; }
   if(!d.posts||!d.posts.length){ body.innerHTML='<div class="muted">Zatím žádné aktuality.'+(d.canPost?' Přidejte první novinku tlačítkem <strong>+ Přidat</strong>.':'')+'</div>'; return; }
+  window._aktPosts=d.posts;
   body.innerHTML='<div class="akt-feed">'+d.posts.map(aktCard).join('')+'</div>';
 }
 function aktCard(p){
   const when=new Date(p.ts).toLocaleDateString("cs-CZ",{day:"numeric",month:"long",year:"numeric"});
-  return '<article class="akt-card">'+
-    (p.image?'<div class="akt-media"><img src="'+esc(p.image)+'" alt="" loading="lazy"></div>':'')+
-    '<div class="akt-txt"><h4>'+esc(p.title)+'</h4>'+
+  return '<article class="akt-card'+(p.read?" is-read":"")+'" data-id="'+p.id+'">'+
+    (p.image?'<div class="akt-media" onclick="aktOpen(\''+p.id+'\')"><img src="'+esc(p.image)+'" alt="" loading="lazy"></div>':'')+
+    '<div class="akt-txt"><h4 onclick="aktOpen(\''+p.id+'\')">'+esc(p.title)+(p.read?' <span class="akt-read">✓ Přečteno</span>':'')+'</h4>'+
     (p.body?'<p>'+esc(p.body).replace(/\n/g,"<br>")+'</p>':'')+
     '<div class="akt-foot"><span class="muted">'+esc(p.author||"")+' · '+when+'</span><span class="akt-actions">'+
       '<button class="like-btn'+(p.liked?" on":"")+'" type="button" onclick="aktLike(\''+p.id+'\',this)" aria-pressed="'+(p.liked?"true":"false")+'">'+
@@ -1918,6 +1937,26 @@ function aktCard(p){
         '<b>'+p.likes+'</b></button>'+
       ((p.mine||MUJ.admin)?'<button class="like-btn del" type="button" title="Smazat" onclick="aktDelete(\''+p.id+'\')"><svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>':'')+
     '</span></div></div></article>';
+}
+// Otevře aktualitu v detailu a označí ji za přečtenou (klik zaměstnance).
+async function aktOpen(id){
+  const p=(window._aktPosts||[]).find(x=>x.id===id); if(!p) return;
+  const when=new Date(p.ts).toLocaleDateString("cs-CZ",{day:"numeric",month:"long",year:"numeric"});
+  const ov=document.createElement("div"); ov.className="akt-modal-ov";
+  ov.innerHTML='<div class="akt-modal akt-detail" role="dialog" aria-modal="true">'+
+    (p.image?'<img class="akt-detail-img" src="'+esc(p.image)+'" alt="">':'')+
+    '<h3>'+esc(p.title)+'</h3>'+
+    '<div class="muted" style="margin:-6px 0 12px">'+esc(p.author||"")+' · '+when+'</div>'+
+    (p.body?'<p style="white-space:pre-wrap;margin:0">'+esc(p.body)+'</p>':'')+
+    '<div class="akt-modal-foot"><button class="btn" type="button" onclick="this.closest(\'.akt-modal-ov\').remove()">Zavřít</button></div></div>';
+  ov.addEventListener("click",e=>{ if(e.target===ov) ov.remove(); });
+  document.body.appendChild(ov);
+  if(!p.read){
+    try{ await fetch("/api/aktuality/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
+      p.read=true; const card=document.querySelector('.akt-card[data-id="'+id+'"]');
+      if(card){ card.classList.add("is-read"); const h=card.querySelector("h4"); if(h&&!h.querySelector(".akt-read")) h.insertAdjacentHTML("beforeend",' <span class="akt-read">✓ Přečteno</span>'); }
+    }catch(e){}
+  }
 }
 async function aktLike(id,btn){
   btn.disabled=true;
@@ -2108,6 +2147,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="grit") renderGritAdmin();
   if(v==="cenmon") renderCenmon();
   if(v==="activity") renderActivity();
+  if(v==="aktuality") renderAktualityAdmin();
   if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); }
 });
 
@@ -2146,6 +2186,28 @@ async function renderActivity(){
     h+='<tr><td style="white-space:nowrap;font-size:13px;color:var(--ink-soft)">'+esc(fmtDate(e.ts))+'</td>'+
        '<td>'+esc(who)+sub+'</td>'+
        '<td>'+m.i+' '+esc(m.l)+det+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  box.innerHTML=h;
+}
+
+// Přehled aktualit pro administraci — čtenost (kdo přečetl) + lajky.
+async function renderAktualityAdmin(){
+  const box=document.getElementById("aktAdminBox");
+  box.innerHTML='<p class="muted">Načítám…</p>';
+  let posts=[];
+  try{ const r=await fetch("/api/aktuality/admin",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } posts=(await r.json()).posts||[]; }
+  catch(e){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nepodařilo se načíst aktuality.</p></div>'; return; }
+  if(!posts.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Zatím nebyly zveřejněny žádné aktuality.</p></div>'; return; }
+  let h='<div class="matrix-wrap" style="max-height:none"><table class="matrix"><thead><tr><th style="min-width:220px">Aktualita</th><th style="min-width:150px">Autor · datum</th><th style="min-width:90px">Přečteno</th><th style="min-width:70px">Lajky</th><th>Kdo přečetl</th></tr></thead><tbody>';
+  posts.forEach(p=>{
+    const when=new Date(p.ts).toLocaleDateString("cs-CZ",{day:"numeric",month:"long",year:"numeric"});
+    const readers=(p.readers||[]).map(r=>esc(r.name||r.email)).join(", ")||'<span class="muted">nikdo</span>';
+    h+='<tr><td><strong>'+esc(p.title)+'</strong></td>'+
+       '<td style="font-size:13px">'+esc(p.author||"")+'<div class="muted" style="font-size:12px">'+esc(when)+'</div></td>'+
+       '<td><span class="pill green">'+p.reads+'</span></td>'+
+       '<td>'+p.likes+'</td>'+
+       '<td style="font-size:13px;color:var(--ink-soft)">'+readers+'</td></tr>';
   });
   h+='</tbody></table></div>';
   box.innerHTML=h;
