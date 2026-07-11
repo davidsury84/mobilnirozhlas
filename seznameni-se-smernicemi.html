@@ -398,6 +398,29 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .spotlight .sp-cap p{margin:0;font-size:12.5px;color:rgba(255,255,255,.9)}
 @media(max-width:980px){.hub-grid{grid-template-columns:1fr}.hub-side{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.hub-side{grid-template-columns:1fr}}
+/* Modul Plasty — ekonomická analýza skladu */
+.pl-callout{border:1px solid var(--line);border-left:4px solid var(--green);border-radius:var(--radius);background:var(--green-soft);padding:16px 18px;margin:0 0 18px}
+.pl-callout h3{margin:0 0 6px;font-size:16px;color:var(--green-d)}
+.pl-callout p{margin:0;font-size:14px;line-height:1.55}
+.pl-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start;margin-bottom:18px}
+@media(max-width:900px){.pl-grid2{grid-template-columns:1fr}}
+.pl-bars{display:grid;gap:9px}
+.pl-bar{display:grid;grid-template-columns:150px 1fr 74px;align-items:center;gap:10px;font-size:12.5px}
+.pl-bar .lab{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-bar .track{display:block;height:15px;background:var(--bg-2);border-radius:999px;overflow:hidden}
+.pl-bar .fill{display:block;height:100%;background:var(--green);border-radius:999px;min-width:2px}
+.pl-bar .val{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+.pl-rec{display:grid;gap:10px}
+.pl-rec .item{display:grid;grid-template-columns:30px 1fr;gap:12px;padding:13px 14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper)}
+.pl-rec .num{width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
+.pl-rec .item.p0 .num{background:var(--red)}
+.pl-rec b{font-size:14px}
+.pl-rec .item>div>p{margin:3px 0 0;font-size:13px;color:var(--ink-soft);line-height:1.5}
+.pl-neg{color:var(--red);font-weight:700}
+.pl-pos{color:var(--green-d);font-weight:700}
+.matrix.pl td,.matrix.pl th{font-size:12.5px;padding:8px 10px}
+.pl-note{margin:8px 2px 0;font-size:12px;color:var(--ink-soft)}
+.pl-chart-cap{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-top:2px}
 /* Editace banneru */
 .mj-hero .hero-edit-btn{position:absolute;top:14px;right:14px;z-index:2;display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:var(--radius);border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);color:#fff;font-size:12.5px;font-weight:650;backdrop-filter:blur(3px);cursor:pointer}
 .mj-hero .hero-edit-btn:hover{background:rgba(255,255,255,.28)}
@@ -1262,6 +1285,7 @@ function mjGo(key){
   else if(key==="tridicilinka") showTridiciLinka();
   else if(key==="prekladiste") showPrekladiste();
   else if(key==="kovo"||key==="kovokalk") showKovoKalk();
+  else if(key==="plasty") showPlasty();
   else if(key==="doprava") showDoprava();
   else if(key==="smlouvy") showSmlouvy();
   else if(key==="sortiment") showSortiment();
@@ -1280,6 +1304,102 @@ function showProvoz(key){
   if((MUJ.modules||[]).indexOf(key)<0){ body.innerHTML='<div class="card pad"><p class="muted" style="margin:0">K tomuto modulu nemáte přístup.</p></div>'; return; }
   body.innerHTML='<div class="dash-hero"><h2>'+esc(MUJ_PROVOZ[key]||key)+'</h2><p>Máte přístup k tomuto modulu.</p></div>'+
     '<div class="card pad" style="display:flex;align-items:center;gap:12px"><span class="pill green">✓ Přístup povolen</span><span class="muted">Obsah modulu se připravuje.</span></div>';
+}
+/* ---------- Plasty: ekonomická analýza skladu (data z sklad-plasty_analyza_2026.xlsx) ---------- */
+function showPlasty(){
+  MUJ.view="plasty"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!(MUJ.admin || (MUJ.modules||[]).indexOf("plasty")>=0)){
+    body.innerHTML='<div class="card pad"><p class="muted" style="margin:0">K modulu Plasty nemáte přístup.</p></div>'; return;
+  }
+  const kc=n=>Math.round(n).toLocaleString('cs-CZ')+' Kč';
+  const cis=n=>Math.round(n).toLocaleString('cs-CZ');
+  const pct=n=>Math.round(n*100)+' %';
+
+  const hvYears=['2020','2021','2022','2023','2024','2025'];
+  const hv=[-989591,-882725,-1526662,-1718097,-1545306,-1657929];
+  const costs=[['Mzdy — skladníci, expedice, řidič',0.24],['Mzdy — THP',0.19],['Odvody zaměstnavatele',0.14],['Vnitropodnikový nájem',0.10],['Folie + palety',0.10],['Opravy a údržba',0.06],['Cestovné',0.03],['Ostatní služby',0.03],['Ostatní (drobné účty)',0.11]];
+  const bands=[['0–500 Kč',634,0.27,243,-539],['500–1 000',739,0.12,756,186],['1 000–2 000',1197,0.06,1417,373],['2 000–5 000',1565,0.05,3251,886],['5 000–10 000',1346,0.05,7113,1738],['10 000+',1814,0.06,36734,9775]];
+  const lossProd=[['Rámeček pro plastové kontejnery (plochý)',-589875],['Klíč ke košům Classic/Prima/Elegant',-73286],['Visací zámek – Pana',-23322],['Odpad. koš GLOBULAR 2×90',-14823],['Náhradní díly CLD 240 l – víko',-14582]];
+  const probs=[
+    ['Metodika alokace / transfer pricing','Sklad měřen na HV, který strukturálně nemůže být kladný (sazba 530 < plný náklad 833).','Ověřit obsah „Tržby"; přenastavit na activity-based sazbu, nebo řídit jako nákladové středisko.'],
+    ['Rigidní nákladová báze','~75 % nákladů fixních; náklad neklesá s objemem.','Variabilizace kapacity — agentura/brigády na špičky, směny dle křivky objednávek.'],
+    ['Klesající produktivita','Náklad/výdejku +27 % (697→885 Kč, 2020→25).','Slotting, batch/zónový picking, čtečky/WMS, měření výkonu na pracovníka.'],
+    ['Posun mixu kanálů','Podíl e-shopu 64 %→78 % — mnoho malých výdejek.','Politika malých objednávek: min. hodnota / příplatek; konsolidace svozů.'],
+    ['Slabá kontrola diskrečních nákladů','Kolísání cestovné, správa, folie+palety rok od roku.','Zero-based budget, schvalovací limity, rámcové smlouvy.'],
+    ['Mikroekonomika malých zakázek','28 z 53 hodnocených zakázek ztrátových (<1 000 Kč).','Minimální marže/hodnota zakázky, příplatek za malý objem.']
+  ];
+  const recs=[
+    [true,'Ověřit metodiku „Tržby" s controllingem (hned)','Bez toho je „ztráta" −1,6 mil. řídicí iluze — pravděpodobně jde o vnitropodnikovou sazbu pod plným nákladem, ne o provozní neživotaschopnost.'],
+    [false,'Nahradit paušál 530 Kč activity-based sazbou','ABC ukazuje e-shop ~667 Kč a B2B ~1 449 Kč/výdejku. Paušál dotuje dražší B2B z e-shopu — rozlišit kanály pro férové přeúčtování i cenu k zákazníkovi.'],
+    [false,'Řídit sklad na náklad/výdejku a náklad/obrat','Cíl náklad/výdejku ~700 Kč (dnes 833). Hospodářský výsledek je jako řídicí metrika zavádějící.'],
+    [false,'Zaútočit na plný náklad 833 Kč','Hlavní anomálie = režie THP 160 Kč/výdejku (nad trhem) + nízká produktivita. Slotting, batch picking, WMS, right-size THP.'],
+    [false,'Politika malých zakázek','Min. hodnota 1 500–2 000 Kč nebo příplatek 300–500 Kč. Pod 3 000 Kč padá 45 % výdejek, ale jen 5 % tržeb.'],
+    [false,'Prověřit produkt „Rámeček pro kontejnery"','Ztráta −590 tis. — pravděpodobně chyba evidenční ceny. Narovnat i ceny příslušenství (klíče, zámky) prodávaného pod náklady.'],
+    [false,'Vyžádat 2–3 nabídky 3PL na e-shop profil','Benchmark i reálná make-or-buy varianta. E-shop (72 % výdejek, malé zásilky) je kandidát na 3PL; objemné B2B nechat in-house.'],
+    [false,'Rychlé úspory ≈ 262 tis./rok','Produktivita −10 % mezd skladníků, nájem −15 %, folie+palety −12 %, cestovné −20 % — realizovat bez ohledu na strategické rozhodnutí.']
+  ];
+
+  const W=560,H=190,pad=30,n=hvYears.length,bw=48,gap=(W-pad*2-bw*n)/(n-1),maxAbs=1800000;
+  let bars='';
+  hvYears.forEach((y,i)=>{ const x=pad+i*(bw+gap), bh=Math.round((Math.abs(hv[i])/maxAbs)*(H-52));
+    bars+='<rect x="'+x+'" y="24" width="'+bw+'" height="'+bh+'" rx="4" fill="var(--red)" opacity="0.82"/>'+
+      '<text x="'+(x+bw/2)+'" y="18" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--red)">−'+Math.round(Math.abs(hv[i])/1000)+'</text>'+
+      '<text x="'+(x+bw/2)+'" y="'+(24+bh+15)+'" text-anchor="middle" font-size="11" fill="var(--ink-soft)">'+y+'</text>'; });
+  const hvSvg='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:'+W+'px">'+bars+'</svg>';
+
+  let h='<div class="dash-hero"><h2>Sklad plastů — ekonomická analýza</h2><p>Rozhodovací podklad z dat 2020–2026. 2026 = leden–duben (4 měsíce), měna Kč.</p></div>';
+  h+='<div class="pl-callout"><h3>Klíčové zjištění</h3><p>Sklad protáčí <strong>38–59 mil. Kč</strong> zboží ročně a umožňuje <strong>13–19 mil. Kč</strong> obchodní marže; jeho provozní náklad spotřebuje jen ~24–29 % této marže. „Ztráta" −1,6 mil. Kč/rok vzniká hlavně tím, že vnitropodniková <strong>sazba 530 Kč/výdejku je pod plným nákladem ~833 Kč</strong> — jde primárně o problém metodiky alokace, ne provozní životaschopnosti.</p></div>';
+
+  h+='<div class="dash-sec">Klíčové ukazatele (2026, leden–duben)</div>';
+  h+='<div class="metric-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">'+
+    '<div class="metric"><b>'+kc(957835)+'</b><span>tržby (vč. ostatních výnosů)</span></div>'+
+    '<div class="metric"><b>'+kc(1493793)+'</b><span>náklady (61 % mzdy a odvody)</span></div>'+
+    '<div class="metric"><b style="color:var(--red)">−536 tis.</b><span>hospodářský výsledek (anual. −1,6 mil.)</span></div>'+
+    '<div class="metric"><b>1,56</b><span>nákladovost (cíl &lt; 1,00)</span></div>'+
+    '<div class="metric"><b>1&nbsp;793</b><span>výdejek (zakázek)</span></div>'+
+    '<div class="metric"><b>833 Kč</b><span>plný náklad na výdejku</span></div></div>';
+
+  h+='<div class="pl-grid2" style="margin-top:18px">';
+  h+='<section class="webpart"><div class="webpart-head"><h3>Hospodářský výsledek 2020–2025</h3><span class="chip red">ztráta roste</span></div><div class="webpart-body">'+hvSvg+'<div class="pl-chart-cap"><span>tis. Kč (ztráta)</span><span>náklad/výdejku 697 → 885 Kč</span></div></div></section>';
+  const cmax=Math.max.apply(null,costs.map(c=>c[1]));
+  let cbars=''; costs.forEach(c=>{ cbars+='<div class="pl-bar"><span class="lab">'+esc(c[0])+'</span><span class="track"><span class="fill" style="width:'+Math.round(c[1]/cmax*100)+'%"></span></span><span class="val">'+pct(c[1])+'</span></div>'; });
+  h+='<section class="webpart"><div class="webpart-head"><h3>Struktura nákladů (2026)</h3><span class="chip">61 % mzdy+odvody</span></div><div class="webpart-body"><div class="pl-bars">'+cbars+'</div><p class="pl-note">Potenciál rychlých úspor ≈ <strong>262 tis. Kč/rok</strong> (produktivita, nájem, folie+palety, cestovné).</p></div></section>';
+  h+='</div>';
+
+  h+='<section class="webpart"><div class="webpart-head"><h3>Ziskovost zakázek</h3><span class="chip green">byznys je zdravý</span></div><div class="webpart-body">';
+  h+='<p style="margin:0 0 12px;font-size:14px;line-height:1.55">Na úrovni všech 7 295 zakázek je zisk <strong>+21,7 mil. Kč</strong> při marži <strong>30,5 %</strong>. Ztrátových je jen 7,9 % zakázek — a ty jsou z velké části vnitrofiremní převody (nominální cena ~1 Kč/ks). U <strong>externích zákazníků je ztrátových jen 3,2 %</strong>. Problém není plošný — jde o konkrétní produkty a malé zakázky.</p>';
+  h+='<div class="matrix-wrap" style="max-height:none"><table class="matrix pl"><thead><tr><th>Pásmo tržby</th><th>Zakázek</th><th>Ztrátových</th><th>ø tržba</th><th>ø zisk</th></tr></thead><tbody>';
+  bands.forEach(b=>{ h+='<tr><td>'+b[0]+'</td><td>'+cis(b[1])+'</td><td>'+pct(b[2])+'</td><td>'+cis(b[3])+'</td><td class="'+(b[4]<0?'pl-neg':'pl-pos')+'">'+(b[4]<0?'−':'')+cis(Math.abs(b[4]))+'</td></tr>'; });
+  h+='</tbody></table></div>';
+  h+='<div class="dash-sec" style="margin:16px 0 8px">Nejztrátovější produkty</div><div class="matrix-wrap" style="max-height:none"><table class="matrix pl"><thead><tr><th>Produkt</th><th>Čistá ztráta</th></tr></thead><tbody>';
+  lossProd.forEach(p=>{ h+='<tr><td>'+esc(p[0])+'</td><td class="pl-neg">−'+cis(Math.abs(p[1]))+' Kč</td></tr>'; });
+  h+='</tbody></table></div><p class="pl-note">Priorita: „Rámeček" ztrácí −590 tis. → prověřit cenu/evidenci (možná chyba). Příslušenství se prodává pod náklady.</p></div></section>';
+
+  h+='<div class="pl-grid2">';
+  h+='<section class="webpart"><div class="webpart-head"><h3>Cena výdejky: paušál vs. realita</h3></div><div class="webpart-body"><div class="metric-grid">'+
+    '<div class="metric"><b>530 Kč</b><span>dnešní paušál</span></div>'+
+    '<div class="metric"><b>833 Kč</b><span>plný vlastní náklad</span></div>'+
+    '<div class="metric"><b>667 Kč</b><span>ABC e-shop</span></div>'+
+    '<div class="metric"><b>1&nbsp;449 Kč</b><span>ABC B2B</span></div></div>'+
+    '<p class="pl-note">Paušál 530 Kč pokryje jen ~64 % nákladu a dotuje dražší B2B z e-shopu. Tržní 3PL sazba pro tento profil je 180–460 Kč → vlastní náklad 833 Kč je <strong>nad trhem</strong> (hlavní příčina: režie THP 160 Kč/výd).</p></div></section>';
+  h+='<section class="webpart"><div class="webpart-head"><h3>Make-or-buy (roční náklad)</h3></div><div class="webpart-body"><div class="matrix-wrap" style="max-height:none"><table class="matrix pl"><thead><tr><th>Cesta</th><th>Náklad/rok</th><th>Změna</th></tr></thead><tbody>'+
+    '<tr><td>Současný stav</td><td>4&nbsp;464&nbsp;337</td><td>—</td></tr>'+
+    '<tr><td>A) Outsourcing e-shopu (3PL)</td><td>3&nbsp;987&nbsp;812</td><td class="pl-pos">−476&nbsp;525</td></tr>'+
+    '<tr><td>B) Optimalizace in-house</td><td>3&nbsp;903&nbsp;989</td><td class="pl-pos">−560&nbsp;348</td></tr>'+
+    '</tbody></table></div><p class="pl-note">Cesta A dává úsporu jen při reálném snížení kapacity (lidé, plocha) → vyšší riziko. Cesta B drží plnou kontrolu. E-shop = kandidát na 3PL, objemné B2B nechat in-house.</p></div></section>';
+  h+='</div>';
+
+  h+='<section class="webpart"><div class="webpart-head"><h3>Strukturální problémy a řešení</h3></div><div class="webpart-body"><div class="matrix-wrap" style="max-height:none"><table class="matrix pl"><thead><tr><th style="width:34px">#</th><th>Problém</th><th>Řešení</th></tr></thead><tbody>';
+  probs.forEach((p,i)=>{ h+='<tr><td><strong>'+(i+1)+'</strong></td><td><strong>'+esc(p[0])+'</strong><div class="muted" style="font-size:12px;margin-top:2px">'+esc(p[1])+'</div></td><td>'+esc(p[2])+'</td></tr>'; });
+  h+='</tbody></table></div></div></section>';
+
+  h+='<div class="dash-sec">Souhrn a doporučení</div><div class="pl-rec">';
+  recs.forEach((r,i)=>{ h+='<div class="item'+(r[0]?' p0':'')+'"><span class="num">'+(r[0]?'0':i)+'</span><div><b>'+esc(r[1])+'</b><p>'+esc(r[2])+'</p></div></div>'; });
+  h+='</div>';
+  h+='<p class="pl-note" style="margin-top:16px">Zdroj: <strong>sklad-plasty_analyza_2026.xlsx</strong> (10 listů). Období: 2020–2025 celé roky, 2026 leden–duben. Čísla jsou snapshot analýzy; pro aktualizaci nahraď data novým exportem.</p>';
+
+  body.innerHTML=h; window.scrollTo(0,0);
 }
 /* ---------- Kovo: přehled výroby ze 4 závodů (Google Sheets přes server) ---------- */
 let KOVO_VYROBA=null;
@@ -1870,7 +1990,7 @@ function showDashboard(){
   }
   mainH += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Provozní modul"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     mainH += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
     provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
