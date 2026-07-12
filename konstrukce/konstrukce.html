@@ -134,6 +134,18 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
   .two{grid-template-columns:1fr}.kv{grid-template-columns:110px 1fr}
   .drawer{width:100vw}
 }
+
+/* Timeline zakázky: pruh poptávka→termín + čísla */
+.tl{margin-top:12px}
+.tl-bar{position:relative;height:8px;border-radius:20px;background:var(--line);overflow:hidden}
+.tl-fill{position:absolute;left:0;top:0;height:100%;border-radius:20px;min-width:3px}
+.tl-step{position:absolute;top:-2px;width:2px;height:12px;background:var(--mut);opacity:.55}
+.tl-ends{display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--mut)}
+.tl-nums{display:flex;gap:20px;flex-wrap:wrap;margin-top:8px}
+.tl-n{display:flex;align-items:baseline;gap:5px}
+.tl-n b{font-size:16px;font-weight:800;line-height:1}
+.tl-n .lab{font-size:11.5px;color:var(--mut)}
+.tl-n.red b{color:var(--red)}.tl-n.amber b{color:var(--amber)}.tl-n.green b{color:var(--g3)}
 </style>
 </head>
 <body>
@@ -250,6 +262,32 @@ function renderMain(){
   list.forEach(function(z){h+=zkCard(z)});
   m.innerHTML=h;
 }
+function zkTimeline(z){
+  var now=Date.now(), DAY=86400000, d=function(ms){return Math.max(0,Math.round(ms/DAY));};
+  var start=z.createdAt||now;
+  var totalDays=d(now-start);
+  var stepDays=z.stepStartedAt?d(now-z.stepStartedAt):null;
+  var col=(z.semafor==='red')?'var(--red)':(z.semafor==='amber')?'var(--amber)':'var(--g3)';
+  var bar, toTxt='';
+  if(z.deadline && !isTerminal(z.stav)){
+    var span=z.deadline-start, elapsed=now-start, over=now>z.deadline;
+    var pct=span>0?Math.max(2,Math.min(100,elapsed/span*100)):(now>=z.deadline?100:2);
+    var stepPct=(z.stepStartedAt&&span>0)?Math.max(0,Math.min(100,(z.stepStartedAt-start)/span*100)):null;
+    var toDays=Math.round((z.deadline-now)/DAY);
+    bar='<div class="tl-bar"><i class="tl-fill" style="width:'+pct.toFixed(1)+'%;background:'+(over?'var(--red)':col)+'"></i>'+
+        (stepPct!=null?'<span class="tl-step" style="left:'+stepPct.toFixed(1)+'%"></span>':'')+'</div>'+
+        '<div class="tl-ends"><span>poptávka '+fdate(start)+'</span><span>termín '+fdate(z.deadline)+'</span></div>';
+    toTxt=over?('<span class="tl-n red"><b>'+Math.abs(toDays)+'</b><span class="lab">dní po termínu</span></span>')
+              :('<span class="tl-n '+(z.semafor==='amber'?'amber':'green')+'"><b>'+toDays+'</b><span class="lab">dní do termínu</span></span>');
+  } else {
+    bar='<div class="tl-bar"><i class="tl-fill" style="width:100%;background:var(--line)"></i></div>';
+    if(isTerminal(z.stav)) toTxt='<span class="tl-n"><b>&#8226;</b><span class="lab">'+esc(z.stavLabel)+'</span></span>';
+  }
+  return '<div class="tl">'+bar+'<div class="tl-nums">'+
+    '<span class="tl-n"><b>'+totalDays+'</b><span class="lab">dní od poptávky</span></span>'+
+    (stepDays!=null?'<span class="tl-n"><b>'+stepDays+'</b><span class="lab">dní &middot; '+esc(z.stavLabel)+'</span></span>':'')+
+    toTxt+'</div></div>';
+}
 function zkCard(z){
   var right=(z.deadline&&!isTerminal(z.stav)&&z.stav!=='schvaleno')?('<span class="muted" style="font-size:12.5px">termín '+fdate(z.deadline)+'</span>'):'';
   return '<div class="card zk" onclick="openDrawer(\''+z.id+'\')">'+
@@ -257,7 +295,7 @@ function zkCard(z){
       '<div class="row"><span class="dot '+z.semafor+'"></span><div><div class="t">'+esc(z.cislo)+' · '+esc(z.zakaznik)+'</div>'+
       '<div class="sub">'+esc(z.typName)+' · v'+(z.versionCount||0)+(z.assignedName?(' · '+esc(z.assignedName)):'')+'</div></div></div>'+
       '<div style="text-align:right"><span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span><div class="sub" style="margin-top:4px">'+esc(z.responsibleName||'—')+' '+right+'</div></div>'+
-    '</div></div>';
+    '</div>'+zkTimeline(z)+'</div>';
 }
 
 /* ---- kapacity ---- */
