@@ -6,14 +6,15 @@
 <title>Konstrukce — workflow výkresů</title>
 <style>
 :root{
-  --g:#2e7d32;--g2:#1b5e20;--g3:#43a047;--ink:#1f2a24;--mut:#6b776f;--line:#e5e9e3;
-  --bg:#f4f6f2;--card:#fff;--red:#c62828;--amber:#ef6c00;--blue:#1565c0;--purple:#6a1b9a;--gray:#78909c;
+  --g:#0e8a43;--g2:#0a6b34;--g3:#12a350;--ink:#0f1512;--mut:#5b635c;--line:#e3e7e0;
+  --bg:#eef1ec;--card:#fff;--red:#c23636;--amber:#b06f00;--blue:#1565c0;--purple:#6a1b9a;--gray:#78909c;
+  --green-soft:#e6f6ec;
 }
 *{box-sizing:border-box}
 body{margin:0;font-family:Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:14px}
 .bar{background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
 .bar h1{font-size:17px;margin:0;font-weight:800;color:var(--g2)}
-.bar .rolech{font-size:12px;font-weight:700;color:var(--g2);background:#e8f5e9;border:1px solid #c8e6c9;border-radius:20px;padding:3px 11px}
+.bar .rolech{font-size:12px;font-weight:700;color:var(--g2);background:var(--green-soft);border:1px solid #bfe6cd;border-radius:20px;padding:3px 11px}
 .bar .sp{flex:1}
 .iconbtn{position:relative;border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 10px;cursor:pointer;font-weight:600;color:#33513f}
 .iconbtn:hover{background:#f0f3ee}
@@ -49,10 +50,10 @@ body{margin:0;font-family:Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);back
 .pill.prace{background:#fff3e0;color:#e65100}
 .pill.kontrola{background:#f3e5f5;color:#6a1b9a}
 .pill.obchodnik{background:#e3f2fd;color:#1565c0}
-.pill.klient{background:#e8f5e9;color:#2e7d32}
+.pill.klient{background:var(--green-soft);color:#0a6b34}
 .pill.revize{background:#fff3e0;color:#e65100}
 .pill.podklady{background:#eceff1;color:#607d8b}
-.pill.schvaleno{background:#e8f5e9;color:#1b5e20}
+.pill.schvaleno{background:var(--green-soft);color:#0a6b34}
 .pill.dokonceno{background:#e0f2f1;color:#00695c}
 .pill.zamitnuto{background:#fdecea;color:#c62828}
 .muted{color:var(--mut)}
@@ -350,11 +351,11 @@ function actionsFor(z){
   if(z.stav==='obchodnik'&&canObch){blocks.push(obchodnikBlock(z))}
 
   if(z.stav==='klient'&&canObch){blocks.push(
-    '<div class="card" style="background:#f2f9f3"><b>U klienta</b><p class="muted" style="margin:6px 0">Odkaz odeslán klientovi'+(z.link?(', platí do '+fdate(z.link.expiresAt)+', '+z.link.accesses+'× otevřen'):'')+'. Čekáme na jeho rozhodnutí.</p>'+
+    '<div class="card" style="background:#eef7f0"><b>U klienta</b><p class="muted" style="margin:6px 0">Odkaz odeslán klientovi'+(z.link?(', platí do '+fdate(z.link.expiresAt)+', '+z.link.accesses+'× otevřen'):'')+'. Čekáme na jeho rozhodnutí.</p>'+
     '<div class="actions"><button class="btn ghost sm" onclick="copyLink(\''+(z.link?z.link.url:'')+'\')">Kopírovat odkaz</button>'+
     '<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button></div></div>')}
 
-  if(z.stav==='schvaleno'&&(canSef||canObch)){blocks.push('<div class="card" style="background:#e8f5e9"><b>Schváleno klientem ✓</b><div class="actions" style="margin-top:6px"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'dokoncit\')">Dokončit a archivovat</button></div></div>')}
+  if(z.stav==='schvaleno'&&(canSef||canObch)){blocks.push('<div class="card" style="background:#e6f6ec"><b>Schváleno klientem ✓</b><div class="actions" style="margin-top:6px"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'dokoncit\')">Dokončit a archivovat</button></div></div>')}
 
   // pozastavení / obnovení
   if(!isTerminal(z.stav)&&z.stav!=='schvaleno'){
@@ -365,7 +366,7 @@ function actionsFor(z){
   return h;
 }
 function assignBlock(z){
-  return '<div class="card" style="background:#f7fbf7"><b>Přidělit konstruktéra</b>'+recomHint()+
+  return '<div class="card" style="background:#f3faf5"><b>Přidělit konstruktéra</b>'+recomHint()+
     '<div class="row" style="margin-top:6px">'+konstrSelect('asg_'+z.id)+'<button class="btn sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přidělit</button></div></div>';
 }
 function assignReassign(z){return konstrSelect('asg_'+z.id)+'<button class="btn ghost sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přeřadit</button>'}

@@ -1013,7 +1013,7 @@ const PUBLIC_HTML = `<!doctype html><html lang="cs"><head><meta charset="utf-8">
 <meta name="robots" content="noindex,nofollow">
 <title>Výkres ke schválení · ELKOPLAST</title>
 <style>
-:root{--g:#2e7d32;--g2:#1b5e20;--ink:#1f2a24;--mut:#6b776f;--line:#e3e7e1;--bg:#f5f7f4;--red:#c62828;--amber:#ef6c00}
+:root{--g:#0e8a43;--g2:#0a6b34;--g3:#12a350;--ink:#0f1512;--mut:#5b635c;--line:#e3e7e0;--bg:#eef1ec;--red:#c23636;--amber:#b06f00}
 *{box-sizing:border-box}
 body{margin:0;font-family:Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg)}
 .top{background:#fff;border-bottom:1px solid var(--line);padding:12px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
@@ -1037,7 +1037,7 @@ button{font:inherit;border:0;border-radius:10px;padding:12px 18px;cursor:pointer
 textarea,input{width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:6px}
 label{display:block;font-size:14px;font-weight:600;margin-top:10px}
 .done{padding:18px;border-radius:12px;text-align:center}
-.done.ok{background:#e8f5e9;color:var(--g2);border:1px solid #c8e6c9}
+.done.ok{background:#e6f6ec;color:var(--g2);border:1px solid #bfe6cd}
 .done.rej{background:#fdecea;color:var(--red);border:1px solid #f5c6cb}
 .hide{display:none}
 .chk{display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:14px}
