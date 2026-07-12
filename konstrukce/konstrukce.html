@@ -164,7 +164,7 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 function fdate(ts){if(!ts)return'—';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'+d.getUTCFullYear()}
 function fdt(ts){if(!ts)return'—';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return fdate(ts)+' '+p(d.getUTCHours())+':'+p(d.getUTCMinutes())}
 function hhmm(sec){sec=sec||0;var h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);return h+'h '+(m<10?'0':'')+m+'m'}
-function roleLabel(r){return{obchodnik:'Obchodník',sef:'Šéf konstrukce',konstrukter:'Konstruktér',reditel:'Ředitel','sef-vyroby':'Šéf výroby',admin:'Správce'}[r]||r||'—'}
+function roleLabel(r){return{obchodnik:'Obchodník',sef:'Šéf konstrukce',konstrukter:'Konstruktér',reditel:'Ředitel','vyrobni-reditel':'Výrobní ředitel','sef-vyroby':'Výrobní ředitel',admin:'Správce'}[r]||r||'—'}
 function api(path,method,body){return fetch('/api/konstrukce'+path,{method:method||'GET',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined,cache:'no-store'}).then(function(r){return r.json().then(function(j){return{ok:r.ok,status:r.status,j:j}})})}
 
 function isPriv(){return ME.isAdmin||ME.role==='sef'||ME.role==='reditel'}
@@ -208,7 +208,7 @@ function renderSide(){
   if(ME.isAdmin||ME.role==='sef'){h+=chip('novy','Nové k přidělení',c.novy);h+=chip('kontrola','Interní kontrola',c.kontrola);}
   if(ME.isAdmin||ME.role==='konstrukter'||ME.role==='sef'){h+=chip('prace','Ve zkreslení',c.prace);}
   if(ME.isAdmin||ME.role==='obchodnik'||ME.role==='sef'){h+=chip('obchodnik','U obchodníka',c.obchodnik);h+=chip('klient','U klienta',c.klient);}
-  if(ME.isAdmin||ME.role==='sef-vyroby'||ME.role==='sef'||ME.role==='reditel'){h+=chip('vyroba','Ve výrobě',c.vyr);}
+  if(ME.isAdmin||ME.role==='vyrobni-reditel'||ME.role==='sef'||ME.role==='reditel'){h+=chip('vyroba','Ve výrobě',c.vyr);}
   h+='<div class="grp">Přehled</div>';
   h+=chip('red','Po termínu',c.red);
   h+=chip('open','Otevřené',c.open);
@@ -318,7 +318,7 @@ function renderWorkflow(m){
     '<span><i style="background:var(--purple)"></i>Šéf konstrukce</span>'+
     '<span><i style="background:#e65100"></i>Konstruktér</span>'+
     '<span><i style="background:var(--g)"></i>Klient</span>'+
-    '<span><i style="background:#00838f"></i>Šéf výroby</span>'+
+    '<span><i style="background:#00838f"></i>Výrobní ředitel</span>'+
     '<span><i style="background:var(--gray)"></i>Systém</span></div>';
   var flow='<div class="wf">'+
     node('obch','1 · Zadání','obchodník · požadavek')+arw()+
@@ -328,8 +328,8 @@ function renderWorkflow(m){
     node('obch','5 · Potvrzení','obchodník · '+t.lhutaObchodnikDays+' prac. den')+arw()+
     node('kli','6 · Veřejný náhled','klient · odkaz '+t.linkValidDays+' dnů')+arw()+
     node('kli','7 · Schválení','klient schválí výkres')+arw()+
-    node('vyr','8 · Předání do výroby','šéf výroby přebírá')+arw()+
-    node('vyr','9 · Výrobní středisko','šéf výroby přidělí středisko')+arw()+
+    node('vyr','8 · Předání do výroby','obchodník vybere oblast')+arw()+
+    node('vyr','9 · Výroba v oblasti','výrobní ředitel oblasti')+arw()+
     node('sys','10 · Vyrobeno','hotovo · archiv')+'</div>';
   var branches='<div class="two" style="margin-top:16px">'+
     '<div class="branch"><b>↩ Revize</b><div class="muted" style="margin-top:4px">Klient pošle připomínky → nová verze (v2, v3…), zpět na konstruktéra ('+t.lhutaRevizeDays+' prac. dny), znovu kontrola a schválení. Původní odkaz se deaktivuje.</div></div>'+
@@ -472,7 +472,7 @@ function actionsFor(z){
   var me=ME, h='', canObch=me.isAdmin||(me.role==='obchodnik'&&z.obchodnikEmail===me.email);
   var canSef=me.isAdmin||me.role==='sef';
   var canKon=me.isAdmin||(me.role==='konstrukter'&&z.assignedTo===me.email);
-  var canVyr=me.isAdmin||me.role==='sef-vyroby';
+  var canVyr=me.isAdmin||me.role==='vyrobni-reditel';
   var blocks=[];
 
   if(z.stav==='novy'&&canSef){blocks.push(assignBlock(z))}
@@ -493,7 +493,8 @@ function actionsFor(z){
     '<div class="actions"><button class="btn ghost sm" onclick="copyLink(\''+(z.link?z.link.url:'')+'\')">Kopírovat odkaz</button>'+
     '<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button></div></div>')}
 
-  if(z.stav==='schvaleno'&&(canSef||canObch)){blocks.push('<div class="card" style="background:#e6f6ec"><b>Schváleno klientem ✓</b><p class="muted" style="margin:6px 0">Výkres je uzamčen. Předejte zakázku do výroby — dostane ji šéf výroby k přidělení střediska.</p><div class="actions"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'predat-vyrobe\')">→ Předat do výroby</button></div></div>')}
+  if(z.stav==='schvaleno'&&(canSef||canObch)){blocks.push('<div class="card" style="background:#e6f6ec"><b>Schváleno klientem ✓</b><p class="muted" style="margin:6px 0">Výkres je uzamčen. Vyberte výrobní oblast a předejte zakázku do výroby — bude na tahu její výrobní ředitel.</p>'+
+    '<div class="row">'+strediskoSelect('pv_'+z.id,'')+'<button class="btn sm" onclick="predatVyrobe(\''+z.id+'\')">→ Předat do výroby</button></div></div>')}
 
   if(z.stav==='vyroba'&&canVyr){blocks.push(vyrobaBlock(z,'Přidělit výrobní středisko'))}
   if(z.stav==='stredisko'&&canVyr){blocks.push(
@@ -527,8 +528,13 @@ function strediskoSelect(id,sel){
 }
 function prideliStredisko(id,selId){
   var s=(document.getElementById(selId)||{}).value;
-  if(!s){alert('Vyberte výrobní středisko.');return}
+  if(!s){alert('Vyberte výrobní oblast.');return}
   api('/stav','POST',{id:id,action:'prideli-stredisko',stredisko:s}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba.');return}reloadData()});
+}
+function predatVyrobe(id){
+  var s=(document.getElementById('pv_'+id)||{}).value;
+  if(!s){alert('Vyberte výrobní oblast, do které zakázku předáváte.');return}
+  api('/stav','POST',{id:id,action:'predat-vyrobe',stredisko:s}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba.');return}reloadData()});
 }
 function recomHint(){
   var k=(D.kapacita||[])[0];
@@ -757,15 +763,21 @@ function tsDelete(id){if(!confirm('Smazat záznam?'))return;api('/timesheet/dele
 /* ---- nastavení (admin) ---- */
 function renderNastaveni(m){
   var h='<div class="head"><h2>Role a číselník</h2></div>';
-  h+='<div class="sec">Role uživatelů</div><p class="muted" style="margin-top:0">Přiřaďte zaměstnancům roli v modulu. Šéf a ředitel vidí vše; obchodník své zakázky; konstruktér přidělené úkoly.</p><div class="card">';
-  (D.roles||[]).forEach(function(r){
-    h+='<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)"><div style="min-width:200px"><b>'+esc(r.name)+'</b><div class="sub">'+esc(r.email)+'</div></div>'+
-      '<select onchange="setRole(\''+esc(r.email)+'\',this.value)" style="max-width:180px"><option value="">— bez role —</option>'+
-      ['obchodnik','sef','konstrukter','sef-vyroby','reditel'].map(function(x){return '<option value="'+x+'"'+(r.role===x?' selected':'')+'>'+roleLabel(x)+'</option>'}).join('')+'</select>'+
-      (r.role==='konstrukter'?('<input style="width:120px" type="number" placeholder="fond h/týd" value="'+(r.fond||'')+'" onchange="setFond(\''+esc(r.email)+'\',this.value)">'):'<span style="width:120px"></span>')+
-    '</div>';
+  var R=D.roles||{sef:[],konstrukter:[],obchodnik:[],reditel:[]};
+  // — role s výběrem konkrétních osob z databáze —
+  h+='<div class="sec">Konstrukce — role</div>';
+  h+=roleCard('Šéf konstrukce','sef',R.sef,'Řídí frontu, přiděluje práci, provádí interní kontrolu. Vidí vše v konstrukci.',false);
+  h+=roleCard('Konstruktéři','konstrukter',R.konstrukter,'Zpracovávají přidělené výkresy. U každého lze nastavit týdenní fond hodin pro kapacity.',true);
+  h+=roleCard('Obchodníci','obchodnik',R.obchodnik,'Zadávají požadavky, potvrzují výkresy a odesílají náhledy klientům.',false);
+  h+=roleCard('Ředitel (přehledy / KPI)','reditel',R.reditel,'Přístup jen pro čtení k reportům a KPI; příjemce eskalací.',false);
+  // — výrobní oblasti + jejich ředitelé —
+  h+='<div class="sec">Výroba — oblasti a výrobní ředitelé</div><div class="card"><p class="muted" style="margin-top:0">Každá výrobní oblast má svého ředitele (konkrétní osoba z databáze). Schválená zakázka se předává do vybrané oblasti a je na tahu její výrobní ředitel.</p>';
+  (D.strediska||[]).forEach(function(s){
+    h+='<div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap"><div style="min-width:120px"><b>'+esc(s.label)+'</b><div class="sub">výrobní ředitel</div></div>'+
+      '<div style="flex:1;min-width:220px">'+personPicker('dir_'+s.key,s.reditelEmail,'setReditel(\''+esc(s.key)+'\',\'dir_'+s.key+'\')','— vyberte ředitele —')+'</div>'+
+      '<button class="btn ghost sm" onclick="delStredisko(\''+esc(s.key)+'\')">×</button></div>';
   });
-  h+='</div>';
+  h+='<div class="row" style="margin-top:10px"><input id="strLabel" placeholder="Název nové oblasti" style="max-width:240px"><button class="btn sm" onclick="addStredisko()">+ Přidat oblast</button></div></div>';
   h+='<div class="sec">Číselník typů výrobků</div><div class="card">';
   (D.types||[]).forEach(function(t){
     h+='<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="row" style="justify-content:space-between"><b>'+esc(t.name)+'</b><span class="muted">'+esc(t.key)+'</span></div>'+
@@ -773,11 +785,6 @@ function renderNastaveni(m){
       '<div class="actions" style="margin-top:6px"><button class="btn ghost sm" onclick="editTyp(\''+esc(t.key)+'\')">Upravit</button></div></div>';
   });
   h+='<div class="actions" style="margin-top:10px"><button class="btn sm" onclick="editTyp(\'\')">+ Nový typ výrobku</button></div></div>';
-  h+='<div class="sec">Výrobní střediska</div><div class="card"><p class="muted" style="margin-top:0">Střediska, kterým šéf výroby přiděluje schválené zakázky do výroby.</p>';
-  (D.strediska||[]).forEach(function(s){
-    h+='<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><b>'+esc(s.label)+'</b><button class="btn ghost sm" onclick="delStredisko(\''+esc(s.key)+'\')">×</button></div>';
-  });
-  h+='<div class="row" style="margin-top:10px"><input id="strLabel" placeholder="Název střediska"><button class="btn sm" onclick="addStredisko()">+ Přidat středisko</button></div></div>';
   h+='<div class="sec">Druhy práce (evidence)</div><div class="card">';
   (D.activities||[]).forEach(function(a){
     h+='<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span><b>'+esc(a.label)+'</b> <span class="tag">'+(a.kind==='zakazka'?'zakázka':'režie')+'</span></span>'+
@@ -825,6 +832,26 @@ function seedDemo(mode){
 }
 function setRole(email,role){api('/admin/role','POST',{email:email,role:role}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function setFond(email,fond){api('/admin/fond','POST',{email:email,fond:fond}).then(function(){reloadData()})}
+function personPicker(id,sel,onchange,placeholder){
+  var emps=(D.employees||[]).slice();
+  if(sel&&!emps.some(function(e){return e.email===sel}))emps.unshift({email:sel,name:sel});
+  var opts='<option value="">'+esc(placeholder||'— vyberte osobu —')+'</option>';
+  emps.forEach(function(e){opts+='<option value="'+esc(e.email)+'"'+(sel===e.email?' selected':'')+'>'+esc(e.name)+'</option>'});
+  return '<select id="'+id+'" onchange="'+onchange+'" style="width:100%;max-width:300px">'+opts+'</select>';
+}
+function roleCard(title,role,people,desc,withFond){
+  var h='<div class="card"><b>'+esc(title)+'</b><p class="muted" style="margin:4px 0 8px">'+esc(desc)+'</p>';
+  (people||[]).forEach(function(p){
+    h+='<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap"><div style="min-width:170px"><b>'+esc(p.name)+'</b><div class="sub">'+esc(p.email)+'</div></div>'+
+      (withFond?'<input type="number" style="width:130px" placeholder="fond h/týd" value="'+(p.fond||'')+'" onchange="setFond(\''+esc(p.email)+'\',this.value)">':'')+
+      '<button class="btn ghost sm" onclick="setRole(\''+esc(p.email)+'\',\'\')">Odebrat</button></div>';
+  });
+  if(!people||!people.length)h+='<p class="muted" style="margin:6px 0">Zatím nikdo.</p>';
+  h+='<div class="row" style="margin-top:8px">'+personPicker('add_'+role,'','addRolePerson(\''+role+'\',this.value)','+ přidat osobu…')+'</div></div>';
+  return h;
+}
+function addRolePerson(role,email){if(!email)return;setRole(email,role)}
+function setReditel(key,selId){var email=(document.getElementById(selId)||{}).value||'';api('/admin/stredisko','POST',{key:key,reditel:email}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function editTyp(key){
   var t=(D.types||[]).find(function(x){return x.key===key})||{key:'',name:'',normohodiny:8,revizeNh:2,lhutaZkresleniDays:3,lhutaRevizeDays:2,lhutaPrideleniDays:1,lhutaKontrolaDays:1,lhutaObchodnikDays:1,lhutaKlientDays:5,linkValidDays:30,internalCheck:true,params:[]};
   var m=document.getElementById('modal');

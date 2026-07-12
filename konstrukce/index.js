@@ -36,12 +36,13 @@ const STAV = {
   zamitnuto: { label: 'Zamítnuto / Storno', onTurn: null,        terminal: true },
 };
 
-// ---- Výrobní střediska (seed — editovatelné v adminu) -----------------------
+// ---- Výrobní oblasti / střediska (seed — editovatelné v adminu) -------------
+// Každá oblast má svého výrobního ředitele (reditelEmail = konkrétní člověk z databáze).
 const SEED_STREDISKA = [
-  { key: 'supikovice', label: 'Supíkovice' },
-  { key: 'zlin', label: 'Zlín' },
-  { key: 'bruntal', label: 'Bruntál' },
-  { key: 'chomutov', label: 'Chomutov' },
+  { key: 'supikovice', label: 'Supíkovice', reditelEmail: '' },
+  { key: 'bruntal', label: 'Bruntál', reditelEmail: '' },
+  { key: 'chomutov', label: 'Chomutov', reditelEmail: '' },
+  { key: 'polsko', label: 'Polsko', reditelEmail: '' },
 ];
 
 // ---- Výchozí číselník výrobků (seed) — vzorový ABROLL kontejner ------------
@@ -177,6 +178,15 @@ function mount(host) {
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
 
   // ---- role a přístup ------------------------------------------------------
+  // Je uživatel výrobním ředitelem některé oblasti? (role odvozená z číselníku oblastí)
+  function isVyrobniReditel(d, email) {
+    if (!email) return false;
+    return (d.strediska || []).some(s => (s.reditelEmail || '').toLowerCase() === email.toLowerCase());
+  }
+  function oblastReditel(d, key) {
+    const s = (d.strediska || []).find(x => x.key === key);
+    return s ? (s.reditelEmail || '') : '';
+  }
   function maModul(req) {
     if (host.isAdmin(req)) return true;
     const e = host.empSession(req); if (!e) return false;
@@ -184,16 +194,24 @@ function mount(host) {
       if ((host.employeeModules(e.email) || []).includes('konstrukce')) return true;
     } catch (_) {}
     const d = load();
-    return !!d.roles[(e.email || '').toLowerCase()];
+    const email = (e.email || '').toLowerCase();
+    return !!d.roles[email] || isVyrobniReditel(d, email);
   }
-  // Efektivní role uživatele: admin vidí vše (sef+reditel+config); jinak z číselníku rolí.
+  // Efektivní role uživatele: admin vidí vše; jinak z číselníku rolí, případně
+  // odvozeně „vyrobni-reditel", je-li ředitelem některé výrobní oblasti.
   function roleOf(req) {
     const e = host.empSession(req);
     const isAdm = host.isAdmin(req);
     const email = e ? (e.email || '').toLowerCase() : '';
     const d = load();
-    const r = email ? (d.roles[email] || '') : '';
+    let r = email ? (d.roles[email] || '') : '';
+    if (!r && email && isVyrobniReditel(d, email)) r = 'vyrobni-reditel';
     return { email, name: e ? e.name : '', isAdmin: isAdm, role: r };
+  }
+  // Seznam zaměstnanců intranetu pro výběr osob k rolím (jen pro admina).
+  function adminEmployees() {
+    try { return (host.getState().employees || []).map(x => ({ email: (x.email || '').toLowerCase(), name: x.name || x.email })).filter(x => x.email).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs')); }
+    catch (_) { return []; }
   }
   function empName(email) {
     if (!email) return '';
@@ -232,7 +250,7 @@ function mount(host) {
     if (st.onTurn === 'konstrukter') return z.assignedTo || '';
     if (st.onTurn === 'obchodnik') return z.obchodnikEmail || '';
     if (st.onTurn === 'sef') { const s = employeesWithRole('sef'); return s[0] || ''; }
-    if (st.onTurn === 'sef-vyroby') { const s = employeesWithRole('sef-vyroby'); return s[0] || ''; }
+    if (st.onTurn === 'sef-vyroby') { const d = load(); return z.strediskoKey ? oblastReditel(d, z.strediskoKey) : ''; }
     return '';
   }
   function semafor(z) {
@@ -352,12 +370,15 @@ function mount(host) {
     const me = roleOf(req);
     const d = load();
     // který stav „vidím"? admin/šéf/ředitel = vše; obchodník = své zakázky; konstruktér = přiřazené.
-    const canSeeAll = me.isAdmin || me.role === 'sef' || me.role === 'reditel' || me.role === 'sef-vyroby';
+    const canSeeAll = me.isAdmin || me.role === 'sef' || me.role === 'reditel';
     let list = d.zakazky.slice();
     if (!canSeeAll) {
       if (me.role === 'obchodnik') list = list.filter(z => (z.obchodnikEmail || '').toLowerCase() === me.email);
       else if (me.role === 'konstrukter') list = list.filter(z => (z.assignedTo || '').toLowerCase() === me.email);
-      else list = [];
+      else if (me.role === 'vyrobni-reditel') {
+        const myObl = (d.strediska || []).filter(s => (s.reditelEmail || '').toLowerCase() === me.email).map(s => s.key);
+        list = list.filter(z => z.stav === 'vyroba' || ((z.stav === 'stredisko' || z.stav === 'dokonceno') && myObl.includes(z.strediskoKey)));
+      } else list = [];
     }
     // sečti hodiny z evidence práce podle zakázky (přičtou se k odpracováno)
     d._tsMap = {}; d.timesheet.forEach(t => { if (t.zakId) d._tsMap[t.zakId] = (d._tsMap[t.zakId] || 0) + (t.hours || 0); });
@@ -374,8 +395,9 @@ function mount(host) {
       types: d.types,
       kapacita,
       konstrukteri: employeesWithRole('konstrukter').map(em => ({ email: em, name: empName(em) })),
-      strediska: d.strediska,
-      roles: (me.isAdmin) ? adminRolesTable(d) : undefined,
+      strediska: (d.strediska || []).map(s => ({ key: s.key, label: s.label, reditelEmail: s.reditelEmail || '', reditelName: s.reditelEmail ? empName(s.reditelEmail) : '' })),
+      roles: (me.isAdmin) ? roleAssignments(d) : undefined,
+      employees: (me.isAdmin) ? adminEmployees() : undefined,
       notif: myNotif.slice(0, 40),
       notifUnread: myNotif.filter(n => !n.read).length,
       now: Date.now(),
@@ -396,14 +418,12 @@ function mount(host) {
     });
     return rows.sort((a, b) => a.vytizeni - b.vytizeni);
   }
-  function adminRolesTable(d) {
-    // všichni zaměstnanci intranetu + jejich role v modulu
-    let emps = [];
-    try { emps = (host.getState().employees || []).map(e => ({ email: (e.email || '').toLowerCase(), name: e.name || e.email })); } catch (_) {}
-    // doplníme i ty, co mají roli, ale nejsou v seznamu
-    Object.keys(d.roles).forEach(em => { if (!emps.find(x => x.email === em)) emps.push({ email: em, name: empName(em) }); });
-    return emps.filter(e => e.email).map(e => ({ email: e.email, name: e.name, role: d.roles[e.email] || '', fond: d.fond[e.email] || null }))
+  // Přiřazení osob k rolím pro roli-centrickou administraci (role → seznam lidí).
+  function roleAssignments(d) {
+    const by = (role) => Object.keys(d.roles).filter(em => d.roles[em] === role)
+      .map(em => ({ email: em, name: empName(em), fond: d.fond[em] || null }))
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'));
+    return { sef: by('sef'), konstrukter: by('konstrukter'), obchodnik: by('obchodnik'), reditel: by('reditel') };
   }
 
   // Tvar zakázky pro frontend (bez interních tajností klienta se řeší v public části).
@@ -534,7 +554,8 @@ function mount(host) {
     const isSef = me.isAdmin || me.role === 'sef';
     const isObch = me.isAdmin || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email) || (me.role === 'obchodnik' && isSef);
     const isKon = me.isAdmin || (me.role === 'konstrukter' && (z.assignedTo || '').toLowerCase() === me.email);
-    const isSefVyroby = me.isAdmin || me.role === 'sef-vyroby';
+    const isVyr = me.isAdmin || me.role === 'vyrobni-reditel';           // libovolný výrobní ředitel
+    const isMujOblast = me.isAdmin || (z.strediskoKey && oblastReditel(d, z.strediskoKey) === me.email); // ředitel oblasti této zakázky
     let err = null;
 
     switch (action) {
@@ -643,35 +664,45 @@ function mount(host) {
         audit(z, me.email, 'Storno', note);
         break;
       }
-      case 'predat-vyrobe': { // schválený výkres → předání do výroby (šéf výroby na tahu)
+      case 'predat-vyrobe': { // schválený výkres → předání do výroby (do vybrané oblasti)
         if (!(isSef || isObch)) { err = 'Předat do výroby smí obchodník nebo šéf konstrukce.'; break; }
         if (z.stav !== 'schvaleno') { err = 'Do výroby lze předat jen schválenou zakázku.'; break; }
         if (z.link) z.link.active = false;
-        enterState(d, z, 'vyroba');
-        audit(z, me.email, 'Předáno do výroby', note);
-        const komu = employeesWithRole('sef-vyroby');
-        komu.forEach(em => notify(d, em, 'Výkres ' + z.cislo + ' (' + z.zakaznik + ') je schválen a předán do výroby — přidělte výrobní středisko.', z.id));
-        for (const em of komu) mail(em, 'Předáno do výroby · ' + z.cislo, 'Schválený výkres ' + z.cislo + ' (' + z.zakaznik + ') byl předán do výroby. Přidělte prosím výrobní středisko v intranetu → Konstrukce.');
+        const skey0 = String(b.stredisko || '').trim();
+        const s0 = skey0 ? d.strediska.find(x => x.key === skey0) : null;
+        if (s0) {
+          z.strediskoKey = s0.key; z.strediskoName = s0.label;
+          enterState(d, z, 'stredisko');
+          audit(z, me.email, 'Předáno do výroby', 'oblast ' + s0.label + (note ? ' — ' + note : ''));
+          const dir = oblastReditel(d, s0.key);
+          if (dir) { notify(d, dir, 'Do výroby (' + s0.label + ') přišel schválený výkres ' + z.cislo + ' (' + z.zakaznik + ').', z.id); mail(dir, 'Do výroby · ' + z.cislo + ' · ' + s0.label, 'Schválený výkres ' + z.cislo + ' (' + z.zakaznik + ') byl předán do výroby ve vaší oblasti ' + s0.label + '.'); }
+        } else {
+          enterState(d, z, 'vyroba');
+          audit(z, me.email, 'Předáno do výroby', note || 'bez přidělené oblasti');
+          (d.strediska || []).forEach(s => { if (s.reditelEmail) notify(d, s.reditelEmail, 'Schválený výkres ' + z.cislo + ' čeká na přidělení výrobní oblasti.', z.id); });
+        }
         break;
       }
-      case 'prideli-stredisko': { // šéf výroby přidělí konkrétní výrobní středisko
-        if (!isSefVyroby) { err = 'Přidělit výrobní středisko smí šéf výroby.'; break; }
+      case 'prideli-stredisko': { // přidělení / přeřazení výrobní oblasti
+        if (!(isVyr || isSef)) { err = 'Přidělit výrobní oblast smí výrobní ředitel nebo šéf konstrukce.'; break; }
         if (z.stav !== 'vyroba' && z.stav !== 'stredisko') { err = 'Zakázka není ve fázi výroby.'; break; }
         const skey = String(b.stredisko || '').trim();
         const s = d.strediska.find(x => x.key === skey);
-        if (!s) { err = 'Vyberte výrobní středisko.'; break; }
+        if (!s) { err = 'Vyberte výrobní oblast.'; break; }
         z.strediskoKey = s.key; z.strediskoName = s.label;
         const wasNew = z.stav !== 'stredisko';
         enterState(d, z, 'stredisko');
-        audit(z, me.email, wasNew ? 'Přiděleno výrobní středisko' : 'Přeřazeno výrobní středisko', s.label + (note ? ' — ' + note : ''));
-        notify(d, z.obchodnikEmail, 'Zakázka ' + z.cislo + ' je ve výrobě — středisko ' + s.label + '.', z.id);
+        audit(z, me.email, wasNew ? 'Přidělena výrobní oblast' : 'Přeřazena výrobní oblast', s.label + (note ? ' — ' + note : ''));
+        const dir = oblastReditel(d, s.key);
+        if (dir) notify(d, dir, 'Zakázka ' + z.cislo + ' je přidělena do výroby (' + s.label + ').', z.id);
+        notify(d, z.obchodnikEmail, 'Zakázka ' + z.cislo + ' je ve výrobě — oblast ' + s.label + '.', z.id);
         break;
       }
       case 'vyrobeno': { // výroba dokončena → dokončeno/archiv
-        if (!(isSefVyroby || isSef)) { err = 'Označit jako vyrobeno smí šéf výroby.'; break; }
+        if (!(isMujOblast || isSef || (isVyr && z.stav === 'vyroba'))) { err = 'Označit jako vyrobeno smí výrobní ředitel dané oblasti.'; break; }
         if (z.stav !== 'stredisko' && z.stav !== 'vyroba') { err = 'Zakázka není ve výrobě.'; break; }
         z.stav = 'dokonceno'; z.deadline = null; z.closedAt = Date.now();
-        audit(z, me.email, 'Vyrobeno / dokončeno', (z.strediskoName ? 'středisko ' + z.strediskoName : '') + (note ? ' — ' + note : ''));
+        audit(z, me.email, 'Vyrobeno / dokončeno', (z.strediskoName ? 'oblast ' + z.strediskoName : '') + (note ? ' — ' + note : ''));
         notify(d, z.obchodnikEmail, 'Zakázka ' + z.cislo + ' je vyrobena a dokončena.', z.id);
         break;
       }
@@ -1182,8 +1213,9 @@ function mount(host) {
     if (!key) { json(res, 400, { chyba: 'Chybí název střediska.' }); return true; }
     if (b.delete) { d.strediska = d.strediska.filter(x => x.key !== key); save(d); json(res, 200, { ok: true, strediska: d.strediska }); return true; }
     let s = d.strediska.find(x => x.key === key);
-    if (!s) { s = { key }; d.strediska.push(s); }
-    s.label = String(b.label || s.label || key).slice(0, 60);
+    if (!s) { s = { key, reditelEmail: '' }; d.strediska.push(s); }
+    if (b.label != null) s.label = String(b.label || s.label || key).slice(0, 60);
+    if (b.reditel !== undefined) s.reditelEmail = String(b.reditel || '').toLowerCase().trim();
     save(d);
     json(res, 200, { ok: true, strediska: d.strediska });
     return true;
@@ -1278,7 +1310,13 @@ function mount(host) {
       { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Výkres VYK-2026-0093 je schválen a předán do výroby — přidělte středisko.', zakId: hh, at: now - 6 * H, read: false },
       { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Klient poslal PŘIPOMÍNKY k VYK-2026-0095 — založena revize v2.', zakId: f, at: now - 14 * H, read: true },
     ];
-    save({ seq: 101, roles: { [OBCH]: 'obchodnik', [SEF]: 'sef', [PEPA]: 'konstrukter', [KAREL]: 'konstrukter', [JANA]: 'konstrukter', [RED]: 'reditel', [SEFV]: 'sef-vyroby' }, fond: { [PEPA]: 40, [KAREL]: 32, [JANA]: 40 }, types: JSON.parse(JSON.stringify(SEED_TYPES)), zakazky: Z, notif });
+    const strediska = [
+      { key: 'supikovice', label: 'Supíkovice', reditelEmail: SEFV },
+      { key: 'bruntal', label: 'Bruntál', reditelEmail: '' },
+      { key: 'chomutov', label: 'Chomutov', reditelEmail: '' },
+      { key: 'polsko', label: 'Polsko', reditelEmail: '' },
+    ];
+    save({ seq: 101, roles: { [OBCH]: 'obchodnik', [SEF]: 'sef', [PEPA]: 'konstrukter', [KAREL]: 'konstrukter', [JANA]: 'konstrukter', [RED]: 'reditel' }, fond: { [PEPA]: 40, [KAREL]: 32, [JANA]: 40 }, types: JSON.parse(JSON.stringify(SEED_TYPES)), strediska, zakazky: Z, notif });
     return Z.length;
   }
   async function apiAdminSeed(req, res) {
