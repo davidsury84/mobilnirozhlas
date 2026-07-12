@@ -396,6 +396,15 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .metric{padding:13px;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg-2)}
 .metric b{display:block;color:var(--green-d);font-size:22px;line-height:1;font-weight:800}
 .metric span{display:block;margin-top:5px;color:var(--ink-soft);font-size:12px;font-weight:600}
+.metric.hl{border-width:1px}
+.metric b.hl{display:inline-block;padding:3px 11px;border-radius:9px}
+.metric b.m-red{color:var(--red);background:rgba(194,54,54,.13)}
+.metric b.m-amber{color:var(--amber);background:rgba(122,92,14,.15)}
+.metric b.m-green{color:var(--green);background:rgba(14,138,67,.13)}
+.metric b.m-blue{color:#2f6fd6;background:rgba(47,111,214,.13)}
+.metric.hl-red{background:rgba(194,54,54,.05);border-color:rgba(194,54,54,.35)}
+.metric.hl-amber{background:rgba(122,92,14,.05);border-color:rgba(122,92,14,.35)}
+.metric.hl-green{background:rgba(14,138,67,.05);border-color:rgba(14,138,67,.30)}
 .spotlight{position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);min-height:190px;display:flex;align-items:flex-end;background:#12351f center/cover no-repeat;background-image:var(--spot-scrim),url('/assets/intranet-hero.jpg')}
 .spotlight .sp-tag{position:absolute;top:12px;left:12px}
 .spotlight .sp-cap{position:relative;padding:14px;color:#fff}
@@ -1405,12 +1414,12 @@ function showPlasty(tab){
 
   h+='<div class="dash-sec">Klíčové ukazatele (2026, leden–duben)</div>';
   h+='<div class="metric-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">'+
-    '<div class="metric"><b>'+kc(957835)+'</b><span>tržby (vč. ostatních výnosů)</span></div>'+
-    '<div class="metric"><b>'+kc(1493793)+'</b><span>náklady (61 % mzdy a odvody)</span></div>'+
-    '<div class="metric"><b style="color:var(--red)">−536 tis.</b><span>hospodářský výsledek (anual. −1,6 mil.)</span></div>'+
-    '<div class="metric"><b>1,56</b><span>nákladovost (cíl &lt; 1,00)</span></div>'+
-    '<div class="metric"><b>1&nbsp;793</b><span>výdejek (zakázek)</span></div>'+
-    '<div class="metric"><b>833 Kč</b><span>plný náklad na výdejku</span></div></div>';
+    '<div class="metric hl"><b class="hl m-blue">'+kc(957835)+'</b><span>tržby (vč. ostatních výnosů)</span></div>'+
+    '<div class="metric hl hl-amber"><b class="hl m-amber">'+kc(1493793)+'</b><span>náklady (61 % mzdy a odvody)</span></div>'+
+    '<div class="metric hl hl-red"><b class="hl m-red">−536 tis.</b><span>hospodářský výsledek (anual. −1,6 mil.)</span></div>'+
+    '<div class="metric hl hl-red"><b class="hl m-red">1,56</b><span>nákladovost (cíl &lt; 1,00)</span></div>'+
+    '<div class="metric hl"><b class="hl m-blue">1&nbsp;793</b><span>výdejek (zakázek)</span></div>'+
+    '<div class="metric hl hl-amber"><b class="hl m-amber">833 Kč</b><span>plný náklad na výdejku</span></div></div>';
 
   h+='<div class="pl-grid2" style="margin-top:18px">';
   h+='<section class="webpart"><div class="webpart-head"><h3>Hospodářský výsledek 2020–2025</h3><span class="chip red">ztráta roste</span></div><div class="webpart-body">'+hvSvg+'<div class="pl-chart-cap"><span>tis. Kč (ztráta)</span><span>náklad/výdejku 697 → 885 Kč</span></div></div></section>';
@@ -1430,10 +1439,10 @@ function showPlasty(tab){
 
   h+='<div class="pl-grid2">';
   h+='<section class="webpart"><div class="webpart-head"><h3>Cena výdejky: paušál vs. realita</h3></div><div class="webpart-body"><div class="metric-grid">'+
-    '<div class="metric"><b>530 Kč</b><span>dnešní paušál</span></div>'+
-    '<div class="metric"><b>833 Kč</b><span>plný vlastní náklad</span></div>'+
-    '<div class="metric"><b>667 Kč</b><span>ABC e-shop</span></div>'+
-    '<div class="metric"><b>1&nbsp;449 Kč</b><span>ABC B2B</span></div></div>'+
+    '<div class="metric hl hl-red"><b class="hl m-red">530 Kč</b><span>dnešní paušál (pod nákladem)</span></div>'+
+    '<div class="metric hl hl-amber"><b class="hl m-amber">833 Kč</b><span>plný vlastní náklad</span></div>'+
+    '<div class="metric hl hl-green"><b class="hl m-green">667 Kč</b><span>ABC e-shop (férová sazba)</span></div>'+
+    '<div class="metric hl"><b class="hl m-blue">1&nbsp;449 Kč</b><span>ABC B2B</span></div></div>'+
     '<p class="pl-note">Paušál 530 Kč pokryje jen ~64 % nákladu a dotuje dražší B2B z e-shopu. Tržní 3PL sazba pro tento profil je 180–460 Kč → vlastní náklad 833 Kč je <strong>nad trhem</strong> (hlavní příčina: režie THP 160 Kč/výd).</p></div></section>';
   h+='<section class="webpart"><div class="webpart-head"><h3>Make-or-buy (roční náklad)</h3></div><div class="webpart-body"><div class="matrix-wrap" style="max-height:none"><table class="matrix pl"><thead><tr><th>Cesta</th><th>Náklad/rok</th><th>Změna</th></tr></thead><tbody>'+
     '<tr><td>Současný stav</td><td>4&nbsp;464&nbsp;337</td><td>—</td></tr>'+
