@@ -733,10 +733,16 @@ function canPostAktuality(req) {
 }
 // Uloží obrázek z data URL (base64) do UPLOADS_DIR a vrátí veřejnou cestu /uploads/<jméno>. Vrací null pro neplatný vstup.
 function saveDataUrlImage(dataUrl) {
-  const m = /^data:image\/(png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
-  if (!m) return null;
-  const ext = m[1] === 'jpeg' ? 'jpg' : m[1];
-  const buf = Buffer.from(m[2], 'base64');
+  let m = /^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
+  let buf;
+  if (m) { buf = Buffer.from(m[2], 'base64'); }
+  else {
+    // SVG přichází i jako data:image/svg+xml;utf8,… nebo ;charset=utf-8,… (ne base64)
+    const sv = /^data:image\/svg\+xml(?:;[^,]*)?,([\s\S]+)$/.exec(dataUrl || '');
+    if (!sv) return null;
+    m = [null, 'svg+xml']; buf = Buffer.from(decodeURIComponent(sv[1]), 'utf8');
+  }
+  const ext = m[1] === 'jpeg' ? 'jpg' : (m[1] === 'svg+xml' ? 'svg' : m[1]);
   if (buf.length > 8e6) throw new Error('Obrázek je příliš velký (max 8 MB).');
   const fn = crypto.randomBytes(8).toString('hex') + '.' + ext;
   fs.writeFileSync(path.join(UPLOADS_DIR, fn), buf);
@@ -1438,8 +1444,10 @@ const server = http.createServer(async (req, res) => {
       const f = path.join(UPLOADS_DIR, rel);
       if (!f.startsWith(UPLOADS_DIR + path.sep) || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
       const ext = path.extname(f).toLowerCase();
-      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
-      res.writeHead(200, { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
+      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
+      const uhdrs = { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' };
+      if (ext === '.svg') uhdrs['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
+      res.writeHead(200, uhdrs);
       return res.end(fs.readFileSync(f));
     }
     // Logo v hlavičce intranetu (veřejné čtení — hlavička ho načítá v adminu i intranetu).
