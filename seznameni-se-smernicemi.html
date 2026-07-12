@@ -437,6 +437,10 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .pl-h{margin:22px 0 8px;font-size:15px;font-weight:700;color:var(--green-d)}
 .pl-p{margin:0 0 10px;font-size:13.5px;line-height:1.55;color:var(--ink)}
 .pl-content table.matrix.pl{margin-bottom:14px}
+/* podmíněné formátování číselných tabulek (přehlednost) */
+.matrix.pl td.pl-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.matrix.pl tr.pl-sum td{font-weight:800;border-top:2px solid var(--line);background:rgba(0,0,0,.045)}
+.matrix.pl tr.pl-sum td.pl-neg{color:var(--red)}
 /* Editace banneru */
 .mj-hero .hero-edit-btn{position:absolute;top:14px;right:14px;z-index:2;display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:var(--radius);border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);color:#fff;font-size:12.5px;font-weight:650;backdrop-filter:blur(3px);cursor:pointer}
 .mj-hero .hero-edit-btn:hover{background:rgba(255,255,255,.28)}
@@ -1148,13 +1152,14 @@ const MUJ_MODS = [
   { key:"plasty", icon:MUJ_IC.droplet, label:"Plasty", gated:true },
   { key:"kovo", icon:MUJ_IC.gear, label:"Kovo", gated:true },
   { key:"eshop", icon:MUJ_IC.cart, label:"E-shop", gated:true },
-  { key:"kalkulace", icon:MUJ_IC.calc, label:"Kalkulace-lisy", gated:true },
-  { key:"svozesa", icon:MUJ_IC.truck, label:"Kalkulačka svoz ESA", gated:true },
-  { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
-  { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
   { key:"doprava", icon:MUJ_IC.truck, label:"Doprava", gated:true },
   { key:"konstrukce", icon:MUJ_IC.gear, label:"Konstrukce", gated:true },
   { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
+  { grp:"Kalkulačky" },
+  { key:"kalkulace", icon:MUJ_IC.calc, label:"Kalkulace-lisy", gated:true },
+  { key:"svozesa", icon:MUJ_IC.calc, label:"Kalkulačka svoz ESA", gated:true },
+  { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
+  { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
@@ -2053,10 +2058,16 @@ function showDashboard(){
   }
   mainH += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.truck,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.gear,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     mainH += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
     provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
+    mainH += '</div>';
+  }
+  const kalk = [["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.calc,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.calc,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  if(kalk.length){
+    mainH += '<div class="dash-sec">Kalkulačky</div><div class="dash-grid">';
+    kalk.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
     mainH += '</div>';
   }
 
