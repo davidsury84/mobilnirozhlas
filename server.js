@@ -1301,6 +1301,18 @@ try {
   console.error('[doprava] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Konstrukce" (workflow zadání a schválení výkresů) ----
+let konstrukceMod = null;
+try {
+  konstrukceMod = require('./konstrukce').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – konstrukce', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+  });
+} catch (e) {
+  console.error('[konstrukce] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -1313,6 +1325,8 @@ const server = http.createServer(async (req, res) => {
   const smlouvyPublic = p.startsWith('/smlouvy/potvrdit') || p === '/api/smlouvy/webhook/resend';
   // Veřejné cesty modulu Adaptace: magic-link pozvánka, guest plnění, import z náboru.
   const adaptacePublic = p.startsWith('/adaptace/uvod/') || p === '/api/adaptace/guest' || p === '/api/adaptace/guest-flag' || p === '/api/adaptace/import-user';
+  // Veřejné cesty modulu Konstrukce: klientský náhled výkresu (token, bez přihlášení).
+  const konstrukcePublic = p.startsWith('/konstrukce/nahled/') || p.startsWith('/api/konstrukce/nahled/');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
@@ -1374,7 +1388,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -1405,6 +1419,8 @@ const server = http.createServer(async (req, res) => {
     if (adaptaceMod && await adaptaceMod.handle(req, res)) return;
     // Modul „Doprava" si obslouží vlastní cesty (/doprava*, /api/doprava*).
     if (dopravaMod && await dopravaMod.handle(req, res)) return;
+    // Modul „Konstrukce" si obslouží vlastní cesty (/konstrukce*, /api/konstrukce*).
+    if (konstrukceMod && await konstrukceMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
@@ -2206,6 +2222,11 @@ if (require.main === module) {
     if (dopravaMod) {
       dopravaMod.tick();
       setInterval(() => dopravaMod.tick(), 6 * 3600 * 1000);
+    }
+    // Konstrukce: hlídání termínů, semaforů a eskalací (30min — kvůli 80% a překročení lhůt).
+    if (konstrukceMod) {
+      konstrukceMod.tick();
+      setInterval(() => konstrukceMod.tick(), 30 * 60 * 1000);
     }
   });
 }
