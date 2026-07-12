@@ -776,6 +776,15 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
       <div id="themeSettings"></div>
     </div>
     <div class="card pad" style="max-width:680px;margin-bottom:18px">
+      <h3 style="margin:0 0 4px">Logo v hlavičce</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:13px">Nahraj firemní logo — zobrazí se v hlavičce celého intranetu i administrace pro všechny uživatele (nahradí zelenou fajfku). Doporučeno PNG nebo SVG s průhledným pozadím.</p>
+      <div id="logoPreview" style="margin-bottom:14px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm" onclick="logoUpload()">Nahrát logo</button>
+        <button class="btn sm ghost" onclick="logoReset()">Obnovit výchozí</button>
+      </div>
+    </div>
+    <div class="card pad" style="max-width:680px;margin-bottom:18px">
       <div class="spread" style="margin-bottom:6px">
         <h3 style="margin:0">Odesílací profily</h3>
         <button class="btn sm" onclick="openProfileModal()">+ Nový profil</button>
@@ -2344,7 +2353,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="cenmon") renderCenmon();
   if(v==="activity") renderActivity();
   if(v==="aktuality") renderAktualityAdmin();
-  if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); }
+  if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); applyBrandLogo(BRAND_LOGO); }
 });
 
 /* ---------- Pozvánky do intranetu: stav odesláno / přijato ---------- */
