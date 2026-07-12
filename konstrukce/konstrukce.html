@@ -515,7 +515,18 @@ function renderNastaveni(m){
       '<div class="actions" style="margin-top:6px"><button class="btn ghost sm" onclick="editTyp(\''+esc(t.key)+'\')">Upravit</button></div></div>';
   });
   h+='<div class="actions" style="margin-top:10px"><button class="btn sm" onclick="editTyp(\'\')">+ Nový typ výrobku</button></div></div>';
+  h+='<div class="sec">Ukázková data</div><div class="card"><p class="muted" style="margin-top:0">Nahraje ilustrativní scénář (7 zakázek napříč stavy, role, kapacity, notifikace) pro vyzkoušení modulu. Vše lze pak jedním tlačítkem smazat.</p>'+
+    '<div class="actions"><button class="btn sm" onclick="seedDemo(\'load\')">Nahrát ukázkový scénář</button><button class="btn warn sm" onclick="seedDemo(\'clear\')">Smazat všechna data</button></div></div>';
   m.innerHTML=h;
+}
+function seedDemo(mode){
+  if(mode==='clear'&&!confirm('Opravdu smazat VŠECHNA data modulu (zakázky, role i kapacity)? Tuto akci nelze vzít zpět.'))return;
+  api('/admin/seed','POST',{mode:mode}).then(function(o){
+    if(!o.ok){alert(o.j.chyba||'Chyba.');return}
+    reloadData();
+    alert(mode==='clear'?'Všechna data modulu byla smazána.':'Nahráno '+o.j.count+' ukázkových zakázek. Projděte si je ve složce „Vše".');
+    if(mode!=='clear')setFilter('all');
+  });
 }
 function setRole(email,role){api('/admin/role','POST',{email:email,role:role}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function setFond(email,fond){api('/admin/fond','POST',{email:email,fond:fond}).then(function(){reloadData()})}

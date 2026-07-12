@@ -284,6 +284,7 @@ function mount(host) {
       if (p === '/api/konstrukce/admin/role' && req.method === 'POST') return apiAdminRole(req, res);
       if (p === '/api/konstrukce/admin/fond' && req.method === 'POST') return apiAdminFond(req, res);
       if (p === '/api/konstrukce/admin/typ' && req.method === 'POST') return apiAdminTyp(req, res);
+      if (p === '/api/konstrukce/admin/seed' && req.method === 'POST') return apiAdminSeed(req, res);
     } catch (e) {
       console.error('[konstrukce] chyba obsluhy:', e);
       json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true;
@@ -1002,6 +1003,61 @@ function mount(host) {
 
   function publicPage() {
     return PUBLIC_HTML;
+  }
+
+  // ======================================================================
+  //  Ukázková („slepá") data — správce si je nahraje a zase smaže z modulu
+  // ======================================================================
+  const DEMO_PDF = Buffer.from('JVBERi0xLjEKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqCjIgMCBvYmo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iagozIDAgb2JqPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgMjAwIDIwMF0+PmVuZG9iagp4cmVmCjAgNAowMDAwMDAwMDAwIDY1NTM1IGYgCnRyYWlsZXI8PC9Sb290IDEgMCBSL1NpemUgND4+CnN0YXJ0eHJlZgowCiUlRU9G', 'base64');
+  function demoFile(zId, kind, ext, content) {
+    const dir = path.join(FILES_DIR, zId.replace(/[^a-z0-9]/gi, ''));
+    try { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+    const fn = kind + '-' + crypto.randomBytes(6).toString('hex') + '.' + ext;
+    fs.writeFileSync(path.join(dir, fn), content);
+    return path.relative(FILES_DIR, path.join(dir, fn));
+  }
+  function demoVer(zId, v, author, at, locked, withCad) {
+    const ver = { v, pdf: { name: 'vykres-v' + v + '.pdf', path: demoFile(zId, 'pdf', 'pdf', DEMO_PDF), at }, author, createdAt: at, locked: !!locked };
+    if (withCad) ver.cad = { name: 'vykres-v' + v + '.step', path: demoFile(zId, 'cad', 'step', Buffer.from('ISO-10303-21; demo')), at };
+    return ver;
+  }
+  function demoClear() {
+    try { if (fs.existsSync(FILES_DIR)) fs.rmSync(FILES_DIR, { recursive: true, force: true }); } catch (_) {}
+    try { fs.mkdirSync(FILES_DIR, { recursive: true }); } catch (_) {}
+    save({ seq: 0, roles: {}, fond: {}, types: JSON.parse(JSON.stringify(SEED_TYPES)), zakazky: [], notif: [] });
+  }
+  function demoSeed(adminEmail) {
+    demoClear();
+    const now = Date.now(), DAY = 86400000, H = 3600000;
+    const A = (at, by, action, note) => ({ at, by, action, note: note || '', from: '', to: '' });
+    const zid = () => 'z' + crypto.randomBytes(7).toString('hex');
+    const OBCH = 'anna.obchodni@elkoplast.cz', SEF = 'martin.sef@elkoplast.cz', PEPA = 'pepa.novak@elkoplast.cz', KAREL = 'karel.dvorak@elkoplast.cz', JANA = 'jana.mala@elkoplast.cz', RED = 'reditel@elkoplast.cz';
+    const P = { 'Vnitřní délka': '6000 mm', 'Výška bočnic': '1400 mm', 'Objem': '20 m³', 'Materiál': 'S355; dno 5 mm, bočnice 3 mm', 'Zadní čelo': 'dvoukřídlá vrata' };
+    const Z = [];
+    const a = zid(); Z.push({ id: a, cislo: 'VYK-2026-0101', createdAt: now - 4 * H, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: { 'Vnitřní délka': '5500 mm', 'Materiál': 'S235' }, zakaznik: 'Kovošrot Zlín s.r.o.', kontakt: 'Ing. Petr Malý', kontaktEmail: 'maly@kovosrot-zlin.cz', cisloPoptavky: 'P-2026-101', pozadovanyTermin: null, stav: 'novy', assignedTo: '', versions: [], comments: [], timeEntries: [], activeTimer: null, link: null, revisionCount: 0, stepStartedAt: now - 4 * H, deadline: now + DAY, esc: { key: 'novy:0' }, audit: [A(now - 4 * H, OBCH, 'Založení požadavku', 'typ: ABROLL kontejner (standardní)')] });
+    const b = zid(); Z.push({ id: b, cislo: 'VYK-2026-0102', createdAt: now - DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'Metalšrot Ostrava a.s.', kontakt: 'Jana Nová', kontaktEmail: 'nova@metalsrot.cz', cisloPoptavky: 'P-2026-102', pozadovanyTermin: null, stav: 'prace', assignedTo: PEPA, versions: [demoVer(b, 1, PEPA, now - 3 * H, false, true)], comments: [], timeEntries: [{ user: PEPA, seconds: 2 * 3600, at: now - 2 * H, note: 'timer' }], activeTimer: null, link: null, revisionCount: 0, stepStartedAt: now - 6 * H, deadline: now + 3 * DAY, esc: { key: 'prace:1' }, audit: [A(now - DAY, OBCH, 'Založení požadavku'), A(now - 20 * H, SEF, 'Přidělení', 'konstruktér: ' + PEPA)] });
+    const c = zid(); Z.push({ id: c, cislo: 'VYK-2026-0098', createdAt: now - 8 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: { 'Vnitřní délka': '7000 mm', 'Nosnost': '26 t' }, zakaznik: 'Recyklace Bruntál s.r.o.', kontakt: 'Tomáš Velký', kontaktEmail: 'velky@rec-bruntal.cz', cisloPoptavky: 'P-2026-098', pozadovanyTermin: null, stav: 'prace', assignedTo: KAREL, versions: [demoVer(c, 1, KAREL, now - 2 * DAY, false, true)], comments: [], timeEntries: [{ user: KAREL, seconds: 5 * 3600, at: now - DAY, note: 'timer' }], activeTimer: null, link: null, revisionCount: 0, stepStartedAt: now - 6 * DAY, deadline: now - 2 * DAY, esc: { key: 'prace:1', warned80: true, overdue: true, overdueDay: '01.01.2000' }, audit: [A(now - 8 * DAY, OBCH, 'Založení požadavku'), A(now - 7 * DAY, SEF, 'Přidělení', 'konstruktér: ' + KAREL)] });
+    const dd = zid(); Z.push({ id: dd, cislo: 'VYK-2026-0100', createdAt: now - 3 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'EKO Chomutov a.s.', kontakt: 'Lucie Bílá', kontaktEmail: 'bila@eko-chomutov.cz', cisloPoptavky: 'P-2026-100', pozadovanyTermin: null, stav: 'kontrola', assignedTo: JANA, versions: [demoVer(dd, 1, JANA, now - 6 * H, false, true)], comments: [], timeEntries: [{ user: JANA, seconds: 7 * 3600, at: now - 8 * H, note: 'timer' }], activeTimer: null, link: null, revisionCount: 0, stepStartedAt: now - 20 * H, deadline: now + 8 * H, esc: { key: 'kontrola:1' }, audit: [A(now - 3 * DAY, OBCH, 'Založení požadavku'), A(now - 2 * DAY, SEF, 'Přidělení', 'konstruktér: ' + JANA), A(now - 6 * H, JANA, 'Zkreslení hotovo', 'verze v1')] });
+    const e = zid(), tok = crypto.randomBytes(24).toString('hex'); Z.push({ id: e, cislo: 'VYK-2026-0099', createdAt: now - 4 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'Sběrné suroviny Zlín', kontakt: 'Martin Holý', kontaktEmail: 'holy@sbernesuroviny.cz', cisloPoptavky: 'P-2026-099', pozadovanyTermin: null, stav: 'klient', assignedTo: PEPA, versions: [demoVer(e, 1, PEPA, now - 2 * DAY, true, true)], comments: [], timeEntries: [{ user: PEPA, seconds: 8 * 3600, at: now - 2 * DAY, note: 'timer' }], activeTimer: null, link: { token: tok, active: true, createdAt: now - DAY, expiresAt: now + 29 * DAY, pin: '', accesses: [{ at: now - 12 * H, ip: '89.24.10.5', action: 'view' }] }, revisionCount: 0, stepStartedAt: now - DAY, deadline: now + 4 * DAY, esc: { key: 'klient:1' }, audit: [A(now - 4 * DAY, OBCH, 'Založení požadavku'), A(now - 3 * DAY, SEF, 'Přidělení', 'konstruktér: ' + PEPA), A(now - 2 * DAY, PEPA, 'Zkreslení hotovo', 'verze v1'), A(now - 30 * H, SEF, 'Interní kontrola OK'), A(now - 26 * H, OBCH, 'Obchodník potvrdil výkres'), A(now - DAY, OBCH, 'Odesláno klientovi', 'odkaz platí 30 dnů')] });
+    const f = zid(); Z.push({ id: f, cislo: 'VYK-2026-0095', createdAt: now - 7 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'Demont Group s.r.o.', kontakt: 'Eva Krátká', kontaktEmail: 'kratka@demont.cz', cisloPoptavky: 'P-2026-095', pozadovanyTermin: null, stav: 'revize', assignedTo: KAREL, versions: [demoVer(f, 1, KAREL, now - 4 * DAY, true, true), { v: 2, author: KAREL, createdAt: now - 12 * H, locked: false }], comments: [{ id: 'c' + crypto.randomBytes(5).toString('hex'), author: '', authorName: 'Martin Holý', role: 'client', text: 'Připomínky klienta: Prosím přidat žebřík a zvětšit výšku bočnic na 1600 mm.', at: now - 14 * H, versionRef: 1 }], timeEntries: [{ user: KAREL, seconds: 9 * 3600, at: now - 3 * DAY, note: 'timer' }], activeTimer: null, link: null, revisionCount: 1, stepStartedAt: now - 12 * H, deadline: now + 2 * DAY, esc: { key: 'revize:2' }, audit: [A(now - 7 * DAY, OBCH, 'Založení požadavku'), A(now - 6 * DAY, SEF, 'Přidělení', 'konstruktér: ' + KAREL), A(now - 4 * DAY, KAREL, 'Zkreslení hotovo', 'verze v1'), A(now - 3 * DAY, OBCH, 'Odesláno klientovi'), A(now - 14 * H, 'Martin Holý (klient)', 'Klient poslal připomínky', 'založena revize v2 — IP 89.24.10.5')] });
+    const g = zid(); Z.push({ id: g, cislo: 'VYK-2026-0090', createdAt: now - 14 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'Železárny Veselí a.s.', kontakt: 'Pavel Silný', kontaktEmail: 'silny@zelezarny.cz', cisloPoptavky: 'P-2026-090', pozadovanyTermin: null, stav: 'dokonceno', assignedTo: JANA, versions: [demoVer(g, 1, JANA, now - 11 * DAY, true, true)], comments: [], timeEntries: [{ user: JANA, seconds: 8 * 3600, at: now - 11 * DAY, note: 'timer' }], activeTimer: null, link: { token: crypto.randomBytes(24).toString('hex'), active: false, createdAt: now - 10 * DAY, expiresAt: now + 20 * DAY, pin: '', accesses: [] }, revisionCount: 0, closedAt: now - 8 * DAY, stepStartedAt: now - 8 * DAY, deadline: null, esc: { key: 'dokonceno:1' }, clientDecision: { action: 'schvalit', name: 'Pavel Silný', at: now - 9 * DAY, ip: '81.2.3.4', version: 1 }, audit: [A(now - 14 * DAY, OBCH, 'Založení požadavku'), A(now - 13 * DAY, SEF, 'Přidělení', 'konstruktér: ' + JANA), A(now - 11 * DAY, JANA, 'Zkreslení hotovo', 'verze v1'), A(now - 10 * DAY, SEF, 'Interní kontrola OK'), A(now - 10 * DAY, OBCH, 'Odesláno klientovi'), A(now - 9 * DAY, 'Pavel Silný (klient)', 'Klient schválil', 'verze v1, IP 81.2.3.4'), A(now - 8 * DAY, SEF, 'Dokončeno')] });
+    const nm = adminEmail || '';
+    const notif = [
+      { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'PO TERMÍNU: krok „V práci" u VYK-2026-0098 překročil termín.', zakId: c, at: now - 2 * H, read: false },
+      { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Nový požadavek VYK-2026-0101 (Kovošrot Zlín s.r.o.) čeká na přidělení.', zakId: a, at: now - 4 * H, read: false },
+      { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Klient poslal PŘIPOMÍNKY k VYK-2026-0095 — založena revize v2.', zakId: f, at: now - 14 * H, read: true },
+    ];
+    save({ seq: 101, roles: { [OBCH]: 'obchodnik', [SEF]: 'sef', [PEPA]: 'konstrukter', [KAREL]: 'konstrukter', [JANA]: 'konstrukter', [RED]: 'reditel' }, fond: { [PEPA]: 40, [KAREL]: 32, [JANA]: 40 }, types: JSON.parse(JSON.stringify(SEED_TYPES)), zakazky: Z, notif });
+    return Z.length;
+  }
+  async function apiAdminSeed(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    if (b.mode === 'clear') { demoClear(); json(res, 200, { ok: true, cleared: true }); return true; }
+    const me = roleOf(req);
+    const n = demoSeed(me.email);
+    json(res, 200, { ok: true, count: n });
+    return true;
   }
 
   return { handle, tick };
