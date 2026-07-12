@@ -29,10 +29,20 @@ const STAV = {
   klient:    { label: 'U klienta',         onTurn: 'obchodnik',  terminal: false }, // hlídá obchodník
   revize:    { label: 'Revize',            onTurn: 'konstrukter', terminal: false },
   podklady:  { label: 'Čeká na podklady',  onTurn: 'obchodnik',  terminal: false, hold: true },
-  schvaleno: { label: 'Schváleno klientem', onTurn: null,        terminal: false },
-  dokonceno: { label: 'Dokončeno',         onTurn: null,        terminal: true },
+  schvaleno: { label: 'Schváleno klientem', onTurn: 'obchodnik', terminal: false },
+  vyroba:    { label: 'Předáno do výroby',  onTurn: 'sef-vyroby', terminal: false }, // u šéfa výroby
+  stredisko: { label: 'Ve výrobním středisku', onTurn: 'sef-vyroby', terminal: false },
+  dokonceno: { label: 'Vyrobeno / Dokončeno', onTurn: null,      terminal: true },
   zamitnuto: { label: 'Zamítnuto / Storno', onTurn: null,        terminal: true },
 };
+
+// ---- Výrobní střediska (seed — editovatelné v adminu) -----------------------
+const SEED_STREDISKA = [
+  { key: 'supikovice', label: 'Supíkovice' },
+  { key: 'zlin', label: 'Zlín' },
+  { key: 'bruntal', label: 'Bruntál' },
+  { key: 'chomutov', label: 'Chomutov' },
+];
 
 // ---- Výchozí číselník výrobků (seed) — vzorový ABROLL kontejner ------------
 const SEED_TYPES = [{
@@ -47,6 +57,7 @@ const SEED_TYPES = [{
   lhutaKontrolaDays: 1,
   lhutaObchodnikDays: 1,
   lhutaKlientDays: 5,
+  lhutaVyrobaDays: 1,
   internalCheck: true,
   linkValidDays: 30,
   params: [
@@ -160,6 +171,7 @@ function mount(host) {
     if (!Array.isArray(d.notif)) d.notif = [];
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
     if (!Array.isArray(d.timesheet)) d.timesheet = [];
+    if (!Array.isArray(d.strediska) || !d.strediska.length) d.strediska = JSON.parse(JSON.stringify(SEED_STREDISKA));
     return d;
   }
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
@@ -220,6 +232,7 @@ function mount(host) {
     if (st.onTurn === 'konstrukter') return z.assignedTo || '';
     if (st.onTurn === 'obchodnik') return z.obchodnikEmail || '';
     if (st.onTurn === 'sef') { const s = employeesWithRole('sef'); return s[0] || ''; }
+    if (st.onTurn === 'sef-vyroby') { const s = employeesWithRole('sef-vyroby'); return s[0] || ''; }
     return '';
   }
   function semafor(z) {
@@ -257,6 +270,7 @@ function mount(host) {
     const dayMap = {
       novy: t.lhutaPrideleniDays, prace: t.lhutaZkresleniDays, kontrola: t.lhutaKontrolaDays,
       obchodnik: t.lhutaObchodnikDays, klient: t.lhutaKlientDays, revize: t.lhutaRevizeDays,
+      vyroba: t.lhutaVyrobaDays, stredisko: t.lhutaStrediskoDays,
     };
     const days = dayMap[stav];
     z.deadline = days ? addBusinessDays(Date.now(), days) : null;
@@ -316,6 +330,7 @@ function mount(host) {
       if (p === '/api/konstrukce/timesheet' && req.method === 'POST') return apiTimesheetSave(req, res);
       if (p === '/api/konstrukce/timesheet/delete' && req.method === 'POST') return apiTimesheetDelete(req, res);
       if (p === '/api/konstrukce/admin/activity' && req.method === 'POST') return apiAdminActivity(req, res);
+      if (p === '/api/konstrukce/admin/stredisko' && req.method === 'POST') return apiAdminStredisko(req, res);
       if (p === '/api/konstrukce/admin/import' && req.method === 'POST') return apiAdminImport(req, res);
     } catch (e) {
       console.error('[konstrukce] chyba obsluhy:', e);
@@ -337,7 +352,7 @@ function mount(host) {
     const me = roleOf(req);
     const d = load();
     // který stav „vidím"? admin/šéf/ředitel = vše; obchodník = své zakázky; konstruktér = přiřazené.
-    const canSeeAll = me.isAdmin || me.role === 'sef' || me.role === 'reditel';
+    const canSeeAll = me.isAdmin || me.role === 'sef' || me.role === 'reditel' || me.role === 'sef-vyroby';
     let list = d.zakazky.slice();
     if (!canSeeAll) {
       if (me.role === 'obchodnik') list = list.filter(z => (z.obchodnikEmail || '').toLowerCase() === me.email);
@@ -359,6 +374,7 @@ function mount(host) {
       types: d.types,
       kapacita,
       konstrukteri: employeesWithRole('konstrukter').map(em => ({ email: em, name: empName(em) })),
+      strediska: d.strediska,
       roles: (me.isAdmin) ? adminRolesTable(d) : undefined,
       notif: myNotif.slice(0, 40),
       notifUnread: myNotif.filter(n => !n.read).length,
@@ -416,6 +432,7 @@ function mount(host) {
       totalSec, myTimer, timerRunning: !!(z.activeTimer),
       link: z.link ? { active: z.link.active, expiresAt: z.link.expiresAt, url: '/konstrukce/nahled/' + z.link.token, hasPin: !!z.link.pin, accesses: (z.link.accesses || []).length } : null,
       revisionCount: z.revisionCount || 0,
+      strediskoKey: z.strediskoKey || '', strediskoName: z.strediskoName || '',
       holdReason: z.holdReason || '', prevStav: z.prevStav || '',
       clientDecision: z.clientDecision || null,
       audit: z.audit || [],
@@ -517,6 +534,7 @@ function mount(host) {
     const isSef = me.isAdmin || me.role === 'sef';
     const isObch = me.isAdmin || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email) || (me.role === 'obchodnik' && isSef);
     const isKon = me.isAdmin || (me.role === 'konstrukter' && (z.assignedTo || '').toLowerCase() === me.email);
+    const isSefVyroby = me.isAdmin || me.role === 'sef-vyroby';
     let err = null;
 
     switch (action) {
@@ -625,12 +643,36 @@ function mount(host) {
         audit(z, me.email, 'Storno', note);
         break;
       }
-      case 'dokoncit': { // schválený výkres → dokončeno (archiv/výroba)
-        if (!(isSef || isObch)) { err = 'Dokončit smí šéf konstrukce nebo obchodník.'; break; }
-        if (z.stav !== 'schvaleno') { err = 'Dokončit lze jen schválenou zakázku.'; break; }
-        z.stav = 'dokonceno'; z.deadline = null; z.closedAt = Date.now();
+      case 'predat-vyrobe': { // schválený výkres → předání do výroby (šéf výroby na tahu)
+        if (!(isSef || isObch)) { err = 'Předat do výroby smí obchodník nebo šéf konstrukce.'; break; }
+        if (z.stav !== 'schvaleno') { err = 'Do výroby lze předat jen schválenou zakázku.'; break; }
         if (z.link) z.link.active = false;
-        audit(z, me.email, 'Dokončeno', note);
+        enterState(d, z, 'vyroba');
+        audit(z, me.email, 'Předáno do výroby', note);
+        const komu = employeesWithRole('sef-vyroby');
+        komu.forEach(em => notify(d, em, 'Výkres ' + z.cislo + ' (' + z.zakaznik + ') je schválen a předán do výroby — přidělte výrobní středisko.', z.id));
+        for (const em of komu) mail(em, 'Předáno do výroby · ' + z.cislo, 'Schválený výkres ' + z.cislo + ' (' + z.zakaznik + ') byl předán do výroby. Přidělte prosím výrobní středisko v intranetu → Konstrukce.');
+        break;
+      }
+      case 'prideli-stredisko': { // šéf výroby přidělí konkrétní výrobní středisko
+        if (!isSefVyroby) { err = 'Přidělit výrobní středisko smí šéf výroby.'; break; }
+        if (z.stav !== 'vyroba' && z.stav !== 'stredisko') { err = 'Zakázka není ve fázi výroby.'; break; }
+        const skey = String(b.stredisko || '').trim();
+        const s = d.strediska.find(x => x.key === skey);
+        if (!s) { err = 'Vyberte výrobní středisko.'; break; }
+        z.strediskoKey = s.key; z.strediskoName = s.label;
+        const wasNew = z.stav !== 'stredisko';
+        enterState(d, z, 'stredisko');
+        audit(z, me.email, wasNew ? 'Přiděleno výrobní středisko' : 'Přeřazeno výrobní středisko', s.label + (note ? ' — ' + note : ''));
+        notify(d, z.obchodnikEmail, 'Zakázka ' + z.cislo + ' je ve výrobě — středisko ' + s.label + '.', z.id);
+        break;
+      }
+      case 'vyrobeno': { // výroba dokončena → dokončeno/archiv
+        if (!(isSefVyroby || isSef)) { err = 'Označit jako vyrobeno smí šéf výroby.'; break; }
+        if (z.stav !== 'stredisko' && z.stav !== 'vyroba') { err = 'Zakázka není ve výrobě.'; break; }
+        z.stav = 'dokonceno'; z.deadline = null; z.closedAt = Date.now();
+        audit(z, me.email, 'Vyrobeno / dokončeno', (z.strediskoName ? 'středisko ' + z.strediskoName : '') + (note ? ' — ' + note : ''));
+        notify(d, z.obchodnikEmail, 'Zakázka ' + z.cislo + ' je vyrobena a dokončena.', z.id);
         break;
       }
       default: err = 'Neznámá akce „' + action + '".';
@@ -731,7 +773,7 @@ function mount(host) {
     if (!email) { json(res, 400, { chyba: 'Chybí e-mail.' }); return true; }
     const d = load();
     if (!role) delete d.roles[email];
-    else if (['obchodnik', 'sef', 'konstrukter', 'reditel'].includes(role)) d.roles[email] = role;
+    else if (['obchodnik', 'sef', 'konstrukter', 'reditel', 'sef-vyroby'].includes(role)) d.roles[email] = role;
     else { json(res, 400, { chyba: 'Neplatná role.' }); return true; }
     save(d);
     json(res, 200, { ok: true, roles: adminRolesTable(d) });
@@ -1132,6 +1174,20 @@ function mount(host) {
     json(res, 200, { ok: true, activities: d.activities });
     return true;
   }
+  async function apiAdminStredisko(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load();
+    const key = String(b.key || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9_-]/g, '').slice(0, 30);
+    if (!key) { json(res, 400, { chyba: 'Chybí název střediska.' }); return true; }
+    if (b.delete) { d.strediska = d.strediska.filter(x => x.key !== key); save(d); json(res, 200, { ok: true, strediska: d.strediska }); return true; }
+    let s = d.strediska.find(x => x.key === key);
+    if (!s) { s = { key }; d.strediska.push(s); }
+    s.label = String(b.label || s.label || key).slice(0, 60);
+    save(d);
+    json(res, 200, { ok: true, strediska: d.strediska });
+    return true;
+  }
   async function apiAdminImport(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
@@ -1202,7 +1258,7 @@ function mount(host) {
     const now = Date.now(), DAY = 86400000, H = 3600000;
     const A = (at, by, action, note) => ({ at, by, action, note: note || '', from: '', to: '' });
     const zid = () => 'z' + crypto.randomBytes(7).toString('hex');
-    const OBCH = 'anna.obchodni@elkoplast.cz', SEF = 'martin.sef@elkoplast.cz', PEPA = 'pepa.novak@elkoplast.cz', KAREL = 'karel.dvorak@elkoplast.cz', JANA = 'jana.mala@elkoplast.cz', RED = 'reditel@elkoplast.cz';
+    const OBCH = 'anna.obchodni@elkoplast.cz', SEF = 'martin.sef@elkoplast.cz', PEPA = 'pepa.novak@elkoplast.cz', KAREL = 'karel.dvorak@elkoplast.cz', JANA = 'jana.mala@elkoplast.cz', RED = 'reditel@elkoplast.cz', SEFV = 'josef.vyroba@elkoplast.cz';
     const P = { 'Vnitřní délka': '6000 mm', 'Výška bočnic': '1400 mm', 'Objem': '20 m³', 'Materiál': 'S355; dno 5 mm, bočnice 3 mm', 'Zadní čelo': 'dvoukřídlá vrata' };
     const Z = [];
     const a = zid(); Z.push({ id: a, cislo: 'VYK-2026-0101', createdAt: now - 4 * H, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: { 'Vnitřní délka': '5500 mm', 'Materiál': 'S235' }, zakaznik: 'Kovošrot Zlín s.r.o.', kontakt: 'Ing. Petr Malý', kontaktEmail: 'maly@kovosrot-zlin.cz', cisloPoptavky: 'P-2026-101', pozadovanyTermin: null, stav: 'novy', assignedTo: '', versions: [], comments: [], timeEntries: [], activeTimer: null, link: null, revisionCount: 0, stepStartedAt: now - 4 * H, deadline: now + DAY, esc: { key: 'novy:0' }, audit: [A(now - 4 * H, OBCH, 'Založení požadavku', 'typ: ABROLL kontejner (standardní)')] });
@@ -1212,13 +1268,17 @@ function mount(host) {
     const e = zid(), tok = crypto.randomBytes(24).toString('hex'); Z.push({ id: e, cislo: 'VYK-2026-0099', createdAt: now - 4 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'Sběrné suroviny Zlín', kontakt: 'Martin Holý', kontaktEmail: 'holy@sbernesuroviny.cz', cisloPoptavky: 'P-2026-099', pozadovanyTermin: null, stav: 'klient', assignedTo: PEPA, versions: [demoVer(e, 1, PEPA, now - 2 * DAY, true, true)], comments: [], timeEntries: [{ user: PEPA, seconds: 8 * 3600, at: now - 2 * DAY, note: 'timer' }], activeTimer: null, link: { token: tok, active: true, createdAt: now - DAY, expiresAt: now + 29 * DAY, pin: '', accesses: [{ at: now - 12 * H, ip: '89.24.10.5', action: 'view' }] }, revisionCount: 0, stepStartedAt: now - DAY, deadline: now + 4 * DAY, esc: { key: 'klient:1' }, audit: [A(now - 4 * DAY, OBCH, 'Založení požadavku'), A(now - 3 * DAY, SEF, 'Přidělení', 'konstruktér: ' + PEPA), A(now - 2 * DAY, PEPA, 'Zkreslení hotovo', 'verze v1'), A(now - 30 * H, SEF, 'Interní kontrola OK'), A(now - 26 * H, OBCH, 'Obchodník potvrdil výkres'), A(now - DAY, OBCH, 'Odesláno klientovi', 'odkaz platí 30 dnů')] });
     const f = zid(); Z.push({ id: f, cislo: 'VYK-2026-0095', createdAt: now - 7 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'Demont Group s.r.o.', kontakt: 'Eva Krátká', kontaktEmail: 'kratka@demont.cz', cisloPoptavky: 'P-2026-095', pozadovanyTermin: null, stav: 'revize', assignedTo: KAREL, versions: [demoVer(f, 1, KAREL, now - 4 * DAY, true, true), { v: 2, author: KAREL, createdAt: now - 12 * H, locked: false }], comments: [{ id: 'c' + crypto.randomBytes(5).toString('hex'), author: '', authorName: 'Martin Holý', role: 'client', text: 'Připomínky klienta: Prosím přidat žebřík a zvětšit výšku bočnic na 1600 mm.', at: now - 14 * H, versionRef: 1 }], timeEntries: [{ user: KAREL, seconds: 9 * 3600, at: now - 3 * DAY, note: 'timer' }], activeTimer: null, link: null, revisionCount: 1, stepStartedAt: now - 12 * H, deadline: now + 2 * DAY, esc: { key: 'revize:2' }, audit: [A(now - 7 * DAY, OBCH, 'Založení požadavku'), A(now - 6 * DAY, SEF, 'Přidělení', 'konstruktér: ' + KAREL), A(now - 4 * DAY, KAREL, 'Zkreslení hotovo', 'verze v1'), A(now - 3 * DAY, OBCH, 'Odesláno klientovi'), A(now - 14 * H, 'Martin Holý (klient)', 'Klient poslal připomínky', 'založena revize v2 — IP 89.24.10.5')] });
     const g = zid(); Z.push({ id: g, cislo: 'VYK-2026-0090', createdAt: now - 14 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'Železárny Veselí a.s.', kontakt: 'Pavel Silný', kontaktEmail: 'silny@zelezarny.cz', cisloPoptavky: 'P-2026-090', pozadovanyTermin: null, stav: 'dokonceno', assignedTo: JANA, versions: [demoVer(g, 1, JANA, now - 11 * DAY, true, true)], comments: [], timeEntries: [{ user: JANA, seconds: 8 * 3600, at: now - 11 * DAY, note: 'timer' }], activeTimer: null, link: { token: crypto.randomBytes(24).toString('hex'), active: false, createdAt: now - 10 * DAY, expiresAt: now + 20 * DAY, pin: '', accesses: [] }, revisionCount: 0, closedAt: now - 8 * DAY, stepStartedAt: now - 8 * DAY, deadline: null, esc: { key: 'dokonceno:1' }, clientDecision: { action: 'schvalit', name: 'Pavel Silný', at: now - 9 * DAY, ip: '81.2.3.4', version: 1 }, audit: [A(now - 14 * DAY, OBCH, 'Založení požadavku'), A(now - 13 * DAY, SEF, 'Přidělení', 'konstruktér: ' + JANA), A(now - 11 * DAY, JANA, 'Zkreslení hotovo', 'verze v1'), A(now - 10 * DAY, SEF, 'Interní kontrola OK'), A(now - 10 * DAY, OBCH, 'Odesláno klientovi'), A(now - 9 * DAY, 'Pavel Silný (klient)', 'Klient schválil', 'verze v1, IP 81.2.3.4'), A(now - 8 * DAY, SEF, 'Dokončeno')] });
+    // h) Předáno do výroby — čeká na přidělení střediska (šéf výroby na tahu)
+    const hh = zid(); Z.push({ id: hh, cislo: 'VYK-2026-0093', createdAt: now - 10 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'Technické služby Přerov', kontakt: 'Ivo Krátký', kontaktEmail: 'kratky@ts-prerov.cz', cisloPoptavky: 'P-2026-093', pozadovanyTermin: null, stav: 'vyroba', assignedTo: PEPA, versions: [demoVer(hh, 1, PEPA, now - 6 * DAY, true, true)], comments: [], timeEntries: [{ user: PEPA, seconds: 8 * 3600, at: now - 6 * DAY, note: 'timer' }], activeTimer: null, link: { token: crypto.randomBytes(24).toString('hex'), active: false, createdAt: now - 5 * DAY, expiresAt: now + 25 * DAY, pin: '', accesses: [] }, revisionCount: 0, strediskoKey: '', strediskoName: '', stepStartedAt: now - 6 * H, deadline: now + 18 * H, esc: { key: 'vyroba:1' }, clientDecision: { action: 'schvalit', name: 'Ivo Krátký', at: now - DAY, ip: '81.2.3.9', version: 1 }, audit: [A(now - 10 * DAY, OBCH, 'Založení požadavku'), A(now - 9 * DAY, SEF, 'Přidělení', 'konstruktér: ' + PEPA), A(now - 6 * DAY, PEPA, 'Zkreslení hotovo', 'verze v1'), A(now - 5 * DAY, SEF, 'Interní kontrola OK'), A(now - 4 * DAY, OBCH, 'Odesláno klientovi'), A(now - DAY, 'Ivo Krátký (klient)', 'Klient schválil', 'verze v1'), A(now - 6 * H, OBCH, 'Předáno do výroby')] });
+    // i) Ve výrobním středisku (Supíkovice)
+    const ii = zid(); Z.push({ id: ii, cislo: 'VYK-2026-0088', createdAt: now - 16 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'AVE CZ odpadové hospodářství', kontakt: 'Petra Zelená', kontaktEmail: 'zelena@ave.cz', cisloPoptavky: 'P-2026-088', pozadovanyTermin: null, stav: 'stredisko', assignedTo: JANA, versions: [demoVer(ii, 1, JANA, now - 12 * DAY, true, true)], comments: [], timeEntries: [{ user: JANA, seconds: 8 * 3600, at: now - 12 * DAY, note: 'timer' }], activeTimer: null, link: { token: crypto.randomBytes(24).toString('hex'), active: false, createdAt: now - 11 * DAY, expiresAt: now + 19 * DAY, pin: '', accesses: [] }, revisionCount: 0, strediskoKey: 'supikovice', strediskoName: 'Supíkovice', stepStartedAt: now - 2 * DAY, deadline: null, esc: { key: 'stredisko:1' }, clientDecision: { action: 'schvalit', name: 'Petra Zelená', at: now - 3 * DAY, ip: '81.2.3.11', version: 1 }, audit: [A(now - 16 * DAY, OBCH, 'Založení požadavku'), A(now - 15 * DAY, SEF, 'Přidělení', 'konstruktér: ' + JANA), A(now - 12 * DAY, JANA, 'Zkreslení hotovo', 'verze v1'), A(now - 11 * DAY, SEF, 'Interní kontrola OK'), A(now - 10 * DAY, OBCH, 'Odesláno klientovi'), A(now - 3 * DAY, 'Petra Zelená (klient)', 'Klient schválil', 'verze v1'), A(now - 2 * DAY, OBCH, 'Předáno do výroby'), A(now - 2 * DAY, SEFV, 'Přiděleno výrobní středisko', 'Supíkovice')] });
     const nm = adminEmail || '';
     const notif = [
       { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'PO TERMÍNU: krok „V práci" u VYK-2026-0098 překročil termín.', zakId: c, at: now - 2 * H, read: false },
-      { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Nový požadavek VYK-2026-0101 (Kovošrot Zlín s.r.o.) čeká na přidělení.', zakId: a, at: now - 4 * H, read: false },
+      { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Výkres VYK-2026-0093 je schválen a předán do výroby — přidělte středisko.', zakId: hh, at: now - 6 * H, read: false },
       { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Klient poslal PŘIPOMÍNKY k VYK-2026-0095 — založena revize v2.', zakId: f, at: now - 14 * H, read: true },
     ];
-    save({ seq: 101, roles: { [OBCH]: 'obchodnik', [SEF]: 'sef', [PEPA]: 'konstrukter', [KAREL]: 'konstrukter', [JANA]: 'konstrukter', [RED]: 'reditel' }, fond: { [PEPA]: 40, [KAREL]: 32, [JANA]: 40 }, types: JSON.parse(JSON.stringify(SEED_TYPES)), zakazky: Z, notif });
+    save({ seq: 101, roles: { [OBCH]: 'obchodnik', [SEF]: 'sef', [PEPA]: 'konstrukter', [KAREL]: 'konstrukter', [JANA]: 'konstrukter', [RED]: 'reditel', [SEFV]: 'sef-vyroby' }, fond: { [PEPA]: 40, [KAREL]: 32, [JANA]: 40 }, types: JSON.parse(JSON.stringify(SEED_TYPES)), zakazky: Z, notif });
     return Z.length;
   }
   async function apiAdminSeed(req, res) {

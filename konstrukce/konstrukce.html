@@ -54,6 +54,8 @@ body{margin:0;font-family:Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);back
 .pill.revize{background:#fff3e0;color:#e65100}
 .pill.podklady{background:#eceff1;color:#607d8b}
 .pill.schvaleno{background:var(--green-soft);color:#0a6b34}
+.pill.vyroba{background:#e0f7fa;color:#00838f}
+.pill.stredisko{background:#e0f7fa;color:#00838f}
 .pill.dokonceno{background:#e0f2f1;color:#00695c}
 .pill.zamitnuto{background:#fdecea;color:#c62828}
 .muted{color:var(--mut)}
@@ -107,7 +109,7 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .flow .st.cur{color:#fff;border-color:transparent}
 .flow .st.cur .rd{background:rgba(255,255,255,.9)}
 .flow .arw{color:#c3ccc4;font-size:13px}
-.r-sef{background:var(--purple)!important}.r-kon{background:#e65100!important}.r-obch{background:var(--blue)!important}.r-kli{background:var(--g)!important}.r-sys{background:var(--gray)!important}
+.r-sef{background:var(--purple)!important}.r-kon{background:#e65100!important}.r-obch{background:var(--blue)!important}.r-kli{background:var(--g)!important}.r-sys{background:var(--gray)!important}.r-vyr{background:#00838f!important}
 .pdfwrap{background:#525659;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
 .pdfwrap iframe{width:100%;height:58vh;border:0;display:block}
 .pdfbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
@@ -161,7 +163,7 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 function fdate(ts){if(!ts)return'—';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'+d.getUTCFullYear()}
 function fdt(ts){if(!ts)return'—';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return fdate(ts)+' '+p(d.getUTCHours())+':'+p(d.getUTCMinutes())}
 function hhmm(sec){sec=sec||0;var h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);return h+'h '+(m<10?'0':'')+m+'m'}
-function roleLabel(r){return{obchodnik:'Obchodník',sef:'Šéf konstrukce',konstrukter:'Konstruktér',reditel:'Ředitel',admin:'Správce'}[r]||r||'—'}
+function roleLabel(r){return{obchodnik:'Obchodník',sef:'Šéf konstrukce',konstrukter:'Konstruktér',reditel:'Ředitel','sef-vyroby':'Šéf výroby',admin:'Správce'}[r]||r||'—'}
 function api(path,method,body){return fetch('/api/konstrukce'+path,{method:method||'GET',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined,cache:'no-store'}).then(function(r){return r.json().then(function(j){return{ok:r.ok,status:r.status,j:j}})})}
 
 function isPriv(){return ME.isAdmin||ME.role==='sef'||ME.role==='reditel'}
@@ -190,6 +192,7 @@ function counts(){
     kontrola:z.filter(function(x){return x.stav==='kontrola'}).length,
     obchodnik:z.filter(function(x){return x.stav==='obchodnik'}).length,
     klient:z.filter(function(x){return x.stav==='klient'}).length,
+    vyr:z.filter(function(x){return x.stav==='vyroba'||x.stav==='stredisko'}).length,
     red:z.filter(function(x){return x.semafor==='red'}).length,
     open:z.filter(function(x){return !isTerminal(x.stav)}).length,
     all:z.length
@@ -204,6 +207,7 @@ function renderSide(){
   if(ME.isAdmin||ME.role==='sef'){h+=chip('novy','Nové k přidělení',c.novy);h+=chip('kontrola','Interní kontrola',c.kontrola);}
   if(ME.isAdmin||ME.role==='konstrukter'||ME.role==='sef'){h+=chip('prace','Ve zkreslení',c.prace);}
   if(ME.isAdmin||ME.role==='obchodnik'||ME.role==='sef'){h+=chip('obchodnik','U obchodníka',c.obchodnik);h+=chip('klient','U klienta',c.klient);}
+  if(ME.isAdmin||ME.role==='sef-vyroby'||ME.role==='sef'||ME.role==='reditel'){h+=chip('vyroba','Ve výrobě',c.vyr);}
   h+='<div class="grp">Přehled</div>';
   h+=chip('red','Po termínu',c.red);
   h+=chip('open','Otevřené',c.open);
@@ -226,6 +230,7 @@ function filtered(){
   if(FILTER==='kontrola')return z.filter(function(x){return x.stav==='kontrola'});
   if(FILTER==='obchodnik')return z.filter(function(x){return x.stav==='obchodnik'});
   if(FILTER==='klient')return z.filter(function(x){return x.stav==='klient'});
+  if(FILTER==='vyroba')return z.filter(function(x){return x.stav==='vyroba'||x.stav==='stredisko'});
   if(FILTER==='red')return z.filter(function(x){return x.semafor==='red'});
   if(FILTER==='open')return z.filter(function(x){return !isTerminal(x.stav)});
   return z;
@@ -237,7 +242,7 @@ function renderMain(){
   if(FILTER==='workflow')return renderWorkflow(m);
   if(FILTER==='evidence')return renderTimesheet(m);
   if(FILTER==='nastaveni')return renderNastaveni(m);
-  var titleMap={mine:'Na tahu u mě',novy:'Nové k přidělení',prace:'Ve zkreslení',kontrola:'Interní kontrola',obchodnik:'U obchodníka',klient:'U klienta',red:'Po termínu',open:'Otevřené zakázky',all:'Všechny zakázky'};
+  var titleMap={mine:'Na tahu u mě',novy:'Nové k přidělení',prace:'Ve zkreslení',kontrola:'Interní kontrola',obchodnik:'U obchodníka',klient:'U klienta',vyroba:'Ve výrobě',red:'Po termínu',open:'Otevřené zakázky',all:'Všechny zakázky'};
   var list=filtered();
   var h='<div class="head"><h2>'+esc(titleMap[FILTER]||'Zakázky')+' <span class="muted" style="font-weight:400;font-size:15px">('+list.length+')</span></h2></div>';
   if(!list.length){h+='<div class="empty">Žádné zakázky v této složce.</div>';m.innerHTML=h;return}
@@ -304,7 +309,7 @@ function kc(v,l){return '<div class="c"><div class="v">'+esc(v)+'</div><div clas
 /* ---- workflow schéma (celý proces) ---- */
 function renderWorkflow(m){
   var t=(D.types&&D.types[0])||{lhutaPrideleniDays:1,lhutaZkresleniDays:3,lhutaKontrolaDays:1,lhutaObchodnikDays:1,lhutaKlientDays:5,lhutaRevizeDays:2,linkValidDays:30};
-  var COL={sef:'var(--purple)',kon:'#e65100',obch:'var(--blue)',kli:'var(--g)',sys:'var(--gray)'};
+  var COL={sef:'var(--purple)',kon:'#e65100',obch:'var(--blue)',kli:'var(--g)',sys:'var(--gray)',vyr:'#00838f'};
   function node(role,title,meta){return '<div class="node" style="background:'+COL[role]+'"><div class="t">'+esc(title)+'</div><div class="m">'+esc(meta)+'</div></div>'}
   function arw(){return '<div class="arw">→</div>'}
   var legend='<div class="legend">'+
@@ -312,16 +317,19 @@ function renderWorkflow(m){
     '<span><i style="background:var(--purple)"></i>Šéf konstrukce</span>'+
     '<span><i style="background:#e65100"></i>Konstruktér</span>'+
     '<span><i style="background:var(--g)"></i>Klient</span>'+
+    '<span><i style="background:#00838f"></i>Šéf výroby</span>'+
     '<span><i style="background:var(--gray)"></i>Systém</span></div>';
   var flow='<div class="wf">'+
     node('obch','1 · Zadání','obchodník · požadavek')+arw()+
-    node('sef','2 · Přidělení','šéf · '+t.lhutaPrideleniDays+' prac. den')+arw()+
+    node('sef','2 · Přidělení','šéf konstrukce · '+t.lhutaPrideleniDays+' prac. den')+arw()+
     node('kon','3 · Zkreslení','konstruktér · '+t.lhutaZkresleniDays+' prac. dny · PDF + CAD')+arw()+
-    node('sef','4 · Interní kontrola','šéf · '+t.lhutaKontrolaDays+' prac. den')+arw()+
+    node('sef','4 · Interní kontrola','šéf konstrukce · '+t.lhutaKontrolaDays+' prac. den')+arw()+
     node('obch','5 · Potvrzení','obchodník · '+t.lhutaObchodnikDays+' prac. den')+arw()+
     node('kli','6 · Veřejný náhled','klient · odkaz '+t.linkValidDays+' dnů')+arw()+
-    node('kli','7 · Rozhodnutí','schválit / revize / zamítnout')+arw()+
-    node('sys','8 · Dokončeno','archiv · výroba')+'</div>';
+    node('kli','7 · Schválení','klient schválí výkres')+arw()+
+    node('vyr','8 · Předání do výroby','šéf výroby přebírá')+arw()+
+    node('vyr','9 · Výrobní středisko','šéf výroby přidělí středisko')+arw()+
+    node('sys','10 · Vyrobeno','hotovo · archiv')+'</div>';
   var branches='<div class="two" style="margin-top:16px">'+
     '<div class="branch"><b>↩ Revize</b><div class="muted" style="margin-top:4px">Klient pošle připomínky → nová verze (v2, v3…), zpět na konstruktéra ('+t.lhutaRevizeDays+' prac. dny), znovu kontrola a schválení. Původní odkaz se deaktivuje.</div></div>'+
     '<div class="branch"><b>⏸ Čeká na podklady</b><div class="muted" style="margin-top:4px">Chybí-li podklady od zákazníka, zakázka se pozastaví a lhůty se zastaví (zpoždění se nepočítá konstrukci).</div></div>'+
@@ -381,6 +389,7 @@ function renderDrawer(z){
         '<b>Poptávka</b><span>'+esc(z.cisloPoptavky||'—')+'</span>'+
         '<b>Odpracováno</b><span>'+hhmm(z.totalSec)+'</span>'+
         (z.revisionCount?('<b>Revizí</b><span>'+z.revisionCount+'</span>'):'')+
+        (z.strediskoName?('<b>Výrobní středisko</b><span>'+esc(z.strediskoName)+'</span>'):'')+
         (z.holdReason?('<b>Čeká na</b><span>'+esc(z.holdReason)+'</span>'):'')+
       '</div>'+
       actionsFor(z)+
@@ -391,7 +400,7 @@ function renderDrawer(z){
     '</div>';
 }
 function stepFlow(z){
-  var stages=[{k:'novy',l:'Nový',r:'sef'},{k:'prace',l:'V práci',r:'kon'},{k:'kontrola',l:'Kontrola',r:'sef'},{k:'obchodnik',l:'Obchodník',r:'obch'},{k:'klient',l:'U klienta',r:'kli'},{k:'schvaleno',l:'Schváleno',r:'kli'},{k:'dokonceno',l:'Dokončeno',r:'sys'}];
+  var stages=[{k:'novy',l:'Nový',r:'sef'},{k:'prace',l:'V práci',r:'kon'},{k:'kontrola',l:'Kontrola',r:'sef'},{k:'obchodnik',l:'Obchodník',r:'obch'},{k:'klient',l:'U klienta',r:'kli'},{k:'schvaleno',l:'Schváleno',r:'kli'},{k:'vyroba',l:'Do výroby',r:'vyr'},{k:'stredisko',l:'Středisko',r:'vyr'},{k:'dokonceno',l:'Vyrobeno',r:'sys'}];
   var order=stages.map(function(s){return s.k});
   var cur=z.stav, eff=cur;
   if(cur==='revize')eff='prace';
@@ -403,7 +412,9 @@ function stepFlow(z){
     var cls='st';
     if(ci>=0&&i<ci)cls+=' done';
     else if(i===ci)cls+=' cur r-'+s.r;
-    var label=(i===ci&&cur==='revize')?('Revize v'+z.versionCount):s.l;
+    var label=s.l;
+    if(i===ci&&cur==='revize')label='Revize v'+z.versionCount;
+    if(i===ci&&cur==='stredisko'&&z.strediskoName)label=z.strediskoName;
     h+=(i?'<span class="arw">→</span>':'')+'<span class="'+cls+'"><span class="rd"></span>'+esc(label)+'</span>';
   });
   h+='</div>';
@@ -439,6 +450,7 @@ function actionsFor(z){
   var me=ME, h='', canObch=me.isAdmin||(me.role==='obchodnik'&&z.obchodnikEmail===me.email);
   var canSef=me.isAdmin||me.role==='sef';
   var canKon=me.isAdmin||(me.role==='konstrukter'&&z.assignedTo===me.email);
+  var canVyr=me.isAdmin||me.role==='sef-vyroby';
   var blocks=[];
 
   if(z.stav==='novy'&&canSef){blocks.push(assignBlock(z))}
@@ -459,7 +471,13 @@ function actionsFor(z){
     '<div class="actions"><button class="btn ghost sm" onclick="copyLink(\''+(z.link?z.link.url:'')+'\')">Kopírovat odkaz</button>'+
     '<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button></div></div>')}
 
-  if(z.stav==='schvaleno'&&(canSef||canObch)){blocks.push('<div class="card" style="background:#e6f6ec"><b>Schváleno klientem ✓</b><div class="actions" style="margin-top:6px"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'dokoncit\')">Dokončit a archivovat</button></div></div>')}
+  if(z.stav==='schvaleno'&&(canSef||canObch)){blocks.push('<div class="card" style="background:#e6f6ec"><b>Schváleno klientem ✓</b><p class="muted" style="margin:6px 0">Výkres je uzamčen. Předejte zakázku do výroby — dostane ji šéf výroby k přidělení střediska.</p><div class="actions"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'predat-vyrobe\')">→ Předat do výroby</button></div></div>')}
+
+  if(z.stav==='vyroba'&&canVyr){blocks.push(vyrobaBlock(z,'Přidělit výrobní středisko'))}
+  if(z.stav==='stredisko'&&canVyr){blocks.push(
+    '<div class="card" style="background:#e0f7fa"><b>Ve výrobním středisku'+(z.strediskoName?' — '+esc(z.strediskoName):'')+'</b>'+
+    '<div class="actions" style="margin-top:8px"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'vyrobeno\')">✓ Vyrobeno — dokončit</button></div>'+
+    '<div style="border-top:1px solid var(--line);margin:10px 0"></div>'+vyrobaBlock(z,'Přeřadit na jiné středisko',true)+'</div>')}
 
   // pozastavení / obnovení
   if(!isTerminal(z.stav)&&z.stav!=='schvaleno'){
@@ -474,6 +492,22 @@ function assignBlock(z){
     '<div class="row" style="margin-top:6px">'+konstrSelect('asg_'+z.id)+'<button class="btn sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přidělit</button></div></div>';
 }
 function assignReassign(z){return konstrSelect('asg_'+z.id)+'<button class="btn ghost sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přeřadit</button>'}
+function vyrobaBlock(z,title,inline){
+  var isRe=title.indexOf('Přeřadit')>=0;
+  var inner=strediskoSelect('str_'+z.id,z.strediskoKey)+'<button class="btn '+(inline?'ghost ':'')+'sm" onclick="prideliStredisko(\''+z.id+'\',\'str_'+z.id+'\')">'+(isRe?'Přeřadit':'Přidělit')+'</button>';
+  if(inline)return '<div><label>'+esc(title)+'</label><div class="row" style="margin-top:4px">'+inner+'</div></div>';
+  return '<div class="card" style="background:#e0f7fa"><b>'+esc(title)+'</b><p class="muted" style="margin:6px 0">Zakázka je schválena a předána do výroby. Vyberte výrobní středisko, které ji zpracuje.</p><div class="row">'+inner+'</div></div>';
+}
+function strediskoSelect(id,sel){
+  var opts='<option value="">— vyberte středisko —</option>';
+  (D.strediska||[]).forEach(function(s){opts+='<option value="'+esc(s.key)+'"'+(sel===s.key?' selected':'')+'>'+esc(s.label)+'</option>'});
+  return '<select id="'+id+'" style="max-width:240px">'+opts+'</select>';
+}
+function prideliStredisko(id,selId){
+  var s=(document.getElementById(selId)||{}).value;
+  if(!s){alert('Vyberte výrobní středisko.');return}
+  api('/stav','POST',{id:id,action:'prideli-stredisko',stredisko:s}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba.');return}reloadData()});
+}
 function recomHint(){
   var k=(D.kapacita||[])[0];
   return k?('<div class="muted" style="font-size:12.5px;margin-top:4px">Doporučeno: <b>'+esc(k.name)+'</b> (nejnižší vytížení '+k.vytizeni+' %)</div>'):'';
@@ -705,7 +739,7 @@ function renderNastaveni(m){
   (D.roles||[]).forEach(function(r){
     h+='<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)"><div style="min-width:200px"><b>'+esc(r.name)+'</b><div class="sub">'+esc(r.email)+'</div></div>'+
       '<select onchange="setRole(\''+esc(r.email)+'\',this.value)" style="max-width:180px"><option value="">— bez role —</option>'+
-      ['obchodnik','sef','konstrukter','reditel'].map(function(x){return '<option value="'+x+'"'+(r.role===x?' selected':'')+'>'+roleLabel(x)+'</option>'}).join('')+'</select>'+
+      ['obchodnik','sef','konstrukter','sef-vyroby','reditel'].map(function(x){return '<option value="'+x+'"'+(r.role===x?' selected':'')+'>'+roleLabel(x)+'</option>'}).join('')+'</select>'+
       (r.role==='konstrukter'?('<input style="width:120px" type="number" placeholder="fond h/týd" value="'+(r.fond||'')+'" onchange="setFond(\''+esc(r.email)+'\',this.value)">'):'<span style="width:120px"></span>')+
     '</div>';
   });
@@ -717,6 +751,11 @@ function renderNastaveni(m){
       '<div class="actions" style="margin-top:6px"><button class="btn ghost sm" onclick="editTyp(\''+esc(t.key)+'\')">Upravit</button></div></div>';
   });
   h+='<div class="actions" style="margin-top:10px"><button class="btn sm" onclick="editTyp(\'\')">+ Nový typ výrobku</button></div></div>';
+  h+='<div class="sec">Výrobní střediska</div><div class="card"><p class="muted" style="margin-top:0">Střediska, kterým šéf výroby přiděluje schválené zakázky do výroby.</p>';
+  (D.strediska||[]).forEach(function(s){
+    h+='<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><b>'+esc(s.label)+'</b><button class="btn ghost sm" onclick="delStredisko(\''+esc(s.key)+'\')">×</button></div>';
+  });
+  h+='<div class="row" style="margin-top:10px"><input id="strLabel" placeholder="Název střediska"><button class="btn sm" onclick="addStredisko()">+ Přidat středisko</button></div></div>';
   h+='<div class="sec">Druhy práce (evidence)</div><div class="card">';
   (D.activities||[]).forEach(function(a){
     h+='<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span><b>'+esc(a.label)+'</b> <span class="tag">'+(a.kind==='zakazka'?'zakázka':'režie')+'</span></span>'+
@@ -739,6 +778,12 @@ function addActivity(){
   api('/admin/activity','POST',{key:key,label:label,kind:kind}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData();renderMain()});
 }
 function delActivity(key){if(!confirm('Smazat činnost z číselníku? (existující záznamy zůstanou)'))return;api('/admin/activity','POST',{key:key,delete:true}).then(function(){reloadData();renderMain()})}
+function addStredisko(){
+  var label=(document.getElementById('strLabel')||{}).value||'';if(!label.trim())return;
+  var key=label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,30);
+  api('/admin/stredisko','POST',{key:key,label:label}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData();renderMain()});
+}
+function delStredisko(key){if(!confirm('Smazat výrobní středisko?'))return;api('/admin/stredisko','POST',{key:key,delete:true}).then(function(){reloadData();renderMain()})}
 function importEvidence(){
   var user=(document.getElementById('impUser')||{}).value||'';var mode=(document.getElementById('impMode')||{}).value||'append';
   var err=document.getElementById('impErr');err.textContent='';
