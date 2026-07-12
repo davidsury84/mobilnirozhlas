@@ -41,6 +41,7 @@ const STAV = {
 const SEED_STREDISKA = [
   { key: 'supikovice', label: 'Supíkovice', reditelEmail: '' },
   { key: 'bruntal', label: 'Bruntál', reditelEmail: '' },
+  { key: 'bruntal-popelnice', label: 'Bruntál popelnice', reditelEmail: '' },
   { key: 'chomutov', label: 'Chomutov', reditelEmail: '' },
   { key: 'polsko', label: 'Polsko', reditelEmail: '' },
 ];
@@ -1313,6 +1314,7 @@ function mount(host) {
     const strediska = [
       { key: 'supikovice', label: 'Supíkovice', reditelEmail: SEFV },
       { key: 'bruntal', label: 'Bruntál', reditelEmail: '' },
+      { key: 'bruntal-popelnice', label: 'Bruntál popelnice', reditelEmail: '' },
       { key: 'chomutov', label: 'Chomutov', reditelEmail: '' },
       { key: 'polsko', label: 'Polsko', reditelEmail: '' },
     ];
