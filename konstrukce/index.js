@@ -23,7 +23,7 @@ const HTML_FILE = path.join(__dirname, 'konstrukce.html');
 // ---- Stavy zakázky (kap. 4 dokumentu) --------------------------------------
 const STAV = {
   novy:      { label: 'Nový',              onTurn: 'sef',        terminal: false },
-  prace:     { label: 'V práci',           onTurn: 'konstrukter', terminal: false },
+  prace:     { label: 'Zkreslení',         onTurn: 'konstrukter', terminal: false },
   kontrola:  { label: 'Interní kontrola',  onTurn: 'sef',        terminal: false },
   obchodnik: { label: 'U obchodníka',      onTurn: 'obchodnik',  terminal: false },
   klient:    { label: 'U klienta',         onTurn: 'obchodnik',  terminal: false }, // hlídá obchodník
@@ -1274,7 +1274,7 @@ function mount(host) {
     const ii = zid(); Z.push({ id: ii, cislo: 'VYK-2026-0088', createdAt: now - 16 * DAY, createdBy: OBCH, obchodnikEmail: OBCH, typKey: 'abroll', params: P, zakaznik: 'AVE CZ odpadové hospodářství', kontakt: 'Petra Zelená', kontaktEmail: 'zelena@ave.cz', cisloPoptavky: 'P-2026-088', pozadovanyTermin: null, stav: 'stredisko', assignedTo: JANA, versions: [demoVer(ii, 1, JANA, now - 12 * DAY, true, true)], comments: [], timeEntries: [{ user: JANA, seconds: 8 * 3600, at: now - 12 * DAY, note: 'timer' }], activeTimer: null, link: { token: crypto.randomBytes(24).toString('hex'), active: false, createdAt: now - 11 * DAY, expiresAt: now + 19 * DAY, pin: '', accesses: [] }, revisionCount: 0, strediskoKey: 'supikovice', strediskoName: 'Supíkovice', stepStartedAt: now - 2 * DAY, deadline: null, esc: { key: 'stredisko:1' }, clientDecision: { action: 'schvalit', name: 'Petra Zelená', at: now - 3 * DAY, ip: '81.2.3.11', version: 1 }, audit: [A(now - 16 * DAY, OBCH, 'Založení požadavku'), A(now - 15 * DAY, SEF, 'Přidělení', 'konstruktér: ' + JANA), A(now - 12 * DAY, JANA, 'Zkreslení hotovo', 'verze v1'), A(now - 11 * DAY, SEF, 'Interní kontrola OK'), A(now - 10 * DAY, OBCH, 'Odesláno klientovi'), A(now - 3 * DAY, 'Petra Zelená (klient)', 'Klient schválil', 'verze v1'), A(now - 2 * DAY, OBCH, 'Předáno do výroby'), A(now - 2 * DAY, SEFV, 'Přiděleno výrobní středisko', 'Supíkovice')] });
     const nm = adminEmail || '';
     const notif = [
-      { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'PO TERMÍNU: krok „V práci" u VYK-2026-0098 překročil termín.', zakId: c, at: now - 2 * H, read: false },
+      { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'PO TERMÍNU: krok „Zkreslení" u VYK-2026-0098 překročil termín.', zakId: c, at: now - 2 * H, read: false },
       { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Výkres VYK-2026-0093 je schválen a předán do výroby — přidělte středisko.', zakId: hh, at: now - 6 * H, read: false },
       { id: 'n' + crypto.randomBytes(5).toString('hex'), email: nm, text: 'Klient poslal PŘIPOMÍNKY k VYK-2026-0095 — založena revize v2.', zakId: f, at: now - 14 * H, read: true },
     ];

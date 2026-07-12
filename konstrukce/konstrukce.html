@@ -109,6 +109,7 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .flow .st.cur{color:#fff;border-color:transparent}
 .flow .st.cur .rd{background:rgba(255,255,255,.9)}
 .flow .arw{color:#c3ccc4;font-size:13px}
+.flow .dd{font-weight:700;font-size:11px;margin-left:3px;opacity:.6}
 .r-sef{background:var(--purple)!important}.r-kon{background:#e65100!important}.r-obch{background:var(--blue)!important}.r-kli{background:var(--g)!important}.r-sys{background:var(--gray)!important}.r-vyr{background:#00838f!important}
 .pdfwrap{background:#525659;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
 .pdfwrap iframe{width:100%;height:58vh;border:0;display:block}
@@ -399,14 +400,34 @@ function renderDrawer(z){
       comments+audit+
     '</div>';
 }
+function stepDays(z){
+  var order=['novy','prace','kontrola','obchodnik','klient','schvaleno','vyroba','stredisko','dokonceno'];
+  var starts={novy:z.createdAt};
+  var map=[['Přidělení','prace'],['Zkreslení hotovo','kontrola'],['Interní kontrola OK','obchodnik'],['Odesláno klientovi','klient'],['Klient schválil','schvaleno'],['Předáno do výroby','vyroba'],['Přiděleno výrobní středisko','stredisko']];
+  (z.audit||[]).forEach(function(a){
+    var ac=a.action||'';
+    map.forEach(function(m){if(ac.indexOf(m[0])>=0)starts[m[1]]=a.at});
+    if(ac.indexOf('Vyrobeno')>=0||ac.indexOf('Dokončeno')>=0)starts.dokonceno=a.at;
+  });
+  var days={};
+  order.forEach(function(k,i){
+    if(starts[k]==null||k==='dokonceno')return;
+    var end=null;
+    for(var j=i+1;j<order.length;j++){if(starts[order[j]]!=null){end=starts[order[j]];break}}
+    if(end==null)end=Date.now();
+    days[k]=Math.max(0,Math.round((end-starts[k])/86400000));
+  });
+  return days;
+}
 function stepFlow(z){
-  var stages=[{k:'novy',l:'Nový',r:'sef'},{k:'prace',l:'V práci',r:'kon'},{k:'kontrola',l:'Kontrola',r:'sef'},{k:'obchodnik',l:'Obchodník',r:'obch'},{k:'klient',l:'U klienta',r:'kli'},{k:'schvaleno',l:'Schváleno',r:'kli'},{k:'vyroba',l:'Do výroby',r:'vyr'},{k:'stredisko',l:'Středisko',r:'vyr'},{k:'dokonceno',l:'Vyrobeno',r:'sys'}];
+  var stages=[{k:'novy',l:'Nový',r:'sef'},{k:'prace',l:'Zkreslení',r:'kon'},{k:'kontrola',l:'Kontrola',r:'sef'},{k:'obchodnik',l:'Obchodník',r:'obch'},{k:'klient',l:'U klienta',r:'kli'},{k:'schvaleno',l:'Schváleno',r:'kli'},{k:'vyroba',l:'Do výroby',r:'vyr'},{k:'stredisko',l:'Středisko',r:'vyr'},{k:'dokonceno',l:'Vyrobeno',r:'sys'}];
   var order=stages.map(function(s){return s.k});
   var cur=z.stav, eff=cur;
   if(cur==='revize')eff='prace';
   if(cur==='podklady')eff=z.prevStav||'prace';
   if(cur==='zamitnuto')eff='';
   var ci=order.indexOf(eff);
+  var days=stepDays(z);
   var h='<div class="flow">';
   stages.forEach(function(s,i){
     var cls='st';
@@ -415,7 +436,8 @@ function stepFlow(z){
     var label=s.l;
     if(i===ci&&cur==='revize')label='Revize v'+z.versionCount;
     if(i===ci&&cur==='stredisko'&&z.strediskoName)label=z.strediskoName;
-    h+=(i?'<span class="arw">→</span>':'')+'<span class="'+cls+'"><span class="rd"></span>'+esc(label)+'</span>';
+    var dtxt=(days[s.k]!=null)?(' <span class="dd">'+days[s.k]+' d</span>'):'';
+    h+=(i?'<span class="arw">→</span>':'')+'<span class="'+cls+'"><span class="rd"></span>'+esc(label)+dtxt+'</span>';
   });
   h+='</div>';
   if(cur==='podklady')h+='<div style="margin:-4px 0 8px;color:var(--amber);font-size:13px;font-weight:600">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</div>';
