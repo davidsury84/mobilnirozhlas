@@ -46,7 +46,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
-  background:var(--bg-2);
+  background:var(--paper);
   color:var(--ink);
   font-family:"IBM Plex Sans",system-ui,sans-serif;
   font-size:15px;
@@ -67,7 +67,7 @@ header.appbar{
   box-shadow:0 1px 0 var(--line), 0 6px 22px rgba(15,21,18,.05);
   -webkit-backdrop-filter:saturate(1.1);backdrop-filter:saturate(1.1);
 }
-.appbar-inner{max-width:1240px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.appbar-inner{max-width:1320px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:12px}
 .brand .logo{
   width:52px;height:52px;flex:none;border-radius:13px;background:var(--grad-green);
@@ -5324,7 +5324,7 @@ function renderThemeSettings(){
 function toggleThemePop(ev){ if(ev) ev.stopPropagation(); document.getElementById("themePop").classList.toggle("show"); }
 function toggleThemePop(ev){ if(ev) ev.stopPropagation(); document.getElementById("themePop").classList.toggle("show"); }
 document.addEventListener("click", e=>{ const pop=document.getElementById("themePop"); const btn=document.getElementById("themeBtn"); if(pop && pop.classList.contains("show") && !pop.contains(e.target) && e.target!==btn && !btn.contains(e.target)) pop.classList.remove("show"); });
-applyTheme((function(){ try{ return localStorage.getItem("intranetTheme"); }catch(e){ return null; } })() || "zelena");
+applyTheme((function(){ try{ return localStorage.getItem("intranetTheme"); }catch(e){ return null; } })() || "google");
 
 // Kořen „/" = zaměstnanecký intranet, „/admin" = administrace. (#cti= otevře čtečku směrnice.)
 if(location.hash.match(/cti=/i)) route();
