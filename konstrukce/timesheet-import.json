@@ -1,0 +1,6394 @@
+[
+{
+"date": "2026-01-05",
+"zakazka": "25B888,889",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-01-05",
+"zakazka": "25C470",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.2,
+"note": ""
+},
+{
+"date": "2026-01-05",
+"zakazka": "25C448",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.7,
+"note": ""
+},
+{
+"date": "2026-01-05",
+"zakazka": "25B851",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 8.0,
+"note": "special + prototyp CV01"
+},
+{
+"date": "2026-01-05",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-01-05",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-01-06",
+"zakazka": "Kapsy na VZV ACTS29AUL",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.1,
+"note": "ACTS - step od zakaznika"
+},
+{
+"date": "2026-01-06",
+"zakazka": "EV-BOX",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 6.0,
+"note": ""
+},
+{
+"date": "2026-01-06",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-01-06",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-01-07",
+"zakazka": "BEBAT-520-MOD02",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.8,
+"note": "ŠROUBY M6 V VÍKO"
+},
+{
+"date": "2026-01-07",
+"zakazka": "25B726",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 50,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-07",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-01-07",
+"zakazka": "ACTS29AUL",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-08",
+"zakazka": "25B726",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-01-08",
+"zakazka": "25B801",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.8,
+"note": ""
+},
+{
+"date": "2026-01-08",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-01-08",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-01-09",
+"zakazka": "25S177",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.1,
+"note": ""
+},
+{
+"date": "2026-01-09",
+"zakazka": "25S178",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-01-09",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-01-09",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-01-12",
+"zakazka": "25C365",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.8,
+"note": ""
+},
+{
+"date": "2026-01-12",
+"zakazka": "25C432",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 4.0,
+"note": "special container --- electro navijak+najezd hlinik+klanice"
+},
+{
+"date": "2026-01-12",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-12",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-13",
+"zakazka": "25B800",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.5,
+"note": "kontrola umístění  nákupních dílů"
+},
+{
+"date": "2026-01-13",
+"zakazka": "25C432",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-01-13",
+"zakazka": "25B876",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 5.0,
+"note": "special kontejner - PORSCHE - litihové baterie"
+},
+{
+"date": "2026-01-13",
+"zakazka": "26C001, 26C002, 26C007",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-01-13",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-13",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-01-14",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 2.0,
+"note": "konstruktér 02"
+},
+{
+"date": "2026-01-14",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.0,
+"note": "konstruktér 03"
+},
+{
+"date": "2026-01-14",
+"zakazka": "tendr Francie - RIOM 2026",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-01-14",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-01-14",
+"zakazka": "ALST38-ABR-ALST-7000x2300_2420x2350-54-QSTE",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-01-14",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-01-15",
+"zakazka": "EELR36-ABR-ECON3-ELLERMANN-6500x2200_2300x2400-53",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 5.0,
+"note": "nový prototype pro schválení podlé seznamů"
+},
+{
+"date": "2026-01-15",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-15",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-01-15",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-01-15",
+"zakazka": "25C485",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.8,
+"note": "změny podle e-mail - nova verze var_01"
+},
+{
+"date": "2026-01-16",
+"zakazka": "ACTS29AUL-KAPSY VZV-KLIN",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 1.9,
+"note": ""
+},
+{
+"date": "2026-01-16",
+"zakazka": "EELR36-ABR-ECON3-ELLERMANN-6500x2200_2300x2400-53",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.0,
+"note": "nový prototype pro schválení podlé seznamů"
+},
+{
+"date": "2026-01-16",
+"zakazka": "25B891",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.8,
+"note": ""
+},
+{
+"date": "2026-01-16",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-01-19",
+"zakazka": "25B892",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-01-19",
+"zakazka": "25B893",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.6,
+"note": ""
+},
+{
+"date": "2026-01-19",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-19",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-01-19",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-19",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-01-20",
+"zakazka": "TENDR Romania 3 pcs x DSD-6000-2300-2200-43",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.0,
+"note": "Radoslav Rojko"
+},
+{
+"date": "2026-01-20",
+"zakazka": "tender do Moldavie",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.9,
+"note": "Radoslav Rojko"
+},
+{
+"date": "2026-01-20",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 2.0,
+"note": "Zdeněk Barcuch - konzultace přes vzdálený přístup + komunikace"
+},
+{
+"date": "2026-01-20",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-01-20",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-21",
+"zakazka": "tendr Francie - RIOM 2026",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.3,
+"note": "kontejner Č.01   ABR-AFS-6000x2300x2200-5-4-5 pro hutnící válec"
+},
+{
+"date": "2026-01-21",
+"zakazka": "25B894, 895",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.1,
+"note": ""
+},
+{
+"date": "2026-01-21",
+"zakazka": "25B896, 897",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-21",
+"zakazka": "ASP- PRUŽINA-MOD01",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-01-21",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-01-21",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-01-22",
+"zakazka": "tendr Francie - RIOM 2026",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.9,
+"note": "kontejner Č.02   ABR-AFS-5500x2300x800-6-4-KLZ"
+},
+{
+"date": "2026-01-22",
+"zakazka": "ASP520 deksel - opmerkingen in file",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-01-22",
+"zakazka": "26B001",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 80,
+"hours": 2.1,
+"note": ""
+},
+{
+"date": "2026-01-22",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-01-22",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-01-22",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-23",
+"zakazka": "26B001",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 100,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-01-23",
+"zakazka": "tendr Francie - RIOM 2026",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 3.5,
+"note": "kontejner Č.03   ABR-AFS-POP-5500x2300x1400-3-2,5"
+},
+{
+"date": "2026-01-23",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-01-23",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.5,
+"note": "Michaela Hlisnikovska"
+},
+{
+"date": "2026-01-23",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-01-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.5,
+"note": "konstruktér 2"
+},
+{
+"date": "2026-01-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "konstruktér 3"
+},
+{
+"date": "2026-01-26",
+"zakazka": "Kapsy na VZV ACTS29AUL",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.2,
+"note": "přepracování KLÍNU jako sestavy"
+},
+{
+"date": "2026-01-26",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-01-26",
+"zakazka": "tendr Francie - RIOM 2026",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 2.2,
+"note": "kontejner Č.01, 02, 03"
+},
+{
+"date": "2026-01-26",
+"zakazka": "ASP520 deksel - opmerkingen in file",
+"activity": "Model Nula. Kontrola sady podkladů",
+"percent": null,
+"hours": 0.6,
+"note": "kontrola otvorů víka ASP-50-17 podlé podkladů Zakaznika, konzultace podle otázky"
+},
+{
+"date": "2026-01-26",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-01-26",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-01-26",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-01-27",
+"zakazka": "25C432",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 90,
+"hours": 3.2,
+"note": "special kontejner"
+},
+{
+"date": "2026-01-27",
+"zakazka": "ASP520 deksel - opmerkingen in file",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.6,
+"note": "kontroly dílů podlé info z výroby"
+},
+{
+"date": "2026-01-27",
+"zakazka": "ABR-DSD-PREZERO-DE-7000x2420x----",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-01-27",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-01-27",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-01-27",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-01-28",
+"zakazka": "ASP520 deksel - opmerkingen in file",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 0.7,
+"note": "spolu z bruno.vanson@parsprototo.be"
+},
+{
+"date": "2026-01-28",
+"zakazka": "ASP520 deksel - opmerkingen in file",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.4,
+"note": "provedení změn v   ASP-520-BEBAT-MOD02 / nahravani na Google / komunikace"
+},
+{
+"date": "2026-01-28",
+"zakazka": "25C432",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 100,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-01-28",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-01-28",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-01-29",
+"zakazka": "ABR-DSD-PREZERO-DE-7000x2300x2350-53-KLST-SFX",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 3.7,
+"note": "+ komunikace zPetr Sibal podle konstrukce a adaptaci pro Elko výrobu"
+},
+{
+"date": "2026-01-29",
+"zakazka": "ASP520 deksel - opmerkingen in file",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.7,
+"note": "online schvalovací proces otázky/odpovědi Zákazníkovi"
+},
+{
+"date": "2026-01-29",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-01-29",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-01-29",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-01-29",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-01-30",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.2,
+"note": "vytvoření nových SD, SP"
+},
+{
+"date": "2026-01-30",
+"zakazka": "26B017",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-01-30",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 2.1,
+"note": ""
+},
+{
+"date": "2026-01-30",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-02-02",
+"zakazka": "26C020",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": "IVAREM PROJECT (ABR-BE)"
+},
+{
+"date": "2026-02-02",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.7,
+"note": ""
+},
+{
+"date": "2026-02-02",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-02-02",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-03",
+"zakazka": "ACTS NA SYPKÉ LÁTKY",
+"activity": "Vytvoření návrhu řešení. Posílání obchodníků",
+"percent": null,
+"hours": 4.3,
+"note": "provedení změn + OB-výkres pro certifikaci  na Petr Pšeja"
+},
+{
+"date": "2026-02-03",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-03",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-03",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-03",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-02-04",
+"zakazka": "26C015",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-02-04",
+"zakazka": "ACTS NA SYPKÉ LÁTKY",
+"activity": "Vytvoření návrhu řešení. Posílání obchodníků",
+"percent": null,
+"hours": 2.0,
+"note": "přidávání informace podlé požadavků galas@cslloyd.cz"
+},
+{
+"date": "2026-02-04",
+"zakazka": "Call Bebat - Elkoplast",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-02-04",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-04",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-04",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-05",
+"zakazka": "ACTS NA SYPKÉ LÁTKY",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-02-05",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.6,
+"note": "Renata Maňáková"
+},
+{
+"date": "2026-02-05",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-05",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-05",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-02-05",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-02-06",
+"zakazka": "26C014",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.7,
+"note": ""
+},
+{
+"date": "2026-02-06",
+"zakazka": "PDP plachta síť dvoudílná (PDF)",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.9,
+"note": "NÁVRH pro Jana Rychlíková"
+},
+{
+"date": "2026-02-06",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-06",
+"zakazka": "call Elkoplast - Bebat: lid ASP (sensor protection)",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-02-06",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-02-06",
+"zakazka": "školení konstruktér 3",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-02-09",
+"zakazka": "call Elkoplast - Bebat: lid ASP (sensor protection)",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.0,
+"note": "provedení změn v ASP-50-00 podlé řešení na videokonference"
+},
+{
+"date": "2026-02-09",
+"zakazka": "26C012",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-02-09",
+"zakazka": "26C013",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-02-09",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-02-09",
+"zakazka": "26C022",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 0.5,
+"note": "opakovaná zák. 25C212"
+},
+{
+"date": "2026-02-09",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-02-09",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-10",
+"zakazka": "STŘECHA RS1",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-02-10",
+"zakazka": "ABR-ALST-7000x2300_2420x2300-54-QSTE-RS1",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-02-10",
+"zakazka": "26C023",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-10",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-02-10",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.6,
+"note": "Michaela Hlisnikovska, Renata Maňáková, Jana Rychlíková"
+},
+{
+"date": "2026-02-10",
+"zakazka": "školení konstruktér 2",
+"activity": "Spolupráce / konzultaci konstruktera",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-10",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-02-11",
+"zakazka": "ACTS NA SYPKÉ LÁTKY",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.5,
+"note": "revise 01"
+},
+{
+"date": "2026-02-11",
+"zakazka": "EELR36-ABR-ECON3-ELLERMANN-6500x2200_2300x2400-53",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.7,
+"note": "revise 02, probírání z Petr Sibal vše body seznamů telefonicky"
+},
+{
+"date": "2026-02-11",
+"zakazka": "ABR-DSD-REMONDIS-DE 6500x2300x750",
+"activity": "Návrh prototypů",
+"percent": 20,
+"hours": 1.3,
+"note": "KLST"
+},
+{
+"date": "2026-02-11",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-02-11",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-11",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-02-12",
+"zakazka": "26B017A",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-02-12",
+"zakazka": "26B017B",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-02-12",
+"zakazka": "25B800",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 2.0,
+"note": "revize 02"
+},
+{
+"date": "2026-02-12",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-12",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-12",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.6,
+"note": "Michaela Hlisnikovska"
+},
+{
+"date": "2026-02-13",
+"zakazka": "25C351",
+"activity": "Změny/opimizace podlé otázek výroby",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-02-13",
+"zakazka": "ROMOLD BLL",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.8,
+"note": "testovací obrázek TEST20260213-06.02-01 VANA"
+},
+{
+"date": "2026-02-13",
+"zakazka": "25B800",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.0,
+"note": "revize 03"
+},
+{
+"date": "2026-02-13",
+"zakazka": "ABR-DSD-REMONDIS-DE 6500x2300x750",
+"activity": "Návrh prototypů",
+"percent": 100,
+"hours": 4.5,
+"note": ""
+},
+{
+"date": "2026-02-13",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.6,
+"note": "Petr Pšeja"
+},
+{
+"date": "2026-02-13",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-16",
+"zakazka": "zámek EVBL pro EV-Box",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-02-16",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 10,
+"hours": 5.0,
+"note": "kontejner pro lithiové batérie - PLB"
+},
+{
+"date": "2026-02-16",
+"zakazka": "25B876",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.0,
+"note": "komunikace z Dodavatelem nákupních dílů pro kontejner PLB"
+},
+{
+"date": "2026-02-16",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-02-16",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.4,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-16",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.2,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-17",
+"zakazka": "25B890",
+"activity": "Změny/opimizace podlé otázek výroby",
+"percent": null,
+"hours": 1.9,
+"note": "změny v původně zák. 25B081"
+},
+{
+"date": "2026-02-17",
+"zakazka": "25C432",
+"activity": "Vytvoření dodatečně dokumentaci na vyžádání",
+"percent": null,
+"hours": 0.5,
+"note": "schéma umístění nájezdu pro Josef Jelínek"
+},
+{
+"date": "2026-02-17",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-02-17",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 15,
+"hours": 1.3,
+"note": "kontejner pro lithiové batérie - PLB"
+},
+{
+"date": "2026-02-17",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-17",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-18",
+"zakazka": "25B800",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.0,
+"note": "revize 04"
+},
+{
+"date": "2026-02-18",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 20,
+"hours": 5.0,
+"note": ""
+},
+{
+"date": "2026-02-18",
+"zakazka": "25B876",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 0.6,
+"note": "z dodavatelem klimatizaci"
+},
+{
+"date": "2026-02-18",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-02-18",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-18",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-19",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 25,
+"hours": 6.0,
+"note": ""
+},
+{
+"date": "2026-02-19",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-19",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-19",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-20",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 26,
+"hours": 5.0,
+"note": ""
+},
+{
+"date": "2026-02-20",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-20",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-20",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-23",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 24,
+"hours": 4.0,
+"note": ""
+},
+{
+"date": "2026-02-23",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 3.3,
+"note": ""
+},
+{
+"date": "2026-02-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-23",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-24",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 30,
+"hours": 7.0,
+"note": ""
+},
+{
+"date": "2026-02-24",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-24",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-24",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-25",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 33,
+"hours": 7.0,
+"note": ""
+},
+{
+"date": "2026-02-25",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-25",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-25",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-26",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 40,
+"hours": 7.0,
+"note": ""
+},
+{
+"date": "2026-02-26",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-26",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-26",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-02-27",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 45,
+"hours": 7.0,
+"note": ""
+},
+{
+"date": "2026-02-27",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-02-27",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-02-27",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-02",
+"zakazka": "ASP-520-BEBAT-WT",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 1.7,
+"note": "VERZE MOD01"
+},
+{
+"date": "2026-03-02",
+"zakazka": "04-CELLCONT1812-CellCont1812",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-02",
+"zakazka": "",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 0.5,
+"note": "netmeet z fajnklima@email.cz"
+},
+{
+"date": "2026-03-02",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 49,
+"hours": 5.0,
+"note": ""
+},
+{
+"date": "2026-03-02",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-02",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-03-03",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 55,
+"hours": 6.0,
+"note": ""
+},
+{
+"date": "2026-03-03",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-03",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-03-03",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-04",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 60,
+"hours": 6.0,
+"note": ""
+},
+{
+"date": "2026-03-04",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-04",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-03-04",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-04",
+"zakazka": "ROMOLD RÁM",
+"activity": "Změny/opimizace podlé otázek výroby",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-05",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 65,
+"hours": 6.0,
+"note": ""
+},
+{
+"date": "2026-03-05",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-05",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-03-05",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-06",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 70,
+"hours": 6.0,
+"note": ""
+},
+{
+"date": "2026-03-06",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-06",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "konstrukter 3"
+},
+{
+"date": "2026-03-06",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-09",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 75,
+"hours": 6.0,
+"note": ""
+},
+{
+"date": "2026-03-09",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-09",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-09",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-03-10",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 79,
+"hours": 7.0,
+"note": "www.rerosa.cz komunikace podle válců"
+},
+{
+"date": "2026-03-10",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-10",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-11",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 82,
+"hours": 2.0,
+"note": "www.rerosa.cz komunikace podle válců"
+},
+{
+"date": "2026-03-11",
+"zakazka": "26C021",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 5.0,
+"note": "ABR-ALST-STH // prototyp"
+},
+{
+"date": "2026-03-11",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-11",
+"zakazka": "25B851",
+"activity": "Změny/opimizace podlé otázek výroby",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-12",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 86,
+"hours": 5.0,
+"note": ""
+},
+{
+"date": "2026-03-12",
+"zakazka": "26С021",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 80,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-03-12",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-12",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-13",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 90,
+"hours": 5.0,
+"note": ""
+},
+{
+"date": "2026-03-13",
+"zakazka": "26С021",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 100,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-03-13",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-13",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-13",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.7,
+"note": "Michaela Hlisnikovska"
+},
+{
+"date": "2026-03-16",
+"zakazka": "26S044",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-03-16",
+"zakazka": "ABR-DSD-REMONDIS-DE 6500x2300x750",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 1.9,
+"note": ""
+},
+{
+"date": "2026-03-16",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-16",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-16",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-03-16",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.5,
+"note": "Renata Maňáková"
+},
+{
+"date": "2026-03-17",
+"zakazka": "ABR-ACTS-KLS-PRTPL",
+"activity": "Změny/opimizace podlé otázek výroby",
+"percent": null,
+"hours": 3.0,
+"note": "UPRAVY PODLE E-MAIL Kontejnery Bruntal"
+},
+{
+"date": "2026-03-17",
+"zakazka": "ABR-ACTS-KLS-PRTPL CERTIFIKACE",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 4.8,
+"note": "PODLE E-MAIL Certifikace ACTS kont. Petr Pšeja"
+},
+{
+"date": "2026-03-17",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-17",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-18",
+"zakazka": "ABR-ACTS-NSL-KLST-PRTPL CERTIFIKACE",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 6.0,
+"note": "PODLE E-MAIL Certifikace ACTS kont. Petr Pšeja"
+},
+{
+"date": "2026-03-18",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-03-18",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-18",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.7,
+"note": "Michaela Hlisnikovska"
+},
+{
+"date": "2026-03-19",
+"zakazka": "26S044",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-03-19",
+"zakazka": "ABR-ACTS-KLS-PRTP",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-03-19",
+"zakazka": "ABR-ACTS-KLS-PRTl",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-03-19",
+"zakazka": "ABR-ACTS-NSL-KLST-PRTP",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 1.6,
+"note": ""
+},
+{
+"date": "2026-03-19",
+"zakazka": "ABR-ACTS-NSL-KLST-PRTL",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-03-19",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-19",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-03-19",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 1.0,
+"note": "Michaela Hlisnikovska, Renata Maňáková, Petr Pšeja, andrzej@elkoplast.pl"
+},
+{
+"date": "2026-03-20",
+"zakazka": "26C036",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-03-20",
+"zakazka": "26C038",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-03-20",
+"zakazka": "26C041",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-03-20",
+"zakazka": "ABR-ACTS-NSL-5700x2300x2250-53-NS1570_50-KLST-PRTL",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-03-20",
+"zakazka": "ABR-ACTS-NSL-5700x2300x2250-53-NS1570_50-KLST-PRTP",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-03-20",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-20",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-03-20",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.8,
+"note": "Michaela Hlisnikovska, Petr Pšeja"
+},
+{
+"date": "2026-03-23",
+"zakazka": "REKLAMACE C-351",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-03-23",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-03-23",
+"zakazka": "ABR-ALST-7000x2300_2420x......",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-03-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-23",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-03-23",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.5,
+"note": "Michaela Hlisnikovska, Petr Pšeja"
+},
+{
+"date": "2026-03-24",
+"zakazka": "Meeting Elkoplast/Bebat: EV box en kwaliteit bodem ASP520",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-03-24",
+"zakazka": "EV-BOX",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.2,
+"note": "změny podlé řešení na poradě // STEP24032026 // komunikace to bruno.vanson@parsprototo.be"
+},
+{
+"date": "2026-03-24",
+"zakazka": "REKLAMACE C-351",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.0,
+"note": "rev 01"
+},
+{
+"date": "2026-03-24",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-24",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-03-24",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.6,
+"note": "Michaela Hlisnikovska, Petr Pšeja"
+},
+{
+"date": "2026-03-25",
+"zakazka": "26C051",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-03-25",
+"zakazka": "26C053",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-03-25",
+"zakazka": "CASIER30-1 (CSR301)",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-03-25",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-25",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-03-25",
+"zakazka": "26C052",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-26",
+"zakazka": "ABR-ALT-RS1",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-03-26",
+"zakazka": "26C023",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-03-26",
+"zakazka": "26B199",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.5,
+"note": "chystání nové NULA sada dokumentů"
+},
+{
+"date": "2026-03-26",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.9,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-26",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-26",
+"zakazka": "REKLAMACE C-351",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-27",
+"zakazka": "ASP-51-00",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.5,
+"note": "podle telefonátu Tomáš Krajča // e-mail to bruno.vanson@parsprototo.be from 26.03.2026"
+},
+{
+"date": "2026-03-27",
+"zakazka": "CASIER30-1 (CSR301)",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 3.0,
+"note": "změny podlé přání release nové verze"
+},
+{
+"date": "2026-03-27",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.9,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-27",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-03-27",
+"zakazka": "SYSTEM KÓDŮ // KONFIGURATOR",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 3.0,
+"note": "VELKÁ AKTUALIZACE PODLÉ DNEŠNÍCH NOVACI NA BŘEZEN 2026"
+},
+{
+"date": "2026-03-30",
+"zakazka": "Certifikace ACTS kont.",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.8,
+"note": "sady dokumentů zvlášť  // změny 03"
+},
+{
+"date": "2026-03-30",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-03-30",
+"zakazka": "přibližné váhy ABR AFS",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.0,
+"note": "Michaela Hlisnikovska pro"
+},
+{
+"date": "2026-03-30",
+"zakazka": "ELLERMANN ECON3",
+"activity": "Model Nula. Aktualizace",
+"percent": 60,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-03-30",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-03-31",
+"zakazka": "ELLERMANN ECON3",
+"activity": "Model Nula. Aktualizace",
+"percent": 100,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-03-31",
+"zakazka": "Overleg Bebat - Elkoplast",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 2.0,
+"note": "varianty VANA-bebat-520 podle požadavků pro Suzan Šmídová"
+},
+{
+"date": "2026-03-31",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-03-31",
+"zakazka": "ELLERMANN DSD",
+"activity": "Návrh prototypů",
+"percent": 100,
+"hours": 2.2,
+"note": "rev 01 // OB-výkres posláno na Petr Sibal 31.03.2026"
+},
+{
+"date": "2026-03-31",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.9,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-04-01",
+"zakazka": "nájezdy-ABR",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 2.8,
+"note": "all modifications"
+},
+{
+"date": "2026-04-01",
+"zakazka": "bebat 4 varianty",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 2.5,
+"note": "varianta 1, 2, 3, 4"
+},
+{
+"date": "2026-04-01",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.9,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-04-01",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-04-01",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-02",
+"zakazka": "bebat 4 varianty",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.1,
+"note": "revize 01 pro varianta 03 (SLEEVES)"
+},
+{
+"date": "2026-04-02",
+"zakazka": "Elko Ai",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 2.0,
+"note": "školení pomocníka podle aktuálních kódů ABR"
+},
+{
+"date": "2026-04-02",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-04-02",
+"zakazka": "26B214",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 30,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-02",
+"zakazka": "nájezdy-ABR",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-04-02",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.9,
+"note": "konstrukter 2"
+},
+{
+"date": "2026-04-02",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-03",
+"zakazka": "bebat 5 varianty",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-04-03",
+"zakazka": "BEBAT520",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-03",
+"zakazka": "nájezdy-ABR",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-03",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-04-03",
+"zakazka": "Elko Ai",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.3,
+"note": "školení pomocníka podle aktuálních kódů ABR"
+},
+{
+"date": "2026-04-03",
+"zakazka": "ABR-ALST",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.8,
+"note": "MODELY DÉLKA 6500"
+},
+{
+"date": "2026-04-03",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-03",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-03",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-06",
+"zakazka": "26C058",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-04-06",
+"zakazka": "26C059",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-04-06",
+"zakazka": "26C060",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.6,
+"note": ""
+},
+{
+"date": "2026-04-06",
+"zakazka": "26C061",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 30,
+"hours": 1.0,
+"note": "posláno otázky na Renata Maňáková 06.04.2026"
+},
+{
+"date": "2026-04-06",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-04-06",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-06",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-07",
+"zakazka": "26C061",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-04-07",
+"zakazka": "26C021",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.0,
+"note": "DXF + PDF + NÁVRHY PRO OPRAVU ČELA"
+},
+{
+"date": "2026-04-07",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-07",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-07",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Pavel Skybík"
+},
+{
+"date": "2026-04-07",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-04-08",
+"zakazka": "26C062",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-04-08",
+"zakazka": "BEBAT520 + WT // VÍKO // OHYB",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.7,
+"note": "komunikace podle technologické otázky"
+},
+{
+"date": "2026-04-08",
+"zakazka": "ABR-ALST ŘADA 7000",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-04-08",
+"zakazka": "26C062",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-04-08",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-08",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-08",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-04-09",
+"zakazka": "26C063",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-04-09",
+"zakazka": "26C064",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-04-09",
+"zakazka": "26C051",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": "revise 01"
+},
+{
+"date": "2026-04-09",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-09",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-09",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-04-09",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-04-09",
+"zakazka": "",
+"activity": "Spolupráce / konzultaci obchodnika",
+"percent": null,
+"hours": 0.6,
+"note": "Renata Maňáková"
+},
+{
+"date": "2026-04-10",
+"zakazka": "změny ABR-DSD-PREZERO NULA",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 1.3,
+"note": "změny podlé e-mail // prototyp - Petr Sibal"
+},
+{
+"date": "2026-04-10",
+"zakazka": "25C485",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.0,
+"note": "revize 01"
+},
+{
+"date": "2026-04-10",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-04-10",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-10",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-10",
+"zakazka": "ABR-ALST ŘADA 6000",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-04-10",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-13",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-04-13",
+"zakazka": "26B214",
+"activity": "Návrh prototypů",
+"percent": 70,
+"hours": 5.0,
+"note": "agro-kontejner"
+},
+{
+"date": "2026-04-13",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-13",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-13",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-04-14",
+"zakazka": "26B214",
+"activity": "Návrh prototypů",
+"percent": 100,
+"hours": 5.0,
+"note": ""
+},
+{
+"date": "2026-04-14",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-14",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-14",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-04-14",
+"zakazka": "Re: Angebot",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.8,
+"note": "odeslání podkladů podle e-mail Petr Sibal"
+},
+{
+"date": "2026-04-15",
+"zakazka": "25B876",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 70,
+"hours": 5.0,
+"note": "VERZE 01 - BEZ RAMPY"
+},
+{
+"date": "2026-04-15",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-15",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-15",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-04-16",
+"zakazka": "25B876",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 100,
+"hours": 2.0,
+"note": "VERZE 01 - BEZ RAMPY"
+},
+{
+"date": "2026-04-16",
+"zakazka": "ABR-LENAERTS",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 4.0,
+"note": "PODLE NOVÉHO SYSTÉMU OF NUMBERING // 3 SADY DOC."
+},
+{
+"date": "2026-04-16",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-16",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-16",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-17",
+"zakazka": "LEN10.01-ABR-LENAERTS-5500x2300x800-43-C0",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-04-17",
+"zakazka": "LEN15.01-ABR-LENAERTS-6000x2300x1100-43",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-04-17",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-17",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-17",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-20",
+"zakazka": "26B264",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-04-20",
+"zakazka": "26B264",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-20",
+"zakazka": "BEBAT-520, BEBAT-520-WT // PŘIDÁNÍ ROZMĚRŮ PRO KONTROLU OHYBU VÍKA",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-04-20",
+"zakazka": "26B214",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 0.5,
+"note": "konzultace spolu Lukáš Pospíšil"
+},
+{
+"date": "2026-04-20",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-04-20",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 50,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-04-20",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-20",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-20",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-21",
+"zakazka": "26B281",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-04-21",
+"zakazka": "26B282",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.7,
+"note": ""
+},
+{
+"date": "2026-04-21",
+"zakazka": "25B876",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 50,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-04-21",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-21",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-21",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-21",
+"zakazka": "26B286",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-22",
+"zakazka": "26S072",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-22",
+"zakazka": "26s069",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-04-22",
+"zakazka": "26s071",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-04-22",
+"zakazka": "",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 0.5,
+"note": "bebat"
+},
+{
+"date": "2026-04-22",
+"zakazka": "PODLAHA-BEBAT-520",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-22",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-23",
+"zakazka": "26B214",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.6,
+"note": "verze 01"
+},
+{
+"date": "2026-04-23",
+"zakazka": "25C351",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-04-23",
+"zakazka": "Úprava dílu - Rámy Romold - 03.01-01",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.3,
+"note": "ZMĚNY PODLÉ VÝROBY"
+},
+{
+"date": "2026-04-23",
+"zakazka": "26C057",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.9,
+"note": ""
+},
+{
+"date": "2026-04-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-23",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-24",
+"zakazka": "26C056",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.6,
+"note": ""
+},
+{
+"date": "2026-04-24",
+"zakazka": "26B202",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.6,
+"note": "komunikace/kluzné lozosko - e-mail"
+},
+{
+"date": "2026-04-24",
+"zakazka": "26C069",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-04-24",
+"zakazka": "26C070",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.4,
+"note": ""
+},
+{
+"date": "2026-04-24",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-24",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.4,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-24",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "26C081",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "26C083",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "26C084",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "26C074",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "26С082",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "26C059",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "26C085",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "26C086",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-27",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-27",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.2,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-27",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-04-28",
+"zakazka": "26B214",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 4.0,
+"note": "agro - spec - container"
+},
+{
+"date": "2026-04-28",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-28",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-28",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-04-28",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-04-29",
+"zakazka": "Marius Pedersen - kontejner 01",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": "e-mail-01"
+},
+{
+"date": "2026-04-29",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-04-29",
+"zakazka": "Marius Pedersen - kontejner 07",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.6,
+"note": "e-mail-01"
+},
+{
+"date": "2026-04-29",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-29",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.3,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-04-29",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-04-30",
+"zakazka": "Marius Pedersen - kontejner 04",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": "e-mail-01"
+},
+{
+"date": "2026-04-30",
+"zakazka": "Marius Pedersen - kontejner 05",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.2,
+"note": "e-mail-01"
+},
+{
+"date": "2026-04-30",
+"zakazka": "Marius Pedersen - kontejner 06",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.6,
+"note": "e-mail-01"
+},
+{
+"date": "2026-04-30",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-30",
+"zakazka": "",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.5,
+"note": "řešení po optimalizace kontejnerů ABR po schůzce 29.04.2026"
+},
+{
+"date": "2026-04-30",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-04-30",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.2,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-01",
+"zakazka": "Marius Pedersen - kontejner 02",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": "e-mail-01"
+},
+{
+"date": "2026-05-01",
+"zakazka": "Marius Pedersen - kontejner 03",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.0,
+"note": "e-mail-01"
+},
+{
+"date": "2026-05-01",
+"zakazka": "Marius Pedersen - kontejner 08",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 0.9,
+"note": "e-mail-01"
+},
+{
+"date": "2026-05-01",
+"zakazka": "Marius Pedersen - kontejner 09",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.9,
+"note": "e-mail-01"
+},
+{
+"date": "2026-05-01",
+"zakazka": "Marius Pedersen - kontejner 10",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.3,
+"note": "e-mail-01"
+},
+{
+"date": "2026-05-01",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-01",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-05-04",
+"zakazka": "26C078",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-05-04",
+"zakazka": "26C089",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-04",
+"zakazka": "26C090",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-04",
+"zakazka": "26C092",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-04",
+"zakazka": "26C088",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.4,
+"note": ""
+},
+{
+"date": "2026-05-04",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-04",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.3,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-04",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-05-05",
+"zakazka": "26C087",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.7,
+"note": ""
+},
+{
+"date": "2026-05-05",
+"zakazka": "ABR-ALST",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 3.5,
+"note": "MODEL ŘADA 6500,6000"
+},
+{
+"date": "2026-05-05",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-05-05",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-05",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-06",
+"zakazka": "26C094",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-06",
+"zakazka": "26B281",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-05-06",
+"zakazka": "ABR-ALST",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 2.0,
+"note": "MODEL ŘADA 7000"
+},
+{
+"date": "2026-05-06",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-06",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-07",
+"zakazka": "26B282",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-05-07",
+"zakazka": "ABR-DSD-PREZERO-DE",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-05-07",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-05-07",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-08",
+"zakazka": "26C082",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.3,
+"note": ""
+},
+{
+"date": "2026-05-08",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-05-08",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-11",
+"zakazka": "26C095",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-05-11",
+"zakazka": "26C096",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-05-11",
+"zakazka": "26C097",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-05-11",
+"zakazka": "26C098",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.2,
+"note": ""
+},
+{
+"date": "2026-05-11",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-05-11",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.8,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-11",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-05-12",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-05-12",
+"zakazka": "26C061",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-12",
+"zakazka": "26C078",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-05-12",
+"zakazka": "26C088",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-12",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.1,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-12",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-05-12",
+"zakazka": "24C192",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-05-12",
+"zakazka": "Realizace rozhodnutí výrobní porady",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-05-13",
+"zakazka": "26C105",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-13",
+"zakazka": "26C106",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-05-13",
+"zakazka": "26C101",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-05-13",
+"zakazka": "26C102",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-13",
+"zakazka": "VEOLIE-BE-10 (VBE10)",
+"activity": "Model Nula. Aktualizace",
+"percent": 50,
+"hours": 4.0,
+"note": "změny podle e-mail + Komunikace a upřesnění úkolů k provedení"
+},
+{
+"date": "2026-05-13",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-13",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-14",
+"zakazka": "VEOLIE-BE-10 (VBE10)",
+"activity": "Model Nula. Aktualizace",
+"percent": 100,
+"hours": 2.8,
+"note": ""
+},
+{
+"date": "2026-05-14",
+"zakazka": "VEOLIE-BE-15 (VBE15)",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-05-14",
+"zakazka": "VEOLIE-BE-20 (VBE20)",
+"activity": "Model Nula. Aktualizace",
+"percent": 50,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-05-14",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.9,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-14",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-05-15",
+"zakazka": "VEOLIE-BE-20 (VBE20)",
+"activity": "Model Nula. Aktualizace",
+"percent": 100,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-05-15",
+"zakazka": "VEOLIE-BE-30 (VBE30)",
+"activity": "Model Nula. Aktualizace",
+"percent": 100,
+"hours": 3.5,
+"note": ""
+},
+{
+"date": "2026-05-15",
+"zakazka": "VEOLIE-BE-40 (VBE40)",
+"activity": "Model Nula. Aktualizace",
+"percent": 50,
+"hours": 1.7,
+"note": ""
+},
+{
+"date": "2026-05-15",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-15",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-05-18",
+"zakazka": "VEOLIE-BE-40 (VBE40)",
+"activity": "Model Nula. Aktualizace",
+"percent": 100,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-05-18",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.1,
+"note": ""
+},
+{
+"date": "2026-05-18",
+"zakazka": "26C061",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 50,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-05-18",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.9,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-18",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-18",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-05-19",
+"zakazka": "26C061",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 100,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-05-19",
+"zakazka": "26C064",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 100,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-05-19",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.2,
+"note": "nové SP - PAKA pro \"PROB\""
+},
+{
+"date": "2026-05-19",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": "změny dílů podlé pravidla psaní materiálů"
+},
+{
+"date": "2026-05-19",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-19",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-20",
+"zakazka": "26C063",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.8,
+"note": ""
+},
+{
+"date": "2026-05-20",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-05-20",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-20",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-20",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-21",
+"zakazka": "26C352",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.4,
+"note": ""
+},
+{
+"date": "2026-05-21",
+"zakazka": "26C353",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.4,
+"note": ""
+},
+{
+"date": "2026-05-21",
+"zakazka": "26C354",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-05-21",
+"zakazka": "26C355",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.4,
+"note": ""
+},
+{
+"date": "2026-05-21",
+"zakazka": "26C095",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-05-21",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.6,
+"note": "S235JR S355JR"
+},
+{
+"date": "2026-05-21",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-21",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-21",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-05-22",
+"zakazka": "26C096",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-05-22",
+"zakazka": "26C097",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-05-22",
+"zakazka": "26C098",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 1.9,
+"note": ""
+},
+{
+"date": "2026-05-22",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-22",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-22",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-05-25",
+"zakazka": "Provádění změn v SP pro NA1570/60 NA1570/50",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.5,
+"note": "V souladu se zadáním z výrobní porady 29.04.2026"
+},
+{
+"date": "2026-05-25",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.6,
+"note": ""
+},
+{
+"date": "2026-05-25",
+"zakazka": "Provádění změn v SP pro NS",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-05-25",
+"zakazka": "tendr RIOM",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": 50,
+"hours": 1.3,
+"note": "další návrh podle e-mail"
+},
+{
+"date": "2026-05-25",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-25",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-25",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-05-26",
+"zakazka": "26S105",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.7,
+"note": ""
+},
+{
+"date": "2026-05-26",
+"zakazka": "tendr Francie - Beaune",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.8,
+"note": "Přidávání doplňujících informací do výkresu."
+},
+{
+"date": "2026-05-26",
+"zakazka": "tendr RIOM",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": 100,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-05-26",
+"zakazka": "Container AWM München",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": null,
+"hours": 1.0,
+"note": "Upřesnění zadání, komunikace, dotazy ns Petr Sibal/ Změna zadání."
+},
+{
+"date": "2026-05-26",
+"zakazka": "26B336",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 50,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-05-26",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-26",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-26",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-05-27",
+"zakazka": "26B336",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 100,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-05-27",
+"zakazka": "26B338",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 20,
+"hours": 2.0,
+"note": "special kontejner"
+},
+{
+"date": "2026-05-27",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": "S235JR S355JR"
+},
+{
+"date": "2026-05-27",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.1,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-27",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.3,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-27",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-05-28",
+"zakazka": "26B338",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 100,
+"hours": 5.0,
+"note": "special kontejner"
+},
+{
+"date": "2026-05-28",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.3,
+"note": "S235JR S355JR"
+},
+{
+"date": "2026-05-28",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.2,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-28",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-28",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-05-29",
+"zakazka": "ABR-DSD-PREZERO-DE // PLECH REKLAMY",
+"activity": "Změny/opimizace podlé otázek výroby",
+"percent": null,
+"hours": 0.8,
+"note": "E-MAIL"
+},
+{
+"date": "2026-05-29",
+"zakazka": "26B391",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-05-29",
+"zakazka": "26B336",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-05-29",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": "S235JR S355JR"
+},
+{
+"date": "2026-05-29",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-05-29",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-05-29",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-06-01",
+"zakazka": "ASP150",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-06-01",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-06-01",
+"zakazka": "PREZERO-DE",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 3.0,
+"note": "ZMĚNY PODLÉ E-MAIL"
+},
+{
+"date": "2026-06-01",
+"zakazka": "VEOLIA-BE",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.9,
+"note": "ZMĚNY PODLÉ E-MAIL"
+},
+{
+"date": "2026-06-01",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-01",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-01",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-06-02",
+"zakazka": "25C485",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": "Verze č. 3"
+},
+{
+"date": "2026-06-02",
+"zakazka": "SESTAVY SP (NATAHOVÁNÍ) - AKTUALIZACE / Optimalizace",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.8,
+"note": "diskuse podle změn SP sestav"
+},
+{
+"date": "2026-06-02",
+"zakazka": "26C103",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-06-02",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-06-02",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-02",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-02",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-03",
+"zakazka": "SESTAVY SP (NATAHOVÁNÍ) - AKTUALIZACE / Optimalizace",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.8,
+"note": "změny v NA50/1570 NA60/1570 podle diskuse na výrobní schůzce 02.06.2026"
+},
+{
+"date": "2026-06-03",
+"zakazka": "KOTY PRO HÁČKY",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-06-03",
+"zakazka": "TS Vítkov",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-06-03",
+"zakazka": "26B384",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.7,
+"note": ""
+},
+{
+"date": "2026-06-03",
+"zakazka": "26S105",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": "Verze č. 2"
+},
+{
+"date": "2026-06-03",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-03",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-03",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-06-04",
+"zakazka": "26B384",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.6,
+"note": "Verze č. 2"
+},
+{
+"date": "2026-06-04",
+"zakazka": "ABR-DSD-PREZERO-DE-6500x2420x2350-53-PS-ZD-SHP",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 3.8,
+"note": ""
+},
+{
+"date": "2026-06-04",
+"zakazka": "26C114",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-04",
+"zakazka": "26C116",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-04",
+"zakazka": "26C118",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-04",
+"zakazka": "26C119",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-04",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-04",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-04",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-06-05",
+"zakazka": "ABR-DSD-4000x2300x750-53 /// lite version",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-06-05",
+"zakazka": "26S106",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-06-05",
+"zakazka": "26S107",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-06-05",
+"zakazka": "26S108",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-06-05",
+"zakazka": "ABR-DSD-PREZERO-DE",
+"activity": "Model Nula. Aktualizace",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-06-05",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-05",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-06-08",
+"zakazka": "Container AWM München  / kontejner #1",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": null,
+"hours": 4.0,
+"note": "special kontejner"
+},
+{
+"date": "2026-06-08",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-06-08",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-08",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-06-08",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-09",
+"zakazka": "Container AWM München  / kontejner #2",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-06-09",
+"zakazka": "tendr Francie-Sictom",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-06-09",
+"zakazka": "Container AWM München  / kontejner #1, #2",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.7,
+"note": "google meet, diskuse, spolupráce z Petr Sibal"
+},
+{
+"date": "2026-06-09",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.2,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-09",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-06-09",
+"zakazka": "26C121",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-09",
+"zakazka": "26C122",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-10",
+"zakazka": "26C085",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 0.5,
+"note": "Upravená verze podle přání zákazníka."
+},
+{
+"date": "2026-06-10",
+"zakazka": "26C086",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 0.5,
+"note": "Upravená verze podle přání zákazníka."
+},
+{
+"date": "2026-06-10",
+"zakazka": "Container AWM München  / kontejner #1, #2",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 1.4,
+"note": ""
+},
+{
+"date": "2026-06-10",
+"zakazka": "26B338",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 80,
+"hours": 3.8,
+"note": "ABR-ARC nestandardní"
+},
+{
+"date": "2026-06-10",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-10",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-06-11",
+"zakazka": "26B338",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": 100,
+"hours": 2.6,
+"note": "ABR-ARC nestandardní"
+},
+{
+"date": "2026-06-11",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-06-11",
+"zakazka": "26B384",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-06-11",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.3,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-11",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-06-13",
+"zakazka": "Kontejner na vyžádání.",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": null,
+"hours": 2.2,
+"note": "Jan Horálek"
+},
+{
+"date": "2026-06-13",
+"zakazka": "26S105",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-06-13",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.2,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-13",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-06-13",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-06-15",
+"zakazka": "26C134",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-06-15",
+"zakazka": "26C135",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.4,
+"note": ""
+},
+{
+"date": "2026-06-15",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-06-15",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-15",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.0,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-15",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-06-16",
+"zakazka": "26S106",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-06-16",
+"zakazka": "26S107",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.7,
+"note": ""
+},
+{
+"date": "2026-06-16",
+"zakazka": "26S108",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-06-16",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-16",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-16",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-17",
+"zakazka": "26B432",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.8,
+"note": ""
+},
+{
+"date": "2026-06-17",
+"zakazka": "26B428",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-17",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.8,
+"note": ""
+},
+{
+"date": "2026-06-17",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.1,
+"note": ""
+},
+{
+"date": "2026-06-17",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-17",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-18",
+"zakazka": "26B426",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-06-18",
+"zakazka": "26B427",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.9,
+"note": ""
+},
+{
+"date": "2026-06-18",
+"zakazka": "ABR-DSD-VLPT-SMLT-BK2",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-18",
+"zakazka": "26B426",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-18",
+"zakazka": "26B427",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-18",
+"zakazka": "natahování NHALST",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.2,
+"note": "Provedení změn v SD SP v souladu s aktuální formou Háku natahování"
+},
+{
+"date": "2026-06-18",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-18",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-18",
+"zakazka": "",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 1.0,
+"note": "Kontaktování administrátora a DPS Software ohledně problémů s fungováním systému Solidworks PDM."
+},
+{
+"date": "2026-06-19",
+"zakazka": "25C485",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-06-19",
+"zakazka": "26C062",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.6,
+"note": ""
+},
+{
+"date": "2026-06-19",
+"zakazka": "26C060",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-06-19",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-19",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-22",
+"zakazka": "26C078",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-06-22",
+"zakazka": "26C125",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 3.2,
+"note": "special container"
+},
+{
+"date": "2026-06-22",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 1.7,
+"note": ""
+},
+{
+"date": "2026-06-22",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-22",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 1.1,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-22",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-06-23",
+"zakazka": "Nové změny v kontejnerech PREZERO-DE",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-06-23",
+"zakazka": "26S120",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 1.5,
+"note": "verze #2"
+},
+{
+"date": "2026-06-23",
+"zakazka": "26S121",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 0.5,
+"note": "verze #2"
+},
+{
+"date": "2026-06-23",
+"zakazka": "BOX NA ODPADOVÉ NÁDOBY S KVĚTINÁČEM",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 1.0,
+"note": "Diskuse o prototypech verze číslo 1 z Valentin Bratuška"
+},
+{
+"date": "2026-06-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-23",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-23",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.6,
+"note": ""
+},
+{
+"date": "2026-06-24",
+"zakazka": "26C134",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-06-24",
+"zakazka": "26C135",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-24",
+"zakazka": "BOX NA ODPADOVÉ NÁDOBY S KVĚTINÁČEM",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 2.0,
+"note": "Diskuse o prototypech verze číslo 1 z David Surý"
+},
+{
+"date": "2026-06-24",
+"zakazka": "26S120",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 0.5,
+"note": "verze #3"
+},
+{
+"date": "2026-06-24",
+"zakazka": "26S121",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 0.5,
+"note": "verze #3"
+},
+{
+"date": "2026-06-24",
+"zakazka": "Rolna-delena-Remondis",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-06-24",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-24",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-24",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-06-25",
+"zakazka": "26C138",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-25",
+"zakazka": "26C140",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-25",
+"zakazka": "26C141",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-25",
+"zakazka": "26C087",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-06-25",
+"zakazka": "26C125",
+"activity": "Změny podlé přání",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-25",
+"zakazka": "26C103",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.9,
+"note": ""
+},
+{
+"date": "2026-06-25",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-25",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-25",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-06-26",
+"zakazka": "26B426",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.7,
+"note": ""
+},
+{
+"date": "2026-06-26",
+"zakazka": "26B427",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.6,
+"note": ""
+},
+{
+"date": "2026-06-26",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-06-26",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-26",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-06-26",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-06-29",
+"zakazka": "26C056",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": "nová verze (verze #2)"
+},
+{
+"date": "2026-06-29",
+"zakazka": "ABR-DSD-PREZERO-DE",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.0,
+"note": "příprava verze podle seznamů změn"
+},
+{
+"date": "2026-06-29",
+"zakazka": "nastavení počítačů / vpn / remote session with admin",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-06-29",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-29",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-06-30",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-06-30",
+"zakazka": "26C057",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": "nová verze (verze #2)"
+},
+{
+"date": "2026-06-30",
+"zakazka": "ABR-DSD-PREZERO-DE",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.5,
+"note": "příprava verze podle seznamů změn / další komunikace z výrobou / změny"
+},
+{
+"date": "2026-06-30",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-06-30",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-01",
+"zakazka": "NATAHOVÁNÍ NSS60",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 1.3,
+"note": ""
+},
+{
+"date": "2026-07-01",
+"zakazka": "ROLNA-PREZERO-RS159/300PD",
+"activity": "Návrh prototypů",
+"percent": null,
+"hours": 1.5,
+"note": ""
+},
+{
+"date": "2026-07-01",
+"zakazka": "ABR-DSD-PREZERO-DE",
+"activity": "Model Nula. Vytvoření/úprava",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-07-01",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-07-01",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-07-01",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-07-01",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-07-02",
+"zakazka": "BOX NA ODPADOVÉ NÁDOBY S KVĚTINÁČEM",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 1.5,
+"note": "Diskuse o prototypech verze číslo 2 z Valentin Bratuška David Surý"
+},
+{
+"date": "2026-07-02",
+"zakazka": "26C133",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.5,
+"note": ""
+},
+{
+"date": "2026-07-02",
+"zakazka": "26C146",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-02",
+"zakazka": "26C147",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-02",
+"zakazka": "26С154",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-02",
+"zakazka": "26С163",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-02",
+"zakazka": "VRATA-PREZERO-ELLERMANN",
+"activity": "Návrh prototypů",
+"percent": 40,
+"hours": 1.6,
+"note": ""
+},
+{
+"date": "2026-07-02",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-07-02",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-07-02",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-07-03",
+"zakazka": "26C149",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.3,
+"note": ""
+},
+{
+"date": "2026-07-03",
+"zakazka": "26C150",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.8,
+"note": ""
+},
+{
+"date": "2026-07-03",
+"zakazka": "26C164",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-03",
+"zakazka": "26C168",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.3,
+"note": ""
+},
+{
+"date": "2026-07-03",
+"zakazka": "26C169",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.3,
+"note": ""
+},
+{
+"date": "2026-07-03",
+"zakazka": "26C170",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.3,
+"note": ""
+},
+{
+"date": "2026-07-03",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-07-03",
+"zakazka": "",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 0.5,
+"note": "z Tomáš Krajča"
+},
+{
+"date": "2026-07-06",
+"zakazka": "26C166",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 2.7,
+"note": ""
+},
+{
+"date": "2026-07-06",
+"zakazka": "26C127",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-07-06",
+"zakazka": "26C128",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 3.0,
+"note": ""
+},
+{
+"date": "2026-07-07",
+"zakazka": "",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-07-07",
+"zakazka": "BOX NA ODPADOVÉ NÁDOBY S KVĚTINÁČEM",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-07-07",
+"zakazka": "26S126",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 50,
+"hours": 1.4,
+"note": ""
+},
+{
+"date": "2026-07-07",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.5,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-07-07",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-07-07",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-07-07",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.9,
+"note": ""
+},
+{
+"date": "2026-07-07",
+"zakazka": "",
+"activity": "jiná / dodatečně práce",
+"percent": null,
+"hours": 0.9,
+"note": "PDF STP na požádání"
+},
+{
+"date": "2026-07-08",
+"zakazka": "26S126",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": 100,
+"hours": 2.0,
+"note": "ALST-VLPT-PROB-EKO"
+},
+{
+"date": "2026-07-08",
+"zakazka": "návrhový výkres Francie - SCG Grossete",
+"activity": "TENDR project. Vytvoření modelů/prototypu, OB-výkres",
+"percent": null,
+"hours": 4.0,
+"note": ""
+},
+{
+"date": "2026-07-08",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+},
+{
+"date": "2026-07-08",
+"zakazka": "BOX NA ODPADOVÉ NÁDOBY S KVĚTINÁČEM",
+"activity": "Porada podlé skutečně úkoly",
+"percent": null,
+"hours": 1.0,
+"note": ""
+},
+{
+"date": "2026-07-08",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.7,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-07-08",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Valentin Bratuška"
+},
+{
+"date": "2026-07-08",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.6,
+"note": ""
+},
+{
+"date": "2026-07-09",
+"zakazka": "26C056",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.9,
+"note": ""
+},
+{
+"date": "2026-07-09",
+"zakazka": "26C057",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.7,
+"note": ""
+},
+{
+"date": "2026-07-09",
+"zakazka": "26B514",
+"activity": "Vytvoření/modifikace modelu a OB-výkresu",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-09",
+"zakazka": "26B514",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.4,
+"note": ""
+},
+{
+"date": "2026-07-09",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-09",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-07-09",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-07-10",
+"zakazka": "26C177",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-10",
+"zakazka": "26C125",
+"activity": "Chystání sady výkresů, Kusovník, DXF",
+"percent": null,
+"hours": 2.9,
+"note": ""
+},
+{
+"date": "2026-07-10",
+"zakazka": "Konstrukce Standard provedení ABR katalog",
+"activity": "Porada výrobní střediska",
+"percent": null,
+"hours": 2.0,
+"note": ""
+},
+{
+"date": "2026-07-10",
+"zakazka": "",
+"activity": "Řízení práce - konstruktéry",
+"percent": null,
+"hours": 0.6,
+"note": "Anatolii Semaško"
+},
+{
+"date": "2026-07-10",
+"zakazka": "",
+"activity": "Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů",
+"percent": null,
+"hours": 0.8,
+"note": ""
+},
+{
+"date": "2026-07-10",
+"zakazka": "26C181",
+"activity": "Přidání zakázek podlé NULA modelů",
+"percent": null,
+"hours": 0.5,
+"note": ""
+},
+{
+"date": "2026-07-10",
+"zakazka": "",
+"activity": "Díly SD/SP. Vytváření/modifikace dílů",
+"percent": null,
+"hours": 0.7,
+"note": ""
+}
+]

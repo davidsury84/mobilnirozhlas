@@ -62,6 +62,31 @@ const SEED_TYPES = [{
   ],
 }];
 
+// ---- Číselník druhů práce pro evidenci (seed z reálného deníku konstrukce) --
+// kind: 'zakazka' = produktivní práce na konkrétní zakázce · 'rezie' = režie mimo zakázku
+const SEED_ACTIVITIES = [
+  { key: 'vyt-model', label: 'Vytvoření/modifikace modelu a OB-výkresu', kind: 'zakazka' },
+  { key: 'chystani-sady', label: 'Chystání sady výkresů, Kusovník, DXF', kind: 'zakazka' },
+  { key: 'nula-aktualizace', label: 'Model Nula. Aktualizace', kind: 'zakazka' },
+  { key: 'nula-vytvoreni', label: 'Model Nula. Vytvoření/úprava', kind: 'zakazka' },
+  { key: 'nula-kontrola', label: 'Model Nula. Kontrola sady podkladů', kind: 'zakazka' },
+  { key: 'zmeny-prani', label: 'Změny podle přání', kind: 'zakazka' },
+  { key: 'zmeny-vyroba', label: 'Změny/optimalizace podle otázek výroby', kind: 'zakazka' },
+  { key: 'navrh-prototyp', label: 'Návrh prototypů', kind: 'zakazka' },
+  { key: 'navrh-reseni', label: 'Vytvoření návrhu řešení. Posílání obchodníkům', kind: 'zakazka' },
+  { key: 'dily-sdsp', label: 'Díly SD/SP. Vytváření/modifikace dílů', kind: 'zakazka' },
+  { key: 'pridani-nula', label: 'Přidání zakázek podle NULA modelů', kind: 'zakazka' },
+  { key: 'dokumentace', label: 'Vytvoření dodatečné dokumentace na vyžádání', kind: 'zakazka' },
+  { key: 'tendr', label: 'TENDR — modely/prototyp, OB-výkres', kind: 'zakazka' },
+  { key: 'konzultace-konstr', label: 'Spolupráce / konzultace konstruktéra', kind: 'rezie' },
+  { key: 'konzultace-obch', label: 'Spolupráce / konzultace obchodníka', kind: 'rezie' },
+  { key: 'rizeni-prace', label: 'Řízení práce – konstruktéři', kind: 'rezie' },
+  { key: 'porada-stredisko', label: 'Porada výrobního střediska', kind: 'rezie' },
+  { key: 'porada-ukoly', label: 'Porada podle skutečných úkolů', kind: 'rezie' },
+  { key: 'administrativa', label: 'Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů', kind: 'rezie' },
+  { key: 'jina', label: 'Jiná / dodatečná práce', kind: 'rezie' },
+];
+
 // ---- České státní svátky (pevné + pohyblivé velikonoční) --------------------
 function easterSunday(year) {
   // Anonymous Gregorian algorithm (Meeus/Jones/Butcher) — vrací {m, d}.
@@ -133,6 +158,8 @@ function mount(host) {
     if (!Array.isArray(d.types) || !d.types.length) d.types = JSON.parse(JSON.stringify(SEED_TYPES));
     if (!Array.isArray(d.zakazky)) d.zakazky = [];
     if (!Array.isArray(d.notif)) d.notif = [];
+    if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
+    if (!Array.isArray(d.timesheet)) d.timesheet = [];
     return d;
   }
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
@@ -285,6 +312,11 @@ function mount(host) {
       if (p === '/api/konstrukce/admin/fond' && req.method === 'POST') return apiAdminFond(req, res);
       if (p === '/api/konstrukce/admin/typ' && req.method === 'POST') return apiAdminTyp(req, res);
       if (p === '/api/konstrukce/admin/seed' && req.method === 'POST') return apiAdminSeed(req, res);
+      if (p === '/api/konstrukce/timesheet' && req.method === 'GET') return apiTimesheetGet(req, res, u.query);
+      if (p === '/api/konstrukce/timesheet' && req.method === 'POST') return apiTimesheetSave(req, res);
+      if (p === '/api/konstrukce/timesheet/delete' && req.method === 'POST') return apiTimesheetDelete(req, res);
+      if (p === '/api/konstrukce/admin/activity' && req.method === 'POST') return apiAdminActivity(req, res);
+      if (p === '/api/konstrukce/admin/import' && req.method === 'POST') return apiAdminImport(req, res);
     } catch (e) {
       console.error('[konstrukce] chyba obsluhy:', e);
       json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true;
@@ -312,6 +344,8 @@ function mount(host) {
       else if (me.role === 'konstrukter') list = list.filter(z => (z.assignedTo || '').toLowerCase() === me.email);
       else list = [];
     }
+    // sečti hodiny z evidence práce podle zakázky (přičtou se k odpracováno)
+    d._tsMap = {}; d.timesheet.forEach(t => { if (t.zakId) d._tsMap[t.zakId] = (d._tsMap[t.zakId] || 0) + (t.hours || 0); });
     const view = list.map(z => publicShape(d, z, me)).sort((a, b) => b.createdAt - a.createdAt);
 
     // kapacitní přehled konstruktérů (pro šéfa/admin)
@@ -360,7 +394,8 @@ function mount(host) {
   function publicShape(d, z, me) {
     const t = typeOf(d, z.typKey);
     const cur = CURRENT_V(z);
-    const totalSec = (z.timeEntries || []).reduce((s, e) => s + (e.seconds || 0), 0);
+    const tsSec = ((d._tsMap && d._tsMap[z.id]) || 0) * 3600;
+    const totalSec = (z.timeEntries || []).reduce((s, e) => s + (e.seconds || 0), 0) + tsSec;
     const myTimer = z.activeTimer && me && z.activeTimer.user === me.email ? z.activeTimer : null;
     return {
       id: z.id, cislo: z.cislo, createdAt: z.createdAt,
@@ -1003,6 +1038,142 @@ function mount(host) {
 
   function publicPage() {
     return PUBLIC_HTML;
+  }
+
+  // ======================================================================
+  //  Evidence práce (timesheet) — denní zápis hodin po činnostech (kap. 8)
+  // ======================================================================
+  function tsCanSeeAll(me) { return me.isAdmin || me.role === 'sef' || me.role === 'reditel'; }
+  function activityLabel(d, key, fallback) { const a = d.activities.find(x => x.key === key); return a ? a.label : (fallback || key || ''); }
+  function activityKind(d, key) { const a = d.activities.find(x => x.key === key); return a ? a.kind : 'rezie'; }
+
+  function apiTimesheetGet(req, res, q) {
+    const me = roleOf(req);
+    const d = load();
+    const all = tsCanSeeAll(me);
+    let list = d.timesheet.slice();
+    if (!all) list = list.filter(t => (t.user || '').toLowerCase() === me.email);
+    else if (q.user) list = list.filter(t => (t.user || '').toLowerCase() === String(q.user).toLowerCase());
+    if (q.from) list = list.filter(t => t.date >= q.from);
+    if (q.to) list = list.filter(t => t.date <= q.to);
+    list.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+    // seznam osob s evidencí (pro filtr managementu)
+    const users = {};
+    d.timesheet.forEach(t => { const u = (t.user || '').toLowerCase(); if (u) users[u] = (users[u] || 0) + (t.hours || 0); });
+    json(res, 200, {
+      me: { email: me.email, role: me.role || (me.isAdmin ? 'admin' : ''), canSeeAll: all },
+      activities: d.activities,
+      entries: list.map(t => ({ id: t.id, user: t.user, userName: empName(t.user), date: t.date, activityKey: t.activityKey || '', activity: t.activity || activityLabel(d, t.activityKey), kind: t.kind || activityKind(d, t.activityKey), zakId: t.zakId || '', zakCislo: t.zakId ? ((d.zakazky.find(z => z.id === t.zakId) || {}).cislo || '') : '', zakazka: t.zakazka || '', hours: t.hours || 0, percent: t.percent == null ? null : t.percent, note: t.note || '' })),
+      users: Object.keys(users).map(u => ({ email: u, name: empName(u), hours: Math.round(users[u] * 10) / 10 })).sort((a, b) => b.hours - a.hours),
+      zakazky: d.zakazky.map(z => ({ id: z.id, cislo: z.cislo, zakaznik: z.zakaznik })),
+    });
+    return true;
+  }
+  async function apiTimesheetSave(req, res) {
+    const me = roleOf(req);
+    if (!me.email && !me.isAdmin) { json(res, 403, { chyba: 'Neznámý uživatel.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load();
+    const date = String(b.date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { json(res, 400, { chyba: 'Zadejte platné datum.' }); return true; }
+    const hours = Math.round((parseFloat(String(b.hours).replace(',', '.')) || 0) * 100) / 100;
+    if (!(hours > 0)) { json(res, 400, { chyba: 'Zadejte počet hodin.' }); return true; }
+    const activityKey = String(b.activityKey || '').trim();
+    if (!activityKey && !b.activity) { json(res, 400, { chyba: 'Vyberte druh práce.' }); return true; }
+    // cílový uživatel: sám sebe; management může zapsat na jiného
+    let user = me.email;
+    if (tsCanSeeAll(me) && b.user) user = String(b.user).toLowerCase().trim();
+    const rec = {
+      id: b.id && String(b.id) || 't' + crypto.randomBytes(6).toString('hex'),
+      user, date, activityKey,
+      activity: activityKey ? activityLabel(d, activityKey) : String(b.activity || '').slice(0, 120),
+      kind: activityKey ? activityKind(d, activityKey) : 'rezie',
+      zakId: String(b.zakId || '').trim(),
+      zakazka: String(b.zakazka || '').trim().slice(0, 80),
+      hours, percent: (b.percent === '' || b.percent == null) ? null : Math.max(0, Math.min(100, parseInt(b.percent, 10) || 0)),
+      note: String(b.note || '').slice(0, 300), createdAt: Date.now(),
+    };
+    // pokud je zapsáno na workflow zakázku, doplň její kód do zakazka
+    if (rec.zakId) { const z = d.zakazky.find(x => x.id === rec.zakId); if (z && !rec.zakazka) rec.zakazka = z.cislo; }
+    const i = d.timesheet.findIndex(t => t.id === rec.id);
+    if (i >= 0) {
+      if (!tsCanSeeAll(me) && (d.timesheet[i].user || '').toLowerCase() !== me.email) { json(res, 403, { chyba: 'Můžete upravovat jen své záznamy.' }); return true; }
+      rec.createdAt = d.timesheet[i].createdAt || rec.createdAt;
+      d.timesheet[i] = rec;
+    } else d.timesheet.push(rec);
+    save(d);
+    json(res, 200, { ok: true, id: rec.id });
+    return true;
+  }
+  async function apiTimesheetDelete(req, res) {
+    const me = roleOf(req);
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load();
+    const t = d.timesheet.find(x => x.id === b.id);
+    if (!t) { json(res, 404, { chyba: 'Záznam nenalezen.' }); return true; }
+    if (!tsCanSeeAll(me) && (t.user || '').toLowerCase() !== me.email) { json(res, 403, { chyba: 'Můžete mazat jen své záznamy.' }); return true; }
+    d.timesheet = d.timesheet.filter(x => x.id !== b.id);
+    save(d);
+    json(res, 200, { ok: true });
+    return true;
+  }
+  async function apiAdminActivity(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load();
+    const key = String(b.key || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 30);
+    if (!key) { json(res, 400, { chyba: 'Chybí klíč činnosti.' }); return true; }
+    if (b.delete) { d.activities = d.activities.filter(x => x.key !== key); save(d); json(res, 200, { ok: true, activities: d.activities }); return true; }
+    let a = d.activities.find(x => x.key === key);
+    if (!a) { a = { key }; d.activities.push(a); }
+    a.label = String(b.label || a.label || key).slice(0, 120);
+    a.kind = b.kind === 'zakazka' ? 'zakazka' : 'rezie';
+    save(d);
+    json(res, 200, { ok: true, activities: d.activities });
+    return true;
+  }
+  async function apiAdminImport(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const user = String(b.user || '').toLowerCase().trim();
+    if (!user) { json(res, 400, { chyba: 'Zadejte e-mail konstruktéra, na kterého se historie zapíše.' }); return true; }
+    let raw = [];
+    try { raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'timesheet-import.json'), 'utf8')); } catch (e) { json(res, 400, { chyba: 'Importní soubor nenalezen.' }); return true; }
+    const d = load();
+    // mapování popisu na klíč činnosti (dle normalizované shody na label + alias z tabulky)
+    const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const byNorm = {}; d.activities.forEach(a => { byNorm[norm(a.label)] = a; });
+    // přesné (i překlepové) názvy z původního deníku → klíč činnosti
+    const ALIAS = {
+      'Vytvoření/modifikace modelu a OB-výkresu': 'vyt-model', 'Chystání sady výkresů, Kusovník, DXF': 'chystani-sady',
+      'Model Nula. Aktualizace': 'nula-aktualizace', 'Model Nula. Vytvoření/úprava': 'nula-vytvoreni', 'Model Nula. Kontrola sady podkladů': 'nula-kontrola',
+      'Změny podlé přání': 'zmeny-prani', 'Změny/opimizace podlé otázek výroby': 'zmeny-vyroba', 'Návrh prototypů': 'navrh-prototyp',
+      'Vytvoření návrhu řešení. Posílání obchodníků': 'navrh-reseni', 'Díly SD/SP. Vytváření/modifikace dílů': 'dily-sdsp',
+      'Přidání zakázek podlé NULA modelů': 'pridani-nula', 'Vytvoření dodatečně dokumentaci na vyžádání': 'dokumentace',
+      'TENDR project. Vytvoření modelů/prototypu, OB-výkres': 'tendr', 'Spolupráce / konzultaci konstruktera': 'konzultace-konstr',
+      'Spolupráce / konzultaci obchodnika': 'konzultace-obch', 'Řízení práce - konstruktéry': 'rizeni-prace',
+      'Porada výrobní střediska': 'porada-stredisko', 'Porada podlé skutečně úkoly': 'porada-ukoly',
+      'Vyřizování objednávek, e-mailů, dotazů z dílny a telefonátů': 'administrativa', 'jiná / dodatečně práce': 'jina',
+    };
+    const aliasNorm = {}; Object.keys(ALIAS).forEach(k => { const a = d.activities.find(x => x.key === ALIAS[k]); if (a) aliasNorm[norm(k)] = a; });
+    if (b.mode === 'replace') d.timesheet = d.timesheet.filter(t => (t.user || '').toLowerCase() !== user);
+    let n = 0;
+    raw.forEach(r => {
+      const label = r.activity || '';
+      const match = byNorm[norm(label)] || aliasNorm[norm(label)];
+      d.timesheet.push({
+        id: 't' + crypto.randomBytes(6).toString('hex'), user, date: r.date,
+        activityKey: match ? match.key : '', activity: match ? match.label : label,
+        kind: match ? match.kind : (r.zakazka ? 'zakazka' : 'rezie'),
+        zakId: '', zakazka: String(r.zakazka || '').slice(0, 80),
+        hours: Math.round((r.hours || 0) * 100) / 100, percent: r.percent == null ? null : r.percent,
+        note: String(r.note || '').slice(0, 300), createdAt: Date.now(), imported: true,
+      });
+      n++;
+    });
+    save(d);
+    json(res, 200, { ok: true, count: n });
+    return true;
   }
 
   // ======================================================================

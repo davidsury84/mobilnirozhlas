@@ -134,6 +134,7 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 
 <script>
 var D=null, ME=null, FILTER='mine', SEL=null;
+var TS={from:null,to:null,user:'',data:null,editing:null};
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fdate(ts){if(!ts)return'—';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'+d.getUTCFullYear()}
 function fdt(ts){if(!ts)return'—';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return fdate(ts)+' '+p(d.getUTCHours())+':'+p(d.getUTCMinutes())}
@@ -187,6 +188,7 @@ function renderSide(){
   h+=chip('all','Vše',c.all);
   if(ME.isAdmin||ME.role==='sef'){h+='<div class="grp">Konstrukce</div>';h+='<button class="chip'+(FILTER==='kapacity'?' act':'')+'" onclick="setFilter(\'kapacity\')"><span>Kapacity</span></button>';}
   if(ME.isAdmin||ME.role==='reditel'){h+='<button class="chip'+(FILTER==='kpi'?' act':'')+'" onclick="setFilter(\'kpi\')"><span>KPI ředitele</span></button>';}
+  if(ME.isAdmin||ME.role==='konstrukter'||ME.role==='sef'||ME.role==='reditel'){h+='<div class="grp">Evidence</div>';h+='<button class="chip'+(FILTER==='evidence'?' act':'')+'" onclick="setFilter(\'evidence\')"><span>Evidence práce</span></button>';}
   if(ME.isAdmin){h+='<div class="grp">Správa</div>';h+='<button class="chip'+(FILTER==='nastaveni'?' act':'')+'" onclick="setFilter(\'nastaveni\')"><span>Role a číselník</span></button>';}
   document.getElementById('side').innerHTML=h;
 }
@@ -209,6 +211,7 @@ function renderMain(){
   var m=document.getElementById('main');
   if(FILTER==='kapacity')return renderKapacity(m);
   if(FILTER==='kpi')return renderKpi(m);
+  if(FILTER==='evidence')return renderTimesheet(m);
   if(FILTER==='nastaveni')return renderNastaveni(m);
   var titleMap={mine:'Na tahu u mě',novy:'Nové k přidělení',prace:'Ve zkreslení',kontrola:'Interní kontrola',obchodnik:'U obchodníka',klient:'U klienta',red:'Po termínu',open:'Otevřené zakázky',all:'Všechny zakázky'};
   var list=filtered();
@@ -496,6 +499,104 @@ function createZak(){
 }
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 
+/* ---- evidence práce (timesheet) ---- */
+function monthStart(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'}
+function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function hnum(h){return (Math.round((h||0)*10)/10).toString().replace('.',',')}
+function renderTimesheet(m){
+  if(!TS.from){TS.from=monthStart();TS.to=todayStr()}
+  m.innerHTML='<div class="head"><h2>Evidence práce</h2></div><p class="muted">Načítám…</p>';
+  var qs='from='+TS.from+'&to='+TS.to+(TS.user?('&user='+encodeURIComponent(TS.user)):'');
+  api('/timesheet?'+qs).then(function(o){
+    if(!o.ok){m.innerHTML='<div class="empty">'+esc(o.j.chyba||'Chyba.')+'</div>';return}
+    TS.data=o.j; drawTimesheet(m);
+  });
+}
+function drawTimesheet(m){
+  var j=TS.data, e=j.entries, all=j.me.canSeeAll;
+  // souhrny
+  var tot=0,zak=0,rez=0,days={};
+  e.forEach(function(x){tot+=x.hours;if(x.kind==='zakazka')zak+=x.hours;else rez+=x.hours;days[x.date]=1});
+  var nd=Object.keys(days).length;
+  // reporty
+  var byAct={},byZak={};
+  e.forEach(function(x){byAct[x.activity]=(byAct[x.activity]||0)+x.hours;var k=x.zakCislo||x.zakazka;if(k)byZak[k]=(byZak[k]||0)+x.hours});
+  var actRows=Object.keys(byAct).map(function(k){return [k,byAct[k]]}).sort(function(a,b){return b[1]-a[1]});
+  var zakRows=Object.keys(byZak).map(function(k){return [k,byZak[k]]}).sort(function(a,b){return b[1]-a[1]}).slice(0,15);
+
+  var h='<div class="head"><h2>Evidence práce</h2><div class="row">'+
+    '<input type="date" value="'+TS.from+'" onchange="TS.from=this.value;renderMain()" style="width:150px">'+
+    '<span class="muted">–</span><input type="date" value="'+TS.to+'" onchange="TS.to=this.value;renderMain()" style="width:150px">'+
+    (all?userFilter(j):'')+'</div></div>';
+
+  // formulář zápisu
+  h+=tsForm(j);
+
+  // KPI karty
+  h+='<div class="kpi">'+kc(hnum(tot)+' h','Celkem hodin')+kc(hnum(zak)+' h','Na zakázky')+kc(hnum(rez)+' h','Režie')+kc(nd,'Dní se zápisem')+kc(e.length,'Záznamů')+'</div>';
+
+  // reporty
+  h+='<div class="two"><div><div class="sec">Hodiny podle činnosti</div><div class="card">'+
+    (actRows.length?actRows.map(function(r){return repRow(r[0],r[1],tot)}).join(''):'<p class="muted" style="margin:0">Žádná data.</p>')+'</div></div>'+
+    '<div><div class="sec">Top zakázky podle hodin</div><div class="card">'+
+    (zakRows.length?zakRows.map(function(r){return repRow(r[0],r[1],tot)}).join(''):'<p class="muted" style="margin:0">Žádná data.</p>')+'</div></div></div>';
+
+  // seznam záznamů podle dní
+  h+='<div class="sec">Záznamy ('+e.length+')</div>';
+  if(!e.length)h+='<div class="empty">V tomto období nejsou žádné záznamy.</div>';
+  else{
+    var curd='';
+    e.forEach(function(x){
+      if(x.date!==curd){curd=x.date;h+='<div class="muted" style="font-weight:700;margin:12px 0 4px">'+fdate(new Date(x.date+'T00:00:00Z').getTime())+(all?'':'')+'</div>'}
+      h+='<div class="card" style="padding:9px 12px;margin-bottom:6px"><div class="row" style="justify-content:space-between">'+
+        '<div style="min-width:0"><b>'+esc(x.activity)+'</b> <span class="tag">'+(x.kind==='zakazka'?'zakázka':'režie')+'</span>'+
+        (x.zakCislo||x.zakazka?'<div class="sub">'+esc(x.zakCislo||x.zakazka)+(x.percent!=null?(' · '+x.percent+' %'):'')+(x.note?(' · '+esc(x.note)):'')+'</div>':(x.note?'<div class="sub">'+esc(x.note)+'</div>':''))+
+        (all?'<div class="sub" style="opacity:.7">'+esc(x.userName||x.user)+'</div>':'')+'</div>'+
+        '<div class="row" style="gap:6px"><b style="white-space:nowrap">'+hnum(x.hours)+' h</b>'+
+        ((all||x.user===ME.email)?'<button class="btn ghost sm" onclick="tsEdit(\''+x.id+'\')">Upravit</button><button class="btn warn sm" onclick="tsDelete(\''+x.id+'\')">×</button>':'')+'</div>'+
+      '</div></div>';
+    });
+  }
+  m.innerHTML=h;
+}
+function userFilter(j){
+  var opts='<option value="">Všichni</option>';
+  (j.users||[]).forEach(function(u){opts+='<option value="'+esc(u.email)+'"'+(TS.user===u.email?' selected':'')+'>'+esc(u.name)+' ('+hnum(u.hours)+' h)</option>'});
+  return '<select onchange="TS.user=this.value;renderMain()" style="width:auto">'+opts+'</select>';
+}
+function repRow(label,hours,tot){
+  var pct=tot>0?Math.round(hours/tot*100):0;
+  return '<div style="padding:5px 0;border-bottom:1px solid var(--line)"><div class="row" style="justify-content:space-between"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(label)+'</span><b style="white-space:nowrap">'+hnum(hours)+' h · '+pct+' %</b></div>'+
+    '<div class="capbar" style="margin-top:3px"><i style="width:'+pct+'%;background:var(--g3)"></i></div></div>';
+}
+function tsForm(j){
+  var ed=TS.editing;
+  var actOpts=(j.activities||[]).map(function(a){return '<option value="'+esc(a.key)+'"'+(ed&&ed.activityKey===a.key?' selected':'')+'>'+esc(a.label)+(a.kind==='rezie'?' (režie)':'')+'</option>'}).join('');
+  var zakOpts='<option value="">— bez zakázky (režie) / vlastní kód —</option>'+(j.zakazky||[]).map(function(z){return '<option value="'+esc(z.id)+'"'+(ed&&ed.zakId===z.id?' selected':'')+'>'+esc(z.cislo)+' · '+esc(z.zakaznik)+'</option>'}).join('');
+  var userSel='';
+  if(j.me.canSeeAll){var uo=(j.users||[]).map(function(u){return '<option value="'+esc(u.email)+'"'+(ed&&ed.user===u.email?' selected':'')+'>'+esc(u.name)+'</option>'}).join('');
+    userSel='<div><label>Konstruktér</label><input id="tsUser" list="tsUsers" value="'+esc(ed?ed.user:(TS.user||''))+'" placeholder="e-mail"><datalist id="tsUsers">'+uo+'</datalist></div>';}
+  return '<div class="card" style="background:#f3faf5"><b>'+(ed?'Upravit záznam':'Přidat záznam')+'</b>'+
+    '<div class="two" style="margin-top:8px"><div><label>Datum</label><input type="date" id="tsDate" value="'+(ed?ed.date:todayStr())+'"></div>'+
+    '<div><label>Druh práce</label><select id="tsAct">'+actOpts+'</select></div></div>'+
+    '<div class="two"><div><label>Zakázka (workflow)</label><select id="tsZak" onchange="if(this.value)document.getElementById(\'tsZakFree\').value=\'\'">'+zakOpts+'</select></div>'+
+    '<div><label>…nebo vlastní kód zakázky</label><input id="tsZakFree" value="'+esc(ed?ed.zakazka:'')+'" placeholder="např. 25B876 nebo ABR-…"></div></div>'+
+    '<div class="two">'+userSel+'<div class="two" style="gap:12px"><div><label>Hodiny</label><input id="tsHours" inputmode="decimal" value="'+(ed?hnum(ed.hours):'')+'" placeholder="2,5"></div><div><label>% dokončení</label><input id="tsPct" inputmode="numeric" value="'+(ed&&ed.percent!=null?ed.percent:'')+'" placeholder="volitelné"></div></div></div>'+
+    '<label>Poznámka</label><input id="tsNote" value="'+esc(ed?ed.note:'')+'" placeholder="volitelné">'+
+    '<div class="err" id="tsErr"></div>'+
+    '<div class="actions" style="margin-top:10px"><button class="btn sm" onclick="tsSave()">'+(ed?'Uložit změny':'Přidat záznam')+'</button>'+(ed?'<button class="btn ghost sm" onclick="TS.editing=null;renderMain()">Zrušit úpravu</button>':'')+'</div></div>';
+}
+function tsSave(){
+  function v(id){return (document.getElementById(id)||{}).value}
+  var b={id:TS.editing?TS.editing.id:'',date:v('tsDate'),activityKey:v('tsAct'),zakId:v('tsZak'),zakazka:v('tsZakFree'),hours:v('tsHours'),percent:v('tsPct'),note:v('tsNote')};
+  if(TS.data.me.canSeeAll){var uu=v('tsUser');if(uu)b.user=uu}
+  var err=document.getElementById('tsErr');err.textContent='';
+  if(!b.hours){err.textContent='Zadejte hodiny.';return}
+  api('/timesheet','POST',b).then(function(o){if(!o.ok){err.textContent=o.j.chyba||'Chyba.';return}TS.editing=null;renderMain()});
+}
+function tsEdit(id){var x=(TS.data.entries||[]).find(function(e){return e.id===id});if(!x)return;TS.editing=x;renderMain();window.scrollTo(0,0)}
+function tsDelete(id){if(!confirm('Smazat záznam?'))return;api('/timesheet/delete','POST',{id:id}).then(function(o){if(!o.ok){alert(o.j.chyba);return}renderMain()})}
+
 /* ---- nastavení (admin) ---- */
 function renderNastaveni(m){
   var h='<div class="head"><h2>Role a číselník</h2></div>';
@@ -515,9 +616,35 @@ function renderNastaveni(m){
       '<div class="actions" style="margin-top:6px"><button class="btn ghost sm" onclick="editTyp(\''+esc(t.key)+'\')">Upravit</button></div></div>';
   });
   h+='<div class="actions" style="margin-top:10px"><button class="btn sm" onclick="editTyp(\'\')">+ Nový typ výrobku</button></div></div>';
+  h+='<div class="sec">Druhy práce (evidence)</div><div class="card">';
+  (D.activities||[]).forEach(function(a){
+    h+='<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line)"><span><b>'+esc(a.label)+'</b> <span class="tag">'+(a.kind==='zakazka'?'zakázka':'režie')+'</span></span>'+
+      '<button class="btn ghost sm" onclick="delActivity(\''+esc(a.key)+'\')">×</button></div>';
+  });
+  h+='<div class="two" style="margin-top:10px"><input id="naLabel" placeholder="Název nové činnosti"><select id="naKind"><option value="zakazka">na zakázku</option><option value="rezie">režie</option></select></div>'+
+    '<div class="actions" style="margin-top:8px"><button class="btn sm" onclick="addActivity()">+ Přidat činnost</button></div></div>';
+  h+='<div class="sec">Import historické evidence</div><div class="card"><p class="muted" style="margin-top:0">Naimportuje záznamy práce z původní tabulky (799 řádků, 1–7/2026) na zadaného konstruktéra. „Nahradit" nejdřív smaže jeho stávající záznamy.</p>'+
+    '<div class="two"><div><label>E-mail konstruktéra</label><input id="impUser" placeholder="jmeno@elkoplast.cz"></div>'+
+    '<div><label>Režim</label><select id="impMode"><option value="append">Přidat k existujícím</option><option value="replace">Nahradit jeho záznamy</option></select></div></div>'+
+    '<div class="actions" style="margin-top:8px"><button class="btn sm" onclick="importEvidence()">Naimportovat historii</button></div><div class="err" id="impErr"></div></div>';
   h+='<div class="sec">Ukázková data</div><div class="card"><p class="muted" style="margin-top:0">Nahraje ilustrativní scénář (7 zakázek napříč stavy, role, kapacity, notifikace) pro vyzkoušení modulu. Vše lze pak jedním tlačítkem smazat.</p>'+
     '<div class="actions"><button class="btn sm" onclick="seedDemo(\'load\')">Nahrát ukázkový scénář</button><button class="btn warn sm" onclick="seedDemo(\'clear\')">Smazat všechna data</button></div></div>';
   m.innerHTML=h;
+}
+function addActivity(){
+  var label=(document.getElementById('naLabel')||{}).value||'';var kind=(document.getElementById('naKind')||{}).value||'rezie';
+  if(!label.trim())return;
+  var key=label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,30);
+  api('/admin/activity','POST',{key:key,label:label,kind:kind}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData();renderMain()});
+}
+function delActivity(key){if(!confirm('Smazat činnost z číselníku? (existující záznamy zůstanou)'))return;api('/admin/activity','POST',{key:key,delete:true}).then(function(){reloadData();renderMain()})}
+function importEvidence(){
+  var user=(document.getElementById('impUser')||{}).value||'';var mode=(document.getElementById('impMode')||{}).value||'append';
+  var err=document.getElementById('impErr');err.textContent='';
+  if(!user.trim()){err.textContent='Zadejte e-mail konstruktéra.';return}
+  if(mode==='replace'&&!confirm('Nahradit VŠECHNY dosavadní záznamy uživatele '+user+' importem?'))return;
+  err.textContent='Importuji…';
+  api('/admin/import','POST',{user:user.trim().toLowerCase(),mode:mode}).then(function(o){if(!o.ok){err.textContent=o.j.chyba||'Chyba.';return}err.textContent='';alert('Naimportováno '+o.j.count+' záznamů. Otevřete „Evidence práce".')});
 }
 function seedDemo(mode){
   if(mode==='clear'&&!confirm('Opravdu smazat VŠECHNA data modulu (zakázky, role i kapacity)? Tuto akci nelze vzít zpět.'))return;
