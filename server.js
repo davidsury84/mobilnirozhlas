@@ -1442,6 +1442,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
       return res.end(fs.readFileSync(f));
     }
+    // Logo v hlavičce intranetu (veřejné čtení — hlavička ho načítá v adminu i intranetu).
+    if (p === '/api/site/logo' && req.method === 'GET') {
+      return send(res, 200, { logo: (readJson(SITE_F, {}).logoImage) || null });
+    }
     if (p === '/api/login' && req.method === 'POST') {
       const b = JSON.parse(await readBody(req));
       if ((b.password || '') === SEC.password) { const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''; logActivity('admin-login', { email: '', name: 'Správce (heslo)' }, ''); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_auth=' + token() + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure }); }
@@ -1862,6 +1866,23 @@ const server = http.createServer(async (req, res) => {
       writeJson(SITE_F, site);
       logActivity('aktuality', { email: e.email, name: e.name }, b.reset ? 'Obnovil výchozí banner' : 'Změnil banner intranetu');
       return send(res, 200, { ok: true, hero: site.heroImage || null });
+    }
+
+    // Logo v hlavičce — nahrání / reset (jen správce).
+    if (p === '/api/site/logo' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Logo v hlavičce může měnit jen správce.' });
+      const e = empSession(req);
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const site = readJson(SITE_F, {});
+      if (b.reset) { deleteUpload(site.logoImage); site.logoImage = null; }
+      else {
+        let img = null; try { img = saveDataUrlImage(b.image); } catch (err) { return send(res, 400, { error: err.message }); }
+        if (!img) return send(res, 400, { error: 'Chybí platný obrázek.' });
+        deleteUpload(site.logoImage); site.logoImage = img;
+      }
+      writeJson(SITE_F, site);
+      logActivity('nastaveni', { email: (e && e.email) || '', name: (e && e.name) || 'Správce' }, b.reset ? 'Obnovil výchozí logo' : 'Změnil logo v hlavičce');
+      return send(res, 200, { ok: true, logo: site.logoImage || null });
     }
 
     // ---- Dovolená: moje konto + žádosti (zaměstnanec) ----
