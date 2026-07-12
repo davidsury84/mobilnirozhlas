@@ -74,7 +74,8 @@ header.appbar{
   display:grid;place-items:center;font-weight:800;color:#fff;font-size:28px;
   box-shadow:0 6px 16px rgba(10,107,52,.28);overflow:hidden;
 }
-.brand .logo.has-img{width:auto;height:52px;flex:none;min-width:52px;max-width:230px;background:#fff;border:1px solid var(--line);box-shadow:0 2px 8px rgba(15,21,18,.1);padding:4px 9px}
+.brand .logo.has-img{width:auto;height:46px;flex:none;max-width:230px;background:none;border:none;box-shadow:none;padding:0}
+.brand .logo:not(.has-img){display:none}
 .brand .logo.has-img img{width:auto;height:100%;max-width:212px;object-fit:contain;display:block}
 .brand h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-.02em;line-height:1.05}
 .brand h1 .sub{font-weight:500;color:var(--ink-soft);letter-spacing:0}
@@ -526,7 +527,7 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
     <div class="brand">
       <div class="logo">✓</div>
       <div>
-        <h1>ELKOPLAST <span class="sub">intranet</span></h1>
+        <h1>intranet</h1>
         <small>Evidence proškolení &amp; potvrzení</small>
       </div>
     </div>
@@ -902,7 +903,7 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
     <div class="appbar-inner">
       <div class="brand">
         <div class="logo">✓</div>
-        <div><h1>ELKOPLAST <span class="sub">intranet</span></h1><small id="mujWho">Intranet pro zaměstnance</small></div>
+        <div><h1>intranet</h1><small id="mujWho">Intranet pro zaměstnance</small></div>
       </div>
       <nav class="tabs"><button id="mujAdmin" style="display:none" onclick="location.href='/admin'">Správa</button><button id="mujLogout" style="display:none" onclick="location.href='/auth/logout'">Odhlásit</button></nav>
     </div>
