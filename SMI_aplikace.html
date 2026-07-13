@@ -138,6 +138,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .grid-set label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
   .grid-set .unit{color:var(--acc2);font-size:11px}
   .note{background:var(--panel2);border-left:3px solid var(--acc);padding:10px 14px;border-radius:8px;color:var(--mut);font-size:12.5px;margin-bottom:14px}
+  .ea-h{font-size:16px;margin:22px 0 10px;padding-left:10px;border-left:4px solid var(--acc)}
   footer{color:var(--mut);font-size:12px;text-align:center;padding:24px}
   #toast{position:fixed;bottom:20px;right:20px;background:var(--panel2);border:1px solid var(--line);padding:12px 18px;border-radius:10px;display:none;z-index:99}
   th.filt{padding:3px 5px !important;background:var(--panel);z-index:3}
@@ -275,6 +276,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="tab" data-pane="pokryti">🗓 Měsíční pokrytí</div>
       <div class="tab" data-pane="elko">🛒 Elkoplast</div>
       <div class="tab" data-pane="nakup">📦 Optimalizace nákupu</div>
+      <div class="tab" data-pane="eanalyza">📈 Analýza prodejů e-shopu</div>
       <div class="tab" data-pane="navod">📖 Návod</div>
     </div>
 
@@ -362,6 +364,59 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="note">Náhled listu „Parametry" s jednotkami. Hodnoty se mění v sekci ⚙️ Parametry modelu nahoře.</div>
       <div class="tblwrap"><table id="paramTbl"></table></div>
       <div id="iccLegend" class="note" style="margin-top:12px;border-left-color:var(--ok)"></div>
+    </div>
+    <div class="pane" id="pane-eanalyza">
+      <div class="note">Analýza reálných prodejů e-shopu <b>2020–2026</b> — 38 081 fakturačních položek, 24 268 objednávek, leden 2020 – 9. 7. 2026, částky <b>bez DPH</b>. Zdroj: „Prodeje eshop 2020-2026".</div>
+      <div class="kpis">
+        <div class="kpi"><div class="v">182,3 mil.</div><div class="l">Celkové tržby 2020–2026</div></div>
+        <div class="kpi ok"><div class="v">+22,9 %</div><div class="l">Růst tržeb H1 2026 vs. H1 2025</div></div>
+        <div class="kpi"><div class="v">2 892 Kč</div><div class="l">Medián hodnoty objednávky</div></div>
+        <div class="kpi"><div class="v">69 %</div><div class="l">Podíl tržeb B2B (firmy a instituce)</div></div>
+        <div class="kpi"><div class="v">13,7 %</div><div class="l">Zákazníků nakoupí opakovaně</div></div>
+        <div class="kpi ok"><div class="v">48 %</div><div class="l">Tržeb tvoří opakovaní zákazníci</div></div>
+      </div>
+      <h3 class="ea-h">1. Časová řada tržeb</h3>
+      <div class="card"><h3>Měsíční tržby a klouzavý průměr (12 měs.)</h3><canvas id="ea_month" height="90"></canvas>
+        <div class="note">Rok 2026 obsahuje data jen do 9. 7. Po slabším období 2023–2024 tržby od poloviny 2025 zřetelně akcelerují – jaro 2026 přineslo historicky nejsilnější měsíce (duben 2026: 4,58 mil. Kč).</div></div>
+      <div class="charts" style="grid-template-columns:1fr 1fr">
+        <div class="card"><h3>Roční tržby</h3><canvas id="ea_year" height="150"></canvas></div>
+        <div class="card"><h3>Srovnatelné 1. pololetí (leden–červen)</h3><canvas id="ea_h1" height="150"></canvas><div class="note">H1 2026 je nejlepší pololetí v historii – o 23 % nad H1 2025 i nad maximem z 2022.</div></div>
+      </div>
+      <div class="charts" style="grid-template-columns:1fr 1fr">
+        <div class="card"><h3>Počet objednávek a průměrná hodnota objednávky (AOV)</h3><canvas id="ea_aov" height="150"></canvas><div class="note">Růst tržeb táhne hlavně AOV (5 625 → 8 387 Kč/rok), počet objednávek stagnuje kolem 4 000/rok. Největší páka: více objednávek, ne jen dražší koš.</div></div>
+        <div class="card"><h3>Sezónní index (průměr 2021–2025, 100 = průměr)</h3><canvas id="ea_season" height="150"></canvas><div class="note">Dva vrcholy: květen (123) a říjen–listopad (114–119). Nejslabší leden, únor a červenec (~78–79).</div></div>
+      </div>
+      <h3 class="ea-h">2. Sezónní paterny podle sortimentu</h3>
+      <div class="card"><h3>Rozložení tržeb kategorie v roce (% ročních tržeb kategorie)</h3><canvas id="ea_catseason" height="110"></canvas>
+        <div class="note">Dvě protichůdné sezóny se doplňují: <b>nádrže na dešťovou vodu</b> vrcholí březen–červen (56 % ročních tržeb), <b>zimní posyp</b> říjen–leden (80 %). Slabé měsíce e-shopu (leden–únor, červenec) nemá čím vykrýt žádná velká kategorie – prostor pro nový sortiment či kampaně.</div></div>
+      <h3 class="ea-h">3. Produkty a kategorie</h3>
+      <div class="charts" style="grid-template-columns:1fr 1fr">
+        <div class="card"><h3>Top 10 kategorií podle tržeb (2020–2026)</h3><canvas id="ea_topsk" height="170"></canvas></div>
+        <div class="card"><h3>Top 12 produktů podle tržeb</h3><canvas id="ea_topprod" height="170"></canvas></div>
+      </div>
+      <div class="charts" style="grid-template-columns:1fr 1fr">
+        <div class="card"><h3>Nejrychleji rostoucí kategorie (H1 2026 vs. 2025, Kč)</h3><canvas id="ea_gain" height="150"></canvas><div class="note">Nové růstové motory: záchytné vany pod IBC, přístřešky na kontejnery, skladovací kontejnery, rohože pro zpevnění štěrku – vesměs B2B/průmyslový sortiment.</div></div>
+        <div class="card"><h3>Klesající kategorie (H1 2026 vs. 2025, Kč)</h3><canvas id="ea_lose" height="150"></canvas><div class="note">Pokles u kontejnerů na textil (−0,9 mil.) je pravděpodobně výpadek několika velkých obecních zakázek, ne trend poptávky – stojí za obchodní dotažení.</div></div>
+      </div>
+      <div class="card"><h3>Koncentrace sortimentu</h3>
+        <div class="tblwrap" style="max-height:none"><table id="ea_conc"></table></div>
+        <div class="note">67 % jednopoložkových objednávek = velký nevyužitý cross-sell potenciál. Nejčastější reálné kombinace: koš + sloupek (485×), sběrač vody + okapový díl, kontejner 1100 l + koš. Doporučené doplňky přímo v košíku mohou zvednout AOV o jednotky procent okamžitě.</div></div>
+      <h3 class="ea-h">4. Zákazníci</h3>
+      <div class="charts" style="grid-template-columns:1fr 1fr">
+        <div class="card"><h3>Podíl tržeb od vracejících se zákazníků (bez 2 velkoodběratelů)</h3><canvas id="ea_ret" height="150"></canvas><div class="note">Podíl opakovaných nákupů vyrostl z 11 % (2020) na ~35 % – dobrý trend, ale od 2024 stagnuje. Retenční program (e-mailing, spotřební materiál, servisní cykly) může posunout dál.</div></div>
+        <div class="card"><h3>Objednávky podle dne v týdnu</h3><canvas id="ea_wd" height="150"></canvas><div class="note">Víkend prakticky nulový (1,8 % objednávek) – potvrzuje B2B charakter. Časové razítko je z fakturace, přesný čas nákupu může být dřívější.</div></div>
+      </div>
+      <div class="card"><h3>Top 10 zákazníků (2020–2026)</h3>
+        <div class="tblwrap" style="max-height:none"><table id="ea_cust"></table></div>
+        <div class="note">Dva účty (HighTech Industries, Elkoplast Poland) tvoří 7,3 % všech tržeb a fungují spíš jako velkoobchodní/partnerský kanál – v metrikách je vhodné je sledovat odděleně. Medián doby do druhého nákupu běžného zákazníka je ~131 dní.</div></div>
+      <h3 class="ea-h">5. Klíčová zjištění a doporučení</h3>
+      <div class="note" style="border-left-color:var(--ok)"><b>1. Držte momentum 2026.</b> H1 2026 (+23 % YoY) táhnou nové B2B kategorie: záchytné vany pod IBC, přístřešky na kontejnery, skladovací kontejnery a rohože pro zpevnění štěrku. Rozšiřte v nich sortiment, obsah a PPC – rostou z malého základu.</div>
+      <div class="note" style="border-left-color:var(--ok)"><b>2. Počet objednávek stagnuje – růst stojí jen na AOV.</b> Objednávek je ~4 000/rok už od 2021. Zaměřte se na akvizici: SEO/obsah pro sezónní vrcholy (nádrže od února, posyp od září), srovnávače, remarketing.</div>
+      <div class="note" style="border-left-color:var(--ok)"><b>3. Vytěžte sezónní kalendář.</b> Kampaně na nádrže spouštět v únoru–březnu (vrchol květen), na zimní posyp v září (vrchol říjen–prosinec). Slabé měsíce (leden, únor, červenec) vykrývat interiérovým sortimentem, plánovanými B2B nabídkami nebo výprodeji.</div>
+      <div class="note" style="border-left-color:var(--ok)"><b>4. Cross-sell v košíku.</b> 67 % objednávek má jedinou položku. Automatická doporučení ověřených párů (koš + sloupek + sáčky, sběrač vody + příslušenství, kontejner + koše) je nejlevnější cesta k vyššímu AOV.</div>
+      <div class="note" style="border-left-color:var(--ok)"><b>5. Retence: 13,7 % zákazníků dělá 48 % tržeb.</b> Opakovaný nákup přichází v mediánu po ~131 dnech. Nastavte e-mailové připomínky ve 3–4měsíčním cyklu, B2B věrnostní ceník a account management pro top ~1 200 zákazníků (dělají 50 % tržeb).</div>
+      <div class="note" style="border-left-color:var(--ok)"><b>6. B2B je jádro (69 % tržeb, AOV 10 tis. vs. 4,8 tis. Kč).</b> Zvažte B2B portál: individuální ceníky, nákup na fakturu, rychlá znovuobjednávka, výkazy pro obce a firmy.</div>
+      <div class="note" style="border-left-color:var(--warn)"><b>7. Rizika koncentrace.</b> Kontejnery na textil −0,9 mil. Kč H1 YoY (výpadek velkých zakázek) a závislost na 2 velkoodběratelských účtech (7,3 % tržeb). Diverzifikace akvizičních kanálů snižuje volatilitu.</div>
     </div>
     <div class="pane" id="pane-navod">
       <div class="note">Jak se počítá <b>nová prodejní cena</b> (NIFO + vyhlazení). Čte se shora dolů: nejdřív se určí základní cena (Drží / NIFO skok / Vyhlazení), pak případný markdown s podlahou na úrovni nákupní ceny.</div>
@@ -993,7 +1048,7 @@ function renderParam(){
     `<span class="muted">Náklady skladu a kapitálovou sazbu zadáš v záložce 📦 Optimalizace nákupu (předvyplněno z reálných dat – doplňkové/skladové náklady 2025). „Odhad ročního ICC" položky = průměrná hodnota zásoby (Kč) × ICC. Tutéž sazbu používá i Optimalizace nákupu (efektivní sazba držení).</span>`;
 }
 const PANE_TBL={chyby:'errTbl',ceny:'priceTbl',mrtve:'deadTbl',vse:'allTbl',model:'modelTbl',elko:'elkoTbl',nakup:'nkTbl',seg:'csSalesTbl'};
-$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='historie')renderHistory();if(pane==='vyvoj'){refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='nakup')renderNakup();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();try{tableTools();}catch(e){}});
+$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='historie')renderHistory();if(pane==='vyvoj'){refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='nakup')renderNakup();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();try{tableTools();}catch(e){}});
 const _bulkBtn=$('#bulkApply');if(_bulkBtn)_bulkBtn.onclick=bulkApply;
 
 // ---- per-column filtering ----
@@ -1982,6 +2037,52 @@ function renderSegOverview(){
   pairs.sort((x,y)=>y[2]-x[2]||y[3]-x[3]);
   $('#segPairs').innerHTML=`<thead><tr><th>Produkt A</th><th>Produkt B</th><th class="num">Společných objednávek</th><th class="num">Lift</th></tr></thead><tbody>`+
     pairs.slice(0,25).map(p=>`<tr><td>${esc(csName(p[0]))}</td><td>${esc(csName(p[1]))}</td><td class="num">${p[2]}</td><td class="num">${p[3]}×</td></tr>`).join('')+`</tbody>`;
+}
+// ===== ANALÝZA PRODEJŮ E-SHOPU 2020–2026 (integrovaná zpráva) =====
+const ESHOP_ANALYZA={"monthly":{"labels":["2020-01","2020-02","2020-03","2020-04","2020-05","2020-06","2020-07","2020-08","2020-09","2020-10","2020-11","2020-12","2021-01","2021-02","2021-03","2021-04","2021-05","2021-06","2021-07","2021-08","2021-09","2021-10","2021-11","2021-12","2022-01","2022-02","2022-03","2022-04","2022-05","2022-06","2022-07","2022-08","2022-09","2022-10","2022-11","2022-12","2023-01","2023-02","2023-03","2023-04","2023-05","2023-06","2023-07","2023-08","2023-09","2023-10","2023-11","2023-12","2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07"],"rev":[8332.0,1242.0,8559.0,90467.0,131120.0,1695529.0,1112594.0,1391433.0,1325884.0,1700585.0,1612891.0,1225992.0,1177796.0,1625592.0,2369123.0,2141617.0,2776945.0,2148704.0,1619713.0,1955901.0,2269225.0,1822948.0,2568255.0,3249729.0,1736862.0,1774501.0,3020732.0,2624353.0,4203109.0,3239715.0,2313649.0,2373335.0,2523085.0,3139895.0,2921476.0,2044452.0,2074554.0,1615439.0,2795176.0,2262297.0,3120646.0,2422245.0,1888425.0,2167712.0,1915701.0,3395094.0,2547026.0,2455236.0,1825565.0,2341671.0,2358354.0,2825351.0,2383377.0,2760460.0,1847988.0,2821324.0,2103565.0,3718066.0,3140428.0,3009554.0,2997047.0,2510470.0,2612974.0,2722524.0,2957991.0,2817310.0,2310643.0,2904790.0,3188576.0,2925682.0,3159551.0,2365569.0,2516226.0,3287100.0,3292555.0,4584607.0,3587007.0,3148802.0,649132.0],"orders":[4,1,5,25,14,378,218,285,231,259,250,171,191,258,433,488,549,380,218,342,293,277,333,248,297,248,445,427,532,447,286,401,306,286,283,212,235,238,393,347,491,380,244,352,274,322,301,222,277,308,354,473,415,326,230,411,333,364,346,285,318,284,385,404,432,393,238,333,326,357,337,241,286,306,451,492,556,436,116],"aov":[2083.0,1242.0,1712.0,3619.0,9366.0,4486.0,5104.0,4882.0,5740.0,6566.0,6452.0,7170.0,6166.0,6301.0,5471.0,4389.0,5058.0,5654.0,7430.0,5719.0,7745.0,6581.0,7712.0,13104.0,5848.0,7155.0,6788.0,6146.0,7901.0,7248.0,8090.0,5919.0,8245.0,10979.0,10323.0,9644.0,8828.0,6788.0,7112.0,6520.0,6356.0,6374.0,7739.0,6158.0,6992.0,10544.0,8462.0,11060.0,6590.0,7603.0,6662.0,5973.0,5743.0,8468.0,8035.0,6865.0,6317.0,10214.0,9076.0,10560.0,9425.0,8840.0,6787.0,6739.0,6847.0,7169.0,9709.0,8723.0,9781.0,8195.0,9376.0,9816.0,8798.0,10742.0,7301.0,9318.0,6451.0,7222.0,5596.0]},"yearly":{"labels":[2020,2021,2022,2023,2024,2025,2026],"rev":[10304628.0,25725550.0,31915163.0,28659551.0,31135703.0,33473128.0,21065429.0],"orders":[1832,3952,4115,3748,4065,3991,2604],"cust":[1234,3376,3279,2980,3050,2957,2041],"aov":[5625.0,6510.0,7756.0,7647.0,7659.0,8387.0,8090.0]},"h1":{"labels":[2020,2021,2022,2023,2024,2025,2026],"rev":[1935249.0,12239778.0,16599271.0,14290356.0,14494778.0,16618317.0,20416297.0]},"season":[78.0,78.5,104.6,100.0,122.8,106.5,79.4,97.2,95.4,119.3,114.0,104.4],"season_posyp":[18.1,8.0,1.3,1.7,0.8,0.4,1.2,0.8,5.5,18.1,20.9,23.2],"season_voda":[1.3,3.1,9.3,12.3,17.3,16.5,8.4,9.9,6.0,6.1,5.9,3.8],"topsk":{"labels":["Plošiny a manipulační technika","Sběrače dešťové vody","Nádoby na zimní posyp","Venkovní odpadkové koše","Podzemní nádrže","Plastové kontejnery 1100 l","Interiérové koše na tříděný odpad","Lavičky a mobiliář","Kontejnery na textil","Plastové palety"],"rev":[38411821.0,31172748.0,13134306.0,10917397.0,10081204.0,6765019.0,5038841.0,3886795.0,3671694.0,3557398.0]},"topprod":{"labels":["Nádoba na zimní posyp SBA 110 l, žlutá-otvor","Nádoba na zimní posyp SBA 220 l, žlutá-otvor","Kontejner na textil, bílý","Pracovní plošina pro vysokozdvižný vozík 350","Výklopný kontejner - 600 l AUTOMATIC","Pracovní plošina pro vysokozdvižný vozík 300","Mřížkový nádstavec na europaletu 1200x800x120","Sběrač dešťové vody s filtrem na rychlomontáž","Výklopný kontejner - 1100 l AUTOMATIC","Podzemní nádrž FLAT 3","Podzemní nádrž NEPTUN 6 s pevnou šachtou 450 ","Nádrž na dešťovou vodu Seine 650 l písková,st"],"rev":[3876189.0,3241249.0,2280629.0,2242356.0,2176257.0,2059167.0,2043730.0,1698684.0,1608132.0,1546224.0,1540543.0,1511753.0]},"gain":{"labels":["Sběrače dešťové vody","Plošiny a manipulační technika","Plastové kontejnery 1100 l","Záchytné vany pod IBC","Přístřešky na kontejnery","Skladovací kontejnery FCM"],"d":[917315.0,880606.0,690392.0,633673.0,577662.0,573780.0]},"lose":{"labels":["Kontejnery na textil","Podzemní nádrže","Sloupky/kotvení","Lavičky a mobiliář","Kontejnery CLE-CO","Filtry/příslušenství"],"d":[-905100.0,-291550.0,-266584.0,-238220.0,-177954.0,-95797.0]},"retshare":{"labels":[2020,2021,2022,2023,2024,2025,2026],"share":[10.6,19.0,25.8,28.6,36.3,34.9,34.0]},"weekday":[5149,5396,4967,4684,3629,86,357],"topcust":{"labels":["HighTech Industries s.r.o.","Elkoplast Poland sp. z o.o.","Aquanix s.r.o.","TB baits s.r.o.","PKS stavby a.s.","STV Technology, s.r.o.","TUNET.CZ, s.r.o.","DEZA a.s.","Stillking Films s.r.o.","Praktik system s.r.o"],"rev":[7774913.0,5604977.0,1915756.0,777260.0,756000.0,719087.0,627467.0,593000.0,522340.0,518998.0],"orders":[1282,1724,348,8,1,11,88,2,8,2]},"stats":{"total_rev":182279151.0,"orders":24268,"customers":16673,"skus":1550,"aov_median":2891.7,"repeat_pct":13.7,"repeat_rev_pct":47.7,"b2b_rev_pct":69.1}};
+let EA_DONE=false, EA_CHARTS=[];
+function renderEshopAnalyza(){
+  if(EA_DONE||!ESHOP_ANALYZA||typeof Chart==='undefined') return;
+  const d=ESHOP_ANALYZA;
+  const txt=_cv('--txt'), mut=_cv('--mut'), line=_cv('--line');
+  const M=v=>(v/1e6).toFixed(1).replace('.',',')+' mil.';
+  const K=v=>Math.round(v).toLocaleString('cs-CZ');
+  const roll=(a,n)=>a.map((_,i)=>i<n-1?null:a.slice(i-n+1,i+1).reduce((x,y)=>x+y,0)/n);
+  const mn=['Led','Úno','Bře','Dub','Kvě','Čvn','Čvc','Srp','Zář','Říj','Lis','Pro'];
+  const leg={labels:{color:txt,font:{size:11}}}, dl={display:false};
+  const ax=(cb)=>({ticks:Object.assign({color:mut},cb?{callback:cb}:{}),grid:{color:line}});
+  const axx=()=>({ticks:{color:mut},grid:{display:false}});
+  const mk=(id,cfg)=>{const el=$('#'+id);if(el){cfg.options=cfg.options||{};cfg.options.plugins=Object.assign({datalabels:dl},cfg.options.plugins);EA_CHARTS.push(new Chart(el,cfg));}};
+  mk('ea_month',{data:{labels:d.monthly.labels,datasets:[
+    {type:'bar',label:'Měsíční tržby',data:d.monthly.rev,backgroundColor:'#4f8ef766',borderRadius:3},
+    {type:'line',label:'Klouzavý průměr 12 m',data:roll(d.monthly.rev,12),borderColor:'#f7b84f',pointRadius:0,borderWidth:2.5,tension:.3}]},
+    options:{responsive:true,plugins:{legend:leg,tooltip:{callbacks:{label:c=>c.dataset.label+': '+K(c.raw)+' Kč'}}},scales:{y:ax(M),x:{ticks:{color:mut,maxTicksLimit:14},grid:{display:false}}}}});
+  mk('ea_year',{type:'bar',data:{labels:d.yearly.labels,datasets:[{label:'Tržby',data:d.yearly.rev,backgroundColor:d.yearly.labels.map(l=>l==2026?'#34c98e':'#4f8ef7'),borderRadius:5}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>K(c.raw)+' Kč'+(c.label==2026?' (do 9. 7.)':'')}}},scales:{y:ax(M),x:axx()}}});
+  mk('ea_h1',{type:'bar',data:{labels:d.h1.labels,datasets:[{label:'H1 tržby',data:d.h1.rev,backgroundColor:d.h1.labels.map(l=>l==2026?'#34c98e':'#4f8ef7'),borderRadius:5}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>K(c.raw)+' Kč'}}},scales:{y:ax(M),x:axx()}}});
+  mk('ea_aov',{data:{labels:d.yearly.labels,datasets:[
+    {type:'bar',label:'Objednávky',data:d.yearly.orders,backgroundColor:'#4f8ef766',yAxisID:'y',borderRadius:4},
+    {type:'line',label:'AOV (Kč)',data:d.yearly.aov,borderColor:'#f7b84f',yAxisID:'y2',borderWidth:2.5,tension:.3}]},
+    options:{responsive:true,plugins:{legend:leg},scales:{y:Object.assign(ax(),{position:'left'}),y2:{position:'right',grid:{display:false},ticks:{color:mut,callback:K}},x:axx()}}});
+  mk('ea_season',{type:'bar',data:{labels:mn,datasets:[{label:'Index',data:d.season,backgroundColor:d.season.map(v=>v>=110?'#34c98e':v<85?'#f76c5e':'#4f8ef7'),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:ax(),x:axx()}}});
+  mk('ea_catseason',{type:'line',data:{labels:mn,datasets:[
+    {label:'Nádrže na dešťovou vodu (%)',data:d.season_voda,borderColor:'#34c98e',backgroundColor:'#34c98e33',fill:true,tension:.35},
+    {label:'Zimní posyp (%)',data:d.season_posyp,borderColor:'#f7b84f',backgroundColor:'#f7b84f33',fill:true,tension:.35}]},
+    options:{responsive:true,plugins:{legend:leg},scales:{y:ax(v=>v+' %'),x:axx()}}});
+  const hbar=(cb)=>({indexAxis:'y',responsive:true,plugins:{legend:{display:false},datalabels:dl,tooltip:{callbacks:{label:c=>K(c.raw)+' Kč'}}},scales:{x:ax(M),y:{ticks:{color:mut,font:{size:10}},grid:{display:false}}}});
+  mk('ea_topsk',{type:'bar',data:{labels:d.topsk.labels,datasets:[{data:d.topsk.rev,backgroundColor:'#4f8ef7',borderRadius:4}]},options:hbar()});
+  mk('ea_topprod',{type:'bar',data:{labels:d.topprod.labels,datasets:[{data:d.topprod.rev,backgroundColor:'#4f8ef7',borderRadius:4}]},options:hbar()});
+  mk('ea_gain',{type:'bar',data:{labels:d.gain.labels,datasets:[{data:d.gain.d,backgroundColor:'#34c98e',borderRadius:4}]},options:hbar()});
+  mk('ea_lose',{type:'bar',data:{labels:d.lose.labels,datasets:[{data:d.lose.d,backgroundColor:'#f76c5e',borderRadius:4}]},options:hbar()});
+  mk('ea_ret',{type:'line',data:{labels:d.retshare.labels,datasets:[{label:'% tržeb od vracejících se',data:d.retshare.share,borderColor:'#34c98e',backgroundColor:'#34c98e33',fill:true,tension:.3}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:Object.assign(ax(v=>v+' %'),{max:50}),x:axx()}}});
+  mk('ea_wd',{type:'bar',data:{labels:['Po','Út','St','Čt','Pá','So','Ne'],datasets:[{data:d.weekday,backgroundColor:'#4f8ef7',borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:ax(),x:axx()}}});
+  const conc=$('#ea_conc'); if(conc) conc.innerHTML='<thead><tr><th>Metrika</th><th class="num">Hodnota</th></tr></thead><tbody>'+
+    [['Aktivních produktů (SKU) celkem','1 550'],['Produktů tvořících 80 % tržeb','322 (18 %)'],['Průměrný počet položek na objednávku','1,57'],['Objednávek s jedinou položkou','67 %'],['Objednávek kombinujících 2+ kategorie','11,6 %']].map(r=>'<tr><td>'+r[0]+'</td><td class="num">'+r[1]+'</td></tr>').join('')+'</tbody>';
+  const cust=$('#ea_cust'); if(cust) cust.innerHTML='<thead><tr><th>Zákazník</th><th class="num">Objednávek</th><th class="num">Tržby (Kč)</th></tr></thead><tbody>'+
+    d.topcust.labels.map((l,i)=>'<tr><td>'+esc(l)+'</td><td class="num">'+K(d.topcust.orders[i])+'</td><td class="num">'+K(d.topcust.rev[i])+'</td></tr>').join('')+'</tbody>';
+  EA_DONE=true;
 }
 function showSeg(name){
   document.querySelectorAll('#pane-seg .subtab').forEach(s=>s.classList.toggle('active',s.dataset.seg===name));
