@@ -174,9 +174,54 @@ function mount(host) {
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
     if (!Array.isArray(d.timesheet)) d.timesheet = [];
     if (!Array.isArray(d.strediska) || !d.strediska.length) d.strediska = JSON.parse(JSON.stringify(SEED_STREDISKA));
+    if (!d.settings || typeof d.settings !== 'object') d.settings = {};
+    if (typeof d.settings.reportEnabled !== 'boolean') d.settings.reportEnabled = true;
+    if (!Array.isArray(d.settings.reportRecipients)) d.settings.reportRecipients = ['tomas.krajca@elkoplast.cz', 'david.sury@elkoplast.cz', 'lukas.pospisil@elkoplast.cz'];
+    if (!d.settings.phaseDays || typeof d.settings.phaseDays !== 'object') d.settings.phaseDays = { obchod: 2, konstrukce: 5, schvaleni: 5, vyroba: 10 };
     return d;
   }
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
+
+  // ---- Fáze procesu: Obchod -> Konstrukce -> Schvaleni -> Zadani do vyroby ----
+  const PHASE_LABEL = { obchod: 'Obchod', konstrukce: 'Konstrukce', schvaleni: 'Schvaleni', vyroba: 'Zadani do vyroby' };
+  const PHASE_OF = { novy: 'obchod', obchodnik: 'schvaleni', klient: 'schvaleni', schvaleno: 'schvaleni', prace: 'konstrukce', kontrola: 'konstrukce', revize: 'konstrukce', podklady: 'konstrukce', vyroba: 'vyroba', stredisko: 'vyroba', dokonceno: 'vyroba' };
+  function auditAt(z, needle, last) { let t = null; (z.audit || []).forEach(a => { if ((a.action || '').indexOf(needle) >= 0) { if (last) t = a.at; else if (t == null) t = a.at; } }); return t; }
+  function computePhaseStats(d) {
+    const acc = { obchod: [], konstrukce: [], schvaleni: [], vyroba: [] }, total = [];
+    for (const z of (d.zakazky || [])) {
+      const created = z.createdAt || null;
+      const assigned = auditAt(z, 'Přidělení', false);
+      const drawn = auditAt(z, 'Zkreslení hotovo', true);
+      const approved = auditAt(z, 'Klient schválil', false);
+      const toProd = auditAt(z, 'Předáno do výroby', false) || approved;
+      const done = z.closedAt || null;
+      if (created && assigned) acc.obchod.push(businessDaysBetween(created, assigned));
+      if (assigned && drawn) acc.konstrukce.push(businessDaysBetween(assigned, drawn));
+      if (drawn && approved) acc.schvaleni.push(businessDaysBetween(drawn, approved));
+      if (toProd && done) acc.vyroba.push(businessDaysBetween(toProd, done));
+      const end = done || approved;
+      if (created && end) total.push(businessDaysBetween(created, end));
+    }
+    const avg = a => a.length ? Math.round(a.reduce((x, v) => x + v, 0) / a.length * 10) / 10 : null;
+    return { obchod: avg(acc.obchod), konstrukce: avg(acc.konstrukce), schvaleni: avg(acc.schvaleni), vyroba: avg(acc.vyroba), total: avg(total),
+      n: { obchod: acc.obchod.length, konstrukce: acc.konstrukce.length, schvaleni: acc.schvaleni.length, vyroba: acc.vyroba.length, total: total.length } };
+  }
+  function isoWeekKey(ts) { const dt = new Date(ts); const day = (dt.getUTCDay() + 6) % 7; const th = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate() - day + 3)); const wk = 1 + Math.round((th - new Date(Date.UTC(th.getUTCFullYear(), 0, 4))) / 604800000); return th.getUTCFullYear() + '-W' + String(wk).padStart(2, '0'); }
+  function buildWeeklyReport(d) {
+    const now = Date.now();
+    const open = (d.zakazky || []).filter(z => STAV[z.stav] && !STAV[z.stav].terminal);
+    const overdue = open.filter(z => semafor(z) === 'red');
+    const byPhase = { obchod: 0, konstrukce: 0, schvaleni: 0, vyroba: 0 };
+    open.forEach(z => { const ph = PHASE_OF[z.stav]; if (ph) byPhase[ph]++; });
+    const ps = computePhaseStats(d), pd = (d.settings && d.settings.phaseDays) || {};
+    const pa = (v, tgt) => (v == null ? '\u2014' : v + ' d') + (tgt ? ' (cíl ' + tgt + ' d)' : '');
+    let t = 'Týdenní přehled \u2014 Konstrukce (' + fmtDate(now) + ')\n\n';
+    t += 'Otevřených zakázek: ' + open.length + '\nPo termínu: ' + overdue.length + '\n\n';
+    t += 'Rozpracováno dle fáze:\n\u2022 Obchod: ' + byPhase.obchod + '\n\u2022 Konstrukce: ' + byPhase.konstrukce + '\n\u2022 Schválení: ' + byPhase.schvaleni + '\n\u2022 Zadání do výroby: ' + byPhase.vyroba + '\n\n';
+    if (overdue.length) t += 'Zpožděné zakázky:\n' + overdue.map(z => '\u2022 ' + z.cislo + ' (' + z.zakaznik + ') \u2014 ' + STAV[z.stav].label + ', termín ' + fmtDate(z.deadline) + ', odpovídá ' + (empName(responsibleEmail(z)) || '\u2014')).join('\n') + '\n\n';
+    t += 'Průměrná skutečná doba fází (prac. dny):\n\u2022 Obchod: ' + pa(ps.obchod, pd.obchod) + '\n\u2022 Konstrukce: ' + pa(ps.konstrukce, pd.konstrukce) + '\n\u2022 Schválení: ' + pa(ps.schvaleni, pd.schvaleni) + '\n\u2022 Zadání do výroby: ' + pa(ps.vyroba, pd.vyroba) + '\n\u2022 Celý proces: ' + pa(ps.total, null) + '\n';
+    return t;
+  }
 
   // ---- role a přístup ------------------------------------------------------
   // Je uživatel výrobním ředitelem některé oblasti? (role odvozená z číselníku oblastí)
@@ -345,6 +390,9 @@ function mount(host) {
       if (p === '/api/konstrukce/admin/fond' && req.method === 'POST') return apiAdminFond(req, res);
       if (p === '/api/konstrukce/admin/typ' && req.method === 'POST') return apiAdminTyp(req, res);
       if (p === '/api/konstrukce/admin/seed' && req.method === 'POST') return apiAdminSeed(req, res);
+      if (p === '/api/konstrukce/admin/settings' && req.method === 'POST') return apiAdminSettings(req, res);
+      if (p === '/api/konstrukce/admin/report' && req.method === 'GET') return apiReport(req, res, false);
+      if (p === '/api/konstrukce/admin/report' && req.method === 'POST') return apiReport(req, res, true);
       if (p === '/api/konstrukce/timesheet' && req.method === 'GET') return apiTimesheetGet(req, res, u.query);
       if (p === '/api/konstrukce/timesheet' && req.method === 'POST') return apiTimesheetSave(req, res);
       if (p === '/api/konstrukce/timesheet/delete' && req.method === 'POST') return apiTimesheetDelete(req, res);
@@ -402,6 +450,10 @@ function mount(host) {
       notif: myNotif.slice(0, 40),
       notifUnread: myNotif.filter(n => !n.read).length,
       now: Date.now(),
+      settings: me.isAdmin ? d.settings : undefined,
+      phaseDays: (d.settings && d.settings.phaseDays) || {},
+      phaseAvg: computePhaseStats(d),
+      phaseLabel: PHASE_LABEL,
     });
     return true;
   }
@@ -1100,6 +1152,18 @@ function mount(host) {
       }
     }
 
+    // Tydenni report (pondeli, jednou za tyden) — jde-li zapnout/vypnout v SET-UP
+    try {
+      if (d.settings && d.settings.reportEnabled && (d.settings.reportRecipients || []).length) {
+        const wk = isoWeekKey(now), dow = new Date(now).getUTCDay();
+        if (dow === 1 && d.settings._lastReportWeek !== wk) {
+          d.settings._lastReportWeek = wk; changed = true;
+          const text = buildWeeklyReport(d);
+          for (const em of d.settings.reportRecipients) await mail(em, 'Týdenní přehled konstrukce', text);
+        }
+      }
+    } catch (_) {}
+
     if (changed) save(d);
   }
 
@@ -1331,6 +1395,21 @@ function mount(host) {
     return true;
   }
 
+  async function apiAdminSettings(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen spravce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load(); d.settings = d.settings || {};
+    if (b.phaseDays && typeof b.phaseDays === 'object') { d.settings.phaseDays = d.settings.phaseDays || {}; ['obchod', 'konstrukce', 'schvaleni', 'vyroba'].forEach(k => { if (b.phaseDays[k] != null) d.settings.phaseDays[k] = Math.max(0, Number(b.phaseDays[k]) || 0); }); }
+    if (typeof b.reportEnabled === 'boolean') d.settings.reportEnabled = b.reportEnabled;
+    if (Array.isArray(b.reportRecipients)) d.settings.reportRecipients = b.reportRecipients.map(e => String(e).trim().toLowerCase()).filter(Boolean);
+    save(d); json(res, 200, { ok: true, settings: d.settings }); return true;
+  }
+  async function apiReport(req, res, send) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen spravce.' }); return true; }
+    const d = load(); const text = buildWeeklyReport(d);
+    if (send) { const rec = (d.settings && d.settings.reportRecipients) || []; for (const em of rec) await mail(em, 'Týdenní přehled konstrukce', text); json(res, 200, { ok: true, sent: rec.length, recipients: rec, text }); return true; }
+    json(res, 200, { ok: true, text }); return true;
+  }
   return { handle, tick };
 }
 
