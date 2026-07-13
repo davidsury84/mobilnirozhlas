@@ -441,6 +441,33 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .matrix.pl td.pl-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .matrix.pl tr.pl-sum td{font-weight:800;border-top:2px solid var(--line);background:rgba(0,0,0,.045)}
 .matrix.pl tr.pl-sum td.pl-neg{color:var(--red)}
+/* Obchod — rozdělení obchodníků */
+.ob-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.ob-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.ob-head{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--bg-2)}
+.ob-av{flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px;letter-spacing:.02em}
+.ob-av.off{background:var(--bg-2);color:var(--ink-soft);border:1px dashed var(--line-strong)}
+.ob-who{min-width:0;flex:1}
+.ob-who .nm{font-size:15px;font-weight:700;line-height:1.2}
+.ob-who .dom{margin-top:2px;font-size:12.5px;color:var(--ink-soft)}
+.ob-who .em{margin-top:4px;font-size:12px;display:inline-flex;align-items:center;gap:5px}
+.ob-who .em a{font-weight:600}
+.ob-who .em.no{color:var(--ink-soft)}
+.ob-body{padding:14px 16px;display:grid;gap:12px}
+.ob-lbl{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
+.ob-prods{display:flex;flex-wrap:wrap;gap:6px}
+.ob-prod{display:inline-block;background:var(--green-soft);color:var(--green-d);border-radius:8px;padding:4px 9px;font-size:12px;font-weight:500}
+.ob-zastup{font-size:13px;line-height:1.5;color:var(--ink)}
+.ob-rec{font-size:12.5px;line-height:1.5;color:var(--ink-soft);border-left:3px solid var(--line-strong);padding-left:10px}
+.ob-foot{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.ob-badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700}
+.ob-badge .k{opacity:.7;font-weight:600}
+.ob-risk-lo{background:var(--green-soft);color:var(--green-d)}
+.ob-risk-mid{background:var(--amber-soft);color:var(--amber)}
+.ob-risk-hi{background:var(--red-soft);color:var(--red)}
+.ob-rep{background:var(--bg-2);color:var(--ink-soft)}
+.ob-note{margin:0 0 18px;font-size:13px;color:var(--ink-soft);line-height:1.55}
+.ob-note b{color:var(--ink)}
 /* Editace banneru */
 .mj-hero .hero-edit-btn{position:absolute;top:14px;right:14px;z-index:2;display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:var(--radius);border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);color:#fff;font-size:12.5px;font-weight:650;backdrop-filter:blur(3px);cursor:pointer}
 .mj-hero .hero-edit-btn:hover{background:rgba(255,255,255,.28)}
@@ -1138,7 +1165,8 @@ const MUJ_IC = {
   cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.3 12.2a1.5 1.5 0 0 0 1.5 1.2h8a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/>',
   calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7.5" x2="16" y2="7.5"/><circle cx="9" cy="12" r="0.5"/><circle cx="12" cy="12" r="0.5"/><circle cx="15" cy="12" r="0.5"/><circle cx="9" cy="15" r="0.5"/><circle cx="12" cy="15" r="0.5"/><circle cx="15" cy="15" r="0.5"/><circle cx="9" cy="18" r="0.5"/><circle cx="12" cy="18" r="0.5"/><circle cx="15" cy="18" r="0.5"/>',
   truck:'<path d="M3 6.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V16H3V6.5z"/><path d="M14 9h3.6l2.4 3v4H14V9z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>',
-  tasks:'<rect x="8" y="2.5" width="8" height="3.5" rx="1"/><path d="M16 4.5h2a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/><path d="M8.5 13.5l2.2 2.2 4.8-5.2"/>'
+  tasks:'<rect x="8" y="2.5" width="8" height="3.5" rx="1"/><path d="M16 4.5h2a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/><path d="M8.5 13.5l2.2 2.2 4.8-5.2"/>',
+  users:'<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M17 14.2A6.5 6.5 0 0 1 21.5 20"/>'
 };
 const MUJ_MODS = [
   { key:"dash", icon:MUJ_IC.dash, label:"Můj přehled" },
@@ -1160,6 +1188,8 @@ const MUJ_MODS = [
   { key:"svozesa", icon:MUJ_IC.calc, label:"Kalkulačka svoz ESA", gated:true },
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
+  { grp:"Obchod" },
+  { key:"obchod", icon:MUJ_IC.users, label:"Rozdělení obchodníků", gated:true },
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
@@ -1321,6 +1351,7 @@ function mjGo(key){
   else if(key==="plasty") showPlasty();
   else if(key==="doprava") showDoprava();
   else if(key==="konstrukce") showKonstrukce();
+  else if(key==="obchod") showObchod();
   else if(key==="smlouvy") showSmlouvy();
   else if(key==="sortiment") showSortiment();
   else if(key==="adaptace") showAdaptace();
@@ -1389,6 +1420,53 @@ function plSheet(s){
     else h+=plTable(b.rows||[]);
   });
   return h;
+}
+let OBCHOD_DATA=null;
+function obInitials(name){ return (name||"").trim().split(/\s+/).map(w=>w[0]||"").slice(0,2).join("").toUpperCase(); }
+function obRiskClass(r){ const t=(r||"").toLowerCase(); if(t.indexOf("vysok")>=0) return "ob-risk-hi"; if(t.indexOf("nízk")>=0||t.indexOf("nizk")>=0||t.indexOf("žádn")>=0||t.indexOf("zadn")>=0) return t.indexOf("stř")>=0||t.indexOf("str")>=0?"ob-risk-mid":"ob-risk-lo"; return "ob-risk-mid"; }
+async function showObchod(tab){
+  MUJ.view="obchod"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!(MUJ.admin || (MUJ.modules||[]).indexOf("obchod")>=0)){
+    body.innerHTML='<div class="card pad"><p class="muted" style="margin:0">K modulu Obchod nemáte přístup.</p></div>'; return;
+  }
+  tab=tab||'rozdeleni';
+  const tabDefs=[['rozdeleni','Rozdělení obchodníků']];
+  const bar='<div class="pl-tabs">'+tabDefs.map(t=>'<button class="pl-tab'+(t[0]===tab?' active':'')+'" type="button" onclick="showObchod(\''+t[0]+'\')">'+esc(t[1])+'</button>').join('')+'</div>';
+  const hero='<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Kdo má na starosti jaké portfolio, kdo ho zastupuje a kde je riziko výpadku. Obchodníci jsou propojeni na živou databázi zaměstnanců.</p></div>';
+  body.innerHTML=hero+bar+'<p class="muted">Načítám…</p>';
+  if(!OBCHOD_DATA){
+    try{ const r=await fetch("/api/obchod",{cache:"no-store"}); if(!r.ok) throw new Error((await r.json()).error||("HTTP "+r.status)); OBCHOD_DATA=await r.json(); }
+    catch(e){ body.innerHTML=hero+bar+'<div class="card pad"><p class="muted" style="margin:0">Nepodařilo se načíst rozdělení obchodníků. '+esc(e.message||"")+'</p></div>'; return; }
+  }
+  const d=OBCHOD_DATA, items=d.items||[];
+  const note='<p class="ob-note">Portfolio je rozděleno mezi <b>'+items.length+'</b> obchodníků. '+
+    'Propojeno na živou databázi: <b>'+(d.matched||0)+'</b> z '+(d.total||items.length)+'. '+
+    'Obchodníci bez propojení se doplní automaticky, jakmile se poprvé přihlásí firemním Google účtem.</p>';
+  const cards=items.map(it=>{
+    const em = it.inDb
+      ? '<span class="em"><a href="mailto:'+esc(it.email)+'">'+esc(it.email)+'</a></span>'
+      : '<span class="em no">zatím není v intranetu</span>';
+    const prods='<div class="ob-prods">'+(it.produkty||[]).map(p=>'<span class="ob-prod">'+esc(p)+'</span>').join('')+'</div>';
+    return '<div class="ob-card">'+
+      '<div class="ob-head">'+
+        '<div class="ob-av'+(it.inDb?'':' off')+'">'+esc(obInitials(it.manager))+'</div>'+
+        '<div class="ob-who"><div class="nm">'+esc(it.manager)+'</div>'+
+          '<div class="dom">'+esc(it.domena)+'</div>'+em+'</div>'+
+      '</div>'+
+      '<div class="ob-body">'+
+        '<div><div class="ob-lbl">Produkty</div>'+prods+'</div>'+
+        '<div><div class="ob-lbl">Zastupitelnost / překryv</div><div class="ob-zastup">'+esc(it.zastup)+'</div></div>'+
+        '<div><div class="ob-lbl">Doporučení</div><div class="ob-rec">'+esc(it.doporuceni)+'</div></div>'+
+      '</div>'+
+      '<div class="ob-foot">'+
+        '<span class="ob-badge '+obRiskClass(it.riziko)+'"><span class="k">Riziko</span> '+esc(it.riziko)+'</span>'+
+        '<span class="ob-badge ob-rep"><span class="k">Zastupitelnost</span> '+esc(it.zastupitelnost)+'</span>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  body.innerHTML=hero+bar+note+'<div class="ob-grid">'+cards+'</div>';
+  window.scrollTo(0,0);
 }
 function showPlasty(tab){
   MUJ.view="plasty"; renderSidebar();
@@ -2981,13 +3059,13 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["konstrukce","Konstrukce"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
-  ["Agendy",["doprava","konstrukce","smlouvy","sortiment","adaptace","freelo","aktuality"]]
+  ["Agendy",["doprava","konstrukce","obchod","smlouvy","sortiment","adaptace","freelo","aktuality"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }

@@ -1069,6 +1069,61 @@ function calApi(method, apiPath, token, bodyObj) {
     if (body) r.write(body); r.end();
   });
 }
+/* ---------- Obchod: rozdělení obchodníků (produktoví manažeři → domény, produkty, zastupitelnost) ----------
+   Seed vychází z interního rozdělení portfolia. Jména se za běhu párují na ŽIVOU databázi
+   zaměstnanců (state.json) — jakmile se obchodník poprvé přihlásí přes firemní Google účet,
+   automaticky se k němu doplní e-mail a propojení na intranetový profil. */
+const OBCHOD_ROZDELENI = [
+  { manager: 'Josef Beránek', domena: 'Skladování, logistika',
+    produkty: ['Skladovací kontejnery', 'Lodní kontejnery', 'Skladovací boxy a přepravky', 'Záchytné vany'],
+    zastup: 'Nikdo (částečný překryv s P. Jančou u ocelových kontejnerů)', zastupitelnost: 'Žádná', riziko: 'Střední',
+    doporuceni: 'Určit a zaškolit zástupce; sortiment je obchodně jednodušší, vhodný pro sdílené know-how.' },
+  { manager: 'Jan Mokrejš', domena: 'Dům a zahrada + městský mobiliář',
+    produkty: ['Kompostéry', 'Kuchyňské koše', 'Třídění v interiéru', 'Kontejnery na textil', 'Nádrže na naftu a AdBlue (B2B)'],
+    zastup: 'P. Lattner (nafta/AdBlue); P. Janča (koše, interiér, mobiliář)', zastupitelnost: 'Částečná', riziko: 'Nízké–střední',
+    doporuceni: 'Formalizovat zástup s Lattnerem (nafta/AdBlue) a Jančou (koše/mobiliář).' },
+  { manager: 'Martin Veselý', domena: 'Komunální technika',
+    produkty: ['ESA', 'Hydrocity (Baroclean)', 'Kompostovací kontejnery (PL)', 'Depacker (Mavitec)', 'Nádrže na solanku'],
+    zastup: 'Nikdo', zastupitelnost: 'Žádná', riziko: 'Vysoké',
+    doporuceni: 'Technicky specifické portfolio bez zálohy – prioritně zaškolit druhého člověka (nabízí se J. Šonský – technologie).' },
+  { manager: 'Jana Rychlíková', domena: 'Odpadové hospodářství',
+    produkty: ['Polo/podzemní kontejnery (+ stavby)', 'VOK Morava', 'Kontejnery na nebezpečný nemocniční odpad'],
+    zastup: 'J. Horálek (VOK); částečně P. Janča (nádoby)', zastupitelnost: 'Částečná', riziko: 'Střední',
+    doporuceni: 'U polo/podzemních kontejnerů (vč. staveb) chybí záloha – zaškolit Horálka nebo Janču.' },
+  { manager: 'Petr Janča', domena: 'Odpadové hospodářství',
+    produkty: ['Plastové nádoby 120–1100 l', 'Kontejnery se spodním výsypem', 'Venkovní koše, lavičky, zástěny, přístřešky', 'Nádoby na zimní posyp'],
+    zastup: 'J. Rychlíková (nádoby); J. Mokrejš (koše, mobiliář)', zastupitelnost: 'Částečná', riziko: 'Nízké',
+    doporuceni: 'Nejlépe zastupitelné portfolio – vhodný jako univerzální záloha pro ostatní.' },
+  { manager: 'Petr Lattner', domena: 'Hospodaření s kapalinami',
+    produkty: ['Podzemní nádrže na vodu', 'Nadzemní nádrže', 'Zasakovací bloky a tunely', 'Vodoměrné šachty', 'Nafta a AdBlue (zemědělství)'],
+    zastup: 'J. Mokrejš (pouze nafta/AdBlue)', zastupitelnost: 'Částečná (jen okraj portfolia)', riziko: 'Střední–vysoké',
+    doporuceni: 'Jádro (podzemní nádrže, vsakování, šachty) bez zálohy – zaškolit zástupce.' },
+  { manager: 'Jan Horálek', domena: 'Odpadové hospodářství',
+    produkty: ['Balíkovací lisy Bramidan', 'Mobilní a stacionární lisy', 'VOK Čechy', 'Štěpkovače Timberwolf'],
+    zastup: 'J. Rychlíková (VOK); J. Šonský (lisovací/hutnící technika)', zastupitelnost: 'Částečná', riziko: 'Střední',
+    doporuceni: 'VOK vzájemně s Rychlíkovou; u lisů prohloubit překryv se Šonským.' },
+  { manager: 'Jan Šonský', domena: 'Odpadové hospodářství',
+    produkty: ['Technologie třídících linek', 'Překládací stanice', 'Hutnící válce (Zentex)'],
+    zastup: 'Částečně J. Horálek (lisovací a hutnící technika)', zastupitelnost: 'Nízká', riziko: 'Vysoké',
+    doporuceni: 'Nejsložitější (investiční) portfolio – dokumentovat projekty, zaškolit Horálka jako zálohu.' }
+];
+// Porovnání jmen bez ohledu na diakritiku/velikost písmen (pro párování na živou databázi).
+function obchodNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+// Vrátí rozdělení obohacené o propojení na živého zaměstnance (e-mail, oddělení), pokud se jméno shoduje.
+function buildObchodRozdeleni() {
+  const emps = getState().employees || [];
+  const byName = new Map();
+  emps.forEach(e => { const k = obchodNorm(e.name); if (k && !byName.has(k)) byName.set(k, e); });
+  return OBCHOD_ROZDELENI.map(r => {
+    const e = byName.get(obchodNorm(r.manager));
+    return Object.assign({}, r, {
+      email: e ? e.email : null,
+      oddeleni: e && Array.isArray(e.cats) && e.cats.length ? e.cats[0] : null,
+      inDb: !!e
+    });
+  });
+}
+
 /* ---------- Freelo (modul Freelo: projekty přes REST API, basic auth) ---------- */
 function freeloConfigured() { return !!(FREELO_EMAIL && FREELO_API_KEY); }
 let freeloCache = { at: 0, data: null }; // 5min cache, ať se Freelo nevolá při každém otevření záložky
@@ -1739,6 +1794,15 @@ const server = http.createServer(async (req, res) => {
       const it = updateUkol(b.id, b);
       if (!it) return send(res, 404, { error: 'Úkol nenalezen.' });
       return send(res, 200, { ok: true, item: it });
+    }
+
+    // ---- Obchod: rozdělení obchodníků (produktoví manažeři, párováno na živou DB zaměstnanců) ----
+    if (p === '/api/obchod' && req.method === 'GET') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req) && employeeModules(e.email).indexOf('obchod') < 0) return send(res, 403, { error: 'K modulu Obchod nemáte přístup.' });
+      const items = buildObchodRozdeleni();
+      return send(res, 200, { items, matched: items.filter(x => x.inDb).length, total: items.length }, { 'Cache-Control': 'no-store' });
     }
 
     // ---- Kovo: přehled výroby ze 4 závodů (Google Sheets přes service account) ----
