@@ -478,6 +478,31 @@ table.ob-table td.col-sekce{white-space:nowrap;color:var(--ink-soft)}
 .ob-brow .fill.none{background:var(--line-strong)}
 .ob-brow .fill.pm{background:#4285f4}
 .ob-brow .val{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+/* druhý pohled — obchodníci (karty) */
+.ob-persons{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+.ob-person{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.ob-phead{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--bg-2);flex-wrap:wrap}
+.ob-av{flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:#4285f4;color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px}
+.ob-av.off{background:var(--bg-2);color:var(--ink-soft);border:1px dashed var(--line-strong)}
+.ob-who{min-width:0;flex:1}
+.ob-who .ob-nm{font-size:15px;font-weight:700;line-height:1.2}
+.ob-em{margin-top:3px;font-size:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ob-em a{font-weight:600}
+.ob-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);background:var(--bg-2);border:1px solid var(--line);border-radius:999px;padding:1px 7px}
+.ob-tag.db{color:#0a6b34;background:#e6f6ec;border-color:#bfe6cd}
+.ob-pstat{display:flex;gap:14px;text-align:center}
+.ob-pstat>div{display:flex;flex-direction:column;line-height:1.1}
+.ob-pstat b{font-size:18px;font-variant-numeric:tabular-nums}
+.ob-pstat span{font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em}
+.ob-pstat .warn b{color:var(--amber)}
+.ob-pbody{padding:14px 16px;display:grid;gap:14px}
+.ob-pblock .ob-lbl{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px}
+.ob-prods{display:flex;flex-wrap:wrap;gap:6px}
+.ob-prod{display:inline-block;background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:3px 9px;font-size:12px;font-weight:600}
+.ob-catlist{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ob-catlist li{font-size:12.5px;line-height:1.4;display:flex;gap:8px;align-items:baseline}
+.ob-catlist .ob-risk{font-size:10.5px;padding:1px 7px;flex:0 0 auto}
+.ob-zas{font-size:12.5px;line-height:1.5;color:var(--ink-soft)}
 /* editační režim */
 table.ob-table td.ob-ed{padding:6px}
 table.ob-table textarea.ob-inp{width:100%;min-width:120px;box-sizing:border-box;font-family:inherit;font-size:12.5px;line-height:1.45;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;background:var(--paper);color:var(--ink);resize:vertical;min-height:38px}
@@ -1439,19 +1464,22 @@ function plSheet(s){
   });
   return h;
 }
-let OBCHOD_DATA=null, OBCHOD_EDIT=false, OBCHOD_DRAFT=null, OBCHOD_MSG="";
+let OBCHOD_DATA=null, OBCHOD_EDIT=false, OBCHOD_DRAFT=null, OBCHOD_MSG="", OBCHOD_TAB="kategorie";
 function obCols(){ return (OBCHOD_DATA&&OBCHOD_DATA.columns)||[]; }
-// Stav pokrytí → barevná třída (zelená/červená/oranžová/šedá).
-function obCoverClass(v){ const t=(v||"").toLowerCase().trim(); if(!t) return "ob-risk-none"; if(t.indexOf("nepokr")>=0) return "ob-risk-hi"; if(t.indexOf("nejas")>=0) return "ob-risk-mid"; if(t.indexOf("pokr")>=0) return "ob-risk-lo"; return "ob-risk-mid"; }
-function obCoverKey(v){ const t=(v||"").toLowerCase().trim(); if(!t) return "Neobsazeno"; if(t.indexOf("nepokr")>=0) return "Nepokryto"; if(t.indexOf("nejas")>=0) return "Nejasné"; if(t.indexOf("pokr")>=0) return "Pokryto"; return v; }
-// Odpovědný PM: rozdělí buňku na jednotlivé PM (oddělené „/"), odstraní závorky/segmenty.
+// Vyhodnocení pokrytí (počítáme sami): vlastník + záloha → Pokryto; jen vlastník → Bez zálohy; bez vlastníka → Neobsazeno.
+function obFilled(s){ s=String(s||"").trim(); return (s===""||s==="—"||s==="-")?"":s; }
+function obEval(r){ const pm=String(r.pm||"").trim(); if(!pm||/nutné obsadit/i.test(pm)) return "Neobsazeno"; return (obFilled(r.zastup)||obFilled(r.nahradnik))?"Pokryto":"Bez zálohy"; }
+function obCoverClass(v){ if(v==="Neobsazeno") return "ob-risk-hi"; if(v==="Bez zálohy") return "ob-risk-mid"; if(v==="Pokryto") return "ob-risk-lo"; return "ob-risk-none"; }
+// Odpovědný PM / Zástup: rozdělí buňku na jednotlivé osoby (odděleno „/", bez závorek).
 function obPmList(cell){ return String(cell||"").split("/").map(s=>s.replace(/\([^)]*\)/g,"").trim()).filter(Boolean); }
-async function showObchod(){
+async function showObchod(tab){
   MUJ.view="obchod"; renderSidebar();
   const body=document.getElementById("mujBody");
   if(!(MUJ.admin || (MUJ.modules||[]).indexOf("obchod")>=0)){
     body.innerHTML='<div class="card pad"><p class="muted" style="margin:0">K modulu Obchod nemáte přístup.</p></div>'; return;
   }
+  if(tab) OBCHOD_TAB=tab;
+  if(OBCHOD_EDIT && OBCHOD_TAB!=="kategorie") OBCHOD_EDIT=false;
   if(!OBCHOD_DATA){
     body.innerHTML=obHero()+obTabs()+'<p class="muted">Načítám…</p>';
     try{ const r=await fetch("/api/obchod",{cache:"no-store"}); if(!r.ok) throw new Error((await r.json()).error||("HTTP "+r.status)); OBCHOD_DATA=await r.json(); }
@@ -1459,43 +1487,74 @@ async function showObchod(){
   }
   obRender();
 }
-function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Rozdělení kategorií webu mezi produktové manažery: odpovědný PM, zástup, třetí náhradník a stav pokrytí. Graf shrnuje pokrytí a vytížení.</p></div>'; }
-function obTabs(){ return '<div class="pl-tabs"><button class="pl-tab active" type="button">Rozdělení obchodníků</button></div>'; }
-// Sloupcový graf z řádků: (1) stav pokrytí, (2) počet kategorií na odpovědného PM.
+function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Rozdělení kategorií webu mezi obchodníky (produktové manažery). Stav pokrytí vyhodnocujeme z dat: vlastník + záloha = pokryto. Obchodníci jsou propojeni na živou databázi zaměstnanců včetně kontaktu.</p></div>'; }
+function obTabs(){
+  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků']];
+  return '<div class="pl-tabs">'+t.map(x=>'<button class="pl-tab'+(x[0]===OBCHOD_TAB?' active':'')+'" type="button" onclick="showObchod(\''+x[0]+'\')">'+esc(x[1])+'</button>').join('')+'</div>';
+}
+// Sloupcový graf: (1) vyhodnocené pokrytí, (2) počet kategorií na odpovědného obchodníka.
 function obChartsHtml(rows){
-  // (1) stav pokrytí
-  const order=['Pokryto','Nepokryto','Nejasné','Neobsazeno'];
-  const cov={}; rows.forEach(r=>{ const k=obCoverKey(r.pokryti); cov[k]=(cov[k]||0)+1; });
-  const covKeys=order.filter(k=>cov[k]).concat(Object.keys(cov).filter(k=>order.indexOf(k)<0));
+  const order=['Pokryto','Bez zálohy','Neobsazeno'];
+  const cov={}; rows.forEach(r=>{ const k=obEval(r); cov[k]=(cov[k]||0)+1; });
+  const covKeys=order.filter(k=>cov[k]);
   const covMax=Math.max(1,...covKeys.map(k=>cov[k]));
-  const covCls={'Pokryto':'lo','Nepokryto':'hi','Nejasné':'mid','Neobsazeno':'none'};
+  const covCls={'Pokryto':'lo','Bez zálohy':'mid','Neobsazeno':'hi'};
   const covBars=covKeys.map(k=>'<div class="ob-brow"><span class="lab">'+esc(k)+'</span><span class="track"><span class="fill '+(covCls[k]||'mid')+'" style="width:'+Math.round(cov[k]/covMax*100)+'%"></span></span><span class="val">'+cov[k]+'</span></div>').join('');
-  // (2) vytížení PM (odpovědný PM)
   const load={}; rows.forEach(r=>obPmList(r.pm).forEach(pm=>{ load[pm]=(load[pm]||0)+1; }));
   const pmKeys=Object.keys(load).sort((a,b)=>load[b]-load[a]);
   const pmMax=Math.max(1,...pmKeys.map(k=>load[k]));
   const pmBars=pmKeys.map(k=>'<div class="ob-brow"><span class="lab" title="'+esc(k)+'">'+esc(k)+'</span><span class="track"><span class="fill pm" style="width:'+Math.round(load[k]/pmMax*100)+'%"></span></span><span class="val">'+load[k]+'</span></div>').join('');
   return '<div class="ob-charts">'+
-    '<div class="ob-chart"><h3>Stav pokrytí kategorií</h3><div class="ob-bars">'+covBars+'</div></div>'+
-    '<div class="ob-chart"><h3>Počet kategorií na odpovědného PM</h3><div class="ob-bars ob-bars-pm">'+pmBars+'</div></div>'+
+    '<div class="ob-chart"><h3>Vyhodnocené pokrytí kategorií</h3><div class="ob-bars">'+covBars+'</div></div>'+
+    '<div class="ob-chart"><h3>Počet kategorií na obchodníka</h3><div class="ob-bars ob-bars-pm">'+pmBars+'</div></div>'+
     '</div>';
 }
 function obRender(){
   const body=document.getElementById("mujBody"), d=OBCHOD_DATA;
+  if(OBCHOD_TAB==="obchodnici"){ body.innerHTML=obHero()+obTabs()+obObchodniciHtml(); window.scrollTo(0,0); return; }
   if(OBCHOD_EDIT){ body.innerHTML=obHero()+obTabs()+obEditHtml(); window.scrollTo(0,0); return; }
   const cols=d.columns||[], rows=d.rows||[];
   const editBtn = d.canEdit ? '<button class="btn sm" type="button" onclick="obEnterEdit()">Upravit tabulku</button>' : '';
   const savedMsg = OBCHOD_MSG ? '<span class="ob-saved">'+esc(OBCHOD_MSG)+'</span>' : '';
-  const note='<div class="ob-bar"><p class="ob-note"><b>'+rows.length+'</b> kategorií webu rozdělených mezi produktové manažery.</p>'+savedMsg+editBtn+'</div>';
+  const note='<div class="ob-bar"><p class="ob-note"><b>'+rows.length+'</b> kategorií webu rozdělených mezi obchodníky. Stav pokrytí je vyhodnocený z odpovědnosti a zálohy.</p>'+savedMsg+editBtn+'</div>';
   const head='<thead><tr>'+cols.map(c=>'<th class="col-'+c.key+'">'+esc(c.label)+'</th>').join('')+'</tr></thead>';
   const bodyRows=rows.map(r=>'<tr>'+cols.map(c=>{
     const k=c.key, v=r[k]||"";
-    if(k==='pokryti') return '<td class="col-pokryti">'+(v?'<span class="ob-risk '+obCoverClass(v)+'">'+esc(v)+'</span>':'')+'</td>';
+    if(k==='pokryti'){ const cv=obEval(r); return '<td class="col-pokryti"><span class="ob-risk '+obCoverClass(cv)+'">'+esc(cv)+'</span></td>'; }
     if(k==='kategorie') return '<td class="col-kategorie"><b>'+esc(v)+'</b></td>';
     return '<td class="col-'+k+'">'+esc(v)+'</td>';
   }).join('')+'</tr>').join('');
   body.innerHTML=obHero()+obTabs()+obChartsHtml(rows)+note+'<div class="ob-wrap"><table class="ob-table">'+head+'<tbody>'+bodyRows+'</tbody></table></div>';
   window.scrollTo(0,0);
+}
+// Druhý pohled: karta na obchodníka + jeho atributy a kontakt.
+function obObchodniciHtml(){
+  const list=(OBCHOD_DATA&&OBCHOD_DATA.obchodnici)||[];
+  if(!list.length) return '<div class="card pad"><p class="muted" style="margin:0">Zatím žádní obchodníci.</p></div>';
+  const cards=list.map(o=>{
+    const inic=(o.name||"").split(/\s+/).map(w=>w[0]||"").slice(0,2).join("").toUpperCase();
+    const contact = o.email
+      ? '<a href="mailto:'+esc(o.email)+'">'+esc(o.email)+'</a> '+(o.inDb?'<span class="ob-tag db">v databázi</span>':'<span class="ob-tag">firemní e-mail</span>')
+      : '<span class="muted">bez kontaktu</span>';
+    const sekce = o.sekce.length ? o.sekce.map(s=>'<span class="ob-prod">'+esc(s)+'</span>').join('') : '<span class="muted">—</span>';
+    const owned = o.owner.length
+      ? '<ul class="ob-catlist">'+o.owner.map(x=>'<li><span class="ob-risk '+obCoverClass(x.coverage)+'">'+esc(x.coverage)+'</span> '+esc(x.kategorie)+'</li>').join('')+'</ul>'
+      : '<p class="muted" style="margin:0">—</p>';
+    const zast = o.zastup.length ? o.zastup.map(x=>esc(x.kategorie)).join(', ') : '—';
+    return '<div class="ob-person">'+
+      '<div class="ob-phead">'+
+        '<div class="ob-av'+(o.inDb?'':' off')+'">'+esc(inic)+'</div>'+
+        '<div class="ob-who"><div class="ob-nm">'+esc(o.name)+'</div><div class="ob-em">'+contact+'</div></div>'+
+        '<div class="ob-pstat"><div><b>'+o.pocetOdpovedny+'</b><span>kategorií</span></div><div><b>'+o.pocetZastup+'</b><span>jako zástup</span></div>'+(o.bezZalohy?'<div class="warn"><b>'+o.bezZalohy+'</b><span>bez zálohy</span></div>':'')+'</div>'+
+      '</div>'+
+      '<div class="ob-pbody">'+
+        '<div class="ob-pblock"><div class="ob-lbl">Sekce / domény</div><div class="ob-prods">'+sekce+'</div></div>'+
+        '<div class="ob-pblock"><div class="ob-lbl">Odpovědný za ('+o.pocetOdpovedny+')</div>'+owned+'</div>'+
+        '<div class="ob-pblock"><div class="ob-lbl">Zastupuje ('+o.pocetZastup+')</div><div class="ob-zas">'+zast+'</div></div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  return '<div class="ob-persons">'+cards+'</div>';
 }
 function obEditHtml(){
   const cols=obCols(), rows=OBCHOD_DRAFT||[];

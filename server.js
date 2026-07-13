@@ -1070,6 +1070,25 @@ function calApi(method, apiPath, token, bodyObj) {
     if (body) r.write(body); r.end();
   });
 }
+
+// ---- Google Drive přes service account (read-only) — pro modul Smlouvy ----
+async function driveGetToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claim = b64url(JSON.stringify({ iss: GOOGLE_SA_CLIENT_EMAIL, scope: 'https://www.googleapis.com/auth/drive.readonly', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
+  const signer = crypto.createSign('RSA-SHA256'); signer.update(header + '.' + claim);
+  const sig = signer.sign(GOOGLE_SA_PRIVATE_KEY).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const tok = await httpsPostForm('oauth2.googleapis.com', '/token', { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: header + '.' + claim + '.' + sig });
+  return tok.access_token;
+}
+async function driveList(folderId) {
+  const token = await driveGetToken();
+  const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
+  const path = `/drive/v3/files?q=${q}&fields=files(id,name,mimeType,webViewLink)&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+  const res = await calApi('GET', path, token);
+  return (res.files || []).map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, link: f.webViewLink, isFolder: f.mimeType === 'application/vnd.google-apps.folder' }));
+}
+function driveAvailable() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }
 /* ---------- Obchod: rozdělení obchodníků / zastupitelnost produktových manažerů ----------
    Editovatelná tabulka 1:1 se zdrojovým Google Sheetem „Zastupitelnost_PM_Elkoplast_cisty"
    (list: sekce webu → kategorie → odpovědný PM → zástup → třetí náhradník → stav pokrytí).
@@ -1165,6 +1184,40 @@ function writeObchod(rows) {
   }).filter(r => KEYS.some(k => r[k].trim()));
   writeJson(OBCHOD_F, { rows: clean });
   return { rows: clean };
+}
+// Normalizace jména (bez diakritiky/velikosti) pro párování na zaměstnance.
+function obchodNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+// Rozdělí buňku „Odpovědný PM" / „Zástup" na jednotlivé osoby (odděleno „/", bez závorek).
+function obPmListSrv(cell) { return String(cell || '').split('/').map(s => s.replace(/\([^)]*\)/g, '').trim()).filter(Boolean); }
+// Vyhodnocení pokrytí (děláme sami z dat): vlastník + záloha → Pokryto; jen vlastník → Bez zálohy; bez vlastníka → Neobsazeno.
+function obCellFilled(s) { s = String(s || '').trim(); return (s === '' || s === '—' || s === '-') ? '' : s; }
+function obEvalCoverage(r) { const pm = String(r.pm || '').trim(); if (!pm || /nutné obsadit/i.test(pm)) return 'Neobsazeno'; return (obCellFilled(r.zastup) || obCellFilled(r.nahradnik)) ? 'Pokryto' : 'Bez zálohy'; }
+// Známí obchodníci (klíč = normalizovaná zkratka z listu → celé jméno). Kontakt se bere ze živé DB, jinak firemní e-mail dle konvence.
+const OBCHOD_LIDE = {
+  'j. beranek': 'Josef Beránek', 'j. mokrejs': 'Jan Mokrejš', 'm. vesely': 'Martin Veselý',
+  'j. rychlikova': 'Jana Rychlíková', 'p. janca': 'Petr Janča', 'p. lattner': 'Petr Lattner',
+  'j. horalek': 'Jan Horálek', 'j. sonsky': 'Jan Šonský', 'lukas pospisil': 'Lukáš Pospíšil'
+};
+function obchodEmail(full) { const p = String(full || '').split(/\s+/).filter(Boolean); if (p.length < 2) return null; const strip = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, ''); return strip(p[0]) + '.' + strip(p[p.length - 1]) + '@elkoplast.cz'; }
+// Najde zaměstnance v živé DB dle celého jména (přesně, jinak příjmení + iniciála).
+function obMatchEmp(full, emps) {
+  const nf = obchodNorm(full); let e = emps.find(x => obchodNorm(x.name) === nf); if (e) return e;
+  const p = String(full).split(/\s+/).filter(Boolean); if (p.length < 2) return null;
+  const sur = obchodNorm(p[p.length - 1]), ini = obchodNorm(p[0])[0] || '';
+  return emps.find(x => { const q = String(x.name || '').split(/\s+/).filter(Boolean); if (q.length < 2) return false; return obchodNorm(q[q.length - 1]) === sur && (obchodNorm(q[0])[0] || '') === ini; }) || null;
+}
+// Druhý pohled: obchodník → jeho atributy (sekce, kategorie kde je odpovědný / zástup, kontakt ze živé DB).
+function buildObchodnici(rows) {
+  const emps = getState().employees || [];
+  const acc = {};
+  Object.keys(OBCHOD_LIDE).forEach(k => { acc[k] = { name: OBCHOD_LIDE[k], owner: [], zastup: [], sekce: {} }; });
+  rows.forEach(r => {
+    obPmListSrv(r.pm).forEach(l => { const k = obchodNorm(l); if (acc[k]) { acc[k].owner.push({ sekce: r.sekce || '', kategorie: r.kategorie || '', coverage: obEvalCoverage(r) }); if (r.sekce) acc[k].sekce[r.sekce] = 1; } });
+    obPmListSrv(r.zastup).forEach(l => { const k = obchodNorm(l); if (acc[k]) acc[k].zastup.push({ sekce: r.sekce || '', kategorie: r.kategorie || '' }); });
+  });
+  return Object.keys(acc).map(k => { const o = acc[k]; const e = obMatchEmp(o.name, emps);
+    return { name: o.name, email: e ? e.email : obchodEmail(o.name), inDb: !!e, sekce: Object.keys(o.sekce), owner: o.owner, zastup: o.zastup, pocetOdpovedny: o.owner.length, pocetZastup: o.zastup.length, bezZalohy: o.owner.filter(x => x.coverage === 'Bez zálohy').length };
+  }).filter(o => o.pocetOdpovedny > 0 || o.pocetZastup > 0).sort((a, b) => b.pocetOdpovedny - a.pocetOdpovedny);
 }
 
 /* ---------- Freelo (modul Freelo: projekty přes REST API, basic auth) ---------- */
@@ -1373,6 +1426,9 @@ try {
     dataDir: DATA_DIR,
     eskalaceEmail: SUPERADMIN,
     publicBaseUrl: (CFG.publicUrl || process.env.SMLOUVY_BASE_URL || ''),
+    drive: { get available() { return driveAvailable(); }, list: driveList },
+    driveRoots: (process.env.SMLOUVY_DRIVE_ROOT || '').split(',').map((x) => x.trim()).filter(Boolean),
+    saEmail: GOOGLE_SA_CLIENT_EMAIL,
   });
 } catch (e) {
   console.error('[smlouvy] modul se nenačetl, intranet pokračuje bez něj:', e.message);
@@ -1845,13 +1901,13 @@ const server = http.createServer(async (req, res) => {
       if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       if (!isAdmin(req) && employeeModules(e.email).indexOf('obchod') < 0) return send(res, 403, { error: 'K modulu Obchod nemáte přístup.' });
       const rows = readObchod().rows;
-      return send(res, 200, { columns: OBCHOD_SLOUPCE, rows, total: rows.length, canEdit: isAdmin(req) }, { 'Cache-Control': 'no-store' });
+      return send(res, 200, { columns: OBCHOD_SLOUPCE, rows, obchodnici: buildObchodnici(rows), total: rows.length, canEdit: isAdmin(req) }, { 'Cache-Control': 'no-store' });
     }
     if (p === '/api/obchod' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Tabulku může upravovat jen správce.' });
       const b = JSON.parse(await readBody(req));
       const saved = writeObchod(b.rows);
-      return send(res, 200, { ok: true, columns: OBCHOD_SLOUPCE, rows: saved.rows, total: saved.rows.length, canEdit: true });
+      return send(res, 200, { ok: true, columns: OBCHOD_SLOUPCE, rows: saved.rows, obchodnici: buildObchodnici(saved.rows), total: saved.rows.length, canEdit: true });
     }
 
     // ---- Kovo: přehled výroby ze 4 závodů (Google Sheets přes service account) ----
