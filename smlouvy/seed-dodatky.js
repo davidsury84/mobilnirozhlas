@@ -32,4 +32,25 @@ function seedDodatky(M) {
   return { zalozeno: n };
 }
 
-module.exports = { seedDodatky, DODATKY, SEED_KEY };
+// Úprava smlouvy 2025-004 podle dodatku č. 2 (doba neurčitá, výpověď 2 měs.,
+// cena 240 Kč/den) + zneaktivnění propadlého termínu konce platnosti.
+const OPRAVA_KEY = 'seed_oprava_2025004_v1';
+function seedOpravaCdCargo(M) {
+  if (M.meta.get(OPRAVA_KEY)) return { skipped: true };
+  const s = M.smlouva.getByCislo('2025-004');
+  if (!s) { M.meta.set(OPRAVA_KEY, todayPrague()); return { skipped: true }; }
+  M.smlouva.update(s.id, {
+    platnost_typ: 'neurcita', platnost_do: null, platnost_podminka: null,
+    vypovedni_lhuta_mesice: 2, prolongace: 'zadna',
+    hodnota_popis: '240 Kč/den (2 kontejnery ACTS à 120 Kč/den)',
+    stav: 'aktivni', stav_popis: 'doba neurčitá (dodatek č. 2)',
+  }, 'seed-cdcargo');
+  // propadlý termín konce platnosti (15.4.2026) už neplatí → neaktivní
+  M.db.prepare(`UPDATE termin SET stav='neaktivni', updated_at=datetime('now')
+    WHERE smlouva_id=? AND typ='konec_platnosti'`).run(s.id);
+  M.meta.set(OPRAVA_KEY, todayPrague());
+  console.log('[smlouvy] oprava 2025-004 dle dodatku č. 2 provedena');
+  return { upraveno: true };
+}
+
+module.exports = { seedDodatky, seedOpravaCdCargo, DODATKY, SEED_KEY };
