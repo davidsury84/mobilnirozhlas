@@ -45,6 +45,9 @@ function mount(host) {
   // Rozpad souhrnných KS bloků na jednotlivé profily smluv.
   try { require('./seed-ks-rozpad').seedKsRozpad(M); }
   catch (e) { console.error('[smlouvy] seed KS rozpad selhal:', e.message); }
+  // Doplnění dodatků z Disku, které v registru chyběly jako záznam.
+  try { require('./seed-dodatky').seedDodatky(M); }
+  catch (e) { console.error('[smlouvy] seed dodatky selhal:', e.message); }
 
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);
