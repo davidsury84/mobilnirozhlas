@@ -441,33 +441,35 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .matrix.pl td.pl-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .matrix.pl tr.pl-sum td{font-weight:800;border-top:2px solid var(--line);background:rgba(0,0,0,.045)}
 .matrix.pl tr.pl-sum td.pl-neg{color:var(--red)}
-/* Obchod — rozdělení obchodníků */
-.ob-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
-.ob-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
-.ob-head{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--bg-2)}
-.ob-av{flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px;letter-spacing:.02em}
-.ob-av.off{background:var(--bg-2);color:var(--ink-soft);border:1px dashed var(--line-strong)}
-.ob-who{min-width:0;flex:1}
-.ob-who .nm{font-size:15px;font-weight:700;line-height:1.2}
-.ob-who .dom{margin-top:2px;font-size:12.5px;color:var(--ink-soft)}
-.ob-who .em{margin-top:4px;font-size:12px;display:inline-flex;align-items:center;gap:5px}
-.ob-who .em a{font-weight:600}
-.ob-who .em.no{color:var(--ink-soft)}
-.ob-body{padding:14px 16px;display:grid;gap:12px}
-.ob-lbl{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
-.ob-prods{display:flex;flex-wrap:wrap;gap:6px}
-.ob-prod{display:inline-block;background:var(--green-soft);color:var(--green-d);border-radius:8px;padding:4px 9px;font-size:12px;font-weight:500}
-.ob-zastup{font-size:13px;line-height:1.5;color:var(--ink)}
-.ob-rec{font-size:12.5px;line-height:1.5;color:var(--ink-soft);border-left:3px solid var(--line-strong);padding-left:10px}
-.ob-foot{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
-.ob-badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700}
-.ob-badge .k{opacity:.7;font-weight:600}
+/* Obchod — rozdělení obchodníků / zastupitelnost PM (editovatelná tabulka) */
+.ob-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
+.ob-note{margin:0;font-size:13px;color:var(--ink-soft);line-height:1.5;flex:1;min-width:220px}
+.ob-note b{color:var(--ink)}
+.ob-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow)}
+table.ob-table{border-collapse:collapse;width:100%;font-size:13px;min-width:920px}
+table.ob-table th,table.ob-table td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+table.ob-table th:last-child,table.ob-table td:last-child{border-right:none}
+table.ob-table thead th{position:sticky;top:0;z-index:2;background:var(--bg-2);font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);white-space:nowrap}
+table.ob-table tbody tr:hover td{background:#f6f8f6}
+table.ob-table td.col-manager{min-width:150px}
+table.ob-table td.col-produkty{min-width:230px}
+table.ob-table td.col-doporuceni{min-width:230px}
+.ob-nm{font-weight:700;line-height:1.25}
+.ob-em{margin-top:3px;font-size:11.5px}
+.ob-em.no{color:var(--ink-soft)}
+.ob-cell-list{margin:0;line-height:1.5}
+.ob-risk{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
 .ob-risk-lo{background:var(--green-soft);color:var(--green-d)}
 .ob-risk-mid{background:var(--amber-soft);color:var(--amber)}
 .ob-risk-hi{background:var(--red-soft);color:var(--red)}
-.ob-rep{background:var(--bg-2);color:var(--ink-soft)}
-.ob-note{margin:0 0 18px;font-size:13px;color:var(--ink-soft);line-height:1.55}
-.ob-note b{color:var(--ink)}
+/* editační režim */
+table.ob-table td.ob-ed{padding:6px}
+table.ob-table textarea.ob-inp{width:100%;min-width:120px;box-sizing:border-box;font-family:inherit;font-size:12.5px;line-height:1.45;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;background:var(--paper);color:var(--ink);resize:vertical;min-height:38px}
+table.ob-table textarea.ob-inp:focus{outline:none;border-color:var(--green-2);box-shadow:0 0 0 2px var(--green-soft)}
+.ob-del{border:1px solid var(--line-strong);background:var(--paper);color:var(--red);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:15px;line-height:1;font-family:inherit}
+.ob-del:hover{background:var(--red-soft);border-color:var(--red)}
+th.ob-delcol,td.ob-delcol{width:42px;text-align:center!important}
+.ob-saved{font-size:12.5px;color:var(--green-d);font-weight:600}
 /* Editace banneru */
 .mj-hero .hero-edit-btn{position:absolute;top:14px;right:14px;z-index:2;display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:var(--radius);border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.16);color:#fff;font-size:12.5px;font-weight:650;backdrop-filter:blur(3px);cursor:pointer}
 .mj-hero .hero-edit-btn:hover{background:rgba(255,255,255,.28)}
@@ -1421,52 +1423,81 @@ function plSheet(s){
   });
   return h;
 }
-let OBCHOD_DATA=null;
-function obInitials(name){ return (name||"").trim().split(/\s+/).map(w=>w[0]||"").slice(0,2).join("").toUpperCase(); }
+let OBCHOD_DATA=null, OBCHOD_EDIT=false, OBCHOD_DRAFT=null, OBCHOD_MSG="";
 function obRiskClass(r){ const t=(r||"").toLowerCase(); if(t.indexOf("vysok")>=0) return "ob-risk-hi"; if(t.indexOf("nízk")>=0||t.indexOf("nizk")>=0||t.indexOf("žádn")>=0||t.indexOf("zadn")>=0) return t.indexOf("stř")>=0||t.indexOf("str")>=0?"ob-risk-mid":"ob-risk-lo"; return "ob-risk-mid"; }
-async function showObchod(tab){
+function obCols(){ return (OBCHOD_DATA&&OBCHOD_DATA.columns)||[]; }
+async function showObchod(){
   MUJ.view="obchod"; renderSidebar();
   const body=document.getElementById("mujBody");
   if(!(MUJ.admin || (MUJ.modules||[]).indexOf("obchod")>=0)){
     body.innerHTML='<div class="card pad"><p class="muted" style="margin:0">K modulu Obchod nemáte přístup.</p></div>'; return;
   }
-  tab=tab||'rozdeleni';
-  const tabDefs=[['rozdeleni','Rozdělení obchodníků']];
-  const bar='<div class="pl-tabs">'+tabDefs.map(t=>'<button class="pl-tab'+(t[0]===tab?' active':'')+'" type="button" onclick="showObchod(\''+t[0]+'\')">'+esc(t[1])+'</button>').join('')+'</div>';
-  const hero='<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Kdo má na starosti jaké portfolio, kdo ho zastupuje a kde je riziko výpadku. Obchodníci jsou propojeni na živou databázi zaměstnanců.</p></div>';
-  body.innerHTML=hero+bar+'<p class="muted">Načítám…</p>';
   if(!OBCHOD_DATA){
+    body.innerHTML=obHero()+obTabs()+'<p class="muted">Načítám…</p>';
     try{ const r=await fetch("/api/obchod",{cache:"no-store"}); if(!r.ok) throw new Error((await r.json()).error||("HTTP "+r.status)); OBCHOD_DATA=await r.json(); }
-    catch(e){ body.innerHTML=hero+bar+'<div class="card pad"><p class="muted" style="margin:0">Nepodařilo se načíst rozdělení obchodníků. '+esc(e.message||"")+'</p></div>'; return; }
+    catch(e){ body.innerHTML=obHero()+obTabs()+'<div class="card pad"><p class="muted" style="margin:0">Nepodařilo se načíst tabulku. '+esc(e.message||"")+'</p></div>'; return; }
   }
-  const d=OBCHOD_DATA, items=d.items||[];
-  const note='<p class="ob-note">Portfolio je rozděleno mezi <b>'+items.length+'</b> obchodníků. '+
-    'Propojeno na živou databázi: <b>'+(d.matched||0)+'</b> z '+(d.total||items.length)+'. '+
-    'Obchodníci bez propojení se doplní automaticky, jakmile se poprvé přihlásí firemním Google účtem.</p>';
-  const cards=items.map(it=>{
-    const em = it.inDb
-      ? '<span class="em"><a href="mailto:'+esc(it.email)+'">'+esc(it.email)+'</a></span>'
-      : '<span class="em no">zatím není v intranetu</span>';
-    const prods='<div class="ob-prods">'+(it.produkty||[]).map(p=>'<span class="ob-prod">'+esc(p)+'</span>').join('')+'</div>';
-    return '<div class="ob-card">'+
-      '<div class="ob-head">'+
-        '<div class="ob-av'+(it.inDb?'':' off')+'">'+esc(obInitials(it.manager))+'</div>'+
-        '<div class="ob-who"><div class="nm">'+esc(it.manager)+'</div>'+
-          '<div class="dom">'+esc(it.domena)+'</div>'+em+'</div>'+
-      '</div>'+
-      '<div class="ob-body">'+
-        '<div><div class="ob-lbl">Produkty</div>'+prods+'</div>'+
-        '<div><div class="ob-lbl">Zastupitelnost / překryv</div><div class="ob-zastup">'+esc(it.zastup)+'</div></div>'+
-        '<div><div class="ob-lbl">Doporučení</div><div class="ob-rec">'+esc(it.doporuceni)+'</div></div>'+
-      '</div>'+
-      '<div class="ob-foot">'+
-        '<span class="ob-badge '+obRiskClass(it.riziko)+'"><span class="k">Riziko</span> '+esc(it.riziko)+'</span>'+
-        '<span class="ob-badge ob-rep"><span class="k">Zastupitelnost</span> '+esc(it.zastupitelnost)+'</span>'+
-      '</div>'+
-    '</div>';
-  }).join('');
-  body.innerHTML=hero+bar+note+'<div class="ob-grid">'+cards+'</div>';
+  obRender();
+}
+function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Zastupitelnost produktových manažerů: kdo má na starosti jaké portfolio, kdo ho zastupuje a kde je riziko výpadku. Sloupec „Produktový manažer" je propojen na živou databázi zaměstnanců.</p></div>'; }
+function obTabs(){ return '<div class="pl-tabs"><button class="pl-tab active" type="button">Rozdělení obchodníků</button></div>'; }
+function obProdCell(v){ const parts=String(v||"").split(";").map(s=>s.trim()).filter(Boolean); return parts.length?'<div class="ob-cell-list">'+parts.map(esc).join("<br>")+'</div>':''; }
+function obRender(){
+  const body=document.getElementById("mujBody"), d=OBCHOD_DATA;
+  if(OBCHOD_EDIT){ body.innerHTML=obHero()+obTabs()+obEditHtml(); window.scrollTo(0,0); return; }
+  const cols=d.columns||[], rows=d.rows||[];
+  const editBtn = d.canEdit ? '<button class="btn sm" type="button" onclick="obEnterEdit()">Upravit tabulku</button>' : '';
+  const savedMsg = OBCHOD_MSG ? '<span class="ob-saved">'+esc(OBCHOD_MSG)+'</span>' : '';
+  const note='<div class="ob-bar"><p class="ob-note">Portfolio je rozděleno mezi <b>'+rows.length+'</b> produktových manažerů. '+
+    'Propojeno na živou databázi: <b>'+(d.matched||0)+'</b> z '+(d.total||rows.length)+'.'+
+    '</p>'+savedMsg+editBtn+'</div>';
+  const head='<thead><tr>'+cols.map(c=>'<th>'+esc(c.label)+'</th>').join('')+'</tr></thead>';
+  const bodyRows=rows.map(r=>'<tr>'+cols.map(c=>{
+    const k=c.key, v=r[k];
+    if(k==='manager'){
+      const em = r.inDb ? '<div class="ob-em"><a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a></div>'
+                        : '<div class="ob-em no">zatím není v intranetu</div>';
+      return '<td class="col-manager"><div class="ob-nm">'+esc(v)+'</div>'+em+'</td>';
+    }
+    if(k==='produkty') return '<td class="col-produkty">'+obProdCell(v)+'</td>';
+    if(k==='riziko') return '<td><span class="ob-risk '+obRiskClass(v)+'">'+esc(v)+'</span></td>';
+    if(k==='doporuceni') return '<td class="col-doporuceni">'+esc(v)+'</td>';
+    return '<td>'+esc(v)+'</td>';
+  }).join('')+'</tr>').join('');
+  body.innerHTML=obHero()+obTabs()+note+'<div class="ob-wrap"><table class="ob-table">'+head+'<tbody>'+bodyRows+'</tbody></table></div>';
   window.scrollTo(0,0);
+}
+function obEditHtml(){
+  const cols=obCols(), rows=OBCHOD_DRAFT||[];
+  const head='<thead><tr>'+cols.map(c=>'<th>'+esc(c.label)+'</th>').join('')+'<th class="ob-delcol"></th></tr></thead>';
+  const trs=rows.map((r,i)=>'<tr data-id="'+esc(r.id||'')+'">'+cols.map(c=>{
+    const rows2 = c.key==='produkty'||c.key==='doporuceni'||c.key==='zastup' ? 3 : (c.key==='manager'||c.key==='domena'?2:1);
+    return '<td class="ob-ed"><textarea class="ob-inp" rows="'+rows2+'" data-key="'+c.key+'">'+esc(r[c.key]||'')+'</textarea></td>';
+  }).join('')+'<td class="ob-delcol"><button class="ob-del" type="button" title="Smazat řádek" onclick="obDelRow('+i+')">✕</button></td></tr>').join('');
+  const bar='<div class="ob-bar">'+
+    '<p class="ob-note">Uprav buňky přímo v tabulce. Změny se uloží na server (do datového souboru) a projeví se všem s přístupem. '+
+    'Sloupec „Produktový manažer" se páruje na zaměstnance podle jména.</p>'+
+    '<button class="btn sm ghost" type="button" onclick="obAddRow()">+ Přidat řádek</button>'+
+    '<button class="btn sm ghost" type="button" onclick="obCancelEdit()">Zrušit</button>'+
+    '<button class="btn sm" type="button" id="obSaveBtn" onclick="obSave()">Uložit</button>'+
+    '</div>';
+  return bar+'<div class="ob-wrap"><table class="ob-table">'+head+'<tbody id="obEditBody">'+trs+'</tbody></table></div>';
+}
+function obCollectFromDom(){
+  return [...document.querySelectorAll('#obEditBody tr')].map(tr=>{ const o={id:tr.getAttribute('data-id')||''}; tr.querySelectorAll('textarea.ob-inp').forEach(t=>{ o[t.getAttribute('data-key')]=t.value; }); return o; });
+}
+function obEnterEdit(){ OBCHOD_MSG=""; OBCHOD_EDIT=true; OBCHOD_DRAFT=(OBCHOD_DATA.rows||[]).map(r=>{ const o={id:r.id}; obCols().forEach(c=>o[c.key]=r[c.key]||''); return o; }); obRender(); }
+function obCancelEdit(){ OBCHOD_EDIT=false; OBCHOD_DRAFT=null; obRender(); }
+function obAddRow(){ OBCHOD_DRAFT=obCollectFromDom(); const o={id:''}; obCols().forEach(c=>o[c.key]=''); OBCHOD_DRAFT.push(o); obRender(); }
+function obDelRow(i){ OBCHOD_DRAFT=obCollectFromDom(); OBCHOD_DRAFT.splice(i,1); obRender(); }
+async function obSave(){
+  const rows=obCollectFromDom();
+  const btn=document.getElementById('obSaveBtn'); if(btn){ btn.disabled=true; btn.textContent='Ukládám…'; }
+  try{
+    const r=await fetch('/api/obchod',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});
+    const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+    OBCHOD_DATA=j; OBCHOD_EDIT=false; OBCHOD_DRAFT=null; OBCHOD_MSG='Uloženo.'; obRender();
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Uložit'; } alert('Uložení selhalo: '+(e.message||e)); }
 }
 function showPlasty(tab){
   MUJ.view="plasty"; renderSidebar();

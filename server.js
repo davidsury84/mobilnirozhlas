@@ -90,6 +90,7 @@ const CENMON_F  = path.join(DATA_DIR, 'cenmon.json');     // cenový monitoring:
 const INVITES_F = path.join(DATA_DIR, 'invites.json');    // stav pozvánek dle e-mailu: {invitedAt, acceptedAt, lastLoginAt}
 const UKOLY_F   = path.join(DATA_DIR, 'smernice-ukoly.json'); // úkoly vyplývající ze směrnic (záložka „Úkoly ze směrnic")
 const KOVOKALK_F = path.join(DATA_DIR, 'kovo-kalkulace.json'); // Kalkulace KOVO: parametry (s historií změn) + výrobky
+const OBCHOD_F   = path.join(DATA_DIR, 'obchod-zastupitelnost.json'); // Obchod: rozdělení obchodníků / zastupitelnost PM (editovatelná tabulka)
 const AKTUALITY_F = path.join(DATA_DIR, 'aktuality.json');    // aktuality (novinky) na intranetu: {posts:[{id,title,body,image,author,authorEmail,ts,likes:{email:ts}}]}
 const SITE_F      = path.join(DATA_DIR, 'site.json');         // nastavení vzhledu intranetu (např. vlastní hero banner)
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');           // nahrané obrázky (aktuality, banner) — persistentní volume
@@ -1069,52 +1070,80 @@ function calApi(method, apiPath, token, bodyObj) {
     if (body) r.write(body); r.end();
   });
 }
-/* ---------- Obchod: rozdělení obchodníků (produktoví manažeři → domény, produkty, zastupitelnost) ----------
-   Seed vychází z interního rozdělení portfolia. Jména se za běhu párují na ŽIVOU databázi
-   zaměstnanců (state.json) — jakmile se obchodník poprvé přihlásí přes firemní Google účet,
-   automaticky se k němu doplní e-mail a propojení na intranetový profil. */
-const OBCHOD_ROZDELENI = [
-  { manager: 'Josef Beránek', domena: 'Skladování, logistika',
-    produkty: ['Skladovací kontejnery', 'Lodní kontejnery', 'Skladovací boxy a přepravky', 'Záchytné vany'],
+/* ---------- Obchod: rozdělení obchodníků / zastupitelnost produktových manažerů ----------
+   Editovatelná tabulka (7 sloupců dle zdrojového Google Sheetu). Data žijí v datovém souboru
+   OBCHOD_F; při prvním načtení se předvyplní ze seedu níže. Sloupec „Produktový manažer" se
+   za běhu páruje na ŽIVOU databázi zaměstnanců (state.json) — jakmile se obchodník poprvé
+   přihlásí přes firemní Google účet, doplní se k němu e-mail a propojení na profil.
+   Sloupce tabulky (pořadí = zdrojový list): */
+const OBCHOD_SLOUPCE = [
+  { key: 'manager', label: 'Produktový manažer' },
+  { key: 'domena', label: 'Doména' },
+  { key: 'produkty', label: 'Produkty (dle interního návrhu)' },
+  { key: 'zastup', label: 'Kdo zastoupí / překryv' },
+  { key: 'zastupitelnost', label: 'Míra zastupitelnosti' },
+  { key: 'riziko', label: 'Riziko výpadku' },
+  { key: 'doporuceni', label: 'Doporučení' }
+];
+const OBCHOD_SEED = [
+  { id: 'pm-beranek', manager: 'Josef Beránek', domena: 'Skladování, logistika',
+    produkty: 'Skladovací kontejnery; Lodní kontejnery; Skladovací boxy a přepravky; Záchytné vany',
     zastup: 'Nikdo (částečný překryv s P. Jančou u ocelových kontejnerů)', zastupitelnost: 'Žádná', riziko: 'Střední',
     doporuceni: 'Určit a zaškolit zástupce; sortiment je obchodně jednodušší, vhodný pro sdílené know-how.' },
-  { manager: 'Jan Mokrejš', domena: 'Dům a zahrada + městský mobiliář',
-    produkty: ['Kompostéry', 'Kuchyňské koše', 'Třídění v interiéru', 'Kontejnery na textil', 'Nádrže na naftu a AdBlue (B2B)'],
+  { id: 'pm-mokrejs', manager: 'Jan Mokrejš', domena: 'Dům a zahrada + městský mobiliář',
+    produkty: 'Kompostéry; Kuchyňské koše; Třídění v interiéru; Kontejnery na textil; Nádrže na naftu a AdBlue (B2B)',
     zastup: 'P. Lattner (nafta/AdBlue); P. Janča (koše, interiér, mobiliář)', zastupitelnost: 'Částečná', riziko: 'Nízké–střední',
     doporuceni: 'Formalizovat zástup s Lattnerem (nafta/AdBlue) a Jančou (koše/mobiliář).' },
-  { manager: 'Martin Veselý', domena: 'Komunální technika',
-    produkty: ['ESA', 'Hydrocity (Baroclean)', 'Kompostovací kontejnery (PL)', 'Depacker (Mavitec)', 'Nádrže na solanku'],
+  { id: 'pm-vesely', manager: 'Martin Veselý', domena: 'Komunální technika',
+    produkty: 'ESA; Hydrocity (Baroclean); Kompostovací kontejnery (PL); Depacker (Mavitec); Nádrže na solanku',
     zastup: 'Nikdo', zastupitelnost: 'Žádná', riziko: 'Vysoké',
     doporuceni: 'Technicky specifické portfolio bez zálohy – prioritně zaškolit druhého člověka (nabízí se J. Šonský – technologie).' },
-  { manager: 'Jana Rychlíková', domena: 'Odpadové hospodářství',
-    produkty: ['Polo/podzemní kontejnery (+ stavby)', 'VOK Morava', 'Kontejnery na nebezpečný nemocniční odpad'],
+  { id: 'pm-rychlikova', manager: 'Jana Rychlíková', domena: 'Odpadové hospodářství',
+    produkty: 'Polo/podzemní kontejnery (+ stavby); VOK Morava; Kontejnery na nebezpečný nemocniční odpad',
     zastup: 'J. Horálek (VOK); částečně P. Janča (nádoby)', zastupitelnost: 'Částečná', riziko: 'Střední',
     doporuceni: 'U polo/podzemních kontejnerů (vč. staveb) chybí záloha – zaškolit Horálka nebo Janču.' },
-  { manager: 'Petr Janča', domena: 'Odpadové hospodářství',
-    produkty: ['Plastové nádoby 120–1100 l', 'Kontejnery se spodním výsypem', 'Venkovní koše, lavičky, zástěny, přístřešky', 'Nádoby na zimní posyp'],
+  { id: 'pm-janca', manager: 'Petr Janča', domena: 'Odpadové hospodářství',
+    produkty: 'Plastové nádoby 120–1100 l; Kontejnery se spodním výsypem; Venkovní koše, lavičky, zástěny, přístřešky; Nádoby na zimní posyp',
     zastup: 'J. Rychlíková (nádoby); J. Mokrejš (koše, mobiliář)', zastupitelnost: 'Částečná', riziko: 'Nízké',
     doporuceni: 'Nejlépe zastupitelné portfolio – vhodný jako univerzální záloha pro ostatní.' },
-  { manager: 'Petr Lattner', domena: 'Hospodaření s kapalinami',
-    produkty: ['Podzemní nádrže na vodu', 'Nadzemní nádrže', 'Zasakovací bloky a tunely', 'Vodoměrné šachty', 'Nafta a AdBlue (zemědělství)'],
+  { id: 'pm-lattner', manager: 'Petr Lattner', domena: 'Hospodaření s kapalinami',
+    produkty: 'Podzemní nádrže na vodu; Nadzemní nádrže; Zasakovací bloky a tunely; Vodoměrné šachty; Nafta a AdBlue (zemědělství)',
     zastup: 'J. Mokrejš (pouze nafta/AdBlue)', zastupitelnost: 'Částečná (jen okraj portfolia)', riziko: 'Střední–vysoké',
     doporuceni: 'Jádro (podzemní nádrže, vsakování, šachty) bez zálohy – zaškolit zástupce.' },
-  { manager: 'Jan Horálek', domena: 'Odpadové hospodářství',
-    produkty: ['Balíkovací lisy Bramidan', 'Mobilní a stacionární lisy', 'VOK Čechy', 'Štěpkovače Timberwolf'],
+  { id: 'pm-horalek', manager: 'Jan Horálek', domena: 'Odpadové hospodářství',
+    produkty: 'Balíkovací lisy Bramidan; Mobilní a stacionární lisy; VOK Čechy; Štěpkovače Timberwolf',
     zastup: 'J. Rychlíková (VOK); J. Šonský (lisovací/hutnící technika)', zastupitelnost: 'Částečná', riziko: 'Střední',
     doporuceni: 'VOK vzájemně s Rychlíkovou; u lisů prohloubit překryv se Šonským.' },
-  { manager: 'Jan Šonský', domena: 'Odpadové hospodářství',
-    produkty: ['Technologie třídících linek', 'Překládací stanice', 'Hutnící válce (Zentex)'],
+  { id: 'pm-sonsky', manager: 'Jan Šonský', domena: 'Odpadové hospodářství',
+    produkty: 'Technologie třídících linek; Překládací stanice; Hutnící válce (Zentex)',
     zastup: 'Částečně J. Horálek (lisovací a hutnící technika)', zastupitelnost: 'Nízká', riziko: 'Vysoké',
     doporuceni: 'Nejsložitější (investiční) portfolio – dokumentovat projekty, zaškolit Horálka jako zálohu.' }
 ];
 // Porovnání jmen bez ohledu na diakritiku/velikost písmen (pro párování na živou databázi).
 function obchodNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
-// Vrátí rozdělení obohacené o propojení na živého zaměstnance (e-mail, oddělení), pokud se jméno shoduje.
-function buildObchodRozdeleni() {
+// Řádky tabulky (z datového souboru, jinak seed). Nemění se zde – jen čtou.
+function readObchod() {
+  const saved = readJson(OBCHOD_F, null);
+  if (saved && Array.isArray(saved.rows)) return { rows: saved.rows };
+  return { rows: OBCHOD_SEED.map(r => Object.assign({}, r)) };
+}
+// Uloží celou tabulku (jen správce). Ořízne délky, doplní chybějící id.
+function writeObchod(rows) {
+  const KEYS = OBCHOD_SLOUPCE.map(c => c.key);
+  const clean = (Array.isArray(rows) ? rows : []).slice(0, 100).map((r, i) => {
+    const o = { id: (r && r.id && String(r.id).trim()) ? String(r.id).slice(0, 60) : 'r' + Date.now().toString(36) + i };
+    KEYS.forEach(k => { o[k] = String((r && r[k]) || '').slice(0, 1000); });
+    return o;
+  }).filter(r => KEYS.some(k => r[k].trim()));
+  writeJson(OBCHOD_F, { rows: clean });
+  return { rows: clean };
+}
+// Obohatí řádky o propojení na živého zaměstnance (e-mail, oddělení) dle jména manažera.
+function enrichObchod(rows) {
   const emps = getState().employees || [];
   const byName = new Map();
   emps.forEach(e => { const k = obchodNorm(e.name); if (k && !byName.has(k)) byName.set(k, e); });
-  return OBCHOD_ROZDELENI.map(r => {
+  return rows.map(r => {
     const e = byName.get(obchodNorm(r.manager));
     return Object.assign({}, r, {
       email: e ? e.email : null,
@@ -1796,13 +1825,20 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, item: it });
     }
 
-    // ---- Obchod: rozdělení obchodníků (produktoví manažeři, párováno na živou DB zaměstnanců) ----
+    // ---- Obchod: rozdělení obchodníků / zastupitelnost PM (editovatelná tabulka, párováno na živou DB) ----
     if (p === '/api/obchod' && req.method === 'GET') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       if (!isAdmin(req) && employeeModules(e.email).indexOf('obchod') < 0) return send(res, 403, { error: 'K modulu Obchod nemáte přístup.' });
-      const items = buildObchodRozdeleni();
-      return send(res, 200, { items, matched: items.filter(x => x.inDb).length, total: items.length }, { 'Cache-Control': 'no-store' });
+      const rows = enrichObchod(readObchod().rows);
+      return send(res, 200, { columns: OBCHOD_SLOUPCE, rows, matched: rows.filter(x => x.inDb).length, total: rows.length, canEdit: isAdmin(req) }, { 'Cache-Control': 'no-store' });
+    }
+    if (p === '/api/obchod' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Tabulku může upravovat jen správce.' });
+      const b = JSON.parse(await readBody(req));
+      const saved = writeObchod(b.rows);
+      const rows = enrichObchod(saved.rows);
+      return send(res, 200, { ok: true, columns: OBCHOD_SLOUPCE, rows, matched: rows.filter(x => x.inDb).length, total: rows.length, canEdit: true });
     }
 
     // ---- Kovo: přehled výroby ze 4 závodů (Google Sheets přes service account) ----
