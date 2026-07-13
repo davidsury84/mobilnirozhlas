@@ -111,6 +111,8 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .langb.act{background:var(--g);color:#fff}
 .langb:not(.act):hover{background:#eef1ec}
 .reqmark{color:var(--red)}
+.ssobar{display:flex;align-items:center;gap:8px;margin:10px 0 2px;padding:8px 12px;background:var(--green-soft);border:1px solid #bfe6cd;border-radius:10px;font-size:13.5px;color:#245c39}
+.ssobar svg{color:var(--g2);flex:0 0 auto}
 .dq-hint{font-size:11.5px;color:var(--mut);margin-top:2px}
 @media(max-width:600px){.dq{grid-template-columns:1fr}.dqview{grid-template-columns:1fr}}
 .ok{color:var(--g);font-size:13px;margin-top:8px}
@@ -791,6 +793,8 @@ var TR={
   'požadavek zákazníka…':{en:'customer requirement…',de:'Kundenwunsch…',pl:'wymaganie klienta…'},
   'začněte psát adresu… (číselník)':{en:'start typing the address… (list)',de:'Adresse eingeben… (Verzeichnis)',pl:'zacznij wpisywać adres… (rejestr)'},
   'Vyplňte zákazníka.':{en:'Please fill in the customer.',de:'Bitte Kunden ausfüllen.',pl:'Uzupełnij klienta.'},
+  'Zadává':{en:'Entered by',de:'Erfasst von',pl:'Wprowadza'},
+  'automaticky z přihlášení (SSO)':{en:'automatically from login (SSO)',de:'automatisch aus Login (SSO)',pl:'automatycznie z logowania (SSO)'},
   // sekce
   'Základní údaje':{en:'Basic details',de:'Grunddaten',pl:'Dane podstawowe'},
   'Provedení (ABR-DSD)':{en:'Design (ABR-DSD)',de:'Ausführung (ABR-DSD)',pl:'Wykonanie (ABR-DSD)'},
@@ -850,6 +854,7 @@ function openNew(state){
   m.innerHTML='<div class="sheet" style="max-width:840px">'+
     '<div class="row" style="justify-content:space-between;align-items:flex-start"><h3 style="margin:0">'+esc(tr('Nové zadání zakázky do konstrukce'))+'</h3><div class="langbar">'+langs+'</div></div>'+
     '<p class="muted" style="margin:4px 0 0">'+esc(tr('Vyplňte dotazník provedení. U parametrů zvolte standard, opci, nebo zapište požadavek zákazníka.'))+'</p>'+
+    '<div class="ssobar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>'+esc(tr('Zadává'))+': <b>'+esc((ME&&(ME.name||ME.email))||'—')+'</b> · '+new Date().toLocaleDateString('cs-CZ')+' <span class="muted">('+esc(tr('automaticky z přihlášení (SSO)'))+')</span></span></div>'+
     '<datalist id="adresyList">'+adrOpts+'</datalist>'+
     '<div class="two" style="margin-top:8px"><div><label>'+esc(tr('Typ výrobku'))+'</label><select id="nTyp" onchange="DQ_PREFILL=null;renderDotaznik()">'+typeOpts+'</select></div>'+
     '<div><label>'+esc(tr('Číslo poptávky / zakázky'))+'</label><input id="nPopt" value="'+esc(head.nPopt||'')+'"></div></div>'+

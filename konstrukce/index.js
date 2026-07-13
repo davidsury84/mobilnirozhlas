@@ -484,7 +484,7 @@ function mount(host) {
 
     const myNotif = d.notif.filter(n => n.email === me.email);
     json(res, 200, {
-      me: { email: me.email, name: me.name, isAdmin: me.isAdmin, role: me.role || (me.isAdmin ? 'admin' : '') },
+      me: { email: me.email, name: me.name || empName(me.email), isAdmin: me.isAdmin, role: me.role || (me.isAdmin ? 'admin' : '') },
       zakazky: view,
       types: d.types,
       kapacita,
