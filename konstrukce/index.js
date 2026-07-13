@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const urlLib = require('url');
+const https = require('https');
 
 const HTML_FILE = path.join(__dirname, 'konstrukce.html');
 
@@ -438,6 +439,7 @@ function mount(host) {
       if (p === '/api/konstrukce/admin/settings' && req.method === 'POST') return apiAdminSettings(req, res);
       if (p === '/api/konstrukce/admin/report' && req.method === 'GET') return apiReport(req, res, false);
       if (p === '/api/konstrukce/admin/report' && req.method === 'POST') return apiReport(req, res, true);
+      if (p === '/api/konstrukce/geocode' && req.method === 'GET') return apiGeocode(req, res, u.query);
       if (p === '/api/konstrukce/timesheet' && req.method === 'GET') return apiTimesheetGet(req, res, u.query);
       if (p === '/api/konstrukce/timesheet' && req.method === 'POST') return apiTimesheetSave(req, res);
       if (p === '/api/konstrukce/timesheet/delete' && req.method === 'POST') return apiTimesheetDelete(req, res);
@@ -833,6 +835,38 @@ function mount(host) {
     save(d);
     json(res, 200, { ok: true });
     return true;
+  }
+
+  // ---- geokódování adres z OpenStreetMap (Photon) — našeptávač adresy ------
+  // Proxy přes server (kvůli CORS a fair-use); při chybě vrací prázdno a UI
+  // spadne zpět na interní číselník adres. Krátká paměťová cache dotazů.
+  const _geoCache = {}; let _geoCacheKeys = [];
+  function apiGeocode(req, res, q) {
+    const query = String(q.q || '').trim();
+    if (query.length < 3) { json(res, 200, { items: [] }); return true; }
+    const lang = ['en', 'de', 'fr', 'it'].includes(q.lang) ? q.lang : 'default';
+    const key = lang + '|' + query.toLowerCase();
+    if (_geoCache[key]) { json(res, 200, { items: _geoCache[key] }); return true; }
+    const url = 'https://photon.komoot.io/api/?limit=6' + (lang !== 'default' ? '&lang=' + lang : '') + '&q=' + encodeURIComponent(query);
+    let done = false;
+    const finish = (items) => { if (done) return; done = true; if (items && items.length) { _geoCache[key] = items; _geoCacheKeys.push(key); if (_geoCacheKeys.length > 300) delete _geoCache[_geoCacheKeys.shift()]; } json(res, 200, { items: items || [] }); };
+    try {
+      const r = https.get(url, { headers: { 'User-Agent': 'ElkoplastIntranet/1.0 (konstrukce; david.sury@elkoplast.cz)' }, timeout: 4000 }, (resp) => {
+        let data = ''; resp.on('data', c => { data += c; if (data.length > 500000) resp.destroy(); });
+        resp.on('end', () => { try { const j = JSON.parse(data); finish((j.features || []).map(f => formatPhoton(f.properties)).filter(Boolean)); } catch (_) { finish([]); } });
+      });
+      r.on('timeout', () => { r.destroy(); finish([]); });
+      r.on('error', () => finish([]));
+    } catch (_) { finish([]); }
+    return true;
+  }
+  function formatPhoton(p) {
+    if (!p) return '';
+    const nm = (p.name && p.name !== p.city && p.name !== p.street) ? p.name : '';
+    const line1 = [p.street || nm, p.housenumber].filter(Boolean).join(' ').trim() || nm;
+    const city = [p.postcode, p.city || p.town || p.village || p.district || p.county].filter(Boolean).join(' ').trim();
+    const out = [line1, city, p.country].filter(Boolean).join(', ');
+    return out.length > 4 ? out : '';
   }
 
   // ---- timer (konstruktér) -------------------------------------------------

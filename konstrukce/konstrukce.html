@@ -113,6 +113,12 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .reqmark{color:var(--red)}
 .ssobar{display:flex;align-items:center;gap:8px;margin:10px 0 2px;padding:8px 12px;background:var(--green-soft);border:1px solid #bfe6cd;border-radius:10px;font-size:13.5px;color:#245c39}
 .ssobar svg{color:var(--g2);flex:0 0 auto}
+.adr-dd{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 26px rgba(0,0,0,.14);max-height:270px;overflow:auto;margin-top:3px}
+.adr-i{display:flex;gap:8px;align-items:center;padding:8px 11px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--line)}
+.adr-i:last-child{border-bottom:0}.adr-i:hover{background:#eef6f0}
+.adr-b{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:#eef1ec;color:#33513f;flex:0 0 auto}
+.adr-b.osm{background:#e3f2fd;color:#1565c0}
+.adr-load{padding:9px 11px;font-size:12.5px;color:var(--mut)}
 .dq-hint{font-size:11.5px;color:var(--mut);margin-top:2px}
 @media(max-width:600px){.dq{grid-template-columns:1fr}.dqview{grid-template-columns:1fr}}
 .ok{color:var(--g);font-size:13px;margin-top:8px}
@@ -792,6 +798,9 @@ var TR={
   'Zrušit':{en:'Cancel',de:'Abbrechen',pl:'Anuluj'},
   'požadavek zákazníka…':{en:'customer requirement…',de:'Kundenwunsch…',pl:'wymaganie klienta…'},
   'začněte psát adresu… (číselník)':{en:'start typing the address… (list)',de:'Adresse eingeben… (Verzeichnis)',pl:'zacznij wpisywać adres… (rejestr)'},
+  'začněte psát adresu…':{en:'start typing the address…',de:'Adresse eingeben…',pl:'zacznij wpisywać adres…'},
+  'našeptává z OpenStreetMap':{en:'suggestions from OpenStreetMap',de:'Vorschläge aus OpenStreetMap',pl:'podpowiedzi z OpenStreetMap'},
+  'hledám v OpenStreetMap…':{en:'searching OpenStreetMap…',de:'Suche in OpenStreetMap…',pl:'szukam w OpenStreetMap…'},
   'Vyplňte zákazníka.':{en:'Please fill in the customer.',de:'Bitte Kunden ausfüllen.',pl:'Uzupełnij klienta.'},
   'Zadává':{en:'Entered by',de:'Erfasst von',pl:'Wprowadza'},
   'automaticky z přihlášení (SSO)':{en:'automatically from login (SSO)',de:'automatisch aus Login (SSO)',pl:'automatycznie z logowania (SSO)'},
@@ -849,13 +858,11 @@ function openNew(state){
   var head=state.head||{};
   var typeOpts=(D.types||[]).map(function(x){return '<option value="'+esc(x.key)+'"'+(state.typKey===x.key?' selected':'')+'>'+esc(x.name)+'</option>'}).join('');
   var langs=['cs','en','de','pl'].map(function(l){return '<button type="button" class="langb'+(DQ_LANG===l?' act':'')+'" onclick="langSwitch(\''+l+'\')">'+(l==='cs'?'CZ':l.toUpperCase())+'</button>'}).join('');
-  var adrOpts=(D.adresy||[]).map(function(a){return '<option value="'+esc(a)+'">'}).join('');
   var m=document.getElementById('modal');
   m.innerHTML='<div class="sheet" style="max-width:840px">'+
     '<div class="row" style="justify-content:space-between;align-items:flex-start"><h3 style="margin:0">'+esc(tr('Nové zadání zakázky do konstrukce'))+'</h3><div class="langbar">'+langs+'</div></div>'+
     '<p class="muted" style="margin:4px 0 0">'+esc(tr('Vyplňte dotazník provedení. U parametrů zvolte standard, opci, nebo zapište požadavek zákazníka.'))+'</p>'+
     '<div class="ssobar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>'+esc(tr('Zadává'))+': <b>'+esc((ME&&(ME.name||ME.email))||'—')+'</b> · '+new Date().toLocaleDateString('cs-CZ')+' <span class="muted">('+esc(tr('automaticky z přihlášení (SSO)'))+')</span></span></div>'+
-    '<datalist id="adresyList">'+adrOpts+'</datalist>'+
     '<div class="two" style="margin-top:8px"><div><label>'+esc(tr('Typ výrobku'))+'</label><select id="nTyp" onchange="DQ_PREFILL=null;renderDotaznik()">'+typeOpts+'</select></div>'+
     '<div><label>'+esc(tr('Číslo poptávky / zakázky'))+'</label><input id="nPopt" value="'+esc(head.nPopt||'')+'"></div></div>'+
     '<div class="two"><div><label>'+esc(tr('Zákazník'))+' <span class="reqmark">*</span></label><input id="nZak" value="'+esc(head.nZak||'')+'"></div><div><label>'+esc(tr('Kontaktní osoba'))+'</label><input id="nKontakt" value="'+esc(head.nKontakt||'')+'"></div></div>'+
@@ -883,7 +890,10 @@ function renderDotaznik(){
             '<label class="dq-c"><input type="radio" name="dq_'+f.k+'" value="pozadavek"'+ck('pozadavek')+'><span class="dq-tag p">'+reqTag()+'</span><input class="dq-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" oninput="if(this.value){var r=document.querySelector(\'input[name=&quot;dq_'+f.k+'&quot;][value=pozadavek]\');if(r)r.checked=true}"></label>'+
             '</div></div>';
         } else if(f.type==='adresa'){
-          h+='<div class="dq"><div class="dq-l">'+esc(tr(f.label))+'</div><div class="dq-o"><input id="dq_'+f.k+'" list="adresyList" autocomplete="off" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('začněte psát adresu… (číselník)'))+'"><div class="dq-hint">'+((D.adresy||[]).length)+' '+(DQ_LANG==='en'?'saved addresses':DQ_LANG==='de'?'gespeicherte Adressen':DQ_LANG==='pl'?'zapisanych adresów':'adres v číselníku')+'</div></div></div>';
+          h+='<div class="dq"><div class="dq-l">'+esc(tr(f.label))+'</div><div class="dq-o" style="position:relative">'+
+            '<input id="dq_'+f.k+'" autocomplete="off" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('začněte psát adresu…'))+'" oninput="adrLookup(this)" onfocus="adrLookup(this)" onblur="setTimeout(adrClose,180)">'+
+            '<div class="adr-dd" style="display:none"></div>'+
+            '<div class="dq-hint">'+esc(tr('našeptává z OpenStreetMap'))+' · '+((D.adresy||[]).length)+' '+(DQ_LANG==='en'?'saved':DQ_LANG==='de'?'gespeichert':DQ_LANG==='pl'?'zapisane':'uloženo')+'</div></div></div>';
         } else {
           h+='<div class="dq"><div class="dq-l">'+esc(tr(f.label))+'</div><div class="dq-o"><input id="dq_'+f.k+'" '+(f.type==='number'?'type="number" inputmode="decimal"':'')+' value="'+esc(typeof a==='string'?a:'')+'" placeholder="…"></div></div>';
         }
@@ -916,6 +926,33 @@ function createZak(){
     closeModal();reloadData();if(o.j.warn)alert(o.j.warn);
   });
 }
+var ADR_T=null;
+function adrLookup(inp){
+  var dd=inp.parentNode.querySelector('.adr-dd'); if(!dd)return;
+  var q=inp.value.trim();
+  var local=(D.adresy||[]).filter(function(a){return a.toLowerCase().indexOf(q.toLowerCase())>=0}).slice(0,4);
+  renderAdrDD(dd,local,[],q.length>=3);
+  clearTimeout(ADR_T);
+  if(q.length<3)return;
+  ADR_T=setTimeout(function(){
+    fetch('/api/konstrukce/geocode?q='+encodeURIComponent(q)+'&lang='+(DQ_LANG==='cs'?'default':DQ_LANG),{cache:'no-store'})
+      .then(function(r){return r.json()}).then(function(j){renderAdrDD(dd,local,(j.items||[]),false)}).catch(function(){});
+  },350);
+}
+function renderAdrDD(dd,local,osm,loading){
+  var h='';
+  local.forEach(function(a){h+=adrRow(a,'saved')});
+  osm.forEach(function(a){if(local.indexOf(a)>=0)return;h+=adrRow(a,'osm')});
+  if(loading&&!osm.length)h+='<div class="adr-load">'+esc(tr('hledám v OpenStreetMap…'))+'</div>';
+  if(!h){dd.style.display='none';return}
+  dd.innerHTML=h;dd.style.display='block';
+}
+function adrRow(a,kind){
+  var tag=kind==='osm'?'<span class="adr-b osm">OSM</span>':'<span class="adr-b">'+(DQ_LANG==='en'?'saved':DQ_LANG==='de'?'gesp.':DQ_LANG==='pl'?'zapis.':'uloženo')+'</span>';
+  return '<div class="adr-i" onmousedown="adrPick(this)" data-v="'+esc(a)+'">'+tag+'<span>'+esc(a)+'</span></div>';
+}
+function adrPick(el){var o=el.closest('.dq-o');var inp=o.querySelector('input');inp.value=el.getAttribute('data-v');var dd=o.querySelector('.adr-dd');if(dd)dd.style.display='none';}
+function adrClose(){document.querySelectorAll('.adr-dd').forEach(function(d){d.style.display='none'})}
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 
 /* ---- evidence práce (timesheet) ---- */
