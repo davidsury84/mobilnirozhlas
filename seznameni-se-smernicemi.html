@@ -1235,6 +1235,7 @@ const MUJ_MODS = [
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
   { grp:"Obchod" },
   { key:"obchod", icon:MUJ_IC.users, label:"Rozdělení obchodníků", gated:true },
+  { key:"zadanikonstrukce", icon:MUJ_IC.file, label:"Zadání do konstrukce", gated:true },
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
@@ -1291,7 +1292,7 @@ async function refreshMy(){
   if(!MUJ.data.library) MUJ.data.library = {folders:[],docs:[]};
   MUJ.modules = MUJ.data.modules || [];
 }
-function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; return m.key==="kovo"&&mods.indexOf("kovokalk")>=0; }
+function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("konstrukce")>=0); }
 function mujCounts(){
   const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[]; const survs=d.surveys||[];
   return { dirs, libDocs, survs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length, survTodo:survs.filter(x=>!x.filled).length };
@@ -1315,7 +1316,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1397,6 +1398,7 @@ function mjGo(key){
   else if(key==="doprava") showDoprava();
   else if(key==="konstrukce") showKonstrukce();
   else if(key==="obchod") showObchod();
+  else if(key==="zadanikonstrukce") showZadaniKonstrukce();
   else if(key==="smlouvy") showSmlouvy();
   else if(key==="sortiment") showSortiment();
   else if(key==="adaptace") showAdaptace();
@@ -1502,7 +1504,7 @@ async function showObchod(tab){
 }
 function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Rozdělení kategorií webu mezi obchodníky (produktové manažery). Stav pokrytí vyhodnocujeme z dat: vlastník + záloha = pokryto. Obchodníci jsou propojeni na živou databázi zaměstnanců včetně kontaktu.</p></div>'; }
 function obTabs(){
-  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků'],['zadani','Zadání do konstrukce']];
+  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků']];
   return '<div class="pl-tabs">'+t.map(x=>'<button class="pl-tab'+(x[0]===OBCHOD_TAB?' active':'')+'" type="button" onclick="showObchod(\''+x[0]+'\')">'+esc(x[1])+'</button>').join('')+'</div>';
 }
 // Sloupcový graf: (1) vyhodnocené pokrytí, (2) počet kategorií na odpovědného obchodníka.
@@ -1524,11 +1526,6 @@ function obChartsHtml(rows){
 }
 function obRender(){
   const body=document.getElementById("mujBody"), d=OBCHOD_DATA;
-  if(OBCHOD_TAB==="zadani"){
-    body.innerHTML='<div class="dash-hero" style="margin-bottom:0"><h2>Zadání do konstrukce</h2><p>Vyplňte dotazník provedení výrobku — tím vznikne zakázka přímo v modulu Konstrukce (jeden informační tok). Stejný formulář používá i „Nová zakázka" v Konstrukci.</p></div>'+obTabs()+
-      '<iframe src="/konstrukce#zadani" style="width:100%;height:calc(100vh - 210px);border:0;display:block;background:#f4f6f2;border-radius:12px" title="Zadání zakázky do konstrukce"></iframe>';
-    window.scrollTo(0,0); return;
-  }
   if(OBCHOD_TAB==="obchodnici"){ body.innerHTML=obHero()+obTabs()+obObchodniciHtml(); window.scrollTo(0,0); return; }
   if(OBCHOD_EDIT){ body.innerHTML=obHero()+obTabs()+obEditHtml(); window.scrollTo(0,0); return; }
   const cols=d.columns||[], rows=d.rows||[];
@@ -1878,6 +1875,13 @@ async function showKonstrukce(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("konstrukce")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/konstrukce" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f6f2" title="Konstrukce — workflow zadání a schválení výkresů"></iframe>';
+  window.scrollTo(0,0);
+}
+function showZadaniKonstrukce(){
+  MUJ.view="zadanikonstrukce"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("obchod")<0 && (MUJ.modules||[]).indexOf("konstrukce")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K zadávání do konstrukce nemáte přístup.</div>'; return; }
+  body.innerHTML='<iframe src="/konstrukce#zadani" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f6f2" title="Zadání zakázky do konstrukce"></iframe>';
   window.scrollTo(0,0);
 }
 async function showFreelo(){
