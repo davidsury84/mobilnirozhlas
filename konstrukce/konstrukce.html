@@ -146,6 +146,8 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .tl-n b{font-size:16px;font-weight:800;line-height:1}
 .tl-n .lab{font-size:11.5px;color:var(--mut)}
 .tl-n.red b{color:var(--red)}.tl-n.amber b{color:var(--amber)}.tl-n.green b{color:var(--g3)}
+.tl-late{margin-top:10px;display:inline-flex;align-items:center;gap:7px;background:var(--red);color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;line-height:1}
+.tl-late b{font-weight:800}
 </style>
 </head>
 <body>
@@ -268,8 +270,13 @@ function renderMain(){
   list.forEach(function(z){h+=zkCard(z)});
   m.innerHTML=h;
 }
+var KDE={novy:'u konstrukce',prace:'u konstrukce',kontrola:'u konstrukce',revize:'u konstrukce',podklady:'u obchodníka',obchodnik:'u obchodníka',klient:'u klienta',schvaleno:'u obchodníka',vyroba:'ve výrobě',stredisko:'ve výrobě'};
 function zkTimeline(z){
   var now=Date.now(), DAY=86400000, d=function(ms){return Math.max(0,Math.round(ms/DAY));};
+  if(z.deadline && !isTerminal(z.stav) && now>z.deadline){
+    var od=Math.round((now-z.deadline)/DAY), w=KDE[z.stav]||'', dw=(od===1?'den':(od>=2&&od<=4?'dny':'dní'));
+    return '<div class="tl-late">⚠ Po termínu'+(w?' '+w:'')+' · <b>'+od+'</b> '+dw+'</div>';
+  }
   var start=z.createdAt||now;
   var totalDays=d(now-start);
   var stepDays=z.stepStartedAt?d(now-z.stepStartedAt):null;
