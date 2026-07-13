@@ -20,6 +20,47 @@ const urlLib = require('url');
 
 const HTML_FILE = path.join(__dirname, 'konstrukce.html');
 
+// ---- Dotazník provedení kontejneru ABROLL (ABR-DSD) ------------------------
+// Zdroj: sdílený Google Sheet „Dotazník provedení kontejneru Abroll".
+// Pole typu 'volba' mají standard/opci; obchodník volí standard, opci, nebo
+// zapíše vlastní „požadavek zákazníka". Jeden informační tok Obchod → Konstrukce.
+const DOTAZNIK_ABROLL = [
+  { title: 'Základní údaje', fields: [
+    { k: 'rozmery', label: 'Vnitřní rozměry (délka × šířka × výška)', type: 'text' },
+    { k: 'pocet', label: 'Počet ks', type: 'number' },
+    { k: 'adresaDodani', label: 'Adresa dodání', type: 'text' },
+  ] },
+  { title: 'Provedení (ABR-DSD)', fields: [
+    { k: 'provedeni', label: 'Provedení', std: '5/3', opce: '4/3 nebo jiné' },
+    { k: 'natahovani', label: 'Natahování', std: 'typ A', opce: 'typ H / sklopné / tunelové' },
+    { k: 'prumerHaku', label: 'Průměr háku h 1570 (mm)', std: '50', opce: '60' },
+    { k: 'napojeniPodlaha', label: 'Napojení podlaha × bočnice', std: '45/45, vytažená podlaha (VP 250)', opce: 'R200/0° (K90)' },
+    { k: 'vrchniLem', label: 'Vrchní lem', std: 'jekl 100×80×4 S355', opce: 'tr 89×6 / tr 114×6 S355' },
+    { k: 'roztecVyztuhBocnice', label: 'Rozteč výztuh bočnice', std: '750 mm', opce: '500 mm' },
+    { k: 'profilVyztuhBocnice', label: 'Profil výztuh bočnice', std: 'U 100×60×3', opce: 'U 100×60×4' },
+    { k: 'roztecVyztuhPodlahy', label: 'Rozteč výztuh podlahy', std: '750 mm', opce: '500 mm' },
+    { k: 'profilVyztuhPodlahy', label: 'Profil výztuh podlahy', std: 'U 100×60×4', opce: '' },
+    { k: 'mezivyztuhaIPN', label: 'Mezivýztuha IPN × podlaha', std: 'ne', opce: 'ano' },
+    { k: 'jisteniC', label: 'Jištění C v lyžině', std: 'ano', opce: 'ne' },
+    { k: 'zadniTramec', label: 'Zadní trámec', std: 'UPN 180', opce: '' },
+    { k: 'rolny', label: 'Rolny 2 ks délka 300 mm', std: 'tr 159×6', opce: '' },
+    { k: 'cepRolen', label: 'Čep rolen mazaný / průměr', std: '40 mm (CR 300/40)', opce: '50 mm (CR 300/50)' },
+    { k: 'provedeniVrat', label: 'Provedení vrat', std: '2křídlá', opce: '1křídlá / klapka / jiné' },
+    { k: 'zaviraniVrat', label: 'Zavírání vrat', std: 'S hák (typ VSH)', opce: 'holandské (VNL)' },
+    { k: 'strecha', label: 'Střecha', std: 'ne', opce: 'mechanická / hydraulická / rolovací plachta aj.' },
+    { k: 'umisteniOvladaniStrechy', label: 'Umístění ovládání střechy ve směru jízdy', std: 'vlevo', opce: 'vpravo' },
+    { k: 'hackyNaPlachtu', label: 'Háčky na plachtu', std: 'ano / 500 mm / 10 mm', opce: 'ne' },
+    { k: 'zebrik', label: 'Žebřík (výška kont. min 1500 mm)', std: 'ano / vlevo ve směru jízdy', opce: 'ne' },
+    { k: 'centralniJisteni', label: 'Centrální jištění', std: 'ano / 2křídla (typ CE)', opce: 'ne' },
+  ] },
+  { title: 'Doplňky', fields: [
+    { k: 'dvojiteZavirani', label: 'Dvojité zavírání', std: 'ne', opce: 'ano' },
+    { k: 'zhustkeNosniky', label: 'Zhuštěné nosníky podlahy', std: 'ne', opce: 'ano 60×60×4' },
+    { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano / počet výztuh' },
+    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text' },
+  ] },
+];
+
 // ---- Stavy zakázky (kap. 4 dokumentu) --------------------------------------
 const STAV = {
   novy:      { label: 'Nový',              onTurn: 'sef',        terminal: false },
@@ -62,6 +103,7 @@ const SEED_TYPES = [{
   lhutaVyrobaDays: 1,
   internalCheck: true,
   linkValidDays: 30,
+  dotaznik: DOTAZNIK_ABROLL,
   params: [
     { label: 'Vnitřní délka', examples: '5000 / 5500 / 6000 / 6500 / 7000 mm' },
     { label: 'Výška bočnic', examples: '1000 – 2300 mm dle řady' },
@@ -169,6 +211,8 @@ function mount(host) {
     if (!d.roles || typeof d.roles !== 'object') d.roles = {};
     if (!d.fond || typeof d.fond !== 'object') d.fond = {};      // email -> hodin/týden
     if (!Array.isArray(d.types) || !d.types.length) d.types = JSON.parse(JSON.stringify(SEED_TYPES));
+    // migrace: doplň ABROLL dotazník na existující typ, pokud ještě nemá
+    { const ab = d.types.find(t => t.key === 'abroll'); if (ab && (!Array.isArray(ab.dotaznik) || !ab.dotaznik.length)) ab.dotaznik = JSON.parse(JSON.stringify(DOTAZNIK_ABROLL)); }
     if (!Array.isArray(d.zakazky)) d.zakazky = [];
     if (!Array.isArray(d.notif)) d.notif = [];
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
@@ -491,7 +535,7 @@ function mount(host) {
       typKey: z.typKey, typName: t.name,
       zakaznik: z.zakaznik, kontakt: z.kontakt, kontaktEmail: z.kontaktEmail,
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
-      params: z.params || {},
+      params: z.params || {}, dotaznik: z.dotaznik || null,
       stav: z.stav, stavLabel: STAV[z.stav].label, onTurn: STAV[z.stav].onTurn,
       obchodnikEmail: z.obchodnikEmail, obchodnikName: empName(z.obchodnikEmail),
       assignedTo: z.assignedTo || '', assignedName: z.assignedTo ? empName(z.assignedTo) : '',
@@ -512,6 +556,24 @@ function mount(host) {
     };
   }
 
+  // Očistí odpovědi dotazníku podle definice typu (jen známá pole, omezené délky).
+  function sanitizeDotaznik(t, raw) {
+    if (!t || !Array.isArray(t.dotaznik) || !raw || typeof raw !== 'object') return null;
+    const out = {};
+    t.dotaznik.forEach(sec => (sec.fields || []).forEach(f => {
+      const a = raw[f.k]; if (a == null) return;
+      if (f.std !== undefined) {
+        // pole typu volba: { volba: standard|opce|pozadavek, hodnota }
+        const volba = ['standard', 'opce', 'pozadavek'].includes(a.volba) ? a.volba : 'standard';
+        const hodnota = String(a.hodnota == null ? '' : a.hodnota).slice(0, 300);
+        if (hodnota) out[f.k] = { volba, hodnota };
+      } else {
+        const v = String(a).slice(0, 500).trim(); if (v) out[f.k] = v;
+      }
+    }));
+    return Object.keys(out).length ? out : null;
+  }
+
   // ---- vytvoření zakázky (obchodník) ---------------------------------------
   async function apiCreate(req, res) {
     const me = roleOf(req);
@@ -528,6 +590,7 @@ function mount(host) {
       id: 'z' + crypto.randomBytes(7).toString('hex'), cislo, createdAt: now,
       createdBy: me.email, obchodnikEmail: me.email,
       typKey: t.key, params: b.params && typeof b.params === 'object' ? b.params : {},
+      dotaznik: sanitizeDotaznik(t, b.dotaznik),
       zakaznik, kontakt: String(b.kontakt || '').trim(), kontaktEmail: String(b.kontaktEmail || '').trim(),
       cisloPoptavky: String(b.cisloPoptavky || '').trim(),
       pozadovanyTermin: b.pozadovanyTermin ? String(b.pozadovanyTermin).slice(0, 10) : null,
@@ -890,6 +953,16 @@ function mount(host) {
     numFields.forEach(f => { if (b[f] != null && !isNaN(parseInt(b[f], 10))) t[f] = parseInt(b[f], 10); });
     ['lhutaPrideleniDays', 'lhutaKontrolaDays', 'lhutaObchodnikDays', 'lhutaKlientDays'].forEach(f => { if (t[f] == null) t[f] = SEED_TYPES[0][f]; });
     if (Array.isArray(b.params)) t.params = b.params.slice(0, 40).map(pp => ({ label: String(pp.label || '').slice(0, 80), examples: String(pp.examples || '').slice(0, 200) })).filter(pp => pp.label);
+    // dotazník: pole sekcí {title, fields:[{k,label,type|std,opce}]} (pro budoucí typy)
+    if (Array.isArray(b.dotaznik)) t.dotaznik = b.dotaznik.slice(0, 20).map(sec => ({
+      title: String(sec.title || '').slice(0, 80),
+      fields: (Array.isArray(sec.fields) ? sec.fields : []).slice(0, 60).map(f => {
+        const o = { k: String(f.k || '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 40), label: String(f.label || '').slice(0, 120) };
+        if (f.std !== undefined) { o.std = String(f.std || '').slice(0, 200); o.opce = String(f.opce || '').slice(0, 200); }
+        else o.type = f.type === 'number' ? 'number' : 'text';
+        return o;
+      }).filter(f => f.k && f.label),
+    })).filter(sec => sec.fields.length);
     save(d);
     json(res, 200, { ok: true, types: d.types });
     return true;

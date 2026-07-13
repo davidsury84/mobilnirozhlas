@@ -87,6 +87,21 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .sheet{background:#fff;border-radius:14px;width:min(720px,100%);padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
 .sheet h3{margin:0 0 4px}
 .err{color:var(--red);font-size:13px;margin-top:8px}
+/* dotazník */
+.dq{display:grid;grid-template-columns:220px 1fr;gap:8px 14px;align-items:start;padding:8px 0;border-bottom:1px solid var(--line)}
+.dq-l{font-weight:600;font-size:13.5px;padding-top:6px}
+.dq-o{display:flex;flex-direction:column;gap:5px}
+.dq-c{display:flex;align-items:center;gap:7px;font-size:13.5px;cursor:pointer}
+.dq-c input[type=radio]{width:auto;margin:0}
+.dq-tag{font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;flex:0 0 auto}
+.dq-tag.s{background:var(--green-soft);color:#0a6b34}.dq-tag.o{background:#fff3e0;color:#e65100}.dq-tag.p{background:#e3f2fd;color:#1565c0}
+.dq-req{flex:1;min-width:120px;padding:5px 8px}
+.dqview{display:grid;grid-template-columns:200px 1fr;gap:4px 12px;font-size:13px}
+.dqview b{color:var(--mut);font-weight:600}
+.dqview .bd{font-size:10px;font-weight:700;padding:0 5px;border-radius:4px;margin-left:6px}
+.dqview .s{background:var(--green-soft);color:#0a6b34}.dqview .o{background:#fff3e0;color:#e65100}.dqview .p{background:#e3f2fd;color:#1565c0}
+.dqsec{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:12px 0 4px}
+@media(max-width:600px){.dq{grid-template-columns:1fr}.dqview{grid-template-columns:1fr}}
 .ok{color:var(--g);font-size:13px;margin-top:8px}
 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
 .kpi .c{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}
@@ -195,8 +210,11 @@ function reloadData(){
     if(D.notifUnread){nb.style.display='';nb.textContent=D.notifUnread}else nb.style.display='none';
     renderSide(); renderMain();
     if(SEL){var z=D.zakazky.find(function(x){return x.id===SEL});if(z)renderDrawer(z);}
+    // vstup z Obchodu: /konstrukce#zadani otevře rovnou nové zadání (jeden tok)
+    if(!ZADANI_OPENED && /(^|[#&])zadani/.test(location.hash) && canCreate()){ZADANI_OPENED=true;openNew();}
   });
 }
+var ZADANI_OPENED=false;
 
 /* ---- levý filtr ---- */
 function counts(){
@@ -495,7 +513,7 @@ function renderDrawer(z){
       '</div>'+
       actionsFor(z)+
       pdfPanel(z)+
-      params+vers+
+      dotaznikView(z)+params+vers+
       linkBox(z)+
       comments+audit+
     '</div>';
@@ -564,6 +582,22 @@ function openPdfModal(id,v){
     '<button class="x" onclick="closeModal()">×</button></div></div>'+
     '<div class="pdfwrap" style="flex:1;margin-top:10px"><iframe style="height:100%" src="/api/konstrukce/soubor?id='+id+'&v='+v+'&kind=pdf#toolbar=1"></iframe></div></div>';
   m.classList.add('open');
+}
+function dotaznikView(z){
+  if(!z.dotaznik||!Object.keys(z.dotaznik).length)return '';
+  var t=(D.types||[]).find(function(x){return x.key===z.typKey});
+  if(!t||!t.dotaznik)return '';
+  var h='<div class="sec">Zadání (dotazník provedení)</div>';
+  t.dotaznik.forEach(function(sec){
+    var rows='';
+    (sec.fields||[]).forEach(function(f){
+      var a=z.dotaznik[f.k];if(a==null)return;
+      if(typeof a==='object'){var bd=a.volba==='standard'?'s':(a.volba==='opce'?'o':'p');var bl=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek');rows+='<b>'+esc(f.label)+'</b><span>'+esc(a.hodnota)+' <span class="bd '+bd+'">'+bl+'</span></span>';}
+      else rows+='<b>'+esc(f.label)+'</b><span>'+esc(a)+'</span>';
+    });
+    if(rows)h+='<div class="dqsec" style="margin-top:10px">'+esc(sec.title)+'</div><div class="dqview">'+rows+'</div>';
+  });
+  return h;
 }
 function semaforText(z){if(isTerminal(z.stav)||z.stav==='schvaleno'||!z.deadline)return '';if(z.semafor==='red')return ' <span style="color:var(--red);font-weight:700">· po termínu</span>';if(z.semafor==='amber')return ' <span style="color:var(--amber);font-weight:700">· blíží se</span>';return ''}
 
@@ -731,29 +765,59 @@ function askTermin(id){var t=prompt('Nový termín (RRRR-MM-DD):');if(!t)return;
 
 /* ---- nová zakázka ---- */
 function openNew(){
-  var t=(D.types&&D.types[0])||{params:[]};
   var typeOpts=(D.types||[]).map(function(x){return '<option value="'+esc(x.key)+'">'+esc(x.name)+'</option>'}).join('');
   var m=document.getElementById('modal');
-  m.innerHTML='<div class="sheet"><h3>Nová zakázka — požadavek na výkres</h3><p class="muted" style="margin-top:0">Vyplňte podklady od zákazníka. Nevyplněné termíny doplní systém z výchozích lhůt.</p>'+
-    '<div class="two"><div><label>Typ výrobku</label><select id="nTyp" onchange="renderParams()">'+typeOpts+'</select></div>'+
+  m.innerHTML='<div class="sheet" style="max-width:820px"><h3>Nové zadání zakázky do konstrukce</h3><p class="muted" style="margin-top:0">Vyplňte dotazník provedení. U parametrů zvolte standard, opci, nebo zapište požadavek zákazníka. Nevyplněné termíny doplní systém z výchozích lhůt.</p>'+
+    '<div class="two"><div><label>Typ výrobku</label><select id="nTyp" onchange="renderDotaznik()">'+typeOpts+'</select></div>'+
     '<div><label>Číslo poptávky / zakázky</label><input id="nPopt"></div></div>'+
     '<div class="two"><div><label>Zákazník *</label><input id="nZak"></div><div><label>Kontaktní osoba</label><input id="nKontakt"></div></div>'+
-    '<div class="two"><div><label>E-mail klienta (pro náhled)</label><input id="nMail" placeholder="email@klient.cz"></div><div><label>Požadovaný termín</label><input id="nTerm" type="date"></div></div>'+
+    '<div class="two"><div><label>E-mail klienta (pro náhled)</label><input id="nMail" placeholder="email@klient.cz"></div><div><label>Požadovaný termín dodání</label><input id="nTerm" type="date"></div></div>'+
     '<div id="paramBox"></div>'+
     '<div class="err" id="nErr"></div>'+
-    '<div class="actions" style="margin-top:14px"><button class="btn" onclick="createZak()">Založit požadavek</button><button class="btn ghost" onclick="closeModal()">Zrušit</button></div></div>';
-  m.classList.add('open');renderParams();
+    '<div class="actions" style="margin-top:14px"><button class="btn" onclick="createZak()">Založit zakázku</button><button class="btn ghost" onclick="closeModal()">Zrušit</button></div></div>';
+  m.classList.add('open');renderDotaznik();
 }
-function renderParams(){
-  var key=(document.getElementById('nTyp')||{}).value;
-  var t=(D.types||[]).find(function(x){return x.key===key})||{params:[]};
-  var h='<div class="sec">Parametry výrobku</div>';
-  (t.params||[]).forEach(function(p,i){h+='<label>'+esc(p.label)+'</label><input id="pp_'+i+'" data-lbl="'+esc(p.label)+'" placeholder="'+esc(p.examples||'')+'">'});
+function curType(){var key=(document.getElementById('nTyp')||{}).value;return (D.types||[]).find(function(x){return x.key===key})||{}}
+function renderDotaznik(){
+  var t=curType();
+  var h='';
+  if(t.dotaznik&&t.dotaznik.length){
+    t.dotaznik.forEach(function(sec){
+      h+='<div class="dqsec">'+esc(sec.title||'')+'</div>';
+      (sec.fields||[]).forEach(function(f){
+        if(f.std!==undefined){
+          h+='<div class="dq"><div class="dq-l">'+esc(f.label)+'</div><div class="dq-o">'+
+            '<label class="dq-c"><input type="radio" name="dq_'+f.k+'" value="standard" checked><span class="dq-tag s">std</span>'+esc(f.std||'—')+'</label>'+
+            (f.opce?('<label class="dq-c"><input type="radio" name="dq_'+f.k+'" value="opce"><span class="dq-tag o">opce</span>'+esc(f.opce)+'</label>'):'')+
+            '<label class="dq-c"><input type="radio" name="dq_'+f.k+'" value="pozadavek"><span class="dq-tag p">poř.</span><input class="dq-req" id="dqr_'+f.k+'" placeholder="požadavek zákazníka…" oninput="if(this.value){var r=document.querySelector(\'input[name=&quot;dq_'+f.k+'&quot;][value=pozadavek]\');if(r)r.checked=true}"></label>'+
+            '</div></div>';
+        } else {
+          h+='<div class="dq"><div class="dq-l">'+esc(f.label)+'</div><div class="dq-o"><input id="dq_'+f.k+'" '+(f.type==='number'?'type="number" inputmode="decimal"':'')+' placeholder="…"></div></div>';
+        }
+      });
+    });
+  } else {
+    // starší typy bez dotazníku — jednoduché parametry
+    h+='<div class="dqsec">Parametry výrobku</div>';
+    (t.params||[]).forEach(function(p,i){h+='<label>'+esc(p.label)+'</label><input id="pp_'+i+'" data-lbl="'+esc(p.label)+'" placeholder="'+esc(p.examples||'')+'">'});
+  }
   document.getElementById('paramBox').innerHTML=h;
 }
 function createZak(){
-  var params={};document.querySelectorAll('#paramBox input').forEach(function(inp){if(inp.value.trim())params[inp.getAttribute('data-lbl')]=inp.value.trim()});
-  var b={typKey:(document.getElementById('nTyp')||{}).value,zakaznik:(document.getElementById('nZak')||{}).value,kontakt:(document.getElementById('nKontakt')||{}).value,kontaktEmail:(document.getElementById('nMail')||{}).value,cisloPoptavky:(document.getElementById('nPopt')||{}).value,pozadovanyTermin:(document.getElementById('nTerm')||{}).value,params:params};
+  var t=curType();
+  var params={},dot={};
+  if(t.dotaznik&&t.dotaznik.length){
+    t.dotaznik.forEach(function(sec){(sec.fields||[]).forEach(function(f){
+      if(f.std!==undefined){
+        var sel=document.querySelector('input[name="dq_'+f.k+'"]:checked');var volba=sel?sel.value:'standard';
+        var hodnota=volba==='standard'?f.std:(volba==='opce'?f.opce:((document.getElementById('dqr_'+f.k)||{}).value||''));
+        if(hodnota&&String(hodnota).trim())dot[f.k]={volba:volba,hodnota:String(hodnota).trim()};
+      }else{var v=(document.getElementById('dq_'+f.k)||{}).value||'';if(v.trim())dot[f.k]=v.trim();}
+    })});
+  }else{
+    document.querySelectorAll('#paramBox input[data-lbl]').forEach(function(inp){if(inp.value.trim())params[inp.getAttribute('data-lbl')]=inp.value.trim()});
+  }
+  var b={typKey:(document.getElementById('nTyp')||{}).value,zakaznik:(document.getElementById('nZak')||{}).value,kontakt:(document.getElementById('nKontakt')||{}).value,kontaktEmail:(document.getElementById('nMail')||{}).value,cisloPoptavky:(document.getElementById('nPopt')||{}).value,pozadovanyTermin:(document.getElementById('nTerm')||{}).value,params:params,dotaznik:dot};
   if(!b.zakaznik.trim()){document.getElementById('nErr').textContent='Vyplňte zákazníka.';return}
   api('/zakazka','POST',b).then(function(o){
     if(!o.ok){document.getElementById('nErr').textContent=o.j.chyba||'Chyba.';return}

@@ -1502,7 +1502,7 @@ async function showObchod(tab){
 }
 function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Rozdělení kategorií webu mezi obchodníky (produktové manažery). Stav pokrytí vyhodnocujeme z dat: vlastník + záloha = pokryto. Obchodníci jsou propojeni na živou databázi zaměstnanců včetně kontaktu.</p></div>'; }
 function obTabs(){
-  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků']];
+  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků'],['zadani','Zadání do konstrukce']];
   return '<div class="pl-tabs">'+t.map(x=>'<button class="pl-tab'+(x[0]===OBCHOD_TAB?' active':'')+'" type="button" onclick="showObchod(\''+x[0]+'\')">'+esc(x[1])+'</button>').join('')+'</div>';
 }
 // Sloupcový graf: (1) vyhodnocené pokrytí, (2) počet kategorií na odpovědného obchodníka.
@@ -1524,6 +1524,11 @@ function obChartsHtml(rows){
 }
 function obRender(){
   const body=document.getElementById("mujBody"), d=OBCHOD_DATA;
+  if(OBCHOD_TAB==="zadani"){
+    body.innerHTML='<div class="dash-hero" style="margin-bottom:0"><h2>Zadání do konstrukce</h2><p>Vyplňte dotazník provedení výrobku — tím vznikne zakázka přímo v modulu Konstrukce (jeden informační tok). Stejný formulář používá i „Nová zakázka" v Konstrukci.</p></div>'+obTabs()+
+      '<iframe src="/konstrukce#zadani" style="width:100%;height:calc(100vh - 210px);border:0;display:block;background:#f4f6f2;border-radius:12px" title="Zadání zakázky do konstrukce"></iframe>';
+    window.scrollTo(0,0); return;
+  }
   if(OBCHOD_TAB==="obchodnici"){ body.innerHTML=obHero()+obTabs()+obObchodniciHtml(); window.scrollTo(0,0); return; }
   if(OBCHOD_EDIT){ body.innerHTML=obHero()+obTabs()+obEditHtml(); window.scrollTo(0,0); return; }
   const cols=d.columns||[], rows=d.rows||[];
