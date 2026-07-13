@@ -1071,57 +1071,85 @@ function calApi(method, apiPath, token, bodyObj) {
   });
 }
 /* ---------- Obchod: rozdělení obchodníků / zastupitelnost produktových manažerů ----------
-   Editovatelná tabulka (7 sloupců dle zdrojového Google Sheetu). Data žijí v datovém souboru
-   OBCHOD_F; při prvním načtení se předvyplní ze seedu níže. Sloupec „Produktový manažer" se
-   za běhu páruje na ŽIVOU databázi zaměstnanců (state.json) — jakmile se obchodník poprvé
-   přihlásí přes firemní Google účet, doplní se k němu e-mail a propojení na profil.
-   Sloupce tabulky (pořadí = zdrojový list): */
+   Editovatelná tabulka 1:1 se zdrojovým Google Sheetem „Zastupitelnost_PM_Elkoplast_cisty"
+   (list: sekce webu → kategorie → odpovědný PM → zástup → třetí náhradník → stav pokrytí).
+   Data žijí v datovém souboru OBCHOD_F; při prvním načtení se předvyplní seedem níže. */
 const OBCHOD_SLOUPCE = [
-  { key: 'manager', label: 'Produktový manažer' },
-  { key: 'domena', label: 'Doména' },
-  { key: 'produkty', label: 'Produkty (dle interního návrhu)' },
-  { key: 'zastup', label: 'Kdo zastoupí / překryv' },
-  { key: 'zastupitelnost', label: 'Míra zastupitelnosti' },
-  { key: 'riziko', label: 'Riziko výpadku' },
-  { key: 'doporuceni', label: 'Doporučení' }
+  { key: 'sekce', label: 'Sekce webu' },
+  { key: 'kategorie', label: 'Kategorie na webu (elkoplast.cz)' },
+  { key: 'stitek', label: 'Štítek' },
+  { key: 'pm', label: 'Odpovědný PM (dle návrhu)' },
+  { key: 'zastup', label: 'Zástup / překryv' },
+  { key: 'nahradnik', label: 'Třetí náhradník' },
+  { key: 'pokryti', label: 'Stav pokrytí' },
+  { key: 'poznamka', label: 'Poznámka' }
 ];
-const OBCHOD_SEED = [
-  { id: 'pm-beranek', manager: 'Josef Beránek', domena: 'Skladování, logistika',
-    produkty: 'Skladovací kontejnery; Lodní kontejnery; Skladovací boxy a přepravky; Záchytné vany',
-    zastup: 'Nikdo (částečný překryv s P. Jančou u ocelových kontejnerů)', zastupitelnost: 'Žádná', riziko: 'Střední',
-    doporuceni: 'Určit a zaškolit zástupce; sortiment je obchodně jednodušší, vhodný pro sdílené know-how.' },
-  { id: 'pm-mokrejs', manager: 'Jan Mokrejš', domena: 'Dům a zahrada + městský mobiliář',
-    produkty: 'Kompostéry; Kuchyňské koše; Třídění v interiéru; Kontejnery na textil; Nádrže na naftu a AdBlue (B2B)',
-    zastup: 'P. Lattner (nafta/AdBlue); P. Janča (koše, interiér, mobiliář)', zastupitelnost: 'Částečná', riziko: 'Nízké–střední',
-    doporuceni: 'Formalizovat zástup s Lattnerem (nafta/AdBlue) a Jančou (koše/mobiliář).' },
-  { id: 'pm-vesely', manager: 'Martin Veselý', domena: 'Komunální technika',
-    produkty: 'ESA; Hydrocity (Baroclean); Kompostovací kontejnery (PL); Depacker (Mavitec); Nádrže na solanku',
-    zastup: 'Nikdo', zastupitelnost: 'Žádná', riziko: 'Vysoké',
-    doporuceni: 'Technicky specifické portfolio bez zálohy – prioritně zaškolit druhého člověka (nabízí se J. Šonský – technologie).' },
-  { id: 'pm-rychlikova', manager: 'Jana Rychlíková', domena: 'Odpadové hospodářství',
-    produkty: 'Polo/podzemní kontejnery (+ stavby); VOK Morava; Kontejnery na nebezpečný nemocniční odpad',
-    zastup: 'J. Horálek (VOK); částečně P. Janča (nádoby)', zastupitelnost: 'Částečná', riziko: 'Střední',
-    doporuceni: 'U polo/podzemních kontejnerů (vč. staveb) chybí záloha – zaškolit Horálka nebo Janču.' },
-  { id: 'pm-janca', manager: 'Petr Janča', domena: 'Odpadové hospodářství',
-    produkty: 'Plastové nádoby 120–1100 l; Kontejnery se spodním výsypem; Venkovní koše, lavičky, zástěny, přístřešky; Nádoby na zimní posyp',
-    zastup: 'J. Rychlíková (nádoby); J. Mokrejš (koše, mobiliář)', zastupitelnost: 'Částečná', riziko: 'Nízké',
-    doporuceni: 'Nejlépe zastupitelné portfolio – vhodný jako univerzální záloha pro ostatní.' },
-  { id: 'pm-lattner', manager: 'Petr Lattner', domena: 'Hospodaření s kapalinami',
-    produkty: 'Podzemní nádrže na vodu; Nadzemní nádrže; Zasakovací bloky a tunely; Vodoměrné šachty; Nafta a AdBlue (zemědělství)',
-    zastup: 'J. Mokrejš (pouze nafta/AdBlue)', zastupitelnost: 'Částečná (jen okraj portfolia)', riziko: 'Střední–vysoké',
-    doporuceni: 'Jádro (podzemní nádrže, vsakování, šachty) bez zálohy – zaškolit zástupce.' },
-  { id: 'pm-horalek', manager: 'Jan Horálek', domena: 'Odpadové hospodářství',
-    produkty: 'Balíkovací lisy Bramidan; Mobilní a stacionární lisy; VOK Čechy; Štěpkovače Timberwolf',
-    zastup: 'J. Rychlíková (VOK); J. Šonský (lisovací/hutnící technika)', zastupitelnost: 'Částečná', riziko: 'Střední',
-    doporuceni: 'VOK vzájemně s Rychlíkovou; u lisů prohloubit překryv se Šonským.' },
-  { id: 'pm-sonsky', manager: 'Jan Šonský', domena: 'Odpadové hospodářství',
-    produkty: 'Technologie třídících linek; Překládací stanice; Hutnící válce (Zentex)',
-    zastup: 'Částečně J. Horálek (lisovací a hutnící technika)', zastupitelnost: 'Nízká', riziko: 'Vysoké',
-    doporuceni: 'Nejsložitější (investiční) portfolio – dokumentovat projekty, zaškolit Horálka jako zálohu.' }
+// Řádky = zdrojový list (pořadí sloupců dle OBCHOD_SLOUPCE).
+const OBCHOD_SEED_ROWS = [
+  ['Odpadové hospodářství', 'Kontejnery ABROLL', '', 'J. Rychlíková (Morava) / J. Horálek (Čechy)', 'vzájemně', 'Lukáš Pospíšil', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Kontejnery CITY', '', 'J. Horálek', '', 'Lukáš Pospíšil', 'Pokryto', 'Přiřadit k VOK (Rychlíková/Horálek)'],
+  ['Odpadové hospodářství', 'Vanové kontejnery', '', 'J. Rychlíková / J. Horálek', 'vzájemně', 'Lukáš Pospíšil', 'Pokryto', 'Spadá pod VOK'],
+  ['Odpadové hospodářství', 'Třídicí linka na směsný komunální odpad', '', 'J. Šonský', 'Burša / Krajča', 'J. Šonský', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Polyethylenové kontejnery (tříděný sběr)', '', 'P. Janča', 'J. Rychlíková', 'P. Janča', 'Pokryto', 'Přes položku „kontejnery se spodním výsypem" – potvrdit'],
+  ['Odpadové hospodářství', 'Kontejner HoReCa', '', 'P. Janča', 'J. Rychlíková', 'P. Janča', 'Nepokryto', 'Návrh: P. Janča (nádoby)'],
+  ['Odpadové hospodářství', 'Sklolaminátové kontejnery (tříděný sběr)', '', 'P. Janča', 'J. Rychlíková', '', 'Pokryto', 'Přes „spodní výsyp" – potvrdit'],
+  ['Odpadové hospodářství', 'Ocelové kontejnery (tříděný sběr)', '', 'P. Janča', 'J. Rychlíková', '', 'Pokryto', 'Přes „spodní výsyp" – potvrdit'],
+  ['Odpadové hospodářství', 'Polopodzemní kontejnery SemiQ', '', 'J. Rychlíková', 'P. Janča', '', 'Pokryto', 'Bez zálohy (vč. staveb)'],
+  ['Odpadové hospodářství', 'Kontejnery SemiQ bin', '', 'J. Rychlíková', 'P. Janča', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Podzemní kontejnery', '', 'J. Rychlíková', '—', '', 'Pokryto', 'Bez zálohy (vč. staveb)'],
+  ['Odpadové hospodářství', 'Plastové kontejnery (komunální/tříděný) 1100 / 120 /240', '', 'P. Janča', 'J. Rychlíková', '', 'Pokryto', 'Nádoby 120–1100 l'],
+  ['Odpadové hospodářství', 'Žárově zinkované kontejnery', '', 'J. Horálek', '', 'Nový obchodní PRŮMYSL', 'Nejasné', 'Návrh: P. Janča'],
+  ['Odpadové hospodářství', 'Kontejnery ASP na nebezpečný tuhý odpad', '', 'J. Horálek', '—', 'Nový obchodní PRŮMYSL', 'Nepokryto', 'Návrh: J. Rychlíková (má nemocniční odpad)'],
+  ['Odpadové hospodářství', 'Kontejnery ASP na aerosolové nádoby', '', 'J. Horálek', '—', 'Nový obchodní PRŮMYSL', 'Nepokryto', 'Návrh: J. Rychlíková'],
+  ['Odpadové hospodářství', 'Venkovní odpadkové koše', 'mobiliář', 'P. Janča', 'J. Mokrejš', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Stojany na odpadkové pytle', 'mobiliář', 'P. Janča', 'J. Mokrejš', '', 'Nepokryto', 'Návrh: P. Janča'],
+  ['Odpadové hospodářství', 'Třídění v interiéru', '', 'J. Mokrejš', 'P. Janča', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Mobilní lisovací kontejnery', 'technika', 'J. Horálek', 'J. Šonský', 'LAZY', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Stacionární lisovací jednotky', 'technika', 'J. Horálek', 'J. Šonský', 'LAZY', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Překládací stanice', 'technika', 'J. Šonský', 'J. Horálek', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Balíkovací lisy (Bramidan)', '', 'J. Horálek', 'J. Šonský', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Svozová vozidla', '', 'M. Veselý', 'J. Šonský', '', 'Pokryto', 'Návrh: M. Veselý (komunální technika)'],
+  ['Odpadové hospodářství', 'Svozový systém 2AS', '', 'M. Veselý', 'J. Šonský', '', 'Pokryto', 'Návrh: M. Veselý; novinka na webu'],
+  ['Odpadové hospodářství', 'Kontejnery na použitý textil', '', 'J. Mokrejš', 'J. Rychlíková', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Kontejnery na nebezpečný nemocniční odpad', '', 'J. Rychlíková', '', 'Nový obchodní PRŮMYSL', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Traktory a traktorové nosiče kontejnerů', '', 'M. Veselý', 'P. Lattner', '', 'Pokryto', 'Návrh: M. Veselý'],
+  ['Odpadové hospodářství', 'Kompostárny', '', 'M. Veselý', 'P. Lattner', '', 'Pokryto', 'Kompostovací kontejnery (PL)'],
+  ['Odpadové hospodářství', 'Kontejner na znečištěné obaly 1000 l', '', 'J. Rychlíková', '—', 'Nový obchodní PRŮMYSL', 'Pokryto', 'Návrh: J. Rychlíková (nebezpečné odpady)'],
+  ['Odpadové hospodářství', 'Nádoby na kuchyňský odpad FATBOXX', '', 'J. Mokrejš', 'P. Janča', '', 'Pokryto', 'Přes „kuchyňské koše" – potvrdit'],
+  ['Odpadové hospodářství', 'Nádoby na kuchyňský odpad', '', 'J. Mokrejš', 'P. Janča', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Kontejnerové hutnící válce (Zentex)', '', 'J. Šonský', 'J. Horálek', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Betonové skříně SILENT na kont. 120–1100 l', '', 'P. Janča', 'J. Mokrejš', '', 'Pokryto', 'Zástěny/přístřešky'],
+  ['Odpadové hospodářství', 'Ocelové přístřešky na popelnice 120–240 l', '', 'P. Janča', 'J. Mokrejš', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Paddle Depacker (Mavitec)', '', 'M. Veselý', 'J. Šonský', '', 'Pokryto', ''],
+  ['Odpadové hospodářství', 'Monitoring naplnění kontejnerů DistSense', '', 'J. Horálek', 'J. Rychlíková', '', 'Pokryto', 'Digitalizace/IoT – chybí vlastník'],
+  ['Odpadové hospodářství', 'GPS monitoring pohybu kontejnerů', '', 'J. Horálek', 'J. Rychlíková', '', 'Pokryto', 'Digitalizace/IoT – chybí vlastník'],
+  ['Odpadové hospodářství', 'Hydrocity Premium (Baroclean)', '', 'M. Veselý', 'LAZY', '', 'Pokryto', ''],
+  ['Dům a zahrada', 'Štěpkovače a drtiče (Timberwolf)', '', 'J. Horálek', 'J. Beránek', 'LAZY', 'Pokryto', ''],
+  ['Dům a zahrada', 'Kompostéry', '', 'J. Mokrejš', 'J. Mokrejš', '', 'Pokryto', ''],
+  ['Dům a zahrada', 'Nádrže na vodu (designové)', '', 'J. Mokrejš', 'P. Lattner', '', 'Pokryto', 'Mokrejš (dům a zahrada) × Lattner (nadzemní nádrže) – rozhodnout'],
+  ['Hospodaření s kapalinami', 'Mobilní nádrže na naftu (plastové)', '', 'J. Mokrejš (B2B) / P. Lattner (zemědělství)', 'vzájemně', '', 'Pokryto', 'Dělení dle segmentu'],
+  ['Hospodaření s kapalinami', 'Nádrž na AdBlue', '', 'J. Mokrejš (B2B) / P. Lattner (zemědělství)', 'vzájemně', '', 'Pokryto', ''],
+  ['Hospodaření s kapalinami', 'Nádrže na ostatní kapaliny', '', 'P. Lattner', 'J. Mokrejš', '', 'Pokryto', ''],
+  ['Hospodaření s kapalinami', 'Podzemní nádrže', '', 'P. Lattner', 'J. Mokrejš', '', 'Pokryto', 'Bez zálohy'],
+  ['Hospodaření s kapalinami', 'Vsakovací tunely', '', 'P. Lattner', 'J. Mokrejš', '', 'Pokryto', 'Bez zálohy'],
+  ['Hospodaření s kapalinami', 'Vodoměrná šachta 100/140', '', 'P. Lattner', 'J. Mokrejš', '', 'Pokryto', 'Bez zálohy'],
+  ['Hospodaření s kapalinami', 'Nádrž na solanku BrineGuard 9000', '', 'M. Veselý', 'J. Beránek', '', 'Pokryto', ''],
+  ['Zimní údržba', 'Nádoby na zimní posyp (sklolaminátové)', '', 'P. Janča', 'J. Mokrejš', '', 'Pokryto', ''],
+  ['Zimní údržba', 'Nádoby na zimní posyp (polyethylenové)', '', 'P. Janča', 'J. Mokrejš', '', 'Pokryto', ''],
+  ['Zimní údržba', 'Posypové vozíky', '', 'P. Janča', 'J. Mokrejš', '', 'Pokryto', 'Návrh: P. Janča (sjednotit zimní údržbu)'],
+  ['Skladování', 'Lodní kontejnery', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', ''],
+  ['Skladování', 'Kontejnery a boxy pro Li-Ion baterie (ADR)', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', 'Návrh: J. Beránek; rostoucí segment'],
+  ['Skladování', 'Skládací skladovací kontejnery', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', ''],
+  ['Skladování', 'Záchytné vany, pracovní plošiny', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', ''],
+  ['Skladování', 'Plastové přepravky', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', ''],
+  ['Skladování', 'Paletové boxy', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', ''],
+  ['Skladování', 'Plastové palety', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', 'Návrh: J. Beránek (boxy a přepravky)'],
+  ['Skladování', 'Kontejnery USB', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', 'Návrh: J. Beránek'],
+  ['Skladování', 'Výklopné kontejnery', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', 'Návrh: J. Beránek'],
+  ['', 'Květináče', '', 'nutné obsadit', 'nutné obsadit', '', '', '']
 ];
-// Porovnání jmen bez ohledu na diakritiku/velikost písmen (pro párování na živou databázi).
-function obchodNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
-// Řádky tabulky (z datového souboru, jinak seed). Nemění se zde – jen čtou.
+const OBCHOD_SEED = OBCHOD_SEED_ROWS.map((r, i) => { const o = { id: 'k' + (i + 1) }; OBCHOD_SLOUPCE.forEach((c, j) => { o[c.key] = r[j] || ''; }); return o; });
+// Řádky tabulky (z datového souboru, jinak seed).
 function readObchod() {
   const saved = readJson(OBCHOD_F, null);
   if (saved && Array.isArray(saved.rows)) return { rows: saved.rows };
@@ -1130,27 +1158,13 @@ function readObchod() {
 // Uloží celou tabulku (jen správce). Ořízne délky, doplní chybějící id.
 function writeObchod(rows) {
   const KEYS = OBCHOD_SLOUPCE.map(c => c.key);
-  const clean = (Array.isArray(rows) ? rows : []).slice(0, 100).map((r, i) => {
+  const clean = (Array.isArray(rows) ? rows : []).slice(0, 300).map((r, i) => {
     const o = { id: (r && r.id && String(r.id).trim()) ? String(r.id).slice(0, 60) : 'r' + Date.now().toString(36) + i };
     KEYS.forEach(k => { o[k] = String((r && r[k]) || '').slice(0, 1000); });
     return o;
   }).filter(r => KEYS.some(k => r[k].trim()));
   writeJson(OBCHOD_F, { rows: clean });
   return { rows: clean };
-}
-// Obohatí řádky o propojení na živého zaměstnance (e-mail, oddělení) dle jména manažera.
-function enrichObchod(rows) {
-  const emps = getState().employees || [];
-  const byName = new Map();
-  emps.forEach(e => { const k = obchodNorm(e.name); if (k && !byName.has(k)) byName.set(k, e); });
-  return rows.map(r => {
-    const e = byName.get(obchodNorm(r.manager));
-    return Object.assign({}, r, {
-      email: e ? e.email : null,
-      oddeleni: e && Array.isArray(e.cats) && e.cats.length ? e.cats[0] : null,
-      inDb: !!e
-    });
-  });
 }
 
 /* ---------- Freelo (modul Freelo: projekty přes REST API, basic auth) ---------- */
@@ -1830,15 +1844,14 @@ const server = http.createServer(async (req, res) => {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       if (!isAdmin(req) && employeeModules(e.email).indexOf('obchod') < 0) return send(res, 403, { error: 'K modulu Obchod nemáte přístup.' });
-      const rows = enrichObchod(readObchod().rows);
-      return send(res, 200, { columns: OBCHOD_SLOUPCE, rows, matched: rows.filter(x => x.inDb).length, total: rows.length, canEdit: isAdmin(req) }, { 'Cache-Control': 'no-store' });
+      const rows = readObchod().rows;
+      return send(res, 200, { columns: OBCHOD_SLOUPCE, rows, total: rows.length, canEdit: isAdmin(req) }, { 'Cache-Control': 'no-store' });
     }
     if (p === '/api/obchod' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Tabulku může upravovat jen správce.' });
       const b = JSON.parse(await readBody(req));
       const saved = writeObchod(b.rows);
-      const rows = enrichObchod(saved.rows);
-      return send(res, 200, { ok: true, columns: OBCHOD_SLOUPCE, rows, matched: rows.filter(x => x.inDb).length, total: rows.length, canEdit: true });
+      return send(res, 200, { ok: true, columns: OBCHOD_SLOUPCE, rows: saved.rows, total: saved.rows.length, canEdit: true });
     }
 
     // ---- Kovo: přehled výroby ze 4 závodů (Google Sheets přes service account) ----

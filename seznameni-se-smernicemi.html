@@ -451,17 +451,33 @@ table.ob-table th,table.ob-table td{text-align:left;vertical-align:top;padding:1
 table.ob-table th:last-child,table.ob-table td:last-child{border-right:none}
 table.ob-table thead th{position:sticky;top:0;z-index:2;background:var(--bg-2);font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);white-space:nowrap}
 table.ob-table tbody tr:hover td{background:#f6f8f6}
-table.ob-table td.col-manager{min-width:150px}
-table.ob-table td.col-produkty{min-width:230px}
-table.ob-table td.col-doporuceni{min-width:230px}
-.ob-nm{font-weight:700;line-height:1.25}
-.ob-em{margin-top:3px;font-size:11.5px}
-.ob-em.no{color:var(--ink-soft)}
-.ob-cell-list{margin:0;line-height:1.5}
+table.ob-table td.col-kategorie{min-width:210px}
+table.ob-table td.col-pm{min-width:160px}
+table.ob-table td.col-zastup{min-width:120px}
+table.ob-table td.col-poznamka{min-width:200px;color:var(--ink-soft)}
+table.ob-table td.col-sekce{white-space:nowrap;color:var(--ink-soft)}
 .ob-risk{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
-.ob-risk-lo{background:var(--green-soft);color:var(--green-d)}
+.ob-risk-lo{background:#e6f6ec;color:#0a6b34}
 .ob-risk-mid{background:var(--amber-soft);color:var(--amber)}
 .ob-risk-hi{background:var(--red-soft);color:var(--red)}
+.ob-risk-none{background:var(--bg-2);color:var(--ink-soft)}
+/* graf */
+.ob-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 18px}
+@media(max-width:820px){.ob-charts{grid-template-columns:1fr}}
+.ob-chart{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow);padding:14px 16px}
+.ob-chart h3{margin:0 0 12px;font-size:14px;font-weight:700}
+.ob-bars{display:grid;gap:8px}
+.ob-bars-pm{max-height:280px;overflow-y:auto}
+.ob-brow{display:grid;grid-template-columns:120px 1fr 34px;align-items:center;gap:10px;font-size:12.5px}
+.ob-brow .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.ob-brow .track{display:block;height:16px;background:var(--bg-2);border-radius:999px;overflow:hidden}
+.ob-brow .fill{display:block;height:100%;border-radius:999px;min-width:3px}
+.ob-brow .fill.lo{background:#12a350}
+.ob-brow .fill.hi{background:var(--red)}
+.ob-brow .fill.mid{background:#e0a90c}
+.ob-brow .fill.none{background:var(--line-strong)}
+.ob-brow .fill.pm{background:#4285f4}
+.ob-brow .val{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
 /* editační režim */
 table.ob-table td.ob-ed{padding:6px}
 table.ob-table textarea.ob-inp{width:100%;min-width:120px;box-sizing:border-box;font-family:inherit;font-size:12.5px;line-height:1.45;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;background:var(--paper);color:var(--ink);resize:vertical;min-height:38px}
@@ -1272,7 +1288,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1424,8 +1440,12 @@ function plSheet(s){
   return h;
 }
 let OBCHOD_DATA=null, OBCHOD_EDIT=false, OBCHOD_DRAFT=null, OBCHOD_MSG="";
-function obRiskClass(r){ const t=(r||"").toLowerCase(); if(t.indexOf("vysok")>=0) return "ob-risk-hi"; if(t.indexOf("nízk")>=0||t.indexOf("nizk")>=0||t.indexOf("žádn")>=0||t.indexOf("zadn")>=0) return t.indexOf("stř")>=0||t.indexOf("str")>=0?"ob-risk-mid":"ob-risk-lo"; return "ob-risk-mid"; }
 function obCols(){ return (OBCHOD_DATA&&OBCHOD_DATA.columns)||[]; }
+// Stav pokrytí → barevná třída (zelená/červená/oranžová/šedá).
+function obCoverClass(v){ const t=(v||"").toLowerCase().trim(); if(!t) return "ob-risk-none"; if(t.indexOf("nepokr")>=0) return "ob-risk-hi"; if(t.indexOf("nejas")>=0) return "ob-risk-mid"; if(t.indexOf("pokr")>=0) return "ob-risk-lo"; return "ob-risk-mid"; }
+function obCoverKey(v){ const t=(v||"").toLowerCase().trim(); if(!t) return "Neobsazeno"; if(t.indexOf("nepokr")>=0) return "Nepokryto"; if(t.indexOf("nejas")>=0) return "Nejasné"; if(t.indexOf("pokr")>=0) return "Pokryto"; return v; }
+// Odpovědný PM: rozdělí buňku na jednotlivé PM (oddělené „/"), odstraní závorky/segmenty.
+function obPmList(cell){ return String(cell||"").split("/").map(s=>s.replace(/\([^)]*\)/g,"").trim()).filter(Boolean); }
 async function showObchod(){
   MUJ.view="obchod"; renderSidebar();
   const body=document.getElementById("mujBody");
@@ -1439,39 +1459,50 @@ async function showObchod(){
   }
   obRender();
 }
-function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Zastupitelnost produktových manažerů: kdo má na starosti jaké portfolio, kdo ho zastupuje a kde je riziko výpadku. Sloupec „Produktový manažer" je propojen na živou databázi zaměstnanců.</p></div>'; }
+function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Rozdělení kategorií webu mezi produktové manažery: odpovědný PM, zástup, třetí náhradník a stav pokrytí. Graf shrnuje pokrytí a vytížení.</p></div>'; }
 function obTabs(){ return '<div class="pl-tabs"><button class="pl-tab active" type="button">Rozdělení obchodníků</button></div>'; }
-function obProdCell(v){ const parts=String(v||"").split(";").map(s=>s.trim()).filter(Boolean); return parts.length?'<div class="ob-cell-list">'+parts.map(esc).join("<br>")+'</div>':''; }
+// Sloupcový graf z řádků: (1) stav pokrytí, (2) počet kategorií na odpovědného PM.
+function obChartsHtml(rows){
+  // (1) stav pokrytí
+  const order=['Pokryto','Nepokryto','Nejasné','Neobsazeno'];
+  const cov={}; rows.forEach(r=>{ const k=obCoverKey(r.pokryti); cov[k]=(cov[k]||0)+1; });
+  const covKeys=order.filter(k=>cov[k]).concat(Object.keys(cov).filter(k=>order.indexOf(k)<0));
+  const covMax=Math.max(1,...covKeys.map(k=>cov[k]));
+  const covCls={'Pokryto':'lo','Nepokryto':'hi','Nejasné':'mid','Neobsazeno':'none'};
+  const covBars=covKeys.map(k=>'<div class="ob-brow"><span class="lab">'+esc(k)+'</span><span class="track"><span class="fill '+(covCls[k]||'mid')+'" style="width:'+Math.round(cov[k]/covMax*100)+'%"></span></span><span class="val">'+cov[k]+'</span></div>').join('');
+  // (2) vytížení PM (odpovědný PM)
+  const load={}; rows.forEach(r=>obPmList(r.pm).forEach(pm=>{ load[pm]=(load[pm]||0)+1; }));
+  const pmKeys=Object.keys(load).sort((a,b)=>load[b]-load[a]);
+  const pmMax=Math.max(1,...pmKeys.map(k=>load[k]));
+  const pmBars=pmKeys.map(k=>'<div class="ob-brow"><span class="lab" title="'+esc(k)+'">'+esc(k)+'</span><span class="track"><span class="fill pm" style="width:'+Math.round(load[k]/pmMax*100)+'%"></span></span><span class="val">'+load[k]+'</span></div>').join('');
+  return '<div class="ob-charts">'+
+    '<div class="ob-chart"><h3>Stav pokrytí kategorií</h3><div class="ob-bars">'+covBars+'</div></div>'+
+    '<div class="ob-chart"><h3>Počet kategorií na odpovědného PM</h3><div class="ob-bars ob-bars-pm">'+pmBars+'</div></div>'+
+    '</div>';
+}
 function obRender(){
   const body=document.getElementById("mujBody"), d=OBCHOD_DATA;
   if(OBCHOD_EDIT){ body.innerHTML=obHero()+obTabs()+obEditHtml(); window.scrollTo(0,0); return; }
   const cols=d.columns||[], rows=d.rows||[];
   const editBtn = d.canEdit ? '<button class="btn sm" type="button" onclick="obEnterEdit()">Upravit tabulku</button>' : '';
   const savedMsg = OBCHOD_MSG ? '<span class="ob-saved">'+esc(OBCHOD_MSG)+'</span>' : '';
-  const note='<div class="ob-bar"><p class="ob-note">Portfolio je rozděleno mezi <b>'+rows.length+'</b> produktových manažerů. '+
-    'Propojeno na živou databázi: <b>'+(d.matched||0)+'</b> z '+(d.total||rows.length)+'.'+
-    '</p>'+savedMsg+editBtn+'</div>';
-  const head='<thead><tr>'+cols.map(c=>'<th>'+esc(c.label)+'</th>').join('')+'</tr></thead>';
+  const note='<div class="ob-bar"><p class="ob-note"><b>'+rows.length+'</b> kategorií webu rozdělených mezi produktové manažery.</p>'+savedMsg+editBtn+'</div>';
+  const head='<thead><tr>'+cols.map(c=>'<th class="col-'+c.key+'">'+esc(c.label)+'</th>').join('')+'</tr></thead>';
   const bodyRows=rows.map(r=>'<tr>'+cols.map(c=>{
-    const k=c.key, v=r[k];
-    if(k==='manager'){
-      const em = r.inDb ? '<div class="ob-em"><a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a></div>'
-                        : '<div class="ob-em no">zatím není v intranetu</div>';
-      return '<td class="col-manager"><div class="ob-nm">'+esc(v)+'</div>'+em+'</td>';
-    }
-    if(k==='produkty') return '<td class="col-produkty">'+obProdCell(v)+'</td>';
-    if(k==='riziko') return '<td><span class="ob-risk '+obRiskClass(v)+'">'+esc(v)+'</span></td>';
-    if(k==='doporuceni') return '<td class="col-doporuceni">'+esc(v)+'</td>';
-    return '<td>'+esc(v)+'</td>';
+    const k=c.key, v=r[k]||"";
+    if(k==='pokryti') return '<td class="col-pokryti">'+(v?'<span class="ob-risk '+obCoverClass(v)+'">'+esc(v)+'</span>':'')+'</td>';
+    if(k==='kategorie') return '<td class="col-kategorie"><b>'+esc(v)+'</b></td>';
+    return '<td class="col-'+k+'">'+esc(v)+'</td>';
   }).join('')+'</tr>').join('');
-  body.innerHTML=obHero()+obTabs()+note+'<div class="ob-wrap"><table class="ob-table">'+head+'<tbody>'+bodyRows+'</tbody></table></div>';
+  body.innerHTML=obHero()+obTabs()+obChartsHtml(rows)+note+'<div class="ob-wrap"><table class="ob-table">'+head+'<tbody>'+bodyRows+'</tbody></table></div>';
   window.scrollTo(0,0);
 }
 function obEditHtml(){
   const cols=obCols(), rows=OBCHOD_DRAFT||[];
   const head='<thead><tr>'+cols.map(c=>'<th>'+esc(c.label)+'</th>').join('')+'<th class="ob-delcol"></th></tr></thead>';
+  const big={kategorie:2,pm:2,zastup:2,poznamka:2};
   const trs=rows.map((r,i)=>'<tr data-id="'+esc(r.id||'')+'">'+cols.map(c=>{
-    const rows2 = c.key==='produkty'||c.key==='doporuceni'||c.key==='zastup' ? 3 : (c.key==='manager'||c.key==='domena'?2:1);
+    const rows2 = big[c.key]||1;
     return '<td class="ob-ed"><textarea class="ob-inp" rows="'+rows2+'" data-key="'+c.key+'">'+esc(r[c.key]||'')+'</textarea></td>';
   }).join('')+'<td class="ob-delcol"><button class="ob-del" type="button" title="Smazat řádek" onclick="obDelRow('+i+')">✕</button></td></tr>').join('');
   const bar='<div class="ob-bar">'+
