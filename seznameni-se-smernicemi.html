@@ -446,17 +446,19 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .ob-note{margin:0;font-size:13px;color:var(--ink-soft);line-height:1.5;flex:1;min-width:220px}
 .ob-note b{color:var(--ink)}
 .ob-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow)}
-table.ob-table{border-collapse:collapse;width:100%;font-size:13px;min-width:920px}
-table.ob-table th,table.ob-table td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+table.ob-table{border-collapse:collapse;width:100%;font-size:12px;line-height:1.32;min-width:900px}
+table.ob-table th,table.ob-table td{text-align:left;vertical-align:top;padding:4px 8px;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
 table.ob-table th:last-child,table.ob-table td:last-child{border-right:none}
-table.ob-table thead th{position:sticky;top:0;z-index:2;background:var(--bg-2);font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);white-space:nowrap}
+table.ob-table thead th{position:sticky;top:0;z-index:2;background:var(--bg-2);font-size:10px;text-transform:uppercase;letter-spacing:.02em;color:var(--ink-soft);white-space:nowrap;padding-top:7px;padding-bottom:7px}
 table.ob-table tbody tr:hover td{background:#f6f8f6}
-table.ob-table td.col-kategorie{min-width:210px}
-table.ob-table td.col-pm{min-width:160px}
-table.ob-table td.col-zastup{min-width:120px}
-table.ob-table td.col-poznamka{min-width:200px;color:var(--ink-soft)}
-table.ob-table td.col-sekce{white-space:nowrap;color:var(--ink-soft)}
-.ob-risk{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+table.ob-table td.col-kategorie{min-width:170px}
+table.ob-table td.col-pm{min-width:120px}
+table.ob-table td.col-zastup{min-width:95px}
+table.ob-table td.col-poznamka{min-width:160px;color:var(--ink-soft)}
+table.ob-table td.col-sekce,table.ob-table td.col-stitek,table.ob-table td.col-nahradnik{white-space:nowrap;color:var(--ink-soft)}
+table.ob-table td.col-pm a,table.ob-table td.col-zastup a{color:var(--green-d);text-decoration:none;border-bottom:1px dotted currentColor}
+table.ob-table td.col-pm a:hover,table.ob-table td.col-zastup a:hover{text-decoration:none;opacity:.75}
+.ob-risk{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}
 .ob-risk-lo{background:#e6f6ec;color:#0a6b34}
 .ob-risk-mid{background:var(--amber-soft);color:var(--amber)}
 .ob-risk-hi{background:var(--red-soft);color:var(--red)}
@@ -1472,6 +1474,17 @@ function obEval(r){ const pm=String(r.pm||"").trim(); if(!pm||/nutné obsadit/i.
 function obCoverClass(v){ if(v==="Neobsazeno") return "ob-risk-hi"; if(v==="Bez zálohy") return "ob-risk-mid"; if(v==="Pokryto") return "ob-risk-lo"; return "ob-risk-none"; }
 // Odpovědný PM / Zástup: rozdělí buňku na jednotlivé osoby (odděleno „/", bez závorek).
 function obPmList(cell){ return String(cell||"").split("/").map(s=>s.replace(/\([^)]*\)/g,"").trim()).filter(Boolean); }
+function obNorm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim(); }
+// Propojí jména v buňce (PM/zástup) na kontakt zaměstnance (mailto), zbytek nechá jako text.
+function obLinkPeople(cell){
+  const kont=(OBCHOD_DATA&&OBCHOD_DATA.kontakty)||{};
+  const s=String(cell||""); if(!s) return "";
+  return s.split("/").map(seg=>{
+    const t=seg.trim(); if(!t) return "";
+    const rec=kont[obNorm(t.replace(/\([^)]*\)/g,""))];
+    return (rec&&rec.email) ? '<a href="mailto:'+esc(rec.email)+'" title="'+esc(rec.name+" · "+rec.email)+'">'+esc(t)+'</a>' : esc(t);
+  }).filter(Boolean).join(" / ");
+}
 async function showObchod(tab){
   MUJ.view="obchod"; renderSidebar();
   const body=document.getElementById("mujBody");
@@ -1522,6 +1535,7 @@ function obRender(){
     const k=c.key, v=r[k]||"";
     if(k==='pokryti'){ const cv=obEval(r); return '<td class="col-pokryti"><span class="ob-risk '+obCoverClass(cv)+'">'+esc(cv)+'</span></td>'; }
     if(k==='kategorie') return '<td class="col-kategorie"><b>'+esc(v)+'</b></td>';
+    if(k==='pm'||k==='zastup') return '<td class="col-'+k+'">'+obLinkPeople(v)+'</td>';
     return '<td class="col-'+k+'">'+esc(v)+'</td>';
   }).join('')+'</tr>').join('');
   body.innerHTML=obHero()+obTabs()+obChartsHtml(rows)+note+'<div class="ob-wrap"><table class="ob-table">'+head+'<tbody>'+bodyRows+'</tbody></table></div>';

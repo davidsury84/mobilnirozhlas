@@ -1219,6 +1219,17 @@ function buildObchodnici(rows) {
     return { name: o.name, email: e ? e.email : obchodEmail(o.name), inDb: !!e, sekce: Object.keys(o.sekce), owner: o.owner, zastup: o.zastup, pocetOdpovedny: o.owner.length, pocetZastup: o.zastup.length, bezZalohy: o.owner.filter(x => x.coverage === 'Bez zálohy').length };
   }).filter(o => o.pocetOdpovedny > 0 || o.pocetZastup > 0).sort((a, b) => b.pocetOdpovedny - a.pocetOdpovedny);
 }
+// Mapa kontaktů klíčovaná normalizovanou zkratkou (i celým jménem), pro propojení jmen v tabulce na zaměstnance.
+function buildKontakty() {
+  const emps = getState().employees || [];
+  const out = {};
+  Object.keys(OBCHOD_LIDE).forEach(k => {
+    const full = OBCHOD_LIDE[k]; const e = obMatchEmp(full, emps);
+    const rec = { name: full, email: e ? e.email : obchodEmail(full), inDb: !!e };
+    out[k] = rec; out[obchodNorm(full)] = rec;
+  });
+  return out;
+}
 
 /* ---------- Freelo (modul Freelo: projekty přes REST API, basic auth) ---------- */
 function freeloConfigured() { return !!(FREELO_EMAIL && FREELO_API_KEY); }
@@ -1901,13 +1912,13 @@ const server = http.createServer(async (req, res) => {
       if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       if (!isAdmin(req) && employeeModules(e.email).indexOf('obchod') < 0) return send(res, 403, { error: 'K modulu Obchod nemáte přístup.' });
       const rows = readObchod().rows;
-      return send(res, 200, { columns: OBCHOD_SLOUPCE, rows, obchodnici: buildObchodnici(rows), total: rows.length, canEdit: isAdmin(req) }, { 'Cache-Control': 'no-store' });
+      return send(res, 200, { columns: OBCHOD_SLOUPCE, rows, obchodnici: buildObchodnici(rows), kontakty: buildKontakty(), total: rows.length, canEdit: isAdmin(req) }, { 'Cache-Control': 'no-store' });
     }
     if (p === '/api/obchod' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Tabulku může upravovat jen správce.' });
       const b = JSON.parse(await readBody(req));
       const saved = writeObchod(b.rows);
-      return send(res, 200, { ok: true, columns: OBCHOD_SLOUPCE, rows: saved.rows, obchodnici: buildObchodnici(saved.rows), total: saved.rows.length, canEdit: true });
+      return send(res, 200, { ok: true, columns: OBCHOD_SLOUPCE, rows: saved.rows, obchodnici: buildObchodnici(saved.rows), kontakty: buildKontakty(), total: saved.rows.length, canEdit: true });
     }
 
     // ---- Kovo: přehled výroby ze 4 závodů (Google Sheets přes service account) ----
