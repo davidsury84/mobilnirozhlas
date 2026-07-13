@@ -151,6 +151,7 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 <body>
 <div class="bar">
   <h1>Konstrukce</h1>
+  <button class="btn ghost sm" id="backBtn" style="display:none" onclick="goBack()">← Zpět</button>
   <span class="rolech" id="rolech">…</span>
   <span class="sp"></span>
   <button class="btn sm" id="newBtn" style="display:none" onclick="openNew()">+ Nová zakázka</button>
@@ -233,7 +234,10 @@ function renderSide(){
   if(ME.isAdmin){h+='<div class="grp">Správa</div>';h+='<button class="chip'+(FILTER==='nastaveni'?' act':'')+'" onclick="setFilter(\'nastaveni\')"><span>Role a číselník</span></button>';}
   document.getElementById('side').innerHTML=h;
 }
-function setFilter(f){FILTER=f;renderSide();renderMain();window.scrollTo(0,0)}
+var NAVHIST=[];
+function setFilter(f,isBack){ if(!isBack && f!==FILTER) NAVHIST.push(FILTER); FILTER=f; updateBack(); renderSide(); renderMain(); window.scrollTo(0,0); }
+function goBack(){ if(NAVHIST.length){ setFilter(NAVHIST.pop(),true); } else setFilter('dash',true); }
+function updateBack(){ var b=document.getElementById('backBtn'); if(b) b.style.display=(FILTER!=='dash')?'':'none'; }
 
 /* ---- hlavní obsah ---- */
 function filtered(){
