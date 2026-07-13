@@ -28,7 +28,7 @@ const DOTAZNIK_ABROLL = [
   { title: 'Základní údaje', fields: [
     { k: 'rozmery', label: 'Vnitřní rozměry (délka × šířka × výška)', type: 'text' },
     { k: 'pocet', label: 'Počet ks', type: 'number' },
-    { k: 'adresaDodani', label: 'Adresa dodání', type: 'text' },
+    { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
   ] },
   { title: 'Provedení (ABR-DSD)', fields: [
     { k: 'provedeni', label: 'Provedení', std: '5/3', opce: '4/3 nebo jiné' },
@@ -218,6 +218,7 @@ function mount(host) {
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
     if (!Array.isArray(d.timesheet)) d.timesheet = [];
     if (!Array.isArray(d.strediska) || !d.strediska.length) d.strediska = JSON.parse(JSON.stringify(SEED_STREDISKA));
+    if (!Array.isArray(d.adresy)) d.adresy = [];   // globální číselník adres dodání (roste automaticky)
     if (!d.settings || typeof d.settings !== 'object') d.settings = {};
     if (typeof d.settings.reportEnabled !== 'boolean') d.settings.reportEnabled = true;
     if (!Array.isArray(d.settings.reportRecipients)) d.settings.reportRecipients = ['tomas.krajca@elkoplast.cz', 'david.sury@elkoplast.cz', 'lukas.pospisil@elkoplast.cz'];
@@ -489,6 +490,7 @@ function mount(host) {
       kapacita,
       konstrukteri: employeesWithRole('konstrukter').map(em => ({ email: em, name: empName(em) })),
       strediska: (d.strediska || []).map(s => ({ key: s.key, label: s.label, reditelEmail: s.reditelEmail || '', reditelName: s.reditelEmail ? empName(s.reditelEmail) : '' })),
+      adresy: (d.adresy || []).slice().sort((a, b) => a.localeCompare(b, 'cs')),
       roles: (me.isAdmin) ? roleAssignments(d) : undefined,
       employees: (me.isAdmin) ? adminEmployees() : undefined,
       notif: myNotif.slice(0, 40),
@@ -600,6 +602,9 @@ function mount(host) {
     enterState(d, z, 'novy');
     audit(z, me.email, 'Založení požadavku', 'typ: ' + t.name);
     d.zakazky.push(z);
+    // globální číselník adres: nová adresa dodání se automaticky přidá
+    const adr = z.dotaznik && typeof z.dotaznik.adresaDodani === 'string' ? z.dotaznik.adresaDodani.trim() : '';
+    if (adr && !d.adresy.some(x => x.toLowerCase() === adr.toLowerCase())) { d.adresy.push(adr); if (d.adresy.length > 800) d.adresy.shift(); }
     // kontrola realizovatelnosti požadovaného termínu (aprox z výchozích lhůt)
     let warn = null;
     if (z.pozadovanyTermin) {
