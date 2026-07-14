@@ -144,6 +144,12 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .ral-sw i{width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.18);flex:0 0 auto;display:inline-block}
 .ral-sw:hover{background:#f0f3ee}
 .ral-sw.sel{border-color:var(--g);box-shadow:0 0 0 2px rgba(14,138,67,.25)}
+.ral-row{display:flex;align-items:center;gap:10px}
+.ral-pick{width:38px;height:34px;padding:0;border:1px solid var(--line-strong,#cdd3ca);border-radius:8px;cursor:pointer;background:none;flex:0 0 auto}
+.ral-pick::-webkit-color-swatch-wrapper{padding:3px}
+.ral-pick::-webkit-color-swatch{border:none;border-radius:5px}
+.ral-pick::-moz-color-swatch{border:none;border-radius:5px}
+.ral-cur{font-size:13px}
 .dq2-req{margin-top:4px}
 @media(max-width:640px){.dqhg{grid-template-columns:1fr}.dq2{grid-template-columns:1fr;gap:3px}.dq2 input.txt,.dq2-req{grid-column:1}}
 .dq-hint{font-size:11.5px;color:var(--mut);margin-top:2px}
@@ -826,6 +832,9 @@ var TR={
   'požadavek zákazníka…':{en:'customer requirement…',de:'Kundenwunsch…',pl:'wymaganie klienta…'},
   'vlastní':{en:'custom',de:'eigene',pl:'własne'},
   'RAL a další poznámky…':{en:'RAL and other notes…',de:'RAL und weitere Hinweise…',pl:'RAL i inne uwagi…'},
+  'Vybrat barvu (kukátko / pipeta)':{en:'Pick a colour (picker / eyedropper)',de:'Farbe wählen (Auswahl / Pipette)',pl:'Wybierz kolor (próbnik / pipeta)'},
+  'vyberte odstín':{en:'pick a shade',de:'Farbton wählen',pl:'wybierz odcień'},
+  'nejbližší RAL':{en:'nearest RAL',de:'nächstes RAL',pl:'najbliższy RAL'},
   'parametrů':{en:'parameters',de:'Parameter',pl:'parametrów'},
   'začněte psát adresu… (číselník)':{en:'start typing the address… (list)',de:'Adresse eingeben… (Verzeichnis)',pl:'zacznij wpisywać adres… (rejestr)'},
   'začněte psát adresu…':{en:'start typing the address…',de:'Adresse eingeben…',pl:'zacznij wpisywać adres…'},
@@ -919,8 +928,18 @@ var RAL=[
  {c:'RAL 9010',n:'Čistá bílá',hex:'#F1ECE1'},{c:'RAL 9016',n:'Dopravní bílá',hex:'#F1F1EA'}
 ];
 function ralTB(k){return '<div class="ral-tb">'+RAL.map(function(r){return '<button type="button" class="ral-sw" data-k="'+k+'" data-code="'+r.c.replace(/\D/g,'')+'" title="'+esc(r.c+' · '+r.n)+'" onclick="ralPick(\''+k+'\',\''+r.c+'\')"><i style="background:'+r.hex+'"></i>'+esc(r.c.replace('RAL ',''))+'</button>'}).join('')+'</div>';}
-function ralPick(k,code){var inp=document.getElementById('dq_'+k);var rest=inp.value.replace(/^\s*RAL\s*\d{4}\s*/i,'').trim();inp.value=(code+(rest?' '+rest:'')).trim();ralMark(k);inp.focus();}
-function ralMark(k){var inp=document.getElementById('dq_'+k);var m=(inp.value.match(/RAL\s*(\d{4})/i)||[])[1]||'';document.querySelectorAll('.ral-sw[data-k="'+k+'"]').forEach(function(s){s.classList.toggle('sel',s.getAttribute('data-code')===m)});}
+function hexRgb(h){h=String(h||'').replace('#','');if(h.length<6)return[128,128,128];return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function ralByCode(m){if(!m)return null;return RAL.find(function(r){return r.c.replace(/\D/g,'')===m})||null;}
+function nearestRAL(hex){var t=hexRgb(hex),best=RAL[0],bd=1e18;RAL.forEach(function(r){var c=hexRgb(r.hex),d=(c[0]-t[0])*(c[0]-t[0])+(c[1]-t[1])*(c[1]-t[1])+(c[2]-t[2])*(c[2]-t[2]);if(d<bd){bd=d;best=r;}});return best;}
+function ralApply(k,r){if(!r)return;var inp=document.getElementById('dq_'+k);var rest=inp.value.replace(/^\s*RAL\s*\d{4}\s*/i,'').trim();inp.value=(r.c+(rest?' '+rest:'')).trim();ralMark(k);}
+function ralPick(k,code){var r=RAL.find(function(x){return x.c===code});if(r){ralApply(k,r);var inp=document.getElementById('dq_'+k);if(inp)inp.focus();}}
+function ralColorInput(k,el){ralApply(k,nearestRAL(el.value));}
+function ralMark(k){
+  var inp=document.getElementById('dq_'+k);var m=(inp.value.match(/RAL\s*(\d{4})/i)||[])[1]||'';var r=ralByCode(m);
+  document.querySelectorAll('.ral-sw[data-k="'+k+'"]').forEach(function(s){s.classList.toggle('sel',s.getAttribute('data-code')===m)});
+  var pick=document.getElementById('ralPick_'+k);if(pick&&r)pick.value=r.hex;
+  var cur=document.getElementById('ralCur_'+k);if(cur)cur.innerHTML=r?('<b style="color:'+r.hex+';filter:brightness(.75)">'+esc(r.c)+'</b> · '+esc(r.n)):'<span class="muted">'+esc(tr('vyberte odstín'))+'</span>';
+}
 function selVolba(k){var s=document.querySelector('.dq2[data-k="'+k+'"] .seg.sel');return s?s.getAttribute('data-v'):'standard';}
 function seg(k,v,tag,label,cur){return '<button type="button" class="seg'+(cur===v?' sel':'')+'" data-v="'+v+'" onclick="segClick(this)"><span class="st">'+tag+'</span>'+esc(label||'—')+'</button>';}
 function segClick(el){var grp=el.parentNode;grp.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});el.classList.add('sel');var row=el.closest('.dq2');var req=row.querySelector('.dq2-req');if(req){if(el.getAttribute('data-v')==='pozadavek'){req.style.display='';req.focus();}else req.style.display='none';}}
@@ -947,7 +966,9 @@ function renderDotaznik(){
             '<div class="adr-dd" style="display:none"></div>'+
             '<div class="dq-hint">'+esc(tr('našeptává z OpenStreetMap'))+' · '+((D.adresy||[]).length)+' '+(DQ_LANG==='en'?'saved':DQ_LANG==='de'?'gespeichert':DQ_LANG==='pl'?'zapisane':'uloženo')+'</div></div></div>';
         } else if(f.ral){
-          h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg" style="flex-direction:column;align-items:stretch;gap:6px">'+
+          var m0=(String(typeof a==='string'?a:'').match(/RAL\s*(\d{4})/i)||[])[1]||'';var r0=ralByCode(m0);
+          h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg" style="flex-direction:column;align-items:stretch;gap:7px">'+
+            '<div class="ral-row"><input type="color" class="ral-pick" id="ralPick_'+f.k+'" value="'+(r0?r0.hex:'#8a8a8a')+'" title="'+esc(tr('Vybrat barvu (kukátko / pipeta)'))+'" oninput="ralColorInput(\''+f.k+'\',this)"><span class="ral-cur" id="ralCur_'+f.k+'">'+(r0?('<b style="color:'+r0.hex+';filter:brightness(.75)">'+esc(r0.c)+'</b> · '+esc(r0.n)):'<span class="muted">'+esc(tr('vyberte odstín'))+'</span>')+'</span><span class="muted" style="font-size:11.5px;margin-left:auto">'+esc(tr('nejbližší RAL'))+'</span></div>'+
             ralTB(f.k)+
             '<input id="dq_'+f.k+'" class="txt" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('RAL a další poznámky…'))+'" oninput="ralMark(\''+f.k+'\')"></div></div>';
         } else {
