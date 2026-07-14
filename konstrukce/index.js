@@ -58,7 +58,7 @@ const DOTAZNIK_ABROLL = [
     { k: 'dvojiteZavirani', label: 'Dvojité zavírání', std: 'ne', opce: 'ano' },
     { k: 'zhustkeNosniky', label: 'Zhuštěné nosníky podlahy', std: 'ne', opce: 'ano 60×60×4' },
     { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano / počet výztuh' },
-    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text' },
+    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
   ] },
 ];
 
@@ -212,8 +212,8 @@ function mount(host) {
     if (!d.roles || typeof d.roles !== 'object') d.roles = {};
     if (!d.fond || typeof d.fond !== 'object') d.fond = {};      // email -> hodin/týden
     if (!Array.isArray(d.types) || !d.types.length) d.types = JSON.parse(JSON.stringify(SEED_TYPES));
-    // migrace: doplň ABROLL dotazník na existující typ, pokud ještě nemá
-    { const ab = d.types.find(t => t.key === 'abroll'); if (ab && (!Array.isArray(ab.dotaznik) || !ab.dotaznik.length)) ab.dotaznik = JSON.parse(JSON.stringify(DOTAZNIK_ABROLL)); }
+    // ABROLL dotazník je standard definovaný v kódu — držíme ho v synchronu
+    { const ab = d.types.find(t => t.key === 'abroll'); if (ab) ab.dotaznik = JSON.parse(JSON.stringify(DOTAZNIK_ABROLL)); }
     if (!Array.isArray(d.zakazky)) d.zakazky = [];
     if (!Array.isArray(d.notif)) d.notif = [];
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
