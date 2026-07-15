@@ -204,6 +204,10 @@ function mount(host) {
   const htmlOut = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
 
   // ---- perzistence ---------------------------------------------------------
+  // Práh (podíl lhůty) pro upozornění „blíží se termín" — drží se v synchronu s d.settings.notif.warnPct.
+  let WARN_FRAC = 0.8;
+  // Výchozí konfigurace notifikací a eskalací (editovatelné v SET-UP).
+  const DEFAULT_NOTIF = { warnPct: 80, clientRemind1: 5, clientRemind2: 10, overdueEmail: true, directorDigest: true };
   function load() {
     let d = null;
     try { d = JSON.parse(fs.readFileSync(DATA_F, 'utf8')); } catch (_) {}
@@ -224,6 +228,11 @@ function mount(host) {
     if (typeof d.settings.reportEnabled !== 'boolean') d.settings.reportEnabled = true;
     if (!Array.isArray(d.settings.reportRecipients)) d.settings.reportRecipients = ['tomas.krajca@elkoplast.cz', 'david.sury@elkoplast.cz', 'lukas.pospisil@elkoplast.cz'];
     if (!d.settings.phaseDays || typeof d.settings.phaseDays !== 'object') d.settings.phaseDays = { obchod: 2, konstrukce: 5, schvaleni: 5, vyroba: 10 };
+    if (!d.settings.notif || typeof d.settings.notif !== 'object') d.settings.notif = {};
+    for (const k in DEFAULT_NOTIF) { if (d.settings.notif[k] == null) d.settings.notif[k] = DEFAULT_NOTIF[k]; }
+    if (d.settings.reportFreq !== 'daily' && d.settings.reportFreq !== 'weekly') d.settings.reportFreq = 'weekly';
+    if (typeof d.settings.reportDow !== 'number' || d.settings.reportDow < 0 || d.settings.reportDow > 6) d.settings.reportDow = 1; // 1 = pondělí
+    WARN_FRAC = Math.min(1, Math.max(0, (Number(d.settings.notif.warnPct) || 80) / 100));
     return d;
   }
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
@@ -353,7 +362,7 @@ function mount(host) {
     if (now > z.deadline) return 'red';
     const total = z.deadline - z.stepStartedAt;
     const elapsed = now - z.stepStartedAt;
-    if (total > 0 && elapsed >= 0.8 * total) return 'amber';
+    if (total > 0 && elapsed >= WARN_FRAC * total) return 'amber';
     // zbývá poslední pracovní den → oranžová
     if (businessDaysBetween(now, z.deadline) <= 1) return 'amber';
     return 'green';
@@ -985,7 +994,7 @@ function mount(host) {
     let t = d.types.find(x => x.key === key);
     if (b.delete) { d.types = d.types.filter(x => x.key !== key); save(d); json(res, 200, { ok: true, types: d.types }); return true; }
     if (!t) { t = { key, params: [] }; d.types.push(t); }
-    const numFields = ['normohodiny', 'revizeNh', 'lhutaZkresleniDays', 'lhutaRevizeDays', 'lhutaPrideleniDays', 'lhutaKontrolaDays', 'lhutaObchodnikDays', 'lhutaKlientDays', 'linkValidDays'];
+    const numFields = ['normohodiny', 'revizeNh', 'lhutaZkresleniDays', 'lhutaRevizeDays', 'lhutaPrideleniDays', 'lhutaKontrolaDays', 'lhutaObchodnikDays', 'lhutaKlientDays', 'lhutaVyrobaDays', 'lhutaStrediskoDays', 'linkValidDays'];
     t.name = String(b.name || t.name || key).slice(0, 120);
     t.standard = !!b.standard;
     t.internalCheck = b.internalCheck !== false;
@@ -1202,6 +1211,9 @@ function mount(host) {
     let changed = false;
     const now = Date.now();
     const overdueForDirector = [];
+    const cfg = (d.settings && d.settings.notif) || DEFAULT_NOTIF;
+    const warnFrac = Math.min(1, Math.max(0, (Number(cfg.warnPct) || 80) / 100));
+    const remind1 = Number(cfg.clientRemind1) || 0, remind2 = Number(cfg.clientRemind2) || 0;
     for (const z of d.zakazky) {
       const st = STAV[z.stav];
       if (!st || st.terminal || st.hold || z.stav === 'schvaleno') continue;
@@ -1212,18 +1224,18 @@ function mount(host) {
       // --- klient nereaguje (5 / 10 pracovních dnů) ---
       if (z.stav === 'klient' && z.stepStartedAt) {
         const bdays = businessDaysBetween(z.stepStartedAt, now);
-        if (bdays >= 5 && !z.esc.klient5) {
+        if (remind1 > 0 && bdays >= remind1 && !z.esc.klient5) {
           z.esc.klient5 = true; changed = true;
-          notify(d, z.obchodnikEmail, 'Klient nereaguje na náhled ' + z.cislo + ' 5 prac. dnů — odeslána připomínka.', z.id);
+          notify(d, z.obchodnikEmail, 'Klient nereaguje na náhled ' + z.cislo + ' ' + remind1 + ' prac. dnů — odeslána připomínka.', z.id);
           if (z.kontaktEmail && z.link && z.link.active) {
             const base = host.mailFrom && host.mailFrom.publicUrl ? host.mailFrom.publicUrl : '';
             mail(z.kontaktEmail, 'Připomenutí — výkres ke schválení · ' + z.cislo, 'Dobrý den,\n\ndovolujeme si připomenout výkres ke schválení k zakázce ' + z.cislo + '.\nOdkaz: ' + base + '/konstrukce/nahled/' + z.link.token + '\n\nDěkujeme.');
           }
         }
-        if (bdays >= 10 && !z.esc.klient10) {
+        if (remind2 > 0 && bdays >= remind2 && !z.esc.klient10) {
           z.esc.klient10 = true; changed = true;
-          notify(d, z.obchodnikEmail, 'ÚKOL: Klient nereaguje 10 prac. dnů na ' + z.cislo + ' — kontaktujte ho telefonicky.', z.id);
-          mail(z.obchodnikEmail, 'Klient nereaguje 10 dnů · ' + z.cislo, 'Klient nereaguje na náhled výkresu ' + z.cislo + ' už 10 pracovních dnů. Kontaktujte ho prosím telefonicky.');
+          notify(d, z.obchodnikEmail, 'ÚKOL: Klient nereaguje ' + remind2 + ' prac. dnů na ' + z.cislo + ' — kontaktujte ho telefonicky.', z.id);
+          mail(z.obchodnikEmail, 'Klient nereaguje ' + remind2 + ' dnů · ' + z.cislo, 'Klient nereaguje na náhled výkresu ' + z.cislo + ' už ' + remind2 + ' pracovních dnů. Kontaktujte ho prosím telefonicky.');
         }
         continue;
       }
@@ -1233,7 +1245,7 @@ function mount(host) {
       // --- 80 % lhůty (oranžová, app-notifikace odpovědné osobě) ---
       if (z.stepStartedAt && z.deadline > z.stepStartedAt) {
         const frac = (now - z.stepStartedAt) / (z.deadline - z.stepStartedAt);
-        if (frac >= 0.8 && now < z.deadline && !z.esc.warned80) {
+        if (frac >= warnFrac && now < z.deadline && !z.esc.warned80) {
           z.esc.warned80 = true; changed = true;
           if (resp) notify(d, resp, 'Blíží se termín kroku „' + st.label + '" u ' + z.cislo + ' (do ' + fmtDate(z.deadline) + ').', z.id);
         }
@@ -1244,8 +1256,10 @@ function mount(host) {
           z.esc.overdue = true; z.esc.overdueDay = fmtDate(now); changed = true;
           const komu = new Set([resp, z.obchodnikEmail, ...employeesWithRole('sef')].filter(Boolean));
           komu.forEach(em => notify(d, em, 'PO TERMÍNU: krok „' + st.label + '" u ' + z.cislo + ' překročil termín.', z.id));
-          const text = 'Zakázka ' + z.cislo + ' (' + z.zakaznik + ') překročila termín kroku „' + st.label + '" (' + fmtDate(z.deadline) + ').\nOdpovědná osoba: ' + (empName(resp) || '—') + '.';
-          komu.forEach(em => mail(em, 'Po termínu · ' + z.cislo, text));
+          if (cfg.overdueEmail !== false) {
+            const text = 'Zakázka ' + z.cislo + ' (' + z.zakaznik + ') překročila termín kroku „' + st.label + '" (' + fmtDate(z.deadline) + ').\nOdpovědná osoba: ' + (empName(resp) || '—') + '.';
+            komu.forEach(em => mail(em, 'Po termínu · ' + z.cislo, text));
+          }
         }
         // --- D+1 a dále: denní souhrn řediteli ---
         overdueForDirector.push(z);
@@ -1253,7 +1267,7 @@ function mount(host) {
     }
 
     // denní souhrn řediteli (jednou za den, jsou-li zpožděné zakázky ≥ 1 den)
-    if (overdueForDirector.length) {
+    if (overdueForDirector.length && cfg.directorDigest !== false) {
       const readyForDigest = overdueForDirector.filter(z => z.esc && z.esc.overdueDay && z.esc.overdueDay !== fmtDate(now));
       const today = fmtDate(now);
       if (readyForDigest.length && d._lastDirectorDigest !== today) {
@@ -1264,14 +1278,24 @@ function mount(host) {
       }
     }
 
-    // Tydenni report (pondeli, jednou za tyden) — jde-li zapnout/vypnout v SET-UP
+    // Report o stavu — denně nebo týdně (zvolený den), zap./vyp. + příjemci v SET-UP
     try {
       if (d.settings && d.settings.reportEnabled && (d.settings.reportRecipients || []).length) {
-        const wk = isoWeekKey(now), dow = new Date(now).getUTCDay();
-        if (dow === 1 && d.settings._lastReportWeek !== wk) {
-          d.settings._lastReportWeek = wk; changed = true;
+        const freq = d.settings.reportFreq === 'daily' ? 'daily' : 'weekly';
+        const dow = new Date(now).getUTCDay();
+        let due = false, subject = 'Týdenní přehled konstrukce';
+        if (freq === 'daily') {
+          const day = fmtDate(now);
+          if (d.settings._lastReportDay !== day) { d.settings._lastReportDay = day; due = true; }
+          subject = 'Denní přehled konstrukce';
+        } else {
+          const wk = isoWeekKey(now), wantDow = typeof d.settings.reportDow === 'number' ? d.settings.reportDow : 1;
+          if (dow === wantDow && d.settings._lastReportWeek !== wk) { d.settings._lastReportWeek = wk; due = true; }
+        }
+        if (due) {
+          changed = true;
           const text = buildWeeklyReport(d);
-          for (const em of d.settings.reportRecipients) await mail(em, 'Týdenní přehled konstrukce', text);
+          for (const em of d.settings.reportRecipients) await mail(em, subject, text);
         }
       }
     } catch (_) {}
@@ -1514,6 +1538,18 @@ function mount(host) {
     if (b.phaseDays && typeof b.phaseDays === 'object') { d.settings.phaseDays = d.settings.phaseDays || {}; ['obchod', 'konstrukce', 'schvaleni', 'vyroba'].forEach(k => { if (b.phaseDays[k] != null) d.settings.phaseDays[k] = Math.max(0, Number(b.phaseDays[k]) || 0); }); }
     if (typeof b.reportEnabled === 'boolean') d.settings.reportEnabled = b.reportEnabled;
     if (Array.isArray(b.reportRecipients)) d.settings.reportRecipients = b.reportRecipients.map(e => String(e).trim().toLowerCase()).filter(Boolean);
+    if (b.reportFreq === 'daily' || b.reportFreq === 'weekly') d.settings.reportFreq = b.reportFreq;
+    if (b.reportDow != null) { const dw = parseInt(b.reportDow, 10); if (!isNaN(dw) && dw >= 0 && dw <= 6) d.settings.reportDow = dw; }
+    if (b.notif && typeof b.notif === 'object') {
+      d.settings.notif = d.settings.notif || {};
+      const n = d.settings.notif;
+      if (b.notif.warnPct != null) n.warnPct = Math.min(100, Math.max(1, parseInt(b.notif.warnPct, 10) || 80));
+      if (b.notif.clientRemind1 != null) n.clientRemind1 = Math.max(0, parseInt(b.notif.clientRemind1, 10) || 0);
+      if (b.notif.clientRemind2 != null) n.clientRemind2 = Math.max(0, parseInt(b.notif.clientRemind2, 10) || 0);
+      if (typeof b.notif.overdueEmail === 'boolean') n.overdueEmail = b.notif.overdueEmail;
+      if (typeof b.notif.directorDigest === 'boolean') n.directorDigest = b.notif.directorDigest;
+      WARN_FRAC = Math.min(1, Math.max(0, (Number(n.warnPct) || 80) / 100));
+    }
     save(d); json(res, 200, { ok: true, settings: d.settings }); return true;
   }
   async function apiReport(req, res, send) {

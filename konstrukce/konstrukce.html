@@ -188,6 +188,7 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .wf .node{border-radius:12px;padding:12px 14px;color:#fff;min-width:150px;flex:0 0 auto}
 .wf .node .t{font-weight:800;font-size:14px}
 .wf .node .m{font-size:12px;opacity:.92;margin-top:3px}
+.wf .node .m .wfd{width:44px;padding:2px 4px;border:0;border-radius:5px;font:inherit;font-weight:700;text-align:center;background:rgba(255,255,255,.92);color:#22302a}
 .wf .arw{display:flex;align-items:center;color:#b6bfb7;font-size:20px;font-weight:700}
 .wf .branch{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;background:#fff;color:#3a4a41;min-width:150px;font-size:12.5px}
 @media(max-width:820px){
@@ -465,23 +466,56 @@ function setupCard(){
   h+=pr('obchod','Obchod')+pr('konstrukce','Konstrukce')+pr('schvaleni','Schválení')+pr('vyroba','Zadání do výroby');
   h+='<div class="row" style="justify-content:space-between;padding:8px 0 2px"><span class="muted">Celý proces (průměr skutečně)</span><b>'+(pa.total==null?'—':pa.total+' prac. dní')+'</b></div>';
   h+='<div style="margin-top:10px"><button class="btn sm" onclick="saveSetupDays()">Uložit cílové dny</button></div></div>';
-  h+='<div class="sec">Týdenní report</div><div class="card">';
-  h+='<label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" id="repEnabled" style="width:auto" '+(st.reportEnabled?'checked':'')+'> <span>Zasílat týdenní report (každé pondělí)</span></label>';
+  // --- Notifikace a eskalace (kdy se posílají) ---
+  var nf=st.notif||{};
+  var dnames=['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota'];
+  h+='<div class="sec">Notifikace a eskalace — kdy se posílají</div><div class="card"><p class="muted" style="margin-top:0">Prahy pro automatická upozornění a e-maily u běžících zakázek.</p>';
+  h+='<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap"><div style="min-width:200px"><b>Upozornění „blíží se termín"</b><div class="sub">app-notifikace odpovědné osobě při využití lhůty</div></div><div class="row" style="gap:6px"><input id="nf_warn" type="number" min="1" max="100" value="'+(nf.warnPct!=null?nf.warnPct:80)+'" style="width:70px"> <span class="muted">% lhůty</span></div></div>';
+  h+='<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap"><div style="min-width:200px"><b>Klient nereaguje — 1. připomínka</b><div class="sub">e-mail klientovi + upozornění obchodníkovi</div></div><div class="row" style="gap:6px"><input id="nf_cr1" type="number" min="0" value="'+(nf.clientRemind1!=null?nf.clientRemind1:5)+'" style="width:70px"> <span class="muted">prac. dní</span></div></div>';
+  h+='<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap"><div style="min-width:200px"><b>Klient nereaguje — 2. připomínka (úkol)</b><div class="sub">výzva obchodníkovi kontaktovat telefonicky</div></div><div class="row" style="gap:6px"><input id="nf_cr2" type="number" min="0" value="'+(nf.clientRemind2!=null?nf.clientRemind2:10)+'" style="width:70px"> <span class="muted">prac. dní</span></div></div>';
+  h+='<label class="row" style="gap:8px;cursor:pointer;padding:8px 0 2px"><input type="checkbox" id="nf_oe" style="width:auto" '+(nf.overdueEmail!==false?'checked':'')+'> <span>E-mail při <b>překročení termínu</b> (odpovědný + obchodník + šéf)</span></label>';
+  h+='<label class="row" style="gap:8px;cursor:pointer;padding:2px 0"><input type="checkbox" id="nf_dd" style="width:auto" '+(nf.directorDigest!==false?'checked':'')+'> <span>Denní <b>souhrn řediteli</b> o zpožděných zakázkách (D+1)</span></label>';
+  h+='<div style="margin-top:10px"><button class="btn sm" onclick="saveNotif()">Uložit notifikace</button></div></div>';
+  // --- Report o stavu ---
+  var freq=st.reportFreq==='daily'?'daily':'weekly', dow=(typeof st.reportDow==='number')?st.reportDow:1;
+  var dowOpts=[1,2,3,4,5,6,0].map(function(i){return '<option value="'+i+'"'+(i===dow?' selected':'')+'>'+dnames[i]+'</option>'}).join('');
+  h+='<div class="sec">Report o stavu — kdy se rozesílá</div><div class="card">';
+  h+='<label class="row" style="gap:8px;cursor:pointer"><input type="checkbox" id="repEnabled" style="width:auto" '+(st.reportEnabled?'checked':'')+'> <span>Rozesílat souhrnný report příjemcům</span></label>';
+  h+='<div class="row" style="gap:14px;margin-top:10px;flex-wrap:wrap"><label class="row" style="gap:6px"><span class="muted">Frekvence</span><select id="repFreq" onchange="document.getElementById(\'repDowWrap\').style.display=(this.value===\'weekly\'?\'inline-flex\':\'none\')"><option value="weekly"'+(freq==='weekly'?' selected':'')+'>Týdně</option><option value="daily"'+(freq==='daily'?' selected':'')+'>Denně</option></select></label>';
+  h+='<label class="row" id="repDowWrap" style="gap:6px;display:'+(freq==='weekly'?'inline-flex':'none')+'"><span class="muted">Den</span><select id="repDow">'+dowOpts+'</select></label></div>';
   h+='<div style="margin-top:10px"><div class="sub" style="margin-bottom:4px">Příjemci (oddělené čárkou)</div><textarea id="repRec" rows="2" style="width:100%;box-sizing:border-box">'+esc(rec)+'</textarea></div>';
   h+='<div class="row" style="gap:8px;margin-top:10px"><button class="btn sm" onclick="saveReport()">Uložit report</button><button class="btn ghost sm" onclick="sendReportNow()">Odeslat teď</button><button class="btn ghost sm" onclick="previewReport()">Náhled</button></div>';
   h+='<pre id="repPrev" style="white-space:pre-wrap;margin-top:10px;font-size:12px;color:var(--mut);background:var(--bg,#f4f6f2);padding:10px;border-radius:8px;display:none"></pre></div>';
   return h;
 }
+function saveNotif(){
+  var g=function(id){return document.getElementById(id)};
+  var notif={ warnPct:Number(g('nf_warn').value)||80, clientRemind1:Number(g('nf_cr1').value)||0, clientRemind2:Number(g('nf_cr2').value)||0, overdueEmail:g('nf_oe').checked, directorDigest:g('nf_dd').checked };
+  api('/admin/settings','POST',{notif:notif}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return} reloadData();});
+}
 function saveSetupDays(){ var pd={}; ['obchod','konstrukce','schvaleni','vyroba'].forEach(function(k){var el=document.getElementById('pd_'+k); if(el)pd[k]=Number(el.value)||0;}); api('/admin/settings','POST',{phaseDays:pd}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba');return} reloadData();}); }
-function saveReport(){ var en=document.getElementById('repEnabled').checked; var rec=(document.getElementById('repRec').value||'').split(/[,;\n]/).map(function(s){return s.trim()}).filter(Boolean); api('/admin/settings','POST',{reportEnabled:en,reportRecipients:rec}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba');return} reloadData();}); }
+function saveReport(){ var en=document.getElementById('repEnabled').checked; var rec=(document.getElementById('repRec').value||'').split(/[,;\n]/).map(function(s){return s.trim()}).filter(Boolean); var freq=document.getElementById('repFreq').value; var dow=Number(document.getElementById('repDow').value); api('/admin/settings','POST',{reportEnabled:en,reportRecipients:rec,reportFreq:freq,reportDow:dow}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba');return} reloadData();}); }
 function sendReportNow(){ if(!confirm('Odeslat report příjemcům teď?'))return; api('/admin/report','POST',{}).then(function(o){ if(!o.ok){alert(o.j.chyba||'Chyba');return} var pv=document.getElementById('repPrev'); pv.style.display='block'; pv.textContent=(o.j.text||''); alert('Odesláno '+o.j.sent+' příjemcům.'); }); }
 function previewReport(){ api('/admin/report').then(function(o){ if(!o.ok){alert(o.j.chyba||'Chyba');return} var pv=document.getElementById('repPrev'); pv.style.display='block'; pv.textContent=(o.j.text||''); }); }
 
-/* ---- workflow schéma (celý proces) ---- */
+/* ---- workflow schéma (celý proces) — editovatelné lhůty kroků ---- */
+var WF_TYPE=null;
 function renderWorkflow(m){
-  var t=(D.types&&D.types[0])||{lhutaPrideleniDays:1,lhutaZkresleniDays:3,lhutaKontrolaDays:1,lhutaObchodnikDays:1,lhutaKlientDays:5,lhutaRevizeDays:2,linkValidDays:30};
+  var types=(D.types&&D.types.length)?D.types:[{key:'',name:'—',lhutaPrideleniDays:1,lhutaZkresleniDays:3,lhutaKontrolaDays:1,lhutaObchodnikDays:1,lhutaKlientDays:5,lhutaVyrobaDays:1,lhutaStrediskoDays:1,lhutaRevizeDays:2,linkValidDays:30}];
+  if(!WF_TYPE||!types.some(function(x){return x.key===WF_TYPE}))WF_TYPE=types[0].key;
+  var t=types.find(function(x){return x.key===WF_TYPE})||types[0];
+  var edit=(ME.isAdmin||ME.role==='sef');
   var COL={sef:'var(--purple)',kon:'#e65100',obch:'var(--blue)',kli:'var(--g)',sys:'var(--gray)',vyr:'#00838f'};
-  function node(role,title,meta){return '<div class="node" style="background:'+COL[role]+'"><div class="t">'+esc(title)+'</div><div class="m">'+esc(meta)+'</div></div>'}
+  // pole dne: buď editovatelný input (edit), nebo prostý text
+  function dfld(field,val,unit){
+    var v=(val==null?'':val);
+    if(edit)return '<input class="wfd" data-f="'+field+'" type="number" min="0" value="'+v+'" onclick="event.stopPropagation()"> '+esc(unit||'prac. dní');
+    return '<b>'+esc(v===''?'?':v)+'</b> '+esc(unit||'prac. dní');
+  }
+  function node(role,title,pre,field,val,unit,post){
+    var mid=field?(esc(pre?pre+' · ':'')+dfld(field,val,unit)+esc(post?' · '+post:'')):esc(pre||'');
+    return '<div class="node" style="background:'+COL[role]+'"><div class="t">'+esc(title)+'</div><div class="m">'+mid+'</div></div>';
+  }
   function arw(){return '<div class="arw">→</div>'}
   var legend='<div class="legend">'+
     '<span><i style="background:var(--blue)"></i>Obchodník</span>'+
@@ -492,25 +526,46 @@ function renderWorkflow(m){
     '<span><i style="background:var(--gray)"></i>Systém</span></div>';
   var flow='<div class="wf">'+
     node('obch','1 · Zadání','obchodník · požadavek')+arw()+
-    node('sef','2 · Přidělení','šéf konstrukce · '+t.lhutaPrideleniDays+' prac. den')+arw()+
-    node('kon','3 · Zkreslení','konstruktér · '+t.lhutaZkresleniDays+' prac. dny · PDF + CAD')+arw()+
-    node('sef','4 · Interní kontrola','šéf konstrukce · '+t.lhutaKontrolaDays+' prac. den')+arw()+
-    node('obch','5 · Potvrzení','obchodník · '+t.lhutaObchodnikDays+' prac. den')+arw()+
-    node('kli','6 · Veřejný náhled','klient · odkaz '+t.linkValidDays+' dnů')+arw()+
+    node('sef','2 · Přidělení','šéf konstrukce','lhutaPrideleniDays',t.lhutaPrideleniDays)+arw()+
+    node('kon','3 · Zkreslení','konstruktér','lhutaZkresleniDays',t.lhutaZkresleniDays,'prac. dní','PDF + CAD')+arw()+
+    node('sef','4 · Interní kontrola','šéf konstrukce','lhutaKontrolaDays',t.lhutaKontrolaDays)+arw()+
+    node('obch','5 · Potvrzení','obchodník','lhutaObchodnikDays',t.lhutaObchodnikDays)+arw()+
+    node('kli','6 · Veřejný náhled','reakce klienta','lhutaKlientDays',t.lhutaKlientDays,'prac. dní','odkaz '+(t.linkValidDays==null?30:t.linkValidDays)+' dnů')+arw()+
     node('kli','7 · Schválení','klient schválí výkres')+arw()+
-    node('vyr','8 · Předání do výroby','obchodník vybere oblast')+arw()+
-    node('vyr','9 · Výroba v oblasti','výrobní ředitel oblasti')+arw()+
+    node('vyr','8 · Předání do výroby','šéf výroby','lhutaVyrobaDays',t.lhutaVyrobaDays)+arw()+
+    node('vyr','9 · Výroba v oblasti','výrobní ředitel','lhutaStrediskoDays',t.lhutaStrediskoDays)+arw()+
     node('sys','10 · Vyrobeno','hotovo · archiv')+'</div>';
+  var revMeta=edit
+    ?('Klient pošle připomínky → nová verze (v2, v3…), zpět na konstruktéra na '+dfld('lhutaRevizeDays',t.lhutaRevizeDays)+', znovu kontrola a schválení. Původní odkaz se deaktivuje.')
+    :('Klient pošle připomínky → nová verze (v2, v3…), zpět na konstruktéra ('+(t.lhutaRevizeDays==null?'?':t.lhutaRevizeDays)+' prac. dní), znovu kontrola a schválení. Původní odkaz se deaktivuje.');
   var branches='<div class="two" style="margin-top:16px">'+
-    '<div class="branch"><b>↩ Revize</b><div class="muted" style="margin-top:4px">Klient pošle připomínky → nová verze (v2, v3…), zpět na konstruktéra ('+t.lhutaRevizeDays+' prac. dny), znovu kontrola a schválení. Původní odkaz se deaktivuje.</div></div>'+
+    '<div class="branch"><b>↩ Revize</b><div class="muted" style="margin-top:4px">'+revMeta+'</div></div>'+
     '<div class="branch"><b>⏸ Čeká na podklady</b><div class="muted" style="margin-top:4px">Chybí-li podklady od zákazníka, zakázka se pozastaví a lhůty se zastaví (zpoždění se nepočítá konstrukci).</div></div>'+
     '<div class="branch"><b>✕ Zamítnuto / storno</b><div class="muted" style="margin-top:4px">Obchodník nebo ředitel s povinným důvodem; propíše se do statistik.</div></div>'+
-    '<div class="branch"><b>🚦 Termíny a eskalace</b><div class="muted" style="margin-top:4px">80 % lhůty → upozornění odpovědnému; překročení → e-mail obchodník + šéf; den D+1 → souhrn řediteli; klient bez reakce 5/10 dnů → připomínka a úkol.</div></div>'+
+    '<div class="branch"><b>🚦 Termíny a eskalace</b><div class="muted" style="margin-top:4px">Prahy upozornění, e-mailů a reportů se nastavují v <b>Role a číselník → SET-UP</b> (sekce Notifikace a eskalace).</div></div>'+
     '</div>';
-  m.innerHTML='<div class="head"><h2>Postup zpracování výkresu</h2></div>'+legend+
+  var picker='';
+  if(edit){
+    var opts=types.map(function(x){return '<option value="'+esc(x.key)+'"'+(x.key===WF_TYPE?' selected':'')+'>'+esc(x.name||x.key)+'</option>'}).join('');
+    picker='<div class="row" style="gap:10px;align-items:center;margin:2px 0 12px;flex-wrap:wrap">'+
+      '<span class="muted">Lhůty pro typ výrobku:</span>'+
+      '<select id="wfType" onchange="WF_TYPE=this.value;render()" style="max-width:280px">'+opts+'</select>'+
+      '<button class="btn sm" onclick="saveWorkflowDays()">Uložit lhůty kroků</button>'+
+      '<span class="muted" style="font-size:12px">Počet <b>pracovních dní</b>, za který má být krok hotový.</span></div>';
+  }
+  var note=edit
+    ?'<p class="muted" style="margin-top:14px">Změny se projeví u <b>nově zakládaných</b> zakázek daného typu; běžící zakázky si drží svůj termín (lze upravit tlačítkem „Změnit termín" v detailu). Plné šipky = standardní tok, přerušované rámečky = vratky a zvláštní stavy.</p>'
+    :'<p class="muted" style="margin-top:14px">Lhůty kroků nastavuje šéf konstrukce / admin. Plné šipky = standardní tok, přerušované rámečky = vratky a zvláštní stavy. U každé zakázky vidíte její aktuální pozici v detailu nahoře.</p>';
+  m.innerHTML='<div class="head"><h2>Postup zpracování výkresu</h2></div>'+legend+picker+
     '<div class="card" style="overflow-x:auto">'+flow+'</div>'+
-    '<div class="sec">Vratky a zvláštní stavy</div>'+branches+
-    '<p class="muted" style="margin-top:14px">Výchozí lhůty jsou z číselníku typu výrobku a lze je upravit (Role a číselník). Plné šipky = standardní tok, přerušované rámečky = vratky a zvláštní stavy. U každé konkrétní zakázky vidíte její aktuální pozici v detailu nahoře.</p>';
+    '<div class="sec">Vratky a zvláštní stavy</div>'+branches+note;
+}
+function saveWorkflowDays(){
+  var base=(D.types||[]).find(function(x){return x.key===WF_TYPE});
+  if(!base){alert('Vyberte typ výrobku.');return}
+  var payload={}; for(var k in base)payload[k]=base[k];   // zachovej název, params, dotazník, internalCheck…
+  document.querySelectorAll('.wfd').forEach(function(el){ payload[el.getAttribute('data-f')]=Math.max(0,parseInt(el.value,10)||0); });
+  api('/admin/typ','POST',payload).then(function(o){ if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return} reloadData(); });
 }
 
 /* ---- notifikace ---- */
