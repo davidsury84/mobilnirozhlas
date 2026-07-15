@@ -112,12 +112,12 @@ function parseRows(klic, rows) {
 
 // Načte jen relevantní list(y) knihy zakázek a vybere řádky aktuálního roku.
 async function nactiZavod(z, rok) {
-  const listy = (await sheets.listSheets(z.id)).filter((s) => !s.hidden);
-  const vybrane = listy.filter((l) => z.listy.some((re) => re.test(l.title)));
+  const listy = await sheets.listSheets(z.id);           // pole názvů listů (skryté už odfiltrované)
+  const vybrane = listy.filter((title) => z.listy.some((re) => re.test(title)));
   let vsechny = [];
-  for (const l of vybrane) {
+  for (const title of vybrane) {
     try {
-      const rows = await sheets.readValues(z.id, `'${l.title.replace(/'/g, "''")}'!A1:AH6000`);
+      const rows = await sheets.readValues(z.id, `'${title.replace(/'/g, "''")}'!A1:AH6000`);
       vsechny = vsechny.concat(parseRows(z.klic, rows || []));
     } catch (_) {}
   }
