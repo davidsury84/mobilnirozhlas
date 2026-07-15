@@ -1089,6 +1089,79 @@ async function driveList(folderId) {
   return (res.files || []).map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, link: f.webViewLink, isFolder: f.mimeType === 'application/vnd.google-apps.folder' }));
 }
 function driveAvailable() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }
+
+/* ---------- Telefonní seznam (firemní kontakty dle středisek) ----------
+   Zdroj: „Kontakty Elkoplast.xlsx" na Disku (owner lucie.sedlackova@elkoplast.cz,
+   file id 1QT78DM_CyStOe5-iJcB0ihN4Lepd7dOC). Soubor je nahraný .xlsx, ne nativní
+   Google Sheet — proto zde držíme ručně udržovaný snímek (jako u modulu Plasty).
+   Aktualizace: přepsat řádky níže; při převodu souboru na nativní Sheet lze napojit živě.
+   Skupiny = střediska; každý řádek: [role/pozice, jméno, e-mail, telefon]. */
+const TELEFON_SKUPINY = [
+  { stredisko: 'Bruntál — výroba Abroly', lide: [
+    ['Vedoucí výroby Abroly', 'Martin Mádr', 'martin.madr@elkoplast.cz', '777760858'],
+    ['Asistentka (vydané objednávky a dodáky)', 'Tereza Mádrová', 'tereza.madrova@elkoplast.cz', '777479059'],
+  ] },
+  { stredisko: 'Bruntál — výroba Popelnice', lide: [
+    ['Vedoucí výroby Popelnice', 'Ladislav Máté', 'ladislav.mate@elkoplast.cz', '771227864'],
+  ] },
+  { stredisko: 'Bruntál — sklad plasty', lide: [
+    ['Vedoucí střediska plasty', 'Oldřich Fiala', 'oldrich.fiala@elkoplast.cz', '777760857'],
+    ['Doklady skladu plasty', 'Lada Michenková', 'lada.michenkova@elkoplast.cz', '775295313'],
+  ] },
+  { stredisko: 'Bruntál — doprava', lide: [
+    ['Dispečerka', 'Magda Duhajská', 'magda.duhajska@elkoplast.cz', '775295314'],
+    ['Dispečerka', 'Kamila Pechalová', 'kamila.pechalova@elkoplast.cz', '775295305'],
+    ['Vedoucí dopravy', 'Patrik Deml', 'patrik.deml@elkoplast.cz', '608660422'],
+  ] },
+  { stredisko: 'Supíkovice', lide: [
+    ['Vedoucí výroby Supíkovice', 'Dominik Burdák', 'dominik.burdik@elkoplast.cz', '778119990'],
+    ['Vydané objednávky + doklady', 'Darina Škubalová', 'darina.skubalova@elkoplast.cz', '773757418'],
+    ['Vedoucí laser', 'Milan Sedláček', 'milan.sedlacek@elkoplast.cz', '778969976'],
+  ] },
+  { stredisko: 'Chomutov', lide: [
+    ['Vedoucí výroby', 'Jiří Hejda', 'jiri.hejda@elkoplast.cz', '602159087'],
+  ] },
+  { stredisko: 'Zlín (centrála)', lide: [
+    ['Plán výroby a koordinace objednávek', 'Lukáš Pospíšil', 'lukas.pospisil@elkoplast.cz', '777660435'],
+    ['Nákupčí zboží', 'Hana Faltýnková', 'hana.faltynkova@elkoplast.cz', '777660427'],
+    ['Pomocná účetní', 'Miroslava Vavříková', 'miroslava.vavrikova@elkoplast.cz', '608660425'],
+    ['Hlavní účetní (mzdové věci)', 'Jana Pánková', 'jana.pankova@elkoplast.cz', '775760822'],
+    ['Asistentka jednatele (pojistky, plné moci)', 'Simona Janečková', 'simona.janeckova@elkoplast.cz', '774385335'],
+    ['Jednatel společnosti', 'Tomáš Krajča', 'tomas.krajca@elkoplast.cz', '608660420'],
+    ['Správce majetku (zabezpečení areálu)', 'Antonín (Tonda) Srna', 'antonin.srna@elkoplast.cz', '777070077'],
+    ['Finanční analytik / IT', 'Lucie Sedláčková', 'lucie.sedlackova@elkoplast.cz', '777660439'],
+  ] },
+  { stredisko: 'Polsko', lide: [
+    ['Vedoucí výroby', 'Anna Czechová', 'anna.czechova@elkoplast.pl', '+48661178056'],
+    ['Vedoucí výroby (nástupce Anny)', 'Piotr Buczkowski', 'piotr.buczkowski@elkoplast.pl', ''],
+  ] },
+  { stredisko: 'Ostrata', lide: [
+    ['Vedoucí Rota', 'Ladislav Krajča', 'ladislav.krajca@elkoplast.cz', '777770641'],
+    ['Skladník', 'Rasťo Pavlovič', 'roto@elkoplast.cz', '775295299'],
+  ] },
+  { stredisko: 'Konstrukce', lide: [
+    ['Konstrukce (společný e-mail)', '', 'konstrukce@elkoplast.cz', ''],
+    ['Konstruktér', 'Andrey Shchedrenkov', 'andrey@elkoplast.cz', '778545698'],
+    ['Konstruktér', 'Maksym', 'maksym@elkoplast.cz', ''],
+    ['Konstruktér', 'Zdeněk Barcuch', 'zdenek.barcuch@elkoplast.cz', '770396340'],
+    ['Konstruktér', 'Pavel Skybík', 'pavel.skybik@elkoplast.cz', '771264466'],
+    ['Konstruktér', 'Anatolii Semaško', 'anatolii.semasko@elkoplast.cz', ''],
+    ['Konstruktér', 'Valentin Bratuška', 'valentin.bratuska@elkoplast.cz', ''],
+  ] },
+];
+// Obchodníci mají vlastní veřejný rozcestník na webu — nezveřejňujeme je zde jednotlivě.
+const TELEFON_ODKAZY = [
+  { label: 'Obchodníci (kontakty na webu)', url: 'https://www.elkoplast.cz/kontakty' },
+];
+function buildTelefon() {
+  const groups = TELEFON_SKUPINY.map((g) => ({
+    stredisko: g.stredisko,
+    lide: g.lide.map((r) => ({ role: r[0] || '', name: r[1] || '', email: (r[2] || '').trim(), phone: (r[3] || '').trim() })),
+  }));
+  const total = groups.reduce((n, g) => n + g.lide.length, 0);
+  return { groups, odkazy: TELEFON_ODKAZY, total };
+}
+
 /* ---------- Obchod: rozdělení obchodníků / zastupitelnost produktových manažerů ----------
    Editovatelná tabulka 1:1 se zdrojovým Google Sheetem „Zastupitelnost_PM_Elkoplast_cisty"
    (list: sekce webu → kategorie → odpovědný PM → zástup → třetí náhradník → stav pokrytí).
@@ -1890,6 +1963,13 @@ const server = http.createServer(async (req, res) => {
           .sort((a, b) => a.dny - b.dny);
         return send(res, 200, { configured: true, dnes, items });
       } catch (err) { return send(res, 200, { configured: true, chyba: err.message, items: [] }); }
+    }
+
+    // Telefonní seznam — firemní kontakty dle středisek (dostupné všem přihlášeným zaměstnancům).
+    if (p === '/api/telefon' && req.method === 'GET') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      return send(res, 200, buildTelefon(), { 'Cache-Control': 'no-store' });
     }
 
     // Úkoly ze směrnic — závazky vytažené ze směrnic na Disku (záložka „Úkoly ze směrnic").

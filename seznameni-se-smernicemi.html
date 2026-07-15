@@ -356,6 +356,9 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 .mj-hero .hero-search{display:flex;align-items:center;gap:12px;width:min(560px,100%);min-height:52px;padding:0 16px;border-radius:var(--radius);background:rgba(255,255,255,.95);color:var(--ink-soft);box-shadow:0 16px 38px rgba(0,0,0,.18)}
 .mj-hero .hero-search svg{width:21px;height:21px;color:var(--green-d);flex:none}
 .mj-hero .hero-search input{width:100%;border:0;outline:0;background:transparent;color:#172115;font-size:15px}
+.tel-search{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;min-height:46px;padding:0 14px;margin:0 0 16px;border-radius:var(--radius);background:#fff;border:1px solid var(--line,#e3e7e0);color:var(--ink-soft)}
+.tel-search svg{flex:none;color:var(--green-d)}
+.tel-search input{width:100%;border:0;outline:0;background:transparent;color:#172115;font-size:15px}
 /* Rozbalovací výsledky vyhledávání (fixed, mimo ořez banneru) */
 #mjSearchBox{position:fixed;z-index:120;background:var(--paper);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);padding:6px;display:none;max-height:min(60vh,440px);overflow:auto}
 #mjSearchBox.show{display:block}
@@ -2012,7 +2015,7 @@ async function showTelefon(){
     catch(e){ body.innerHTML=telHero()+'<div class="card pad"><p class="muted" style="margin:0">Telefonní seznam se nepodařilo načíst. '+esc(e.message||"")+'</p></div>'; return; }
   }
   body.innerHTML=telHero()+
-    '<div class="card pad" style="margin-bottom:16px"><label class="hero-search" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 21-4.4-4.4M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg><input type="search" id="telSearch" autocomplete="off" placeholder="Hledat jméno, pozici, středisko nebo číslo…" oninput="telFilter(this.value)"></label></div>'+
+    '<label class="tel-search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 21-4.4-4.4M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg><input type="search" id="telSearch" autocomplete="off" placeholder="Hledat jméno, pozici, středisko nebo číslo…" oninput="telFilter(this.value)"></label>'+
     '<div id="telResults"></div>';
   telFilter("");
   window.scrollTo(0,0);
