@@ -35,6 +35,9 @@ function datum(s) {
 function cislo(s) { const m = String(s || '').replace(',', '.').match(/\d+(?:\.\d+)?/); if (!m) return 0; const n = Math.round(parseFloat(m[0])); return n > 0 && n < 100000 ? n : 0; }
 function rokZPrefixu(s) { const m = String(s || '').match(/(2\d)[A-Z]\s?\d/); return m ? 2000 + Number(m[1]) : null; }
 const STORNO_RE = /storno/i;
+// Robustní doplňkové údaje skenováním celého řádku (nezávisle na rozložení sloupců).
+function povrchZRadku(t) { if (/pozink|žárov|zink/i.test(t)) return 'pozink'; if (/lakov|\blak\b|\bRAL\b|\bPUR\b|epoxid/i.test(t)) return 'lakování'; return null; }
+function ralZRadku(t) { const m = String(t || '').match(/RAL\s?(\d{4})/i); return m ? 'RAL ' + m[1] : null; }
 function jeZakazka(vyrobek, ks, zeDne) {
   const v = String(vyrobek || '').trim();
   if (!v || /^výrobek$/i.test(v) || /^předmět/i.test(v) || /^product/i.test(v) || /^20\d{2}$/.test(v)) return false;
@@ -61,6 +64,7 @@ function parseRows(klic, rows) {
         cvz: String(r[0] || '').trim() || null, vyrobek: String(vyrobek).trim(), ks,
         zeDne, termin: datum(r[11]), expedice: null,
         zakaznik: String(r[4] || '').trim() || null,
+        ral: ralZRadku(r.join(' ')), povrch: povrchZRadku(r.join(' ')),
         storno: STORNO_RE.test(r.join(' ')),
         rok: rokZPrefixu(r[8]) || (zeDne ? Number(zeDne.slice(0, 4)) : null),
       });
@@ -80,6 +84,7 @@ function parseRows(klic, rows) {
         cvz: cvz || null, vyrobek: String(vyrobek).trim(), ks,
         zeDne, termin: datum(r[16]), expedice: datum(r[17]),
         zakaznik: String(r[18] || '').trim() || null,
+        ral: ralZRadku(r.join(' ')), povrch: povrchZRadku(r.join(' ')),
         storno: STORNO_RE.test(r.join(' ')), rok,
       });
     }
@@ -97,6 +102,7 @@ function parseRows(klic, rows) {
       zeDne, termin: datum(r[map.termin]),
       expedice: map.expedice != null ? datum(r[map.expedice]) : null,
       zakaznik: String(r[map.zakaznik] || '').trim() || null,
+      ral: ralZRadku(r.join(' ')), povrch: povrchZRadku(r.join(' ')),
       storno: STORNO_RE.test([r[6], r[16], r[24], vyrobek].join(' ')),
       rok: rokM ? 2000 + Number(rokM[1]) : (zeDne ? Number(zeDne.slice(0, 4)) : null),
     });

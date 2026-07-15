@@ -1211,7 +1211,8 @@ const MUJ_IC = {
   calc:'<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7.5" x2="16" y2="7.5"/><circle cx="9" cy="12" r="0.5"/><circle cx="12" cy="12" r="0.5"/><circle cx="15" cy="12" r="0.5"/><circle cx="9" cy="15" r="0.5"/><circle cx="12" cy="15" r="0.5"/><circle cx="15" cy="15" r="0.5"/><circle cx="9" cy="18" r="0.5"/><circle cx="12" cy="18" r="0.5"/><circle cx="15" cy="18" r="0.5"/>',
   truck:'<path d="M3 6.5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1V16H3V6.5z"/><path d="M14 9h3.6l2.4 3v4H14V9z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>',
   tasks:'<rect x="8" y="2.5" width="8" height="3.5" rx="1"/><path d="M16 4.5h2a2 2 0 0 1 2 2V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/><path d="M8.5 13.5l2.2 2.2 4.8-5.2"/>',
-  users:'<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M17 14.2A6.5 6.5 0 0 1 21.5 20"/>'
+  users:'<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M17 14.2A6.5 6.5 0 0 1 21.5 20"/>',
+  phone:'<path d="M6.5 3.5h3l1.5 4-2 1.4a12 12 0 0 0 5.6 5.6l1.4-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7 2 2 0 0 1 6.5 3.5z"/>'
 };
 const MUJ_MODS = [
   { key:"dash", icon:MUJ_IC.dash, label:"Můj přehled" },
@@ -1220,6 +1221,8 @@ const MUJ_MODS = [
   { key:"ukoly", icon:MUJ_IC.tasks, label:"Úkoly ze směrnic" },
   { key:"library", icon:MUJ_IC.book, label:"Knihovna" },
   { key:"bozp", icon:MUJ_IC.shield, label:"BOZP" },
+  { grp:"Kontakty" },
+  { key:"telefon", icon:MUJ_IC.phone, label:"Telefonní seznam" },
   { grp:"Provozy" },
   { key:"sklady", icon:MUJ_IC.warehouse, label:"Sklady", gated:true },
   { key:"plasty", icon:MUJ_IC.droplet, label:"Plasty", gated:true },
@@ -1406,6 +1409,7 @@ function mjGo(key){
   else if(key==="pruzkumy") showPruzkumy();
   else if(key==="bozp") showBozp();
   else if(key==="ukoly") showUkoly();
+  else if(key==="telefon") showTelefon();
   else if(key==="skoleni") showSkoleni();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
@@ -1737,7 +1741,7 @@ function renderKovoVyroba(){
   const storna=z.filter(x=>x.storno).length;
   const zdroj = D.zivaData ? 'živá data z knih zakázek na Google Sheets'
     : '⚠ jednorázový snímek dat (čeká na nasdílení tabulek service accountu → pak živě)';
-  let h='<div class="dash-hero" style="margin-bottom:16px"><h2>Výroba KOVO '+rok+'</h2><p>Souhrn ze 4 výrobních závodů (Chomutov · Polsko · Bruntál · Supíkovice) · '+zdroj+' · '+(D.zivaData?'aktualizováno ':'pořízeno ')+(D.aktualizovano?new Date(D.aktualizovano).toLocaleString("cs-CZ"):"—")+'</p></div>';
+  let h='<div class="dash-hero" style="margin-bottom:16px"><h2>Výroba KOVO '+rok+'</h2><p>Souhrn z 5 výrobních závodů (Chomutov · Polsko · Bruntál · Bruntál&#8209;popelnice · Supíkovice) · '+zdroj+' · '+(D.zivaData?'aktualizováno ':'pořízeno ')+(D.aktualizovano?new Date(D.aktualizovano).toLocaleString("cs-CZ"):"—")+'</p></div>';
   if(!z.length){
     const chybyTxt=Object.keys(D.chyby||{}).length?Object.entries(D.chyby).map(([k,v])=>'<li><strong>'+((k in {chomutov:1,polsko:1,bruntal:1,brpopelnice:1,supikovice:1})?k:'?')+':</strong> '+esc(v)+'</li>').join(''):'';
     h+='<div class="card pad"><strong>⚠ Data zatím nejsou dostupná</strong>'+
@@ -1780,6 +1784,40 @@ function renderKovoVyroba(){
     return '<div class="card pad" style="flex:1;min-width:320px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">'+t+'</strong><table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><tbody>'+
     rows.map(r=>'<tr><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r[0])+'">'+esc(r[0])+'</td><td class="num" style="white-space:nowrap"><strong>'+r[1].toLocaleString("cs-CZ")+'</strong> ks</td><td style="width:36%">'+kvBar(r[1],mx,'var(--green-2)')+'</td></tr>').join('')+'</tbody></table></div>'; };
   h+='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">'+topTbl('Top 10 výrobků (ks)',topV)+topTbl('Top 10 zákazníků (ks)',topZ)+'</div>';
+  // --- produktové řady (z názvu výrobku) ---
+  const rada=v=>{v=(v||'').toUpperCase().trim();
+    if(/^ABR/.test(v))return 'ABROLL';
+    if(/^CITY/.test(v))return 'CITY';
+    if(/^CPR|BOX/.test(v))return 'Popelnice / CPR box';
+    if(/^DMC/.test(v))return 'DMC (mulda-CH)';
+    if(/MULDA|^AMK|^AM[\s-]/.test(v))return 'Mulda / AM';
+    if(/^FLM/.test(v))return 'FLM';
+    if(/^STMH/.test(v))return 'STMH';
+    if(/VÍKO|VIKA|PLASTOV/.test(v))return 'Víka / plast';
+    if(/NÁHRADN|NAHRAD|DÍL/.test(v))return 'Náhradní díly';
+    return 'Ostatní';};
+  const povrchX=x=>{ if(x.povrch)return x.povrch; const v=(x.vyrobek||'').toUpperCase(); if(/ZIN|ZINK|POZINK/.test(v))return 'pozink'; if(/LAC|LAK/.test(v))return 'lakování'; return null; };
+  const radaMap={}; aktivni.forEach(x=>{const k=rada(x.vyrobek);(radaMap[k]=radaMap[k]||{zak:0,ks:0});radaMap[k].zak++;radaMap[k].ks+=ks(x);});
+  const radaRows=Object.entries(radaMap).sort((a,b)=>b[1].ks-a[1].ks);
+  const maxRada=Math.max(1,...radaRows.map(r=>r[1].ks));
+  h+='<div class="card pad" style="margin-bottom:16px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Produktové řady — kusy '+rok+'</strong><table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><thead><tr><th>Řada</th><th class="num">Zakázek</th><th class="num">Kusů</th><th style="width:40%"></th></tr></thead><tbody>'+
+    radaRows.map(r=>'<tr><td><strong>'+esc(r[0])+'</strong></td><td class="num">'+r[1].zak+'</td><td class="num"><strong>'+r[1].ks.toLocaleString("cs-CZ")+'</strong></td><td>'+kvBar(r[1].ks,maxRada,'var(--green-2)')+'</td></tr>').join('')+'</tbody></table></div>';
+  // --- povrchová úprava (lak vs pozink) ---
+  const povMap={}; let povCelk=0; aktivni.forEach(x=>{const p=povrchX(x); if(p){povMap[p]=(povMap[p]||0)+ks(x);povCelk+=ks(x);}});
+  // --- RAL barvy (z knih zakázek; naplní se živě) ---
+  const RALHEX={'1003':'#F9A800','1015':'#E6D2B5','1021':'#F3A505','1023':'#F0CA00','2002':'#C63927','2004':'#E75B12','2011':'#EC7C25','3000':'#AF2B1E','3009':'#642424','3011':'#781F19','3020':'#CC0605','4006':'#C63678','5002':'#20214F','5005':'#1E2460','5010':'#0E294B','5015':'#1061A0','5017':'#063971','5021':'#07737A','6001':'#325B2E','6005':'#0F4336','6016':'#1E5945','6018':'#4C9141','6026':'#006053','6029':'#20603D','7000':'#7E8B92','7005':'#6C6E6B','7016':'#293133','7023':'#828282','7030':'#8B8C7A','7034':'#92886F','7040':'#9DA1AA','7042':'#8F9695','8001':'#79553D','9002':'#E7EBDA','9005':'#0A0A0D','9006':'#A5A5A5','9010':'#F1ECE1'};
+  const ralMap={}; aktivni.forEach(x=>{if(x.ral){ralMap[x.ral]=(ralMap[x.ral]||0)+ks(x);}});
+  const ralRows=Object.entries(ralMap).sort((a,b)=>b[1]-a[1]).slice(0,14);
+  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">';
+  if(povCelk){ const maxP=Math.max(1,...Object.values(povMap));
+    h+='<div class="card pad" style="flex:1;min-width:280px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Povrchová úprava (ks)</strong><table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><tbody>'+
+      Object.entries(povMap).sort((a,b)=>b[1]-a[1]).map(r=>'<tr><td style="text-transform:capitalize"><strong>'+esc(r[0])+'</strong></td><td class="num"><strong>'+r[1].toLocaleString("cs-CZ")+'</strong> ks</td><td class="num muted">'+Math.round(r[1]/povCelk*100)+' %</td><td style="width:34%">'+kvBar(r[1],maxP,r[0]==='pozink'?'#8a94a0':'var(--green-2)')+'</td></tr>').join('')+'</tbody></table></div>';
+  }
+  if(ralRows.length){ const maxR=Math.max(1,...ralRows.map(r=>r[1]));
+    h+='<div class="card pad" style="flex:1;min-width:300px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft)">Top RAL barvy (ks)</strong><table class="tbl" style="width:100%;font-size:12.5px;margin-top:10px"><tbody>'+
+      ralRows.map(r=>{const num=(r[0].match(/(\d{4})/)||[])[1]||'';return '<tr><td style="white-space:nowrap"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.2);vertical-align:middle;margin-right:7px;background:'+(RALHEX[num]||'#c3c3c3')+'"></span><strong>'+esc(r[0])+'</strong></td><td class="num"><strong>'+r[1].toLocaleString("cs-CZ")+'</strong> ks</td><td style="width:40%">'+kvBar(r[1],maxR,RALHEX[num]||'#9aa39a')+'</td></tr>'}).join('')+'</tbody></table></div>';
+  }
+  h+='</div>';
   // rozpracované — nejbližší plánovaná expedice (termín) + upozornění na po termínu bez expedice
   const poTermínu=rozprac.filter(x=>x.termin&&x.termin<dnes);
   const nadchazi=rozprac.filter(x=>x.termin&&x.termin>=dnes).sort((a,b)=>a.termin.localeCompare(b.termin));
@@ -1963,6 +2001,51 @@ function showAdaptace(){
 }
 /* ---------- Modul BOZP (termíny z wiki registru, po pracovištích) ---------- */
 const BOZP_PRAC = { supikovice:"Supíkovice", zlin:"Zlín", bruntal:"Bruntál", chomutov:"Chomutov" };
+/* ---------- Telefonní seznam (firemní kontakty dle středisek) ---------- */
+let TELEFON_DATA=null;
+async function showTelefon(){
+  MUJ.view="telefon"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML=telHero()+'<p class="muted">Načítám…</p>';
+  if(!TELEFON_DATA){
+    try{ const r=await fetch("/api/telefon",{cache:"no-store"}); if(!r.ok) throw new Error((await r.json()).error||("HTTP "+r.status)); TELEFON_DATA=await r.json(); }
+    catch(e){ body.innerHTML=telHero()+'<div class="card pad"><p class="muted" style="margin:0">Telefonní seznam se nepodařilo načíst. '+esc(e.message||"")+'</p></div>'; return; }
+  }
+  body.innerHTML=telHero()+
+    '<div class="card pad" style="margin-bottom:16px"><label class="hero-search" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 21-4.4-4.4M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg><input type="search" id="telSearch" autocomplete="off" placeholder="Hledat jméno, pozici, středisko nebo číslo…" oninput="telFilter(this.value)"></label></div>'+
+    '<div id="telResults"></div>';
+  telFilter("");
+  window.scrollTo(0,0);
+}
+function telHero(){ return '<div class="dash-hero"><h2>Telefonní seznam</h2><p>Firemní kontakty podle středisek. Klepnutím na číslo ho vytočíte, klepnutím na e-mail napíšete zprávu.</p></div>'; }
+function telDigits(s){ return String(s||"").replace(/[^\d+]/g,""); }
+function telFilter(q){
+  const d=TELEFON_DATA, box=document.getElementById("telResults"); if(!d||!box) return;
+  const nq=mjNorm(q); let h="", shown=0;
+  (d.groups||[]).forEach(g=>{
+    const rows=(g.lide||[]).filter(p=> !nq || mjNorm(p.name+" "+p.role+" "+g.stredisko+" "+p.phone+" "+p.email).indexOf(nq)>=0 );
+    if(!rows.length) return;
+    shown+=rows.length;
+    h+='<div class="dash-sec">'+esc(g.stredisko)+' ('+rows.length+')</div>';
+    rows.forEach(p=>{
+      const tel = p.phone ? '<a class="btn ghost sm" href="tel:'+esc(telDigits(p.phone))+'">📞 '+esc(p.phone)+'</a>' : '<span class="muted" style="font-size:12px">bez čísla</span>';
+      const mail = p.email ? '<a class="btn ghost sm" href="mailto:'+esc(p.email)+'" title="'+esc(p.email)+'">✉︎ e-mail</a>' : '';
+      const title = p.name || p.role;
+      const sub = p.name ? p.role : (p.email||'');
+      h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.phone)+'</div><div>'+
+        '<div class="li-t">'+esc(title)+'</div>'+
+        (sub?'<div class="muted" style="font-size:12px;margin-top:2px">'+esc(sub)+'</div>':'')+
+        '</div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+tel+mail+'</div></div>';
+    });
+  });
+  if(!shown) h+='<div class="card pad"><p class="muted" style="margin:0">Nikdo neodpovídá hledání „'+esc(q)+'".</p></div>';
+  if((d.odkazy||[]).length){
+    h+='<div class="dash-sec">Další kontakty</div>';
+    (d.odkazy||[]).forEach(o=> h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.users)+'</div><div><div class="li-t">'+esc(o.label)+'</div></div></div><a class="btn ghost sm" href="'+esc(o.url)+'" target="_blank" rel="noopener">Otevřít ↗</a></div>');
+  }
+  h+='<p class="muted" style="font-size:12px;margin-top:14px">Zdroj: „Kontakty Elkoplast" (Disk). Změny nahlaste prosím na personální oddělení.</p>';
+  box.innerHTML=h;
+}
 async function showBozp(){
   MUJ.view="bozp"; renderSidebar();
   const body=document.getElementById("mujBody");
@@ -2275,7 +2358,7 @@ function showDashboard(){
     '</div></div>';
 
   // Rychlé akce — ploché barevné dlaždice (SharePoint hub)
-  const qacts=[["directives","Směrnice",MUJ_IC.file],["ukoly","Úkoly",MUJ_IC.tasks],["library","Knihovna",MUJ_IC.book],["bozp","BOZP",MUJ_IC.shield],["skoleni","Školení",MUJ_IC.school],["dovolena","Dovolená",MUJ_IC.cal],["pruzkumy","Průzkumy",MUJ_IC.poll]];
+  const qacts=[["directives","Směrnice",MUJ_IC.file],["ukoly","Úkoly",MUJ_IC.tasks],["library","Knihovna",MUJ_IC.book],["bozp","BOZP",MUJ_IC.shield],["skoleni","Školení",MUJ_IC.school],["dovolena","Dovolená",MUJ_IC.cal],["telefon","Telefony",MUJ_IC.phone],["pruzkumy","Průzkumy",MUJ_IC.poll]];
   h += '<div class="mj-quick">'+qacts.map(q=>'<button onclick="mjGo(\''+q[0]+'\')">'+
     (q[0]==="directives"&&c.dirTodo?'<span class="badge todo qbadge">'+c.dirTodo+'</span>':'')+
     '<span class="qic"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">'+q[2]+'</svg></span><span class="lbl">'+q[1]+'</span></button>').join('')+'</div>';
