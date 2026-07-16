@@ -950,8 +950,8 @@ function renderPrice(){
   let rows=ROWS.filter(r=>r.unitPrice!=null);
   rows=rows.filter(r=>{if(f==='changed')return r.priceDelta&&Math.abs(r.priceDelta)>0.005;if(f==='down')return r.priceDelta<-0.005;return true;}).filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q));
   rows.sort((a,b)=>Math.abs(b.priceDelta||0)-Math.abs(a.priceDelta||0));
-  $('#priceTbl').innerHTML=`<thead><tr><th>Položka</th><th>Kategorie</th><th class="num">Akt. cena/ks</th><th class="num">Sleva</th><th class="num">Nová cena/ks</th><th class="num">Změna</th><th>Akce</th></tr></thead><tbody>`+
-    rows.slice(0,1500).map(r=>{const d=r.priceDelta,cls=d<-0.005?'sev-err':'';const a=d<-0.005?'▼':'–';return `<tr><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(r.unitPrice,1)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num"><b>${fmt(r.newPrice,1)}</b></td><td class="num ${cls}">${a} ${d==null?'—':fmt(Math.abs(d),1)}</td><td>${esc(r.action)}</td></tr>`;}).join('')+`</tbody>`;
+  $('#priceTbl').innerHTML=`<thead><tr><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Akt. cena/ks</th><th class="num">Sleva</th><th class="num">Nová cena/ks</th><th class="num">Změna</th><th>Akce</th></tr></thead><tbody>`+
+    rows.slice(0,1500).map(r=>{const d=r.priceDelta,cls=d<-0.005?'sev-err':'';const a=d<-0.005?'▼':'–';return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(r.unitPrice,1)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num"><b>${fmt(r.newPrice,1)}</b></td><td class="num ${cls}">${a} ${d==null?'—':fmt(Math.abs(d),1)}</td><td>${esc(r.action)}</td></tr>`;}).join('')+`</tbody>`;
 }
 function renderDead(){
   const q=$('#deadSearch').value.toLowerCase(),f=$('#deadFilter').value;
@@ -959,15 +959,15 @@ function renderDead(){
   if(f==='dead')rows=rows.filter(r=>r.cat==='Mrtvá zásoba');if(f==='A')rows=rows.filter(r=>r.prio==='A');
   rows=rows.filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q));
   const o={A:0,B:1,C:2,'-':3};rows.sort((a,b)=>o[a.prio]-o[b.prio]||(b.BB||0)-(a.BB||0));
-  $('#deadTbl').innerHTML=`<thead><tr><th>Priorita</th><th>Položka</th><th>Kategorie</th><th class="num">Měs. bez prodeje</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th class="num">Roční ICC</th><th class="num">Sleva</th><th class="num">Cena → nová</th><th>Akce</th></tr></thead><tbody>`+
-    rows.map(r=>`<tr><td>${prioPill(r.prio)}</td><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${fmt(r.iccCost)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${fmt(r.unitPrice,1)} → <b>${fmt(r.newPrice,1)}</b></td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
-  if(!rows.length)$('#deadTbl').innerHTML+='<tbody><tr><td colspan="10" class="muted" style="padding:18px">Žádné položky.</td></tr></tbody>';
+  $('#deadTbl').innerHTML=`<thead><tr><th>Priorita</th><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Měs. bez prodeje</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th class="num">Roční ICC</th><th class="num">Sleva</th><th class="num">Cena → nová</th><th>Akce</th></tr></thead><tbody>`+
+    rows.map(r=>`<tr><td>${prioPill(r.prio)}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${fmt(r.iccCost)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${fmt(r.unitPrice,1)} → <b>${fmt(r.newPrice,1)}</b></td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
+  if(!rows.length)$('#deadTbl').innerHTML+='<tbody><tr><td colspan="11" class="muted" style="padding:18px">Žádné položky.</td></tr></tbody>';
 }
 function renderAll(){
   const q=$('#allSearch').value.toLowerCase();
   let rows=ROWS.filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q)||String(r.sk||'').includes(q));
-  $('#allTbl').innerHTML=`<thead><tr><th>SK</th><th>Položka</th><th>Kategorie</th><th class="num">Bez prodeje</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th>Priorita</th><th class="num">Sleva</th><th class="num">Nová cena</th><th>Akce</th></tr></thead><tbody>`+
-    rows.slice(0,2000).map(r=>`<tr><td class="muted">${r.sk??''}</td><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td>${prioPill(r.prio)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${fmt(r.newPrice,1)}</td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
+  $('#allTbl').innerHTML=`<thead><tr><th>SK</th><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Bez prodeje</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th>Priorita</th><th class="num">Sleva</th><th class="num">Nová cena</th><th>Akce</th></tr></thead><tbody>`+
+    rows.slice(0,2000).map(r=>`<tr><td class="muted">${r.sk??''}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td>${prioPill(r.prio)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${fmt(r.newPrice,1)}</td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
 }
 function renderModel(){
   const q=$('#modelSearch').value.toLowerCase();
@@ -1461,9 +1461,9 @@ function renderElko(){
     const img=ok?`<img src="${elkoImg(m.best)}" loading="lazy" referrerpolicy="no-referrer" style="width:56px;height:56px;object-fit:contain;background:#fff;border-radius:6px" onerror="this.replaceWith(document.createTextNode('—'))">`:'<span class="muted">—</span>';
     const link=ok?`<a href="${ELKO_BASE+m.best.u}" target="_blank" rel="noopener">${esc(m.best.t)}</a> <span class="muted">(${Math.round(m.score*100)} %)</span>`
       :`<a href="https://www.google.com/search?q=${encodeURIComponent('site:shop.elkoplast.cz '+r.name)}" target="_blank" rel="noopener">Hledat na e-shopu →</a>`;
-    return `<tr><td>${img}</td><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(r.AZ)}</td><td>${link}</td></tr>`;
+    return `<tr><td>${img}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(r.AZ)}</td><td>${link}</td></tr>`;
   }).join('');
-  $('#elkoTbl').innerHTML=`<thead><tr><th>Obrázek</th><th>Položka (sklad)</th><th>Kategorie</th><th class="num">Sklad ks</th><th>E-shop produkt (shoda)</th></tr></thead><tbody>${out}</tbody>`;
+  $('#elkoTbl').innerHTML=`<thead><tr><th>Obrázek</th><th>Položka (sklad)</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Sklad ks</th><th>E-shop produkt (shoda)</th></tr></thead><tbody>${out}</tbody>`;
   let tot=0;ROWS.forEach(r=>{if(r._elko.best&&r._elko.score>=thr)tot++;});
   $('#elkoCount').textContent=tot+' / '+ROWS.length+' spárováno (katalog '+ELKO_CATALOG.length+' produktů)';
 }
@@ -1529,8 +1529,8 @@ function renderNakup(){
   const fmap={now:'Objednat teď',soon:'Brzy',season:'Mimo sezónu',ok:'OK',no:'Nenakupovat'};
   if(f)rows=rows.filter(o=>o.r._nk.status===fmap[f]);
   const sf={'Objednat teď':'c-dead','Brzy':'c-aging','Mimo sezónu':'c-slow','OK':'c-ok','Nenakupovat':'c-none'};
-  $('#nkTbl').innerHTML=`<thead><tr><th>Položka</th><th>Kategorie</th><th class="num">Roční prodej</th><th class="num">Sez. index (teď)</th><th class="num">Sklad ks</th><th class="num">Dní krytí</th><th class="num" title="Očekávaná poptávka za dodací lhůtu + cílové pokrytí od aktuálního měsíce">Poptávka (okno)</th><th class="num">Bod obj.</th><th class="num" title="Cílová zásoba po objednávce (jen na plánovací okno)">Cíl. zásoba</th><th class="num">Doporučeno obj.</th><th>Kdy</th><th>Stav</th><th>Důvod</th></tr></thead><tbody>`+
-    rows.slice(0,1500).map(o=>{const r=o.r,n=r._nk;return `<tr><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.D)}</td><td class="num">${fmt(n.siCur,1)}×</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.windowDem)}</td><td class="num">${fmt(n.rop)}</td><td class="num">${fmt(n.target)}</td><td class="num"><b>${n.rec?fmt(n.rec):'—'}</b></td><td>${esc(n.when)}</td><td><span class="pill ${sf[n.status]}">${n.status}</span></td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+`</tbody>`;
+  $('#nkTbl').innerHTML=`<thead><tr><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Roční prodej</th><th class="num">Sez. index (teď)</th><th class="num">Sklad ks</th><th class="num">Dní krytí</th><th class="num" title="Očekávaná poptávka za dodací lhůtu + cílové pokrytí od aktuálního měsíce">Poptávka (okno)</th><th class="num">Bod obj.</th><th class="num" title="Cílová zásoba po objednávce (jen na plánovací okno)">Cíl. zásoba</th><th class="num">Doporučeno obj.</th><th>Kdy</th><th>Stav</th><th>Důvod</th></tr></thead><tbody>`+
+    rows.slice(0,1500).map(o=>{const r=o.r,n=r._nk;return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.D)}</td><td class="num">${fmt(n.siCur,1)}×</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.windowDem)}</td><td class="num">${fmt(n.rop)}</td><td class="num">${fmt(n.target)}</td><td class="num"><b>${n.rec?fmt(n.rec):'—'}</b></td><td>${esc(n.when)}</td><td><span class="pill ${sf[n.status]}">${n.status}</span></td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+`</tbody>`;
   const P=NK_PARAMS;
   const now=ROWS.filter(r=>r._nk&&r._nk.status==='Objednat teď').length;
   const recsum=ROWS.reduce((s,r)=>s+(r._nk?r._nk.rec:0),0);
@@ -1552,8 +1552,8 @@ function renderNakupOrder(){
   ].map(k=>`<div class="kpi ${k[0]}"><div class="v">${k[1]}</div><div class="l">${k[2]}</div></div>`).join('');
   const tb=$('#nkOrderTbl'); if(!tb) return;
   if(!list.length){tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Aktuálně není co objednávat — žádná položka není pod bodem objednání pro nejbližší okno.</td></tr></tbody>';return;}
-  tb.innerHTML='<thead><tr><th>Produkt</th><th>Kategorie</th><th class="num">Skladem</th><th class="num">Dní krytí</th><th class="num" title="Očekávaná poptávka za dodací lhůtu + cílové pokrytí od teď">Poptávka (okno)</th><th class="num">Objednat (ks)</th><th class="num">Cena/ks</th><th class="num">Hodnota (Kč)</th><th>Proč</th></tr></thead><tbody>'+
-    list.slice(0,1500).map(o=>{const r=o.r,n=o.n;return `<tr><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.windowDem)}</td><td class="num"><b>${fmt(n.rec)}</b></td><td class="num">${r.unitPrice!=null?fmt(r.unitPrice)+' Kč':'—'}</td><td class="num">${o.val!=null?fmt(Math.round(o.val)):'—'}</td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+'</tbody>';
+  tb.innerHTML='<thead><tr><th>Produkt</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Skladem</th><th class="num">Dní krytí</th><th class="num" title="Očekávaná poptávka za dodací lhůtu + cílové pokrytí od teď">Poptávka (okno)</th><th class="num">Objednat (ks)</th><th class="num">Cena/ks</th><th class="num">Hodnota (Kč)</th><th>Proč</th></tr></thead><tbody>'+
+    list.slice(0,1500).map(o=>{const r=o.r,n=o.n;return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.windowDem)}</td><td class="num"><b>${fmt(n.rec)}</b></td><td class="num">${r.unitPrice!=null?fmt(r.unitPrice)+' Kč':'—'}</td><td class="num">${o.val!=null?fmt(Math.round(o.val)):'—'}</td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+'</tbody>';
 }
 ['nkSearch','nkFilter'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=renderNakup;});
 (function(){const b=$('#nkApply');if(b)b.onclick=()=>{recalc();renderNakup();};})();
@@ -1873,8 +1873,8 @@ function renderDrill(){
   const rows=DRILL_ROWS.filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q));
   const sAZ=rows.reduce((s,r)=>s+(r.AZ||0),0),sBB=rows.reduce((s,r)=>s+(r.BB||0),0),sICC=rows.reduce((s,r)=>s+(r.iccCost||0),0);
   $('#drillSum').innerHTML='<span><b>'+fmt(rows.length)+'</b> položek</span><span>Σ hodnota skladu <b>'+fmt(sBB)+' Kč</b></span><span>Σ sklad <b>'+fmt(sAZ)+' ks</b></span>'+(sICC>0?'<span>Σ roční ICC <b>'+fmt(sICC)+' Kč</b></span>':'');
-  $('#drillTbl').innerHTML=`<thead><tr><th>Položka</th><th>Kategorie</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th class="num">Sleva</th><th>Akce</th><th>Priorita</th><th class="num">Nová cena</th></tr></thead><tbody>`+
-    rows.slice(0,3000).map(r=>`<tr><td>${esc(r.name)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td>${esc(r.action)}</td><td>${prioPill(r.prio)}</td><td class="num">${r.newPrice==null?'—':fmt(r.newPrice,2)}</td></tr>`).join('')+`</tbody>`;
+  $('#drillTbl').innerHTML=`<thead><tr><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th class="num">Sleva</th><th>Akce</th><th>Priorita</th><th class="num">Nová cena</th></tr></thead><tbody>`+
+    rows.slice(0,3000).map(r=>`<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td>${esc(r.action)}</td><td>${prioPill(r.prio)}</td><td class="num">${r.newPrice==null?'—':fmt(r.newPrice,2)}</td></tr>`).join('')+`</tbody>`;
   try{condFormat($('#drillTbl'));}catch(e){}
 }
 (function(){
