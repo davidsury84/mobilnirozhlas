@@ -58,6 +58,7 @@ function parseRows(klic, rows) {
   const out = [];
   if (klic === 'polsko') {
     for (const r of rows) {
+      if (!Array.isArray(r)) continue;
       const vyrobek = r[1], ks = cislo(r[6]), zeDne = datum(r[9]);
       if (!jeZakazka(vyrobek, ks, zeDne)) continue;
       out.push({
@@ -73,6 +74,7 @@ function parseRows(klic, rows) {
   }
   if (klic === 'supikovice') {
     for (const r of rows) {
+      if (!Array.isArray(r)) continue;
       const vyrobek = r[2], ks = cislo(r[10]), zeDne = datum(r[14]);
       if (!jeZakazka(vyrobek, ks, zeDne)) continue;
       const cvz = String(r[1] || '').trim();
@@ -92,6 +94,7 @@ function parseRows(klic, rows) {
   }
   const map = MAPY[klic]; if (!map) return out;
   for (const r of rows) {
+    if (!Array.isArray(r)) continue;
     const vyrobek = r[map.vyrobek], ks = cislo(r[map.ks]), zeDne = datum(r[map.zeDne]);
     if (!jeZakazka(vyrobek, ks, zeDne)) continue;
     const prefix = String(r[map.prefix] || '').trim();
@@ -150,10 +153,12 @@ async function fetchVyroba({ force = false } = {}) {
     try { const r = await nactiZavod(z, rok); zakazky = zakazky.concat(r); zivych++; }
     catch (e) { chyby[z.klic] = String(e.message || e).slice(0, 120); }
   }
-  const data = meta({ rok, zakazky, chyby, zivaData: zivych > 0, aktualizovano: new Date().toISOString() });
-  if (zivych > 0) { _cache = { at: now, data }; return data; }
+  const data = meta({ rok, zakazky, chyby, zivaData: zakazky.length > 0, aktualizovano: new Date().toISOString() });
+  // Máme aspoň nějaká živá data (i když část závodů selhala 403) → ukážeme je + chyby.
+  if (zakazky.length > 0) { _cache = { at: now, data }; return data; }
+  // Živá data nic nevrátila (výpadek přístupu ke všem knihám) → padáme na snapshot, ať přehled není prázdný.
   if (fs.existsSync(SNAPSHOT_FILE)) {
-    try { return fromSnapshot(JSON.parse(fs.readFileSync(SNAPSHOT_FILE, 'utf8'))); } catch (_) {}
+    try { const snap = fromSnapshot(JSON.parse(fs.readFileSync(SNAPSHOT_FILE, 'utf8'))); snap.chyby = chyby; return snap; } catch (_) {}
   }
   return data;
 }

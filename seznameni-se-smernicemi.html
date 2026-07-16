@@ -1756,6 +1756,13 @@ function renderKovoVyroba(){
       '<p class="muted" style="font-size:12px;margin:12px 0 0">Po nasdílení se přehled načte sám (obnova dat každých 30 minut).</p></div>';
     el.innerHTML=h; return;
   }
+  // varování, když se část knih nenačetla (403) — data se doplní ze snímku
+  if(z.length && Object.keys(D.chyby||{}).length){
+    const chybZav=Object.keys(D.chyby).map(k=>ZAVODY[k]?ZAVODY[k][0]:k).join(', ');
+    h+='<div class="card pad" style="margin-bottom:16px;border-left:4px solid #b7791f"><strong>⚠ Část výrobních knih se z živých dat nenačetla</strong>'+
+      '<p style="font-size:13px;line-height:1.6;margin:6px 0 0">Service account nemá přístup k: <strong>'+esc(chybZav)+'</strong>. '+(D.zivaData?'Ostatní závody jsou živě, chybějící se berou z posledního snímku.':'Zobrazují se data z posledního snímku'+(D.snapshot?' ('+new Date(D.snapshot).toLocaleDateString("cs-CZ")+')':'')+'.')+'</p>'+
+      '<p class="muted" style="font-size:12px;margin:8px 0 0">Nasdílejte tyto tabulky robotímu účtu (role <strong>Čtenář</strong>): <span class="mono" style="user-select:all;background:var(--bg-2);padding:2px 8px;border-radius:6px">'+esc(D.saEmail||'')+'</span></p></div>';
+  }
   // souhrnné karty
   h+='<div class="card pad" style="margin-bottom:16px;display:flex;gap:30px;flex-wrap:wrap">'+
     '<div><div class="muted" style="font-size:12px">Zakázek '+rok+'</div><strong style="font-size:24px">'+aktivni.length+'</strong></div>'+
