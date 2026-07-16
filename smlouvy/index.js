@@ -57,6 +57,9 @@ function mount(host) {
   // Doplnění všech hlídaných termínů z registru (indexace, audity, záruky…).
   try { require('./seed-terminy').seedTerminy(M); }
   catch (e) { console.error('[smlouvy] seed termínů selhal:', e.message); }
+  // Doplnění IČO protistran (z PDF smluv).
+  try { require('./seed-ico').seedIco(M); }
+  catch (e) { console.error('[smlouvy] seed IČO selhal:', e.message); }
 
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);

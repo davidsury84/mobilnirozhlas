@@ -264,6 +264,7 @@ async function detail(id){
   const info=el('table',{});
   const radek=(k,v)=>info.append(el('tr',{},el('th',{style:'width:200px'},k),el('td',{html:v})));
   radek('Kategorie',`${s.kategorie||''}${s.podtyp?' · '+s.podtyp:''}${s.smer?' ('+s.smer+')':''}`);
+  radek('Protistrana / IČO',esc(s.protistrana_nazev||'')+(s.protistrana_ico?' · IČO '+esc(s.protistrana_ico):''));
   radek('Předmět',esc(s.predmet||''));
   radek('Platnost',(s.platnost_do?czd(s.platnost_do):s.platnost_typ)+(s.platnost_podminka?' · '+esc(s.platnost_podminka):''));
   radek('Výpověď / prolongace',(s.vypovedni_lhuta_mesice?s.vypovedni_lhuta_mesice+' měs.':'—')+' / '+s.prolongace);
