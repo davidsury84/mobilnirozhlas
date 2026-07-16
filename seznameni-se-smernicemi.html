@@ -2211,7 +2211,8 @@ function mjSurvey(kind){
   MUJ.view="pruzkumy"; renderSidebar();
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const url='/'+encodeURIComponent(kind)+'#kdo='+encodeURIComponent(MUJ.email);
+  const tok=(MUJ.data&&MUJ.data.surveyToken)||'';
+  const url='/'+encodeURIComponent(kind)+(tok?('?i='+encodeURIComponent(tok)):'')+'#kdo='+encodeURIComponent(MUJ.email);
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showPruzkumy()">← Zpět na průzkumy</button>'+
       '<span class="muted" style="font-size:13px">Po odeslání se datum vyplnění uloží automaticky. Vyplnit lze jednou za měsíc. Zpět se vrátíte tlačítkem vlevo.</span></div>'+

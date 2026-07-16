@@ -2053,7 +2053,7 @@ const server = http.createServer(async (req, res) => {
       // Je schvalovatelem? = je něčí přímý nadřízený, ředitel střediska, nebo jednatel.
       const isApprover = isAdmin(req) || emps.some(x => x.id !== (me && me.id) && (x.email || '').toLowerCase() !== eml && (approverFor(x, emps) || {}).id === (me && me.id));
       const vacPending = readVac().requests.filter(r => r.status === 'pending' && (isAdmin(req) || (r.approverEmail || '').toLowerCase() === eml)).length;
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), heroImage: (readJson(SITE_F, {}).heroImage) || null });
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 
     // ---- Aktuality (novinky na intranetu) ----
