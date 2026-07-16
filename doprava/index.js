@@ -174,6 +174,70 @@ function parseVozy(rows) {
   return out;
 }
 
+/* ---------- jednotlivé zakázky (jízdy) z listů jednotlivých vozů ----------
+   Každý vůz má vlastní list „<číslo> - <řidič>" s denními jízdami:
+   datum | Trasa | přejezd | vzdálenost s nákladem | EUR | fakturace | převod |
+   Celkem tržby v CZK | tržba/km | Obchodník | váha | puťovka | konstrukce | Poznámka
+   „Klient" (dle zadání) = cíl trasy — poslední (u okružní Br-…-Br prostřední) úsek. */
+const ZAK_NEJIZDA = /^(svatek|dovolena|skoleni|nemoc|volno|servis|stk|sanitka|lekar|porucha|oprava|paragraf|neplacene|nahradni|home ?office|preprava neproběhla|osetrovani|oc\b|p\.?n\.?)/;
+function cilZTrasy(trasa) {
+  const s = String(trasa || '').trim();
+  if (!s) return '';
+  const segs = s.split(/\s*(?:->|[-–—>])\s*/).map((x) => x.trim()).filter(Boolean);
+  if (segs.length <= 1) return s;
+  const home = (x) => /^br(untal)?\.?$/i.test(x);
+  if (segs.length >= 3 && norm(segs[0]) === norm(segs[segs.length - 1])) return segs.slice(1, -1).join(' / ');
+  const last = segs[segs.length - 1];
+  return (home(last) && !home(segs[0])) ? segs[0] : last;
+}
+function parseZakazky(rows, voz) {
+  // Najdi hlavičku (řádek se štítkem „trasa") a zmapuj sloupce dle názvů; fallback = pevné indexy.
+  let idx = { datum: 0, trasa: 1, prejezd: 2, km: 3, trzby: 7, trzbaKm: 8, obchodnik: 9, vaha: 10, putovka: 11, pozn: 13 };
+  let hdrRow = -1;
+  for (let i = 0; i < Math.min(rows.length, 6); i++) {
+    const labels = (rows[i] || []).map((c) => norm(c));
+    if (labels.some((l) => l === 'trasa')) {
+      hdrRow = i;
+      const find = (fn) => { const j = labels.findIndex(fn); return j; };
+      const m = {
+        trasa: find((l) => l === 'trasa'),
+        prejezd: find((l) => l.startsWith('prejezd')),
+        km: find((l) => l.startsWith('vzdalenost')),
+        trzby: find((l) => l.includes('celkem trzby')),
+        trzbaKm: find((l) => l.includes('trzba/km') || l.includes('trzba / km')),
+        obchodnik: find((l) => l.startsWith('obchodnik')),
+        vaha: find((l) => l.startsWith('vaha')),
+        putovka: find((l) => l.startsWith('putovka')),
+        pozn: find((l) => l.startsWith('pozn')),
+      };
+      Object.keys(m).forEach((k) => { if (m[k] >= 0) idx[k] = m[k]; });
+      idx.datum = 0;
+      break;
+    }
+  }
+  const out = [];
+  for (let i = (hdrRow >= 0 ? hdrRow + 1 : 0); i < rows.length; i++) {
+    const r = rows[i] || [];
+    const dm = String(r[idx.datum] || '').trim().match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
+    if (!dm) continue;
+    const trasa = String(r[idx.trasa] || '').trim();
+    if (!trasa || ZAK_NEJIZDA.test(norm(trasa))) continue;
+    const trzby = parseNum(r[idx.trzby]);
+    const km = parseNum(r[idx.km]);
+    if ((trzby == null || trzby === 0) && (km == null || km === 0)) continue;   // řádek bez najetých km i tržby = nejde o reálnou jízdu
+    out.push({
+      datum: dm[3] + '-' + String(dm[2]).padStart(2, '0') + '-' + String(dm[1]).padStart(2, '0'),
+      mesic: dm[3] + '-' + String(dm[2]).padStart(2, '0'),
+      voz: voz.voz, ridic: voz.ridic || '',
+      trasa, cil: cilZTrasy(trasa),
+      km: km || 0, trzby: trzby || 0,
+      obchodnik: String(r[idx.obchodnik] || '').trim().replace(/\.$/, ''),
+      putovka: String(r[idx.putovka] || '').trim(),
+    });
+  }
+  return out;
+}
+
 function mount(host) {
   const CACHE_F = path.join(host.dataDir || __dirname, 'doprava-cache.json');
   let cache = null;
@@ -236,6 +300,21 @@ function mount(host) {
     return best;
   }
 
+  // Jednotlivé zakázky: z výkonového souboru projde listy jednotlivých vozů („<číslo> - <řidič>").
+  async function readZakazky(id) {
+    const listy = await sheets.listSheets(id).catch(() => []);
+    const vozListy = listy.filter((t) => /^\s*\d+\s*[-–]/.test(t) && !/depozit|rekapitul/i.test(t));
+    const out = [];
+    for (const t of vozListy) {
+      try {
+        const m = t.match(/^\s*(\d+)\s*[-–]\s*(.*)$/);
+        const rows = await sheets.readValues(id, "'" + t.replace(/'/g, "''") + "'!A1:P400");
+        out.push(...parseZakazky(rows, { voz: m ? m[1] : t.trim(), ridic: m ? m[2].trim() : '' }));
+      } catch (_) {}
+    }
+    return out.sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : Number(a.voz) - Number(b.voz)));
+  }
+
   // Historické ročníky: z každého souboru list s nejvíce měsíci; rok = převažující rok v datech.
   async function readHistorie() {
     const roky = [];
@@ -280,8 +359,12 @@ function mount(host) {
         data.evidence = (cache && cache.evidence) || null;
         console.error('[doprava] evidence vozů se nenačetla:', data.evidenceChyba);
       }
-      if (vyk.status === 'fulfilled') { data.vozidla = vyk.value.vozidla; data.vykonyZdroj = { id: vyk.value.id, list: vyk.value.list, mesic: vyk.value.mesic }; }
-      else data.vykonyChyba = vyk.reason.message;
+      if (vyk.status === 'fulfilled') {
+        data.vozidla = vyk.value.vozidla; data.vykonyZdroj = { id: vyk.value.id, list: vyk.value.list, mesic: vyk.value.mesic };
+        // Jednotlivé zakázky se čtou z téhož (nejnovějšího) výkonového souboru; selhání nezhatí zbytek.
+        try { data.zakazky = await readZakazky(vyk.value.id); }
+        catch (e) { data.zakazky = (cache && cache.zakazky) || null; console.error('[doprava] zakázky se nenačetly:', e.message); }
+      } else { data.vykonyChyba = vyk.reason.message; data.zakazky = (cache && cache.zakazky) || null; }
       if (nak.status === 'fulfilled') data.naklady = nak.value;
       else data.nakladyChyba = nak.reason.message;
       if (data.vykonyChyba) { data.vozidla = (cache && cache.vozidla) || null; console.error('[doprava] tabulka výkonů se nenačetla:', data.vykonyChyba); }
@@ -335,7 +418,7 @@ function mount(host) {
           cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
           cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
         ].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
@@ -382,4 +465,4 @@ function mount(host) {
   return { handle, tick };
 }
 
-module.exports = { mount };
+module.exports = { mount, parseZakazky, cilZTrasy };

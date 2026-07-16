@@ -53,6 +53,7 @@
   <b>ELKOPLAST · Doprava</b>
   <button data-tab="prehled" class="act">Přehled</button>
   <button data-tab="vozidla">Vozidla</button>
+  <button data-tab="zakazky">Zakázky</button>
   <button data-tab="zvrat">Bod zvratu</button>
   <button data-tab="citlivost">Citlivost</button>
   <button data-tab="bonus">Bonus za spotřebu</button>
@@ -167,6 +168,7 @@ function render(tab){
   Object.keys(CH).forEach(k=>{CH[k].destroy();delete CH[k];});
   if(tab==='prehled') tabPrehled();
   else if(tab==='vozidla') tabVozidla();
+  else if(tab==='zakazky') tabZakazky();
   else if(tab==='zvrat') tabZvrat();
   else if(tab==='citlivost') tabCitlivost();
   else if(tab==='bonus') tabBonus();
@@ -197,6 +199,53 @@ function rokySerie(){
     mapa[rok]={rok,mes,akt:M.aktivni.length,aktualni:true};   // aktuální rok má přednost před historií
   }
   return Object.values(mapa).sort((a,b)=>a.rok-b.rok);
+}
+/* ---------- Zakázky: jednotlivé jízdy z listů vozů; „klient" = cíl trasy ---------- */
+function zakNorm(s){ return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
+function vozRidic(v){ const z=((DATA&&DATA.zakazky)||[]).find(x=>x.voz===v&&x.ridic); return z?z.ridic:''; }
+function tabZakazky(){
+  const Z=(DATA&&DATA.zakazky)||null;
+  let h='<h1>Zakázky <span class="muted" style="font-size:14px;font-weight:400">jednotlivé jízdy · „klient" = cíl trasy</span></h1>';
+  if(!Z||!Z.length){
+    h+=alertHtml('info','Jednotlivé zakázky se čtou z listů jednotlivých vozů („&lt;číslo&gt; - řidič") ve výkazu „Daily report ECZ". Zatím nejsou k dispozici — dej <b>↻ Obnovit z tabulek</b>, případně zkontroluj, že je robotovi nasdílený aktuální ročník.');
+    $('#app').innerHTML=h; return;
+  }
+  const mesice=[...new Set(Z.map(z=>z.mesic))].sort().reverse();
+  const vozy=[...new Set(Z.map(z=>z.voz))].sort((a,b)=>Number(a)-Number(b));
+  const obch=[...new Set(Z.map(z=>z.obchodnik).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'cs'));
+  const opt=(val,lab)=>'<option value="'+esc(val)+'">'+esc(lab)+'</option>';
+  const st='padding:7px 10px;border:1px solid #cfd8e3;border-radius:6px;font:inherit;background:#fff';
+  h+='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 16px">'
+    +'<select id="zMes" onchange="zakFiltr()" style="'+st+'">'+opt('','Všechny měsíce')+mesice.map(m=>opt(m,m.split('-').reverse().join('/'))).join('')+'</select>'
+    +'<select id="zVoz" onchange="zakFiltr()" style="'+st+'">'+opt('','Všechny vozy')+vozy.map(v=>opt(v,v+(vozRidic(v)?' – '+vozRidic(v):''))).join('')+'</select>'
+    +'<select id="zObch" onchange="zakFiltr()" style="'+st+'">'+opt('','Všichni obchodníci')+obch.map(o=>opt(o,o)).join('')+'</select>'
+    +'<input id="zHled" type="search" placeholder="Hledat cíl, trasu, puťovku…" oninput="zakFiltr()" style="'+st+';flex:1;min-width:170px">'
+    +'</div><div id="zakSum"></div><div id="zakTab"></div>';
+  $('#app').innerHTML=h;
+  if(mesice[0]) $('#zMes').value=mesice[0];   // výchozí = nejnovější měsíc (ať se nerendruje vše najednou)
+  zakFiltr();
+}
+function zakFiltr(){
+  const Z=(DATA&&DATA.zakazky)||[];
+  const fm=$('#zMes').value, fv=$('#zVoz').value, fo=$('#zObch').value, fh=zakNorm($('#zHled').value);
+  const rows=Z.filter(z=>(!fm||z.mesic===fm)&&(!fv||z.voz===fv)&&(!fo||z.obchodnik===fo)
+    &&(!fh||zakNorm(z.cil+' '+z.trasa+' '+z.putovka+' '+z.obchodnik).includes(fh)));
+  const sumT=rows.reduce((s,z)=>s+z.trzby,0), sumKm=rows.reduce((s,z)=>s+z.km,0);
+  const byCil={}; rows.forEach(z=>{const k=z.cil||'—';(byCil[k]=byCil[k]||{n:0,t:0,km:0});byCil[k].n++;byCil[k].t+=z.trzby;byCil[k].km+=z.km;});
+  const cile=Object.entries(byCil).sort((a,b)=>b[1].t-a[1].t);
+  const stat=(b,l)=>'<div style="background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 16px;min-width:120px"><div style="font-size:22px;font-weight:700">'+b+'</div><div class="muted" style="font-size:12px">'+l+'</div></div>';
+  let s='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">'
+    +stat(rows.length.toLocaleString('cs-CZ'),'jízd')+stat(kc(sumT),'tržby')+stat(sumKm.toLocaleString('cs-CZ')+' km','ujeto')+stat(cile.length,'cílů (klientů)')+'</div>';
+  const TOP=cile.slice(0,25);
+  s+='<h2>Podle cíle (klient) — '+cile.length+'</h2><table><thead><tr><th style="text-align:left">Cíl</th><th>Jízd</th><th>km</th><th>Tržby</th><th>Ø Kč/km</th></tr></thead><tbody>'
+    +TOP.map(([k,v])=>'<tr><td style="text-align:left">'+esc(k)+'</td><td>'+v.n+'</td><td>'+v.km.toLocaleString('cs-CZ')+'</td><td>'+kc(v.t)+'</td><td>'+(v.km>0?d2(v.t/v.km):'—')+'</td></tr>').join('')
+    +'</tbody></table>'+(cile.length>TOP.length?'<p class="muted" style="font-size:12px">Zobrazeno '+TOP.length+' cílů s nejvyššími tržbami z '+cile.length+'. Zužte filtrem nebo hledáním.</p>':'');
+  $('#zakSum').innerHTML=s;
+  const LIM=500, shown=rows.slice(0,LIM);
+  let t='<h2>Jednotlivé jízdy ('+rows.length.toLocaleString('cs-CZ')+')</h2><table><thead><tr><th>Datum</th><th>Vůz</th><th style="text-align:left">Trasa</th><th style="text-align:left">Cíl</th><th>km</th><th>Tržba</th><th style="text-align:left">Obchodník</th><th>Puťovka</th></tr></thead><tbody>'
+    +shown.map(z=>'<tr><td style="white-space:nowrap">'+z.datum.split('-').reverse().join('.')+'</td><td>'+esc(z.voz)+'</td><td style="text-align:left">'+esc(z.trasa)+'</td><td style="text-align:left">'+esc(z.cil)+'</td><td>'+z.km.toLocaleString('cs-CZ')+'</td><td style="white-space:nowrap">'+kc(z.trzby)+'</td><td style="text-align:left">'+esc(z.obchodnik)+'</td><td>'+esc(z.putovka)+'</td></tr>').join('')
+    +'</tbody></table>'+(rows.length>LIM?'<p class="muted" style="font-size:12px">Zobrazeno prvních '+LIM+' z '+rows.length.toLocaleString('cs-CZ')+' — zužte filtrem (měsíc / vůz / obchodník).</p>':'');
+  $('#zakTab').innerHTML=t;
 }
 function tabHistorie(){
   const serie=rokySerie();
