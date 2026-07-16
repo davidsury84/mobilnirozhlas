@@ -51,6 +51,12 @@ function mount(host) {
     sd.seedDodatky(M);
     sd.seedOpravaCdCargo(M);
   } catch (e) { console.error('[smlouvy] seed dodatky selhal:', e.message); }
+  // Anotace „o čem smlouva je" (z předmětu + PDF).
+  try { require('./seed-anotace').seedAnotace(M); }
+  catch (e) { console.error('[smlouvy] seed anotace selhal:', e.message); }
+  // Doplnění všech hlídaných termínů z registru (indexace, audity, záruky…).
+  try { require('./seed-terminy').seedTerminy(M); }
+  catch (e) { console.error('[smlouvy] seed termínů selhal:', e.message); }
 
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);
@@ -231,6 +237,12 @@ function mount(host) {
       if (p === '/api/smlouvy/me' && req.method === 'GET') {
         const e = host.empSession(req) || {};
         json(res, 200, { email: e.email || null, admin: smiPsat(req) }); return true;
+      }
+      // Seznam zaměstnanců (pro našeptávač garanta v seznamu smluv).
+      if (p === '/api/smlouvy/lide' && req.method === 'GET') {
+        let lide = [];
+        try { lide = (host.getState().employees || []).map((e) => ({ email: e.email, name: e.name })).filter((x) => x.email); } catch (_) {}
+        json(res, 200, lide); return true;
       }
       if (p === '/api/smlouvy/dashboard' && req.method === 'GET') { json(res, 200, dashboardData()); return true; }
 

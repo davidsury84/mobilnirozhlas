@@ -58,6 +58,7 @@ async function api(p,opt){const r=await fetch(p,opt);const t=await r.text();let 
 function pill(dny){return dny<0?['cerv','PO TERMÍNU']:dny<30?['cerv','do 30']:dny<=90?['zlut','do 90']:['sed',dny+' dní'];}
 
 let ADMIN=false;
+let LIDE=[];
 const app = $('#app');
 document.querySelectorAll('header button[data-tab]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('header button[data-tab]').forEach(x=>x.classList.remove('act'));
@@ -208,11 +209,35 @@ async function list(){
       el('td',{},s.protistrana_nazev),
       el('td',{},s.platnost_do?czd(s.platnost_do):(s.platnost_podminka||s.platnost_typ)),
       el('td',{},money(s.hodnota,s.mena)||s.hodnota_popis||'—'),
-      el('td',{html:s.garant_email?esc(s.garant_email):'<span class="warn">nedořešen</span>'}),
+      garantCell(s),
       el('td',{},el('span',{class:'pill '+(s.stav==='aktivni'?'zel':'sed')},s.stav_popis||s.stav)))));
     t.append(tb);wrap.innerHTML='';wrap.append(t);
   }
+  if(!LIDE.length){try{LIDE=await api('/api/smlouvy/lide');}catch(e){}}
+  if(!$('#lide-dl'))document.body.append(el('datalist',{id:'lide-dl'},...LIDE.map(l=>el('option',{value:l.email},l.name||''))));
   go.onclick=nacti;q.addEventListener('keydown',e=>{if(e.key==='Enter')nacti();});await nacti();
+}
+// Buňka garanta — pro správce/admina inline editovatelná (Enter/blur uloží), jinak text.
+function garantCell(s){
+  const td=el('td');
+  td.addEventListener('click',e=>e.stopPropagation()); // klik do buňky neotevře detail smlouvy
+  if(!ADMIN){ td.innerHTML=s.garant_email?esc(s.garant_email):'<span class="warn">nedořešen</span>'; return td; }
+  const inp=el('input',{type:'email',value:s.garant_email||'',placeholder:'garant@elkoplast.cz',list:'lide-dl',
+    style:'width:200px;padding:4px 6px'+(s.garant_email?'':';border-color:var(--cerv)')});
+  const stav=el('span',{style:'margin-left:6px;font-size:12px;white-space:nowrap'});
+  async function uloz(){
+    const v=inp.value.trim();
+    if(v===(s.garant_email||''))return;
+    stav.textContent='ukládám…';stav.style.color='#888';
+    try{ await api('/api/smlouvy/update?id='+s.id,{method:'POST',body:JSON.stringify({garant_email:v||null})});
+      s.garant_email=v; inp.style.borderColor=v?'#cfd6dd':'var(--cerv)';
+      stav.textContent='✓ uloženo';stav.style.color='var(--zel)';setTimeout(()=>{stav.textContent='';},1600);
+    }catch(e){ stav.textContent='✗ '+e.message;stav.style.color='var(--cerv)'; }
+  }
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();inp.blur();}});
+  inp.addEventListener('blur',uloz);
+  td.append(inp,stav);
+  return td;
 }
 
 function terminAkce(t, smlouvaId){
@@ -233,6 +258,9 @@ async function detail(id){
   app.innerHTML='';
   app.append(el('p',{},el('a',{href:'#',on:{click:e=>{e.preventDefault();$('header button[data-tab=list]').click();}}},'← zpět na seznam')));
   app.append(el('h1',{},`${esc(s.cislo_smlouvy||'')} — ${esc(s.protistrana_nazev||'')}`));
+  if(s.anotace)app.append(el('div',{class:'card',style:'border-left:4px solid var(--zel);background:#f6fbf7'},
+    el('div',{class:'muted',style:'font-size:12px;text-transform:uppercase;letter-spacing:.4px'},'Anotace — o čem smlouva je'),
+    el('div',{style:'margin-top:4px;line-height:1.5'},esc(s.anotace))));
   const info=el('table',{});
   const radek=(k,v)=>info.append(el('tr',{},el('th',{style:'width:200px'},k),el('td',{html:v})));
   radek('Kategorie',`${s.kategorie||''}${s.podtyp?' · '+s.podtyp:''}${s.smer?' ('+s.smer+')':''}`);
@@ -329,6 +357,7 @@ async function doplnUdaje(id){
     {k:'protistrana_nazev',l:'Protistrana',val:(s.protistrana_nazev&&s.protistrana_nazev.indexOf('(doplnit')<0)?s.protistrana_nazev:''},
     {k:'protistrana_ico',l:'IČO',val:s.protistrana_ico},
     {k:'predmet',l:'Předmět',ta:1,val:s.predmet},
+    {k:'anotace',l:'Anotace (o čem smlouva je)',ta:1,val:s.anotace},
     {k:'platnost_do',l:'Platnost do (YYYY-MM-DD; prázdné = neurčitá)',val:s.platnost_do},
     {k:'vypovedni_lhuta_mesice',l:'Výpovědní lhůta (měs.)',type:'number',val:s.vypovedni_lhuta_mesice},
     {k:'prolongace',l:'Prolongace',opts:['zadna','auto','jednani'],val:s.prolongace},

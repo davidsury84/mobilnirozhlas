@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS smlouva (
   protistrana_nazev TEXT NOT NULL,
   protistrana_ico TEXT,
   predmet TEXT,
+  anotace TEXT,
   platnost_typ TEXT NOT NULL DEFAULT 'urcita',
   platnost_do TEXT,
   platnost_podminka TEXT,
@@ -92,7 +93,7 @@ CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
 
 const SMLOUVA_COLS = [
   'cislo_smlouvy', 'kategorie', 'smer', 'podtyp', 'protistrana_nazev', 'protistrana_ico',
-  'predmet', 'platnost_typ', 'platnost_do', 'platnost_podminka', 'vypovedni_lhuta_mesice',
+  'predmet', 'anotace', 'platnost_typ', 'platnost_do', 'platnost_podminka', 'vypovedni_lhuta_mesice',
   'prolongace', 'hodnota', 'hodnota_typ', 'hodnota_popis', 'mena', 'garant_email',
   'spravce_email', 'stav', 'stav_popis', 'drive_url', 'je_placeholder',
 ];
