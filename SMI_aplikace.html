@@ -1276,8 +1276,8 @@ async function buildExcel(){
     const i=it.excelRow, r=HR+1+idx;
     const AZ=`${S}!AZ${i}`,BA=`${S}!BA${i}`,BB=`${S}!BB${i}`,D=`${S}!D${i}`,sales=`${S}!Q${i}:AB${i}`,unit=`IFERROR(${BB}/${BA},0)`;
     const set=(c,formula,result)=>{ms.getRow(r).getCell(c).value={formula,result};};
-    ms.getRow(r).getCell(1).value={formula:`${S}!A${i}`,result:it.sk};
-    ms.getRow(r).getCell(2).value={formula:`${S}!C${i}`,result:it.ident};
+    {const c1=ms.getRow(r).getCell(1);c1.value=(it.sk==null?'':String(it.sk));c1.numFmt='@';}   // původní kód jako text
+    {const c2=ms.getRow(r).getCell(2);c2.value=(it.ident==null?'':String(it.ident));c2.numFmt='@';}
     ms.getRow(r).getCell(3).value={formula:`${D}`,result:it.name};
     set(4,`IFERROR(LOOKUP(2,1/(${sales}>0),${arr}),0)`,it.lastMonth);
     set(5,`IF(D${r}=0,12,12-D${r})`,it.monthsNoSale);
@@ -1357,7 +1357,7 @@ async function buildExcel(){
   ['Závažnost','Kategorie','SK','Název','Identifikátor','V čem je chyba'].forEach((h,i)=>ks.getRow(hr).getCell(i+1).value=h);setHead(ks,hr,6);ks.views=[{state:'frozen',ySplit:hr}];
   const o={'Chyba':0,'Varování':1,'Info':2};const e2=[...ERR].sort((a,b)=>o[a.sev]-o[b.sev]||a.cat.localeCompare(b.cat));
   const sevFill={'Chyba':'FFFFC7CE','Varování':'FFFFEB9C','Info':'FFDDEBF7'},sevFont={'Chyba':'FF9C0006','Varování':'FF9C6500','Info':'FF2F5496'};
-  e2.forEach((e,i)=>{const r=hr+1+i;[e.sev,e.cat,e.sk,e.name,e.ident,e.msg].forEach((v,c)=>{const cell=ks.getRow(r).getCell(c+1);cell.value=v;cell.font={name:'Arial',size:10};cell.border=border;cell.alignment={vertical:'middle',wrapText:c===5};});
+  e2.forEach((e,i)=>{const r=hr+1+i;[e.sev,e.cat,e.sk,e.name,e.ident,e.msg].forEach((v,c)=>{const cell=ks.getRow(r).getCell(c+1);cell.value=(c===2||c===4)?(v==null?'':String(v)):v;if(c===2||c===4)cell.numFmt='@';cell.font={name:'Arial',size:10};cell.border=border;cell.alignment={vertical:'middle',wrapText:c===5};});
     ks.getRow(r).getCell(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:sevFill[e.sev]}};ks.getRow(r).getCell(1).font={name:'Arial',bold:true,size:10,color:{argb:sevFont[e.sev]}};});
   ks.columns=[{width:12},{width:12},{width:8},{width:34},{width:14},{width:90}];
   ks.autoFilter={from:{row:hr,column:1},to:{row:hr,column:6}};
@@ -1573,12 +1573,15 @@ function styleSheet(ws,m){
   const low=s=>String(s==null?'':s).toLowerCase();
   const catCol=hdr.findIndex(x=>low(x).indexOf('kategorie')>=0);
   const sevCol=hdr.findIndex(x=>{const t=low(x);return t.indexOf('závažnost')>=0||t.indexOf('verdikt')>=0||t==='stav';});
+  // sloupce s kódy produktů → nechat jako text (žádné převádění na čísla / ztráta nul)
+  const codeCols=hdr.map((h,i)=>({t:low(h),i})).filter(o=>/identifik|registrač|^sk$|^reg\.?\s*č|kód/.test(o.t)).map(o=>o.i+1);
   for(let r=2;r<=m.length;r++){
     let fill=null;const dr=m[r-1]||[];
     if(catCol>=0&&EXCEL_CATFILL[dr[catCol]])fill=EXCEL_CATFILL[dr[catCol]];
     if(!fill&&sevCol>=0&&EXCEL_SEVFILL[dr[sevCol]])fill=EXCEL_SEVFILL[dr[sevCol]];
     if(!fill&&r%2===0)fill='FFF6F8FB';
     ws.getRow(r).eachCell(c=>{c.font={name:'Arial',size:10};c.border=border;if(fill)c.fill={type:'pattern',pattern:'solid',fgColor:{argb:fill}};});
+    codeCols.forEach(col=>{const cell=ws.getRow(r).getCell(col);cell.value=(dr[col-1]==null?'':String(dr[col-1]));cell.numFmt='@';});
   }
   const h1=ws.getRow(1);h1.eachCell(c=>{c.font={name:'Arial',bold:true,color:{argb:'FFFFFFFF'},size:10};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1F3864'}};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border=border;});
   ws.columns.forEach(c=>{let w=10;c.eachCell({includeEmpty:false},cell=>{const l=String(cell.value==null?'':cell.value).length;if(l>w)w=l;});c.width=Math.min(50,w+2);});
@@ -1916,7 +1919,7 @@ async function buildPurchaseReport(){
     const HR=4;heads.forEach((hd,i)=>{const c=ws.getRow(HR).getCell(i+1);c.value=hd;c.font={name:'Arial',bold:true,color:{argb:'FFFFFFFF'},size:10};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1F3864'}};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};});
     ws.views=[{state:'frozen',ySplit:HR}];
     items.forEach((it,j)=>{const r=HR+1+j;const vals=[it.sk,it.ident,it.name,it.cat,it.D,it.dem,it.avail,it.order,Math.round(it.price*100)/100,Math.round(it.val)];
-      vals.forEach((v,i)=>{const c=ws.getRow(r).getCell(i+1);c.value=v;c.font={name:'Arial',size:10};c.border={top:{style:'thin',color:{argb:'FFD9D9D9'}},bottom:{style:'thin',color:{argb:'FFD9D9D9'}},left:{style:'thin',color:{argb:'FFD9D9D9'}},right:{style:'thin',color:{argb:'FFD9D9D9'}}};if(i>=4)c.alignment={horizontal:'center'};});
+      vals.forEach((v,i)=>{const c=ws.getRow(r).getCell(i+1);c.value=(i<=1)?(v==null?'':String(v)):v;if(i<=1)c.numFmt='@';c.font={name:'Arial',size:10};c.border={top:{style:'thin',color:{argb:'FFD9D9D9'}},bottom:{style:'thin',color:{argb:'FFD9D9D9'}},left:{style:'thin',color:{argb:'FFD9D9D9'}},right:{style:'thin',color:{argb:'FFD9D9D9'}}};if(i>=4)c.alignment={horizontal:'center'};});
       ws.getRow(r).getCell(4).fill={type:'pattern',pattern:'solid',fgColor:{argb:CATFILL[it.cat]||'FFFFFFFF'}};
       ws.getRow(r).getCell(8).font={name:'Arial',bold:true,size:10};
       ws.getRow(r).getCell(9).numFmt='#,##0.00';ws.getRow(r).getCell(10).numFmt='#,##0 "Kč"';
@@ -2158,7 +2161,7 @@ async function buildSeasonReport(){
       heads.forEach((hd,i)=>{const c=ws.getRow(HR).getCell(i+1);c.value=hd;c.font={name:'Arial',bold:true,color:{argb:'FFFFFFFF'},size:10};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1F3864'}};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border=bd;});
       ws.views=[{state:'frozen',ySplit:HR}];
       items.forEach((it,j)=>{const r=HR+1+j;const vals=[j+1,it.name,it.ident,Math.round(it.val),Math.round(it.su),Math.round(it.tot),Math.round(it.share*100),it.peak,sezComment(it.name,season)];
-        vals.forEach((v,i)=>{const c=ws.getRow(r).getCell(i+1);c.value=v;c.font={name:'Arial',size:10};c.border=bd;if(i===0||i>=2&&i<=7)c.alignment={horizontal:'center',vertical:'middle'};else c.alignment={vertical:'middle',wrapText:(i===1||i===8)};});
+        vals.forEach((v,i)=>{const c=ws.getRow(r).getCell(i+1);c.value=(i===2)?(v==null?'':String(v)):v;if(i===2)c.numFmt='@';c.font={name:'Arial',size:10};c.border=bd;if(i===0||i>=2&&i<=7)c.alignment={horizontal:'center',vertical:'middle'};else c.alignment={vertical:'middle',wrapText:(i===1||i===8)};});
         ws.getRow(r).getCell(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:SF[season]}};
         ws.getRow(r).getCell(4).numFmt='#,##0 "Kč"';ws.getRow(r).getCell(4).font={name:'Arial',bold:true,size:10};ws.getRow(r).getCell(7).numFmt='0"%"';});
       ws.columns=[{width:5},{width:48},{width:14},{width:18},{width:12},{width:10},{width:9},{width:8},{width:52}];
