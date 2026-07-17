@@ -66,17 +66,25 @@ function mount(host) {
   const html = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
   async function body(req) { try { return JSON.parse(await host.readBody(req)); } catch { return {}; } }
 
+  // Správci smluv = plný editační pohled jako admin, ale BEZ globálního admina
+  // intranetu. Default = Simona; přepsatelné env SMLOUVY_SPRAVCI (čárkou odděl.).
+  const SPRAVCI = (process.env.SMLOUVY_SPRAVCI || 'simona.janeckova@elkoplast.cz')
+    .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  function jeSpravce(req) {
+    const e = host.empSession(req);
+    return !!(e && e.email && SPRAVCI.includes(String(e.email).toLowerCase()));
+  }
   function smiCist(req) { const e = host.empSession(req); return e ? e.email : null; }
-  function smiPsat(req) { return host.isAdmin(req); }
+  function smiPsat(req) { return host.isAdmin(req) || jeSpravce(req); }
   // Řešit plnění smlouvy smí admin/správce vždy; jinak jen garant TÉTO smlouvy.
   function smiResit(req, smlouva) {
-    if (host.isAdmin(req)) return true;
+    if (host.isAdmin(req) || jeSpravce(req)) return true;
     const e = host.empSession(req);
     return !!(e && smlouva && smlouva.garant_email && e.email &&
       e.email.toLowerCase() === String(smlouva.garant_email).toLowerCase());
   }
   function maModul(req) {
-    if (host.isAdmin(req)) return true;
+    if (host.isAdmin(req) || jeSpravce(req)) return true;
     const e = host.empSession(req); if (!e) return false;
     try { return (host.employeeModules(e.email) || []).includes('smlouvy'); } catch { return false; }
   }
