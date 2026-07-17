@@ -60,6 +60,9 @@ function mount(host) {
   // Doplnění IČO protistran (z PDF smluv).
   try { require('./seed-ico').seedIco(M); }
   catch (e) { console.error('[smlouvy] seed IČO selhal:', e.message); }
+  // Vazba smlouva → konkrétní dokument(y) na Disku; přestavba KS z reálných souborů.
+  try { require('./seed-soubory').seedSoubory(M); }
+  catch (e) { console.error('[smlouvy] seed soubory selhal:', e.message); }
 
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);
@@ -283,7 +286,8 @@ function mount(host) {
         const historie = {}; terminy.forEach((t) => { historie[t.id] = M.notifikace.historieProTermin(t.id); });
         json(res, 200, {
           smlouva: s, dodatky: M.dodatek.listBySmlouva(s.id), terminy, historie,
-          reseni: M.reseni.listBySmlouva(s.id), muzuResit: smiResit(req, s),
+          reseni: M.reseni.listBySmlouva(s.id), soubory: M.soubor.listBySmlouva(s.id),
+          muzuResit: smiResit(req, s),
         }); return true;
       }
       if (p === '/api/smlouvy/kalendar' && req.method === 'GET') {

@@ -88,6 +88,19 @@ CREATE TABLE IF NOT EXISTS reseni (
 );
 CREATE INDEX IF NOT EXISTS ix_reseni_smlouva ON reseni(smlouva_id);
 
+CREATE TABLE IF NOT EXISTS soubor (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  smlouva_id INTEGER NOT NULL REFERENCES smlouva(id) ON DELETE CASCADE,
+  nazev TEXT,
+  drive_id TEXT,
+  url TEXT NOT NULL,
+  mime TEXT,
+  poradi INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (smlouva_id, drive_id)
+);
+CREATE INDEX IF NOT EXISTS ix_soubor_smlouva ON soubor(smlouva_id);
+
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
 `;
 
@@ -248,12 +261,25 @@ function openDb(file) {
     },
   };
 
+  const soubor = {
+    listBySmlouva(id) { return db.prepare('SELECT * FROM soubor WHERE smlouva_id=? ORDER BY poradi, id').all(id); },
+    // Idempotentní: párování na (smlouva_id, drive_id); bez drive_id se založí vždy.
+    upsert(s) {
+      db.prepare(`INSERT INTO soubor (smlouva_id, nazev, drive_id, url, mime, poradi)
+        VALUES (?,?,?,?,?,?)
+        ON CONFLICT(smlouva_id, drive_id) DO UPDATE SET
+          nazev=excluded.nazev, url=excluded.url, mime=excluded.mime, poradi=excluded.poradi`)
+        .run(s.smlouva_id, s.nazev || null, s.drive_id || null, s.url, s.mime || null, s.poradi || 0);
+    },
+    deleteBySmlouva(id) { db.prepare('DELETE FROM soubor WHERE smlouva_id=?').run(id); },
+  };
+
   const meta = {
     get(k) { const r = db.prepare('SELECT v FROM meta WHERE k=?').get(k); return r ? r.v : null; },
     set(k, v) { db.prepare('INSERT INTO meta (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run(k, String(v)); },
   };
 
-  return { db, smlouva, dodatek, termin, notifikace, reseni, meta };
+  return { db, smlouva, dodatek, termin, notifikace, reseni, soubor, meta };
 }
 
 module.exports = { openDb, SCHEMA };

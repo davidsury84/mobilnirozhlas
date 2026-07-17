@@ -271,8 +271,18 @@ async function detail(id){
   radek('Hodnota',money(s.hodnota,s.mena)||esc(s.hodnota_popis||'—'));
   radek('Garant / Správce',(s.garant_email?esc(s.garant_email):'<span class="warn">nedořešen</span>')+' / '+esc(s.spravce_email||'—'));
   radek('Stav',`<span class="pill ${s.stav==='aktivni'?'zel':'sed'}">${esc(s.stav_popis||s.stav)}</span>`);
-  radek('Disk',s.drive_url?`<a href="${esc(s.drive_url)}" target="_blank" rel="noopener">${esc(s.drive_url)}</a>`:'—');
+  const soub=d.soubory||[];
+  radek('Disk',soub.length?`${soub.length} ${soub.length===1?'dokument':(soub.length<5?'dokumenty':'dokumentů')} — viz níže`
+    :(s.drive_url?`<a href="${esc(s.drive_url)}" target="_blank" rel="noopener">otevřít na Disku</a>`:'—'));
   app.append(el('div',{class:'card'},info));
+
+  // Dokumenty smlouvy (konkrétní soubory na Disku; u „složkových" smluv všechny).
+  if(soub.length){
+    const dl=el('div',{});
+    soub.forEach(f=>dl.append(el('div',{style:'padding:6px 0;border-top:1px solid var(--lin)'},
+      el('a',{href:f.url,target:'_blank',rel:'noopener'},'📄 '+esc(f.nazev||f.url)))));
+    app.append(el('div',{class:'card'},el('h1',{style:'font-size:16px'},'Dokumenty ('+soub.length+')'),dl));
+  }
   if(ADMIN)app.append(el('div',{class:'row'},el('button',{class:'btn sec',on:{click:()=>upravSmlouvu(s)}},'Upravit smlouvu'),
     el('button',{class:'btn sec',on:{click:()=>novyTermin(s.id)}},'+ Termín'),
     el('button',{class:'btn sec',on:{click:()=>novyDodatek(s.id)}},'+ Dodatek')));
