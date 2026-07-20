@@ -42,6 +42,7 @@
   <b>ELKOPLAST · Smlouvy</b>
   <button data-tab="dash" class="act">Dashboard</button>
   <button data-tab="list">Seznam</button>
+  <button data-tab="garanti">Garanti</button>
   <button data-tab="kal">Kalendář</button>
   <button id="navodBtn" style="margin-left:auto">❔ Návod</button>
   <span class="muted" id="whoami"></span>
@@ -68,7 +69,7 @@ $('#navodBtn').onclick=()=>navod();
 
 async function render(tab){
   app.innerHTML='<p class="muted">Načítám…</p>';
-  try{ if(tab==='dash')await dash(); else if(tab==='list')await list(); else if(tab==='kal')await kal(); }
+  try{ if(tab==='dash')await dash(); else if(tab==='list')await list(); else if(tab==='garanti')await garanti(); else if(tab==='kal')await kal(); }
   catch(e){ app.innerHTML='<p class="warn">Chyba: '+esc(e.message)+'</p>'; }
 }
 
@@ -238,6 +239,42 @@ function garantCell(s){
   inp.addEventListener('blur',uloz);
   td.append(inp,stav);
   return td;
+}
+
+// Pohled podle garanta — garanti a pod každým smlouvy, ve kterých figuruje.
+async function garanti(){
+  app.innerHTML='';
+  app.append(el('h1',{},'Pohled podle garanta'));
+  const data=await api('/api/smlouvy/list');
+  if(!LIDE.length){try{LIDE=await api('/api/smlouvy/lide');}catch(e){}}
+  const jmeno=e=>{const p=LIDE.find(l=>l.email&&e&&l.email.toLowerCase()===e.toLowerCase());return p&&p.name?p.name:null;};
+  const grp=new Map();
+  data.forEach(s=>{const key=(s.garant_email||'').trim().toLowerCase()||'__none__';
+    if(!grp.has(key))grp.set(key,{email:s.garant_email||'',smlouvy:[]});
+    grp.get(key).smlouvy.push(s);});
+  const groups=[...grp.values()].filter(g=>g.email).sort((a,b)=>b.smlouvy.length-a.smlouvy.length||String(jmeno(a.email)||a.email).localeCompare(String(jmeno(b.email)||b.email)));
+  const bez=grp.get('__none__');
+  app.append(el('p',{class:'muted',style:'margin-top:-6px'},
+    groups.length+' '+(groups.length===1?'garant':(groups.length<5?'garanti':'garantů'))+' · '+data.length+' smluv'+(bez?' · '+bez.smlouvy.length+' bez garanta':'')));
+  const karta=(g,warn)=>{
+    const card=el('div',{class:'card'});
+    card.append(el('div',{style:'display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap'},
+      el('h1',{style:'font-size:16px;margin:0'+(warn?';color:var(--cerv)':'')},warn?'— bez garanta —':(jmeno(g.email)||g.email)),
+      el('span',{class:'pill '+(warn?'cerv':'zel')},g.smlouvy.length+'×')));
+    if(!warn && jmeno(g.email))card.append(el('div',{class:'muted',style:'font-size:12px;margin-top:2px'},g.email));
+    const t=el('table',{style:'margin-top:8px'},el('thead',{},el('tr',{},...['Číslo','Protistrana','Platnost','Stav'].map(h=>el('th',{},h)))));
+    const tb=el('tbody');
+    g.smlouvy.slice().sort((a,b)=>String(a.cislo_smlouvy).localeCompare(String(b.cislo_smlouvy)))
+      .forEach(s=>tb.append(el('tr',{'data-clic':1,on:{click:()=>detail(s.id)}},
+        el('td',{html:`<strong>${esc(s.cislo_smlouvy||'')}</strong>${s.je_placeholder?' 📦':''}`}),
+        el('td',{},s.protistrana_nazev),
+        el('td',{},s.platnost_do?czd(s.platnost_do):(s.platnost_podminka||s.platnost_typ)),
+        el('td',{},el('span',{class:'pill '+(s.stav==='aktivni'?'zel':'sed')},s.stav_popis||s.stav)))));
+    t.append(tb);card.append(t);app.append(card);
+  };
+  if(!groups.length && !bez){app.append(el('div',{class:'card muted'},'Žádné smlouvy.'));return;}
+  groups.forEach(g=>karta(g,false));
+  if(bez)karta(bez,true);
 }
 
 function terminAkce(t, smlouvaId){
