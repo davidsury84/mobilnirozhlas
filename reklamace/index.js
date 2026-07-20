@@ -36,9 +36,6 @@ const REQUIRED = [
   { key: 'datumPredani', label: 'Datum předání' },
   { key: 'popisVady', label: 'Přesný popis vady' },
   { key: 'datumZjisteni', label: 'Datum zjištění vady' },
-  { key: 'zpusobPouziti', label: 'Způsob použití' },
-  { key: 'zatizeni', label: 'Zatížení' },
-  { key: 'provozniProstredi', label: 'Provozní prostředí' },
   { key: 'kontaktOsoba', label: 'Kontaktní osoba pro prohlídku' },
 ];
 // Maximální velikosti příloh.
@@ -204,8 +201,7 @@ function mount(host) {
       id: c.id, cislo: c.cislo, clientId: c.clientId, clientName: c.clientName,
       createdAt: c.createdAt, uplatnenoAt: c.uplatnenoAt || null,
       vyrobniCislo: c.vyrobniCislo, datumPredani: c.datumPredani, popisVady: c.popisVady,
-      datumZjisteni: c.datumZjisteni, zpusobPouziti: c.zpusobPouziti, zatizeni: c.zatizeni,
-      provozniProstredi: c.provozniProstredi,
+      datumZjisteni: c.datumZjisteni,
       kontaktOsoba: c.kontaktOsoba, kontaktTelefon: c.kontaktTelefon, kontaktEmail: c.kontaktEmail,
       media: (c.media || []).map((m, i) => ({ i, name: m.name, kind: m.kind, mime: m.mime, size: m.size, url: '/api/reklamace/soubor?id=' + c.id + '&mi=' + i })),
       uplna: !!c.uplna, chybi: c.chybi || [],
@@ -377,9 +373,6 @@ function mount(host) {
       datumPredani: s(b.datumPredani, 40),
       popisVady: s(b.popisVady, 4000),
       datumZjisteni: s(b.datumZjisteni, 40),
-      zpusobPouziti: s(b.zpusobPouziti, 2000),
-      zatizeni: s(b.zatizeni, 1000),
-      provozniProstredi: s(b.provozniProstredi, 1000),
       kontaktOsoba: s(b.kontaktOsoba, 160),
       kontaktTelefon: s(b.kontaktTelefon, 60),
       kontaktEmail: s(b.kontaktEmail, 160),
@@ -537,7 +530,7 @@ function mount(host) {
   }
 
   // ---- Google tabulka ------------------------------------------------------
-  const SHEET_HEADER = ['Číslo', 'Přijato', 'Klient', 'Výrobní číslo', 'Datum předání', 'Popis vady', 'Datum zjištění', 'Způsob použití', 'Zatížení', 'Provozní prostředí', 'Kontaktní osoba', 'Telefon', 'E-mail', 'Přílohy', 'Úplná', 'Stav'];
+  const SHEET_HEADER = ['Číslo', 'Přijato', 'Klient', 'Výrobní číslo', 'Datum předání', 'Popis vady', 'Datum zjištění', 'Kontaktní osoba', 'Telefon', 'E-mail', 'Přílohy', 'Úplná', 'Stav'];
   async function syncSheet(c, d) {
     if (!sheets || !sheets.saReady()) return { ok: false, at: Date.now(), err: 'Service account není nastaven (GOOGLE_SA_CLIENT_EMAIL / GOOGLE_SA_PRIVATE_KEY).' };
     const eff = effectiveSheet(d || load());
@@ -546,7 +539,6 @@ function mount(host) {
       const row = [
         c.cislo, new Date(c.createdAt).toLocaleString('cs-CZ'), c.clientName,
         c.vyrobniCislo, c.datumPredani, c.popisVady, c.datumZjisteni,
-        c.zpusobPouziti, c.zatizeni, c.provozniProstredi,
         c.kontaktOsoba, c.kontaktTelefon, c.kontaktEmail,
         (c.media || []).length + ' ks', c.uplna ? 'ANO' : 'NE — ' + (c.chybi || []).join('; '),
         STAVY[c.stav] || c.stav || '',
