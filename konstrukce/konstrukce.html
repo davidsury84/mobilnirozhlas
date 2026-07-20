@@ -119,6 +119,13 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .adr-b{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:#eef1ec;color:#33513f;flex:0 0 auto}
 .adr-b.osm{background:#e3f2fd;color:#1565c0}
 .adr-load{padding:9px 11px;font-size:12.5px;color:var(--mut)}
+.artpick{margin:10px 0 2px;padding:10px 12px;background:#f3faf5;border:1px solid #bfe6cd;border-radius:10px}
+.artpick>label{margin:0 0 4px;font-size:12.5px;font-weight:700;color:var(--g2)}
+.art-dd{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 26px rgba(0,0,0,.14);max-height:280px;overflow:auto;margin-top:3px}
+.art-i{padding:8px 11px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)}
+.art-i:last-child{border-bottom:0}.art-i:hover{background:#eef6f0}
+.art-info{font-size:12.5px;color:#245c39;margin-top:6px;min-height:16px}
+.art-tag{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:var(--g);color:#fff}
 /* moderní kompaktní dialog */
 .dqmodal{display:flex;flex-direction:column;max-height:92vh;padding:0;width:min(780px,100%);overflow:hidden}
 .dqhead{padding:15px 22px 12px;border-bottom:1px solid var(--line);flex:0 0 auto}
@@ -613,6 +620,7 @@ function renderDrawer(z){
         '<b>Konstruktér</b><span>'+esc(z.assignedName||'—')+'</span>'+
         '<b>Kontakt klienta</b><span>'+esc(z.kontakt||'—')+(z.kontaktEmail?(' · '+esc(z.kontaktEmail)):'')+'</span>'+
         '<b>Poptávka</b><span>'+esc(z.cisloPoptavky||'—')+'</span>'+
+        (z.artNo?('<b>ART NO.</b><span><b>'+esc(z.artNo)+'</b></span>'):'')+
         '<b>Odpracováno</b><span>'+hhmm(z.totalSec)+'</span>'+
         (z.revisionCount?('<b>Revizí</b><span>'+z.revisionCount+'</span>'):'')+
         (z.strediskoName?('<b>Výrobní středisko</b><span>'+esc(z.strediskoName)+'</span>'):'')+
@@ -872,7 +880,32 @@ function askTermin(id){var t=prompt('Nový termín (RRRR-MM-DD):');if(!t)return;
 
 /* ---- nová zakázka ---- */
 /* --- překlady dotazníku (CZ zdroj → EN/DE/PL); neznámé texty zůstanou CZ --- */
-var DQ_LANG='cs', DQ_PREFILL=null;
+var DQ_LANG='cs', DQ_PREFILL=null, DQ_ART='', KAT=null;
+function ensureKat(cb){ if(KAT){cb&&cb();return;} fetch('/api/konstrukce/katalog',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){KAT=j.polozky||[];cb&&cb();}).catch(function(){KAT=[];cb&&cb();}); }
+function artLookup(inp){
+  var dd=inp.parentNode.querySelector('.art-dd'); if(!dd)return;
+  if(!KAT){ensureKat(function(){artLookup(inp);});return;}
+  var q=inp.value.trim().toLowerCase();
+  var res=(KAT||[]).filter(function(x){ if(!q)return true; return (x.art+' '+(x.rozmery||'')+' '+x.provedeni+' '+(x.objem||'')+'m3 '+x.rada).toLowerCase().indexOf(q)>=0; }).slice(0,14);
+  if(!res.length){dd.style.display='none';return;}
+  dd.innerHTML=res.map(function(x){return '<div class="art-i" onmousedown="artPick('+KAT.indexOf(x)+')"><b>'+esc(x.art)+'</b> <span class="muted">'+esc(x.rozmery||'')+' · '+(x.objem||'?')+' m³ · '+(x.hmotnost||'?')+' kg'+(x.pcCzk?' · '+x.pcCzk.toLocaleString('cs-CZ')+' Kč':'')+'</span></div>';}).join('');
+  dd.style.display='block';
+}
+function artClose(){document.querySelectorAll('.art-dd').forEach(function(d){d.style.display='none'});}
+function artPick(i){
+  var x=KAT&&KAT[i]; if(!x)return; DQ_ART=x.art;
+  var inp=document.getElementById('artInput'); if(inp)inp.value=x.art; artClose();
+  var rz=document.getElementById('dq_rozmery'); if(rz&&x.rozmery)rz.value=x.rozmery;
+  var seg=document.querySelector('.dq2[data-k="provedeni"]');
+  if(seg&&x.provedeni){
+    var std=seg.querySelector('.seg[data-v=standard]'), opce=seg.querySelector('.seg[data-v=opce]');
+    if(std&&std.textContent.indexOf(x.provedeni)>=0)segClick(std);
+    else if(opce&&opce.textContent.indexOf(x.provedeni)>=0)segClick(opce);
+    else{var poz=seg.querySelector('.seg[data-v=pozadavek]');if(poz){segClick(poz);var rq=document.getElementById('dqr_provedeni');if(rq)rq.value=x.provedeni;}}
+  }
+  var info=document.getElementById('artInfo');
+  if(info)info.innerHTML='<span class="art-tag">'+esc(x.rada)+'</span> '+esc(x.rozmery||'')+' · '+(x.objem||'?')+' m³ · '+(x.hmotnost||'?')+' kg · '+esc(x.provedeni)+(x.pcCzk?' · orient. '+x.pcCzk.toLocaleString('cs-CZ')+' Kč / '+(x.pcEur||'?')+' €':'');
+}
 var TR={
   'Nové zadání zakázky do konstrukce':{en:'New engineering order',de:'Neuer Konstruktionsauftrag',pl:'Nowe zlecenie do konstrukcji'},
   'Vyplňte dotazník provedení. U parametrů zvolte standard, opci, nebo zapište požadavek zákazníka.':{en:'Fill in the design questionnaire. For each parameter choose standard, option, or enter a customer requirement.',de:'Füllen Sie den Ausführungsfragebogen aus. Wählen Sie Standard, Option, oder tragen Sie einen Kundenwunsch ein.',pl:'Wypełnij ankietę wykonania. Dla parametrów wybierz standard, opcję lub wpisz wymaganie klienta.'},
@@ -891,6 +924,8 @@ var TR={
   'vyberte odstín':{en:'pick a shade',de:'Farbton wählen',pl:'wybierz odcień'},
   'nejbližší RAL':{en:'nearest RAL',de:'nächstes RAL',pl:'najbliższy RAL'},
   'parametrů':{en:'parameters',de:'Parameter',pl:'parametrów'},
+  'Standardní výrobek (ART NO.)':{en:'Standard product (ART NO.)',de:'Standardprodukt (ART-NR.)',pl:'Produkt standardowy (ART NO.)'},
+  'hledat dle kódu, rozměru, objemu…':{en:'search by code, size, volume…',de:'nach Code, Maß, Volumen suchen…',pl:'szukaj wg kodu, wymiaru, objętości…'},
   'začněte psát adresu… (číselník)':{en:'start typing the address… (list)',de:'Adresse eingeben… (Verzeichnis)',pl:'zacznij wpisywać adres… (rejestr)'},
   'začněte psát adresu…':{en:'start typing the address…',de:'Adresse eingeben…',pl:'zacznij wpisywać adres…'},
   'našeptává z OpenStreetMap':{en:'suggestions from OpenStreetMap',de:'Vorschläge aus OpenStreetMap',pl:'podpowiedzi z OpenStreetMap'},
@@ -948,7 +983,9 @@ function collectDot(){
   return dot;
 }
 function openNew(state){
+  if(!state)DQ_ART='';
   state=state||{};DQ_PREFILL=state.dot||null;
+  ensureKat();
   var head=state.head||{};
   var typeOpts=(D.types||[]).map(function(x){return '<option value="'+esc(x.key)+'"'+(state.typKey===x.key?' selected':'')+'>'+esc(x.name)+'</option>'}).join('');
   var langs=['cs','en','de','pl'].map(function(l){return '<button type="button" class="langb'+(DQ_LANG===l?' act':'')+'" onclick="langSwitch(\''+l+'\')">'+(l==='cs'?'CZ':l.toUpperCase())+'</button>'}).join('');
@@ -965,6 +1002,9 @@ function openNew(state){
       '<div><label>'+esc(tr('Kontaktní osoba'))+'</label><input id="nKontakt" value="'+esc(head.nKontakt||'')+'"></div>'+
       '<div><label>'+esc(tr('E-mail klienta (pro náhled)'))+'</label><input id="nMail" placeholder="email@klient.cz" value="'+esc(head.nMail||'')+'"></div>'+
       '<div><label>'+esc(tr('Požadovaný termín dodání'))+'</label><input id="nTerm" type="date" value="'+esc(head.nTerm||'')+'"></div></div>'+
+      '<div class="artpick"><label>'+esc(tr('Standardní výrobek (ART NO.)'))+'</label>'+
+        '<div style="position:relative"><input id="artInput" autocomplete="off" value="'+esc(DQ_ART||'')+'" placeholder="'+esc(tr('hledat dle kódu, rozměru, objemu…'))+'" oninput="artLookup(this)" onfocus="artLookup(this)" onblur="setTimeout(artClose,180)"><div class="art-dd" style="display:none"></div></div>'+
+        '<div id="artInfo" class="art-info"></div></div>'+
       '<div id="paramBox"></div>'+
       '<div class="err" id="nErr"></div>'+
     '</div>'+
@@ -1053,7 +1093,7 @@ function createZak(){
   }else{
     document.querySelectorAll('#paramBox input[data-lbl]').forEach(function(inp){if(inp.value.trim())params[inp.getAttribute('data-lbl')]=inp.value.trim()});
   }
-  var b={typKey:(document.getElementById('nTyp')||{}).value,zakaznik:(document.getElementById('nZak')||{}).value,kontakt:(document.getElementById('nKontakt')||{}).value,kontaktEmail:(document.getElementById('nMail')||{}).value,cisloPoptavky:(document.getElementById('nPopt')||{}).value,pozadovanyTermin:(document.getElementById('nTerm')||{}).value,params:params,dotaznik:dot};
+  var b={typKey:(document.getElementById('nTyp')||{}).value,zakaznik:(document.getElementById('nZak')||{}).value,kontakt:(document.getElementById('nKontakt')||{}).value,kontaktEmail:(document.getElementById('nMail')||{}).value,cisloPoptavky:(document.getElementById('nPopt')||{}).value,pozadovanyTermin:(document.getElementById('nTerm')||{}).value,params:params,dotaznik:dot,artNo:DQ_ART};
   if(!b.zakaznik.trim()){document.getElementById('nErr').textContent=tr('Vyplňte zákazníka.');return}
   api('/zakazka','POST',b).then(function(o){
     if(!o.ok){document.getElementById('nErr').textContent=o.j.chyba||'Chyba.';return}

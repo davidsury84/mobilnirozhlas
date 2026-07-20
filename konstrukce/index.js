@@ -21,6 +21,10 @@ const https = require('https');
 
 const HTML_FILE = path.join(__dirname, 'konstrukce.html');
 
+// Katalog standardních výrobků (ART NO.) z ceníku PRICE LIST ABR-XXX — 6 řad ABROLL.
+let KATALOG_ABR = [];
+try { KATALOG_ABR = (JSON.parse(fs.readFileSync(path.join(__dirname, 'katalog-abr.json'), 'utf8')).polozky) || []; } catch (_) {}
+
 // ---- Dotazník provedení kontejneru ABROLL (ABR-DSD) ------------------------
 // Zdroj: sdílený Google Sheet „Dotazník provedení kontejneru Abroll".
 // Pole typu 'volba' mají standard/opci; obchodník volí standard, opci, nebo
@@ -431,6 +435,7 @@ function mount(host) {
     }
 
     try {
+      if (p === '/api/konstrukce/katalog' && req.method === 'GET') { json(res, 200, { polozky: KATALOG_ABR }); return true; }
       if (p === '/api/konstrukce/me' && req.method === 'GET') return apiMe(req, res);
       if (p === '/api/konstrukce/data' && req.method === 'GET') return apiData(req, res);
       if (p === '/api/konstrukce/zakazka' && req.method === 'POST') return apiCreate(req, res);
@@ -548,7 +553,7 @@ function mount(host) {
       typKey: z.typKey, typName: t.name,
       zakaznik: z.zakaznik, kontakt: z.kontakt, kontaktEmail: z.kontaktEmail,
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
-      params: z.params || {}, dotaznik: z.dotaznik || null,
+      params: z.params || {}, dotaznik: z.dotaznik || null, artNo: z.artNo || '',
       stav: z.stav, stavLabel: STAV[z.stav].label, onTurn: STAV[z.stav].onTurn,
       obchodnikEmail: z.obchodnikEmail, obchodnikName: empName(z.obchodnikEmail),
       assignedTo: z.assignedTo || '', assignedName: z.assignedTo ? empName(z.assignedTo) : '',
@@ -603,7 +608,7 @@ function mount(host) {
       id: 'z' + crypto.randomBytes(7).toString('hex'), cislo, createdAt: now,
       createdBy: me.email, obchodnikEmail: me.email,
       typKey: t.key, params: b.params && typeof b.params === 'object' ? b.params : {},
-      dotaznik: sanitizeDotaznik(t, b.dotaznik),
+      dotaznik: sanitizeDotaznik(t, b.dotaznik), artNo: String(b.artNo || '').slice(0, 60),
       zakaznik, kontakt: String(b.kontakt || '').trim(), kontaktEmail: String(b.kontaktEmail || '').trim(),
       cisloPoptavky: String(b.cisloPoptavky || '').trim(),
       pozadovanyTermin: b.pozadovanyTermin ? String(b.pozadovanyTermin).slice(0, 10) : null,
