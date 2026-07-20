@@ -74,6 +74,8 @@ function mount(host) {
     if (!Array.isArray(d.cases)) d.cases = [];
     if (!d.settings || typeof d.settings !== 'object') d.settings = {};
     if (!Array.isArray(d.settings.notifyEmails)) d.settings.notifyEmails = [];
+    if (typeof d.settings.sheetId !== 'string') d.settings.sheetId = '';
+    if (typeof d.settings.sheetTab !== 'string') d.settings.sheetTab = '';
     return d;
   }
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
@@ -144,6 +146,7 @@ function mount(host) {
       if (p === '/api/reklamace/stav' && req.method === 'POST') return apiCaseStav(req, res);
       if (p === '/api/reklamace/sync' && req.method === 'POST') return apiCaseSync(req, res);
       if (p === '/api/reklamace/nastaveni' && req.method === 'POST') return apiSettings(req, res);
+      if (p === '/api/reklamace/test-sheet' && req.method === 'POST') return apiTestSheet(req, res);
     } catch (e) {
       console.error('[reklamace] chyba obsluhy:', e);
       json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true;
@@ -155,11 +158,27 @@ function mount(host) {
   // ======================================================================
   //  INTERNÍ API
   // ======================================================================
+  // Efektivní cíl zápisu: ID/list z nastavení modulu, jinak fallback na env.
+  function effectiveSheet(d) {
+    const s = d.settings || {};
+    const envId = (sheets && sheets.envSheetId()) || '';
+    const envTab = (sheets && sheets.envSheetTab()) || '';
+    const id = (s.sheetId || envId || '').trim();
+    const tab = (s.sheetTab || envTab || 'Reklamace').trim();
+    return { id, tab, source: s.sheetId ? 'nastavení' : (envId ? 'env' : ''), fromEnv: !!envId && !s.sheetId };
+  }
   function apiMe(req, res) {
     const me = meOf(req);
+    const d = load();
+    const eff = effectiveSheet(d);
     json(res, 200, {
       email: me.email, name: me.name, isAdmin: me.isAdmin,
-      sheet: { configured: !!(sheets && sheets.configured()), saEmail: (sheets && sheets.saEmail()) || '', id: (sheets && sheets.sheetId()) || '', tab: (sheets && sheets.sheetTab()) || '' },
+      sheet: {
+        saReady: !!(sheets && sheets.saReady()),
+        saEmail: (sheets && sheets.saEmail()) || '',
+        id: eff.id, tab: eff.tab, source: eff.source,
+        active: !!(sheets && sheets.saReady() && eff.id),
+      },
     });
     return true;
   }
@@ -265,7 +284,7 @@ function mount(host) {
     const d = load();
     const c = d.cases.find(x => x.id === b.id);
     if (!c) { json(res, 404, { chyba: 'Reklamace nenalezena.' }); return true; }
-    const r = await syncSheet(c);
+    const r = await syncSheet(c, d);
     c.sheetSync = r;
     save(d);
     json(res, r.ok ? 200 : 502, { ok: r.ok, sheetSync: r });
@@ -279,8 +298,31 @@ function mount(host) {
     if (Array.isArray(b.notifyEmails)) {
       d.settings.notifyEmails = b.notifyEmails.map(e => String(e || '').trim().toLowerCase()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)).slice(0, 20);
     }
+    if (typeof b.sheetId === 'string') {
+      // přijmi buď holé ID, nebo celou URL tabulky (…/d/<ID>/…)
+      const raw = b.sheetId.trim();
+      const m = raw.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+      d.settings.sheetId = (m ? m[1] : raw).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
+    }
+    if (typeof b.sheetTab === 'string') d.settings.sheetTab = b.sheetTab.trim().slice(0, 100);
     save(d);
     json(res, 200, { ok: true, settings: d.settings });
+    return true;
+  }
+
+  // Zkušební zápis do tabulky (jen správce) — ověří sdílení a přístup SA.
+  async function apiTestSheet(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    const d = load();
+    if (!sheets || !sheets.saReady()) { json(res, 400, { ok: false, chyba: 'Service account není nastaven na serveru (GOOGLE_SA_*).' }); return true; }
+    const eff = effectiveSheet(d);
+    if (!eff.id) { json(res, 400, { ok: false, chyba: 'Nejprve zadejte ID Google tabulky.' }); return true; }
+    try {
+      await sheets.appendRow(eff.id, eff.tab, ['— test —', new Date().toLocaleString('cs-CZ'), 'Zkušební zápis z intranetu (můžete řádek smazat)'], SHEET_HEADER);
+      json(res, 200, { ok: true, sheet: { id: eff.id, tab: eff.tab } });
+    } catch (e) {
+      json(res, 502, { ok: false, chyba: e.message });
+    }
     return true;
   }
 
@@ -382,7 +424,7 @@ function mount(host) {
     logAct('reklamace-nova', { email: '', name: c.name + ' (klient)' }, 'Reklamace ' + rec.cislo + (rec.uplna ? '' : ' (neúplná)'));
 
     // zápis do Google tabulky (best-effort, neblokuje odpověď klientovi)
-    syncSheet(rec).then(r => { try { const dd = load(); const cc = dd.cases.find(x => x.id === rec.id); if (cc) { cc.sheetSync = r; save(dd); } } catch (_) {} });
+    syncSheet(rec, d).then(r => { try { const dd = load(); const cc = dd.cases.find(x => x.id === rec.id); if (cc) { cc.sheetSync = r; save(dd); } } catch (_) {} });
     // notifikace pověřeným osobám
     notify(d, rec, c);
 
@@ -496,8 +538,10 @@ function mount(host) {
 
   // ---- Google tabulka ------------------------------------------------------
   const SHEET_HEADER = ['Číslo', 'Přijato', 'Klient', 'Výrobní číslo', 'Datum předání', 'Popis vady', 'Datum zjištění', 'Způsob použití', 'Zatížení', 'Provozní prostředí', 'Kontaktní osoba', 'Telefon', 'E-mail', 'Přílohy', 'Úplná', 'Stav'];
-  async function syncSheet(c) {
-    if (!sheets || !sheets.configured()) return { ok: false, at: Date.now(), err: 'Google tabulka není nastavena (GOOGLE_SA_* + REKLAMACE_SHEET_ID).' };
+  async function syncSheet(c, d) {
+    if (!sheets || !sheets.saReady()) return { ok: false, at: Date.now(), err: 'Service account není nastaven (GOOGLE_SA_CLIENT_EMAIL / GOOGLE_SA_PRIVATE_KEY).' };
+    const eff = effectiveSheet(d || load());
+    if (!eff.id) return { ok: false, at: Date.now(), err: 'Není zadané ID Google tabulky — doplňte v Nastavení modulu.' };
     try {
       const row = [
         c.cislo, new Date(c.createdAt).toLocaleString('cs-CZ'), c.clientName,
@@ -507,7 +551,7 @@ function mount(host) {
         (c.media || []).length + ' ks', c.uplna ? 'ANO' : 'NE — ' + (c.chybi || []).join('; '),
         STAVY[c.stav] || c.stav || '',
       ];
-      await sheets.appendRow(row, SHEET_HEADER);
+      await sheets.appendRow(eff.id, eff.tab, row, SHEET_HEADER);
       return { ok: true, at: Date.now(), err: '' };
     } catch (e) {
       console.error('[reklamace] zápis do Google tabulky selhal:', e.message);

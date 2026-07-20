@@ -2,17 +2,21 @@
 // Zápis (append) do Google Sheets přes service account.
 // Vyžaduje env: GOOGLE_SA_CLIENT_EMAIL, GOOGLE_SA_PRIVATE_KEY (PEM; \n → nové řádky).
 // Cílovou tabulku je nutné service accountu nasdílet jako EDITORA (ne jen Prohlížející)
-// a v Google Cloud povolit Google Sheets API. ID tabulky se předává v env REKLAMACE_SHEET_ID.
+// a v Google Cloud povolit Google Sheets API.
+// ID tabulky a název listu se předávají voláním (z nastavení modulu v intranetu),
+// s fallbackem na env REKLAMACE_SHEET_ID / REKLAMACE_SHEET_TAB.
 
 const https = require('https');
 const crypto = require('crypto');
 
 function saEmail() { return process.env.GOOGLE_SA_CLIENT_EMAIL || ''; }
 function saKey() { return (process.env.GOOGLE_SA_PRIVATE_KEY || '').replace(/\\n/g, '\n'); }
-function sheetId() { return process.env.REKLAMACE_SHEET_ID || ''; }
-function sheetTab() { return process.env.REKLAMACE_SHEET_TAB || 'Reklamace'; }
-// Zápis do tabulky je aktivní jen když je nastaven service account i ID tabulky.
-function configured() { return !!(saEmail() && saKey() && sheetId()); }
+function envSheetId() { return process.env.REKLAMACE_SHEET_ID || ''; }
+function envSheetTab() { return process.env.REKLAMACE_SHEET_TAB || ''; }
+// Service account je připraven (má identitu i klíč). Samotné ID tabulky řeší volající.
+function saReady() { return !!(saEmail() && saKey()); }
+// Zpětná kompatibilita: „nakonfigurováno" = SA + nějaké ID z env.
+function configured() { return !!(saReady() && envSheetId()); }
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 
@@ -51,10 +55,13 @@ async function accessToken() {
 
 function rangeA1(tab) { const t = String(tab || 'Reklamace').replace(/'/g, "''"); return "'" + t + "'!A1"; }
 
+function resolveId(spreadsheetId) { return String(spreadsheetId || envSheetId() || '').trim(); }
+function resolveTab(tab) { return String(tab || envSheetTab() || 'Reklamace').trim(); }
+
 // Zajistí hlavičku (řádek 1). Když je list prázdný, zapíše zadané názvy sloupců.
-async function ensureHeader(header) {
+async function ensureHeader(spreadsheetId, tab, header) {
+  const id = resolveId(spreadsheetId); tab = resolveTab(tab);
   const tok = await accessToken();
-  const id = sheetId(); const tab = sheetTab();
   const r = encodeURIComponent("'" + tab.replace(/'/g, "''") + "'!A1:A1");
   let first = [];
   try {
@@ -70,11 +77,12 @@ async function ensureHeader(header) {
 }
 
 // Připojí jeden řádek na konec listu. `row` = pole hodnot (řetězce/čísla).
-async function appendRow(row, header) {
-  if (!configured()) throw new Error('Google Sheets není nastaven (chybí GOOGLE_SA_* nebo REKLAMACE_SHEET_ID).');
-  if (header) { try { await ensureHeader(header); } catch (_) {} }
+async function appendRow(spreadsheetId, tab, row, header) {
+  if (!saReady()) throw new Error('Service account není nastaven (chybí GOOGLE_SA_CLIENT_EMAIL / GOOGLE_SA_PRIVATE_KEY).');
+  const id = resolveId(spreadsheetId); tab = resolveTab(tab);
+  if (!id) throw new Error('Není zadané ID Google tabulky (doplňte v Nastavení modulu).');
+  if (header) { try { await ensureHeader(id, tab, header); } catch (_) {} }
   const tok = await accessToken();
-  const id = sheetId(); const tab = sheetTab();
   const range = encodeURIComponent(rangeA1(tab));
   const body = JSON.stringify({ values: [row] });
   const j = await httpsJson('POST', 'sheets.googleapis.com',
@@ -83,4 +91,4 @@ async function appendRow(row, header) {
   return j.updates || {};
 }
 
-module.exports = { configured, saEmail, sheetId, sheetTab, appendRow, ensureHeader };
+module.exports = { configured, saReady, saEmail, envSheetId, envSheetTab, appendRow, ensureHeader };

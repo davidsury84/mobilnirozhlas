@@ -150,14 +150,34 @@ tr.click:hover{background:var(--bg-2)}
       <div class="b" id="clientsWrap"></div>
     </div>
     <div class="card" id="settingsCard">
-      <div class="h"><h2>Nastavení</h2></div>
+      <div class="h"><h2>Google tabulka</h2><div class="sp"></div><span class="note" id="sheetStateNote"></span></div>
+      <div class="b" style="padding:16px 18px">
+        <div id="saBox"></div>
+        <div class="row2" style="max-width:720px">
+          <div class="field"><label>ID Google tabulky (nebo celý odkaz)</label><input id="sheetId" placeholder="1AbC…xyz  nebo  https://docs.google.com/spreadsheets/d/1AbC…/edit"></div>
+          <div class="field"><label>Název listu</label><input id="sheetTab" placeholder="Reklamace"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn p sm" onclick="saveSheet()">Uložit tabulku</button>
+          <button class="btn sm" onclick="testSheet()">Otestovat zápis</button>
+          <span class="note" id="sheetTestMsg"></span>
+        </div>
+        <ol class="note" style="margin:14px 0 0;padding-left:18px;line-height:1.9">
+          <li>Vytvořte (nebo vyberte) Google tabulku.</li>
+          <li>Nasdílejte ji <b>jako Editora</b> účtu service accountu uvedenému výše.</li>
+          <li>Vložte sem její ID nebo odkaz, uložte a klikněte <b>Otestovat zápis</b> — do tabulky přibude zkušební řádek.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="card" id="notifyCard">
+      <div class="h"><h2>Notifikace</h2></div>
       <div class="b" style="padding:16px 18px">
         <div class="field" style="max-width:520px">
           <label>Upozornit na novou reklamaci e-mailem (oddělte čárkou)</label>
           <input id="notifyEmails" placeholder="reklamace@elkoplast.cz, servis@elkoplast.cz">
         </div>
-        <button class="btn p sm" onclick="saveSettings()">Uložit nastavení</button>
-        <div class="note" style="margin-top:10px">Google tabulka se nastavuje serverovými proměnnými <span class="pill">REKLAMACE_SHEET_ID</span>, <span class="pill">GOOGLE_SA_CLIENT_EMAIL</span>, <span class="pill">GOOGLE_SA_PRIVATE_KEY</span>. Tabulku nasdílejte service accountu jako <b>Editora</b> a povolte <b>Google Sheets API</b>.</div>
+        <button class="btn p sm" onclick="saveSettings()">Uložit notifikace</button>
       </div>
     </div>
   </div>
@@ -181,15 +201,16 @@ function d2(s){return s||'—';}
 function load(){
   Promise.all([api('/api/reklamace/me'),api('/api/reklamace/data')]).then(function(a){
     ME=a[0];DATA=a[1];renderSheet();renderCases();renderClients();
-    if(ME.isAdmin){$('notifyEmails').value=(DATA.settings.notifyEmails||[]).join(', ');}
-    else{$('settingsCard').style.display='none';}
+    if(ME.isAdmin){ $('notifyEmails').value=(DATA.settings.notifyEmails||[]).join(', '); renderSheetSettings(); }
+    else{ $('settingsCard').style.display='none'; $('notifyCard').style.display='none'; }
   }).catch(function(e){document.body.innerHTML='<div class="empty">Chyba načtení: '+esc(e.message)+'</div>';});
 }
 
 function renderSheet(){
   var s=ME.sheet||{};var el=$('sheetstat');
-  if(s.configured){el.innerHTML='<div class="sheetstat okk">✓ Zápis do Google tabulky je aktivní. Nové reklamace se automaticky zapisují do tabulky.</div>';}
-  else{el.innerHTML='<div class="sheetstat nokk">⚠ Google tabulka není nastavena — reklamace se ukládají do intranetu, ale nezapisují do tabulky. Doplňte serverové proměnné (viz Nastavení).</div>';}
+  if(s.active){el.innerHTML='<div class="sheetstat okk">✓ Zápis do Google tabulky je aktivní. Nové reklamace se automaticky zapisují do tabulky'+(s.tab?' (list „'+esc(s.tab)+'")':'')+'.</div>';}
+  else if(!s.saReady){el.innerHTML='<div class="sheetstat nokk">⚠ Na serveru není nastaven service account (GOOGLE_SA_*). Reklamace se ukládají do intranetu, ale zápis do tabulky nelze zapnout.</div>';}
+  else{el.innerHTML='<div class="sheetstat nokk">⚠ Google tabulka zatím není propojená — reklamace se ukládají do intranetu, ale nezapisují do tabulky. Nastavte ji níže v <b>Klienti a odkazy → Nastavení</b>.</div>';}
 }
 
 function setTab(t){TAB=t;$('viewR').style.display=t==='r'?'':'none';$('viewK').style.display=t==='k'?'':'none';$('tabR').classList.toggle('on',t==='r');$('tabK').classList.toggle('on',t==='k');}
@@ -257,7 +278,7 @@ function openCase(id){
       '<div class="field"><label>Interní poznámka</label><textarea id="cPozn">'+esc(c.interniPozn||'')+'</textarea></div>'+
     '</div>'+
     '<div class="mf"><button class="btn p" onclick="saveCase(\''+c.id+'\')">Uložit</button>'+
-      (ME.sheet&&ME.sheet.configured?'<button class="btn" onclick="syncCase(\''+c.id+'\')">Zapsat do tabulky</button>':'')+
+      (ME.sheet&&ME.sheet.active?'<button class="btn" onclick="syncCase(\''+c.id+'\')">Zapsat do tabulky</button>':'')+
       '<div class="sp" style="flex:1"></div><span class="note">'+esc(c.ip||'')+'</span></div>';
   $('ovCase').classList.add('on');
 }
@@ -312,7 +333,34 @@ function saveClient(id){
 }
 function toggleClient(id,active){api('/api/reklamace/klient/stav',{method:'POST',body:JSON.stringify({id:id,active:active})}).then(function(){reloadData();}).catch(function(e){alert(e.message);});}
 function regen(id){if(!confirm('Vygenerovat nový odkaz? Původní odkaz přestane fungovat.'))return;api('/api/reklamace/klient/token',{method:'POST',body:JSON.stringify({id:id})}).then(function(){reloadData().then(function(){toast('Nový odkaz vytvořen');});}).catch(function(e){alert(e.message);});}
-function saveSettings(){var arr=$('notifyEmails').value.split(',').map(function(s){return s.trim();}).filter(Boolean);api('/api/reklamace/nastaveni',{method:'POST',body:JSON.stringify({notifyEmails:arr})}).then(function(r){DATA.settings=r.settings;$('notifyEmails').value=(r.settings.notifyEmails||[]).join(', ');toast('Nastavení uloženo');}).catch(function(e){alert(e.message);});}
+function saveSettings(){var arr=$('notifyEmails').value.split(',').map(function(s){return s.trim();}).filter(Boolean);api('/api/reklamace/nastaveni',{method:'POST',body:JSON.stringify({notifyEmails:arr})}).then(function(r){DATA.settings=r.settings;$('notifyEmails').value=(r.settings.notifyEmails||[]).join(', ');toast('Notifikace uloženy');}).catch(function(e){alert(e.message);});}
+
+function renderSheetSettings(){
+  var s=ME.sheet||{};
+  $('sheetId').value=(DATA.settings.sheetId||'');
+  $('sheetTab').value=(DATA.settings.sheetTab||'');
+  $('sheetTab').placeholder=(s.tab||'Reklamace');
+  $('sheetStateNote').innerHTML = s.active ? '<span class="ok">✓ propojeno</span>' : '<span class="no">nepropojeno</span>';
+  var box=$('saBox');
+  if(!s.saReady){
+    box.innerHTML='<div class="sheetstat nokk" style="margin-bottom:14px">Na serveru není nastaven service account (proměnné <span class="pill">GOOGLE_SA_CLIENT_EMAIL</span> a <span class="pill">GOOGLE_SA_PRIVATE_KEY</span>). Bez něj nelze do tabulky zapisovat.</div>';
+  } else {
+    box.innerHTML='<div class="sheetstat okk" style="margin-bottom:14px">Tabulku nasdílejte <b>jako Editora</b> tomuto service accountu:<br><span class="pill" style="margin-top:6px;user-select:all">'+esc(s.saEmail||'')+'</span></div>';
+  }
+}
+function saveSheet(){
+  api('/api/reklamace/nastaveni',{method:'POST',body:JSON.stringify({sheetId:$('sheetId').value,sheetTab:$('sheetTab').value})})
+    .then(function(r){DATA.settings=r.settings;return api('/api/reklamace/me');})
+    .then(function(me){ME=me;renderSheet();renderSheetSettings();toast('Uloženo');})
+    .catch(function(e){alert(e.message);});
+}
+function testSheet(){
+  var msg=$('sheetTestMsg');msg.innerHTML='<span class="mut">Zapisuji zkušební řádek…</span>';
+  api('/api/reklamace/test-sheet',{method:'POST',body:JSON.stringify({})})
+    .then(function(r){msg.innerHTML='<span class="ok">✓ Zápis funguje — do tabulky přibyl zkušební řádek (můžete ho smazat).</span>';return api('/api/reklamace/me');})
+    .then(function(me){ME=me;renderSheet();renderSheetSettings();})
+    .catch(function(e){msg.innerHTML='<span class="no">✗ '+esc(e.message)+'</span>';});
+}
 
 function reloadData(){return api('/api/reklamace/data').then(function(d){DATA=d;renderCases();renderClients();});}
 function closeOv(){$('ovCase').classList.remove('on');$('ovClient').classList.remove('on');}
