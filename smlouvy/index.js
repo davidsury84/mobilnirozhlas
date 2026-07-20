@@ -134,9 +134,13 @@ function mount(host) {
     }
     const novejsi = files.filter((f) => f.createdTime && new Date(f.createdTime) > new Date(baseline));
     const existuje = M.db.prepare(`SELECT COUNT(*) n FROM smlouva WHERE drive_url LIKE ?`);
+    // Soubor už může být veden jako dokument existující smlouvy (tabulka soubor) —
+    // pak z něj NEZAKLÁDÁME nový návrh (jinak by se KS dokumenty importovaly znovu).
+    const existujeSoub = M.db.prepare(`SELECT COUNT(*) n FROM soubor WHERE drive_id=? OR url LIKE ?`);
     const nove = [];
     for (const f of novejsi) {
       if (existuje.get('%' + f.id + '%').n > 0) continue;   // už evidováno (dle ID souboru v odkazu)
+      if (existujeSoub.get(f.id, '%' + f.id + '%').n > 0) continue;   // už je dokumentem jiné smlouvy
       const nazev = String(f.name || '').replace(/\.[a-z0-9]{2,5}$/i, '').trim().slice(0, 80) || f.id;
       // Kategorii předvyplní název podsložky na Disku (Dodavatelské/Odběratelské); Simona může upravit.
       const slozka = String(f.folder || '').toLowerCase();
