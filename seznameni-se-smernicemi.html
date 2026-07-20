@@ -1511,8 +1511,40 @@ async function showObchod(tab){
 }
 function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Rozdělení kategorií webu mezi obchodníky (produktové manažery). Stav pokrytí vyhodnocujeme z dat: vlastník + záloha = pokryto. Obchodníci jsou propojeni na živou databázi zaměstnanců včetně kontaktu.</p></div>'; }
 function obTabs(){
-  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků']];
-  return '<div class="pl-tabs">'+t.map(x=>'<button class="pl-tab'+(x[0]===OBCHOD_TAB?' active':'')+'" type="button" onclick="showObchod(\''+x[0]+'\')">'+esc(x[1])+'</button>').join('')+'</div>';
+  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků'],['leady','Leady z kalkulačky']];
+  return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="pl-tabs" style="flex:1">'+t.map(x=>'<button class="pl-tab'+(x[0]===OBCHOD_TAB?' active':'')+'" type="button" onclick="showObchod(\''+x[0]+'\')">'+esc(x[1])+'</button>').join('')+'</div><button class="btn ghost sm" type="button" onclick="obExportPdf()" title="Otevře tiskový náhled — uložte jako PDF nebo vytiskněte">📄 Sdílet PDF</button></div>';
+}
+// Export aktuálního pohledu do PDF přes tiskový náhled prohlížeče (bez závislostí).
+function obExportPdf(){
+  const d=OBCHOD_DATA; if(!d) return;
+  const dnes=new Date().toLocaleDateString('cs-CZ');
+  const e=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let title='', inner='';
+  if(OBCHOD_TAB==='obchodnici'){
+    title='Podle obchodníků';
+    inner=(d.obchodnici||[]).map(o=>{
+      const owned=(o.owner&&o.owner.length)?('<ul>'+o.owner.map(x=>'<li>'+e(x.kategorie)+' <span class="cov">['+e(x.coverage)+']</span></li>').join('')+'</ul>'):'<p class="muted">—</p>';
+      const zast=(o.zastup&&o.zastup.length)?o.zastup.map(x=>e(x.kategorie)).join(', '):'—';
+      return '<div class="pm"><h3>'+e(o.name)+(o.email?' <span class="em">'+e(o.email)+'</span>':'')+'</h3>'+
+        '<p class="meta">Odpovědný za '+o.pocetOdpovedny+' kategorií · zastupuje '+o.pocetZastup+(o.bezZalohy?' · <b>'+o.bezZalohy+' bez zálohy</b>':'')+'</p>'+
+        '<div class="two"><div><div class="lbl">Odpovědný za</div>'+owned+'</div><div><div class="lbl">Zastupuje</div><p>'+zast+'</p></div></div></div>';
+    }).join('');
+  } else {
+    title='Podle kategorií';
+    const cols=d.columns||[], rows=d.rows||[];
+    inner='<table><thead><tr>'+cols.map(c=>'<th>'+e(c.label)+'</th>').join('')+'</tr></thead><tbody>'+
+      rows.map(r=>'<tr>'+cols.map(c=>{let v=r[c.key]||'';if(c.key==='pokryti')v=obEval(r);return '<td>'+e(String(v))+'</td>'}).join('')+'</tr>').join('')+'</tbody></table>';
+  }
+  const html='<!doctype html><html><head><meta charset="utf-8"><title>Rozdělení obchodníků — '+e(title)+'</title>'+
+    '<style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;margin:26px;font-size:12px;line-height:1.4}'+
+    'h1{font-size:19px;margin:0 0 2px;color:#0e8a43}.sub{color:#666;font-size:11px;margin:0 0 18px}'+
+    'table{width:100%;border-collapse:collapse}th,td{border:1px solid #cfd3cc;padding:5px 8px;text-align:left;vertical-align:top}th{background:#eef2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}tr:nth-child(even) td{background:#f7f9f5}'+
+    '.pm{border:1px solid #e0e4dd;border-radius:8px;padding:10px 12px;margin-bottom:10px;break-inside:avoid}.pm h3{margin:0 0 2px;font-size:13px}.pm .em{color:#0e8a43;font-weight:400;font-size:11px}.pm .meta{color:#666;font-size:11px;margin:0 0 6px}.pm .two{display:flex;gap:20px}.pm .lbl{font-size:10px;text-transform:uppercase;color:#888;margin-bottom:2px}.pm ul{margin:0;padding-left:16px}.cov{color:#888;font-size:10px}.muted{color:#999}'+
+    '@media print{body{margin:12mm}}</style></head><body>'+
+    '<h1>Obchod — rozdělení obchodníků</h1><p class="sub">ELKOPLAST · '+e(title)+' · vygenerováno '+dnes+'</p>'+inner+'</body></html>';
+  const w=window.open('','_blank'); if(!w){ alert('Pro export do PDF prosím povolte vyskakovací okna.'); return; }
+  w.document.open(); w.document.write(html); w.document.close(); w.focus();
+  setTimeout(function(){ try{ w.print(); }catch(_){} },350);
 }
 // Sloupcový graf: (1) vyhodnocené pokrytí, (2) počet kategorií na odpovědného obchodníka.
 function obChartsHtml(rows){
