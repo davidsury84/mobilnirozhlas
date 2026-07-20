@@ -126,6 +126,7 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .art-i:last-child{border-bottom:0}.art-i:hover{background:#eef6f0}
 .art-info{font-size:12.5px;color:#245c39;margin-top:6px;min-height:16px}
 .art-tag{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:var(--g);color:#fff}
+.art-prov{font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;background:#e3f2fd;color:#1565c0}
 /* moderní kompaktní dialog */
 .dqmodal{display:flex;flex-direction:column;max-height:92vh;padding:0;width:min(780px,100%);overflow:hidden}
 .dqhead{padding:15px 22px 12px;border-bottom:1px solid var(--line);flex:0 0 auto}
@@ -882,19 +883,23 @@ function askTermin(id){var t=prompt('Nový termín (RRRR-MM-DD):');if(!t)return;
 /* --- překlady dotazníku (CZ zdroj → EN/DE/PL); neznámé texty zůstanou CZ --- */
 var DQ_LANG='cs', DQ_PREFILL=null, DQ_ART='', KAT=null;
 function ensureKat(cb){ if(KAT){cb&&cb();return;} fetch('/api/konstrukce/katalog',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){KAT=j.polozky||[];cb&&cb();}).catch(function(){KAT=[];cb&&cb();}); }
+function artReset(){DQ_ART='';var i=document.getElementById('artInput');if(i)i.value='';var f=document.getElementById('artInfo');if(f)f.innerHTML='';artClose();}
 function artLookup(inp){
   var dd=inp.parentNode.querySelector('.art-dd'); if(!dd)return;
   if(!KAT){ensureKat(function(){artLookup(inp);});return;}
+  var tk=((document.getElementById('nTyp')||{}).value||'').toUpperCase();
+  var rada=tk?('ABR-'+tk):'';
   var q=inp.value.trim().toLowerCase();
-  var res=(KAT||[]).filter(function(x){ if(!q)return true; return (x.art+' '+(x.rozmery||'')+' '+x.provedeni+' '+(x.objem||'')+'m3 '+x.rada).toLowerCase().indexOf(q)>=0; }).slice(0,14);
+  var res=(KAT||[]).filter(function(x){ if(rada&&x.rada!==rada)return false; if(!q)return true; return (x.art+' '+(x.rozmery||'')+' '+x.provedeni+' '+(x.objem||'')+'m3').toLowerCase().indexOf(q)>=0; }).slice(0,14);
   if(!res.length){dd.style.display='none';return;}
-  dd.innerHTML=res.map(function(x){return '<div class="art-i" onmousedown="artPick('+KAT.indexOf(x)+')"><b>'+esc(x.art)+'</b> <span class="muted">'+esc(x.rozmery||'')+' · '+(x.objem||'?')+' m³ · '+(x.hmotnost||'?')+' kg'+(x.pcCzk?' · '+x.pcCzk.toLocaleString('cs-CZ')+' Kč':'')+'</span></div>';}).join('');
+  dd.innerHTML=res.map(function(x){return '<div class="art-i" onmousedown="artPick('+KAT.indexOf(x)+')"><b>'+esc(x.art)+'</b> <span class="art-prov">'+esc(x.provedeni)+'</span> <span class="muted">'+esc(x.rozmery||'')+' · '+(x.objem||'?')+' m³ · '+(x.hmotnost||'?')+' kg'+(x.pcCzk?' · '+x.pcCzk.toLocaleString('cs-CZ')+' Kč':'')+'</span></div>';}).join('');
   dd.style.display='block';
 }
 function artClose(){document.querySelectorAll('.art-dd').forEach(function(d){d.style.display='none'});}
 function artPick(i){
-  var x=KAT&&KAT[i]; if(!x)return; DQ_ART=x.art;
-  var inp=document.getElementById('artInput'); if(inp)inp.value=x.art; artClose();
+  var x=KAT&&KAT[i]; if(!x)return;
+  DQ_ART=x.art+(x.art.indexOf(x.provedeni)<0?' — '+x.provedeni:'');
+  var inp=document.getElementById('artInput'); if(inp)inp.value=DQ_ART; artClose();
   var rz=document.getElementById('dq_rozmery'); if(rz&&x.rozmery)rz.value=x.rozmery;
   var seg=document.querySelector('.dq2[data-k="provedeni"]');
   if(seg&&x.provedeni){
@@ -935,7 +940,7 @@ var TR={
   'automaticky z přihlášení (SSO)':{en:'automatically from login (SSO)',de:'automatisch aus Login (SSO)',pl:'automatycznie z logowania (SSO)'},
   // sekce
   'Základní údaje':{en:'Basic details',de:'Grunddaten',pl:'Dane podstawowe'},
-  'Provedení (ABR-DSD)':{en:'Design (ABR-DSD)',de:'Ausführung (ABR-DSD)',pl:'Wykonanie (ABR-DSD)'},
+  'Provedení':{en:'Design',de:'Ausführung',pl:'Wykonanie'},
   'Doplňky':{en:'Accessories',de:'Zubehör',pl:'Dodatki'},
   // pole
   'Vnitřní rozměry (délka × šířka × výška)':{en:'Internal dimensions (length × width × height)',de:'Innenmaße (Länge × Breite × Höhe)',pl:'Wymiary wewnętrzne (długość × szerokość × wysokość)'},
@@ -996,7 +1001,7 @@ function openNew(state){
       '<div class="ssobar" style="margin:10px 0 0"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>'+esc(tr('Zadává'))+': <b>'+esc((ME&&(ME.name||ME.email))||'—')+'</b> · '+new Date().toLocaleDateString('cs-CZ')+' <span class="muted">('+esc(tr('automaticky z přihlášení (SSO)'))+')</span></span></div>'+
     '</div>'+
     '<div class="dqbody">'+
-      '<div class="dqhg"><div><label>'+esc(tr('Typ výrobku'))+'</label><select id="nTyp" onchange="DQ_PREFILL=null;renderDotaznik()">'+typeOpts+'</select></div>'+
+      '<div class="dqhg"><div><label>'+esc(tr('Typ výrobku'))+'</label><select id="nTyp" onchange="DQ_PREFILL=null;artReset();renderDotaznik()">'+typeOpts+'</select></div>'+
       '<div><label>'+esc(tr('Číslo poptávky / zakázky'))+'</label><input id="nPopt" value="'+esc(head.nPopt||'')+'"></div>'+
       '<div><label>'+esc(tr('Zákazník'))+' <span class="reqmark">*</span></label><input id="nZak" value="'+esc(head.nZak||'')+'"></div>'+
       '<div><label>'+esc(tr('Kontaktní osoba'))+'</label><input id="nKontakt" value="'+esc(head.nKontakt||'')+'"></div>'+
