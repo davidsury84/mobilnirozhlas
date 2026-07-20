@@ -59,6 +59,7 @@ const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://trid
 const TRIDICI_LINKA_APP_FILE = path.join(ROOT, 'design-tridici-linky.html'); // alternativně lokální soubor (stejně jako u Kalkulace-lisy)
 const PREKLADISTE_APP_URL = process.env.PREKLADISTE_APP_URL || ''; // aplikace „Kalkulačka překladiště" — prodejní kalkulačka (repo prekladiste-kalkulacka); doplň URL nasazení
 const PREKLADISTE_APP_FILE = path.join(ROOT, 'kalkulacka-prekladiste.html'); // alternativně lokální soubor
+const PREKLAD_VEREJNY_FILE = path.join(ROOT, 'preklad-verejny.html'); // veřejný klientský funnel (lead-gen kalkulačka překladiště, mimo přihlašovací závoru)
 const KOVOKALK_APP_FILE = path.join(ROOT, 'kalkulacka-kovo.html'); // modul „Kalkulace KOVO" — variabilní kalkulačka nacenění výrobků kovovýroby
 const FREELO_EMAIL = process.env.FREELO_EMAIL || '';     // modul Freelo: e-mail účtu (basic auth)
 const FREELO_API_KEY = process.env.FREELO_API_KEY || ''; // modul Freelo: API klíč (Freelo → Nastavení profilu → API)
@@ -91,6 +92,7 @@ const INVITES_F = path.join(DATA_DIR, 'invites.json');    // stav pozvánek dle 
 const UKOLY_F   = path.join(DATA_DIR, 'smernice-ukoly.json'); // úkoly vyplývající ze směrnic (záložka „Úkoly ze směrnic")
 const KOVOKALK_F = path.join(DATA_DIR, 'kovo-kalkulace.json'); // Kalkulace KOVO: parametry (s historií změn) + výrobky
 const OBCHOD_F   = path.join(DATA_DIR, 'obchod-zastupitelnost.json'); // Obchod: rozdělení obchodníků / zastupitelnost PM (editovatelná tabulka)
+const PREKLAD_LEADY_F = path.join(DATA_DIR, 'preklad-leady.json'); // Obchod → Leady: kontakty z veřejné kalkulačky překladiště (lead-gen)
 const AKTUALITY_F = path.join(DATA_DIR, 'aktuality.json');    // aktuality (novinky) na intranetu: {posts:[{id,title,body,image,author,authorEmail,ts,likes:{email:ts}}]}
 const SITE_F      = path.join(DATA_DIR, 'site.json');         // nastavení vzhledu intranetu (např. vlastní hero banner)
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');           // nahrané obrázky (aktuality, banner) — persistentní volume
@@ -1304,6 +1306,53 @@ function buildKontakty() {
   return out;
 }
 
+/* ---------- Obchod → Leady: kontakty z veřejné kalkulačky překladiště ----------
+   Lead vzniká odesláním veřejného formuláře na /preklad (mimo přihlašovací závoru).
+   Ukládá se do data/preklad-leady.json; obchodník (přístup „obchod" / správce) je vidí v záložce Leady. */
+const PREKLAD_LEAD_STAVY = ['novy', 'kontaktovano', 'schuzka', 'nabidka', 'uzavreno', 'zamitnuto'];
+function readLeady() { const s = readJson(PREKLAD_LEADY_F, null); return { items: (s && Array.isArray(s.items)) ? s.items : [] }; }
+function writeLeady(items) { writeJson(PREKLAD_LEADY_F, { items: (items || []).slice(0, 5000) }); }
+function leadStr(v, max) { return String(v == null ? '' : v).slice(0, max || 200); }
+function leadNum(v) { const n = Number(v); return isFinite(n) ? n : 0; }
+// Uloží nový lead z veřejného formuláře. Vrací uložený záznam.
+function addLead(b, req) {
+  const items = readLeady().items;
+  const inp = (b && b.inputs) || {}, rr = (b && b.result) || {};
+  const rec = {
+    id: 'ld' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex'),
+    ts: Date.now(),
+    email: leadStr(b && b.email, 160).trim(),
+    phone: leadStr(b && b.phone, 40).trim(),
+    firma: leadStr(b && b.firma, 160).trim(),
+    inputs: { Q: leadNum(inp.Q), D: leadNum(inp.D), Pnow: leadNum(inp.Pnow), ckm: leadNum(inp.ckm) },
+    result: { saving: leadNum(rr.saving), payback: (rr.payback == null ? null : leadNum(rr.payback)), savedTrips: leadNum(rr.savedTrips), savedKm: leadNum(rr.savedKm), savedHours: leadNum(rr.savedHours), co2t: leadNum(rr.co2t), capexCZK: leadNum(rr.capexCZK) },
+    status: 'novy',
+    note: '',
+    ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim().slice(0, 60),
+    source: 'preklad-verejny'
+  };
+  items.unshift(rec);
+  writeLeady(items);
+  return rec;
+}
+// Best-effort notifikace obchodníkovi (neblokuje odpověď klientovi, spadne-li, jen se zaloguje).
+function notifyLead(rec) {
+  const to = process.env.PREKLAD_LEAD_TO || 'jan.sonsky@elkoplast.cz';
+  const uspora = rec.result.saving ? Math.round(rec.result.saving).toLocaleString('cs-CZ') + ' Kč/rok' : 'neuvedeno';
+  const pay = rec.result.payback ? (rec.result.payback + ' roku') : 'neuvedeno';
+  const text = 'Nový lead z veřejné kalkulačky překladiště\n\n'
+    + 'Firma: ' + (rec.firma || '(neuvedeno)') + '\n'
+    + 'E-mail: ' + rec.email + '\n'
+    + 'Telefon: ' + rec.phone + '\n\n'
+    + 'Zadané hodnoty: ' + rec.inputs.Q + ' t/rok · ' + rec.inputs.D + ' km · dnes ' + rec.inputs.Pnow + ' t/jízda · ' + rec.inputs.ckm + ' Kč/km\n'
+    + 'Odhad úspory: ' + uspora + ' · návratnost ' + pay + '\n\n'
+    + 'Kontakt najdeš v intranetu: Obchod → Leady.';
+  try {
+    deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet — kalkulačka překladiště', subject: 'Nový lead překladiště: ' + (rec.firma || rec.email), text, html: toHtml(text) })
+      .catch(e => { try { console.warn('notifyLead selhalo:', e.message); } catch (_) {} });
+  } catch (e) { try { console.warn('notifyLead výjimka:', e.message); } catch (_) {} }
+}
+
 /* ---------- Freelo (modul Freelo: projekty přes REST API, basic auth) ---------- */
 function freeloConfigured() { return !!(FREELO_EMAIL && FREELO_API_KEY); }
 let freeloCache = { at: 0, data: null }; // 5min cache, ať se Freelo nevolá při každém otevření záložky
@@ -1551,6 +1600,17 @@ try {
   console.error('[konstrukce] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+let reklamaceMod = null;
+try {
+  reklamaceMod = require('./reklamace').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – reklamace', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+  });
+} catch (e) {
+  console.error('[reklamace] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -1565,6 +1625,10 @@ const server = http.createServer(async (req, res) => {
   const adaptacePublic = p.startsWith('/adaptace/uvod/') || p === '/api/adaptace/guest' || p === '/api/adaptace/guest-flag' || p === '/api/adaptace/import-user';
   // Veřejné cesty modulu Konstrukce: klientský náhled výkresu (token, bez přihlášení).
   const konstrukcePublic = p.startsWith('/konstrukce/nahled/') || p.startsWith('/api/konstrukce/nahled/');
+  // Veřejné cesty modulu Reklamace: klientský reklamační formulář na token (bez přihlášení).
+  const reklamacePublic = p.startsWith('/reklamace/r/') || p.startsWith('/api/reklamace/verejny/');
+  // Veřejné cesty klientské kalkulačky překladiště (lead-gen mimo přihlašovací závoru): stránka + odeslání leadu.
+  const prekladPublic = p === '/preklad' || p === '/preklad.html' || (p === '/api/preklad-lead' && req.method === 'POST');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
@@ -1626,7 +1690,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -1659,6 +1723,8 @@ const server = http.createServer(async (req, res) => {
     if (dopravaMod && await dopravaMod.handle(req, res)) return;
     // Modul „Konstrukce" si obslouží vlastní cesty (/konstrukce*, /api/konstrukce*).
     if (konstrukceMod && await konstrukceMod.handle(req, res)) return;
+    // Modul „Reklamace" si obslouží vlastní cesty (/reklamace*, /api/reklamace*).
+    if (reklamaceMod && await reklamaceMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
@@ -1681,6 +1747,21 @@ const server = http.createServer(async (req, res) => {
     if (p === '/koncept' || p === '/koncept.html') {
       if (!fs.existsSync(KONCEPT_FILE)) return send(res, 404, '<h1>Chybí intranet-koncept.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(KONCEPT_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    // Veřejná klientská kalkulačka překladiště (lead-gen; bez přihlášení) — vč. příjmu leadu.
+    if (p === '/preklad' || p === '/preklad.html') {
+      if (!fs.existsSync(PREKLAD_VEREJNY_FILE)) return send(res, 404, '<h1>Chybí preklad-verejny.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(PREKLAD_VEREJNY_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    if (p === '/api/preklad-lead' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const email = String(b.email || '').trim(), phone = String(b.phone || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return send(res, 400, { error: 'Zadejte platný e-mail.' });
+      if (phone.replace(/[^0-9]/g, '').length < 9) return send(res, 400, { error: 'Zadejte platné telefonní číslo.' });
+      const rec = addLead(b, req);
+      try { logActivity('preklad-lead', { email: '', name: 'veřejná kalkulačka' }, 'Nový lead překladiště: ' + (rec.firma || rec.email)); } catch (_) {}
+      notifyLead(rec);
+      return send(res, 200, { ok: true });
     }
     // Statické obrázky/ikony intranetu (např. hero fotka) z adresáře ./assets. Binárně, s cache.
     if (p.indexOf('/assets/') === 0) {
@@ -1999,6 +2080,30 @@ const server = http.createServer(async (req, res) => {
       const b = JSON.parse(await readBody(req));
       const saved = writeObchod(b.rows);
       return send(res, 200, { ok: true, columns: OBCHOD_SLOUPCE, rows: saved.rows, obchodnici: buildObchodnici(saved.rows), kontakty: buildKontakty(), total: saved.rows.length, canEdit: true });
+    }
+
+    // ---- Obchod → Leady: kontakty z veřejné kalkulačky překladiště (čte i edituje obchod/správce) ----
+    if (p === '/api/obchod/leady' && req.method === 'GET') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req) && employeeModules(e.email).indexOf('obchod') < 0) return send(res, 403, { error: 'K modulu Obchod nemáte přístup.' });
+      const items = readLeady().items;
+      return send(res, 200, { items, stavy: PREKLAD_LEAD_STAVY, total: items.length }, { 'Cache-Control': 'no-store' });
+    }
+    if (p === '/api/obchod/leady' && req.method === 'POST') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req) && employeeModules(e.email).indexOf('obchod') < 0) return send(res, 403, { error: 'K modulu Obchod nemáte přístup.' });
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const items = readLeady().items;
+      const it = items.find(x => x.id === b.id);
+      if (!it) return send(res, 404, { error: 'Lead nenalezen.' });
+      if (b.delete) { const next = items.filter(x => x.id !== b.id); writeLeady(next); return send(res, 200, { ok: true, deleted: true }); }
+      if (b.status != null) it.status = PREKLAD_LEAD_STAVY.indexOf(String(b.status)) >= 0 ? String(b.status) : it.status;
+      if (b.note != null) it.note = String(b.note).slice(0, 2000);
+      it.updatedAt = Date.now();
+      writeLeady(items);
+      return send(res, 200, { ok: true, item: it });
     }
 
     // ---- Kovo: přehled výroby ze 4 závodů (Google Sheets přes service account) ----

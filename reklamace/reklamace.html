@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reklamace · Intranet ELKOPLAST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#0e8a43; --green-2:#12a350; --green-d:#0a6b34; --green-soft:#e6f6ec;
+  --ink:#0f1512; --ink-soft:#5b635c; --faint:#8b938c;
+  --bg:#eef1ec; --bg-2:#f7f9f5; --paper:#fff; --line:#e3e7e0; --line-strong:#cdd3ca;
+  --yellow-soft:#fff6d2; --amber:#7a5c0e; --red:#c23636; --red-soft:#fbe9e7;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --cond:'IBM Plex Sans Condensed','IBM Plex Sans',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(15,21,18,.04),0 10px 30px rgba(15,21,18,.07);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg-2);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.55}
+.mono{font-family:var(--mono)}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+.wrap{max-width:1180px;margin:0 auto;padding:20px}
+
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.top .ttl{display:flex;align-items:center;gap:12px}
+.top .ic{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#15ab57,#0a6b34);display:grid;place-items:center;color:#fff;font-size:22px;box-shadow:0 6px 16px rgba(10,107,52,.28)}
+.top h1{font-family:var(--cond);font-weight:700;font-size:22px;margin:0}
+.top .sub{font-size:12.5px;color:var(--ink-soft)}
+.top .sp{flex:1}
+.tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:5px}
+.tabs button{border:0;background:transparent;padding:8px 15px;border-radius:8px;font-weight:600;font-size:13.5px;color:var(--ink-soft)}
+.tabs button.on{background:var(--green-soft);color:var(--green-d)}
+
+.stat{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.stat .s{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:11px 16px;min-width:112px}
+.stat .s .n{font-family:var(--cond);font-weight:700;font-size:22px;line-height:1}
+.stat .s .l{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
+.stat .s.warn .n{color:var(--amber)}
+
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.card .h{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#fbfdfb,#f6faf6)}
+.card .h h2{font-family:var(--cond);font-weight:700;font-size:16px;margin:0}
+.card .h .sp{flex:1}
+.card .b{padding:4px 0;overflow-x:auto}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--line)}
+td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}
+tr.click:hover{background:var(--bg-2)}
+.mut{color:var(--ink-soft)}
+.small{font-size:12px}
+
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:100px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.b-nova{background:var(--green-soft);color:var(--green-d)}
+.b-doplnit{background:var(--yellow-soft);color:var(--amber)}
+.b-reseni{background:#e7eefb;color:#2952b3}
+.b-uzavrena{background:#e8eae7;color:#5b635c}
+.b-zamitnuta{background:var(--red-soft);color:var(--red)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.ok{color:var(--green-d)} .no{color:var(--amber)}
+.pill{display:inline-block;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:2px 8px;font-family:var(--mono);font-size:12px}
+
+.btn{border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);border-radius:9px;padding:8px 13px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--green);color:var(--green-d)}
+.btn.p{background:var(--green);color:#fff;border-color:var(--green)}
+.btn.p:hover{background:var(--green-d);color:#fff}
+.btn.sm{padding:5px 10px;font-size:12px}
+.btn.danger:hover{border-color:var(--red);color:var(--red)}
+
+.empty{text-align:center;color:var(--ink-soft);padding:38px 20px;font-size:14px}
+
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,21,18,.44);display:none;align-items:flex-start;justify-content:center;padding:30px 16px;z-index:50;overflow:auto}
+.ov.on{display:flex}
+.modal{background:var(--paper);border-radius:16px;width:100%;max-width:720px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal .mh{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.modal .mh h3{font-family:var(--cond);font-weight:700;font-size:18px;margin:0}
+.modal .mh .x{margin-left:auto;border:0;background:var(--bg-2);width:32px;height:32px;border-radius:8px;font-size:18px;color:var(--ink-soft)}
+.modal .mb{padding:18px 20px}
+.modal .mf{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+.kv{display:grid;grid-template-columns:190px 1fr;gap:2px 14px;font-size:13.5px}
+.kv dt{color:var(--ink-soft);padding:6px 0}
+.kv dd{margin:0;padding:6px 0;border-bottom:1px solid var(--line)}
+.kv dt{border-bottom:1px solid var(--line)}
+@media(max-width:560px){.kv{grid-template-columns:1fr}.kv dt{border:0;padding-bottom:0}.kv dd{padding-top:2px}}
+.sec-t{font-family:var(--cond);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin:18px 0 8px}
+.media{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.media a{display:block;border:1px solid var(--line);border-radius:10px;overflow:hidden;aspect-ratio:1;background:#000;position:relative}
+.media img{width:100%;height:100%;object-fit:cover}
+.media .v{width:100%;height:100%;display:grid;place-items:center;color:#fff;font-size:26px}
+.media .cap{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.7));color:#fff;font-size:10px;padding:10px 6px 4px;font-family:var(--mono)}
+
+.field{margin-bottom:13px}
+.field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:5px;color:var(--ink-soft)}
+.field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--line-strong);border-radius:9px;background:#fff}
+.field textarea{min-height:64px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.row2{grid-template-columns:1fr}}
+.linkbox{display:flex;gap:8px;align-items:center}
+.linkbox input{flex:1;font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;z-index:80}
+.toast.on{opacity:1}
+.note{font-size:12.5px;color:var(--ink-soft)}
+.sheetstat{font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:14px}
+.sheetstat.okk{background:var(--green-soft);color:var(--green-d)}
+.sheetstat.nokk{background:var(--yellow-soft);color:var(--amber)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="ttl">
+      <div class="ic">🛡️</div>
+      <div>
+        <h1>Reklamace</h1>
+        <div class="sub">Klientské reklamační formuláře, evidence a odkazy</div>
+      </div>
+    </div>
+    <div class="sp"></div>
+    <div class="tabs">
+      <button id="tabR" class="on" onclick="setTab('r')">Reklamace</button>
+      <button id="tabK" onclick="setTab('k')">Klienti a odkazy</button>
+    </div>
+  </div>
+
+  <div id="sheetstat"></div>
+
+  <!-- === REKLAMACE === -->
+  <div id="viewR">
+    <div class="stat" id="stats"></div>
+    <div class="card">
+      <div class="h"><h2>Podané reklamace</h2><div class="sp"></div><span class="note" id="rcount"></span></div>
+      <div class="b" id="casesWrap"></div>
+    </div>
+  </div>
+
+  <!-- === KLIENTI === -->
+  <div id="viewK" style="display:none">
+    <div class="card">
+      <div class="h"><h2>Klienti</h2><div class="sp"></div><button class="btn p sm" onclick="openClient()">+ Nový klient</button></div>
+      <div class="b" id="clientsWrap"></div>
+    </div>
+    <div class="card" id="settingsCard">
+      <div class="h"><h2>Nastavení</h2></div>
+      <div class="b" style="padding:16px 18px">
+        <div class="field" style="max-width:520px">
+          <label>Upozornit na novou reklamaci e-mailem (oddělte čárkou)</label>
+          <input id="notifyEmails" placeholder="reklamace@elkoplast.cz, servis@elkoplast.cz">
+        </div>
+        <button class="btn p sm" onclick="saveSettings()">Uložit nastavení</button>
+        <div class="note" style="margin-top:10px">Google tabulka se nastavuje serverovými proměnnými <span class="pill">REKLAMACE_SHEET_ID</span>, <span class="pill">GOOGLE_SA_CLIENT_EMAIL</span>, <span class="pill">GOOGLE_SA_PRIVATE_KEY</span>. Tabulku nasdílejte service accountu jako <b>Editora</b> a povolte <b>Google Sheets API</b>.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- modal: detail reklamace -->
+<div class="ov" id="ovCase"><div class="modal"><div id="caseModal"></div></div></div>
+<!-- modal: klient -->
+<div class="ov" id="ovClient"><div class="modal" style="max-width:520px"><div id="clientModal"></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+var ME=null, DATA=null, TAB='r';
+var $=function(id){return document.getElementById(id);};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function api(path,opts){return fetch(path,Object.assign({headers:{'Content-Type':'application/json'}},opts)).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.chyba||('HTTP '+r.status));return j;});});}
+function toast(t){var e=$('toast');e.textContent=t;e.classList.add('on');setTimeout(function(){e.classList.remove('on');},1800);}
+function fmtDate(ts){if(!ts)return '—';var d=new Date(ts);return d.toLocaleDateString('cs-CZ')+' '+d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});}
+function d2(s){return s||'—';}
+
+function load(){
+  Promise.all([api('/api/reklamace/me'),api('/api/reklamace/data')]).then(function(a){
+    ME=a[0];DATA=a[1];renderSheet();renderCases();renderClients();
+    if(ME.isAdmin){$('notifyEmails').value=(DATA.settings.notifyEmails||[]).join(', ');}
+    else{$('settingsCard').style.display='none';}
+  }).catch(function(e){document.body.innerHTML='<div class="empty">Chyba načtení: '+esc(e.message)+'</div>';});
+}
+
+function renderSheet(){
+  var s=ME.sheet||{};var el=$('sheetstat');
+  if(s.configured){el.innerHTML='<div class="sheetstat okk">✓ Zápis do Google tabulky je aktivní. Nové reklamace se automaticky zapisují do tabulky.</div>';}
+  else{el.innerHTML='<div class="sheetstat nokk">⚠ Google tabulka není nastavena — reklamace se ukládají do intranetu, ale nezapisují do tabulky. Doplňte serverové proměnné (viz Nastavení).</div>';}
+}
+
+function setTab(t){TAB=t;$('viewR').style.display=t==='r'?'':'none';$('viewK').style.display=t==='k'?'':'none';$('tabR').classList.toggle('on',t==='r');$('tabK').classList.toggle('on',t==='k');}
+
+function stavBadge(st){var lbl=(DATA.stavy&&DATA.stavy[st])||st;return '<span class="badge b-'+esc(st)+'">'+esc(lbl)+'</span>';}
+
+function renderCases(){
+  var cs=DATA.cases||[];
+  // statistiky
+  var n=cs.length,doplnit=cs.filter(function(c){return !c.uplna;}).length,otevr=cs.filter(function(c){return c.stav==='nova'||c.stav==='reseni'||c.stav==='doplnit';}).length;
+  $('stats').innerHTML=
+    '<div class="s"><div class="n">'+n+'</div><div class="l">Celkem</div></div>'+
+    '<div class="s"><div class="n">'+otevr+'</div><div class="l">Otevřené</div></div>'+
+    '<div class="s warn"><div class="n">'+doplnit+'</div><div class="l">K doplnění</div></div>';
+  $('rcount').textContent=n+' záznamů';
+  if(!n){$('casesWrap').innerHTML='<div class="empty">Zatím žádné reklamace. Odkaz pro klienta vytvoříte v záložce „Klienti a odkazy".</div>';return;}
+  var rows=cs.map(function(c){
+    return '<tr class="click" onclick="openCase(\''+c.id+'\')">'+
+      '<td><span class="pill">'+esc(c.cislo)+'</span></td>'+
+      '<td>'+esc(c.clientName)+'</td>'+
+      '<td class="small mut">'+esc(c.vyrobniCislo||'—')+'</td>'+
+      '<td class="small">'+fmtDate(c.createdAt)+'</td>'+
+      '<td>'+(c.uplna?'<span class="ok small">✓ úplná</span>':'<span class="no small">⏳ neúplná</span>')+'</td>'+
+      '<td>'+(c.media.length)+'×</td>'+
+      '<td>'+stavBadge(c.stav)+'</td>'+
+    '</tr>';
+  }).join('');
+  $('casesWrap').innerHTML='<table><thead><tr><th>Číslo</th><th>Klient</th><th>Výr. číslo</th><th>Přijato</th><th>Úplnost</th><th>Přílohy</th><th>Stav</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+function openCase(id){
+  var c=(DATA.cases||[]).find(function(x){return x.id===id;});if(!c)return;
+  var media=(c.media||[]).map(function(m){
+    var inner=m.kind==='video'?'<div class="v">🎬</div>':'<img src="'+m.url+'" loading="lazy">';
+    return '<a href="'+m.url+'" target="_blank" title="'+esc(m.name)+'">'+inner+'<span class="cap">'+esc(m.name)+'</span></a>';
+  }).join('');
+  var chybi=(!c.uplna&&c.chybi&&c.chybi.length)?'<div class="sheetstat nokk" style="margin:0 0 14px">Neúplná reklamace — chybí: '+esc(c.chybi.join(', '))+'. Za řádně uplatněnou se považuje až po doplnění.</div>':'';
+  var opts=Object.keys(DATA.stavy).map(function(k){return '<option value="'+k+'"'+(k===c.stav?' selected':'')+'>'+esc(DATA.stavy[k])+'</option>';}).join('');
+  var sheet='';
+  if(c.sheetSync){sheet=c.sheetSync.ok?'<span class="ok small">✓ zapsáno do tabulky</span>':'<span class="no small" title="'+esc(c.sheetSync.err||'')+'">✗ nezapsáno do tabulky</span>';}
+  $('caseModal').innerHTML=
+    '<div class="mh"><h3>'+esc(c.cislo)+' · '+esc(c.clientName)+'</h3>'+stavBadge(c.stav)+'<button class="x" onclick="closeOv()">×</button></div>'+
+    '<div class="mb">'+chybi+
+      '<dl class="kv">'+
+        kv('Přijato',fmtDate(c.createdAt))+
+        kv('Řádně uplatněno',c.uplatnenoAt?fmtDate(c.uplatnenoAt):'— (nejprve doplnit údaje)')+
+        kv('Výrobní číslo',esc(d2(c.vyrobniCislo)))+
+        kv('Datum předání',esc(d2(c.datumPredani)))+
+        kv('Datum zjištění vady',esc(d2(c.datumZjisteni)))+
+        kv('Přesný popis vady',esc(d2(c.popisVady)))+
+        kv('Způsob použití',esc(d2(c.zpusobPouziti)))+
+        kv('Zatížení',esc(d2(c.zatizeni)))+
+        kv('Provozní prostředí',esc(d2(c.provozniProstredi)))+
+        kv('Kontaktní osoba',esc(d2(c.kontaktOsoba)))+
+        kv('Telefon',esc(d2(c.kontaktTelefon)))+
+        kv('E-mail',c.kontaktEmail?'<a href="mailto:'+esc(c.kontaktEmail)+'">'+esc(c.kontaktEmail)+'</a>':'—')+
+      '</dl>'+
+      '<div class="sec-t">Fotodokumentace ('+(c.media||[]).length+')</div>'+
+      (media?'<div class="media">'+media+'</div>':'<div class="note">Bez příloh.</div>')+
+      '<div class="sec-t">Interní řešení</div>'+
+      '<div class="row2">'+
+        '<div class="field"><label>Stav</label><select id="cStav">'+opts+'</select></div>'+
+        '<div class="field"><label>&nbsp;</label><div>'+sheet+'</div></div>'+
+      '</div>'+
+      '<div class="field"><label>Interní poznámka</label><textarea id="cPozn">'+esc(c.interniPozn||'')+'</textarea></div>'+
+    '</div>'+
+    '<div class="mf"><button class="btn p" onclick="saveCase(\''+c.id+'\')">Uložit</button>'+
+      (ME.sheet&&ME.sheet.configured?'<button class="btn" onclick="syncCase(\''+c.id+'\')">Zapsat do tabulky</button>':'')+
+      '<div class="sp" style="flex:1"></div><span class="note">'+esc(c.ip||'')+'</span></div>';
+  $('ovCase').classList.add('on');
+}
+function kv(k,v){return '<dt>'+k+'</dt><dd>'+v+'</dd>';}
+function saveCase(id){
+  api('/api/reklamace/stav',{method:'POST',body:JSON.stringify({id:id,stav:$('cStav').value,interniPozn:$('cPozn').value})})
+    .then(function(r){var i=DATA.cases.findIndex(function(x){return x.id===id;});if(i>=0)DATA.cases[i]=r.case;renderCases();closeOv();toast('Uloženo');}).catch(function(e){alert(e.message);});
+}
+function syncCase(id){
+  toast('Zapisuji…');
+  api('/api/reklamace/sync',{method:'POST',body:JSON.stringify({id:id})})
+    .then(function(r){var c=DATA.cases.find(function(x){return x.id===id;});if(c)c.sheetSync=r.sheetSync;toast('Zapsáno do tabulky');openCase(id);})
+    .catch(function(e){alert('Zápis selhal: '+e.message);});
+}
+
+/* ---- klienti ---- */
+function renderClients(){
+  var cl=DATA.clients||[];
+  if(!cl.length){$('clientsWrap').innerHTML='<div class="empty">Zatím žádní klienti. Přidejte klienta a získáte jeho reklamační odkaz.</div>';return;}
+  var rows=cl.map(function(c){
+    return '<tr>'+
+      '<td><b>'+esc(c.name)+'</b>'+(c.ico?'<div class="small mut mono">IČO '+esc(c.ico)+'</div>':'')+'</td>'+
+      '<td class="small">'+c.pocet+'×</td>'+
+      '<td>'+(c.active?'<span class="badge b-nova">aktivní</span>':'<span class="badge b-uzavrena">vypnutý</span>')+'</td>'+
+      '<td style="min-width:220px"><div class="linkbox"><input readonly value="'+esc(c.url)+'" onclick="this.select()"><button class="btn sm" onclick="copyLink(\''+esc(c.url)+'\')">Kopírovat</button></div></td>'+
+      '<td><div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end">'+
+        '<button class="btn sm" onclick="openClient(\''+c.id+'\')">Upravit</button>'+
+        '<button class="btn sm" onclick="toggleClient(\''+c.id+'\','+(!c.active)+')">'+(c.active?'Vypnout':'Zapnout')+'</button>'+
+        '<button class="btn sm danger" onclick="regen(\''+c.id+'\')" title="Vygeneruje nový odkaz, starý přestane platit">Nový odkaz</button>'+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+  $('clientsWrap').innerHTML='<table><thead><tr><th>Klient</th><th>Reklamací</th><th>Stav</th><th>Reklamační odkaz</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+function copyLink(url){navigator.clipboard.writeText(url).then(function(){toast('Odkaz zkopírován');},function(){toast(url);});}
+function openClient(id){
+  var c=id?(DATA.clients||[]).find(function(x){return x.id===id;}):null;
+  $('clientModal').innerHTML=
+    '<div class="mh"><h3>'+(c?'Upravit klienta':'Nový klient')+'</h3><button class="x" onclick="closeOv()">×</button></div>'+
+    '<div class="mb">'+
+      '<div class="field"><label>Název klienta *</label><input id="clName" value="'+esc(c?c.name:'')+'" placeholder="Firma s.r.o."></div>'+
+      '<div class="row2"><div class="field"><label>IČO</label><input id="clIco" value="'+esc(c?c.ico:'')+'"></div>'+
+      '<div class="field"><label>Kontaktní e-mail</label><input id="clEmail" value="'+esc(c?c.email:'')+'"></div></div>'+
+      '<div class="field"><label>Poznámka</label><input id="clNote" value="'+esc(c?c.note:'')+'"></div>'+
+    '</div>'+
+    '<div class="mf"><button class="btn p" onclick="saveClient('+(c?'\''+c.id+'\'':'null')+')">Uložit</button><span class="note">Po uložení získá klient vlastní reklamační odkaz.</span></div>';
+  $('ovClient').classList.add('on');
+}
+function saveClient(id){
+  var body={id:id||undefined,name:$('clName').value,ico:$('clIco').value,email:$('clEmail').value,note:$('clNote').value};
+  api('/api/reklamace/klient',{method:'POST',body:JSON.stringify(body)}).then(function(r){closeOv();reloadData().then(function(){toast('Klient uložen');});}).catch(function(e){alert(e.message);});
+}
+function toggleClient(id,active){api('/api/reklamace/klient/stav',{method:'POST',body:JSON.stringify({id:id,active:active})}).then(function(){reloadData();}).catch(function(e){alert(e.message);});}
+function regen(id){if(!confirm('Vygenerovat nový odkaz? Původní odkaz přestane fungovat.'))return;api('/api/reklamace/klient/token',{method:'POST',body:JSON.stringify({id:id})}).then(function(){reloadData().then(function(){toast('Nový odkaz vytvořen');});}).catch(function(e){alert(e.message);});}
+function saveSettings(){var arr=$('notifyEmails').value.split(',').map(function(s){return s.trim();}).filter(Boolean);api('/api/reklamace/nastaveni',{method:'POST',body:JSON.stringify({notifyEmails:arr})}).then(function(r){DATA.settings=r.settings;$('notifyEmails').value=(r.settings.notifyEmails||[]).join(', ');toast('Nastavení uloženo');}).catch(function(e){alert(e.message);});}
+
+function reloadData(){return api('/api/reklamace/data').then(function(d){DATA=d;renderCases();renderClients();});}
+function closeOv(){$('ovCase').classList.remove('on');$('ovClient').classList.remove('on');}
+document.querySelectorAll('.ov').forEach(function(o){o.addEventListener('click',function(e){if(e.target===o)closeOv();});});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeOv();});
+load();
+</script>
+</body>
+</html>

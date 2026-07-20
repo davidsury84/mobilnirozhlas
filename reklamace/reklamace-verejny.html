@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reklamační formulář · ELKOPLAST CZ</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#12a350; --green-d:#0a6b34; --green-l:#e7f6ee;
+  --ink:#0f1512; --muted:#5b635c; --faint:#8b938c;
+  --bg:#f4f7f3; --card:#ffffff; --line:#e3e7e0; --line2:#d3dacf;
+  --amber:#e08a00; --amber-l:#fdf3e0; --red:#c23636; --red-l:#fbe9e7;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --cond:'IBM Plex Sans Condensed','IBM Plex Sans',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --shadow:0 10px 34px rgba(15,21,18,.09); --shadow-sm:0 3px 12px rgba(15,21,18,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--green-d)}
+.wrap{max-width:760px;margin:0 auto;padding:0 18px}
+.hazard{height:5px;background:repeating-linear-gradient(135deg,var(--amber) 0 13px,#1a1f1c 13px 26px);opacity:.9}
+
+header{background:linear-gradient(160deg,#0f2a1c 0%,#10432a 55%,#0a6b34 130%);color:#eafaf1;padding:20px 0 26px;position:relative;overflow:hidden}
+header::after{content:"";position:absolute;right:-110px;top:-120px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(29,214,127,.18),transparent 70%)}
+.brand{display:flex;flex-direction:column;gap:2px;position:relative;z-index:2}
+.brand .co{font-family:var(--cond);font-weight:700;font-size:19px;letter-spacing:.02em}
+.brand .co span{color:#5fe6a1}
+.brand .tl{font-size:12px;color:#9fd8ba;font-family:var(--mono)}
+.htitle{position:relative;z-index:2;margin-top:16px}
+.htitle .kick{display:inline-block;font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:#8ff0bd;background:rgba(20,120,66,.35);border:1px solid rgba(95,230,161,.35);padding:5px 12px;border-radius:100px;margin-bottom:12px}
+.htitle h1{font-family:var(--cond);font-weight:700;font-size:clamp(25px,5vw,36px);line-height:1.06;margin:0 0 8px}
+.htitle .who{font-size:14.5px;color:#cdeadb}
+.htitle .who b{color:#fff}
+
+main{padding:22px 0 60px}
+.notice{background:var(--amber-l);border:1px solid #f0dcb0;border-radius:12px;padding:13px 15px;font-size:13px;color:#6b4e12;margin:-14px 0 22px;position:relative;z-index:3;box-shadow:var(--shadow-sm)}
+.notice b{color:#5a4210}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm);margin-bottom:16px;overflow:hidden}
+.card .ch{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fbfdfb,#f6faf6)}
+.card .ch .n{width:27px;height:27px;flex:0 0 27px;border-radius:8px;background:var(--green-l);color:var(--green-d);display:grid;place-items:center;font-family:var(--cond);font-weight:700;font-size:14px}
+.card .ch h2{font-family:var(--cond);font-weight:700;font-size:16.5px;margin:0}
+.card .cb{padding:16px 18px 18px}
+
+.f{margin-bottom:15px}
+.f:last-child{margin-bottom:0}
+.f label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.f label .req{color:var(--red);margin-left:2px}
+.f .hint{font-size:11.5px;color:var(--faint);margin-top:5px}
+.f input,.f textarea{width:100%;padding:11px 12px;border:1px solid var(--line2);border-radius:10px;font-family:var(--sans);font-size:14.5px;background:#fff;color:var(--ink)}
+.f textarea{resize:vertical;min-height:82px}
+.f input:focus,.f textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(18,163,80,.14)}
+.f input.err,.f textarea.err{border-color:var(--red);box-shadow:0 0 0 3px rgba(216,74,74,.13)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+@media(max-width:540px){.row2{grid-template-columns:1fr}}
+
+/* dropzone */
+.drop{border:2px dashed var(--line2);border-radius:12px;padding:22px 16px;text-align:center;background:#fbfdfb;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.drag{border-color:var(--green);background:var(--green-l)}
+.drop .ic{font-size:30px;line-height:1}
+.drop .t{font-family:var(--cond);font-weight:700;font-size:15px;margin:8px 0 3px}
+.drop .s{font-size:12px;color:var(--muted)}
+.drop input[type=file]{display:none}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-top:14px}
+.thumb{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#000;aspect-ratio:1;display:grid;place-items:center}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .vid{color:#fff;font-size:24px}
+.thumb .meta{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;font-size:10px;padding:12px 6px 4px;font-family:var(--mono)}
+.thumb .rm{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:1;cursor:pointer;display:grid;place-items:center}
+.thumb .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--green);width:0;transition:width .2s}
+.thumb.up{opacity:.7}
+.thumb.fail{outline:2px solid var(--red)}
+
+.submit{display:flex;flex-direction:column;gap:12px;align-items:stretch;margin-top:6px}
+.btn{background:var(--green);color:#fff;font-family:var(--cond);font-weight:700;font-size:16px;border:0;border-radius:12px;padding:15px 22px;cursor:pointer;box-shadow:0 8px 20px rgba(18,163,80,.28);transition:transform .1s,background .15s}
+.btn:hover{transform:translateY(-1px);background:var(--green-d)}
+.btn:disabled{background:var(--line2);color:#fff;box-shadow:none;cursor:not-allowed;transform:none}
+.formmsg{font-size:13.5px;padding:12px 14px;border-radius:10px;display:none}
+.formmsg.err{display:block;background:var(--red-l);border:1px solid #f0c9c6;color:#8a2020}
+.foot{text-align:center;font-size:12px;color:var(--faint);margin-top:26px;line-height:1.7}
+
+/* stavy stránky */
+.state{max-width:520px;margin:60px auto;text-align:center;padding:0 20px}
+.state .big{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;margin:0 auto 18px;font-size:34px}
+.state.ok .big{background:var(--green-l);color:var(--green-d)}
+.state.warn .big{background:var(--amber-l);color:var(--amber)}
+.state.bad .big{background:var(--red-l);color:var(--red)}
+.state h2{font-family:var(--cond);font-weight:700;font-size:24px;margin:0 0 10px}
+.state p{color:var(--muted);font-size:15px;margin:0 0 6px}
+.state .cislo{font-family:var(--mono);font-size:15px;background:var(--green-l);color:var(--green-d);display:inline-block;padding:4px 12px;border-radius:8px;margin:10px 0}
+.state .miss{text-align:left;background:var(--amber-l);border:1px solid #f0dcb0;border-radius:12px;padding:13px 16px;margin:16px 0;font-size:13.5px;color:#6b4e12}
+.state .miss ul{margin:6px 0 0;padding-left:20px}
+.hidden{display:none!important}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="hazard"></div>
+
+<!-- neplatný odkaz -->
+<div id="invalid" class="state bad hidden">
+  <div class="big">⚠️</div>
+  <h2>Odkaz je neplatný</h2>
+  <p id="invalidMsg">Tento reklamační odkaz nefunguje nebo byl deaktivován. Kontaktujte prosím ELKOPLAST&nbsp;CZ.</p>
+</div>
+
+<!-- potvrzení -->
+<div id="done" class="state hidden"></div>
+
+<!-- formulář -->
+<div id="app" class="hidden">
+  <header>
+    <div class="wrap">
+      <div class="brand">
+        <div class="co">ELKOPLAST<span>&nbsp;CZ</span></div>
+        <div class="tl">reklamační formulář</div>
+      </div>
+      <div class="htitle">
+        <span class="kick">Uplatnění reklamace</span>
+        <h1>Reklamační formulář</h1>
+        <div class="who">Zákazník: <b id="clientName">—</b></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div class="notice">
+        <b>Reklamace se uplatňuje písemně</b> a musí obsahovat alespoň výrobní číslo dotčeného kusu, datum předání, přesný popis vady, datum jejího zjištění, fotografie nebo video, údaje o způsobu použití, zatížení a provozním prostředí a kontaktní osobu pro provedení prohlídky. <b>Neúplná reklamace se považuje za řádně uplatněnou až po doplnění požadovaných údajů.</b>
+      </div>
+
+      <form id="form" novalidate>
+        <!-- 1. výrobek -->
+        <div class="card">
+          <div class="ch"><div class="n">1</div><h2>Reklamovaný výrobek</h2></div>
+          <div class="cb">
+            <div class="row2">
+              <div class="f">
+                <label>Výrobní číslo dotčeného kusu <span class="req">*</span></label>
+                <input id="vyrobniCislo" name="vyrobniCislo" autocomplete="off" placeholder="např. 2024-001234">
+              </div>
+              <div class="f">
+                <label>Datum předání <span class="req">*</span></label>
+                <input id="datumPredani" name="datumPredani" type="date">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. vada -->
+        <div class="card">
+          <div class="ch"><div class="n">2</div><h2>Popis vady</h2></div>
+          <div class="cb">
+            <div class="f">
+              <label>Přesný popis vady <span class="req">*</span></label>
+              <textarea id="popisVady" name="popisVady" placeholder="Co, kde a jak se projevuje. Uveďte co nejpřesněji."></textarea>
+            </div>
+            <div class="f" style="max-width:280px">
+              <label>Datum zjištění vady <span class="req">*</span></label>
+              <input id="datumZjisteni" name="datumZjisteni" type="date">
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. fotodokumentace -->
+        <div class="card">
+          <div class="ch"><div class="n">3</div><h2>Fotografie nebo video</h2></div>
+          <div class="cb">
+            <div class="drop" id="drop">
+              <div class="ic">📷</div>
+              <div class="t">Přidat fotografie / video</div>
+              <div class="s">Klepněte pro výběr nebo přetáhněte soubory sem · JPG, PNG, MP4, MOV · foto max 15&nbsp;MB, video max 80&nbsp;MB</div>
+              <input id="file" type="file" accept="image/*,video/*" multiple>
+            </div>
+            <div class="thumbs" id="thumbs"></div>
+          </div>
+        </div>
+
+        <!-- 4. provozní údaje -->
+        <div class="card">
+          <div class="ch"><div class="n">4</div><h2>Způsob použití, zatížení a provozní prostředí</h2></div>
+          <div class="cb">
+            <div class="f">
+              <label>Způsob použití <span class="req">*</span></label>
+              <textarea id="zpusobPouziti" name="zpusobPouziti" style="min-height:64px" placeholder="K čemu a jak se výrobek používá."></textarea>
+            </div>
+            <div class="row2">
+              <div class="f">
+                <label>Zatížení <span class="req">*</span></label>
+                <input id="zatizeni" name="zatizeni" placeholder="např. běžné, plné vytížení, přetěžování…">
+              </div>
+              <div class="f">
+                <label>Provozní prostředí <span class="req">*</span></label>
+                <input id="provozniProstredi" name="provozniProstredi" placeholder="např. venkovní, mokro, mráz, chemie…">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. kontakt -->
+        <div class="card">
+          <div class="ch"><div class="n">5</div><h2>Kontaktní osoba pro prohlídku</h2></div>
+          <div class="cb">
+            <div class="f">
+              <label>Jméno kontaktní osoby <span class="req">*</span></label>
+              <input id="kontaktOsoba" name="kontaktOsoba" autocomplete="name" placeholder="Jméno a příjmení">
+            </div>
+            <div class="row2">
+              <div class="f">
+                <label>Telefon</label>
+                <input id="kontaktTelefon" name="kontaktTelefon" type="tel" autocomplete="tel" placeholder="+420 …">
+              </div>
+              <div class="f">
+                <label>E-mail</label>
+                <input id="kontaktEmail" name="kontaktEmail" type="email" autocomplete="email" placeholder="jmeno@firma.cz">
+              </div>
+            </div>
+            <div class="hint">Uveďte prosím alespoň telefon nebo e-mail, ať vás můžeme kontaktovat ke sjednání prohlídky.</div>
+          </div>
+        </div>
+
+        <div class="submit">
+          <div class="formmsg err" id="formmsg"></div>
+          <button class="btn" id="send" type="submit">Odeslat reklamaci</button>
+        </div>
+        <div class="foot">ELKOPLAST CZ, s.r.o. · Odesláním potvrzujete správnost uvedených údajů.</div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var token = location.pathname.split('/').filter(Boolean).pop() || '';
+  var API = '/api/reklamace/verejny/' + token;
+  var draftId = (Date.now().toString(36) + Math.random().toString(36).slice(2,10)).replace(/[^a-z0-9]/g,'');
+  var media = []; // {file,name,mime,kind,size, el}
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ---- init: ověř odkaz ----
+  fetch(API).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+    .then(function(x){
+      if(!x.ok){ $('invalidMsg').textContent = x.j.chyba || $('invalidMsg').textContent; show('invalid'); return; }
+      $('clientName').textContent = x.j.clientName || '—';
+      show('app');
+    })
+    .catch(function(){ show('invalid'); });
+
+  function show(which){
+    ['invalid','done','app'].forEach(function(id){ $(id).classList.toggle('hidden', id!==which); });
+    window.scrollTo(0,0);
+  }
+
+  // ---- přílohy ----
+  var drop = $('drop'), fileInput = $('file'), thumbs = $('thumbs');
+  drop.addEventListener('click', function(){ fileInput.click(); });
+  drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', function(){ drop.classList.remove('drag'); });
+  drop.addEventListener('drop', function(e){ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer&&e.dataTransfer.files) handleFiles(e.dataTransfer.files); });
+  fileInput.addEventListener('change', function(){ handleFiles(fileInput.files); fileInput.value=''; });
+
+  var ALLOWED = {'image/jpeg':1,'image/png':1,'image/webp':1,'image/heic':1,'image/gif':1,'video/mp4':1,'video/quicktime':1,'video/webm':1,'video/x-msvideo':1,'video/3gpp':1};
+  function guessMime(f){
+    var t=(f.type||'').toLowerCase(); if(t) return t;
+    var n=(f.name||'').toLowerCase();
+    if(/\.hei[cf]$/.test(n)) return 'image/heic'; if(/\.jpe?g$/.test(n)) return 'image/jpeg';
+    if(/\.png$/.test(n)) return 'image/png'; if(/\.webp$/.test(n)) return 'image/webp';
+    if(/\.mov$/.test(n)) return 'video/quicktime'; if(/\.mp4$/.test(n)) return 'video/mp4';
+    if(/\.webm$/.test(n)) return 'video/webm'; if(/\.3gp$/.test(n)) return 'video/3gpp';
+    return '';
+  }
+
+  function handleFiles(list){
+    for(var i=0;i<list.length;i++){
+      if(media.length>=12){ alert('Najednou lze přiložit nejvýše 12 souborů.'); break; }
+      (function(f){
+        var mime = guessMime(f);
+        if(!ALLOWED[mime]){ alert('Soubor „'+f.name+'" má nepodporovaný formát. Povolené: JPG, PNG, WEBP, HEIC, MP4, MOV, WEBM.'); return; }
+        var isVideo = mime.indexOf('video/')===0;
+        var item = {name:f.name, mime:mime, kind:isVideo?'video':'image', size:f.size, file:null, done:false, el:null};
+        media.push(item);
+        renderThumb(item, f, isVideo);
+        // fotku zmenšíme, video pošleme jak je
+        if(isVideo){ uploadBlob(item, f, mime); }
+        else { compress(f, mime).then(function(blob){ uploadBlob(item, blob, blob.type||mime); }); }
+      })(list[i]);
+    }
+  }
+
+  function renderThumb(item, f, isVideo){
+    var d = document.createElement('div'); d.className='thumb up';
+    var inner = isVideo ? '<div class="vid">🎬</div>' : '<img>';
+    d.innerHTML = inner + '<div class="bar"></div><span class="meta">'+humSize(item.size)+'</span><button type="button" class="rm" title="Odebrat">×</button>';
+    thumbs.appendChild(d); item.el = d;
+    if(!isVideo){ var url=URL.createObjectURL(f); d.querySelector('img').src=url; }
+    d.querySelector('.rm').addEventListener('click', function(){ removeItem(item); });
+  }
+  function removeItem(item){
+    var i = media.indexOf(item); if(i>=0) media.splice(i,1);
+    if(item.el && item.el.parentNode) item.el.parentNode.removeChild(item.el);
+  }
+  function setBar(item,pct){ if(item.el){ var b=item.el.querySelector('.bar'); if(b) b.style.width=pct+'%'; } }
+
+  // zmenšení fotky přes canvas (max hrana 1920, JPEG q0.82). Při chybě vrátí originál.
+  function compress(f, mime){
+    return new Promise(function(resolve){
+      if(mime==='image/heic' || mime==='image/gif'){ resolve(f); return; }
+      var img=new Image(), url=URL.createObjectURL(f);
+      img.onload=function(){
+        try{
+          var max=1920, w=img.width, h=img.height;
+          if(w>max||h>max){ if(w>h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+          var c=document.createElement('canvas'); c.width=w; c.height=h;
+          c.getContext('2d').drawImage(img,0,0,w,h);
+          c.toBlob(function(b){ URL.revokeObjectURL(url); resolve(b && b.size<f.size ? b : f); }, 'image/jpeg', 0.82);
+        }catch(e){ URL.revokeObjectURL(url); resolve(f); }
+      };
+      img.onerror=function(){ URL.revokeObjectURL(url); resolve(f); };
+      img.src=url;
+    });
+  }
+
+  function uploadBlob(item, blob, mime){
+    item.size = blob.size;
+    if(item.el){ var m=item.el.querySelector('.meta'); if(m) m.textContent=humSize(blob.size); }
+    var xhr=new XMLHttpRequest();
+    xhr.open('POST', API + '/priloha?draft=' + encodeURIComponent(draftId) + '&name=' + encodeURIComponent(item.name));
+    xhr.setRequestHeader('Content-Type', mime);
+    xhr.upload.onprogress=function(e){ if(e.lengthComputable) setBar(item, Math.round(e.loaded/e.total*100)); };
+    xhr.onload=function(){
+      var j={}; try{ j=JSON.parse(xhr.responseText); }catch(e){}
+      if(xhr.status===200 && j.ref){ item.file=j.ref.file; item.mime=j.ref.mime; item.kind=j.ref.kind; item.done=true; if(item.el){ item.el.classList.remove('up'); setBar(item,100); setTimeout(function(){ var b=item.el&&item.el.querySelector('.bar'); if(b) b.style.opacity='0'; },400); } }
+      else { markFail(item, (j&&j.chyba) || 'Nahrání selhalo'); }
+    };
+    xhr.onerror=function(){ markFail(item,'Nahrání selhalo'); };
+    xhr.send(blob);
+  }
+  function markFail(item,msg){ if(item.el){ item.el.classList.add('fail'); item.el.classList.remove('up'); var m=item.el.querySelector('.meta'); if(m) m.textContent='chyba'; } item.failed=true; item.failMsg=msg; }
+
+  function humSize(b){ return b>=1e6 ? (b/1e6).toFixed(1)+' MB' : Math.max(1,Math.round(b/1e3))+' kB'; }
+
+  // ---- odeslání ----
+  var REQ = ['vyrobniCislo','datumPredani','popisVady','datumZjisteni','zpusobPouziti','zatizeni','provozniProstredi','kontaktOsoba'];
+  $('form').addEventListener('submit', function(e){
+    e.preventDefault();
+    var msg=$('formmsg'); msg.style.display='none';
+    // validace povinných textových polí
+    var firstBad=null;
+    REQ.forEach(function(k){ var el=$(k); var bad=!el.value.trim(); el.classList.toggle('err',bad); if(bad&&!firstBad) firstBad=el; });
+    if(!$('kontaktTelefon').value.trim() && !$('kontaktEmail').value.trim()){
+      $('kontaktTelefon').classList.add('err'); $('kontaktEmail').classList.add('err'); if(!firstBad) firstBad=$('kontaktTelefon');
+    }
+    if(firstBad){ err('Vyplňte prosím všechna povinná pole (označená *).'); firstBad.focus(); firstBad.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    var uploading = media.filter(function(m){ return !m.done && !m.failed; });
+    if(uploading.length){ err('Vyčkejte prosím na dokončení nahrávání příloh ('+uploading.length+' zbývá).'); return; }
+    if(!media.filter(function(m){ return m.done; }).length){
+      if(!confirm('Nepřiložili jste žádnou fotografii ani video. Reklamace pak bude neúplná a bude nutné dokumentaci doplnit.\n\nOdeslat i tak?')) return;
+    }
+
+    var payload = { draftId: draftId, media: media.filter(function(m){ return m.done; }).map(function(m){ return {file:m.file,name:m.name,mime:m.mime,kind:m.kind,size:m.size}; }) };
+    REQ.concat(['kontaktTelefon','kontaktEmail']).forEach(function(k){ payload[k]=$(k).value.trim(); });
+
+    var btn=$('send'); btn.disabled=true; btn.innerHTML='<span class="spin"></span>Odesílám…';
+    fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(x){
+        btn.disabled=false; btn.textContent='Odeslat reklamaci';
+        if(!x.ok){ err(x.j.chyba||'Odeslání se nezdařilo.'); return; }
+        renderDone(x.j);
+      })
+      .catch(function(){ btn.disabled=false; btn.textContent='Odeslat reklamaci'; err('Odeslání se nezdařilo. Zkuste to prosím znovu.'); });
+
+    function err(t){ msg.textContent=t; msg.style.display='block'; }
+  });
+  function err(t){ var m=$('formmsg'); m.textContent=t; m.style.display='block'; }
+
+  function renderDone(j){
+    var el=$('done');
+    el.className = 'state ' + (j.uplna ? 'ok' : 'warn');
+    var h='<div class="big">'+(j.uplna?'✓':'⏳')+'</div>';
+    h+='<h2>'+(j.uplna?'Reklamace přijata':'Přijato — je třeba doplnit')+'</h2>';
+    if(j.cislo) h+='<div class="cislo">'+j.cislo+'</div>';
+    h+='<p>'+(j.zprava||'')+'</p>';
+    if(!j.uplna && j.chybi && j.chybi.length){
+      h+='<div class="miss"><b>Chybějící údaje:</b><ul>'+j.chybi.map(function(x){ return '<li>'+x+'</li>'; }).join('')+'</ul></div>';
+      h+='<p style="font-size:13px">Doplnit je můžete opětovným odesláním tohoto formuláře.</p>';
+    }
+    el.innerHTML=h;
+    show('done');
+  }
+})();
+</script>
+</body>
+</html>

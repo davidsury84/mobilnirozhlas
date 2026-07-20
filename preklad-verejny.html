@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolik vám ušetří překladiště? · ELKOPLAST CZ</title>
+<meta name="description" content="Spočítejte si, kolik času a nákladů na dopravu odpadu vám ušetří vlastní překladiště s lisovací technologií. Orientační propočet zdarma.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#12a350; --green-d:#0a6b34; --green-l:#e7f6ee;
+  --ink:#0f1512; --muted:#5b635c; --faint:#8b938c;
+  --bg:#f4f7f3; --card:#ffffff; --line:#e3e7e0; --line2:#d3dacf;
+  --amber:#e08a00; --amber-l:#fdf3e0;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --cond:'IBM Plex Sans Condensed','IBM Plex Sans',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --shadow:0 10px 34px rgba(15,21,18,.09);
+  --shadow-sm:0 3px 12px rgba(15,21,18,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--green-d)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+/* top strip */
+.hazard{height:5px;background:repeating-linear-gradient(135deg,var(--amber) 0 13px,#1a1f1c 13px 26px);opacity:.9}
+
+/* header / hero */
+header{background:linear-gradient(160deg,#0f2a1c 0%,#10432a 55%,#0a6b34 130%);color:#eafaf1;padding:22px 0 0;position:relative;overflow:hidden}
+header::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(29,214,127,.18),transparent 70%)}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;position:relative;z-index:2}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand .co{font-family:var(--cond);font-weight:700;font-size:19px;letter-spacing:.02em}
+.brand .co span{color:#5fe6a1}
+.brand .tl{font-size:12px;color:#9fd8ba;font-family:var(--mono)}
+.nav .ph{text-align:right;font-size:12.5px;color:#c8ecd8}
+.nav .ph b{display:block;font-family:var(--mono);font-size:15px;color:#fff}
+.hero{position:relative;z-index:2;padding:44px 0 54px;max-width:720px}
+.hero .kick{display:inline-block;font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8ff0bd;background:rgba(20,120,66,.35);border:1px solid rgba(95,230,161,.35);padding:6px 13px;border-radius:100px;margin-bottom:18px}
+.hero h1{font-family:var(--cond);font-weight:700;font-size:clamp(30px,5.2vw,50px);line-height:1.04;letter-spacing:-.01em;margin:0 0 16px}
+.hero h1 em{font-style:normal;color:#5fe6a1}
+.hero p{font-size:17px;color:#cdeadb;max-width:600px;margin:0 0 26px}
+.hero .cta{display:inline-flex;align-items:center;gap:9px;background:#fff;color:var(--green-d);font-family:var(--cond);font-weight:700;font-size:16px;text-decoration:none;padding:14px 24px;border-radius:11px;box-shadow:0 8px 22px rgba(0,0,0,.22);border:0;cursor:pointer;transition:transform .12s}
+.hero .cta:hover{transform:translateY(-1px)}
+.hero .cta .ar{font-size:19px}
+.hero .trust{margin-top:20px;font-size:13px;color:#9fd8ba;display:flex;gap:18px;flex-wrap:wrap}
+.hero .trust span{display:flex;align-items:center;gap:7px}
+.hero .trust i{color:#5fe6a1;font-style:normal}
+
+/* benefit tiles */
+.benefits{margin-top:-32px;position:relative;z-index:5}
+.bgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:860px){.bgrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.bgrid{grid-template-columns:1fr}}
+.btile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;box-shadow:var(--shadow-sm)}
+.btile .ic{width:40px;height:40px;border-radius:10px;background:var(--green-l);color:var(--green-d);display:grid;place-items:center;font-size:20px;margin-bottom:12px}
+.btile h3{font-family:var(--cond);font-weight:700;font-size:16px;margin:0 0 5px}
+.btile p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.5}
+
+/* section */
+section{padding:52px 0}
+.sec-head{text-align:center;max-width:640px;margin:0 auto 32px}
+.sec-head .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:600}
+.sec-head h2{font-family:var(--cond);font-weight:700;font-size:clamp(24px,3.6vw,34px);margin:10px 0 12px;letter-spacing:-.01em}
+.sec-head p{color:var(--muted);font-size:16px;margin:0}
+
+/* calculator */
+#kalk{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.calc{display:grid;grid-template-columns:400px 1fr;gap:0;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow)}
+@media(max-width:900px){.calc{grid-template-columns:1fr}}
+.calc-in{padding:28px 28px 30px;background:linear-gradient(180deg,#fbfdfb,#f4f8f4);border-right:1px solid var(--line)}
+@media(max-width:900px){.calc-in{border-right:0;border-bottom:1px solid var(--line)}}
+.calc-in h3{font-family:var(--cond);font-weight:700;font-size:18px;margin:0 0 4px}
+.calc-in .lead{color:var(--muted);font-size:13.5px;margin:0 0 22px}
+.f{margin-bottom:19px}
+.f label{display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;font-weight:600;margin-bottom:9px;gap:10px}
+.f label .v{font-family:var(--mono);font-size:15px;color:var(--green-d);font-weight:600;background:var(--green-l);padding:2px 9px;border-radius:7px;white-space:nowrap}
+.f input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:6px;background:var(--line2);outline:none}
+.f input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:var(--green);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.2);cursor:pointer}
+.f input[type=range]::-moz-range-thumb{width:19px;height:19px;border-radius:50%;background:var(--green);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.2);cursor:pointer}
+.f .hint{font-size:11.5px;color:var(--faint);margin-top:6px}
+.calc-in .rangenote{font-size:11px;color:var(--faint);font-family:var(--mono);display:flex;justify-content:space-between;margin-top:5px}
+
+/* results side */
+.calc-out{padding:28px;position:relative;display:flex;flex-direction:column;min-height:440px}
+.calc-out .rlabel{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.hero-num{margin:6px 0 2px}
+.hero-num .big{font-family:var(--cond);font-weight:700;font-size:clamp(38px,6vw,58px);line-height:1;color:var(--green-d);letter-spacing:-.02em}
+.hero-num .u{font-size:19px;color:var(--muted);font-weight:600;margin-left:6px}
+.hero-num .sub{font-size:13px;color:var(--muted);margin-top:6px}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0 6px}
+.rcard{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+.rcard.amber{background:var(--amber-l);border-color:#f0dcb0}
+.rcard .rl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-family:var(--cond);font-weight:600}
+.rcard .rn{font-family:var(--mono);font-weight:600;font-size:22px;margin-top:5px;color:var(--ink)}
+.rcard.amber .rn{color:var(--amber)}
+.rcard .rx{font-size:11.5px;color:var(--faint);margin-top:2px}
+.sens{margin-top:16px;background:#f7faf6;border:1px dashed var(--line2);border-radius:12px;padding:13px 15px}
+.sens .st{font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:9px}
+.sens .bar{height:12px;border-radius:8px;background:linear-gradient(90deg,#cfe9d8,var(--green));position:relative;margin:4px 0 7px}
+.sens .bar .mk{position:absolute;top:-3px;width:3px;height:18px;background:var(--green-d);border-radius:2px}
+.sens .lbls{display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--faint)}
+.sens .lbls b{color:var(--ink)}
+
+/* lock overlay + gate */
+.lock{position:absolute;inset:0;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);background:rgba(247,250,246,.72);display:flex;align-items:center;justify-content:center;padding:24px;border-radius:0;transition:opacity .35s}
+.lock.hide{opacity:0;pointer-events:none}
+.gate{width:100%;max-width:340px;text-align:center}
+.gate .lk{width:52px;height:52px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font-size:24px;margin:0 auto 14px;box-shadow:0 6px 16px rgba(18,163,80,.35)}
+.gate h4{font-family:var(--cond);font-weight:700;font-size:20px;margin:0 0 6px}
+.gate p{font-size:13.5px;color:var(--muted);margin:0 0 18px}
+.gate .fld{text-align:left;margin-bottom:11px}
+.gate .fld label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--muted)}
+.gate input{width:100%;padding:12px 13px;border:1px solid var(--line2);border-radius:10px;font-family:var(--sans);font-size:14.5px;background:#fff;color:var(--ink)}
+.gate input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(18,163,80,.14)}
+.gate input.err{border-color:#d84a4a;box-shadow:0 0 0 3px rgba(216,74,74,.13)}
+.gate .submit{width:100%;margin-top:6px;background:var(--green);color:#fff;border:0;padding:14px;border-radius:11px;font-family:var(--cond);font-weight:700;font-size:16px;cursor:pointer;transition:background .15s}
+.gate .submit:hover{background:var(--green-d)}
+.gate .submit:disabled{opacity:.6;cursor:default}
+.gate .fine{font-size:11px;color:var(--faint);margin-top:12px;line-height:1.5}
+.gate .emsg{color:#c0392b;font-size:12.5px;margin-top:9px;min-height:16px}
+
+/* thanks state */
+.thanks{text-align:center;padding:6px 0 2px}
+.thanks .ok{width:52px;height:52px;border-radius:50%;background:var(--green-l);color:var(--green-d);display:grid;place-items:center;font-size:26px;margin:0 auto 12px}
+.thanks h4{font-family:var(--cond);font-weight:700;font-size:19px;margin:0 0 6px}
+.thanks p{font-size:13.5px;color:var(--muted);margin:0 auto;max-width:340px}
+.thanks .rep{margin-top:14px;display:inline-flex;align-items:center;gap:11px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 15px;text-align:left}
+.thanks .rep .av{width:38px;height:38px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font-family:var(--cond);font-weight:700;font-size:15px}
+.thanks .rep .nm{font-weight:600;font-size:13.5px}
+.thanks .rep .ct{font-size:12px;color:var(--muted);font-family:var(--mono)}
+
+/* how it works */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:900px;margin:0 auto}
+@media(max-width:720px){.steps{grid-template-columns:1fr}}
+.step{text-align:center;padding:0 8px}
+.step .no{width:44px;height:44px;border-radius:50%;background:var(--green-l);color:var(--green-d);font-family:var(--cond);font-weight:700;font-size:19px;display:grid;place-items:center;margin:0 auto 14px}
+.step h3{font-family:var(--cond);font-weight:700;font-size:17px;margin:0 0 7px}
+.step p{color:var(--muted);font-size:14px;margin:0}
+
+/* logic strip */
+.logic{background:var(--green-l);border:1px solid #cbe9d7;border-radius:16px;padding:26px 28px;max-width:860px;margin:34px auto 0}
+.logic h3{font-family:var(--cond);font-weight:700;font-size:18px;margin:0 0 14px;color:var(--green-d)}
+.logic .flow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13.5px}
+.logic .fb{background:#fff;border:1px solid #bfe3cd;border-radius:10px;padding:9px 13px;font-weight:600}
+.logic .ar{color:var(--green);font-size:18px;font-weight:700}
+.logic .note{margin:14px 0 0;font-size:12.5px;color:var(--muted);line-height:1.55}
+
+/* footer */
+footer{background:#0f2a1c;color:#bcd9c8;padding:38px 0 30px;margin-top:10px}
+footer .fw{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:flex-start}
+footer .co{font-family:var(--cond);font-weight:700;font-size:18px;color:#fff}
+footer .co span{color:#5fe6a1}
+footer p{font-size:13px;margin:8px 0 0;max-width:420px;line-height:1.6}
+footer .fc{font-size:13px;text-align:right}
+footer .fc b{color:#fff}
+footer .fine{border-top:1px solid rgba(255,255,255,.12);margin-top:24px;padding-top:16px;font-size:11.5px;color:#7fa68e}
+
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="hazard"></div>
+
+<header>
+  <div class="wrap">
+    <div class="nav">
+      <div class="brand">
+        <div class="co">ELKOPLAST <span>CZ</span></div>
+        <div class="tl">Technologie překladišť · lisy L&amp;M</div>
+      </div>
+      <div class="ph">Nezávazná konzultace<b>+420 577 110 921</b></div>
+    </div>
+    <div class="hero">
+      <span class="kick">Překladiště odpadu · ROI kalkulačka</span>
+      <h1>Vozíte odpad na koncovku <em>poloprázdný?</em> Spočítejte, kolik vám ušetří vlastní překladiště.</h1>
+      <p>Zhutněním odpadu do lisovacích kontejnerů naložíte na jednu jízdu 2–3× víc. Míň jízd znamená míň nafty, míň hodin řidiče a čitelnou úsporu každý rok. Za dvě minuty zjistíte svůj potenciál.</p>
+      <button class="cta" onclick="document.getElementById('kalk').scrollIntoView({behavior:'smooth'})">Spustit propočet <span class="ar">→</span></button>
+      <div class="trust">
+        <span><i>✓</i> Orientační, zdarma a nezávazně</span>
+        <span><i>✓</i> Reálné ceny technologie Ludden &amp; Mennekes</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap benefits">
+  <div class="bgrid">
+    <div class="btile"><div class="ic">🚛</div><h3>Méně jízd</h3><p>Zhutněný odpad = plný náklad. Počet jízd na koncovku klesá i o polovinu.</p></div>
+    <div class="btile"><div class="ic">⏱️</div><h3>Ušetřený čas</h3><p>Míň jízd uvolní stovky hodin řidiče a vozidla — čas na užitečnější práci.</p></div>
+    <div class="btile"><div class="ic">💰</div><h3>Nižší náklady</h3><p>Klíčová položka je dálková doprava. Právě tu překladiště nejvíc srazí.</p></div>
+    <div class="btile"><div class="ic">🌱</div><h3>Méně emisí</h3><p>Ujeté kilometry a spálená nafta dolů — s nimi i vaše uhlíková stopa.</p></div>
+  </div>
+</div>
+
+<section id="kalk">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Váš propočet</div>
+      <h2>Zadejte svůj provoz — výsledek uvidíte hned</h2>
+      <p>Stačí čtyři čísla o vašem svozu. Model dopočítá roční úsporu, ušetřený čas i orientační návratnost.</p>
+    </div>
+
+    <div class="calc">
+      <!-- inputs -->
+      <div class="calc-in">
+        <h3>Váš dnešní svoz</h3>
+        <p class="lead">Přibližné hodnoty stačí — čísla si upřesníme společně.</p>
+
+        <div class="f">
+          <label>Roční množství odpadu <span class="v"><span id="vQ">8 000</span> t/rok</span></label>
+          <input type="range" id="Q" min="2000" max="40000" step="500" value="8000" oninput="recalc()">
+          <div class="rangenote"><span>2 000</span><span>40 000</span></div>
+        </div>
+
+        <div class="f">
+          <label>Vzdálenost na koncovku <span class="v"><span id="vD">40</span> km</span></label>
+          <input type="range" id="D" min="10" max="150" step="5" value="40" oninput="recalc()">
+          <div class="rangenote"><span>10 km</span><span>150 km</span></div>
+          <div class="hint">Vzdálenost na skládku / spalovnu (jeden směr).</div>
+        </div>
+
+        <div class="f">
+          <label>Náklad dnes na jednu jízdu <span class="v"><span id="vP">8</span> t</span></label>
+          <input type="range" id="Pnow" min="3" max="16" step="0.5" value="8" oninput="recalc()">
+          <div class="rangenote"><span>3 t</span><span>16 t</span></div>
+          <div class="hint">Kolik tun nesbalen&#233;ho odpadu odveze jedno vozidlo.</div>
+        </div>
+
+        <div class="f">
+          <label>Cena dopravy <span class="v"><span id="vC">55</span> Kč/km</span></label>
+          <input type="range" id="ckm" min="25" max="110" step="5" value="55" oninput="recalc()">
+          <div class="rangenote"><span>25</span><span>110 Kč/km</span></div>
+        </div>
+      </div>
+
+      <!-- results -->
+      <div class="calc-out">
+        <div id="resultInner">
+          <div class="rlabel">Vaše odhadovaná roční úspora</div>
+          <div class="hero-num"><span class="big" id="rSave">—</span><span class="u">Kč/rok</span>
+            <div class="sub" id="rSaveNote">na dálkové dopravě po zhutnění odpadu</div>
+          </div>
+
+          <div class="rgrid">
+            <div class="rcard amber"><div class="rl">Ušetřený čas</div><div class="rn" id="rHours">—</div><div class="rx" id="rDays">vozidla &amp; řidiče ročně</div></div>
+            <div class="rcard"><div class="rl">Méně jízd na koncovku</div><div class="rn" id="rTrips">—</div><div class="rx" id="rKm">kratší najeté km</div></div>
+            <div class="rcard"><div class="rl">Orientační návratnost</div><div class="rn" id="rPay">—</div><div class="rx">investice do technologie</div></div>
+            <div class="rcard"><div class="rl">Méně emisí CO₂</div><div class="rn" id="rCo2">—</div><div class="rx">z ušetřené nafty</div></div>
+          </div>
+
+          <div class="sens">
+            <div class="st">📉 Citlivostní rozpětí — i při opatrnějším odhadu</div>
+            <div class="bar"><div class="mk" id="sensMk" style="left:50%"></div></div>
+            <div class="lbls"><span>konzervativně <b id="sLow">—</b></span><span>optimisticky <b id="sHigh">—</b></span></div>
+          </div>
+        </div>
+
+        <!-- lock / contact gate -->
+        <div class="lock" id="lock">
+          <div class="gate" id="gate">
+            <div class="lk">🔒</div>
+            <h4>Váš výsledek je připraven</h4>
+            <p>Zadejte kontakt a my vám úsporu odemkneme. Ozve se vám náš specialista s upřesněným propočtem.</p>
+            <form id="leadForm" onsubmit="return submitLead(event)">
+              <div class="fld"><label>E-mail *</label><input type="email" id="lEmail" placeholder="vas@email.cz" autocomplete="email" required></div>
+              <div class="fld"><label>Telefon *</label><input type="tel" id="lPhone" placeholder="+420 …" autocomplete="tel" required></div>
+              <div class="fld"><label>Firma / organizace</label><input type="text" id="lFirma" placeholder="nepovinné" autocomplete="organization"></div>
+              <button type="submit" class="submit" id="lBtn">Zobrazit moji úsporu →</button>
+              <div class="emsg" id="lMsg"></div>
+            </form>
+            <div class="fine">Kontakt použijeme jen k přípravě propočtu a nabídky. Nepředáváme jej třetím stranám.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Jak to funguje</div>
+      <h2>Od prvního čísla k nabídce ve třech krocích</h2>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="no">1</div><h3>Spočítáte potenciál</h3><p>Zadáte pár čísel o svém svozu a hned vidíte odhad úspory a ušetřeného času.</p></div>
+      <div class="step"><div class="no">2</div><h3>Ozve se specialista</h3><p>Náš obchodní specialista si s vámi projde reálné podmínky a upřesní propočet.</p></div>
+      <div class="step"><div class="no">3</div><h3>Dostanete nabídku</h3><p>Připravíme konkrétní návrh sestavy lisu a kontejnerů s návratností na míru.</p></div>
+    </div>
+
+    <div class="logic">
+      <h3>Na čem propočet stojí</h3>
+      <div class="flow">
+        <span class="fb">Dnešní jízdy = tonáž ÷ dnešní náklad</span>
+        <span class="ar">→</span>
+        <span class="fb">Po zhutnění naložíte víc</span>
+        <span class="ar">→</span>
+        <span class="fb">Míň jízd = úspora dopravy a času</span>
+      </div>
+      <p class="note">Zhutněním do lisovacích kontejnerů PC&nbsp;6500 (32&nbsp;m³) narazíte místo na objem na zákonnou hmotnost odvozu — na jednu jízdu tak odvezete výrazně víc. Rozdíl mezi dnešní a novou dopravou je roční úspora; ušetřený čas dopočítáme z ujetých kilometrů a počtu jízd. Uvedená čísla jsou orientační; konkrétní hodnoty ověří specialista.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap fw">
+    <div>
+      <div class="co">ELKOPLAST <span>CZ</span>, s.r.o.</div>
+      <p>Dodáváme stacionární lisy a lisovací kontejnery pro překladiště odpadu. Pomáháme technickým službám a svozovým firmám snížit náklady na dálkovou dopravu odpadu.</p>
+    </div>
+    <div class="fc">
+      <b>Nezávazná konzultace</b><br>
+      +420 577 110 921<br>
+      obchod@elkoplast.cz<br>
+      www.elkoplast.cz
+    </div>
+  </div>
+  <div class="wrap"><div class="fine">© ELKOPLAST CZ, s.r.o.</div></div>
+</footer>
+
+<script>
+"use strict";
+
+/* ===== ekonomický model (portováno z interní kalkulačky, sestava STV 3800 · bez traverzy) ===== */
+var M = { kW:22, cycle:36, vstroke:3.93, p_bez:123675, dens:0.55 };
+var CONT_VOL=32, WEIGHT_CAP=24, LOOSE=0.40, KWH=5.0, WAGE=350, MAINT=120000, SWAP_MIN=25;
+var N_CONT=2, C_PRICE=11000, FREIGHT=6000, INSTALL=14000, FX=25, CIVIL=800000;
+var AVG_SPEED=55;         /* km/h vč. manipulace na trase */
+var HANDLE_PER_TRIP=0.5;  /* h nakládky/vykládky ušetřené na jednu odpadlou jízdu */
+var DIESEL_L_PER_KM=0.34, CO2_PER_L=2.64; /* l/km nákladní vozidlo, kg CO2 / l nafty */
+
+function model(Q, D, Pnow, ckm){
+  var payload = Math.min(CONT_VOL*M.dens, WEIGHT_CAP); /* t/jízda po zhutnění */
+  var kmTrip = D*2;
+  var tripsNow = Math.ceil(Q/Math.max(0.1,Pnow));
+  var tripsAft = Math.ceil(Q/payload);
+  var costNow = tripsNow*kmTrip*ckm;
+  var transportAft = tripsAft*kmTrip*ckm;
+
+  var Vloose = Q/LOOSE;
+  var runHours = (Vloose/M.vstroke)*M.cycle/3600;
+  var elec = runHours*M.kW*KWH;
+  var swapLabor = tripsAft*(SWAP_MIN/60)*WAGE;
+  var opex = elec + swapLabor + MAINT;
+  var costAft = transportAft + opex;
+  var saving = costNow - costAft;
+
+  var capexEUR = M.p_bez + N_CONT*C_PRICE + FREIGHT + INSTALL;
+  var capexCZK = capexEUR*FX + CIVIL;
+  var payback = saving>0 ? capexCZK/saving : Infinity;
+
+  var savedTrips = tripsNow - tripsAft;
+  var savedKm = savedTrips*kmTrip;
+  var savedHours = savedKm/AVG_SPEED + savedTrips*HANDLE_PER_TRIP;
+  var savedDays = savedHours/8;
+  var co2t = savedKm*DIESEL_L_PER_KM*CO2_PER_L/1000; /* tuny CO2 */
+
+  return {saving:saving,payback:payback,savedTrips:savedTrips,savedKm:savedKm,
+          savedHours:savedHours,savedDays:savedDays,co2t:co2t,capexCZK:capexCZK};
+}
+
+/* ===== formátování ===== */
+function nf(n,dec){ dec=dec||0; if(!isFinite(n)) return "—"; return new Intl.NumberFormat("cs-CZ",{minimumFractionDigits:dec,maximumFractionDigits:dec}).format(n); }
+function mil(n){ return nf(n/1e6,2)+" mil"; }
+function money(n){ if(n>=1e6) return nf(n/1e6,2)+" mil Kč"; return nf(Math.round(n/1000))+" tis. Kč"; }
+
+var LAST=null, UNLOCKED=false;
+
+function recalc(){
+  var Q=+document.getElementById("Q").value;
+  var D=+document.getElementById("D").value;
+  var Pnow=+document.getElementById("Pnow").value;
+  var ckm=+document.getElementById("ckm").value;
+  document.getElementById("vQ").textContent=nf(Q);
+  document.getElementById("vD").textContent=nf(D);
+  document.getElementById("vP").textContent=nf(Pnow, Pnow%1?1:0);
+  document.getElementById("vC").textContent=nf(ckm);
+
+  var r=model(Q,D,Pnow,ckm);
+  LAST={Q:Q,D:D,Pnow:Pnow,ckm:ckm,r:r};
+
+  /* citlivostní rozpětí: opatrný scénář (kratší vzdálenost, nižší cena, menší tonáž -20 %) vs. optimistický (+20 %) */
+  var low=model(Q*0.8,D*0.8,Pnow,ckm*0.85).saving;
+  var high=model(Q*1.15,D*1.15,Pnow,ckm*1.1).saving;
+
+  if(UNLOCKED) paint(r,low,high);
+}
+
+function paint(r,low,high){
+  document.getElementById("rSave").textContent = r.saving>0 ? money(r.saving) : "—";
+  document.getElementById("rSaveNote").textContent = r.saving>0 ? "na dálkové dopravě po zhutnění odpadu" : "při těchto hodnotách je úspora malá — proberme to";
+  document.getElementById("rHours").textContent = nf(Math.round(r.savedHours))+" h";
+  document.getElementById("rDays").textContent = "≈ "+nf(Math.round(r.savedDays))+" pracovních dnů vozidla ročně";
+  document.getElementById("rTrips").textContent = "−"+nf(r.savedTrips)+" jízd";
+  document.getElementById("rKm").textContent = "≈ "+nf(Math.round(r.savedKm))+" km méně za rok";
+  document.getElementById("rPay").textContent = isFinite(r.payback)&&r.payback<30 ? nf(r.payback,1)+" roku" : "—";
+  document.getElementById("rCo2").textContent = nf(Math.round(r.co2t))+" t";
+
+  if(low>0&&high>0){
+    document.getElementById("sLow").textContent = money(low);
+    document.getElementById("sHigh").textContent = money(high);
+    var pos = high>low ? (r.saving-low)/(high-low)*100 : 50;
+    document.getElementById("sensMk").style.left = Math.max(4,Math.min(96,pos))+"%";
+    document.querySelector(".sens").style.display="";
+  } else { document.querySelector(".sens").style.display="none"; }
+}
+
+/* ===== odeslání leadu ===== */
+function submitLead(ev){
+  ev.preventDefault();
+  var email=document.getElementById("lEmail"), phone=document.getElementById("lPhone");
+  var firma=document.getElementById("lFirma").value.trim();
+  var msg=document.getElementById("lMsg");
+  var em=email.value.trim(), ph=phone.value.trim();
+  email.classList.remove("err"); phone.classList.remove("err"); msg.textContent="";
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ email.classList.add("err"); msg.textContent="Zadejte platný e-mail."; return false; }
+  if(ph.replace(/[^0-9]/g,"").length < 9){ phone.classList.add("err"); msg.textContent="Zadejte platné telefonní číslo."; return false; }
+
+  var btn=document.getElementById("lBtn"); btn.disabled=true; btn.textContent="Odesílám…";
+  var payload={ email:em, phone:ph, firma:firma,
+    inputs:{Q:LAST.Q, D:LAST.D, Pnow:LAST.Pnow, ckm:LAST.ckm},
+    result:{ saving:Math.round(LAST.r.saving), payback:isFinite(LAST.r.payback)?+LAST.r.payback.toFixed(2):null,
+             savedTrips:LAST.r.savedTrips, savedKm:Math.round(LAST.r.savedKm),
+             savedHours:Math.round(LAST.r.savedHours), co2t:Math.round(LAST.r.co2t),
+             capexCZK:Math.round(LAST.r.capexCZK) } };
+
+  fetch("/api/preklad-lead",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+    .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {ok:r.ok,j:j}; }); })
+    .then(function(x){
+      if(!x.ok){ throw new Error((x.j&&x.j.error)||"Nepodařilo se odeslat."); }
+      unlock();
+    })
+    .catch(function(e){
+      /* i při chybě sítě klienta neblokujeme — výsledek ukážeme, lead zkusí uložit localStorage jako fallback */
+      try{ localStorage.setItem("preklad_lead_"+Date.now(), JSON.stringify(payload)); }catch(_){}
+      unlock();
+    });
+  return false;
+}
+
+function unlock(){
+  UNLOCKED=true;
+  recalc();
+  /* nahradit gate poděkováním, pak schovat overlay */
+  var gate=document.getElementById("gate");
+  var fn = (document.getElementById("lFirma").value.trim()||"").length ? "" : "";
+  gate.innerHTML =
+    '<div class="thanks">'+
+      '<div class="ok">✓</div>'+
+      '<h4>Hotovo — úspora je odemčená</h4>'+
+      '<p>Váš propočet vidíte za tímto oknem. Brzy se vám ozveme s upřesněnou nabídkou na míru.</p>'+
+      '<div class="rep"><div class="av">JŠ</div><div><div class="nm">Jan Šonský</div><div class="ct">obchodní specialista · ELKOPLAST CZ</div></div></div>'+
+    '</div>';
+  setTimeout(function(){ document.getElementById("lock").classList.add("hide"); }, 1100);
+}
+
+/* init: spočítat model hned (drží se pod zámkem), placeholdery zůstanou dokud se neodemkne */
+recalc();
+</script>
+</body>
+</html>

@@ -12,3 +12,6 @@ node_modules/
 # Lokální nástroje Claude Code (dev)
 .claude/
 .build-time
+
+# Word/Office dočasné zámky
+~$*

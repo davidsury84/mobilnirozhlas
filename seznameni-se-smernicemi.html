@@ -514,6 +514,41 @@ table.ob-table textarea.ob-inp{width:100%;min-width:120px;box-sizing:border-box;
 table.ob-table textarea.ob-inp:focus{outline:none;border-color:var(--green-2);box-shadow:0 0 0 2px var(--green-soft)}
 .ob-del{border:1px solid var(--line-strong);background:var(--paper);color:var(--red);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:15px;line-height:1;font-family:inherit}
 .ob-del:hover{background:var(--red-soft);border-color:var(--red)}
+/* Leady z veřejné kalkulačky */
+.ld-intro{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin:2px 0 16px}
+.ld-intro .ob-note{flex:1;min-width:260px}
+.ld-stats{display:flex;gap:16px;flex-wrap:wrap}
+.ld-stats span{font-size:12px;color:var(--ink-soft)}
+.ld-stats b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums;margin-right:3px}
+.ld-link{font-size:12.5px;font-weight:600;white-space:nowrap}
+.ld-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.ld-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow);padding:15px 16px;display:flex;flex-direction:column;gap:11px}
+.ld-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.ld-firma{font-size:15px;font-weight:700;line-height:1.25;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ld-when{font-size:11px;color:var(--ink-soft);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ld-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;border-radius:999px;padding:2px 8px}
+.ld-badge.ld-new{color:#0a5aa8;background:#e4f0fb;border:1px solid #bcdcf5}
+.ld-badge.ld-prog{color:#8a5a00;background:#fdf1dc;border:1px solid #f0dcb0}
+.ld-badge.ld-won{color:#0a6b34;background:#e6f6ec;border:1px solid #bfe6cd}
+.ld-badge.ld-lost{color:#9a2a2a;background:#fbe9e9;border:1px solid #f0c4c4}
+.ld-contact{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
+.ld-contact a{font-weight:600}
+.ld-in{font-size:12px;color:var(--ink-soft);background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.5}
+.ld-in b{color:var(--ink);font-variant-numeric:tabular-nums}
+.ld-res{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.ld-kpi{background:var(--bg-2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.ld-kpi.hi{background:#e9f7ef;border-color:#c6e8d3}
+.ld-kpi .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);font-weight:600}
+.ld-kpi .v{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.ld-kpi.hi .v{color:#0a6b34}
+.ld-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.ld-stsel{font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:7px}
+.ld-stsel select{font-family:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper);color:var(--ink)}
+.ld-del{color:var(--red)!important}
+.ld-note{display:flex;flex-direction:column;gap:7px}
+.ld-note textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:12.5px;line-height:1.45;border:1px solid var(--line-strong);border-radius:8px;padding:7px 9px;background:var(--paper);color:var(--ink);resize:vertical}
+.ld-note textarea:focus{outline:none;border-color:var(--green-2);box-shadow:0 0 0 2px var(--green-soft)}
+.ld-note .btn{align-self:flex-start}
 th.ob-delcol,td.ob-delcol{width:42px;text-align:center!important}
 .ob-saved{font-size:12.5px;color:var(--green-d);font-weight:600}
 /* Editace banneru */
@@ -622,6 +657,7 @@ th.ob-delcol,td.ob-delcol{width:42px;text-align:center!important}
       <button data-view="access">Přístupy</button>
       <button data-view="org">Organizační struktura</button>
       <button data-view="adaptace">Adaptace</button>
+      <button data-view="reklamace">Reklamace</button>
       <button data-view="stats">Statistiky</button>
       <button data-view="grit">Průzkumy</button>
       <button data-view="cenmon">Cenový monitoring</button>
@@ -783,6 +819,11 @@ th.ob-delcol,td.ob-delcol{width:42px;text-align:center!important}
   <!-- ===== Adaptace (onboarding — správa) ===== -->
   <section id="view-adaptace" class="view">
     <iframe id="adaptaceAdminFrame" style="width:100%;height:calc(100vh - 150px);border:0;display:block;background:#fff;border-radius:10px" title="Adaptace — správa onboardingu"></iframe>
+  </section>
+
+  <!-- ===== Reklamace ===== -->
+  <section id="view-reklamace" class="view">
+    <iframe id="reklamaceAdminFrame" style="width:100%;height:calc(100vh - 150px);border:0;display:block;background:#f7f9f5;border-radius:10px" title="Reklamace — klientské formuláře, evidence a odkazy"></iframe>
   </section>
 
   <!-- ===== Statistiky ===== -->
@@ -1244,6 +1285,7 @@ const MUJ_MODS = [
   { key:"zadanikonstrukce", icon:MUJ_IC.file, label:"Zadání do konstrukce", gated:true },
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
+  { key:"reklamace", icon:MUJ_IC.shield, label:"Reklamace", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
   { grp:"Rozvoj a nástup" },
   { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace" },
@@ -1322,7 +1364,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1406,6 +1448,7 @@ function mjGo(key){
   else if(key==="obchod") showObchod();
   else if(key==="zadanikonstrukce") showZadaniKonstrukce();
   else if(key==="smlouvy") showSmlouvy();
+  else if(key==="reklamace") showReklamace();
   else if(key==="sortiment") showSortiment();
   else if(key==="adaptace") showAdaptace();
   else if(key==="dovolena") showDovolena();
@@ -1476,6 +1519,7 @@ function plSheet(s){
   return h;
 }
 let OBCHOD_DATA=null, OBCHOD_EDIT=false, OBCHOD_DRAFT=null, OBCHOD_MSG="", OBCHOD_TAB="kategorie";
+let LEADY_DATA=null, LEADY_BUSY=false;
 function obCols(){ return (OBCHOD_DATA&&OBCHOD_DATA.columns)||[]; }
 // Vyhodnocení pokrytí (počítáme sami): vlastník + záloha → Pokryto; jen vlastník → Bez zálohy; bez vlastníka → Neobsazeno.
 function obFilled(s){ s=String(s||"").trim(); return (s===""||s==="—"||s==="-")?"":s; }
@@ -1566,6 +1610,10 @@ function obChartsHtml(rows){
 function obRender(){
   const body=document.getElementById("mujBody"), d=OBCHOD_DATA;
   if(OBCHOD_TAB==="obchodnici"){ body.innerHTML=obHero()+obTabs()+obObchodniciHtml(); window.scrollTo(0,0); return; }
+  if(OBCHOD_TAB==="leady"){
+    if(!LEADY_DATA){ body.innerHTML=obHero()+obTabs()+'<p class="muted" style="margin:16px 4px">Načítám leady…</p>'; loadLeady(); return; }
+    body.innerHTML=obHero()+obTabs()+obLeadyHtml(); window.scrollTo(0,0); return;
+  }
   if(OBCHOD_EDIT){ body.innerHTML=obHero()+obTabs()+obEditHtml(); window.scrollTo(0,0); return; }
   const cols=d.columns||[], rows=d.rows||[];
   const editBtn = d.canEdit ? '<button class="btn sm" type="button" onclick="obEnterEdit()">Upravit tabulku</button>' : '';
@@ -1644,6 +1692,77 @@ async function obSave(){
     OBCHOD_DATA=j; OBCHOD_EDIT=false; OBCHOD_DRAFT=null; OBCHOD_MSG='Uloženo.'; obRender();
   }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Uložit'; } alert('Uložení selhalo: '+(e.message||e)); }
 }
+/* ---- Obchod → Leady: kontakty z veřejné kalkulačky překladiště (/preklad) ---- */
+const LEADY_STAV_LBL={novy:'Nový',kontaktovano:'Kontaktováno',schuzka:'Schůzka',nabidka:'Nabídka',uzavreno:'Uzavřeno',zamitnuto:'Zamítnuto'};
+const LEADY_STAV_CLS={novy:'ld-new',kontaktovano:'ld-prog',schuzka:'ld-prog',nabidka:'ld-prog',uzavreno:'ld-won',zamitnuto:'ld-lost'};
+async function loadLeady(){
+  if(LEADY_BUSY) return; LEADY_BUSY=true;
+  try{ const r=await fetch('/api/obchod/leady',{cache:'no-store'}); if(!r.ok) throw new Error((await r.json()).error||('HTTP '+r.status)); LEADY_DATA=await r.json(); }
+  catch(e){ LEADY_DATA={items:[],stavy:[],error:(e&&e.message)||'chyba'}; }
+  LEADY_BUSY=false; if(OBCHOD_TAB==='leady') obRender();
+}
+function ldMoney(n){ if(!n||n<=0) return '—'; if(n>=1e6) return (n/1e6).toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2})+' mil Kč'; return Math.round(n/1000).toLocaleString('cs-CZ')+' tis. Kč'; }
+function ldDate(ts){ try{ return new Date(ts).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(_){ return ''; } }
+function ldNum(n){ return (n||0).toLocaleString('cs-CZ'); }
+function obLeadyHtml(){
+  const d=LEADY_DATA||{items:[]}, items=d.items||[];
+  const link=location.origin+'/preklad';
+  if(d.error) return '<div class="card pad" style="margin-top:14px"><p class="muted" style="margin:0">Leady se nepodařilo načíst. '+esc(d.error)+'</p></div>';
+  const novych=items.filter(x=>x.status==='novy').length;
+  const sumUspora=items.reduce((a,x)=>a+((x.result&&x.result.saving)||0),0);
+  const intro='<div class="ld-intro">'+
+    '<p class="ob-note" style="margin:0">Kontakty z veřejné kalkulačky překladiště. Klient vidí úsporu až po zadání e-mailu a telefonu — každé odeslání sem přistane jako lead. Reaguje <b>Jan Šonský</b>.</p>'+
+    '<div class="ld-stats"><span><b>'+items.length+'</b> celkem</span><span><b>'+novych+'</b> nových</span><span><b>'+ldMoney(sumUspora)+'</b> potenciál/rok</span></div>'+
+    '<a class="ld-link" href="'+esc(link)+'" target="_blank" rel="noopener">🔗 Veřejný odkaz na kalkulačku</a></div>';
+  if(!items.length) return intro+'<div class="card pad" style="margin-top:14px"><p class="muted" style="margin:0">Zatím žádné leady. Sdílejte veřejný odkaz na kalkulačku — nové kontakty se objeví tady.</p></div>';
+  const cards=items.map(x=>{
+    const r=x.result||{}, inp=x.inputs||{};
+    const st=x.status||'novy';
+    const opts=(d.stavy||Object.keys(LEADY_STAV_LBL)).map(s=>'<option value="'+s+'"'+(s===st?' selected':'')+'>'+esc(LEADY_STAV_LBL[s]||s)+'</option>').join('');
+    const pay=(r.payback!=null&&r.payback>0)?(String(r.payback).replace('.',',')+' roku'):'—';
+    return '<div class="ld-card">'+
+      '<div class="ld-head">'+
+        '<div class="ld-firma">'+esc(x.firma||'(bez názvu firmy)')+'<span class="ld-badge '+(LEADY_STAV_CLS[st]||'ld-new')+'">'+esc(LEADY_STAV_LBL[st]||st)+'</span></div>'+
+        '<div class="ld-when">'+esc(ldDate(x.ts))+'</div>'+
+      '</div>'+
+      '<div class="ld-contact"><a href="mailto:'+esc(x.email)+'">✉ '+esc(x.email)+'</a><a href="tel:'+esc((x.phone||'').replace(/\s/g,''))+'">☎ '+esc(x.phone||'')+'</a></div>'+
+      '<div class="ld-in">Zadal: <b>'+ldNum(inp.Q)+'</b> t/rok · <b>'+ldNum(inp.D)+'</b> km · dnes <b>'+ldNum(inp.Pnow)+'</b> t/jízda · <b>'+ldNum(inp.ckm)+'</b> Kč/km</div>'+
+      '<div class="ld-res">'+
+        '<div class="ld-kpi hi"><span class="k">Úspora/rok</span><span class="v">'+ldMoney(r.saving)+'</span></div>'+
+        '<div class="ld-kpi"><span class="k">Návratnost</span><span class="v">'+esc(pay)+'</span></div>'+
+        '<div class="ld-kpi"><span class="k">Míň jízd</span><span class="v">−'+ldNum(r.savedTrips)+'</span></div>'+
+        '<div class="ld-kpi"><span class="k">Ušetřený čas</span><span class="v">'+ldNum(r.savedHours)+' h</span></div>'+
+      '</div>'+
+      '<div class="ld-foot">'+
+        '<label class="ld-stsel">Stav <select onchange="ldSetStatus(\''+esc(x.id)+'\',this.value)">'+opts+'</select></label>'+
+        '<button class="btn sm ghost ld-del" type="button" onclick="ldDelete(\''+esc(x.id)+'\')">Smazat</button>'+
+      '</div>'+
+      '<div class="ld-note"><textarea id="ldn-'+esc(x.id)+'" rows="2" placeholder="Poznámka obchodníka (co jsme domluvili, kdy volat…)">'+esc(x.note||'')+'</textarea>'+
+        '<button class="btn sm" type="button" onclick="ldSaveNote(\''+esc(x.id)+'\')">Uložit poznámku</button></div>'+
+    '</div>';
+  }).join('');
+  return intro+'<div class="ld-list">'+cards+'</div>';
+}
+async function ldPost(body){
+  const r=await fetch('/api/obchod/leady',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j;
+}
+async function ldSetStatus(id,status){
+  const it=(LEADY_DATA.items||[]).find(x=>x.id===id); if(it) it.status=status;
+  try{ await ldPost({id,status}); obRender(); }catch(e){ alert('Uložení stavu selhalo: '+(e.message||e)); }
+}
+async function ldSaveNote(id){
+  const ta=document.getElementById('ldn-'+id); if(!ta) return;
+  const note=ta.value; const btn=ta.nextElementSibling; if(btn){ btn.disabled=true; btn.textContent='Ukládám…'; }
+  try{ await ldPost({id,note}); const it=(LEADY_DATA.items||[]).find(x=>x.id===id); if(it) it.note=note; if(btn){ btn.textContent='Uloženo ✓'; setTimeout(()=>{ btn.disabled=false; btn.textContent='Uložit poznámku'; },1400); } }
+  catch(e){ if(btn){ btn.disabled=false; btn.textContent='Uložit poznámku'; } alert('Uložení poznámky selhalo: '+(e.message||e)); }
+}
+async function ldDelete(id){
+  if(!confirm('Opravdu smazat tento lead?')) return;
+  try{ await ldPost({id,delete:true}); LEADY_DATA.items=(LEADY_DATA.items||[]).filter(x=>x.id!==id); obRender(); }
+  catch(e){ alert('Smazání selhalo: '+(e.message||e)); }
+}
+
 function showPlasty(tab){
   MUJ.view="plasty"; renderSidebar();
   const body=document.getElementById("mujBody");
@@ -1955,6 +2074,13 @@ async function showKonstrukce(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("konstrukce")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/konstrukce" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f6f2" title="Konstrukce — workflow zadání a schválení výkresů"></iframe>';
+  window.scrollTo(0,0);
+}
+async function showReklamace(){
+  MUJ.view="reklamace"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("reklamace")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<iframe src="/reklamace" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f7f9f5" title="Reklamace — klientské reklamační formuláře a evidence"></iframe>';
   window.scrollTo(0,0);
 }
 function showZadaniKonstrukce(){
@@ -2437,6 +2563,9 @@ function showDashboard(){
   if(MUJ.admin || (MUJ.modules||[]).indexOf("smlouvy")>=0){
     mainH += tile({ icon:MUJ_IC.file, title:"Smlouvy", desc:"Hlídač smluv a termínů.", action:"mjGo('smlouvy')", badge:'<span class="badge ok">Otevřít</span>' });
   }
+  if(MUJ.admin || (MUJ.modules||[]).indexOf("reklamace")>=0){
+    mainH += tile({ icon:MUJ_IC.shield, title:"Reklamace", desc:"Klientské reklamační formuláře a evidence.", action:"mjGo('reklamace')", badge:'<span class="badge ok">Otevřít</span>' });
+  }
   mainH += '</div>';
 
   const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
@@ -2757,6 +2886,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="access") renderAccess();
   if(v==="org") renderOrg();
   if(v==="adaptace"){ const f=document.getElementById("adaptaceAdminFrame"); if(f && !f.src) f.src="/adaptace?admin=1"; }
+  if(v==="reklamace"){ const f=document.getElementById("reklamaceAdminFrame"); if(f && !f.src) f.src="/reklamace"; }
   if(v==="grit") renderGritAdmin();
   if(v==="cenmon") renderCenmon();
   if(v==="activity") renderActivity();
@@ -3329,13 +3459,13 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["smlouvy","Smlouvy"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
-  ["Agendy",["doprava","konstrukce","obchod","smlouvy","sortiment","adaptace","freelo","aktuality"]]
+  ["Agendy",["doprava","konstrukce","obchod","smlouvy","reklamace","sortiment","adaptace","freelo","aktuality"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }
