@@ -254,8 +254,11 @@ async function garanti(){
     grp.get(key).smlouvy.push(s);});
   const groups=[...grp.values()].filter(g=>g.email).sort((a,b)=>b.smlouvy.length-a.smlouvy.length||String(jmeno(a.email)||a.email).localeCompare(String(jmeno(b.email)||b.email)));
   const bez=grp.get('__none__');
-  app.append(el('p',{class:'muted',style:'margin-top:-6px'},
-    groups.length+' '+(groups.length===1?'garant':(groups.length<5?'garanti':'garantů'))+' · '+data.length+' smluv'+(bez?' · '+bez.smlouvy.length+' bez garanta':'')));
+  const q=el('input',{placeholder:'hledat garanta — jméno nebo e-mail…',style:'flex:1;min-width:220px'});
+  app.append(el('div',{class:'row'},q));
+  const sum=el('p',{class:'muted',style:'margin-top:2px'});
+  const wrap=el('div',{});
+  app.append(sum,wrap);
   const karta=(g,warn)=>{
     const card=el('div',{class:'card'});
     card.append(el('div',{style:'display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap'},
@@ -270,11 +273,24 @@ async function garanti(){
         el('td',{},s.protistrana_nazev),
         el('td',{},s.platnost_do?czd(s.platnost_do):(s.platnost_podminka||s.platnost_typ)),
         el('td',{},el('span',{class:'pill '+(s.stav==='aktivni'?'zel':'sed')},s.stav_popis||s.stav)))));
-    t.append(tb);card.append(t);app.append(card);
+    t.append(tb);card.append(t);return card;
   };
-  if(!groups.length && !bez){app.append(el('div',{class:'card muted'},'Žádné smlouvy.'));return;}
-  groups.forEach(g=>karta(g,false));
-  if(bez)karta(bez,true);
+  const pluralG=n=>n+' '+(n===1?'garant':(n<5?'garanti':'garantů'));
+  function vykresli(){
+    const f=q.value.trim().toLowerCase();
+    const gf=groups.filter(g=>!f||(jmeno(g.email)||'').toLowerCase().includes(f)||String(g.email).toLowerCase().includes(f));
+    const showBez=!!bez&&(!f||'bez garanta'.includes(f)||'nepřiřazeno'.includes(f));
+    wrap.innerHTML='';
+    sum.textContent=f
+      ? (pluralG(gf.length)+' odpovídá „'+q.value.trim()+'"'+(showBez?' + bez garanta':''))
+      : (pluralG(groups.length)+' · '+data.length+' smluv'+(bez?' · '+bez.smlouvy.length+' bez garanta':''));
+    if(!gf.length&&!showBez){wrap.append(el('div',{class:'card muted'},'Žádný garant neodpovídá hledání.'));return;}
+    gf.forEach(g=>wrap.append(karta(g,false)));
+    if(showBez)wrap.append(karta(bez,true));
+  }
+  if(!groups.length&&!bez){sum.remove();wrap.append(el('div',{class:'card muted'},'Žádné smlouvy.'));return;}
+  q.addEventListener('input',vykresli);
+  vykresli();
 }
 
 function terminAkce(t, smlouvaId){
