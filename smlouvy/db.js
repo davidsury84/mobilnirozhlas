@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS smlouva (
   stav TEXT NOT NULL DEFAULT 'aktivni',
   stav_popis TEXT,
   drive_url TEXT,
+  vypoved_zpusob TEXT,
   je_placeholder INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -108,7 +109,7 @@ const SMLOUVA_COLS = [
   'cislo_smlouvy', 'kategorie', 'smer', 'podtyp', 'protistrana_nazev', 'protistrana_ico',
   'predmet', 'anotace', 'platnost_typ', 'platnost_do', 'platnost_podminka', 'vypovedni_lhuta_mesice',
   'prolongace', 'hodnota', 'hodnota_typ', 'hodnota_popis', 'mena', 'garant_email',
-  'spravce_email', 'stav', 'stav_popis', 'drive_url', 'je_placeholder',
+  'spravce_email', 'stav', 'stav_popis', 'drive_url', 'je_placeholder', 'vypoved_zpusob',
 ];
 
 function b(v) { return v ? 1 : 0; }
@@ -117,6 +118,10 @@ function openDb(file) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
+  // Migrace existující DB: ALTER přidá jen chybějící sloupce (jinak vyhodí a spolkneme).
+  for (const [tbl, col, typ] of [['smlouva', 'vypoved_zpusob', 'TEXT']]) {
+    try { db.exec(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${typ}`); } catch (_) { /* už existuje */ }
+  }
 
   const smlouva = {
     getById(id) { return db.prepare('SELECT * FROM smlouva WHERE id=?').get(id) || null; },

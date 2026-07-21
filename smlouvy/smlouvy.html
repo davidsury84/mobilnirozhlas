@@ -321,6 +321,7 @@ async function detail(id){
   radek('Předmět',esc(s.predmet||''));
   radek('Platnost',(s.platnost_do?czd(s.platnost_do):s.platnost_typ)+(s.platnost_podminka?' · '+esc(s.platnost_podminka):''));
   radek('Výpověď / prolongace',(s.vypovedni_lhuta_mesice?s.vypovedni_lhuta_mesice+' měs.':'—')+' / '+s.prolongace);
+  if(s.vypoved_zpusob)radek('Výpověď — jak / komu podat',`<span style="white-space:pre-wrap">${esc(s.vypoved_zpusob)}</span>`);
   radek('Hodnota',money(s.hodnota,s.mena)||esc(s.hodnota_popis||'—'));
   radek('Garant / Správce',(s.garant_email?esc(s.garant_email):'<span class="warn">nedořešen</span>')+' / '+esc(s.spravce_email||'—'));
   radek('Stav',`<span class="pill ${s.stav==='aktivni'?'zel':'sed'}">${esc(s.stav_popis||s.stav)}</span>`);
@@ -424,6 +425,7 @@ async function doplnUdaje(id){
     {k:'anotace',l:'Anotace (o čem smlouva je)',ta:1,val:s.anotace},
     {k:'platnost_do',l:'Platnost do (YYYY-MM-DD; prázdné = neurčitá)',val:s.platnost_do},
     {k:'vypovedni_lhuta_mesice',l:'Výpovědní lhůta (měs.)',type:'number',val:s.vypovedni_lhuta_mesice},
+    {k:'vypoved_zpusob',l:'Výpověď — jak / komu podat',ta:1,val:s.vypoved_zpusob},
     {k:'prolongace',l:'Prolongace',opts:['zadna','auto','jednani'],val:s.prolongace},
     {k:'hodnota',l:'Hodnota (číslo)',type:'number',val:s.hodnota},
     {k:'hodnota_typ',l:'Typ hodnoty',opts:['jednorazova','rocni','mesicni'],val:s.hodnota_typ},
@@ -435,7 +437,8 @@ async function doplnUdaje(id){
 function upravSmlouvu(s){dialog('Upravit smlouvu',[
   {k:'stav',l:'Stav',opts:['aktivni','vypovezena','ukoncena','archivovana'],val:s.stav},
   {k:'garant_email',l:'Garant (e-mail)',val:s.garant_email},{k:'spravce_email',l:'Správce (e-mail)',val:s.spravce_email},
-  {k:'platnost_do',l:'Platnost do',val:s.platnost_do},{k:'vypovedni_lhuta_mesice',l:'Výpovědní lhůta (měs.)',type:'number',val:s.vypovedni_lhuta_mesice}],
+  {k:'platnost_do',l:'Platnost do',val:s.platnost_do},{k:'vypovedni_lhuta_mesice',l:'Výpovědní lhůta (měs.)',type:'number',val:s.vypovedni_lhuta_mesice},
+  {k:'vypoved_zpusob',l:'Výpověď — jak / komu podat (adresa, mechanika lhůty)',ta:1,val:s.vypoved_zpusob}],
   async v=>{await api('/api/smlouvy/update?id='+s.id,{method:'POST',body:JSON.stringify(v)});detail(s.id);});}
 function novyTermin(id){dialog('Nový termín',[
   {k:'typ',l:'Typ',opts:['konec_platnosti','deadline_vypovedi','auto_prolongace','cenova_indexace','dohledovy_audit','rocni_review','konec_zaruky','sla','km_limit','jiny']},

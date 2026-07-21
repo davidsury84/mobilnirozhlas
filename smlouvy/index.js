@@ -63,6 +63,9 @@ function mount(host) {
   // Vazba smlouva → konkrétní dokument(y) na Disku; přestavba KS z reálných souborů.
   try { require('./seed-soubory').seedSoubory(M); }
   catch (e) { console.error('[smlouvy] seed soubory selhal:', e.message); }
+  // Doplnění „jak/komu podat výpověď" z plného textu smluv (registr to nemá).
+  try { require('./seed-vypoved').seedVypoved(M); }
+  catch (e) { console.error('[smlouvy] seed výpověď selhal:', e.message); }
 
   // ---- pomocné -----------------------------------------------------
   const json = (res, code, obj) => host.send(res, code, obj);
