@@ -337,9 +337,18 @@ async function detail(id){
       el('a',{href:f.url,target:'_blank',rel:'noopener'},'📄 '+esc(f.nazev||f.url)))));
     app.append(el('div',{class:'card'},el('h1',{style:'font-size:16px'},'Dokumenty ('+soub.length+')'),dl));
   }
-  if(ADMIN)app.append(el('div',{class:'row'},el('button',{class:'btn sec',on:{click:()=>upravSmlouvu(s)}},'Upravit smlouvu'),
-    el('button',{class:'btn sec',on:{click:()=>novyTermin(s.id)}},'+ Termín'),
-    el('button',{class:'btn sec',on:{click:()=>novyDodatek(s.id)}},'+ Dodatek')));
+  if(ADMIN){
+    const abtns=[el('button',{class:'btn sec',on:{click:()=>upravSmlouvu(s)}},'Upravit smlouvu'),
+      el('button',{class:'btn sec',on:{click:()=>novyTermin(s.id)}},'+ Termín'),
+      el('button',{class:'btn sec',on:{click:()=>novyDodatek(s.id)}},'+ Dodatek')];
+    if(soub.length||s.drive_url)abtns.push(el('button',{class:'btn sec',on:{click:async ev=>{
+      const b=ev.target,o=b.textContent;b.disabled=true;b.textContent='Vytěžuji…';
+      try{ const r=await api('/api/smlouvy/extrakce?id='+s.id,{method:'POST',body:'{}'});
+        if(r.chyba){alert('Chyba: '+r.chyba);b.disabled=false;b.textContent=o;}
+        else{const v=r.vyplneno||{};alert('AI vytěženo ('+(r.model||'')+').\nDoplněno polí: '+((v.pole&&v.pole.length)||0)+(v.pole&&v.pole.length?' ('+v.pole.join(', ')+')':'')+'\nNových termínů: '+(v.terminy||0)+'\n\nZkontrolujte a případně upravte.');detail(s.id);}
+      }catch(e){alert('Chyba: '+e.message);b.disabled=false;b.textContent=o;} }}},'🤖 Vytěžit z PDF (AI)'));
+    app.append(el('div',{class:'row'},...abtns));
+  }
 
   const thT=['Typ','Datum','Stav','Opakování','Notifikace'].concat(d.muzuResit?['Akce']:[]);
   const tt=el('table',{},el('thead',{},el('tr',{},...thT.map(h=>el('th',{},h)))));

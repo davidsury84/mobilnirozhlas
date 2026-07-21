@@ -77,4 +77,32 @@ async function listFolder(folderId) {
   return files;
 }
 
-module.exports = { configured, listFolder, saEmail };
+// Binární stažení obsahu souboru (pro AI extrakci). Vrací Buffer.
+function httpsBuffer(method, host, path, headers) {
+  return new Promise((resolve, reject) => {
+    const req = https.request({ method, host, path, headers }, (res) => {
+      if (res.statusCode >= 400) {
+        let d = ''; res.on('data', (c) => (d += c));
+        res.on('end', () => reject(new Error('HTTP ' + res.statusCode + ': ' + d.slice(0, 160))));
+        return;
+      }
+      const chunks = []; res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => req.destroy(new Error('Časový limit stahování souboru.')));
+    req.end();
+  });
+}
+
+// Stáhne soubor z Disku a vrátí { base64, bytes }. Nad maxBytes vyhodí chybu.
+async function downloadFileBase64(fileId, maxBytes = 15 * 1024 * 1024) {
+  const tok = await accessToken();
+  const buf = await httpsBuffer('GET', 'www.googleapis.com',
+    `/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
+    { Authorization: 'Bearer ' + tok });
+  if (buf.length > maxBytes) throw new Error('Soubor je příliš velký (' + Math.round(buf.length / 1048576) + ' MB) pro AI extrakci.');
+  return { base64: buf.toString('base64'), bytes: buf.length };
+}
+
+module.exports = { configured, listFolder, downloadFileBase64, saEmail };

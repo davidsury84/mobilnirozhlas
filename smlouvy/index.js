@@ -20,6 +20,7 @@ const { todayPrague, daysUntil, formatCz } = require('./lib/datum');
 const L = require('./lib/logic');
 const wikiTerminy = require('./lib/wikiTerminy');
 const drive = require('./lib/drive');
+const extrakce = require('./lib/extrakce');
 
 const HTML_FILE = path.join(__dirname, 'smlouvy.html');
 
@@ -156,6 +157,15 @@ function mount(host) {
         stav_popis: 'Staženo z Disku ' + todayPrague() + (f.folder ? ' (složka ' + f.folder + ')' : '') + ' — čeká na doplnění údajů.',
         drive_url: f.webViewLink || ('https://drive.google.com/file/d/' + f.id + '/view'),
       }, 'drive-sync');
+      // Volitelné: AI hned předvyplní údaje (Simona pak jen zkontroluje).
+      if (extrakce.configured()) {
+        try {
+          const dl = await drive.downloadFileBase64(f.id);
+          const ex = await extrakce.extrahovat({ base64: dl.base64 });
+          aplikujExtrakci(M.smlouva.getById(s.id), ex, 'drive-sync-ai');
+          M.smlouva.update(s.id, { stav_popis: 'AI‑předvyplněno ' + todayPrague() + ' — ke kontrole.' }, 'drive-sync-ai');
+        } catch (e) { console.error('[smlouvy] AI extrakce nového souboru selhala:', e.message); }
+      }
       nove.push({ id: s.id, name: f.name, url: f.webViewLink });
     }
     console.log('[smlouvy] drive sync: ve složce ' + files.length + ' souborů, od baseline nových ' + novejsi.length + ', založeno ' + nove.length);
@@ -353,6 +363,21 @@ function mount(host) {
           return true;
         }
 
+        // AI vytěžení smlouvy z PDF na Disku → předvyplní prázdná pole (ke kontrole).
+        if (p === '/api/smlouvy/extrakce') {
+          if (!extrakce.configured()) { json(res, 200, { chyba: 'AI extrakce není nakonfigurovaná (chybí ANTHROPIC_API_KEY).' }); return true; }
+          const s = M.smlouva.getById(Number(u.query.id));
+          if (!s) { json(res, 404, { chyba: 'Smlouva nenalezena.' }); return true; }
+          const fileId = souborId(s);
+          if (!fileId) { json(res, 200, { chyba: 'Smlouva nemá připojený soubor na Disku.' }); return true; }
+          try {
+            const dl = await drive.downloadFileBase64(fileId);
+            const ex = await extrakce.extrahovat({ base64: dl.base64 });
+            const vyplneno = aplikujExtrakci(s, ex, who);
+            json(res, 200, { ok: true, model: extrakce.model(), vyplneno }); return true;
+          } catch (e) { json(res, 200, { chyba: e.message }); return true; }
+        }
+
         if (p === '/api/smlouvy/import-nahled') { json(res, 200, importSvc.nahled(b.radky || [], b.garantMapa || {})); return true; }
         if (p === '/api/smlouvy/import-uloz') {
           const v = importSvc.uloz({ smlouva: M.smlouva, termin: M.termin }, b.plan, { by: who, zakladatOdvozeneTerminy: true });
@@ -363,6 +388,47 @@ function mount(host) {
     } catch (e) { json(res, 500, { chyba: e.message }); return true; }
 
     json(res, 404, { chyba: 'Neznámá cesta modulu.' }); return true;
+  }
+
+  // Zapíše výsledek AI extrakce do smlouvy — VYPLNÍ JEN PRÁZDNÁ pole (nepřepíše
+  // ručně zadané). Vrací { pole:[…], terminy:N } pro zpětnou vazbu.
+  function aplikujExtrakci(s, ex, by) {
+    const patch = {}; const pole = [];
+    const prazdno = (v) => v == null || v === '';
+    const put = (k, v) => { if (v != null && v !== '' && prazdno(s[k])) { patch[k] = v; pole.push(k); } };
+    const placeholder = prazdno(s.protistrana_nazev) || /doplnit/i.test(s.protistrana_nazev || '');
+    if (ex.protistrana_nazev && placeholder) { patch.protistrana_nazev = ex.protistrana_nazev; pole.push('protistrana_nazev'); }
+    const ico = ex.protistrana_ico && String(ex.protistrana_ico).replace(/\D/g, '');
+    put('protistrana_ico', ico || null);
+    put('predmet', ex.predmet);
+    put('anotace', ex.anotace);
+    put('vypoved_zpusob', ex.vypoved_zpusob);
+    put('vypovedni_lhuta_mesice', Number.isFinite(ex.vypovedni_lhuta_mesice) ? ex.vypovedni_lhuta_mesice : null);
+    put('hodnota', Number.isFinite(ex.hodnota) ? ex.hodnota : null);
+    if (prazdno(s.platnost_do) && /^\d{4}-\d{2}-\d{2}$/.test(ex.platnost_do || '')) {
+      patch.platnost_do = ex.platnost_do; patch.platnost_typ = 'urcita'; pole.push('platnost_do');
+    }
+    if (prazdno(s.mena) && ['CZK', 'EUR', 'USD'].includes(ex.mena)) patch.mena = ex.mena;
+    if (s.prolongace === 'zadna' && ['auto', 'jednani'].includes(ex.prolongace)) { patch.prolongace = ex.prolongace; pole.push('prolongace'); }
+    if (Object.keys(patch).length) M.smlouva.update(s.id, patch, by);
+    // Termíny zakládáme jen když smlouva žádné nemá (návrhy z extrakce).
+    let terminy = 0;
+    if (!M.termin.listBySmlouva(s.id).length && Array.isArray(ex.terminy)) {
+      for (const t of ex.terminy) {
+        if (t && /^\d{4}-\d{2}-\d{2}$/.test(t.datum || '')) {
+          M.termin.create({ smlouva_id: s.id, typ: String(t.typ || 'jiny').slice(0, 40), datum: t.datum, popis: t.popis || null, odvozeny: 0, stav: 'ceka' });
+          terminy++;
+        }
+      }
+    }
+    return { pole, terminy };
+  }
+  // Najde primární Drive fileId smlouvy (z tabulky soubor, jinak z drive_url).
+  function souborId(s) {
+    const so = M.soubor.listBySmlouva(s.id);
+    if (so[0] && so[0].drive_id) return so[0].drive_id;
+    const m = String(s.drive_url || '').match(/\/file\/d\/([^/?]+)/);
+    return m ? m[1] : null;
   }
 
   function syncOdvozene(s) {
