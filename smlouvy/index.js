@@ -18,21 +18,17 @@ const engine = require('./engine');
 const importSvc = require('./import');
 const { todayPrague, daysUntil, formatCz } = require('./lib/datum');
 const L = require('./lib/logic');
-const wikiTerminy = require('./lib/wikiTerminy');
 const drive = require('./lib/drive');
 const extrakce = require('./lib/extrakce');
+// Pozn.: integrace „Termíny z wiki" (LLM-wiki registr lhůt) byla z modulu smluv
+// odstraněna — zdrojem pravdy pro smlouvy je DB modulu. Wiki repozitář žije dál
+// samostatně jako znalostní báze pro jiné účely.
 
 const HTML_FILE = path.join(__dirname, 'smlouvy.html');
 
 function mount(host) {
   const dbFile = path.join(host.dataDir || __dirname, 'smlouvy.db');
   const M = openDb(dbFile);
-  // Zdroj registru lhůt z wiki: env, jinak lokální soubor nahraný přes /api/wiki-registr (bez GitHubu).
-  function wikiSrc() {
-    if (process.env.WIKI_TERMINY_URL) return process.env.WIKI_TERMINY_URL;
-    const f = path.join(host.dataDir || __dirname, 'wiki-terminy.md');
-    return fs.existsSync(f) ? f : '';
-  }
 
   // Jednorázový import registru (1× přes meta guard, idempotentní).
   try { require('./seed-registr').seedOnce(M); }
@@ -277,22 +273,6 @@ function mount(host) {
       }
       if (p === '/api/smlouvy/dashboard' && req.method === 'GET') { json(res, 200, dashboardData()); return true; }
 
-      // Lhůty z LLM-wiki (terminy.md) — jeden zdroj pravdy sdílený s wiki repozitářem.
-      if (p === '/api/smlouvy/wiki-terminy' && req.method === 'GET') {
-        const src = wikiSrc();
-        if (!src) { json(res, 200, { configured: false, items: [] }); return true; }
-        try {
-          const rows = await wikiTerminy.nacti(src, { force: u.query.force === '1' });
-          const dnes = todayPrague();
-          // Jen doména smluv — BOZP má vlastní modul v intranetu, sortiment hlídá ranges-watchdog.
-          const items = rows
-            .filter((r) => (r.stav === 'aktivni' || !r.stav) && /^smlouv/.test((r.domena || '').toLowerCase()))
-            .map((r) => ({ ...r, dny: daysUntil(r.termin, dnes) }))
-            .sort((a, b) => a.dny - b.dny);
-          json(res, 200, { configured: true, source: src, dnes, items }); return true;
-        } catch (e) { json(res, 200, { configured: true, chyba: e.message, items: [] }); return true; }
-      }
-
       if (p === '/api/smlouvy/list' && req.method === 'GET') {
         json(res, 200, M.smlouva.list({ kategorie: u.query.kategorie, garant: u.query.garant, stav: u.query.stav, q: u.query.q })); return true;
       }
@@ -437,36 +417,10 @@ function mount(host) {
   }
   function ctxWith(req) { return { deliver: host.deliver, baseUrl: host.baseUrl(req), eskalaceEmail: host.eskalaceEmail }; }
 
-  // ---- lhůty z wiki: digest e-mail (max 1× denně na změněnou sadu) ----
-  async function wikiUpozorneni() {
-    const src = wikiSrc(); if (!src) return;
-    const to = process.env.WIKI_TERMINY_EMAIL || host.eskalaceEmail; if (!to) return;
-    let rows; try { rows = await wikiTerminy.nacti(src, { force: true }); } catch { return; }
-    const dnes = todayPrague();
-    const due = rows.filter((r) => r.stav === 'aktivni' && daysUntil(r.termin, dnes) <= 30)
-      .sort((a, b) => daysUntil(a.termin, dnes) - daysUntil(b.termin, dnes));
-    if (!due.length) return;
-    const stavFile = path.join(host.dataDir || __dirname, 'wiki-terminy-notif.json');
-    const hash = crypto.createHash('sha1').update(dnes + '|' + due.map((d) => d.id + d.termin).join(',')).digest('hex');
-    let last = {}; try { last = JSON.parse(fs.readFileSync(stavFile, 'utf8')); } catch {}
-    if (last.hash === hash) return; // stejná sada už dnes odeslána
-    const lines = due.map((d) => {
-      const dny = daysUntil(d.termin, dnes);
-      return `• ${d.termin} (${dny < 0 ? 'po termínu ' + (-dny) + ' d' : 'za ' + dny + ' d'}) — ${d.domena}: ${d.subjekt} — ${d.popis}`;
-    }).join('\n');
-    try {
-      await host.deliver({ to, subject: `[Wiki termíny] ${due.length} lhůt do 30 dnů`,
-        text: `Blížící se lhůty z LLM-wiki (terminy.md):\n\n${lines}\n\nZdroj: ${src}` });
-      fs.writeFileSync(stavFile, JSON.stringify({ hash, at: Date.now() }));
-    } catch (e) { console.error('[smlouvy] wiki upozornění chyba:', e.message); }
-  }
-
   // ---- cron tick ---------------------------------------------------
   async function tick() {
     try { await engine.tick(M, { deliver: host.deliver, baseUrl: host.publicBaseUrl || '', eskalaceEmail: host.eskalaceEmail }); }
     catch (e) { console.error('[smlouvy] tick chyba:', e.message); }
-    try { await wikiUpozorneni(); }
-    catch (e) { console.error('[smlouvy] wiki tick chyba:', e.message); }
     try { await driveSync(); }
     catch (e) { console.error('[smlouvy] drive sync chyba:', e.message); }
   }

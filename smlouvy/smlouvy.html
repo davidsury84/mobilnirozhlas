@@ -117,7 +117,6 @@ async function dash(){
     }
     app.append(dc);
   }
-  const wp = await wikiPanel(); if(wp) app.append(wp);
   if(d.eskalovane||d.bounced){
     app.append(el('div',{class:'card',style:'margin-bottom:16px'},
       el('h1',{style:'font-size:16px'},'Vyžaduje pozornost'),
@@ -145,31 +144,6 @@ async function dash(){
   app.append(rz);
 
   app.append(tabulkaTerminu([...d.cervene,...d.zlute],true));
-}
-// Panel „Termíny z wiki" — čte sdílený registr lhůt z LLM-wiki (WIKI_TERMINY_URL).
-async function wikiPanel(){
-  let d; try{ d = await api('/api/smlouvy/wiki-terminy'); }catch(e){ return null; }
-  if(!d.configured) return null; // funkce vypnutá (WIKI_TERMINY_URL není nastaveno)
-  const card = el('div',{class:'card',style:'margin-bottom:16px'});
-  card.append(el('h1',{style:'font-size:16px'},'Termíny z wiki ',
-    el('span',{class:'muted',style:'font-size:12px;font-weight:400'},'(BOZP/PO + smlouvy — sdílený registr)')));
-  if(d.chyba){ card.append(el('p',{class:'muted',style:'margin-top:-6px'},'Registr zatím nelze načíst ('+esc(d.chyba)+'). Zkontroluj WIKI_TERMINY_URL a WIKI_TERMINY_TOKEN.')); return card; }
-  const items = d.items||[];
-  if(!items.length){ card.append(el('p',{class:'muted',style:'margin-top:-6px'},'Žádné aktivní lhůty v registru.')); return card; }
-  const t = el('table',{},el('thead',{},el('tr',{},...['Termín','Za','Doména','Subjekt','Popis','Odpovědný'].map(h=>el('th',{},h)))));
-  const tb = el('tbody');
-  items.forEach(x=>{ const cls = pill(x.dny)[0];
-    tb.append(el('tr',{},
-      el('td',{},czd(x.termin)),
-      el('td',{},el('span',{class:'pill '+cls}, x.dny<0 ? ('po '+(-x.dny)+' d') : (x.dny+' d'))),
-      el('td',{},el('span',{class:'pill sed'}, esc(x.domena||''))),
-      el('td',{},esc(x.subjekt||'')),
-      el('td',{},esc(x.popis||'')),
-      el('td',{class:'muted'},esc(x.odpovedny||'—'))));
-  });
-  t.append(tb); card.append(t);
-  card.append(el('p',{class:'muted',style:'font-size:11px;margin-top:8px'},'Zdroj: '+esc(d.source||'')));
-  return card;
 }
 // otevře Seznam s předvyplněným filtrem (z rozpadu na dashboardu)
 function seznamHledat(q){ $('header button[data-tab=list]').click(); setTimeout(()=>{ const i=document.querySelector('main input'); if(i){i.value=q; i.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}));} },50); }
@@ -480,7 +454,7 @@ const NAVOD={
       <li><b>Po termínu</b> — červené na dashboardu + denní připomínka, dokud se nevyřeší.</li>
     </ul>
     <p>Termín se uzavře kliknutím na <b>„Vyřešeno"</b> v e-mailu (zapíše se kdo a kdy). PDF smluv zůstávají na Disku — modul drží jen odkaz.</p>
-    <p><b>Jak se sem smlouvy dostávají:</b> nové PDF na Disku si systém najde sám (záložka <b>„📥 Nové z Disku"</b>); lhůty umí číst i z LLM-wiki (záložka <b>„📚 Termíny z wiki"</b>).</p>`},
+    <p><b>Jak se sem smlouvy dostávají:</b> nové PDF na Disku si systém najde sám (záložka <b>„📥 Nové z Disku"</b>).</p>`},
   disk:{t:'📥 Nové z Disku',h:`
     <p><b>Novou smlouvu nikam nezadáváte ručně — stačí ji nahrát na Disk.</b> Systém hlídá sdílenou složku smluv (podsložky <i>Dodavatelské</i> / <i>Odběratelské</i>, klidně i ročníky uvnitř).</p>
     <p><b>Co se stane automaticky:</b></p>
@@ -493,16 +467,6 @@ const NAVOD={
     <p><b>Co udělá Simona:</b> u položky klikne <b>„Doplnit údaje"</b> → otevře se formulář (vedle je odkaz <i>Otevřít PDF</i>). Doplní: protistranu + IČO, předmět, platnost, výpovědní lhůtu, prolongaci, hodnotu, <b>garanta (e-mail)</b>. <b>Uložením se smlouva zařadí do hlídání</b> a z fronty zmizí.</p>
     <p><b>Potom:</b> v detailu smlouvy založí 2–4 <b>hlídané termíny</b> (konec platnosti, deadline výpovědi…). Od té chvíle chodí upozornění D−90/60/30 garantovi.</p>
     <p class="muted"><b>Pozn.:</b> smlouvy, které ve složce byly už před spuštěním téhle funkce, se berou jako archiv a návrhy se z nich nezakládají. Duplicitně se nic nezaloží — každý soubor se pozná podle svého ID.</p>`},
-  wiki:{t:'📚 Termíny z wiki',h:`
-    <p><b>Co to je:</b> vedle ručně zadaných smluv umí hlídač číst lhůty z <b>LLM-wiki</b> — samostatného repozitáře, kde si AI z nahraných PDF (smlouvy, BOZP/PO) udržuje strukturovanou wiki a z ní generuje strojově čitelný registr lhůt <code>terminy.md</code>.</p>
-    <p><b>Jeden zdroj pravdy:</b> místo dvou databází sdílí wiki a hlídač jeden soubor. Na dashboardu je panel <b>„Termíny z wiki"</b> (červené do 30 dní, žluté do 90 dní) a hlídač jednou denně posílá <b>digest e-mail</b> lhůt do 30 dnů.</p>
-    <p><b>Jak přibude termín do wiki:</b></p>
-    <ol>
-      <li>Nové PDF hodíš do složky <code>inbox/</code> ve wiki repozitáři.</li>
-      <li>V Claude Code spustíš <code>/ingest</code> — AI dokument zkompiluje do wiki stránky s citacemi na zdroj a doplní řádek do <code>terminy.md</code>.</li>
-      <li>Hlídač registr přečte a lhůtu ukáže v panelu (hlídá ji stejně jako smluvní termíny).</li>
-    </ol>
-    <p class="muted">Nastavení (admin): proměnné <code>WIKI_TERMINY_URL</code> a <code>WIKI_TERMINY_TOKEN</code> na Railway (production). Bez nich se panel nezobrazuje.</p>`},
   spravce:{t:'👤 Správce (Simona)',h:`
     <p>Zakládá a edituje <b>všechny</b> smlouvy, dodatky a termíny.</p>
     <p><b>Běžný postup u nové smlouvy (od 7/2026):</b> smlouvu stačí <b>nahrát do složky na Disku</b> — systém ji sám najde, založí návrh a pošle vám e-mail. Vy pak na dashboardu v kartě <b>„Nové z Disku — čeká na doplnění"</b> kliknete <b>„Doplnit údaje"</b> a vyplníte formulář (PDF máte na kliknutí vedle). Podrobně v záložce <b>„📥 Nové z Disku"</b>.</p>
