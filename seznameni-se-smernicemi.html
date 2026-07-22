@@ -1563,15 +1563,33 @@ function obExportPdf(){
   const d=OBCHOD_DATA; if(!d) return;
   const dnes=new Date().toLocaleDateString('cs-CZ');
   const e=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Grafy do PDF ze stejných dat jako v UI (pokrytí kategorií + zatížení garantů).
+  const chartsPdf=function(){
+    const rows=d.rows||[]; if(!rows.length) return '';
+    const order=['Pokryto','Bez zálohy','Neobsazeno'];
+    const cov={}; rows.forEach(r=>{ const k=obEval(r); cov[k]=(cov[k]||0)+1; });
+    const covKeys=order.filter(k=>cov[k]); const covMax=Math.max(1,...covKeys.map(k=>cov[k]));
+    const covCol={'Pokryto':'#2e9e57','Bez zálohy':'#e0a021','Neobsazeno':'#d1483a'};
+    const load={}; rows.forEach(r=>obPmList(r.pm).forEach(pm=>{ load[pm]=(load[pm]||0)+1; }));
+    const pmKeys=Object.keys(load).sort((a,b)=>load[b]-load[a]); const pmMax=Math.max(1,...pmKeys.map(k=>load[k]));
+    const bar=(lab,val,max,col)=>'<div class="pb"><span class="pbl">'+e(lab)+'</span><span class="pbt"><span class="pbf" style="width:'+Math.round(val/max*100)+'%;background:'+col+'"></span></span><span class="pbv">'+val+'</span></div>';
+    return '<div class="charts"><div class="chart"><h3>Vyhodnocené pokrytí kategorií</h3>'+
+      covKeys.map(k=>bar(k,cov[k],covMax,covCol[k]||'#888')).join('')+'</div>'+
+      '<div class="chart"><h3>Počet kategorií na garanta</h3>'+
+      pmKeys.map(k=>bar(k,load[k],pmMax,'#2e6fae')).join('')+'</div></div>';
+  };
   let title='', inner='';
   if(OBCHOD_TAB==='obchodnici'){
     title='Podle obchodníků';
     inner=(d.obchodnici||[]).map(o=>{
       const owned=(o.owner&&o.owner.length)?('<ul>'+o.owner.map(x=>'<li>'+e(x.kategorie)+' <span class="cov">['+e(x.coverage)+']</span></li>').join('')+'</ul>'):'<p class="muted">—</p>';
       const zast=(o.zastup&&o.zastup.length)?o.zastup.map(x=>e(x.kategorie)).join(', '):'—';
+      const nahr=(o.nahrad&&o.nahrad.length)?o.nahrad.map(x=>e(x.kategorie)).join(', '):'—';
       return '<div class="pm"><h3>'+e(o.name)+(o.email?' <span class="em">'+e(o.email)+'</span>':'')+'</h3>'+
-        '<p class="meta">Odpovědný za '+o.pocetOdpovedny+' kategorií · zastupuje '+o.pocetZastup+(o.bezZalohy?' · <b>'+o.bezZalohy+' bez zálohy</b>':'')+'</p>'+
-        '<div class="two"><div><div class="lbl">Odpovědný za</div>'+owned+'</div><div><div class="lbl">Zastupuje</div><p>'+zast+'</p></div></div></div>';
+        '<p class="meta">Garant za '+o.pocetOdpovedny+' kategorií · náhr. garant 1: '+o.pocetZastup+' · náhr. garant 2: '+(o.pocetNahrad||0)+(o.bezZalohy?' · <b>'+o.bezZalohy+' bez zálohy</b>':'')+'</p>'+
+        '<div class="three"><div><div class="lbl">Garant za</div>'+owned+'</div>'+
+        '<div><div class="lbl">Náhradní garant 1 za</div><p>'+zast+'</p></div>'+
+        '<div><div class="lbl">Náhradní garant 2 za</div><p>'+nahr+'</p></div></div></div>';
     }).join('');
   } else {
     title='Podle kategorií';
@@ -1583,9 +1601,11 @@ function obExportPdf(){
     '<style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;margin:26px;font-size:12px;line-height:1.4}'+
     'h1{font-size:19px;margin:0 0 2px;color:#0e8a43}.sub{color:#666;font-size:11px;margin:0 0 18px}'+
     'table{width:100%;border-collapse:collapse}th,td{border:1px solid #cfd3cc;padding:5px 8px;text-align:left;vertical-align:top}th{background:#eef2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}tr:nth-child(even) td{background:#f7f9f5}'+
-    '.pm{border:1px solid #e0e4dd;border-radius:8px;padding:10px 12px;margin-bottom:10px;break-inside:avoid}.pm h3{margin:0 0 2px;font-size:13px}.pm .em{color:#0e8a43;font-weight:400;font-size:11px}.pm .meta{color:#666;font-size:11px;margin:0 0 6px}.pm .two{display:flex;gap:20px}.pm .lbl{font-size:10px;text-transform:uppercase;color:#888;margin-bottom:2px}.pm ul{margin:0;padding-left:16px}.cov{color:#888;font-size:10px}.muted{color:#999}'+
+    '.pm{border:1px solid #e0e4dd;border-radius:8px;padding:10px 12px;margin-bottom:10px;break-inside:avoid}.pm h3{margin:0 0 2px;font-size:13px}.pm .em{color:#0e8a43;font-weight:400;font-size:11px}.pm .meta{color:#666;font-size:11px;margin:0 0 6px}.pm .two{display:flex;gap:20px}.pm .three{display:flex;gap:18px}.pm .three>div{flex:1}.pm .lbl{font-size:10px;text-transform:uppercase;color:#888;margin-bottom:2px}.pm ul{margin:0;padding-left:16px}.cov{color:#888;font-size:10px}.muted{color:#999}'+
+    '.charts{display:flex;gap:24px;margin:0 0 20px;break-inside:avoid}.chart{flex:1;border:1px solid #e0e4dd;border-radius:8px;padding:10px 14px}.chart h3{margin:0 0 8px;font-size:12px;color:#333}'+
+    '.pb{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:10.5px}.pbl{width:130px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pbt{flex:1;height:11px;background:#eef1ec;border-radius:6px;overflow:hidden}.pbf{display:block;height:100%;border-radius:6px}.pbv{width:24px;flex:none;text-align:right;font-weight:700}'+
     '@media print{body{margin:12mm}}</style></head><body>'+
-    '<h1>Obchod — rozdělení obchodníků</h1><p class="sub">ELKOPLAST · '+e(title)+' · vygenerováno '+dnes+'</p>'+inner+'</body></html>';
+    '<h1>Obchod — rozdělení obchodníků</h1><p class="sub">ELKOPLAST · '+e(title)+' · vygenerováno '+dnes+'</p>'+chartsPdf()+inner+'</body></html>';
   const w=window.open('','_blank'); if(!w){ alert('Pro export do PDF prosím povolte vyskakovací okna.'); return; }
   w.document.open(); w.document.write(html); w.document.close(); w.focus();
   setTimeout(function(){ try{ w.print(); }catch(_){} },350);
@@ -1644,16 +1664,19 @@ function obObchodniciHtml(){
       ? '<ul class="ob-catlist">'+o.owner.map(x=>'<li><span class="ob-risk '+obCoverClass(x.coverage)+'">'+esc(x.coverage)+'</span> '+esc(x.kategorie)+'</li>').join('')+'</ul>'
       : '<p class="muted" style="margin:0">—</p>';
     const zast = o.zastup.length ? o.zastup.map(x=>esc(x.kategorie)).join(', ') : '—';
+    const nahrad = (o.nahrad&&o.nahrad.length) ? o.nahrad.map(x=>esc(x.kategorie)).join(', ') : '—';
+    const pocetNahrad = o.pocetNahrad||0;
     return '<div class="ob-person">'+
       '<div class="ob-phead">'+
         '<div class="ob-av'+(o.inDb?'':' off')+'">'+esc(inic)+'</div>'+
         '<div class="ob-who"><div class="ob-nm">'+esc(o.name)+'</div><div class="ob-em">'+contact+'</div></div>'+
-        '<div class="ob-pstat"><div><b>'+o.pocetOdpovedny+'</b><span>kategorií</span></div><div><b>'+o.pocetZastup+'</b><span>jako zástup</span></div>'+(o.bezZalohy?'<div class="warn"><b>'+o.bezZalohy+'</b><span>bez zálohy</span></div>':'')+'</div>'+
+        '<div class="ob-pstat"><div><b>'+o.pocetOdpovedny+'</b><span>garant</span></div><div><b>'+o.pocetZastup+'</b><span>náhr. 1</span></div><div><b>'+pocetNahrad+'</b><span>náhr. 2</span></div>'+(o.bezZalohy?'<div class="warn"><b>'+o.bezZalohy+'</b><span>bez zálohy</span></div>':'')+'</div>'+
       '</div>'+
       '<div class="ob-pbody">'+
         '<div class="ob-pblock"><div class="ob-lbl">Sekce / domény</div><div class="ob-prods">'+sekce+'</div></div>'+
-        '<div class="ob-pblock"><div class="ob-lbl">Odpovědný za ('+o.pocetOdpovedny+')</div>'+owned+'</div>'+
-        '<div class="ob-pblock"><div class="ob-lbl">Zastupuje ('+o.pocetZastup+')</div><div class="ob-zas">'+zast+'</div></div>'+
+        '<div class="ob-pblock"><div class="ob-lbl">Garant za ('+o.pocetOdpovedny+')</div>'+owned+'</div>'+
+        '<div class="ob-pblock"><div class="ob-lbl">Náhradní garant 1 za ('+o.pocetZastup+')</div><div class="ob-zas">'+zast+'</div></div>'+
+        '<div class="ob-pblock"><div class="ob-lbl">Náhradní garant 2 za ('+pocetNahrad+')</div><div class="ob-zas">'+nahrad+'</div></div>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -1669,7 +1692,7 @@ function obEditHtml(){
   }).join('')+'<td class="ob-delcol"><button class="ob-del" type="button" title="Smazat řádek" onclick="obDelRow('+i+')">✕</button></td></tr>').join('');
   const bar='<div class="ob-bar">'+
     '<p class="ob-note">Uprav buňky přímo v tabulce. Změny se uloží na server (do datového souboru) a projeví se všem s přístupem. '+
-    'Sloupec „Produktový manažer" se páruje na zaměstnance podle jména.</p>'+
+    'Sloupce „Garant" a „Náhradní garant 1/2" se párují na zaměstnance podle jména.</p>'+
     '<button class="btn sm ghost" type="button" onclick="obAddRow()">+ Přidat řádek</button>'+
     '<button class="btn sm ghost" type="button" onclick="obCancelEdit()">Zrušit</button>'+
     '<button class="btn sm" type="button" id="obSaveBtn" onclick="obSave()">Uložit</button>'+

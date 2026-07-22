@@ -1172,9 +1172,9 @@ const OBCHOD_SLOUPCE = [
   { key: 'sekce', label: 'Sekce webu' },
   { key: 'kategorie', label: 'Kategorie na webu (elkoplast.cz)' },
   { key: 'stitek', label: 'Štítek' },
-  { key: 'pm', label: 'Odpovědný PM (dle návrhu)' },
-  { key: 'zastup', label: 'Zástup / překryv' },
-  { key: 'nahradnik', label: 'Třetí náhradník' },
+  { key: 'pm', label: 'Garant (odpovědný PM)' },
+  { key: 'zastup', label: 'Náhradní garant 1 (zástup)' },
+  { key: 'nahradnik', label: 'Náhradní garant 2' },
   { key: 'pokryti', label: 'Stav pokrytí' },
   { key: 'poznamka', label: 'Poznámka' }
 ];
@@ -1285,14 +1285,15 @@ function obMatchEmp(full, emps) {
 function buildObchodnici(rows) {
   const emps = getState().employees || [];
   const acc = {};
-  Object.keys(OBCHOD_LIDE).forEach(k => { acc[k] = { name: OBCHOD_LIDE[k], owner: [], zastup: [], sekce: {} }; });
+  Object.keys(OBCHOD_LIDE).forEach(k => { acc[k] = { name: OBCHOD_LIDE[k], owner: [], zastup: [], nahrad: [], sekce: {} }; });
   rows.forEach(r => {
     obPmListSrv(r.pm).forEach(l => { const k = obchodNorm(l); if (acc[k]) { acc[k].owner.push({ sekce: r.sekce || '', kategorie: r.kategorie || '', coverage: obEvalCoverage(r) }); if (r.sekce) acc[k].sekce[r.sekce] = 1; } });
     obPmListSrv(r.zastup).forEach(l => { const k = obchodNorm(l); if (acc[k]) acc[k].zastup.push({ sekce: r.sekce || '', kategorie: r.kategorie || '' }); });
+    obPmListSrv(r.nahradnik).forEach(l => { const k = obchodNorm(l); if (acc[k]) acc[k].nahrad.push({ sekce: r.sekce || '', kategorie: r.kategorie || '' }); });
   });
   return Object.keys(acc).map(k => { const o = acc[k]; const e = obMatchEmp(o.name, emps);
-    return { name: o.name, email: e ? e.email : obchodEmail(o.name), inDb: !!e, sekce: Object.keys(o.sekce), owner: o.owner, zastup: o.zastup, pocetOdpovedny: o.owner.length, pocetZastup: o.zastup.length, bezZalohy: o.owner.filter(x => x.coverage === 'Bez zálohy').length };
-  }).filter(o => o.pocetOdpovedny > 0 || o.pocetZastup > 0).sort((a, b) => b.pocetOdpovedny - a.pocetOdpovedny);
+    return { name: o.name, email: e ? e.email : obchodEmail(o.name), inDb: !!e, sekce: Object.keys(o.sekce), owner: o.owner, zastup: o.zastup, nahrad: o.nahrad, pocetOdpovedny: o.owner.length, pocetZastup: o.zastup.length, pocetNahrad: o.nahrad.length, bezZalohy: o.owner.filter(x => x.coverage === 'Bez zálohy').length };
+  }).filter(o => o.pocetOdpovedny > 0 || o.pocetZastup > 0 || o.pocetNahrad > 0).sort((a, b) => b.pocetOdpovedny - a.pocetOdpovedny);
 }
 // Mapa kontaktů klíčovaná normalizovanou zkratkou (i celým jménem), pro propojení jmen v tabulce na zaměstnance.
 function buildKontakty() {
