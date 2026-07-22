@@ -466,6 +466,12 @@ table.ob-table td.col-pm a:hover,table.ob-table td.col-zastup a:hover{text-decor
 .ob-risk-mid{background:var(--amber-soft);color:var(--amber)}
 .ob-risk-hi{background:var(--red-soft);color:var(--red)}
 .ob-risk-none{background:var(--bg-2);color:var(--ink-soft)}
+.ob-sums{display:flex;flex-wrap:wrap;gap:6px}
+.ob-sum{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;background:var(--bg-2);color:var(--ink-soft)}
+.ob-sum b{color:var(--ink)}
+.ob-sum.lo{background:#e6f6ec;color:#0a6b34}.ob-sum.lo b{color:#0a6b34}
+.ob-sum.mid{background:var(--amber-soft);color:var(--amber)}.ob-sum.mid b{color:var(--amber)}
+.ob-sum.hi{background:var(--red-soft);color:var(--red)}.ob-sum.hi b{color:var(--red)}
 /* graf */
 .ob-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 18px}
 @media(max-width:820px){.ob-charts{grid-template-columns:1fr}}
@@ -1555,8 +1561,10 @@ async function showObchod(tab){
 }
 function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Rozdělení kategorií webu mezi obchodníky (produktové manažery). Stav pokrytí vyhodnocujeme z dat: vlastník + záloha = pokryto. Obchodníci jsou propojeni na živou databázi zaměstnanců včetně kontaktu.</p></div>'; }
 function obTabs(){
-  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků'],['leady','Leady z kalkulačky']];
-  return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="pl-tabs" style="flex:1">'+t.map(x=>'<button class="pl-tab'+(x[0]===OBCHOD_TAB?' active':'')+'" type="button" onclick="showObchod(\''+x[0]+'\')">'+esc(x[1])+'</button>').join('')+'</div><button class="btn ghost sm" type="button" onclick="obExportPdf()" title="Otevře tiskový náhled — uložte jako PDF nebo vytiskněte">📄 Sdílet PDF</button></div>';
+  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků'],['nahradnici','Náhradníci'],['leady','Leady z kalkulačky']];
+  return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="pl-tabs" style="flex:1">'+t.map(x=>'<button class="pl-tab'+(x[0]===OBCHOD_TAB?' active':'')+'" type="button" onclick="showObchod(\''+x[0]+'\')">'+esc(x[1])+'</button>').join('')+'</div>'+
+    '<button class="btn ghost sm" type="button" onclick="obExportXlsx()" title="Stáhne sešit Excel se všemi pohledy">⬇ Excel (XLSX)</button>'+
+    '<button class="btn ghost sm" type="button" onclick="obExportPdf()" title="Otevře tiskový náhled — uložte jako PDF nebo vytiskněte">📄 Sdílet PDF</button></div>';
 }
 // Export aktuálního pohledu do PDF přes tiskový náhled prohlížeče (bez závislostí).
 function obExportPdf(){
@@ -1630,6 +1638,7 @@ function obChartsHtml(rows){
 function obRender(){
   const body=document.getElementById("mujBody"), d=OBCHOD_DATA;
   if(OBCHOD_TAB==="obchodnici"){ body.innerHTML=obHero()+obTabs()+obObchodniciHtml(); window.scrollTo(0,0); return; }
+  if(OBCHOD_TAB==="nahradnici"){ body.innerHTML=obHero()+obTabs()+obNahradniciHtml(); window.scrollTo(0,0); return; }
   if(OBCHOD_TAB==="leady"){
     if(!LEADY_DATA){ body.innerHTML=obHero()+obTabs()+'<p class="muted" style="margin:16px 4px">Načítám leady…</p>'; loadLeady(); return; }
     body.innerHTML=obHero()+obTabs()+obLeadyHtml(); window.scrollTo(0,0); return;
@@ -1681,6 +1690,63 @@ function obObchodniciHtml(){
     '</div>';
   }).join('');
   return '<div class="ob-persons">'+cards+'</div>';
+}
+// Pohled „Náhradníci": řetěz garant → náhradní garant 1 → náhradní garant 2 po kategoriích,
+// seřazený podle rizika (Neobsazeno → Bez zálohy → Pokryto), aby vynikly kategorie bez zálohy.
+function obNahradniciHtml(){
+  const rows=(OBCHOD_DATA&&OBCHOD_DATA.rows)||[];
+  if(!rows.length) return '<div class="card pad"><p class="muted" style="margin:0">Zatím žádná data.</p></div>';
+  const rank={'Neobsazeno':0,'Bez zálohy':1,'Pokryto':2};
+  const list=rows.filter(r=>String(r.kategorie||'').trim()).map(r=>({r,cv:obEval(r)}))
+    .sort((a,b)=>(rank[a.cv]??3)-(rank[b.cv]??3)||String(a.r.sekce||'').localeCompare(String(b.r.sekce||''),'cs'));
+  const cnt={Pokryto:0,'Bez zálohy':0,Neobsazeno:0}; list.forEach(x=>{ if(cnt[x.cv]!=null)cnt[x.cv]++; });
+  const chip=(n,lbl,cls)=>'<span class="ob-sum '+cls+'"><b>'+n+'</b> '+lbl+'</span>';
+  const bar='<div class="ob-bar"><p class="ob-note">Řetěz zastupitelnosti po kategoriích. Řazeno od nejrizikovějších (bez zálohy / neobsazeno).</p>'+
+    '<div class="ob-sums">'+chip(list.length,'kategorií','')+chip(cnt.Pokryto,'pokryto','lo')+chip(cnt['Bez zálohy'],'bez zálohy','mid')+chip(cnt.Neobsazeno,'neobsazeno','hi')+'</div></div>';
+  const naOrDash=v=>{ v=String(v||'').trim(); return (v==='' )?'<span class="muted">—</span>':obLinkPeople(v); };
+  const head='<thead><tr><th>Kategorie</th><th>Garant</th><th>Náhradní garant 1</th><th>Náhradní garant 2</th><th>Stav</th></tr></thead>';
+  const body=list.map(x=>{ const r=x.r;
+    return '<tr><td class="col-kategorie"><b>'+esc(r.kategorie)+'</b>'+(r.sekce?'<div class="muted" style="font-size:11px">'+esc(r.sekce)+'</div>':'')+'</td>'+
+      '<td>'+naOrDash(r.pm)+'</td><td>'+naOrDash(r.zastup)+'</td><td>'+naOrDash(r.nahradnik)+'</td>'+
+      '<td><span class="ob-risk '+obCoverClass(x.cv)+'">'+esc(x.cv)+'</span></td></tr>';
+  }).join('');
+  return bar+'<div class="ob-wrap"><table class="ob-table">'+head+'<tbody>'+body+'</tbody></table></div>';
+}
+// Export všech pohledů do jednoho sešitu XLSX (knihovna SheetJS je načtená v <head>).
+function obExportXlsx(){
+  const d=OBCHOD_DATA; if(!d){ alert('Data ještě nejsou načtená.'); return; }
+  if(typeof XLSX==='undefined'){ alert('Knihovna pro Excel se nenačetla.'); return; }
+  const rows=d.rows||[], cols=d.columns||[];
+  const wb=XLSX.utils.book_new();
+  // 1) Podle kategorií (plná tabulka)
+  const catHead=cols.map(c=>c.label);
+  const catBody=rows.map(r=>cols.map(c=>{ let v=r[c.key]||''; if(c.key==='pokryti')v=obEval(r); return String(v); }));
+  const ws1=XLSX.utils.aoa_to_sheet([catHead,...catBody]);
+  ws1['!cols']=[{wch:22},{wch:40},{wch:12},{wch:26},{wch:24},{wch:20},{wch:12},{wch:34}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Podle kategorií');
+  // 2) Podle obchodníků (souhrn + řetěz garantů)
+  const obHead=['Obchodník','E-mail','V databázi','Garant (počet)','Náhr. 1 (počet)','Náhr. 2 (počet)','Bez zálohy','Sekce','Garant za','Náhradní garant 1 za','Náhradní garant 2 za'];
+  const obBody=(d.obchodnici||[]).map(o=>[
+    o.name, o.email||'', o.inDb?'ano':'ne', o.pocetOdpovedny, o.pocetZastup, o.pocetNahrad||0, o.bezZalohy||0,
+    (o.sekce||[]).join(', '),
+    (o.owner||[]).map(x=>x.kategorie).join(', '),
+    (o.zastup||[]).map(x=>x.kategorie).join(', '),
+    (o.nahrad||[]).map(x=>x.kategorie).join(', ')
+  ]);
+  const ws2=XLSX.utils.aoa_to_sheet([obHead,...obBody]);
+  ws2['!cols']=[{wch:20},{wch:28},{wch:10},{wch:13},{wch:14},{wch:14},{wch:11},{wch:24},{wch:44},{wch:36},{wch:36}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Podle obchodníků');
+  // 3) Náhradníci (řetěz zastupitelnosti, řazeno dle rizika)
+  const rank={'Neobsazeno':0,'Bez zálohy':1,'Pokryto':2};
+  const nList=rows.filter(r=>String(r.kategorie||'').trim()).map(r=>({r,cv:obEval(r)}))
+    .sort((a,b)=>(rank[a.cv]??3)-(rank[b.cv]??3));
+  const nHead=['Sekce','Kategorie','Garant','Náhradní garant 1','Náhradní garant 2','Stav'];
+  const nBody=nList.map(x=>[x.r.sekce||'', x.r.kategorie||'', x.r.pm||'', x.r.zastup||'', x.r.nahradnik||'', x.cv]);
+  const ws3=XLSX.utils.aoa_to_sheet([nHead,...nBody]);
+  ws3['!cols']=[{wch:22},{wch:40},{wch:26},{wch:24},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Náhradníci');
+  const dnes=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,'Rozdeleni-obchodniku_'+dnes+'.xlsx');
 }
 function obEditHtml(){
   const cols=obCols(), rows=OBCHOD_DRAFT||[];
