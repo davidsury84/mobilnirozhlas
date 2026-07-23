@@ -750,10 +750,37 @@ function tabCitlivost(){
   const m=M, N=m.N;
   if(m.VAR==null||m.FIXV==null){ $('#app').innerHTML='<h1>Citlivost</h1>'+alertHtml('warn','Nákladová kalkulace se nenačetla.'); return; }
   const mes=m.mesice.length;
-  const def={cena:N.cenaPhm||28, spotr:N.spotreba||29.3, myto:N.myto||0, mzdy:N.mzdyRidicu||0, saz:0, naj:0, voz:m.NVOZ};
-  const OST=(N.pneu||0)+(N.adblue||0)+(N.opravy||0);
+  // Výchozí hodnoty z ÚČETNÍ SKUTEČNOSTI (skutečná nákupní cena nafty, skutečná spotřeba,
+  // skutečné mzdy řidičů a mýto na km); nákladová kalkulace slouží jen jako fallback.
+  let real=null;
+  (function(){
+    const E=DATA.ekonomika; if(!E||!E.vozy||!E.vozy.length) return;
+    let km=0,l=0,phm=0,mzdy=0,myto=0,varTot=0;
+    E.vozy.forEach(e=>{
+      if(!(e.kmCelkem>0)) return;
+      const s=p=>{const x=e.polozky.find(q=>q.nazev.indexOf(p)===0);return x?(x.celkem||0):0;};
+      km+=e.kmCelkem; l+=(e.spotrebaL||[]).reduce((a,b)=>a+b,0);
+      phm+=s('501100')+s('501110');
+      mzdy+=(e.souhrny.primeMzdy&&e.souhrny.primeMzdy.celkem)||0;
+      myto+=s('518511');
+      const mv=m.voz.find(x=>nSpz(x.spz)===nSpz(e.spz));
+      varTot+=((mv&&mv.varU!=null)?mv.varU:(N.celkemVar||0))*e.kmCelkem;
+    });
+    if(km>0&&l>0&&phm>0) real={cena:phm/l, spotr:l/km*100, mzdy:mzdy/km, myto:myto/km, varKm:varTot/km, km};
+  })();
+  const def= real
+    ? {cena:Math.round(real.cena*10)/10, spotr:Math.round(real.spotr*10)/10, myto:Math.round(real.myto*100)/100, mzdy:Math.round(real.mzdy*100)/100, saz:0, naj:0}
+    : {cena:N.cenaPhm||28, spotr:N.spotreba||29.3, myto:N.myto||0, mzdy:N.mzdyRidicu||0, saz:0, naj:0};
+  const nafta0=Math.round(def.spotr*def.cena)/100;
+  // Ostatní variabilní (opravy, pneu, AdBlue, autopotřeby, parkovné…) = zbytek do skutečných variabilních nákladů
+  const OST= real? Math.max(0, real.varKm-nafta0-def.mzdy-def.myto) : (N.pneu||0)+(N.adblue||0)+(N.opravy||0);
+  const varKm0=nafta0+def.myto+def.mzdy+OST;
+  const baseRes=m.TRZ-varKm0*m.KM-m.FIXTOT;   // výchozí bod = reálné sazby × reálné km − kalibrované fixy
   const sl=(id,lab,min,max,step,val)=>'<div class="sl"><label>'+lab+'</label><input type="range" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+val+'"><output id="o'+id+'"></output></div>';
   let h='<h1>Citlivostní analýza <span class="muted">(hodnocené období: '+mes+' měsíců)</span></h1>';
+  h+= real
+    ? alertHtml('info','Výchozí hodnoty = <b>účetní skutečnost</b> (1–'+((DATA.ekonomika.mesiceSdaty||[]).slice(-1)[0]||'')+'/'+String(DATA.ekonomika.rok||'').slice(2)+'): nafta <b>'+d2(real.cena)+' Kč/l</b> (skutečná nákupní), spotřeba <b>'+real.spotr.toFixed(1).replace('.',',')+' l/100 km</b>, mzdy řidičů '+d2(real.mzdy)+' Kč/km, mýto '+d2(real.myto)+' Kč/km, fixy dle vozů. Posuvníky měří odchylku od reality, ne od teoretické kalkulace.')
+    : alertHtml('warn','Účetní data nejsou k dispozici — výchozí hodnoty jsou z nákladové kalkulace (modelové).');
   h+='<div class="chartbox"><div class="sliders">'
     +sl('cCena','Cena nafty',Math.max(15,def.cena-8),def.cena+14,0.5,def.cena)
     +sl('cSpotr','Spotřeba',def.spotr-5,def.spotr+4,0.1,def.spotr)
@@ -762,28 +789,27 @@ function tabCitlivost(){
     +sl('cSaz','Sazba tržeb',-10,30,1,0)
     +sl('cNaj','Nájezd',-20,50,1,0)
     +sl('cFix','Fixní náklady/měs',Math.max(0,Math.round(m.FIXMES)-60*1e4),Math.round(m.FIXMES)+90*1e4,1e4,Math.round(m.FIXMES))
-    +'<div class="sl"><button class="btn sec" id="cReset">Vrátit na model</button></div></div>'
+    +'<div class="sl"><button class="btn sec" id="cReset">'+(real?'Vrátit na skutečnost':'Vrátit na model')+'</button></div></div>'
     +'<div class="cards" style="margin-bottom:10px">'
     +'<div class="card"><div class="muted">Výsledek (scénář)</div><div class="metr" id="cRes">–</div></div>'
-    +'<div class="card"><div class="muted">Rozdíl proti modelu</div><div class="metr" id="cDelta">–</div></div>'
+    +'<div class="card"><div class="muted">Rozdíl proti '+(real?'skutečnosti':'modelu')+'</div><div class="metr" id="cDelta">–</div></div>'
     +'<div class="card"><div class="muted">Náklad na km</div><div class="metr" id="cNakl">–</div></div>'
     +'<div class="card"><div class="muted">Sazba: máme / potřeba</div><div class="metr" id="cSazKpi" style="font-size:21px">–</div></div></div>'
     +'<div id="cAlerts"></div>'
     +'<h2 style="margin:14px 0 8px">Struktura nákladů scénáře <span class="muted">(částky se mění s posuvníky)</span></h2>'
     +'<div id="cStruct"></div></div>';
   h+=box('Rozklad rozdílu podle parametru (mil. Kč)',cv('chImp',260),legenda([[G,'Zlepšuje'],[R,'Zhoršuje']]));
-  h+=box('Citlivost výsledku na ±10 % parametru',cv('chTor',260),'<p class="muted" style="margin:0 0 8px">Delší pruh = citlivější parametr. Výchozí bod: '+(m.VYSLEDEK!=null?sgn(m.VYSLEDEK,mil):'—')+'.</p>');
+  h+=box('Citlivost výsledku na ±10 % parametru',cv('chTor',260),'<p class="muted" style="margin:0 0 8px">Delší pruh = citlivější parametr. Výchozí bod: '+sgn(baseRes,mil)+(real?' (reálné sazby, kalibrované fixy)':'')+'.</p>');
   $('#app').innerHTML=h;
 
-  const base={ km:m.KM, trz:m.TRZ, varKm:m.VAR, res:m.VYSLEDEK };
-  const nafta0=N.nafta!=null?N.nafta:Math.round(def.spotr*def.cena)/100;
+  const base={ km:m.KM, trz:m.TRZ, varKm:varKm0, res:baseRes };
   const impLb=['Sazba tržeb','Nájezd','Nafta + spotřeba','Mýto','Mzdy řidičů','Fixní náklady','Kombinace'];
   chart('chImp',{type:'bar',data:{labels:impLb,datasets:[{data:impLb.map(()=>0),backgroundColor:[],borderRadius:4,maxBarThickness:20}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>sgn(c.parsed.x*1e6,mil)}}},
       scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' M'}},y:{...AXC,grid:{display:false}}}}});
   // tornado (statické, z dat)
-  const t10=[['Sazba tržeb',m.TRZ*0.1],['Fixní náklady',m.FIXTOT*0.1],['Nájezd',(m.TRZ-m.VARTOT)*0.1],['Mzdy řidičů',(N.mzdyRidicu||0)*m.KM*0.1],['Nafta / spotřeba',nafta0*m.KM*0.1],['Mýto',(N.myto||0)*m.KM*0.1],['Opravy',(N.opravy||0)*m.KM*0.1]].sort((a,b)=>b[1]-a[1]);
-  chart('chTor',{type:'bar',data:{labels:t10.map(x=>x[0]),datasets:[{data:t10.map(x=>[(m.VYSLEDEK-x[1])/1e6,(m.VYSLEDEK+x[1])/1e6]),backgroundColor:B,borderRadius:4,maxBarThickness:20}]},
+  const t10=[['Sazba tržeb',m.TRZ*0.1],['Fixní náklady',m.FIXTOT*0.1],['Nájezd',(m.TRZ-varKm0*m.KM)*0.1],['Mzdy řidičů',def.mzdy*m.KM*0.1],['Nafta / spotřeba',nafta0*m.KM*0.1],['Mýto',def.myto*m.KM*0.1],['Ostatní variabilní',OST*m.KM*0.1]].sort((a,b)=>b[1]-a[1]);
+  chart('chTor',{type:'bar',data:{labels:t10.map(x=>x[0]),datasets:[{data:t10.map(x=>[(baseRes-x[1])/1e6,(baseRes+x[1])/1e6]),backgroundColor:B,borderRadius:4,maxBarThickness:20}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>'výsledek '+d2(c.raw[0])+' až '+d2(c.raw[1])+' mil. Kč'}}},
       scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' M'}},y:{...AXC,grid:{display:false}}}}});
 
@@ -802,15 +828,13 @@ function tabCitlivost(){
     $('#cDelta').textContent=sgn(delta,mil); $('#cDelta').className='metr '+(delta<0?'neg':'pos');
     $('#cNakl').textContent=d2(naklKm)+' Kč';
     $('#cSazKpi').textContent=d2(sazba)+' / '+d2(naklKm);
-    // struktura nákladů scénáře: složka | Kč/měs | za období | podíl | změna proti modelu
-    const pneuAd=(N.pneu||0)+(N.adblue||0);
+    // struktura nákladů scénáře: složka | Kč/měs | za období | podíl | změna proti výchozímu stavu
     const slozky=[
       ['Fixní náklady (odpisy, režie, pojistky…)','#888780', fix, m.FIXTOT],
       ['Nafta','#eda100', nafta*km, nafta0*m.KM],
-      ['Mzdy řidičů','#2a78d6', mzdy*km, (N.mzdyRidicu||0)*m.KM],
-      ['Mýto','#4a3aa7', myto*km, (N.myto||0)*m.KM],
-      ['Opravy','#eb6834', (N.opravy||0)*km, (N.opravy||0)*m.KM],
-      ['Pneu + AdBlue','#1baf7a', pneuAd*km, pneuAd*m.KM],
+      ['Mzdy řidičů','#2a78d6', mzdy*km, def.mzdy*m.KM],
+      ['Mýto','#4a3aa7', myto*km, def.myto*m.KM],
+      ['Ostatní variabilní (opravy, pneu, AdBlue…)','#eb6834', OST*km, OST*m.KM],
     ];
     const nakladyCelk=slozky.reduce((a,s)=>a+s[2],0);
     let st='<table><thead><tr><th style="text-align:left">Složka</th><th>Kč/měs</th><th>Za období ('+mes+' měs)</th><th>Podíl</th><th>Změna proti modelu</th></tr></thead><tbody>';
@@ -820,12 +844,12 @@ function tabCitlivost(){
         +'<td>'+tis(s[2]/mes)+'</td><td><b>'+tis(s[2])+'</b></td><td>'+Math.round(s[2]/nakladyCelk*100)+' %</td>'
         +'<td class="'+(Math.abs(dRozdil)<1e4?'':(dRozdil>0?'neg':'pos'))+'">'+(Math.abs(dRozdil)<1e4?'—':sgn(dRozdil,tis))+'</td></tr>';
     });
-    st+='<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Náklady celkem</td><td>'+tis(nakladyCelk/mes)+'</td><td>'+tis(nakladyCelk)+'</td><td>100 %</td><td class="'+(nakladyCelk-(m.VARTOT+m.FIXTOT)>1e4?'neg':'pos')+'">'+sgn(nakladyCelk-(m.VARTOT+m.FIXTOT),tis)+'</td></tr>'
+    st+='<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Náklady celkem</td><td>'+tis(nakladyCelk/mes)+'</td><td>'+tis(nakladyCelk)+'</td><td>100 %</td><td class="'+(nakladyCelk-(varKm0*m.KM+m.FIXTOT)>1e4?'neg':'pos')+'">'+sgn(nakladyCelk-(varKm0*m.KM+m.FIXTOT),tis)+'</td></tr>'
       +'<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Tržby</td><td>'+tis(trz/mes)+'</td><td>'+tis(trz)+'</td><td></td><td>'+sgn(trz-m.TRZ,tis)+'</td></tr>'
       +'<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Výsledek</td><td class="'+(res<0?'neg':'pos')+'">'+sgn(res/mes,tis)+'</td><td class="'+(res<0?'neg':'pos')+'">'+sgn(res,tis)+'</td><td></td><td class="'+(delta<0?'neg':'pos')+'">'+sgn(delta,tis)+'</td></tr>';
     $('#cStruct').innerHTML=st+'</tbody></table>';
-    const dSaz=m.TRZ*saz/100, dNaj=(naj/100)*(m.TRZ-m.VARTOT), dNafta=-(nafta-nafta0)*m.KM,
-      dMyto=-(myto-(N.myto||0))*m.KM, dMzdy=-(mzdy-(N.mzdyRidicu||0))*m.KM, dFix=-(fixMes-m.FIXMES)*mes;
+    const dSaz=m.TRZ*saz/100, dNaj=(naj/100)*(m.TRZ-varKm0*m.KM), dNafta=-(nafta-nafta0)*m.KM,
+      dMyto=-(myto-def.myto)*m.KM, dMzdy=-(mzdy-def.mzdy)*m.KM, dFix=-(fixMes-m.FIXMES)*mes;
     const parts=[dSaz,dNaj,dNafta,dMyto,dMzdy,dFix];
     const combo=delta-parts.reduce((a,b)=>a+b,0);
     const all=[...parts,combo].map(v=>Math.abs(v)<1e4?0:v);   // zbytky plovoucí čárky → 0

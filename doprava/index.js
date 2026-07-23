@@ -517,11 +517,92 @@ function mount(host) {
     json(res, 404, { chyba: 'Neznámá cesta modulu.' }); return true;
   }
 
+  /* ---------- denní e-mail s pohyblivým ceníkem (klouzavá kalkulace na cílovou marži) ---------- */
+  const CENIK_EMAIL = () => { const e = (process.env.DOPRAVA_CENIK_EMAIL != null ? process.env.DOPRAVA_CENIK_EMAIL : 'patrik.deml@elkoplast.cz').trim(); return (e && e !== 'off') ? e : ''; };
+  const CENIK_STATE_F = path.join(host.dataDir || __dirname, 'doprava-cenik-notif.json');
+  // Stejná logika jako záložka „Pohyblivá cena": fixy a variabilní náklady vozu z účetnictví,
+  // MTD z rozpracovaného měsíce Daily reportu, cena zbytku měsíce na cílovou marži.
+  function cenikDne() {
+    if (!cache || !cache.vozidla || !cache.vozidla.length) return null;
+    const N = cache.naklady || {};
+    const ekon = cache.ekonomika || seedEkonomika;
+    const ekonMap = {}; if (ekon && ekon.vozy) ekon.vozy.forEach((e) => { ekonMap[normSpz(e.spz)] = e; });
+    const EKN = (ekon && ekon.mesiceSdaty && ekon.mesiceSdaty.length) || 0;
+    const info = readInfo();
+    const evid = {}; (cache.evidence || []).forEach((e) => { if (e && e.spz) evid[e.spz] = e; });
+    const mesAll = [...new Set(cache.vozidla.flatMap((v) => Object.keys(v.mesice)))].sort();
+    const sum = {}; mesAll.forEach((mm) => { sum[mm] = { km: 0, trzby: 0 }; cache.vozidla.forEach((v) => { const x = v.mesice[mm]; if (x) { sum[mm].km += x.km; sum[mm].trzby += x.trzby; } }); });
+    const maxKm = Math.max(1, ...mesAll.map((mm) => sum[mm].km));
+    const mesice = mesAll.filter((mm) => sum[mm].km > 0.35 * maxKm && sum[mm].trzby > 0);
+    const rozp = mesAll.filter((k) => !mesice.includes(k) && (sum[k].km > 0 || sum[k].trzby > 0) && (!mesice.length || k > mesice[mesice.length - 1])).sort().pop() || null;
+    const posledni = mesice.length ? Number(mesice[mesice.length - 1].replace('-', '')) : null;
+    const mar = 0.05, kryti = 0.7, strop = Number(process.env.DOPRAVA_CENIK_STROP || 45);
+    const FIXV = N.celkemFix, FIXBASE = FIXV != null ? Math.max(0, FIXV - (N.leasingTahac || 0) - (N.leasingNaves || 0)) : null;
+    const fixUcto = (e) => { if (!e || !EKN) return null; const s = (p) => { const x = e.polozky.find((q) => q.nazev.indexOf(p) === 0); return x ? (x.celkem || 0) : 0; };
+      const f = (s('551000') + s('518410') + ((e.souhrny.rezijni && e.souhrny.rezijni.celkem) || 0) + s('548110') + s('548200') + s('548210') + s('531000')) / EKN; return f > 0 ? f : null; };
+    const rows = [];
+    for (const v of cache.vozidla) {
+      let km = 0; const rates = [];
+      mesice.forEach((mm) => { const x = v.mesice[mm]; if (x) { km += x.km; if (x.km > 0 && x.trzby > 0) rates.push(x.trzby / x.km); } });
+      if (km <= 0) continue;
+      if (rates.length >= 2 && (Math.max(...rates) - Math.min(...rates)) < 0.02) continue;   // paušály mají smluvní cenu
+      const ek = ekonMap[normSpz(v.spz)] || null;
+      const ev = evid[normSpz(v.spz)] || null;
+      const inf = info[v.cislo] || {};
+      const fixU = fixUcto(ek);
+      const leasing = !!(ev && ev.smlouvaDo && posledni && (ev.smlouvaDo.y * 100 + ev.smlouvaDo.m) >= posledni);
+      const fix = (inf.fixMes != null) ? Number(inf.fixMes) : (fixU != null ? fixU : (ev ? (ev.prodano ? 0 : (leasing ? FIXV : FIXBASE)) : FIXV));
+      const varV = (ek && ek.kmCelkem > 0 && ek.souhrny.naklady && fixU != null) ? Math.max(0, (ek.souhrny.naklady.celkem - fixU * EKN) / ek.kmCelkem) : (N.celkemVar != null ? N.celkemVar : null);
+      if (fix == null || varV == null) continue;
+      const plan = Math.max(2000, Math.round(km / Math.max(1, mesice.length)));
+      const mtd = rozp ? (v.mesice[rozp] || { km: 0, trzby: 0 }) : { km: 0, trzby: 0 };
+      const X = plan * kryti;
+      const pA = (varV + fix / X) / (1 - mar), pB = varV / (1 - mar);
+      const q = Math.max(plan - mtd.km, plan * 0.1);
+      const pTed = Math.max(varV, (fix + varV * mtd.km + varV * q - (1 - mar) * mtd.trzby) / ((1 - mar) * q));
+      const pokryto = (mtd.trzby - varV * mtd.km) >= fix;
+      rows.push({ cislo: v.cislo, ridic: inf.ridic || (ev && ev.ridic) || '', mtdKm: mtd.km, pA, pB, pTed, pokryto, nadStrop: pTed > strop });
+    }
+    rows.sort((a, b) => b.pTed - a.pTed);
+    return { rows, rozp, strop, mar, kryti };
+  }
+  async function cenikEmail() {
+    if (!host.deliver || !CENIK_EMAIL()) return;
+    const ted = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Prague' }));
+    if (ted.getHours() < 6) return;                                     // rozesílat až po ránu
+    const dnes = ted.getFullYear() + '-' + String(ted.getMonth() + 1).padStart(2, '0') + '-' + String(ted.getDate()).padStart(2, '0');
+    let st = {}; try { st = JSON.parse(fs.readFileSync(CENIK_STATE_F, 'utf8')); } catch (_) {}
+    if (st.dnes === dnes) return;                                       // dnes už odesláno
+    const c = cenikDne(); if (!c || !c.rows.length) return;
+    const d2 = (v) => v.toFixed(2).replace('.', ',');
+    const pad = (s, n) => String(s).padEnd(n);
+    const lines = c.rows.map((r) => pad(r.cislo, 5) + pad((r.ridic || '—').slice(0, 12), 13) + pad(r.mtdKm.toLocaleString('cs-CZ') + ' km', 10)
+      + pad(d2(r.pA), 8) + pad(d2(r.pB), 8) + pad(d2(r.pTed) + (r.nadStrop ? ' !' : ''), 9)
+      + (r.pokryto ? 'fixy pokryty -> možno zlevnit' : (r.nadStrop ? 'nad stropem' : '')));
+    const pokryte = c.rows.filter((r) => r.pokryto).map((r) => r.cislo);
+    const nadS = c.rows.filter((r) => r.nadStrop).map((r) => r.cislo);
+    const base = host.publicBaseUrl || '';
+    const text = 'Pohyblivý ceník dopravy — ' + dnes + (c.rozp ? ' (rozpracovaný měsíc ' + c.rozp.split('-').reverse().join('/') + ' z Daily reportu)' : '') + '\n'
+      + 'Cíl marže ' + Math.round(c.mar * 100) + ' % · fixy nese prvních ' + Math.round(c.kryti * 100) + ' % plánu · ceny v Kč/km\n\n'
+      + pad('Vůz', 5) + pad('Řidič', 13) + pad('Odjeto', 10) + pad('Začátek', 8) + pad('Po fix.', 8) + pad('TEĎ', 9) + 'Stav\n'
+      + lines.join('\n') + '\n\n'
+      + (pokryte.length ? 'Fixy pokryté (možno jít na nízkou cenu): ' + pokryte.join(', ') + '\n' : '')
+      + (nadS.length ? 'Nad konkurenčním stropem ' + d2(c.strop) + ' Kč/km: ' + nadS.join(', ') + '\n' : '')
+      + '\nDetail a posuvníky: ' + (base ? base + '/doprava' : 'intranet -> Doprava') + ' (záložka Pohyblivá cena)';
+    try {
+      await host.deliver({ to: CENIK_EMAIL(), subject: '[Doprava] Pohyblivý ceník ' + dnes + (nadS.length ? ' · ' + nadS.length + ' vozů nad stropem' : ''), text });
+      fs.writeFileSync(CENIK_STATE_F, JSON.stringify({ dnes, at: Date.now() }));
+      console.log('[doprava] denní ceník odeslán na ' + CENIK_EMAIL());
+    } catch (e) { console.error('[doprava] denní ceník se nepodařilo odeslat:', e.message); }
+  }
+
   // Tick (co 6 h): předehřátí cache, ať první otevření stránky nečeká na Google.
   async function tick() {
-    if (!sheets.configured()) return;
-    try { await refresh(); console.log('[doprava] data obnovena, vozidel: ' + cache.vozidla.length); }
-    catch (e) { console.error('[doprava] obnova dat selhala:', e.message); }
+    if (sheets.configured()) {
+      try { await refresh(); console.log('[doprava] data obnovena, vozidel: ' + cache.vozidla.length); }
+      catch (e) { console.error('[doprava] obnova dat selhala:', e.message); }
+    }
+    try { await cenikEmail(); } catch (e) { console.error('[doprava] ceník e-mail chyba:', e.message); }
   }
 
   return { handle, tick };

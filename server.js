@@ -1584,7 +1584,7 @@ try {
 // ---- Modul „Doprava" (výkony a náklady vozového parku, data z Google Sheets) ----
 let dopravaMod = null;
 try {
-  dopravaMod = require('./doprava').mount({ send, readBody, empSession, isAdmin, employeeModules, dataDir: DATA_DIR });
+  dopravaMod = require('./doprava').mount({ send, readBody, deliver, empSession, isAdmin, employeeModules, dataDir: DATA_DIR, publicBaseUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') });
 } catch (e) {
   console.error('[doprava] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
