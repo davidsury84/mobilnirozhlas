@@ -108,6 +108,16 @@ function spočítej(){
   const posledni = mesice.length? Number(mesice[mesice.length-1].replace('-','')) : null;   // YYYYMM
   const evid = {}; (DATA.evidence||[]).forEach(e=>{ if(e&&e.spz) evid[e.spz]=e; });
   const evidenceOk = Object.keys(evid).length>0;
+  // Kalibrace fixů z účetnictví: fix vozu = (odpisy + alokované režie + pojistky + silniční daň) / měsíc.
+  // Leasing (518410) je účetně nulový — auta se odepisují, model s plným leasingem slouží jen cenotvorbě.
+  const ekonMap={}; const EKN=(DATA.ekonomika&&DATA.ekonomika.mesiceSdaty&&DATA.ekonomika.mesiceSdaty.length)||0;
+  if(DATA.ekonomika&&DATA.ekonomika.vozy) DATA.ekonomika.vozy.forEach(e=>{ ekonMap[nSpz(e.spz)]=e; });
+  function fixUcto(e){
+    if(!e||!EKN) return null;
+    const suma=pre=>{const x=e.polozky.find(q=>q.nazev.indexOf(pre)===0); return x?(x.celkem||0):0;};
+    const f=(suma('551000')+suma('518410')+((e.souhrny.rezijni&&e.souhrny.rezijni.celkem)||0)+suma('548110')+suma('548200')+suma('548210')+suma('531000'))/EKN;
+    return f>0? f : null;
+  }
   const voz = DATA.vozidla.map(v=>{
     let km=0,trz=0,akt=0; const rates=[];
     mesice.forEach(m=>{const x=v.mesice[m]; if(x){km+=x.km;trz+=x.trzby; if(x.km>0){akt++; if(x.trzby>0) rates.push(x.trzby/x.km);}}});
@@ -117,9 +127,12 @@ function spočítej(){
     const leasing = !!(ev && ev.smlouvaDo && posledni && (ev.smlouvaDo.y*100+ev.smlouvaDo.m) >= posledni);
     let fixAuto = FIXV;
     if (FIXV!=null && ev) fixAuto = ev.prodano ? 0 : (leasing ? FIXV : FIXBASE);
-    const fix = (inf.fixMes!=null && isFinite(Number(inf.fixMes))) ? Number(inf.fixMes) : fixAuto;
+    const fixU = fixUcto(ekonMap[nSpz(v.spz)]);
+    // Priorita fixů: ruční úprava > účetní skutečnost > evidence (leasing ano/ne) > plný model
+    const fix = (inf.fixMes!=null && isFinite(Number(inf.fixMes))) ? Number(inf.fixMes) : (fixU!=null ? fixU : fixAuto);
+    const fixZdroj = (inf.fixMes!=null)?'rucne':(fixU!=null?'ucto':(ev?'evidence':'model'));
     return {...v, km, trz, akt, sazba: km>0?trz/km:null, pausal, ev, leasing,
-      fix, fixRucne: inf.fixMes!=null,
+      fix, fixZdroj, fixRucne: inf.fixMes!=null,
       ridic: inf.ridic || (ev&&ev.ridic) || '',
       typ: inf.typ || (ev&&ev.znacka) || '',
       prispevek: VAR!=null? trz-VAR*km : null,
@@ -318,13 +331,24 @@ function tabPrehled(){
   let al='';
   if(DATA.varovani) al+=alertHtml('warn',esc(DATA.varovani));
   if(m.vyloucene.length) al+=alertHtml('info','Měsíce <b>'+m.vyloucene.map(mesLbl).join(', ')+'</b> vypadají neúplně zapsané (chybí km nebo tržby) — do vyhodnocení nejsou zahrnuty.');
-  if(m.VYSLEDEK!=null){
+  const maUcto=!!(DATA.ekonomika&&DATA.ekonomika.vozy&&DATA.ekonomika.vozy.length);
+  if(maUcto){
+    const E=DATA.ekonomika, mm=E.mesiceSdaty||[];
+    const hvU=E.vozy.reduce((a,v)=>a+((v.souhrny.hv&&v.souhrny.hv.celkem)||0),0);
+    const obd=mm.length?mm[0]+'–'+mm[mm.length-1]+'/'+String(E.rok||'').slice(2):'';
+    al += hvU>=0
+      ? alertHtml('ok','Dle účetnictví je flotila za '+obd+' v zisku <b>'+sgn(hvU,mil)+'</b> (skutečné náklady vč. odpisů a režií — leasing účetně neběží žádný).')
+      : alertHtml('danger','Dle účetnictví je flotila za '+obd+' ve ztrátě <b>'+sgn(hvU,mil)+'</b>.');
+    if(m.VYSLEDEK!=null) al += alertHtml('info','Model za hodnocené období: <b>'+sgn(m.VYSLEDEK,mil)+'</b> (fixy kalibrované účetnictvím, průměr '+tis(m.FIXMES/Math.max(1,m.voz.length))+'/vůz/měs). Plný leasingový model ('+tis(m.FIXV)+'/vůz) používej jen pro cenotvorbu nové kapacity — viz Bod zvratu.');
+  } else if(m.VYSLEDEK!=null){
     al += m.VYSLEDEK<0
       ? alertHtml('danger','Podle nákladového modelu je flotila za hodnocené období ve ztrátě <b>'+sgn(m.VYSLEDEK,mil)+'</b> (výnos '+d2(m.SAZBA)+' Kč/km vs. plný náklad '+d2(m.VAR+m.FIXTOT/Math.max(1,m.KM))+' Kč/km).')
       : alertHtml('ok','Flotila je podle modelu v zisku <b>'+sgn(m.VYSLEDEK,mil)+'</b> (výnos '+d2(m.SAZBA)+' Kč/km vs. plný náklad '+d2(m.VAR+m.FIXTOT/Math.max(1,m.KM))+' Kč/km).');
     al += m.evidenceOk
       ? alertHtml('info','Fixní náklady dle evidence vozů: <b>'+m.leasingu+'</b> vozů s běžícím leasingem (plný fix '+tis(m.FIXV)+'/měs), <b>'+(m.voz.length-m.leasingu-m.prodanych)+'</b> odepsaných (bez leasingu '+tis(m.FIXBASE)+'/měs)'+(m.prodanych?', '+m.prodanych+' prodaných (0 Kč)':'')+'. Fixy flotily celkem '+tis(m.FIXMES)+'/měs.')
       : alertHtml('warn','Evidence vozů (leasingy) se nenačetla — všechny vozy se počítají s plným fixem '+tis(m.FIXV)+'/měs, ztráta je proto nadsazená.');
+  }
+  if(m.VAR!=null){
     const pausalPod = m.voz.filter(v=>v.pausal && v.sazba!=null && v.sazba < m.VAR);
     if(pausalPod.length) al+=alertHtml('danger','Vozy <b>'+pausalPod.map(v=>v.cislo).join(', ')+'</b> jezdí za paušál '+d2(pausalPod[0].sazba)+' Kč/km, který je pod variabilními náklady '+d2(m.VAR)+' Kč/km — každý ujetý km prohlubuje ztrátu.');
   }
@@ -350,7 +374,7 @@ function tabPrehled(){
     +'<div class="card"><div class="muted">Tržby</div><div class="metr">'+mil(m.TRZ)+'</div><div class="muted">'+m.KM.toLocaleString('cs-CZ')+' km</div></div>'
     +'<div class="card"><div class="muted">Výnos na km</div><div class="metr">'+d2(m.SAZBA)+' Kč</div><div class="muted">'+(m.VAR!=null?'variabilní náklad '+d2(m.VAR)+' Kč/km':'')+'</div></div>'
     +(m.VAR!=null?'<div class="card"><div class="muted">Krycí příspěvek</div><div class="metr">'+mil(m.TRZ-m.VARTOT)+'</div><div class="muted">tržby − variabilní náklady</div></div>':'')
-    +(m.VYSLEDEK!=null?'<div class="card"><div class="muted">Výsledek dle modelu</div><div class="metr '+(m.VYSLEDEK<0?'neg':'pos')+'">'+sgn(m.VYSLEDEK,mil)+'</div><div class="muted">fixy dle evidence '+tis(m.FIXMES)+'/měs</div></div>':'')
+    +(m.VYSLEDEK!=null?'<div class="card"><div class="muted">Výsledek dle modelu</div><div class="metr '+(m.VYSLEDEK<0?'neg':'pos')+'">'+sgn(m.VYSLEDEK,mil)+'</div><div class="muted">fixy '+tis(m.FIXMES)+'/měs (účetnictví/evidence)</div></div>':'')
     +(()=>{const E=DATA.ekonomika; if(!E||!E.vozy||!E.vozy.length) return '';
       const hv=E.vozy.reduce((a,v)=>a+((v.souhrny.hv&&v.souhrny.hv.celkem)||0),0);
       const mm=E.mesiceSdaty||[];
@@ -412,13 +436,13 @@ function tabVozidla(){
       +'<td style="text-align:left">'+(v.ridic?esc(v.ridic):'<span class="muted">—</span>')+'</td>'
       +'<td style="text-align:left">'+(v.typ?esc(v.typ):'<span class="muted">—</span>')+'</td>'
       +'<td>'+v.km.toLocaleString('cs-CZ')+'</td><td>'+kc(v.trz)+'</td><td>'+(v.sazba!=null?d2(v.sazba):'—')+'</td>'
-      +(m.FIXV!=null?'<td>'+(v.fix!=null?tis(v.fix):'—')+(v.leasing?' <span class="pill zlut" title="běžící leasing">L</span>':'')+(v.fixRucne?' <span class="pill sed" title="ručně upraveno">R</span>':'')+'</td>':'')
+      +(m.FIXV!=null?'<td>'+(v.fix!=null?tis(v.fix):'—')+({rucne:' <span class="pill sed" title="ručně upraveno">R</span>',ucto:' <span class="pill zel" title="dle účetnictví (odpisy+režie+pojistky+daň)">Ú</span>',evidence:(v.leasing?' <span class="pill zlut" title="běžící leasing dle evidence">L</span>':''),model:''}[v.fixZdroj]||'')+'</td>':'')
       +(m.VAR!=null?'<td class="'+(v.prispevek<0?'neg':'')+'">'+sgn(v.prispevek,kc)+'</td>':'')
       +(m.FIXV!=null?'<td class="'+(v.vysledek<0?'neg':'pos')+'">'+sgn(v.vysledek,kc)+'</td>':'')
       +(maEkon?(()=>{const e=ekonVozu(nSpz(v.spz)); return '<td class="'+(e&&e.souhrny.hv&&e.souhrny.hv.celkem<0?'neg':'pos')+'">'+(e&&e.souhrny.hv?sgn(e.souhrny.hv.celkem,kc):'—')+'</td>';})():'')
       +'<td>'+(v.pausal?'<span class="pill sed">paušál</span>':(v.km===0?'<span class="pill cerv">stojí</span>':''))+'</td></tr>').join('')
     +'</tbody></table>'
-    +'<p class="muted" style="font-size:12px">Fix/měs: <span class="pill zlut">L</span> = běžící leasing (plný fix'+(m.FIXV!=null?' '+tis(m.FIXV):'')+'), bez štítku = odepsaný vůz ('+(m.FIXBASE!=null?tis(m.FIXBASE):'—')+'), <span class="pill sed">R</span> = ručně upraveno.'+(ADMIN?' Řidiče, typ i fix upravíš v detailu vozu výše.':'')+'</p>';
+    +'<p class="muted" style="font-size:12px">Fix/měs: <span class="pill zel">Ú</span> = dle účetnictví (odpisy + režie + pojistky + silniční daň — leasing účetně neběží), <span class="pill zlut">L</span> = běžící leasing dle evidence (plný fix'+(m.FIXV!=null?' '+tis(m.FIXV):'')+'), <span class="pill sed">R</span> = ručně upraveno, bez štítku = model.'+(ADMIN?' Řidiče, typ i fix upravíš v detailu vozu výše.':'')+'</p>';
   $('#app').innerHTML=h;
 
   chart('chTrz',{type:'bar',data:{labels:akt.map(v=>v.cislo),datasets:[{data:akt.map(v=>v.trz/1e6),backgroundColor:akt.map(v=>v.pausal?GR:B),borderRadius:4,maxBarThickness:20}]},
