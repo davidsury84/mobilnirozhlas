@@ -488,7 +488,16 @@ table.ob-table td.col-pm a:hover,table.ob-table td.col-zastup a:hover{text-decor
 .ob-brow .fill.mid{background:#e0a90c}
 .ob-brow .fill.none{background:var(--line-strong)}
 .ob-brow .fill.pm{background:#4285f4}
+.ob-brow .fill.nah{background:#a9c7f7}
+.ob-brow .track.stack{display:flex}
+.ob-brow .track.stack .fill{border-radius:0;min-width:0}
+.ob-brow .track.stack .fill:first-child{border-radius:999px 0 0 999px}
+.ob-brow .track.stack .fill:last-child{border-radius:0 999px 999px 0}
 .ob-brow .val{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+.ob-legend{display:flex;gap:16px;margin:2px 0 10px;font-size:12px;color:var(--ink-soft)}
+.ob-legend span{display:inline-flex;align-items:center;gap:6px}
+.ob-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.ob-legend i.pm{background:#4285f4}.ob-legend i.nah{background:#a9c7f7}
 /* druhý pohled — obchodníci (karty) */
 .ob-persons{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
 .ob-person{border:1px solid var(--line);border-radius:var(--radius);background:var(--paper);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
@@ -1571,20 +1580,24 @@ function obExportPdf(){
   const d=OBCHOD_DATA; if(!d) return;
   const dnes=new Date().toLocaleDateString('cs-CZ');
   const e=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  // Grafy do PDF ze stejných dat jako v UI (pokrytí kategorií + zatížení garantů).
+  // Grafy do PDF ze stejných dat jako v UI (pokrytí kategorií + zatížení: garant + náhradník).
   const chartsPdf=function(){
     const rows=d.rows||[]; if(!rows.length) return '';
     const order=['Pokryto','Bez zálohy','Neobsazeno'];
     const cov={}; rows.forEach(r=>{ const k=obEval(r); cov[k]=(cov[k]||0)+1; });
     const covKeys=order.filter(k=>cov[k]); const covMax=Math.max(1,...covKeys.map(k=>cov[k]));
     const covCol={'Pokryto':'#2e9e57','Bez zálohy':'#e0a021','Neobsazeno':'#d1483a'};
-    const load={}; rows.forEach(r=>obPmList(r.pm).forEach(pm=>{ load[pm]=(load[pm]||0)+1; }));
-    const pmKeys=Object.keys(load).sort((a,b)=>load[b]-load[a]); const pmMax=Math.max(1,...pmKeys.map(k=>load[k]));
     const bar=(lab,val,max,col)=>'<div class="pb"><span class="pbl">'+e(lab)+'</span><span class="pbt"><span class="pbf" style="width:'+Math.round(val/max*100)+'%;background:'+col+'"></span></span><span class="pbv">'+val+'</span></div>';
+    const load=obLoadList(); const pmMax=Math.max(1,...load.map(o=>o.total));
+    const sbar=o=>'<div class="pb"><span class="pbl">'+e(o.name)+'</span><span class="pbt">'+
+      (o.g?'<span class="pbf" style="width:'+Math.round(o.g/pmMax*100)+'%;background:#2e6fae"></span>':'')+
+      (o.n?'<span class="pbf" style="width:'+Math.round(o.n/pmMax*100)+'%;background:#a9c7f7"></span>':'')+
+      '</span><span class="pbv">'+o.total+'</span></div>';
     return '<div class="charts"><div class="chart"><h3>Vyhodnocené pokrytí kategorií</h3>'+
       covKeys.map(k=>bar(k,cov[k],covMax,covCol[k]||'#888')).join('')+'</div>'+
-      '<div class="chart"><h3>Počet kategorií na garanta</h3>'+
-      pmKeys.map(k=>bar(k,load[k],pmMax,'#2e6fae')).join('')+'</div></div>';
+      '<div class="chart"><h3>Zatížení obchodníka (garant + náhradník)</h3>'+
+      '<div class="pleg"><span><i style="background:#2e6fae"></i> garant</span><span><i style="background:#a9c7f7"></i> náhradník</span></div>'+
+      load.map(sbar).join('')+'</div></div>';
   };
   let title='', inner='';
   if(OBCHOD_TAB==='obchodnici'){
@@ -1611,14 +1624,21 @@ function obExportPdf(){
     'table{width:100%;border-collapse:collapse}th,td{border:1px solid #cfd3cc;padding:5px 8px;text-align:left;vertical-align:top}th{background:#eef2ec;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}tr:nth-child(even) td{background:#f7f9f5}'+
     '.pm{border:1px solid #e0e4dd;border-radius:8px;padding:10px 12px;margin-bottom:10px;break-inside:avoid}.pm h3{margin:0 0 2px;font-size:13px}.pm .em{color:#0e8a43;font-weight:400;font-size:11px}.pm .meta{color:#666;font-size:11px;margin:0 0 6px}.pm .two{display:flex;gap:20px}.pm .three{display:flex;gap:18px}.pm .three>div{flex:1}.pm .lbl{font-size:10px;text-transform:uppercase;color:#888;margin-bottom:2px}.pm ul{margin:0;padding-left:16px}.cov{color:#888;font-size:10px}.muted{color:#999}'+
     '.charts{display:flex;gap:24px;margin:0 0 20px;break-inside:avoid}.chart{flex:1;border:1px solid #e0e4dd;border-radius:8px;padding:10px 14px}.chart h3{margin:0 0 8px;font-size:12px;color:#333}'+
-    '.pb{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:10.5px}.pbl{width:130px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pbt{flex:1;height:11px;background:#eef1ec;border-radius:6px;overflow:hidden}.pbf{display:block;height:100%;border-radius:6px}.pbv{width:24px;flex:none;text-align:right;font-weight:700}'+
+    '.pb{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:10.5px}.pbl{width:130px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pbt{flex:1;display:flex;height:11px;background:#eef1ec;border-radius:6px;overflow:hidden}.pbf{display:block;height:100%}.pbv{width:24px;flex:none;text-align:right;font-weight:700}'+
+    '.pleg{display:flex;gap:16px;margin:0 0 8px;font-size:10px;color:#555}.pleg span{display:inline-flex;align-items:center;gap:5px}.pleg i{width:10px;height:10px;border-radius:2px;display:inline-block}'+
     '@media print{body{margin:12mm}}</style></head><body>'+
     '<h1>Obchod — rozdělení obchodníků</h1><p class="sub">ELKOPLAST · '+e(title)+' · vygenerováno '+dnes+'</p>'+chartsPdf()+inner+'</body></html>';
   const w=window.open('','_blank'); if(!w){ alert('Pro export do PDF prosím povolte vyskakovací okna.'); return; }
   w.document.open(); w.document.write(html); w.document.close(); w.focus();
   setTimeout(function(){ try{ w.print(); }catch(_){} },350);
 }
-// Sloupcový graf: (1) vyhodnocené pokrytí, (2) počet kategorií na odpovědného obchodníka.
+// Zatížení obchodníka = garant + náhradník (stínování = stejná odpovědnost), skládaný sloupec s odlišením.
+function obLoadList(){
+  const people=(OBCHOD_DATA&&OBCHOD_DATA.obchodnici)||[];
+  return people.map(o=>({name:o.name, g:o.pocetOdpovedny||0, n:(o.pocetZastup||0)+(o.pocetNahrad||0)}))
+    .map(o=>Object.assign(o,{total:o.g+o.n})).filter(o=>o.total>0).sort((a,b)=>b.total-a.total||b.g-a.g);
+}
+// Sloupcový graf: (1) vyhodnocené pokrytí kategorií, (2) zatížení obchodníka (garant + náhradník).
 function obChartsHtml(rows){
   const order=['Pokryto','Bez zálohy','Neobsazeno'];
   const cov={}; rows.forEach(r=>{ const k=obEval(r); cov[k]=(cov[k]||0)+1; });
@@ -1626,13 +1646,16 @@ function obChartsHtml(rows){
   const covMax=Math.max(1,...covKeys.map(k=>cov[k]));
   const covCls={'Pokryto':'lo','Bez zálohy':'mid','Neobsazeno':'hi'};
   const covBars=covKeys.map(k=>'<div class="ob-brow"><span class="lab">'+esc(k)+'</span><span class="track"><span class="fill '+(covCls[k]||'mid')+'" style="width:'+Math.round(cov[k]/covMax*100)+'%"></span></span><span class="val">'+cov[k]+'</span></div>').join('');
-  const load={}; rows.forEach(r=>obPmList(r.pm).forEach(pm=>{ load[pm]=(load[pm]||0)+1; }));
-  const pmKeys=Object.keys(load).sort((a,b)=>load[b]-load[a]);
-  const pmMax=Math.max(1,...pmKeys.map(k=>load[k]));
-  const pmBars=pmKeys.map(k=>'<div class="ob-brow"><span class="lab" title="'+esc(k)+'">'+esc(k)+'</span><span class="track"><span class="fill pm" style="width:'+Math.round(load[k]/pmMax*100)+'%"></span></span><span class="val">'+load[k]+'</span></div>').join('');
+  const load=obLoadList();
+  const pmMax=Math.max(1,...load.map(o=>o.total));
+  const pmBars=load.map(o=>'<div class="ob-brow"><span class="lab" title="'+esc(o.name)+'">'+esc(o.name)+'</span><span class="track stack">'+
+    (o.g?'<span class="fill pm" style="width:'+Math.round(o.g/pmMax*100)+'%" title="garant: '+o.g+'"></span>':'')+
+    (o.n?'<span class="fill nah" style="width:'+Math.round(o.n/pmMax*100)+'%" title="náhradník: '+o.n+'"></span>':'')+
+    '</span><span class="val" title="garant '+o.g+' + náhradník '+o.n+'">'+o.total+'</span></div>').join('');
+  const legend='<div class="ob-legend"><span><i class="pm"></i> garant</span><span><i class="nah"></i> náhradník</span></div>';
   return '<div class="ob-charts">'+
     '<div class="ob-chart"><h3>Vyhodnocené pokrytí kategorií</h3><div class="ob-bars">'+covBars+'</div></div>'+
-    '<div class="ob-chart"><h3>Počet kategorií na obchodníka</h3><div class="ob-bars ob-bars-pm">'+pmBars+'</div></div>'+
+    '<div class="ob-chart"><h3>Zatížení obchodníka (garant + náhradník)</h3>'+legend+'<div class="ob-bars ob-bars-pm">'+pmBars+'</div></div>'+
     '</div>';
 }
 function obRender(){
