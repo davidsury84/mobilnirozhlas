@@ -20,6 +20,10 @@ const HTML_FILE = path.join(__dirname, 'doprava.html');
 // Historické ročníky (2021…) sem NEPATŘÍ — ty jsou jen pro srovnávací analytiku.
 const VYKONY_IDS = () => (process.env.DOPRAVA_SHEET_VYKONY_ID || '1Na7nDmIdSkbpviGfVDRHWsC6kcQacFIFLVx7vaBGVy4')
   .split(',').map((s) => s.trim()).filter(Boolean);
+// Účetní skutečnost po vozech (list „auta-2026"). Výchozí data jsou přibalený snapshot
+// (doprava/seed-ekonomika.json); živé čtení se zapne nastavením DOPRAVA_SHEET_EKONOMIKA_ID
+// na ID nativní Google tabulky se stejnou strukturou (nasdílené robotovi).
+const EKONOMIKA_ID = () => (process.env.DOPRAVA_SHEET_EKONOMIKA_ID || '').trim();
 // Historické ročníky pro záložku Historie (meziroční srovnání, sezónnost, vývoj vozů).
 // Načte se, co je robotovi nasdílené; nenasdílené ročníky se tiše přeskočí.
 const HISTORIE_IDS = () => (process.env.DOPRAVA_SHEET_HISTORIE_IDS
@@ -132,6 +136,53 @@ function parseNaklady(rows) {
     if (parts.some((x) => x != null)) out.celkemFix = Math.round(parts.reduce((a, b) => a + (b || 0), 0) * 100) / 100;
   }
   return out;
+}
+
+/* ---------- účetní skutečnost po vozech (layout listu „auta-2026") ---------- */
+// Bloky: [číslo, 'Text 1', Leden…Prosinec, Celkem] a pod tím řádky [SPZ, položka, měsíce…, celkem, pozn].
+const EKON_SOUHRNY = {
+  'prime naklady': 'primeNaklady', 'prime mzdy - ridici': 'primeMzdy', 'ostatni prime naklady': 'ostatniPrime',
+  'prime naklady celkem': 'primeCelkem', 'rezijni naklady celkem': 'rezijni', 'naklady celkem': 'naklady',
+  'trzby celkem': 'trzby', 'hv celkem': 'hv',
+};
+const EKON_KPI_SKIP = ['kc na 1 km', 'spotreba l na 100 km', 'opravy / trzby', 'trzby na km', 'naklady na km'];
+function parseEkonomika(rows) {
+  const vozy = []; let voz = null;
+  const mesicu = (r) => r.slice(2, 14).map(parseNum).map((x) => x == null ? 0 : x);
+  for (const r0 of rows) {
+    const r = r0 || [];
+    if (String(r[1] || '').trim() === 'Text 1') {
+      if (voz && (voz.souhrny.trzby || voz.souhrny.naklady)) vozy.push(voz);
+      voz = { cislo: String(r[0] || '').trim().split('.')[0], spz: '', polozky: [], souhrny: {}, km: [], kmCelkem: 0, spotrebaL: [] };
+      continue;
+    }
+    if (!voz) continue;
+    const nazev = String(r[1] || '').trim();
+    if (!nazev) continue;
+    const klic = norm(nazev);
+    const mes = mesicu(r); const cel = parseNum(r[14]) || 0;
+    if (!voz.spz && /^[0-9][A-Z]/.test(String(r[0] || '').trim())) voz.spz = String(r[0] || '').trim();
+    if (EKON_SOUHRNY[klic]) voz.souhrny[EKON_SOUHRNY[klic]] = { mesice: mes, celkem: cel };
+    else if (klic === 'najeto celkem km') { voz.km = mes; voz.kmCelkem = cel; }
+    else if (klic === 'spotreba l') voz.spotrebaL = mes;
+    else if (!EKON_KPI_SKIP.includes(klic)) {
+      const p = { nazev, celkem: cel };
+      if (cel !== 0 || mes.some(Boolean)) p.mesice = mes;
+      const pozn = String(r[15] || '').trim(); if (pozn) p.pozn = pozn;
+      voz.polozky.push(p);
+    }
+  }
+  if (voz && (voz.souhrny.trzby || voz.souhrny.naklady)) vozy.push(voz);
+  const mesiceSdaty = [];
+  for (let m = 0; m < 12; m++) if (vozy.some((v) => (v.souhrny.naklady && v.souhrny.naklady.mesice[m]) || 0)) mesiceSdaty.push(m + 1);
+  // ořez měsíčních polí na poslední měsíc s daty (stejně jako v seed souboru)
+  const n = mesiceSdaty.length ? mesiceSdaty[mesiceSdaty.length - 1] : 12;
+  vozy.forEach((v) => {
+    Object.values(v.souhrny).forEach((s) => { s.mesice = s.mesice.slice(0, n); });
+    v.km = v.km.slice(0, n); v.spotrebaL = v.spotrebaL.slice(0, n);
+    v.polozky.forEach((p) => { if (p.mesice) p.mesice = p.mesice.slice(0, n); });
+  });
+  return { rok: null, mesiceSdaty, vozy };
 }
 
 /* ---------- evidence vozů: SPZ, řidič, značka, Scania paušál, smlouva do ---------- */
@@ -252,6 +303,9 @@ function mount(host) {
     } catch (_) {}
   }
   let lastFail = 0;   // neúspěšná obnova → další automatický pokus nejdřív za 10 minut
+  // Účetní skutečnost: přibalený snapshot jako výchozí zdroj (živý zdroj přes env viz výše).
+  let seedEkonomika = null;
+  try { seedEkonomika = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed-ekonomika.json'), 'utf8')); } catch (_) {}
   // Evidence řidičů a typů vozidel (v tabulkách není; plní správce přímo v modulu).
   const INFO_F = path.join(host.dataDir || __dirname, 'doprava-vozidla.json');
   function readInfo() { try { const i = JSON.parse(fs.readFileSync(INFO_F, 'utf8')); return (i && typeof i === 'object') ? i : {}; } catch { return {}; } }
@@ -369,6 +423,14 @@ function mount(host) {
       else data.nakladyChyba = nak.reason.message;
       if (data.vykonyChyba) { data.vozidla = (cache && cache.vozidla) || null; console.error('[doprava] tabulka výkonů se nenačetla:', data.vykonyChyba); }
       if (data.nakladyChyba) { data.naklady = (cache && cache.naklady) || null; console.error('[doprava] nákladová tabulka se nenačetla:', data.nakladyChyba); }
+      // Účetní skutečnost (jen když je nastavený živý zdroj) — obnova max 1× denně.
+      const staraEkon = cache && cache.ekonomika;
+      if (EKONOMIKA_ID() && (!staraEkon || (Date.now() - (staraEkon.ts || 0)) > 24 * 3600 * 1000)) {
+        try {
+          const ek = await readParsed(EKONOMIKA_ID(), 'A1:R1200', parseEkonomika, (d) => d.vozy && d.vozy.length > 0);
+          data.ekonomika = { ts: Date.now(), zdroj: 'živě z Google Sheets', ...ek };
+        } catch (e) { data.ekonomika = staraEkon || null; console.error('[doprava] účetní ekonomika se nenačetla:', e.message); }
+      } else data.ekonomika = staraEkon || null;
       // Historické ročníky se mění zřídka — obnova max 1× denně, jinak z cache.
       const staraHist = cache && cache.historie;
       if (!staraHist || (Date.now() - (staraHist.ts || 0)) > 24 * 3600 * 1000) {
@@ -418,7 +480,7 @@ function mount(host) {
           cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
           cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
         ].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
