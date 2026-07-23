@@ -55,6 +55,7 @@
   <button data-tab="vozidla">Vozidla</button>
   <button data-tab="zakazky">Zakázky</button>
   <button data-tab="zvrat">Bod zvratu</button>
+  <button data-tab="cena">Pohyblivá cena</button>
   <button data-tab="citlivost">Citlivost</button>
   <button data-tab="bonus">Bonus za spotřebu</button>
   <button data-tab="historie">Historie</button>
@@ -127,12 +128,15 @@ function spočítej(){
     const leasing = !!(ev && ev.smlouvaDo && posledni && (ev.smlouvaDo.y*100+ev.smlouvaDo.m) >= posledni);
     let fixAuto = FIXV;
     if (FIXV!=null && ev) fixAuto = ev.prodano ? 0 : (leasing ? FIXV : FIXBASE);
-    const fixU = fixUcto(ekonMap[nSpz(v.spz)]);
+    const ekV = ekonMap[nSpz(v.spz)]||null;
+    const fixU = fixUcto(ekV);
     // Priorita fixů: ruční úprava > účetní skutečnost > evidence (leasing ano/ne) > plný model
     const fix = (inf.fixMes!=null && isFinite(Number(inf.fixMes))) ? Number(inf.fixMes) : (fixU!=null ? fixU : fixAuto);
     const fixZdroj = (inf.fixMes!=null)?'rucne':(fixU!=null?'ucto':(ev?'evidence':'model'));
+    // Skutečné variabilní náklady vozu z účetnictví (náklady bez fixů / ujeté km)
+    const varU = (ekV && ekV.kmCelkem>0 && ekV.souhrny.naklady && fixU!=null)? Math.max(0,(ekV.souhrny.naklady.celkem-fixU*EKN)/ekV.kmCelkem) : null;
     return {...v, km, trz, akt, sazba: km>0?trz/km:null, pausal, ev, leasing,
-      fix, fixZdroj, fixRucne: inf.fixMes!=null,
+      fix, fixZdroj, fixRucne: inf.fixMes!=null, varU, ekV,
       ridic: inf.ridic || (ev&&ev.ridic) || '',
       typ: inf.typ || (ev&&ev.znacka) || '',
       prispevek: VAR!=null? trz-VAR*km : null,
@@ -145,7 +149,8 @@ function spočítej(){
   const FIXTOT = FIXMES!=null? FIXMES*mesice.length : null;
   const aktivni = voz.filter(v=>v.km>0);
   const FIXA = (FIXMES!=null && aktivni.length)? aktivni.reduce((a,v)=>a+v.fix,0)/aktivni.length : FIXV;   // průměrný fix aktivního vozu
-  return { N, VAR, FIXV, FIXBASE, NVOZ, mesAll, mesice, vyloucene, sum, voz, map, KM, TRZ,
+  const rozpracovany = mesAll.filter(k=>!mesice.includes(k)&&(sum[k].km>0||sum[k].trzby>0)&&(!mesice.length||k>mesice[mesice.length-1])).sort().pop()||null;
+  return { N, VAR, FIXV, FIXBASE, NVOZ, mesAll, mesice, vyloucene, rozpracovany, sum, voz, map, KM, TRZ,
     SAZBA: KM>0?TRZ/KM:0, evidenceOk,
     leasingu: voz.filter(v=>v.leasing).length, prodanych: voz.filter(v=>v.ev&&v.ev.prodano).length,
     VARTOT: VAR!=null?VAR*KM:null, FIXMES, FIXTOT, FIXA,
@@ -186,7 +191,105 @@ function render(tab){
   else if(tab==='citlivost') tabCitlivost();
   else if(tab==='bonus') tabBonus();
   else if(tab==='historie') tabHistorie();
+  else if(tab==='cena') tabCena();
   window.scrollTo(0,0);
+}
+
+/* ================= POHYBLIVÁ CENA (klouzavá kalkulace na cílovou marži) ================= */
+// Cena zbytku měsíce tak, aby CELÝ měsíc skončil na cílové marži:
+// (R + p·q)·(1−m) = C + var·q  →  p = (C + var·q − (1−m)·R) / ((1−m)·q); nikdy pod variabilní náklady.
+function cenaZbytek(R, C, varV, q, mar){
+  if(q<=0) return varV/(1-mar);
+  const p=(C+varV*q-(1-mar)*R)/((1-mar)*q);
+  return Math.max(varV, p);
+}
+function tabCena(){
+  const m=M;
+  if(m.VAR==null){ $('#app').innerHTML='<h1>Pohyblivá cena</h1>'+alertHtml('warn','Nákladová kalkulace se nenačetla.'); return; }
+  const mtdKey=m.rozpracovany;
+  const mtdLbl=mtdKey?mesLbl(mtdKey):null;
+  let h='<h1>Pohyblivá cena — klouzavá kalkulace na cílový zisk</h1>';
+  h+=alertHtml('info','Logika: fixní náklady vozu ať zaplatí <b>prvních X % plánu</b> — začátek měsíce se nabízí za vyšší cenu. Jakmile jsou fixy pokryté, zbylé kilometry (typicky posledních 8–10 tis.) lze nabízet <b>za marginální cenu</b> a měsíc přesto skončí na cílové marži. „Cena teď" se počítá živě z odjetých km a tržeb rozpracovaného měsíce'+(mtdLbl?' ('+mtdLbl+' z Daily reportu)':'')+' a z účetních nákladů vozu.');
+  h+='<div class="chartbox"><div class="sliders" style="margin-bottom:10px">'
+    +'<div class="sl"><label>Cílová marže z obratu</label><input type="range" id="pMar" min="0" max="12" step="0.5" value="5"><output id="opMar"></output></div>'
+    +'<div class="sl"><label>Fixy pokryjí prvních</label><input type="range" id="pKryti" min="40" max="100" step="5" value="70"><output id="opKryti"></output></div>'
+    +'<div class="sl"><label>Konkurenční strop ceny</label><input type="range" id="pStrop" min="34" max="60" step="0.5" value="45"><output id="opStrop"></output></div>'
+    +'<div class="sl"><label>Plán km (× průměr vozu)</label><input type="range" id="pPlan" min="80" max="125" step="5" value="100"><output id="opPlan"></output></div>'
+    +'</div>'
+    +'<div id="pAlerts"></div>'
+    +'<div id="pTab"></div></div>';
+  h+='<div class="chartbox"><h2 style="margin:0 0 8px">Cenová křivka vozu <select id="pVoz" style="margin-left:8px"></select> <span class="muted" id="pVozInfo"></span></h2>'
+    +legenda([[B,'Nabízená cena podle odjetých km'],[R,'Konkurenční strop'],[GR,'Variabilní náklady (absolutní dno)'],[G,'Pozice teď']])
+    +cv('chCena',300)+'</div>';
+  h+=alertHtml('info','<b>Automatické hlídání:</b> Daily report se plní denně a modul si ho stahuje — „cena teď" je tedy vždy aktuální po otevření záložky. Chceš-li hlídání bez otevírání intranetu, doporučuji denní e-mail dispečerovi (ceník všech vozů + semafor, kdo už může zlevnit) — server to umí rozeslat automaticky, řekni a doplním.');
+  $('#app').innerHTML=h;
+
+  const akt=m.aktivni.filter(v=>!v.pausal);   // paušály mají smluvní cenu, klouzavá kalkulace se jich netýká
+  const sel=$('#pVoz');
+  akt.forEach(v=>{ const o=document.createElement('option'); o.value=v.cislo; o.textContent=vozLbl(v.cislo); sel.appendChild(o); });
+  chart('chCena',{type:'line',data:{labels:[],datasets:[
+    {data:[],borderColor:B,borderWidth:2.5,pointRadius:0,stepped:true},
+    {data:[],borderColor:R,borderWidth:1.5,borderDash:[6,4],pointRadius:0},
+    {data:[],borderColor:GR,borderWidth:1.5,borderDash:[3,3],pointRadius:0},
+    {type:'scatter',data:[],pointRadius:7,pointBackgroundColor:G,pointBorderColor:'#fff',pointBorderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{...NOLEG,tooltip:{callbacks:{label:c=>c.datasetIndex===3?('teď: '+d2(c.raw.y)+' Kč/km při '+Math.round(c.raw.x).toLocaleString('cs-CZ')+' km'):(d2(c.parsed.y)+' Kč/km')}}},
+      scales:{x:{type:'linear',...AXC,title:{display:true,text:'odjeté km v měsíci',color:'#7f8c8d',font:{size:12}},ticks:{...AXC.ticks,callback:v=>(v/1000)+' tis.'}},
+        y:{...AXC,title:{display:true,text:'Kč/km',color:'#7f8c8d',font:{size:12}},ticks:{...AXC.ticks,callback:v=>v+' Kč'}}}}});
+
+  function radekVozu(v,mar,kryti,plan){
+    const varV=v.varU!=null?v.varU:m.VAR;
+    const F=v.fix!=null?v.fix:m.FIXA;
+    const X=plan*kryti;                                     // km, které nesou fixy
+    const pA=(varV+F/X)/(1-mar);                            // cena na začátku měsíce
+    const pB=varV/(1-mar);                                  // cena po pokrytí fixů
+    const mtd=mtdKey?(v.mesice[mtdKey]||{km:0,trzby:0}):{km:0,trzby:0};
+    const C=F+varV*mtd.km, q=Math.max(plan-mtd.km, plan*0.1);
+    const pTed=cenaZbytek(mtd.trzby, C, varV, q, mar);
+    const fixPokryty=(mtd.trzby-varV*mtd.km)>=F;
+    return {v,varV,F,X,pA,pB,mtd,pTed,fixPokryty,plan};
+  }
+  function upd(){
+    const mar=Number($('#pMar').value)/100, kryti=Number($('#pKryti').value)/100,
+      strop=Number($('#pStrop').value), planK=Number($('#pPlan').value)/100;
+    $('#opMar').textContent=(mar*100).toFixed(1).replace('.',',')+' %';
+    $('#opKryti').textContent=Math.round(kryti*100)+' % plánu';
+    $('#opStrop').textContent=d2(strop)+' Kč/km';
+    $('#opPlan').textContent=Math.round(planK*100)+' %';
+    const radky=akt.map(v=>radekVozu(v,mar,kryti,Math.max(2000,Math.round(v.km/Math.max(1,m.mesice.length)*planK))));
+    let t='<table><thead><tr><th>Vůz</th><th style="text-align:left">Řidič</th><th>Plán km</th><th>'+(mtdLbl?'Odjeto '+mtdLbl:'Odjeto')+'</th><th>Cena do '+Math.round(kryti*100)+' % plánu</th><th>Cena po pokrytí fixů</th><th>Cena teď (na '+(mar*100).toFixed(0)+' %)</th><th>Dno (variabilní)</th><th></th></tr></thead><tbody>';
+    radky.sort((a,b)=>b.pTed-a.pTed).forEach(r=>{
+      const nadStrop=r.pTed>strop;
+      t+='<tr'+(r.fixPokryty?' style="background:#f2faf5"':'')+'><td>'+esc(r.v.cislo)+'</td><td style="text-align:left">'+esc(r.v.ridic||'—')+'</td>'
+        +'<td>'+r.plan.toLocaleString('cs-CZ')+'</td><td>'+r.mtd.km.toLocaleString('cs-CZ')+'</td>'
+        +'<td>'+d2(Math.min(r.pA,999))+'</td><td>'+d2(r.pB)+'</td>'
+        +'<td class="'+(nadStrop?'neg':'pos')+'" style="font-weight:700">'+d2(r.pTed)+(nadStrop?' ⚠':'')+'</td>'
+        +'<td class="muted">'+d2(r.varV)+'</td>'
+        +'<td>'+(r.fixPokryty?'<span class="pill zel">fixy pokryty → může zlevnit</span>':(nadStrop?'<span class="pill cerv">nad stropem</span>':''))+'</td></tr>';
+    });
+    $('#pTab').innerHTML=t+'</tbody></table>'
+      +'<p class="muted" style="font-size:12px">Zeleně podbarvené vozy už letos v měsíci vydělaly na své fixy — jejich „cena teď" míří k marginální. Variabilní náklady i fixy jsou z účetnictví vozu (fallback model). Paušální vozy (409, 410) v tabulce nejsou — mají smluvní cenu.</p>';
+    const pokryto=radky.filter(r=>r.fixPokryty), nadS=radky.filter(r=>r.pTed>strop);
+    let a='';
+    if(pokryto.length) a+=alertHtml('ok','Fixy už mají pokryté: <b>'+pokryto.map(r=>r.v.cislo).join(', ')+'</b> — zbytek měsíce můžou nabízet od '+d2(Math.min(...pokryto.map(r=>r.pB)))+' Kč/km a měsíc přesto skončí na '+(mar*100).toFixed(0)+' %.');
+    if(nadS.length) a+=alertHtml('warn','Nad konkurenčním stropem '+d2(strop)+' Kč/km: <b>'+nadS.map(r=>r.v.cislo).join(', ')+'</b> — cílová marže je u nich při současném rozjezdu měsíce nedosažitelná; potřebují víc km, nebo nižší cíl.');
+    if(!a) a=alertHtml('info','Žádný vůz zatím nemá fixy pokryté ani není nad stropem — ceny drž na úrovni „do '+Math.round(kryti*100)+' % plánu".');
+    $('#pAlerts').innerHTML=a;
+    // křivka vybraného vozu
+    const r=radky.find(x=>x.v.cislo===sel.value)||radky[0]; if(!r) return;
+    if(sel.value!==r.v.cislo) sel.value=r.v.cislo;
+    $('#pVozInfo').textContent='fix '+tis(r.F)+'/měs · variabilní '+d2(r.varV)+' Kč/km · plán '+r.plan.toLocaleString('cs-CZ')+' km';
+    const xs=[]; for(let k=0;k<=r.plan*1.2;k+=250) xs.push(k);
+    CH.chCena.data.labels=xs;
+    CH.chCena.data.datasets[0].data=xs.map(k=>({x:k,y:Math.min(k<r.X?r.pA:r.pB, 999)}));
+    CH.chCena.data.datasets[1].data=xs.map(k=>({x:k,y:strop}));
+    CH.chCena.data.datasets[2].data=xs.map(k=>({x:k,y:r.varV}));
+    CH.chCena.data.datasets[3].data=(r.mtd.km>0)?[{x:r.mtd.km,y:r.pTed}]:[];
+    CH.chCena.update('none');
+  }
+  ['pMar','pKryti','pStrop','pPlan'].forEach(id=>$('#'+id).addEventListener('input',upd));
+  sel.addEventListener('change',upd);
+  upd();
 }
 
 /* ================= HISTORIE (meziroční srovnání) ================= */
