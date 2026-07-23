@@ -658,14 +658,16 @@ function tabCitlivost(){
     +sl('cMzdy','Mzdy řidičů',Math.max(0,def.mzdy-3),def.mzdy+4,0.05,def.mzdy)
     +sl('cSaz','Sazba tržeb',-10,30,1,0)
     +sl('cNaj','Nájezd',-20,50,1,0)
-    +sl('cFixp','Fixní náklady',60,140,5,100)
+    +sl('cFix','Fixní náklady/měs',Math.max(0,Math.round(m.FIXMES)-60*1e4),Math.round(m.FIXMES)+90*1e4,1e4,Math.round(m.FIXMES))
     +'<div class="sl"><button class="btn sec" id="cReset">Vrátit na model</button></div></div>'
     +'<div class="cards" style="margin-bottom:10px">'
     +'<div class="card"><div class="muted">Výsledek (scénář)</div><div class="metr" id="cRes">–</div></div>'
     +'<div class="card"><div class="muted">Rozdíl proti modelu</div><div class="metr" id="cDelta">–</div></div>'
     +'<div class="card"><div class="muted">Náklad na km</div><div class="metr" id="cNakl">–</div></div>'
     +'<div class="card"><div class="muted">Sazba: máme / potřeba</div><div class="metr" id="cSazKpi" style="font-size:21px">–</div></div></div>'
-    +'<div id="cAlerts"></div></div>';
+    +'<div id="cAlerts"></div>'
+    +'<h2 style="margin:14px 0 8px">Struktura nákladů scénáře <span class="muted">(částky se mění s posuvníky)</span></h2>'
+    +'<div id="cStruct"></div></div>';
   h+=box('Rozklad rozdílu podle parametru (mil. Kč)',cv('chImp',260),legenda([[G,'Zlepšuje'],[R,'Zhoršuje']]));
   h+=box('Citlivost výsledku na ±10 % parametru',cv('chTor',260),'<p class="muted" style="margin:0 0 8px">Delší pruh = citlivější parametr. Výchozí bod: '+(m.VYSLEDEK!=null?sgn(m.VYSLEDEK,mil):'—')+'.</p>');
   $('#app').innerHTML=h;
@@ -684,21 +686,43 @@ function tabCitlivost(){
 
   const V=id=>Number($('#'+id).value);
   function upd(){
-    const cena=V('cCena'),spotr=V('cSpotr'),myto=V('cMyto'),mzdy=V('cMzdy'),saz=V('cSaz'),naj=V('cNaj'),fixp=V('cFixp');
+    const cena=V('cCena'),spotr=V('cSpotr'),myto=V('cMyto'),mzdy=V('cMzdy'),saz=V('cSaz'),naj=V('cNaj'),fixMes=V('cFix');
     $('#ocCena').textContent=d2(cena)+' Kč/l'; $('#ocSpotr').textContent=spotr.toFixed(1).replace('.',',')+' l'; $('#ocMyto').textContent=d2(myto)+' Kč/km';
-    $('#ocMzdy').textContent=d2(mzdy)+' Kč/km'; $('#ocSaz').textContent=(saz>=0?'+':'')+saz+' %'; $('#ocNaj').textContent=(naj>=0?'+':'')+naj+' %'; $('#ocFixp').textContent=fixp+' %';
+    $('#ocMzdy').textContent=d2(mzdy)+' Kč/km'; $('#ocSaz').textContent=(saz>=0?'+':'')+saz+' %'; $('#ocNaj').textContent=(naj>=0?'+':'')+naj+' %'; $('#ocFix').textContent=tis(fixMes);
     const km=m.KM*(1+naj/100), sazba=m.SAZBA*(1+saz/100), trz=km*sazba;
     const nafta=Math.round(spotr*cena)/100;
     const varKm=nafta+myto+mzdy+OST;
-    const fix=m.FIXTOT*(fixp/100);
+    const fix=fixMes*mes;
     const res=trz-varKm*km-fix, delta=res-base.res;
     const naklKm=varKm+fix/km;
     $('#cRes').textContent=sgn(res,mil); $('#cRes').className='metr '+(res<0?'neg':'pos');
     $('#cDelta').textContent=sgn(delta,mil); $('#cDelta').className='metr '+(delta<0?'neg':'pos');
     $('#cNakl').textContent=d2(naklKm)+' Kč';
     $('#cSazKpi').textContent=d2(sazba)+' / '+d2(naklKm);
+    // struktura nákladů scénáře: složka | Kč/měs | za období | podíl | změna proti modelu
+    const pneuAd=(N.pneu||0)+(N.adblue||0);
+    const slozky=[
+      ['Fixní náklady (odpisy, režie, pojistky…)','#888780', fix, m.FIXTOT],
+      ['Nafta','#eda100', nafta*km, nafta0*m.KM],
+      ['Mzdy řidičů','#2a78d6', mzdy*km, (N.mzdyRidicu||0)*m.KM],
+      ['Mýto','#4a3aa7', myto*km, (N.myto||0)*m.KM],
+      ['Opravy','#eb6834', (N.opravy||0)*km, (N.opravy||0)*m.KM],
+      ['Pneu + AdBlue','#1baf7a', pneuAd*km, pneuAd*m.KM],
+    ];
+    const nakladyCelk=slozky.reduce((a,s)=>a+s[2],0);
+    let st='<table><thead><tr><th style="text-align:left">Složka</th><th>Kč/měs</th><th>Za období ('+mes+' měs)</th><th>Podíl</th><th>Změna proti modelu</th></tr></thead><tbody>';
+    slozky.forEach(s=>{
+      const dRozdil=s[2]-s[3];
+      st+='<tr><td style="text-align:left"><span class="sw" style="background:'+s[1]+';margin-right:7px"></span>'+s[0]+'</td>'
+        +'<td>'+tis(s[2]/mes)+'</td><td><b>'+tis(s[2])+'</b></td><td>'+Math.round(s[2]/nakladyCelk*100)+' %</td>'
+        +'<td class="'+(Math.abs(dRozdil)<1e4?'':(dRozdil>0?'neg':'pos'))+'">'+(Math.abs(dRozdil)<1e4?'—':sgn(dRozdil,tis))+'</td></tr>';
+    });
+    st+='<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Náklady celkem</td><td>'+tis(nakladyCelk/mes)+'</td><td>'+tis(nakladyCelk)+'</td><td>100 %</td><td class="'+(nakladyCelk-(m.VARTOT+m.FIXTOT)>1e4?'neg':'pos')+'">'+sgn(nakladyCelk-(m.VARTOT+m.FIXTOT),tis)+'</td></tr>'
+      +'<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Tržby</td><td>'+tis(trz/mes)+'</td><td>'+tis(trz)+'</td><td></td><td>'+sgn(trz-m.TRZ,tis)+'</td></tr>'
+      +'<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Výsledek</td><td class="'+(res<0?'neg':'pos')+'">'+sgn(res/mes,tis)+'</td><td class="'+(res<0?'neg':'pos')+'">'+sgn(res,tis)+'</td><td></td><td class="'+(delta<0?'neg':'pos')+'">'+sgn(delta,tis)+'</td></tr>';
+    $('#cStruct').innerHTML=st+'</tbody></table>';
     const dSaz=m.TRZ*saz/100, dNaj=(naj/100)*(m.TRZ-m.VARTOT), dNafta=-(nafta-nafta0)*m.KM,
-      dMyto=-(myto-(N.myto||0))*m.KM, dMzdy=-(mzdy-(N.mzdyRidicu||0))*m.KM, dFix=-((fixp-100)/100)*m.FIXTOT;
+      dMyto=-(myto-(N.myto||0))*m.KM, dMzdy=-(mzdy-(N.mzdyRidicu||0))*m.KM, dFix=-(fixMes-m.FIXMES)*mes;
     const parts=[dSaz,dNaj,dNafta,dMyto,dMzdy,dFix];
     const combo=delta-parts.reduce((a,b)=>a+b,0);
     const all=[...parts,combo].map(v=>Math.abs(v)<1e4?0:v);   // zbytky plovoucí čárky → 0
@@ -715,8 +739,8 @@ function tabCitlivost(){
     if(!a) a=alertHtml('info','Žádný parametr zatím nevytváří významný rozdíl (hranice 0,5 mil. Kč). Posuňte některý z posuvníků.');
     $('#cAlerts').innerHTML=a;
   }
-  ['cCena','cSpotr','cMyto','cMzdy','cSaz','cNaj','cFixp'].forEach(id=>$('#'+id).addEventListener('input',upd));
-  $('#cReset').onclick=()=>{ $('#cCena').value=def.cena; $('#cSpotr').value=def.spotr; $('#cMyto').value=def.myto; $('#cMzdy').value=def.mzdy; $('#cSaz').value=0; $('#cNaj').value=0; $('#cFixp').value=100; upd(); };
+  ['cCena','cSpotr','cMyto','cMzdy','cSaz','cNaj','cFix'].forEach(id=>$('#'+id).addEventListener('input',upd));
+  $('#cReset').onclick=()=>{ $('#cCena').value=def.cena; $('#cSpotr').value=def.spotr; $('#cMyto').value=def.myto; $('#cMzdy').value=def.mzdy; $('#cSaz').value=0; $('#cNaj').value=0; $('#cFix').value=Math.round(m.FIXMES); upd(); };
   upd();
 }
 
