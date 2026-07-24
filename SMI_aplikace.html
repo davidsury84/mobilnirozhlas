@@ -425,12 +425,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="kpis" id="ffKpiStore"></div>
       <h3 class="ea-h">B) Měsíční průtok — odbavení zákazníků</h3>
       <div class="kpis" id="ffKpiFlow"></div>
-      <div class="charts" style="grid-template-columns:1fr 1fr">
-        <div class="card"><div class="spread"><h3 style="margin:0">🗂 Kategorie dle měsíčního objemu</h3></div>
-          <div class="tblwrap" style="max-height:520px"><table id="ffCatTbl"></table></div></div>
-        <div class="card"><div class="spread"><h3 style="margin:0">📦 Položky (měsíčně)</h3><input type="search" id="ffQ" placeholder="Hledat položku / kód…" style="max-width:220px"></div>
-          <div class="tblwrap" style="max-height:520px"><table id="ffItemTbl"></table></div></div>
-      </div>
+      <div class="card"><div class="spread"><h3 style="margin:0">📦 Položky (měsíčně)</h3><input type="search" id="ffQ" placeholder="Hledat položku / kód…" style="max-width:260px"></div>
+        <div class="tblwrap" style="max-height:560px"><table id="ffItemTbl" style="width:100%"></table></div></div>
+      <div class="card"><div class="spread"><h3 style="margin:0">🗂 Kategorie dle měsíčního objemu</h3></div>
+        <div class="tblwrap" style="max-height:440px"><table id="ffCatTbl" style="width:100%"></table></div></div>
       <div class="note" style="border-left-color:var(--mut)">Objem = D×Š×V (vč. obalu, kde je). „Realistická plocha" a „paletová místa" jsou odhad (závisí na stohovatelnosti a nestování). 13 % kusů jsou za posledních 12 měsíců delistované SKU — objem/hmotnost dopočteny průměrem. Profil: Ø kus <b>0,158 m³ / 8,1 kg</b> → objemné, nízkoobrátkové zboží (palety, ne balíky).</div>
     </div>
     <div class="pane" id="pane-navod">
@@ -2078,8 +2076,8 @@ function renderFulfillment(){
   function draw(flt){flt=(flt||'').toLowerCase().trim();let list=d.items;
     if(flt)list=list.filter(r=>(r[1]+' '+r[0]+' '+r[2]).toLowerCase().indexOf(flt)>=0);
     let h='<thead><tr><th>Kód</th><th>Název</th><th '+R+'>kg/ks</th><th '+R+'>m³/ks</th><th '+R+'>ks/měs</th><th '+R+'>m³/měs</th></tr></thead><tbody>';
-    list.slice(0,400).forEach(r=>{h+='<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td '+R+'>'+ffDec(r[3])+'</td><td '+R+'>'+ffDec(r[4])+'</td><td '+R+'>'+ffDec(r[5])+'</td><td '+R+'>'+ffDec(r[7])+'</td></tr>';});
-    if(list.length>400)h+='<tr><td colspan="6" class="muted">… zobrazeno prvních 400 z '+list.length+' (zúžit hledáním)</td></tr>';
+    list.forEach(r=>{h+='<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td '+R+'>'+ffDec(r[3])+'</td><td '+R+'>'+ffDec(r[4])+'</td><td '+R+'>'+ffDec(r[5])+'</td><td '+R+'>'+ffDec(r[7])+'</td></tr>';});
+    h+='<tr><td colspan="6" class="muted" style="text-align:right">Celkem '+list.length+' položek</td></tr>';
     it.innerHTML=h+'</tbody>';}
   if(it){draw('');if(q)q.oninput=()=>draw(q.value);}
 }
