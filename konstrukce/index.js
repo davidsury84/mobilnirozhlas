@@ -979,7 +979,7 @@ function mount(host) {
     else if (['obchodnik', 'sef', 'konstrukter', 'reditel', 'sef-vyroby'].includes(role)) d.roles[email] = role;
     else { json(res, 400, { chyba: 'Neplatná role.' }); return true; }
     save(d);
-    json(res, 200, { ok: true, roles: adminRolesTable(d) });
+    json(res, 200, { ok: true, roles: roleAssignments(d) });
     return true;
   }
   async function apiAdminFond(req, res) {
