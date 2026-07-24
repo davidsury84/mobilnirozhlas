@@ -50,6 +50,89 @@ let BUILD_TIME;
 try { BUILD_TIME = Number(require('fs').readFileSync(path.join(ROOT, '.build-time'), 'utf8').trim()) || 0; } catch (_) { BUILD_TIME = 0; }
 if (!BUILD_TIME) { try { BUILD_TIME = require('fs').statSync(APP_FILE).mtimeMs; } catch (_) { BUILD_TIME = Date.now(); } }
 function injectVersion(html) { return html.replace('<!--VERSION-->', '<script>window.__VER__=' + JSON.stringify({ commit: GIT_COMMIT, built: BUILD_TIME }) + ';<\/script>'); }
+// Lišta „Zobrazit jako…": při náhledu žlutý pruh s tlačítkem Ukončit, jinak pro skutečného admina plovoucí spouštěč.
+function injectViewAsUI(html, req) {
+  let bar = '';
+  if (viewAsActive(req)) {
+    const e = empSession(req) || {};
+    bar = '<div id="__va" style="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#b06f00;color:#fff;font:600 13px/1.4 Segoe UI,Arial;padding:9px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 -2px 10px rgba(0,0,0,.25)">'
+      + '<span style="font-size:16px">👁️</span><span>Prohlížíte aplikaci jako <b>' + esc(e.name || e.email) + '</b> <span style="opacity:.85">(' + esc(e.email) + ')</span></span>'
+      + '<a href="/view-as" style="color:#fff;margin-left:auto">Změnit</a>'
+      + '<button onclick="fetch(\'/api/view-as/stop\',{method:\'POST\'}).then(function(){location.href=\'/\'})" style="background:#fff;color:#8a5600;border:0;border-radius:8px;padding:6px 12px;font:inherit;font-weight:700;cursor:pointer">Ukončit náhled</button></div>';
+  } else if (isRealAdmin(req)) {
+    bar = '<a id="__valaunch" href="/view-as" title="Zobrazit aplikaci jako konkrétní zaměstnanec" style="position:fixed;right:16px;bottom:16px;z-index:2147483000;background:#0e8a43;color:#fff;font:700 13px Segoe UI,Arial;padding:9px 13px;border-radius:22px;text-decoration:none;box-shadow:0 3px 12px rgba(0,0,0,.25)">👤 Zobrazit jako…</a>';
+  }
+  if (!bar) return html;
+  const i = html.lastIndexOf('</body>');   // pozor: HTML má </body> i uvnitř JS template stringů → injektujeme před POSLEDNÍ
+  return i < 0 ? html + bar : html.slice(0, i) + bar + html.slice(i);
+}
+const VIEW_AS_PAGE = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Zobrazit jako zaměstnanec</title>
+<style>
+:root{--g:#0e8a43;--g2:#0a6b34;--ink:#1c2320;--mut:#6b736c;--line:#e3e7e0;--bg:#eef1ec}
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:760px;margin:0 auto;padding:24px 18px 60px}
+h1{font-size:22px;margin:6px 0 4px}.sub{color:var(--mut);font-size:14px;margin:0 0 18px}
+.now{background:#fff6e6;border:1px solid #f0d79a;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:none;align-items:center;gap:12px;flex-wrap:wrap}
+.now b{color:#8a5600}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.search{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font:inherit;margin-bottom:12px}
+.emp{display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid #eef1ec;cursor:pointer;border-radius:8px}
+.emp:hover{background:#f2f6f0}
+.av{width:34px;height:34px;border-radius:50%;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto;font-size:14px}
+.nm{font-weight:700}.em{color:var(--mut);font-size:12.5px}
+.tag{font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px;background:#eef1ec;color:#55605a;margin-left:6px}
+.tag.adm{background:#e9d8f5;color:#6a1b9a}
+.btn{border:0;border-radius:10px;padding:9px 15px;font:inherit;font-weight:700;cursor:pointer;background:var(--g);color:#fff}
+.btn:hover{background:var(--g2)}.btn.ghost{background:#eef1ec;color:#33513f}
+.right{margin-left:auto}.muted{color:var(--mut)}a{color:var(--g2)}
+</style></head><body><div class="wrap">
+<p style="margin:0"><a href="/">&larr; Zpět na intranet</a></p>
+<h1>👤 Zobrazit jako zaměstnanec</h1>
+<p class="sub">Prohlédněte si aplikaci přesně tak, jak ji vidí konkrétní člověk — jeho dlaždice, moduly a oprávnění. Náhled je jen pro čtení vaší strany; kdykoli ho ukončíte.</p>
+<div class="now" id="now"></div>
+<div class="card">
+  <input class="search" id="q" placeholder="Hledat jméno nebo e-mail…" autocomplete="off">
+  <div id="list"><p class="muted">Načítám zaměstnance…</p></div>
+</div></div>
+<script>
+var EMPS=[];
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function initials(n){n=(n||'').trim();if(!n)return '?';var p=n.split(/\\s+/);return ((p[0]||'')[0]||'')+((p[1]||'')[0]||'')||n[0]}
+function load(){
+  fetch('/api/me',{cache:'no-store'}).then(function(r){return r.json()}).then(function(me){
+    var now=document.getElementById('now');
+    if(me&&me.viewAs&&me.employee){
+      now.style.display='flex';
+      now.innerHTML='<span style="font-size:18px">👁️</span><span>Právě prohlížíte jako <b>'+esc(me.employee.name||me.employee.email)+'</b> <span class="muted">('+esc(me.employee.email)+')</span></span>'+
+        '<button class="btn ghost right" onclick="stop()">Ukončit náhled</button>';
+    } else { now.style.display='none'; }
+  });
+  fetch('/api/view-as/employees',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
+    EMPS=(j&&j.employees)||[]; renderList();
+  }).catch(function(){document.getElementById('list').innerHTML='<p class="muted">Nepodařilo se načíst seznam.</p>'});
+}
+function renderList(){
+  var q=(document.getElementById('q').value||'').toLowerCase().trim();
+  var rows=EMPS.filter(function(e){return !q||(e.name||'').toLowerCase().indexOf(q)>=0||(e.email||'').toLowerCase().indexOf(q)>=0});
+  var el=document.getElementById('list');
+  if(!rows.length){el.innerHTML='<p class="muted">Nikdo neodpovídá hledání.</p>';return}
+  el.innerHTML=rows.map(function(e){
+    return '<div class="emp" onclick="viewAs(\\''+esc(e.email).replace(/'/g,"\\\\'")+'\\')">'+
+      '<div class="av">'+esc(initials(e.name).toUpperCase())+'</div>'+
+      '<div><div class="nm">'+esc(e.name||e.email)+(e.admin?'<span class="tag adm">admin</span>':'')+(e.modules?'<span class="tag">'+e.modules+' modulů</span>':'')+'</div><div class="em">'+esc(e.email)+'</div></div>'+
+      '<button class="btn right" onclick="event.stopPropagation();viewAs(\\''+esc(e.email).replace(/'/g,"\\\\'")+'\\')">Zobrazit jako</button></div>';
+  }).join('');
+}
+function viewAs(email){
+  fetch('/api/view-as',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email})}).then(function(r){return r.json()}).then(function(j){
+    if(!j||!j.ok){alert((j&&j.error)||'Nepodařilo se přepnout.');return}
+    location.href='/';
+  });
+}
+function stop(){fetch('/api/view-as/stop',{method:'POST'}).then(function(){location.reload()})}
+document.getElementById('q').addEventListener('input',renderList);
+load();
+</script></body></html>`;
 const SMI_APP_FILE = path.join(ROOT, 'SMI_aplikace.html');   // hotová SMI aplikace (modul E-shop)
 const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu Kalkulace-lisy (napojí se později)
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
@@ -235,7 +318,7 @@ const SUPERADMIN = (process.env.SUPERADMIN || 'david.sury@elkoplast.cz').toLower
 function isAdminEmp(email) { email = (email || '').toLowerCase(); if (!email) return false; if (email === SUPERADMIN) return true; const s = readJson(STATE_F, { employees: [] }); const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email); return !!(e && e.admin); }
 function isSuperadmin(req) { const e = empSession(req); return !!(e && (e.email || '').toLowerCase() === SUPERADMIN); }
 // Admin = heslo (záloha) NEBO přihlášený zaměstnanec se superadmin/admin rolí
-function isAdmin(req) { if (isAuthed(req)) return true; const e = empSession(req); return !!(e && isAdminEmp(e.email)); }
+function isAdmin(req) { if (viewAsActive(req)) { const e = empSession(req); return !!(e && isAdminEmp(e.email)); } if (isAuthed(req)) return true; const e = empSession(req); return !!(e && isAdminEmp(e.email)); }
 
 /* ---------- Sdílená „závora" celého webu (aby intranet nebyl veřejný) ----------
    Aktivní jen když je nastavené SITE_PASSWORD. Dokud návštěvník nezadá toto heslo,
@@ -296,7 +379,20 @@ function empVerify(str) { if (!str) return null; const i = str.lastIndexOf('.');
    Slouží jako podepsaný „kdo to je" v odkazu ?i=... — server osobu pozná, aniž se hlásí. */
 function inviteSign(email, name) { const data = b64url(JSON.stringify({ e: (email || '').toLowerCase(), n: name || '' })); const sig = crypto.createHmac('sha256', SEC.secret).update('inv:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
 function inviteVerify(str) { if (!str) return null; const i = str.lastIndexOf('.'); if (i < 0) return null; const data = str.slice(0, i), sig = str.slice(i + 1); const exp = crypto.createHmac('sha256', SEC.secret).update('inv:' + data).digest('hex').slice(0, 32); if (sig !== exp) return null; try { const o = JSON.parse(b64urlDecode(data)); return o && o.e ? o : null; } catch (_) { return null; } }
-function empSession(req) { return empVerify(cookieVal(req, 'sm_emp')); }
+function empSessionReal(req) { return empVerify(cookieVal(req, 'sm_emp')); }
+function findEmployeeByEmail(email) { email = (email || '').toLowerCase(); if (!email) return null; const s = readJson(STATE_F, { employees: [] }); return (s.employees || []).find(x => (x.email || '').toLowerCase() === email) || null; }
+/* ---------- „Zobrazit jako zaměstnanec" — impersonace pro admina (náhled aplikace jeho očima) ----------
+   Cookie sm_view_as = podepsaný e-mail cílového zaměstnance. Ctí se JEN když je žadatel skutečný admin.
+   Během náhledu vrací empSession() impersonovaného zaměstnance → všechny moduly renderují jeho pohled,
+   isAdmin() je odvozen od impersonované identity (takže admin vidí i to, co běžný člověk nevidí). */
+function viewAsSign(email) { const data = b64url(JSON.stringify({ e: (email || '').toLowerCase(), t: Date.now() })); const sig = crypto.createHmac('sha256', SEC.secret).update('viewas:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
+function viewAsVerify(str) { if (!str) return null; const i = str.lastIndexOf('.'); if (i < 0) return null; const data = str.slice(0, i), sig = str.slice(i + 1); const exp = crypto.createHmac('sha256', SEC.secret).update('viewas:' + data).digest('hex').slice(0, 32); if (sig !== exp) return null; try { const o = JSON.parse(b64urlDecode(data)); return o && o.e ? o.e : null; } catch (_) { return null; } }
+// Skutečný admin (ignoruje impersonaci) — jen ten smí náhled zapnout/vypnout.
+function isRealAdmin(req) { if (isAuthed(req)) return true; const e = empSessionReal(req); return !!(e && isAdminEmp(e.email)); }
+// Impersonovaný zaměstnanec, je-li aktivní platná view-as cookie a žadatel je skutečný admin; jinak null.
+function viewAsEmp(req) { const raw = cookieVal(req, 'sm_view_as'); if (!raw) return null; const va = viewAsVerify(raw); if (!va) return null; if (!isRealAdmin(req)) return null; const real = ((empSessionReal(req) || {}).email || '').toLowerCase(); if (va.toLowerCase() === real) return null; return findEmployeeByEmail(va); }
+function viewAsActive(req) { return !!viewAsEmp(req); }
+function empSession(req) { const imp = viewAsEmp(req); if (imp) return { email: imp.email, name: imp.name || imp.email, _viewAs: true }; return empSessionReal(req); }
 /* ---------- SSO do externích aplikací (nabídkový kalkulátor) ---------- */
 // Token = b64url(JSON{email,name,exp}) + "." + HMAC-SHA256("sso:"+data, SEC.secret)[0..32]. Krátká platnost.
 const SSO_SHARED_SECRET = process.env.SSO_SHARED_SECRET || SEC.secret; // nastav stejně jako INTRANET_SSO_SECRET v nabídkové app
@@ -1731,7 +1827,7 @@ const server = http.createServer(async (req, res) => {
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
     if (p === '/' || p === '/index.html' || p === '/admin' || p === '/admin/') {
       if (!fs.existsSync(APP_FILE)) return send(res, 404, '<h1>Chybí seznameni-se-smernicemi.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, injectVersion(fs.readFileSync(APP_FILE, 'utf8')), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, injectViewAsUI(injectVersion(fs.readFileSync(APP_FILE, 'utf8')), req), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/grit' || p === '/grit.html') {
       if (!fs.existsSync(GRIT_FILE)) return send(res, 404, '<h1>Chybí grit.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
@@ -1748,6 +1844,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/koncept' || p === '/koncept.html') {
       if (!fs.existsSync(KONCEPT_FILE)) return send(res, 404, '<h1>Chybí intranet-koncept.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(KONCEPT_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    // „Zobrazit jako zaměstnanec" — výběrová stránka pro skutečného admina.
+    if (p === '/view-as') {
+      if (!isRealAdmin(req)) return send(res, 403, '<!doctype html><meta charset="utf-8"><body style="font:15px Segoe UI,Arial;padding:40px;color:#333">Tato stránka je jen pro správce. <a href="/">Zpět na intranet</a></body>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, VIEW_AS_PAGE, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     // Veřejná klientská kalkulačka překladiště (lead-gen; bez přihlášení) — vč. příjmu leadu.
     if (p === '/preklad' || p === '/preklad.html') {
@@ -1994,7 +2095,27 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
-    if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req) }); }
+    if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); const ra = empSessionReal(req); const va = viewAsActive(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req), realAdmin: isRealAdmin(req), viewAs: va, real: (va && ra) ? { email: ra.email, name: ra.name } : (va ? { email: '', name: 'Správce' } : null) }); }
+    // ---- „Zobrazit jako zaměstnanec" (impersonace, jen skutečný admin) ----
+    if (p === '/api/view-as/employees' && req.method === 'GET') {
+      if (!isRealAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const s = readJson(STATE_F, { employees: [] });
+      const list = (s.employees || []).map(x => ({ email: x.email, name: x.name || x.email, admin: !!x.admin, modules: Array.isArray(x.modules) ? x.modules.length : 0 }))
+        .filter(x => x.email).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'));
+      return send(res, 200, { employees: list });
+    }
+    if (p === '/api/view-as' && req.method === 'POST') {
+      if (!isRealAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
+      const target = findEmployeeByEmail(b.email);
+      if (!target) return send(res, 400, { error: 'Zaměstnanec nenalezen.' });
+      const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
+      try { logActivity('view-as', empSessionReal(req) || { email: '', name: 'Správce' }, 'náhled jako ' + target.email); } catch (_) {}
+      return send(res, 200, { ok: true, email: target.email, name: target.name || target.email }, { 'Set-Cookie': 'sm_view_as=' + encodeURIComponent(viewAsSign(target.email)) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400' + secure });
+    }
+    if (p === '/api/view-as/stop' && req.method === 'POST') {
+      return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_view_as=; Path=/; Max-Age=0' });
+    }
     // ---- SSO do nabídkového kalkulátoru: přihlášený zaměstnanec → redirect s krátkodobým tokenem ----
     if (p === '/sso/nabidky') {
       const e = empSession(req);
@@ -2410,7 +2531,7 @@ const server = http.createServer(async (req, res) => {
         return res.end();
       } catch (e) { return send(res, 400, '<h1>Přihlášení selhalo</h1><p>' + esc(e.message) + '</p><p><a href="/">Zpět</a></p>', { 'Content-Type': 'text/html; charset=utf-8' }); }
     }
-    if (p === '/auth/logout') { res.writeHead(302, { 'Set-Cookie': 'sm_emp=; Path=/; Max-Age=0', 'Location': '/' }); return res.end(); }
+    if (p === '/auth/logout') { res.writeHead(302, { 'Set-Cookie': ['sm_emp=; Path=/; Max-Age=0', 'sm_view_as=; Path=/; Max-Age=0'], 'Location': '/' }); return res.end(); }
 
     // ---- ABROLL školení (interaktivní): za přihlášením (zaměstnanec nebo správce) ----
     if (p === '/abroll-app') {
