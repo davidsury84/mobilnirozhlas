@@ -61,7 +61,7 @@ const DOTAZNIK_ABROLL = [
   { title: 'Doplňky', fields: [
     { k: 'dvojiteZavirani', label: 'Dvojité zavírání', std: 'ne', opce: 'ano' },
     { k: 'zhustkeNosniky', label: 'Zhuštěné nosníky podlahy', std: 'ne', opce: 'ano 60×60×4' },
-    { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano / počet výztuh' },
+    { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano', opceVstup: { placeholder: 'počet výztuh', unit: 'ks', num: true } },
     { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
   ] },
 ];
@@ -1002,7 +1002,7 @@ function mount(host) {
       title: String(sec.title || '').slice(0, 80),
       fields: (Array.isArray(sec.fields) ? sec.fields : []).slice(0, 60).map(f => {
         const o = { k: String(f.k || '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 40), label: String(f.label || '').slice(0, 120) };
-        if (f.std !== undefined) { o.std = String(f.std || '').slice(0, 200); o.opce = String(f.opce || '').slice(0, 200); }
+        if (f.std !== undefined) { o.std = String(f.std || '').slice(0, 200); o.opce = String(f.opce || '').slice(0, 200); if (f.opceVstup && typeof f.opceVstup === 'object') o.opceVstup = { placeholder: String(f.opceVstup.placeholder || '').slice(0, 60), unit: String(f.opceVstup.unit || '').slice(0, 20), num: !!f.opceVstup.num }; }
         else o.type = f.type === 'number' ? 'number' : 'text';
         return o;
       }).filter(f => f.k && f.label),

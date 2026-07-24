@@ -159,7 +159,10 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .ral-pick::-moz-color-swatch{border:none;border-radius:5px}
 .ral-cur{font-size:13px}
 .dq2-req{margin-top:4px}
-@media(max-width:640px){.dqhg{grid-template-columns:1fr}.dq2{grid-template-columns:1fr;gap:3px}.dq2 input.txt,.dq2-req{grid-column:1}}
+.dq2-optwrap{grid-column:2;display:flex;align-items:center;gap:7px;margin-top:4px}
+.dq2-opt{width:120px;padding:7px 10px;font-size:13.5px;border:1px solid var(--line);border-radius:8px}
+.dq2-unit{font-size:12.5px;color:var(--mut);font-weight:600}
+@media(max-width:640px){.dqhg{grid-template-columns:1fr}.dq2{grid-template-columns:1fr;gap:3px}.dq2 input.txt,.dq2-req,.dq2-optwrap{grid-column:1}}
 .dq-hint{font-size:11.5px;color:var(--mut);margin-top:2px}
 @media(max-width:600px){.dq{grid-template-columns:1fr}.dqview{grid-template-columns:1fr}}
 .ok{color:var(--g);font-size:13px;margin-top:8px}
@@ -770,7 +773,7 @@ function dotaznikView(z){
     var rows='';
     (sec.fields||[]).forEach(function(f){
       var a=z.dotaznik[f.k];if(a==null)return;
-      if(typeof a==='object'){var bd=a.volba==='standard'?'s':(a.volba==='opce'?'o':'p');var bl=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek');rows+='<b>'+esc(f.label)+'</b><span>'+esc(a.hodnota)+' <span class="bd '+bd+'">'+bl+'</span></span>';}
+      if(typeof a==='object'){var bd=a.volba==='standard'?'s':(a.volba==='opce'?'o':'p');var bl=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek');var disp=a.hodnota||'';if(a.detail){var u=(f.opceVstup&&f.opceVstup.unit)?(' '+f.opceVstup.unit):'';disp+=(disp?' · ':'')+a.detail+u;}rows+='<b>'+esc(f.label)+'</b><span>'+esc(disp)+' <span class="bd '+bd+'">'+bl+'</span></span>';}
       else rows+='<b>'+esc(f.label)+'</b><span>'+esc(a)+'</span>';
     });
     if(rows)h+='<div class="dqsec" style="margin-top:10px">'+esc(sec.title)+'</div><div class="dqview">'+rows+'</div>';
@@ -1044,7 +1047,7 @@ function val(id){return (document.getElementById(id)||{}).value||'';}
 function collectDot(){
   var t=curType(),dot={};
   (t.dotaznik||[]).forEach(function(sec){(sec.fields||[]).forEach(function(f){
-    if(f.std!==undefined){var volba=selVolba(f.k);if(volba==='pozadavek'){var rv=val('dqr_'+f.k);if(rv.trim())dot[f.k]={volba:'pozadavek',hodnota:rv.trim()};}else dot[f.k]={volba:volba};}
+    if(f.std!==undefined){var volba=selVolba(f.k);if(volba==='pozadavek'){var rv=val('dqr_'+f.k);if(rv.trim())dot[f.k]={volba:'pozadavek',hodnota:rv.trim()};}else if(volba==='opce'){var od=val('dqo_'+f.k);dot[f.k]=(od&&od.trim())?{volba:'opce',detail:od.trim()}:{volba:'opce'};}else dot[f.k]={volba:volba};}
     else{var v=val('dq_'+f.k);if(v.trim())dot[f.k]=v.trim();}
   })});
   return dot;
@@ -1104,7 +1107,11 @@ function ralMark(k){
 }
 function selVolba(k){var s=document.querySelector('.dq2[data-k="'+k+'"] .seg.sel');return s?s.getAttribute('data-v'):'standard';}
 function seg(k,v,tag,label,cur){return '<button type="button" class="seg'+(cur===v?' sel':'')+'" data-v="'+v+'" onclick="segClick(this)"><span class="st">'+tag+'</span>'+esc(label||'—')+'</button>';}
-function segClick(el){var grp=el.parentNode;grp.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});el.classList.add('sel');var row=el.closest('.dq2');var req=row.querySelector('.dq2-req');if(req){if(el.getAttribute('data-v')==='pozadavek'){req.style.display='';req.focus();}else req.style.display='none';}}
+function segClick(el){var row=el.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});el.classList.add('sel');var v=el.getAttribute('data-v');
+  var req=row.querySelector('.dq2-req');if(req)req.style.display=(v==='pozadavek'?'':'none');
+  var ow=row.querySelector('.dq2-optwrap');if(ow)ow.style.display=(v==='opce'?'':'none');
+  if(v==='pozadavek'&&req)req.focus(); else if(v==='opce'&&ow){var oi=ow.querySelector('.dq2-opt');if(oi)oi.focus();}}
+function segSelect(inp,v){var row=inp.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});var b=row.querySelector('.seg[data-v='+v+']');if(b)b.classList.add('sel');}
 function renderDotaznik(){
   var t=curType(),pf=DQ_PREFILL||{},np=0;
   var h='';
@@ -1115,13 +1122,14 @@ function renderDotaznik(){
         var a=pf[f.k];
         if(f.std!==undefined){
           np++;
-          var vol=(a&&a.volba)||'standard', rq=(a&&a.volba==='pozadavek')?(a.hodnota||''):'';
+          var vol=(a&&a.volba)||'standard', rq=(a&&a.volba==='pozadavek')?(a.hodnota||''):'', oc=(a&&a.detail!=null)?a.detail:'';
+          var optInp=f.opceVstup?('<div class="dq2-optwrap" id="dqow_'+f.k+'" style="'+(vol==='opce'?'':'display:none')+'"><input class="dq2-opt" id="dqo_'+f.k+'" '+(f.opceVstup.num?'type="number" min="0" inputmode="numeric"':'')+' value="'+esc(oc)+'" placeholder="'+esc(tr(f.opceVstup.placeholder||''))+'" oninput="segSelect(this,\'opce\')">'+(f.opceVstup.unit?'<span class="dq2-unit">'+esc(f.opceVstup.unit)+'</span>':'')+'</div>'):'';
           h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg">'+
             seg(f.k,'standard','std',tr(f.std),vol)+
             (f.opce?seg(f.k,'opce','opt',tr(f.opce),vol):'')+
             seg(f.k,'pozadavek','✎',tr('vlastní'),vol)+
-            '</div>'+
-            '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="var g=this.closest(\'.dq2\');g.querySelectorAll(\'.seg\').forEach(function(s){s.classList.remove(\'sel\')});g.querySelector(\'.seg[data-v=pozadavek]\').classList.add(\'sel\')"></div>';
+            '</div>'+optInp+
+            '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
         } else if(f.type==='adresa'){
           h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg" style="flex-direction:column;align-items:stretch;gap:2px;position:relative">'+
             '<input id="dq_'+f.k+'" class="txt" autocomplete="off" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('začněte psát adresu…'))+'" oninput="adrLookup(this)" onfocus="adrLookup(this)" onblur="setTimeout(adrClose,180)">'+
@@ -1154,7 +1162,8 @@ function createZak(){
       if(f.std!==undefined){
         var volba=selVolba(f.k);
         var hodnota=volba==='standard'?f.std:(volba==='opce'?f.opce:((document.getElementById('dqr_'+f.k)||{}).value||''));
-        if(hodnota&&String(hodnota).trim())dot[f.k]={volba:volba,hodnota:String(hodnota).trim()};
+        if(hodnota&&String(hodnota).trim()){dot[f.k]={volba:volba,hodnota:String(hodnota).trim()};
+          if(volba==='opce'&&f.opceVstup){var od=(document.getElementById('dqo_'+f.k)||{}).value||'';if(od.trim())dot[f.k].detail=od.trim();}}
       }else{var v=(document.getElementById('dq_'+f.k)||{}).value||'';if(v.trim())dot[f.k]=v.trim();}
     })});
   }else{
