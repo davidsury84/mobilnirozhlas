@@ -355,8 +355,10 @@ function mount(host) {
     if (!z.deadline || !z.stepStartedAt) return 'green';
     const now = Date.now();
     if (now > z.deadline) return 'red';
-    const total = z.deadline - z.stepStartedAt;
-    const elapsed = now - z.stepStartedAt;
+    // Okno pro „blíží se" počítáme od bodu 0 (zadání), u revize od začátku kroku.
+    const base = z.stav === 'revize' ? z.stepStartedAt : (z.createdAt || z.stepStartedAt);
+    const total = z.deadline - base;
+    const elapsed = now - base;
     if (total > 0 && elapsed >= WARN_FRAC * total) return 'amber';
     // zbývá poslední pracovní den → oranžová
     if (businessDaysBetween(now, z.deadline) <= 1) return 'amber';
@@ -381,13 +383,22 @@ function mount(host) {
     z.stav = stav;
     z.stepStartedAt = Date.now();
     const t = typeOf(d, z.typKey);
-    const dayMap = {
+    // Lhůty kroků jsou OFFSETY od bodu 0 (zadání = z.createdAt) — dny se NESČÍTAJÍ.
+    // Termín kroku = zadání + N prac. dní; stejné N u dvou kroků = stejné datum.
+    const bod0 = z.createdAt || z.stepStartedAt;
+    const offsetMap = {
       novy: t.lhutaPrideleniDays, prace: t.lhutaZkresleniDays, kontrola: t.lhutaKontrolaDays,
-      obchodnik: t.lhutaObchodnikDays, klient: t.lhutaKlientDays, revize: t.lhutaRevizeDays,
+      obchodnik: t.lhutaObchodnikDays, klient: t.lhutaKlientDays,
       vyroba: t.lhutaVyrobaDays, stredisko: t.lhutaStrediskoDays,
     };
-    const days = dayMap[stav];
-    z.deadline = days ? addBusinessDays(Date.now(), days) : null;
+    if (stav === 'revize') {
+      // Revize = iterační přepracování (v2, v3…) bez pevného ukotvení k bodu 0 → lhůta běží od začátku kroku.
+      const rd = t.lhutaRevizeDays;
+      z.deadline = rd ? addBusinessDays(z.stepStartedAt, rd) : null;
+    } else {
+      const off = offsetMap[stav];
+      z.deadline = off ? addBusinessDays(bod0, off) : null;
+    }
     // vyčistíme eskalační příznaky pro nový krok
     z.esc = { key: stav + ':' + (z.versions.length || 0) };
   }
@@ -615,7 +626,8 @@ function mount(host) {
     // kontrola realizovatelnosti požadovaného termínu (aprox z výchozích lhůt)
     let warn = null;
     if (z.pozadovanyTermin) {
-      const internalDays = (t.lhutaPrideleniDays + t.lhutaZkresleniDays + (t.internalCheck ? t.lhutaKontrolaDays : 0) + t.lhutaObchodnikDays);
+      // Lhůty jsou offsety od zadání → interně hotovo = nejzazší z interních kroků (ne součet).
+      const internalDays = Math.max(t.lhutaPrideleniDays || 0, t.lhutaZkresleniDays || 0, (t.internalCheck ? (t.lhutaKontrolaDays || 0) : 0), t.lhutaObchodnikDays || 0);
       const earliest = addBusinessDays(now, internalDays);
       if (new Date(z.pozadovanyTermin + 'T23:59:59Z').getTime() < earliest) warn = 'Pozor: požadovaný termín je při výchozích lhůtách (interně ~' + internalDays + ' prac. dnů) nereálný ještě před reakcí klienta.';
     }
@@ -1238,9 +1250,10 @@ function mount(host) {
 
       if (!z.deadline) continue;
       const resp = responsibleEmail(z);
-      // --- 80 % lhůty (oranžová, app-notifikace odpovědné osobě) ---
-      if (z.stepStartedAt && z.deadline > z.stepStartedAt) {
-        const frac = (now - z.stepStartedAt) / (z.deadline - z.stepStartedAt);
+      // --- blíží se termín (oranžová, app-notifikace odpovědné osobě) — okno od bodu 0 (zadání) ---
+      const warnBase = z.stav === 'revize' ? z.stepStartedAt : (z.createdAt || z.stepStartedAt);
+      if (warnBase && z.deadline > warnBase) {
+        const frac = (now - warnBase) / (z.deadline - warnBase);
         if (frac >= warnFrac && now < z.deadline && !z.esc.warned80) {
           z.esc.warned80 = true; changed = true;
           if (resp) notify(d, resp, 'Blíží se termín kroku „' + st.label + '" u ' + z.cislo + ' (do ' + fmtDate(z.deadline) + ').', z.id);

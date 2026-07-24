@@ -200,6 +200,7 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .wf .node .t{font-weight:800;font-size:14px}
 .wf .node .m{font-size:12px;opacity:.92;margin-top:3px}
 .wf .node .m .wfd{width:44px;padding:2px 4px;border:0;border-radius:5px;font:inherit;font-weight:700;text-align:center;background:rgba(255,255,255,.92);color:#22302a}
+.wf-explain{background:#eef6f0;border:1px solid #bfe6cd;border-radius:10px;padding:9px 12px;font-size:12.5px;color:#2f5c40;margin:2px 0 12px;line-height:1.45}
 .wf .arw{display:flex;align-items:center;color:#b6bfb7;font-size:20px;font-weight:700}
 .wf .branch{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;background:#fff;color:#3a4a41;min-width:150px;font-size:12.5px}
 /* Ganttův timeline SET-UP (cílové doby fází) */
@@ -582,8 +583,8 @@ function renderWorkflow(m){
   // pole dne: buď editovatelný input (edit), nebo prostý text
   function dfld(field,val,unit){
     var v=(val==null?'':val);
-    if(edit)return '<input class="wfd" data-f="'+field+'" type="number" min="0" value="'+v+'" onclick="event.stopPropagation()"> '+esc(unit||'prac. dní');
-    return '<b>'+esc(v===''?'?':v)+'</b> '+esc(unit||'prac. dní');
+    if(edit)return '<input class="wfd" data-f="'+field+'" type="number" min="0" value="'+v+'" onclick="event.stopPropagation()"> '+esc(unit||'prac. dní od zadání');
+    return '<b>'+esc(v===''?'?':v)+'</b> '+esc(unit||'prac. dní od zadání');
   }
   function node(role,title,pre,field,val,unit,post){
     var mid=field?(esc(pre?pre+' · ':'')+dfld(field,val,unit)+esc(post?' · '+post:'')):esc(pre||'');
@@ -600,16 +601,16 @@ function renderWorkflow(m){
   var flow='<div class="wf">'+
     node('obch','1 · Zadání','obchodník · požadavek')+arw()+
     node('sef','2 · Přidělení','šéf konstrukce','lhutaPrideleniDays',t.lhutaPrideleniDays)+arw()+
-    node('kon','3 · Zkreslení','konstruktér','lhutaZkresleniDays',t.lhutaZkresleniDays,'prac. dní','PDF + CAD')+arw()+
+    node('kon','3 · Zkreslení','konstruktér','lhutaZkresleniDays',t.lhutaZkresleniDays,null,'PDF + CAD')+arw()+
     node('sef','4 · Interní kontrola','šéf konstrukce','lhutaKontrolaDays',t.lhutaKontrolaDays)+arw()+
     node('obch','5 · Potvrzení','obchodník','lhutaObchodnikDays',t.lhutaObchodnikDays)+arw()+
-    node('kli','6 · Veřejný náhled','reakce klienta','lhutaKlientDays',t.lhutaKlientDays,'prac. dní','odkaz '+(t.linkValidDays==null?30:t.linkValidDays)+' dnů')+arw()+
+    node('kli','6 · Veřejný náhled','reakce klienta','lhutaKlientDays',t.lhutaKlientDays,null,'odkaz '+(t.linkValidDays==null?30:t.linkValidDays)+' dnů')+arw()+
     node('kli','7 · Schválení','klient schválí výkres')+arw()+
     node('vyr','8 · Předání do výroby','šéf výroby','lhutaVyrobaDays',t.lhutaVyrobaDays)+arw()+
     node('vyr','9 · Výroba v oblasti','výrobní ředitel','lhutaStrediskoDays',t.lhutaStrediskoDays)+arw()+
     node('sys','10 · Vyrobeno','hotovo · archiv')+'</div>';
   var revMeta=edit
-    ?('Klient pošle připomínky → nová verze (v2, v3…), zpět na konstruktéra na '+dfld('lhutaRevizeDays',t.lhutaRevizeDays)+', znovu kontrola a schválení. Původní odkaz se deaktivuje.')
+    ?('Klient pošle připomínky → nová verze (v2, v3…), zpět na konstruktéra na '+dfld('lhutaRevizeDays',t.lhutaRevizeDays,'prac. dní od zahájení revize')+', znovu kontrola a schválení. Původní odkaz se deaktivuje.')
     :('Klient pošle připomínky → nová verze (v2, v3…), zpět na konstruktéra ('+(t.lhutaRevizeDays==null?'?':t.lhutaRevizeDays)+' prac. dní), znovu kontrola a schválení. Původní odkaz se deaktivuje.');
   var branches='<div class="two" style="margin-top:16px">'+
     '<div class="branch"><b>↩ Revize</b><div class="muted" style="margin-top:4px">'+revMeta+'</div></div>'+
@@ -624,12 +625,13 @@ function renderWorkflow(m){
       '<span class="muted">Lhůty pro typ výrobku:</span>'+
       '<select id="wfType" onchange="WF_TYPE=this.value;render()" style="max-width:280px">'+opts+'</select>'+
       '<button class="btn sm" onclick="saveWorkflowDays()">Uložit lhůty kroků</button>'+
-      '<span class="muted" style="font-size:12px">Počet <b>pracovních dní</b>, za který má být krok hotový.</span></div>';
+      '<span class="muted" style="font-size:12px">Počet <b>pracovních dní od zadání</b>, do kdy má být krok hotový (nesčítá se).</span></div>';
   }
+  var explain='<div class="wf-explain">🕒 Čísla udávají, <b>za kolik pracovních dní od zadání (bod 0)</b> má být krok hotový — dny se <b>nesčítají</b>. Stejné číslo u dvou kroků = <b>stejné datum</b>, takže je lze koordinovat. Krok 1 (Zadání) = bod 0; 0 = bez termínu. Revize běží od svého zahájení.</div>';
   var note=edit
-    ?'<p class="muted" style="margin-top:14px">Změny se projeví u <b>nově zakládaných</b> zakázek daného typu; běžící zakázky si drží svůj termín (lze upravit tlačítkem „Změnit termín" v detailu). Plné šipky = standardní tok, přerušované rámečky = vratky a zvláštní stavy.</p>'
+    ?'<p class="muted" style="margin-top:14px">Termín každého kroku = <b>datum zadání + zadaný počet prac. dní</b> (offset od bodu 0), takže se dny nesčítají a víc kroků může padnout na stejné datum. Změny se projeví u <b>nově zakládaných</b> zakázek daného typu; běžící zakázky si drží svůj termín (lze upravit tlačítkem „Změnit termín" v detailu). Plné šipky = standardní tok, přerušované rámečky = vratky a zvláštní stavy.</p>'
     :'<p class="muted" style="margin-top:14px">Lhůty kroků nastavuje šéf konstrukce / admin. Plné šipky = standardní tok, přerušované rámečky = vratky a zvláštní stavy. U každé zakázky vidíte její aktuální pozici v detailu nahoře.</p>';
-  m.innerHTML='<div class="head"><h2>Postup zpracování výkresu</h2></div>'+legend+picker+
+  m.innerHTML='<div class="head"><h2>Postup zpracování výkresu</h2></div>'+legend+picker+explain+
     '<div class="card" style="overflow-x:auto">'+flow+'</div>'+
     '<div class="sec">Vratky a zvláštní stavy</div>'+branches+note;
 }
