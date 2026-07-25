@@ -332,16 +332,53 @@ function mount(host) {
     d.notif.unshift({ id: 'n' + crypto.randomBytes(5).toString('hex'), email: email.toLowerCase(), text, zakId: zakId || null, at: Date.now(), read: false });
     if (d.notif.length > 500) d.notif.length = 500;
   }
-  async function mail(to, subject, text) {
+  async function mail(to, subject, text, html) {
     if (!to || !host.deliver || !host.mailFrom || !host.mailFrom.user) return;
     try {
-      await host.deliver({ to, fromAddr: host.mailFrom.user, fromName: host.mailFrom.name || 'Intranet – konstrukce', subject, text, html: mailHtml(text) });
+      await host.deliver({ to, fromAddr: host.mailFrom.user, fromName: host.mailFrom.name || 'Intranet – konstrukce', subject, text, html: html || mailHtml(text) });
     } catch (e) { console.warn('[konstrukce] e-mail se nepodařilo odeslat (' + to + '): ' + e.message); }
   }
   function mailHtml(text) {
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:15px;color:#233;line-height:1.55">' +
       esc(text).replace(/\n/g, '<br>') + '</div>';
+  }
+  // České skloňování + barevný „odznak" dnů v prodlení (čím déle, tím výraznější).
+  function sklonDni(n) { n = Math.abs(Number(n) || 0); if (n === 1) return 'den'; if (n >= 2 && n <= 4) return 'dny'; return 'dní'; }
+  function sklonZakazek(n) { n = Math.abs(Number(n) || 0); if (n === 1) return 'zakázka'; if (n >= 2 && n <= 4) return 'zakázky'; return 'zakázek'; }
+  function dnyBadge(dny) {
+    let bg = '#fef9c3', fg = '#a16207'; // 1–2 dny žlutá
+    if (dny >= 7) { bg = '#fee2e2'; fg = '#b91c1c'; }      // ≥7 červená
+    else if (dny >= 3) { bg = '#ffedd5'; fg = '#c2410c'; } // 3–6 oranžová
+    return '<span style="display:inline-block;min-width:30px;text-align:center;padding:3px 11px;border-radius:999px;background:' + bg + ';color:' + fg + ';font-weight:700;font-size:13px;white-space:nowrap">' + dny + ' ' + sklonDni(dny) + '</span>';
+  }
+  // Bohatý HTML souhrn zpožděných zakázek pro ředitele. `rows` už mají _krok/_termin/_kdo/_dny.
+  function digestHtml(rows, today) {
+    const e = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const max = rows.reduce((m, r) => Math.max(m, r._dny), 0);
+    const th = (h, center) => '<th style="padding:9px 12px;text-align:' + (center ? 'center' : 'left') + ';font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;border-bottom:2px solid #e2e8f0">' + h + '</th>';
+    const body = rows.map((z, i) => {
+      const bg = i % 2 ? '#f8fafc' : '#ffffff';
+      const td = (v, extra) => '<td style="padding:9px 12px;border-bottom:1px solid #eef1f4;' + (extra || 'color:#334155') + '">' + v + '</td>';
+      return '<tr style="background:' + bg + '">' +
+        td('<strong style="color:#0f172a">' + e(z.cislo) + '</strong>') +
+        td(e(z.zakaznik)) +
+        td(e(z._krok)) +
+        td(e(z._termin), 'color:#64748b;white-space:nowrap') +
+        td(dnyBadge(z._dny), 'text-align:center') +
+        td(e(z._kdo)) + '</tr>';
+    }).join('');
+    return '<div style="font-family:Segoe UI,Arial,sans-serif;background:#f1f5f9;padding:24px 12px">' +
+      '<div style="max-width:660px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0">' +
+      '<div style="background:#0f172a;padding:18px 24px">' +
+      '<div style="color:#fff;font-size:17px;font-weight:700">⚠&nbsp; Zpožděné zakázky konstrukce</div>' +
+      '<div style="color:#94a3b8;font-size:13px;margin-top:3px">Stav k ' + e(today) + ' · ' + rows.length + '&nbsp;' + sklonZakazek(rows.length) + ' po termínu · nejdéle ' + max + '&nbsp;' + sklonDni(max) + '</div>' +
+      '</div>' +
+      '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:14px">' +
+      '<thead><tr style="background:#f8fafc">' + th('Zakázka') + th('Zákazník') + th('Krok') + th('Termín byl') + th('V prodlení', true) + th('Odpovídá') + '</tr></thead>' +
+      '<tbody>' + body + '</tbody></table>' +
+      '<div style="padding:13px 24px;background:#fff;border-top:1px solid #eef1f4;color:#94a3b8;font-size:12px">Automatický denní souhrn · intranet, modul Konstrukce</div>' +
+      '</div></div>';
   }
 
   // ---- odvozené hodnoty (semafor, na tahu) ---------------------------------
@@ -1285,9 +1322,18 @@ function mount(host) {
       const today = fmtDate(now);
       if (readyForDigest.length && d._lastDirectorDigest !== today) {
         d._lastDirectorDigest = today; changed = true;
-        const lines = readyForDigest.map(z => '• ' + z.cislo + ' (' + z.zakaznik + ') — „' + STAV[z.stav].label + '", termín byl ' + fmtDate(z.deadline) + ', odpovídá ' + (empName(responsibleEmail(z)) || '—')).join('\n');
-        const text = 'Přehled zpožděných zakázek konstrukce k ' + today + ':\n\n' + lines;
-        employeesWithRole('reditel').forEach(em => { notify(d, em, readyForDigest.length + ' zpožděných zakázek konstrukce.', null); mail(em, 'Zpožděné zakázky konstrukce · ' + today, text); });
+        // Doplníme vypočtené hodnoty (dny v prodlení) a seřadíme nejzpožděnější nahoru.
+        const rows = readyForDigest.map(z => ({
+          cislo: z.cislo, zakaznik: z.zakaznik,
+          _krok: (STAV[z.stav] && STAV[z.stav].label) || z.stav,
+          _termin: fmtDate(z.deadline),
+          _kdo: empName(responsibleEmail(z)) || '—',
+          _dny: Math.max(1, Math.floor((now - z.deadline) / 86400000)),
+        })).sort((a, b) => b._dny - a._dny);
+        const lines = rows.map(z => '• ' + z.cislo + ' (' + z.zakaznik + ') — „' + z._krok + '", termín byl ' + z._termin + ' → ' + z._dny + ' ' + sklonDni(z._dny) + ' po termínu, odpovídá ' + z._kdo).join('\n');
+        const text = 'Přehled zpožděných zakázek konstrukce k ' + today + ' (' + rows.length + ' ' + sklonZakazek(rows.length) + ', nejdéle ' + rows[0]._dny + ' ' + sklonDni(rows[0]._dny) + '):\n\n' + lines;
+        const html = digestHtml(rows, today);
+        employeesWithRole('reditel').forEach(em => { notify(d, em, readyForDigest.length + ' zpožděných zakázek konstrukce.', null); mail(em, 'Zpožděné zakázky konstrukce · ' + today, text, html); });
       }
     }
 
