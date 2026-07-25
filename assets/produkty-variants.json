@@ -1,0 +1,2904 @@
+{
+ "abroll": [
+  {
+   "name": "ABR ACTS",
+   "spec": "",
+   "img": "/assets/pv-abroll-00-abr-acts.jpg",
+   "gallery": [
+    "/assets/pv-abroll-00-abr-acts.jpg",
+    "/assets/pv-abroll-00-abr-acts-1.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 2,
+   "more": 0
+  },
+  {
+   "name": "ABR AFO (švédsko Hamo)",
+   "spec": "",
+   "img": null,
+   "gallery": [],
+   "nPhoto": 0,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "ABR AFS (LENAERTS)",
+   "spec": "",
+   "img": "/assets/pv-abroll-02-abr-afs-lenaerts.jpg",
+   "gallery": [
+    "/assets/pv-abroll-02-abr-afs-lenaerts.jpg",
+    "/assets/pv-abroll-02-abr-afs-lenaerts-1.jpg",
+    "/assets/pv-abroll-02-abr-afs-lenaerts-2.jpg",
+    "/assets/pv-abroll-02-abr-afs-lenaerts-3.jpg",
+    "/assets/pv-abroll-02-abr-afs-lenaerts-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 5,
+   "more": 0
+  },
+  {
+   "name": "ABR AFS (VANHEEDEE)",
+   "spec": "",
+   "img": "/assets/pv-abroll-03-abr-afs-vanheedee.jpg",
+   "gallery": [
+    "/assets/pv-abroll-03-abr-afs-vanheedee.jpg",
+    "/assets/pv-abroll-03-abr-afs-vanheedee-1.jpg",
+    "/assets/pv-abroll-03-abr-afs-vanheedee-2.jpg",
+    "/assets/pv-abroll-03-abr-afs-vanheedee-3.jpg",
+    "/assets/pv-abroll-03-abr-afs-vanheedee-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 5,
+   "more": 0
+  },
+  {
+   "name": "ABR AFS (francouzske)",
+   "spec": "",
+   "img": "/assets/pv-abroll-04-abr-afs-francouzske.jpg",
+   "gallery": [
+    "/assets/pv-abroll-04-abr-afs-francouzske.jpg",
+    "/assets/pv-abroll-04-abr-afs-francouzske-1.jpg",
+    "/assets/pv-abroll-04-abr-afs-francouzske-2.jpg",
+    "/assets/pv-abroll-04-abr-afs-francouzske-3.jpg",
+    "/assets/pv-abroll-04-abr-afs-francouzske-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 87,
+   "more": 82
+  },
+  {
+   "name": "ABR ALST",
+   "spec": "",
+   "img": "/assets/pv-abroll-05-abr-alst.jpg",
+   "gallery": [
+    "/assets/pv-abroll-05-abr-alst.jpg",
+    "/assets/pv-abroll-05-abr-alst-1.jpg",
+    "/assets/pv-abroll-05-abr-alst-2.jpg",
+    "/assets/pv-abroll-05-abr-alst-3.jpg",
+    "/assets/pv-abroll-05-abr-alst-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 16,
+   "more": 11
+  },
+  {
+   "name": "ABR BS",
+   "spec": "",
+   "img": "/assets/pv-abroll-06-abr-bs.jpg",
+   "gallery": [
+    "/assets/pv-abroll-06-abr-bs.jpg",
+    "/assets/pv-abroll-06-abr-bs-1.jpg",
+    "/assets/pv-abroll-06-abr-bs-2.jpg",
+    "/assets/pv-abroll-06-abr-bs-3.jpg",
+    "/assets/pv-abroll-06-abr-bs-4.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 4,
+   "more": 0
+  },
+  {
+   "name": "ABR DSD",
+   "spec": "",
+   "img": "/assets/pv-abroll-07-abr-dsd.jpg",
+   "gallery": [
+    "/assets/pv-abroll-07-abr-dsd.jpg",
+    "/assets/pv-abroll-07-abr-dsd-1.jpg",
+    "/assets/pv-abroll-07-abr-dsd-2.jpg",
+    "/assets/pv-abroll-07-abr-dsd-3.jpg",
+    "/assets/pv-abroll-07-abr-dsd-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 30,
+   "more": 25
+  },
+  {
+   "name": "ABR ECL (bezvýztuhové)",
+   "spec": "",
+   "img": "/assets/pv-abroll-08-abr-ecl-bezvyztuhove.jpg",
+   "gallery": [
+    "/assets/pv-abroll-08-abr-ecl-bezvyztuhove.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "ABR HBI (hardox šroťaři)",
+   "spec": "",
+   "img": "/assets/pv-abroll-09-abr-hbi-hardox-srotari.jpg",
+   "gallery": [
+    "/assets/pv-abroll-09-abr-hbi-hardox-srotari.jpg",
+    "/assets/pv-abroll-09-abr-hbi-hardox-srotari-1.jpg",
+    "/assets/pv-abroll-09-abr-hbi-hardox-srotari-2.jpg",
+    "/assets/pv-abroll-09-abr-hbi-hardox-srotari-3.jpg",
+    "/assets/pv-abroll-09-abr-hbi-hardox-srotari-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 14,
+   "more": 9
+  },
+  {
+   "name": "ABR HBS (halbshal muldy)",
+   "spec": "",
+   "img": "/assets/pv-abroll-10-abr-hbs-halbshal-muldy.jpg",
+   "gallery": [
+    "/assets/pv-abroll-10-abr-hbs-halbshal-muldy.jpg",
+    "/assets/pv-abroll-10-abr-hbs-halbshal-muldy-1.jpg",
+    "/assets/pv-abroll-10-abr-hbs-halbshal-muldy-2.jpg",
+    "/assets/pv-abroll-10-abr-hbs-halbshal-muldy-3.jpg",
+    "/assets/pv-abroll-10-abr-hbs-halbshal-muldy-4.jpg"
+   ],
+   "nPhoto": 9,
+   "nPdf": 5,
+   "more": 9
+  },
+  {
+   "name": "ABR HDC (hardox GTS)",
+   "spec": "",
+   "img": "/assets/pv-abroll-11-abr-hdc-hardox-gts.jpg",
+   "gallery": [
+    "/assets/pv-abroll-11-abr-hdc-hardox-gts.jpg",
+    "/assets/pv-abroll-11-abr-hdc-hardox-gts-1.jpg"
+   ],
+   "nPhoto": 2,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "ABR HM (hausmull s víky)",
+   "spec": "",
+   "img": "/assets/pv-abroll-12-abr-hm-hausmull-s-viky.jpg",
+   "gallery": [
+    "/assets/pv-abroll-12-abr-hm-hausmull-s-viky.jpg",
+    "/assets/pv-abroll-12-abr-hm-hausmull-s-viky-1.jpg"
+   ],
+   "nPhoto": 2,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "ABR LWC",
+   "spec": "",
+   "img": "/assets/pv-abroll-13-abr-lwc.jpg",
+   "gallery": [
+    "/assets/pv-abroll-13-abr-lwc.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "ABR NL",
+   "spec": "",
+   "img": "/assets/pv-abroll-14-abr-nl.jpg",
+   "gallery": [
+    "/assets/pv-abroll-14-abr-nl.jpg",
+    "/assets/pv-abroll-14-abr-nl-1.jpg"
+   ],
+   "nPhoto": 2,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "ABR PREZERO DE",
+   "spec": "",
+   "img": "/assets/pv-abroll-15-abr-prezero-de.jpg",
+   "gallery": [
+    "/assets/pv-abroll-15-abr-prezero-de.jpg",
+    "/assets/pv-abroll-15-abr-prezero-de-1.jpg",
+    "/assets/pv-abroll-15-abr-prezero-de-2.jpg",
+    "/assets/pv-abroll-15-abr-prezero-de-3.jpg",
+    "/assets/pv-abroll-15-abr-prezero-de-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 29,
+   "more": 24
+  },
+  {
+   "name": "ABR PT (plata)",
+   "spec": "",
+   "img": "/assets/pv-abroll-16-abr-pt-plata.jpg",
+   "gallery": [
+    "/assets/pv-abroll-16-abr-pt-plata.jpg",
+    "/assets/pv-abroll-16-abr-pt-plata-1.jpg",
+    "/assets/pv-abroll-16-abr-pt-plata-2.jpg",
+    "/assets/pv-abroll-16-abr-pt-plata-3.jpg",
+    "/assets/pv-abroll-16-abr-pt-plata-4.jpg"
+   ],
+   "nPhoto": 8,
+   "nPdf": 0,
+   "more": 3
+  },
+  {
+   "name": "ABR RAM",
+   "spec": "",
+   "img": null,
+   "gallery": [],
+   "nPhoto": 0,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "ABR REMONDIS",
+   "spec": "",
+   "img": "/assets/pv-abroll-18-abr-remondis.jpg",
+   "gallery": [
+    "/assets/pv-abroll-18-abr-remondis.jpg",
+    "/assets/pv-abroll-18-abr-remondis-1.jpg",
+    "/assets/pv-abroll-18-abr-remondis-2.jpg",
+    "/assets/pv-abroll-18-abr-remondis-3.jpg",
+    "/assets/pv-abroll-18-abr-remondis-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 9,
+   "more": 4
+  },
+  {
+   "name": "ABR STH (stohovatelne)",
+   "spec": "",
+   "img": "/assets/pv-abroll-19-abr-sth-stohovatelne.jpg",
+   "gallery": [
+    "/assets/pv-abroll-19-abr-sth-stohovatelne.jpg",
+    "/assets/pv-abroll-19-abr-sth-stohovatelne-1.jpg",
+    "/assets/pv-abroll-19-abr-sth-stohovatelne-2.jpg",
+    "/assets/pv-abroll-19-abr-sth-stohovatelne-3.jpg",
+    "/assets/pv-abroll-19-abr-sth-stohovatelne-4.jpg"
+   ],
+   "nPhoto": 10,
+   "nPdf": 8,
+   "more": 13
+  },
+  {
+   "name": "ABR SUEZ",
+   "spec": "",
+   "img": "/assets/pv-abroll-20-abr-suez.jpg",
+   "gallery": [
+    "/assets/pv-abroll-20-abr-suez.jpg",
+    "/assets/pv-abroll-20-abr-suez-1.jpg",
+    "/assets/pv-abroll-20-abr-suez-2.jpg",
+    "/assets/pv-abroll-20-abr-suez-3.jpg",
+    "/assets/pv-abroll-20-abr-suez-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 29,
+   "more": 24
+  },
+  {
+   "name": "ABR TH (thermocont)",
+   "spec": "",
+   "img": null,
+   "gallery": [],
+   "nPhoto": 0,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "ABR WD (bezvýztuh DIN)",
+   "spec": "",
+   "img": "/assets/pv-abroll-22-abr-wd-bezvyztuh-din.jpg",
+   "gallery": [
+    "/assets/pv-abroll-22-abr-wd-bezvyztuh-din.jpg",
+    "/assets/pv-abroll-22-abr-wd-bezvyztuh-din-1.jpg",
+    "/assets/pv-abroll-22-abr-wd-bezvyztuh-din-2.jpg",
+    "/assets/pv-abroll-22-abr-wd-bezvyztuh-din-3.jpg",
+    "/assets/pv-abroll-22-abr-wd-bezvyztuh-din-4.jpg"
+   ],
+   "nPhoto": 140,
+   "nPdf": 2,
+   "more": 137
+  },
+  {
+   "name": "ABR WF (bezvýztuh Afnor)",
+   "spec": "",
+   "img": "/assets/pv-abroll-23-abr-wf-bezvyztuh-afnor.jpg",
+   "gallery": [
+    "/assets/pv-abroll-23-abr-wf-bezvyztuh-afnor.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CITY CSD (ceske)",
+   "spec": "",
+   "img": "/assets/pv-abroll-24-city-csd-ceske.jpg",
+   "gallery": [
+    "/assets/pv-abroll-24-city-csd-ceske.jpg",
+    "/assets/pv-abroll-24-city-csd-ceske-1.jpg",
+    "/assets/pv-abroll-24-city-csd-ceske-2.jpg",
+    "/assets/pv-abroll-24-city-csd-ceske-3.jpg",
+    "/assets/pv-abroll-24-city-csd-ceske-4.jpg"
+   ],
+   "nPhoto": 41,
+   "nPdf": 91,
+   "more": 127
+  },
+  {
+   "name": "CITY DSD (DIN)",
+   "spec": "",
+   "img": "/assets/pv-abroll-25-city-dsd-din.jpg",
+   "gallery": [
+    "/assets/pv-abroll-25-city-dsd-din.jpg",
+    "/assets/pv-abroll-25-city-dsd-din-1.jpg",
+    "/assets/pv-abroll-25-city-dsd-din-2.jpg",
+    "/assets/pv-abroll-25-city-dsd-din-3.jpg",
+    "/assets/pv-abroll-25-city-dsd-din-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 39,
+   "more": 34
+  },
+  {
+   "name": "CITY POP (popelničák)",
+   "spec": "",
+   "img": "/assets/pv-abroll-26-city-pop-popelnicak.jpg",
+   "gallery": [
+    "/assets/pv-abroll-26-city-pop-popelnicak.jpg",
+    "/assets/pv-abroll-26-city-pop-popelnicak-1.jpg",
+    "/assets/pv-abroll-26-city-pop-popelnicak-2.jpg",
+    "/assets/pv-abroll-26-city-pop-popelnicak-3.jpg",
+    "/assets/pv-abroll-26-city-pop-popelnicak-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 5,
+   "more": 0
+  },
+  {
+   "name": "CITY RAM",
+   "spec": "",
+   "img": "/assets/pv-abroll-27-city-ram.jpg",
+   "gallery": [
+    "/assets/pv-abroll-27-city-ram.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CITY WDC",
+   "spec": "",
+   "img": "/assets/pv-abroll-28-city-wdc.jpg",
+   "gallery": [
+    "/assets/pv-abroll-28-city-wdc.jpg",
+    "/assets/pv-abroll-28-city-wdc-1.jpg",
+    "/assets/pv-abroll-28-city-wdc-2.jpg",
+    "/assets/pv-abroll-28-city-wdc-3.jpg",
+    "/assets/pv-abroll-28-city-wdc-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 21,
+   "more": 16
+  },
+  {
+   "name": "CITY WDG (ala Gotzen)",
+   "spec": "",
+   "img": "/assets/pv-abroll-29-city-wdg-ala-gotzen.jpg",
+   "gallery": [
+    "/assets/pv-abroll-29-city-wdg-ala-gotzen.jpg",
+    "/assets/pv-abroll-29-city-wdg-ala-gotzen-1.jpg",
+    "/assets/pv-abroll-29-city-wdg-ala-gotzen-2.jpg",
+    "/assets/pv-abroll-29-city-wdg-ala-gotzen-3.jpg",
+    "/assets/pv-abroll-29-city-wdg-ala-gotzen-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 24,
+   "more": 19
+  },
+  {
+   "name": "CITY-SÍT´",
+   "spec": "",
+   "img": "/assets/pv-abroll-30-city-sit.jpg",
+   "gallery": [
+    "/assets/pv-abroll-30-city-sit.jpg",
+    "/assets/pv-abroll-30-city-sit-1.jpg",
+    "/assets/pv-abroll-30-city-sit-2.jpg",
+    "/assets/pv-abroll-30-city-sit-3.jpg",
+    "/assets/pv-abroll-30-city-sit-4.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 8,
+   "more": 3
+  },
+  {
+   "name": "CITY-WFR",
+   "spec": "",
+   "img": "/assets/pv-abroll-31-city-wfr.jpg",
+   "gallery": [
+    "/assets/pv-abroll-31-city-wfr.jpg",
+    "/assets/pv-abroll-31-city-wfr-1.jpg",
+    "/assets/pv-abroll-31-city-wfr-2.jpg",
+    "/assets/pv-abroll-31-city-wfr-3.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 4,
+   "more": 0
+  }
+ ],
+ "asp": [
+  {
+   "name": "ASP-1500",
+   "spec": "",
+   "img": "/assets/pv-asp-00-asp-1500.jpg",
+   "gallery": [
+    "/assets/pv-asp-00-asp-1500.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "ASP-600",
+   "spec": "",
+   "img": "/assets/pv-asp-01-asp-600.jpg",
+   "gallery": [
+    "/assets/pv-asp-01-asp-600.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "ASP-600-LITHIUM",
+   "spec": "",
+   "img": "/assets/pv-asp-02-asp-600-lithium.jpg",
+   "gallery": [
+    "/assets/pv-asp-02-asp-600-lithium.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "ASP-800",
+   "spec": "",
+   "img": "/assets/pv-asp-03-asp-800.jpg",
+   "gallery": [
+    "/assets/pv-asp-03-asp-800.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "bdf-platforms": [
+  {
+   "name": "Fotografie",
+   "spec": "",
+   "img": "/assets/pv-bdf-platforms-00-fotografie.jpg",
+   "gallery": [
+    "/assets/pv-bdf-platforms-00-fotografie.jpg",
+    "/assets/pv-bdf-platforms-00-fotografie-1.jpg",
+    "/assets/pv-bdf-platforms-00-fotografie-2.jpg",
+    "/assets/pv-bdf-platforms-00-fotografie-3.jpg",
+    "/assets/pv-bdf-platforms-00-fotografie-4.jpg"
+   ],
+   "nPhoto": 19,
+   "nPdf": 0,
+   "more": 14
+  },
+  {
+   "name": "BDF-Wechselbrücke",
+   "spec": "",
+   "img": "/assets/pv-bdf-platforms-01-bdf-wechselbr-cke.jpg",
+   "gallery": [
+    "/assets/pv-bdf-platforms-01-bdf-wechselbr-cke.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "cla-1100": [
+  {
+   "name": "CLA 1100",
+   "spec": "",
+   "img": null,
+   "gallery": [],
+   "nPhoto": 0,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "CLA 1100 SKB",
+   "spec": "",
+   "img": null,
+   "gallery": [],
+   "nPhoto": 0,
+   "nPdf": 0,
+   "more": 0
+  }
+ ],
+ "flachmulden": [
+  {
+   "name": "FLM1-CH_",
+   "spec": "",
+   "img": "/assets/pv-flachmulden-00-flm1-ch.jpg",
+   "gallery": [
+    "/assets/pv-flachmulden-00-flm1-ch.jpg",
+    "/assets/pv-flachmulden-00-flm1-ch-1.jpg",
+    "/assets/pv-flachmulden-00-flm1-ch-2.jpg",
+    "/assets/pv-flachmulden-00-flm1-ch-3.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 4,
+   "more": 0
+  },
+  {
+   "name": "FLM2-CH_",
+   "spec": "",
+   "img": null,
+   "gallery": [],
+   "nPhoto": 0,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "FLMD-CH_",
+   "spec": "",
+   "img": null,
+   "gallery": [],
+   "nPhoto": 0,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "FLMK1-CH_",
+   "spec": "",
+   "img": "/assets/pv-flachmulden-03-flmk1-ch.jpg",
+   "gallery": [
+    "/assets/pv-flachmulden-03-flmk1-ch.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "FLMK2-CH_",
+   "spec": "",
+   "img": null,
+   "gallery": [],
+   "nPhoto": 0,
+   "nPdf": 0,
+   "more": 0
+  }
+ ],
+ "flat-glass": [
+  {
+   "name": "Fotografie",
+   "spec": "",
+   "img": "/assets/pv-flat-glass-00-fotografie.jpg",
+   "gallery": [
+    "/assets/pv-flat-glass-00-fotografie.jpg",
+    "/assets/pv-flat-glass-00-fotografie-1.jpg",
+    "/assets/pv-flat-glass-00-fotografie-2.jpg",
+    "/assets/pv-flat-glass-00-fotografie-3.jpg",
+    "/assets/pv-flat-glass-00-fotografie-4.jpg"
+   ],
+   "nPhoto": 8,
+   "nPdf": 0,
+   "more": 3
+  },
+  {
+   "name": "BS-2000x990x990-KONTEJNER",
+   "spec": "2000×990×990 mm",
+   "img": "/assets/pv-flat-glass-01-bs-2000x990x990-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-flat-glass-01-bs-2000x990x990-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "geesink": [
+  {
+   "name": "GSK-1000",
+   "spec": "",
+   "img": "/assets/pv-geesink-00-gsk-1000.jpg",
+   "gallery": [
+    "/assets/pv-geesink-00-gsk-1000.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "GSK-1300",
+   "spec": "",
+   "img": "/assets/pv-geesink-01-gsk-1300.jpg",
+   "gallery": [
+    "/assets/pv-geesink-01-gsk-1300.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "GSK-1600",
+   "spec": "",
+   "img": "/assets/pv-geesink-02-gsk-1600.jpg",
+   "gallery": [
+    "/assets/pv-geesink-02-gsk-1600.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "kps": [
+  {
+   "name": "KPS-2000x1400x700-43",
+   "spec": "2000×1400×700 mm",
+   "img": "/assets/pv-kps-00-kps-2000x1400x700-43.jpg",
+   "gallery": [
+    "/assets/pv-kps-00-kps-2000x1400x700-43.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "KPS-2000x990x990-43",
+   "spec": "2000×990×990 mm",
+   "img": "/assets/pv-kps-01-kps-2000x990x990-43.jpg",
+   "gallery": [
+    "/assets/pv-kps-01-kps-2000x990x990-43.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "lsb": [
+  {
+   "name": "LSB 02.40_LacNam",
+   "spec": "",
+   "img": "/assets/pv-lsb-00-lsb-02-40-lacnam.jpg",
+   "gallery": [
+    "/assets/pv-lsb-00-lsb-02-40-lacnam.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "LSB 02.40_LacNam_SB",
+   "spec": "",
+   "img": "/assets/pv-lsb-01-lsb-02-40-lacnam-sb.jpg",
+   "gallery": [
+    "/assets/pv-lsb-01-lsb-02-40-lacnam-sb.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "LSB 03.20_LacNam",
+   "spec": "",
+   "img": "/assets/pv-lsb-02-lsb-03-20-lacnam.jpg",
+   "gallery": [
+    "/assets/pv-lsb-02-lsb-03-20-lacnam.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "LSB 04.00_LacNam",
+   "spec": "",
+   "img": "/assets/pv-lsb-03-lsb-04-00-lacnam.jpg",
+   "gallery": [
+    "/assets/pv-lsb-03-lsb-04-00-lacnam.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "LSB 05.00_LacNam",
+   "spec": "",
+   "img": "/assets/pv-lsb-04-lsb-05-00-lacnam.jpg",
+   "gallery": [
+    "/assets/pv-lsb-04-lsb-05-00-lacnam.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "mgb-1100-fl": [
+  {
+   "name": "MGB-1100-FLH",
+   "spec": "",
+   "img": "/assets/pv-mgb-1100-fl-00-mgb-1100-flh.jpg",
+   "gallery": [
+    "/assets/pv-mgb-1100-fl-00-mgb-1100-flh.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "mgb-800-ch": [],
+ "skips-muldy": [
+  {
+   "name": "CH: -FLM-CH-17,6-533",
+   "spec": "17,6 m³",
+   "img": "/assets/pv-skips-muldy-00-ch-flm-ch-17-6-533.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-00-ch-flm-ch-17-6-533.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: AM-CH-11,0-644",
+   "spec": "11,0 m³",
+   "img": "/assets/pv-skips-muldy-01-ch-am-ch-11-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-01-ch-am-ch-11-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: AM-CH-6,7-534",
+   "spec": "6,7 m³",
+   "img": "/assets/pv-skips-muldy-02-ch-am-ch-6-7-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-02-ch-am-ch-6-7-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: AM-CH-11,0-655-MULDA",
+   "spec": "11,0 m³",
+   "img": "/assets/pv-skips-muldy-03-ch-am-ch-11-0-655-mulda.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-03-ch-am-ch-11-0-655-mulda.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: AM-CH-9,5-644-",
+   "spec": "9,5 m³",
+   "img": "/assets/pv-skips-muldy-04-ch-am-ch-9-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-04-ch-am-ch-9-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: ASM-CH-11,8-644-",
+   "spec": "11,8 m³",
+   "img": "/assets/pv-skips-muldy-05-ch-asm-ch-11-8-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-05-ch-asm-ch-11-8-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: ASM-CH-9,8-644- MULDA",
+   "spec": "9,8 m³",
+   "img": "/assets/pv-skips-muldy-06-ch-asm-ch-9-8-644-mulda.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-06-ch-asm-ch-9-8-644-mulda.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMA-CH 10.54-01-00 MULDA",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-07-ch-dma-ch-10-54-01-00-mulda.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-07-ch-dma-ch-10-54-01-00-mulda.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMA-CH 6.54-01-00 MULDA",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-08-ch-dma-ch-6-54-01-00-mulda.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-08-ch-dma-ch-6-54-01-00-mulda.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-10,0-534",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-09-ch-dmc-ch-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-09-ch-dmc-ch-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-10,0-544",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-10-ch-dmc-ch-10-0-544.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-10-ch-dmc-ch-10-0-544.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-12,0-534-",
+   "spec": "12,0 m³",
+   "img": "/assets/pv-skips-muldy-11-ch-dmc-ch-12-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-11-ch-dmc-ch-12-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-12,0-544",
+   "spec": "12,0 m³",
+   "img": "/assets/pv-skips-muldy-12-ch-dmc-ch-12-0-544.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-12-ch-dmc-ch-12-0-544.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-6,3-534",
+   "spec": "6,3 m³",
+   "img": "/assets/pv-skips-muldy-13-ch-dmc-ch-6-3-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-13-ch-dmc-ch-6-3-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: SMR-CH-4,0-534",
+   "spec": "4,0 m³",
+   "img": "/assets/pv-skips-muldy-14-ch-smr-ch-4-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-14-ch-smr-ch-4-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: SMR-CH-6,0-644-",
+   "spec": "6,0 m³",
+   "img": "/assets/pv-skips-muldy-15-ch-smr-ch-6-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-15-ch-smr-ch-6-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: ASM-CH-11,8-644",
+   "spec": "11,8 m³",
+   "img": "/assets/pv-skips-muldy-16-ch-asm-ch-11-8-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-16-ch-asm-ch-11-8-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: ASM-CH-7,5-534",
+   "spec": "7,5 m³",
+   "img": "/assets/pv-skips-muldy-17-ch-asm-ch-7-5-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-17-ch-asm-ch-7-5-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: ASM-CH-9,8-644",
+   "spec": "9,8 m³",
+   "img": "/assets/pv-skips-muldy-18-ch-asm-ch-9-8-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-18-ch-asm-ch-9-8-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-10,0-534 OB NOVÉ VÍKO",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-19-ch-dmc-ch-10-0-534-ob-nove-viko.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-19-ch-dmc-ch-10-0-534-ob-nove-viko.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-10,0-534 OB STARÉ VÍKO",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-20-ch-dmc-ch-10-0-534-ob-stare-viko.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-20-ch-dmc-ch-10-0-534-ob-stare-viko.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-12,0-534 OB nové víko",
+   "spec": "12,0 m³",
+   "img": "/assets/pv-skips-muldy-21-ch-dmc-ch-12-0-534-ob-nove-viko.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-21-ch-dmc-ch-12-0-534-ob-nove-viko.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-12,0-534",
+   "spec": "12,0 m³",
+   "img": "/assets/pv-skips-muldy-22-ch-dmc-ch-12-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-22-ch-dmc-ch-12-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-12,0-544",
+   "spec": "12,0 m³",
+   "img": "/assets/pv-skips-muldy-23-ch-dmc-ch-12-0-544.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-23-ch-dmc-ch-12-0-544.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-6,3-534 OB NOVÉ VÍKO",
+   "spec": "6,3 m³",
+   "img": "/assets/pv-skips-muldy-24-ch-dmc-ch-6-3-534-ob-nove-viko.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-24-ch-dmc-ch-6-3-534-ob-nove-viko.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: DMC-CH-6,3-534 OB STARÉ VÍKO",
+   "spec": "6,3 m³",
+   "img": "/assets/pv-skips-muldy-25-ch-dmc-ch-6-3-534-ob-stare-viko.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-25-ch-dmc-ch-6-3-534-ob-stare-viko.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CH: SMR-CH-4,0-534",
+   "spec": "4,0 m³",
+   "img": "/assets/pv-skips-muldy-26-ch-smr-ch-4-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-26-ch-smr-ch-4-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: AM-CHN-6,7-534 OB CONTRACT",
+   "spec": "6,7 m³",
+   "img": "/assets/pv-skips-muldy-27-chn-am-chn-6-7-534-ob-contract.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-27-chn-am-chn-6-7-534-ob-contract.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: AM-CHN-6,7-534",
+   "spec": "6,7 m³",
+   "img": "/assets/pv-skips-muldy-28-chn-am-chn-6-7-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-28-chn-am-chn-6-7-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: AM-CHN-6,7-534-S1_vyztužení L",
+   "spec": "6,7 m³",
+   "img": "/assets/pv-skips-muldy-29-chn-am-chn-6-7-534-s1-vyztuzeni-l.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-29-chn-am-chn-6-7-534-s1-vyztuzeni-l.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: AM-CHN-9,5-534",
+   "spec": "9,5 m³",
+   "img": "/assets/pv-skips-muldy-30-chn-am-chn-9-5-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-30-chn-am-chn-9-5-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: AM-CHN-9,5-644",
+   "spec": "9,5 m³",
+   "img": "/assets/pv-skips-muldy-31-chn-am-chn-9-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-31-chn-am-chn-9-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: ASM-CHN-11,8-644 OB CONTRACT",
+   "spec": "11,8 m³",
+   "img": "/assets/pv-skips-muldy-32-chn-asm-chn-11-8-644-ob-contract.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-32-chn-asm-chn-11-8-644-ob-contract.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: ASM-CHN-11,8-644",
+   "spec": "11,8 m³",
+   "img": "/assets/pv-skips-muldy-33-chn-asm-chn-11-8-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-33-chn-asm-chn-11-8-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: ASM-CHN-7,5-534-S1",
+   "spec": "7,5 m³",
+   "img": "/assets/pv-skips-muldy-34-chn-asm-chn-7-5-534-s1.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-34-chn-asm-chn-7-5-534-s1.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: ASM-CHN-9,8-644 OB CONTRACT",
+   "spec": "9,8 m³",
+   "img": "/assets/pv-skips-muldy-35-chn-asm-chn-9-8-644-ob-contract.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-35-chn-asm-chn-9-8-644-ob-contract.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: ASM-CHN-9,8-644",
+   "spec": "9,8 m³",
+   "img": "/assets/pv-skips-muldy-36-chn-asm-chn-9-8-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-36-chn-asm-chn-9-8-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: DMC-CHN-12-534 OB CONTRACTS",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-37-chn-dmc-chn-12-534-ob-contracts.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-37-chn-dmc-chn-12-534-ob-contracts.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: DMC-CHN-12-534",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-38-chn-dmc-chn-12-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-38-chn-dmc-chn-12-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: DMC-CHN-6,3-534",
+   "spec": "6,3 m³",
+   "img": "/assets/pv-skips-muldy-39-chn-dmc-chn-6-3-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-39-chn-dmc-chn-6-3-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: DMC-CHN-6,3-534-S1_vyztužení L",
+   "spec": "6,3 m³",
+   "img": "/assets/pv-skips-muldy-40-chn-dmc-chn-6-3-534-s1-vyztuzeni-l.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-40-chn-dmc-chn-6-3-534-s1-vyztuzeni-l.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CHN: DMC-CHN-6,3-534-S2",
+   "spec": "6,3 m³",
+   "img": "/assets/pv-skips-muldy-41-chn-dmc-chn-6-3-534-s2.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-41-chn-dmc-chn-6-3-534-s2.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AM-10,0-534-S_890mm",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-42-cz-am-10-0-534-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-42-cz-am-10-0-534-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AM-10,0-644-S-890mm",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-43-cz-am-10-0-644-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-43-cz-am-10-0-644-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AM-5,5-644-K_890 mm-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-44-cz-am-5-5-644-k-890-mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-44-cz-am-5-5-644-k-890-mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AM-7,0-534-S_890mm",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-45-cz-am-7-0-534-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-45-cz-am-7-0-534-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AM-7,0-644-S_890mm",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-46-cz-am-7-0-644-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-46-cz-am-7-0-644-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AMK-10,0-534-S-890mm",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-47-cz-amk-10-0-534-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-47-cz-amk-10-0-534-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: DMS-10,0-534-S_890mm",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-48-cz-dms-10-0-534-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-48-cz-dms-10-0-534-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: DMS-7,0-533",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-49-cz-dms-7-0-533.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-49-cz-dms-7-0-533.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: DMS-7,0-534-S_890mm",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-50-cz-dms-7-0-534-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-50-cz-dms-7-0-534-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AM-10,0-534-SBL-S_890mm",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-51-cz-am-10-0-534-sbl-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-51-cz-am-10-0-534-sbl-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AM-5,5-644-SBL",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-52-cz-am-5-5-644-sbl.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-52-cz-am-5-5-644-sbl.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AM-7,0-534-SBL-S_890mm",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-53-cz-am-7-0-534-sbl-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-53-cz-am-7-0-534-sbl-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AMK-5,5-534-SBL",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-54-cz-amk-5-5-534-sbl.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-54-cz-amk-5-5-534-sbl.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: AMK-7,0-534-SBL-890mm",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-55-cz-amk-7-0-534-sbl-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-55-cz-amk-7-0-534-sbl-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: DMP-7,0-534-SBL",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-56-cz-dmp-7-0-534-sbl.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-56-cz-dmp-7-0-534-sbl.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: DMS-5,5-534-SBL",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-57-cz-dms-5-5-534-sbl.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-57-cz-dms-5-5-534-sbl.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: DMS-7,0-534-SBL",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-58-cz-dms-7-0-534-sbl.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-58-cz-dms-7-0-534-sbl.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: DMS-7,0-534-SBL-S_890mm",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-59-cz-dms-7-0-534-sbl-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-59-cz-dms-7-0-534-sbl-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: SMR-10,0-534-SBL-S_890mm",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-60-cz-smr-10-0-534-sbl-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-60-cz-smr-10-0-534-sbl-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: SMR-5,5-534-SBL",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-61-cz-smr-5-5-534-sbl.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-61-cz-smr-5-5-534-sbl.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: SMR-5,5-534-SBL-S_890mm",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-62-cz-smr-5-5-534-sbl-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-62-cz-smr-5-5-534-sbl-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: SMR-7,0-534-SBL",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-63-cz-smr-7-0-534-sbl.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-63-cz-smr-7-0-534-sbl.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: SMR-7,0-534-SBL-S_890 mm",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-64-cz-smr-7-0-534-sbl-s-890-mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-64-cz-smr-7-0-534-sbl-s-890-mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: SMR-5,5-544-S-890mm",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-65-cz-smr-5-5-544-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-65-cz-smr-5-5-544-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "CZ: SMR-7,0-534-S_890mm",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-66-cz-smr-7-0-534-s-890mm.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-66-cz-smr-7-0-534-s-890mm.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-10,0-534",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-67-din-am-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-67-din-am-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-10,0-634",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-68-din-am-10-0-634.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-68-din-am-10-0-634.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-10,0-644",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-69-din-am-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-69-din-am-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-5,5-534 DIN-GmbH",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-70-din-am-5-5-534-din-gmbh.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-70-din-am-5-5-534-din-gmbh.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-5,5-634 DIN-GmbH",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-71-din-am-5-5-634-din-gmbh.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-71-din-am-5-5-634-din-gmbh.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-5,5-644 DIN-GmbH",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-72-din-am-5-5-644-din-gmbh.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-72-din-am-5-5-644-din-gmbh.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-7,0-534",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-73-din-am-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-73-din-am-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-7,0-534+MATICE",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-74-din-am-7-0-534-matice.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-74-din-am-7-0-534-matice.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-7,0-634-",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-75-din-am-7-0-634.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-75-din-am-7-0-634.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-7,0-644",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-76-din-am-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-76-din-am-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AMK-10,0-534",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-77-din-amk-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-77-din-amk-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AMK-10,0-644",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-78-din-amk-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-78-din-amk-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AMK-5,5-644",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-79-din-amk-5-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-79-din-amk-5-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AMK-7,0-534",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-80-din-amk-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-80-din-amk-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AMK-7,0-644-",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-81-din-amk-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-81-din-amk-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: -AM-5,5-534-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-82-din-am-5-5-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-82-din-am-5-5-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: -AM-5,5-634-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-83-din-am-5-5-634.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-83-din-am-5-5-634.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM 5,5-644-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-84-din-am-5-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-84-din-am-5-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-10,0-534-",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-85-din-am-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-85-din-am-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-10,0-644-",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-86-din-am-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-86-din-am-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AM-7,0-534-",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-87-din-am-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-87-din-am-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AMK-5,5-534-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-88-din-amk-5-5-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-88-din-amk-5-5-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AMK-5,5-644-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-89-din-amk-5-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-89-din-amk-5-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: AMK-7,0-534-",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-90-din-amk-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-90-din-amk-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMC-10,0-534-",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-91-din-dmc-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-91-din-dmc-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMC-8,0-534-",
+   "spec": "8,0 m³",
+   "img": "/assets/pv-skips-muldy-92-din-dmc-8-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-92-din-dmc-8-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMP-10,0-534-",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-93-din-dmp-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-93-din-dmp-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMP-7,0-644-",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-94-din-dmp-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-94-din-dmp-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMS-7,0-534-",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-95-din-dms-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-95-din-dms-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMS-7,0-644-",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-96-din-dms-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-96-din-dms-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-10,0-534-",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-97-din-smr-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-97-din-smr-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-10,0-644-",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-98-din-smr-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-98-din-smr-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-5,5-534-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-99-din-smr-5-5-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-99-din-smr-5-5-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-5,5-644-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-100-din-smr-5-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-100-din-smr-5-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMC-10,0-534 OB NOVÉ VÍKO",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-101-din-dmc-10-0-534-ob-nove-viko.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-101-din-dmc-10-0-534-ob-nove-viko.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMC-8,0-534 OB NOVÉ VÍKO",
+   "spec": "8,0 m³",
+   "img": "/assets/pv-skips-muldy-102-din-dmc-8-0-534-ob-nove-viko.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-102-din-dmc-8-0-534-ob-nove-viko.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMP-10,0-644",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-103-din-dmp-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-103-din-dmp-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMP-5,5-534-",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-104-din-dmp-5-5-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-104-din-dmp-5-5-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMP-7,0-534",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-105-din-dmp-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-105-din-dmp-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMPM-10,0-534",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-106-din-dmpm-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-106-din-dmpm-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMPM-7,0-534",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-107-din-dmpm-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-107-din-dmpm-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMS-10,0-534",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-108-din-dms-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-108-din-dms-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMS-10,0-644",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-109-din-dms-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-109-din-dms-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMS-5,5-534",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-110-din-dms-5-5-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-110-din-dms-5-5-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: DMS-7,0-534",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-111-din-dms-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-111-din-dms-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-10,0-534",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-112-din-smr-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-112-din-smr-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-10,0-644",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-113-din-smr-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-113-din-smr-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-5,5-544",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-114-din-smr-5-5-544.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-114-din-smr-5-5-544.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-7,0-534",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-115-din-smr-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-115-din-smr-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DIN: SMR-7,0-644",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-116-din-smr-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-116-din-smr-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DMPM-DIN: -DMPM-10,0-534",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-117-dmpm-din-dmpm-10-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-117-dmpm-din-dmpm-10-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "DMPM-DIN: -DMPM-7,0-534",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-118-dmpm-din-dmpm-7-0-534.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-118-dmpm-din-dmpm-7-0-534.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "FR: -AM-FR-10,0-434",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-119-fr-am-fr-10-0-434.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-119-fr-am-fr-10-0-434.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "FR: -AM-FR-10,0-444",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-120-fr-am-fr-10-0-444.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-120-fr-am-fr-10-0-444.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "FR: -AM-FR-8,0-434",
+   "spec": "8,0 m³",
+   "img": "/assets/pv-skips-muldy-121-fr-am-fr-8-0-434.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-121-fr-am-fr-8-0-434.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "FR: -AM-FR-8,0-444",
+   "spec": "8,0 m³",
+   "img": "/assets/pv-skips-muldy-122-fr-am-fr-8-0-444.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-122-fr-am-fr-8-0-444.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "FR: -SMR-FR-5,0-444",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-skips-muldy-123-fr-smr-fr-5-0-444.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-123-fr-smr-fr-5-0-444.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "FR: AM-FR-10_OB",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-124-fr-am-fr-10-ob.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-124-fr-am-fr-10-ob.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "FR: AM-FR-8_OB",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-125-fr-am-fr-8-ob.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-125-fr-am-fr-8-ob.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NLN-3-533",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-126-nl-am-nln-3-533.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-126-nl-am-nln-3-533.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NLN-6-553",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-127-nl-am-nln-6-553.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-127-nl-am-nln-6-553.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NLN-9-553",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-128-nl-am-nln-9-553.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-128-nl-am-nln-9-553.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NL-2,2-433",
+   "spec": "2,2 m³",
+   "img": "/assets/pv-skips-muldy-129-nl-am-nl-2-2-433.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-129-nl-am-nl-2-2-433.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NL-2,2_OB",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-130-nl-am-nl-2-2-ob.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-130-nl-am-nl-2-2-ob.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NL-3,5 433",
+   "spec": "3,5 m³",
+   "img": "/assets/pv-skips-muldy-131-nl-am-nl-3-5-433.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-131-nl-am-nl-3-5-433.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NL-3,5_OB",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-132-nl-am-nl-3-5-ob.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-132-nl-am-nl-3-5-ob.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NL-4_OB",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-133-nl-am-nl-4-ob.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-133-nl-am-nl-4-ob.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: AM-NL-5_OB",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-134-nl-am-nl-5-ob.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-134-nl-am-nl-5-ob.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: KM- KUKA MULDA 10CCM_OB",
+   "spec": "",
+   "img": "/assets/pv-skips-muldy-135-nl-km-kuka-mulda-10ccm-ob.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-135-nl-km-kuka-mulda-10ccm-ob.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: KM-R-10,0-54332",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-136-nl-km-r-10-0-54332.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-136-nl-km-r-10-0-54332.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "NL: KM-RA-10,0-54332",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-137-nl-km-ra-10-0-54332.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-137-nl-km-ra-10-0-54332.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: AM-PreZero-10,0-644",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-138-prezero-am-prezero-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-138-prezero-am-prezero-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: AM-PreZero-5,5-644",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-139-prezero-am-prezero-5-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-139-prezero-am-prezero-5-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: AM-PreZero-7,0-644",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-140-prezero-am-prezero-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-140-prezero-am-prezero-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: AMK-PreZero-5,5-644",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-141-prezero-amk-prezero-5-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-141-prezero-amk-prezero-5-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: AMK-PreZero-7,0-644",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-142-prezero-amk-prezero-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-142-prezero-amk-prezero-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: DMS-PreZero-10,0-644",
+   "spec": "10,0 m³",
+   "img": "/assets/pv-skips-muldy-143-prezero-dms-prezero-10-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-143-prezero-dms-prezero-10-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: DMS-PreZero-5,5-644",
+   "spec": "5,5 m³",
+   "img": "/assets/pv-skips-muldy-144-prezero-dms-prezero-5-5-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-144-prezero-dms-prezero-5-5-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: DMS-PreZero-7,0-644",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-145-prezero-dms-prezero-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-145-prezero-dms-prezero-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: SMC-PreZero-7,0-644",
+   "spec": "7,0 m³",
+   "img": "/assets/pv-skips-muldy-146-prezero-smc-prezero-7-0-644.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-146-prezero-smc-prezero-7-0-644.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: 2.1-AM-NL-PreZero-10,0-544",
+   "spec": "2,1 m³",
+   "img": "/assets/pv-skips-muldy-147-prezero-2-1-am-nl-prezero-10-0-544.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-147-prezero-2-1-am-nl-prezero-10-0-544.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "PREZERO: 2.1-AM-NL-PreZero-6,0 544",
+   "spec": "2,1 m³",
+   "img": "/assets/pv-skips-muldy-148-prezero-2-1-am-nl-prezero-6-0-544.jpg",
+   "gallery": [
+    "/assets/pv-skips-muldy-148-prezero-2-1-am-nl-prezero-6-0-544.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "sld": [
+  {
+   "name": "Fotografie",
+   "spec": "",
+   "img": "/assets/pv-sld-00-fotografie.jpg",
+   "gallery": [
+    "/assets/pv-sld-00-fotografie.jpg",
+    "/assets/pv-sld-00-fotografie-1.jpg",
+    "/assets/pv-sld-00-fotografie-2.jpg"
+   ],
+   "nPhoto": 3,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "SLD-PM-2,5-00-00 KONTEJNER",
+   "spec": "2,5 m³",
+   "img": "/assets/pv-sld-01-sld-pm-2-5-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-01-sld-pm-2-5-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-PM-3,5-00-00 KONTEJNER",
+   "spec": "3,5 m³",
+   "img": "/assets/pv-sld-02-sld-pm-3-5-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-02-sld-pm-3-5-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-PM-3-00-00 KONTEJNER",
+   "spec": "",
+   "img": "/assets/pv-sld-03-sld-pm-3-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-03-sld-pm-3-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-PM-4-00-00 KONTEJNER",
+   "spec": "",
+   "img": "/assets/pv-sld-04-sld-pm-4-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-04-sld-pm-4-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-SM prehled typu",
+   "spec": "",
+   "img": "/assets/pv-sld-05-sld-sm-prehled-typu.jpg",
+   "gallery": [
+    "/assets/pv-sld-05-sld-sm-prehled-typu.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-SM-2,5-00-00 KONTEJNER",
+   "spec": "2,5 m³",
+   "img": "/assets/pv-sld-06-sld-sm-2-5-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-06-sld-sm-2-5-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-SM-2-00-00 KONTEJNER",
+   "spec": "",
+   "img": "/assets/pv-sld-07-sld-sm-2-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-07-sld-sm-2-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-SM-3,5-00-00 KONTEJNER",
+   "spec": "3,5 m³",
+   "img": "/assets/pv-sld-08-sld-sm-3-5-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-08-sld-sm-3-5-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-SM-3-00-00 KONTEJNER",
+   "spec": "",
+   "img": "/assets/pv-sld-09-sld-sm-3-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-09-sld-sm-3-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-SM-4-00-00 KONTEJNER",
+   "spec": "",
+   "img": "/assets/pv-sld-10-sld-sm-4-00-00-kontejner.jpg",
+   "gallery": [
+    "/assets/pv-sld-10-sld-sm-4-00-00-kontejner.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SLD-SM-NOR-3,0",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-sld-11-sld-sm-nor-3-0.jpg",
+   "gallery": [
+    "/assets/pv-sld-11-sld-sm-nor-3-0.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "su-kontejnery": [
+  {
+   "name": "SU-01.001-00 5,0-S-PA2040-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-00-su-01-001-00-5-0-s-pa2040-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-00-su-01-001-00-5-0-s-pa2040-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.002-00 5,0-M-PA2050-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-01-su-01-002-00-5-0-m-pa2050-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-01-su-01-002-00-5-0-m-pa2050-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.003-00 5,0-L-PA2060-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-02-su-01-003-00-5-0-l-pa2060-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-02-su-01-003-00-5-0-l-pa2060-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.004-00 5,0-S-DR60-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-03-su-01-004-00-5-0-s-dr60-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-03-su-01-004-00-5-0-s-dr60-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.005-00 5,0-M-DR80-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-04-su-01-005-00-5-0-m-dr80-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-04-su-01-005-00-5-0-m-dr80-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.006-00 5,0-L-DR100-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-05-su-01-006-00-5-0-l-dr100-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-05-su-01-006-00-5-0-l-dr100-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.007-00 5,0-S-GL160-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-06-su-01-007-00-5-0-s-gl160-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-06-su-01-007-00-5-0-s-gl160-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.008-00 5,0-M-GL220-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-07-su-01-008-00-5-0-m-gl220-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-07-su-01-008-00-5-0-m-gl220-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.009-00 5,0-L-GL330-2H",
+   "spec": "5,0 m³",
+   "img": "/assets/pv-su-kontejnery-08-su-01-009-00-5-0-l-gl330-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-08-su-01-009-00-5-0-l-gl330-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.010-00 3,0-S-PA2040-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-09-su-01-010-00-3-0-s-pa2040-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-09-su-01-010-00-3-0-s-pa2040-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.011-00 3,0-M-PA2050-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-10-su-01-011-00-3-0-m-pa2050-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-10-su-01-011-00-3-0-m-pa2050-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.012-00 3,0-L-PA2060-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-11-su-01-012-00-3-0-l-pa2060-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-11-su-01-012-00-3-0-l-pa2060-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.013-00 3,0-S-DR60-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-12-su-01-013-00-3-0-s-dr60-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-12-su-01-013-00-3-0-s-dr60-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.014-00 3,0-M-DR80-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-13-su-01-014-00-3-0-m-dr80-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-13-su-01-014-00-3-0-m-dr80-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.015-00 3,0-L-DR100-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-14-su-01-015-00-3-0-l-dr100-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-14-su-01-015-00-3-0-l-dr100-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.016-00 3,0-S-GL160-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-15-su-01-016-00-3-0-s-gl160-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-15-su-01-016-00-3-0-s-gl160-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.017-00 3,0-M-GL220-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-16-su-01-017-00-3-0-m-gl220-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-16-su-01-017-00-3-0-m-gl220-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "SU-01.018-00 3,0-L-GL330-2H",
+   "spec": "3,0 m³",
+   "img": "/assets/pv-su-kontejnery-17-su-01-018-00-3-0-l-gl330-2h.jpg",
+   "gallery": [
+    "/assets/pv-su-kontejnery-17-su-01-018-00-3-0-l-gl330-2h.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "sum-pallets": [
+  {
+   "name": "217L",
+   "spec": "",
+   "img": "/assets/pv-sum-pallets-00-217l.jpg",
+   "gallery": [
+    "/assets/pv-sum-pallets-00-217l.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "224L",
+   "spec": "",
+   "img": "/assets/pv-sum-pallets-01-224l.jpg",
+   "gallery": [
+    "/assets/pv-sum-pallets-01-224l.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "420L",
+   "spec": "",
+   "img": "/assets/pv-sum-pallets-02-420l.jpg",
+   "gallery": [
+    "/assets/pv-sum-pallets-02-420l.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "450L",
+   "spec": "",
+   "img": "/assets/pv-sum-pallets-03-450l.jpg",
+   "gallery": [
+    "/assets/pv-sum-pallets-03-450l.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "858L",
+   "spec": "",
+   "img": "/assets/pv-sum-pallets-04-858l.jpg",
+   "gallery": [
+    "/assets/pv-sum-pallets-04-858l.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ],
+ "usb-boxy": [
+  {
+   "name": "Fotografie",
+   "spec": "",
+   "img": "/assets/pv-usb-boxy-00-fotografie.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-00-fotografie.jpg",
+    "/assets/pv-usb-boxy-00-fotografie-1.jpg",
+    "/assets/pv-usb-boxy-00-fotografie-2.jpg",
+    "/assets/pv-usb-boxy-00-fotografie-3.jpg",
+    "/assets/pv-usb-boxy-00-fotografie-4.jpg"
+   ],
+   "nPhoto": 6,
+   "nPdf": 0,
+   "more": 1
+  },
+  {
+   "name": "-USB 150 LTH",
+   "spec": "",
+   "img": "/assets/pv-usb-boxy-01-usb-150-lth.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-01-usb-150-lth.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "-USB 20.00 2400x1200x850-333",
+   "spec": "2400×1200×850 mm",
+   "img": "/assets/pv-usb-boxy-02-usb-20-00-2400x1200x850-333.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-02-usb-20-00-2400x1200x850-333.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "OBCHODNÍ VÝKRES",
+   "spec": "",
+   "img": "/assets/pv-usb-boxy-03-obchodni-vykres.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-03-obchodni-vykres.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "STOHOVÁNÍ",
+   "spec": "",
+   "img": "/assets/pv-usb-boxy-04-stohovani.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-04-stohovani.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "USB 0,5 - 1200x600x850",
+   "spec": "1200×600×850 mm · 0,5 m³",
+   "img": "/assets/pv-usb-boxy-05-usb-0-5-1200x600x850.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-05-usb-0-5-1200x600x850.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "USB 1 - 1200x1200x850",
+   "spec": "1200×1200×850 mm",
+   "img": "/assets/pv-usb-boxy-06-usb-1-1200x1200x850.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-06-usb-1-1200x1200x850.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "USB 1,5 - 1200x1200x1200",
+   "spec": "1200×1200×1200 mm · 1,5 m³",
+   "img": "/assets/pv-usb-boxy-07-usb-1-5-1200x1200x1200.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-07-usb-1-5-1200x1200x1200.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "USB 1-1200x1200x850-22",
+   "spec": "1200×1200×850 mm",
+   "img": "/assets/pv-usb-boxy-08-usb-1-1200x1200x850-22.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-08-usb-1-1200x1200x850-22.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "USB 2 - 1200x2400x850",
+   "spec": "1200×2400×850 mm",
+   "img": "/assets/pv-usb-boxy-09-usb-2-1200x2400x850.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-09-usb-2-1200x2400x850.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  },
+  {
+   "name": "USB-1200x800x600-1,5",
+   "spec": "1200×800×600 mm · 1,5 m³",
+   "img": "/assets/pv-usb-boxy-10-usb-1200x800x600-1-5.jpg",
+   "gallery": [
+    "/assets/pv-usb-boxy-10-usb-1200x800x600-1-5.jpg"
+   ],
+   "nPhoto": 0,
+   "nPdf": 1,
+   "more": 0
+  }
+ ]
+}

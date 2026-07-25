@@ -657,6 +657,29 @@ th.ob-delcol,td.ob-delcol{width:42px;text-align:center!important}
 .prod-spec-v{font-size:14px;margin-top:3px;line-height:1.45}
 ul.prod-facts{margin:6px 0 0;padding-left:20px}
 ul.prod-facts li{margin:7px 0;line-height:1.55}
+.prod-count{margin-top:8px;font-size:12px;font-weight:700;color:var(--green-d,#2f7430);background:var(--green-soft,#eef6e8);display:inline-block;padding:3px 9px;border-radius:999px}
+/* Varianty — galerie ilustrací */
+.pv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+.pv-card{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow);display:flex;flex-direction:column}
+.pv-card.clickable{cursor:zoom-in;transition:.15s}
+.pv-card.clickable:hover{border-color:var(--line-strong);box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.pv-thumb{width:100%;height:150px;object-fit:cover;display:block;background-color:#fff;border-bottom:1px solid var(--line)}
+img.pv-thumb{background:#fff}
+.pv-thumb.pv-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--green-soft);color:var(--green-d)}
+.pv-thumb.pv-ph svg{width:34px;height:34px}
+.pv-thumb.pv-ph span{font-size:11px}
+.pv-b{padding:10px 12px}
+.pv-n{font-weight:600;font-size:13px;line-height:1.3;word-break:break-word}
+.pv-s{font-size:12px;color:var(--ink-soft);margin-top:3px}
+.pv-more{font-size:11px;color:var(--green-d);margin-top:5px;font-weight:600}
+.pv-lb{position:fixed;inset:0;z-index:9999;background:rgba(12,18,14,.86);display:none;align-items:center;justify-content:center;padding:24px}
+.pv-lb-inner{position:relative;max-width:96vw;max-height:94vh;display:flex;flex-direction:column;align-items:center}
+.pv-lb-inner img{max-width:96vw;max-height:84vh;background:#fff;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.pv-lb-cap{color:#fff;margin-top:12px;font-size:14px;font-weight:600;text-align:center;max-width:80vw}
+.pv-lb-close{position:absolute;top:-6px;right:-6px;width:40px;height:40px;border-radius:50%;border:0;background:#fff;color:#1b1f23;font-size:18px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:2}
+.pv-lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#1b1f23;font-size:30px;line-height:1;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.pv-lb-nav.prev{left:-8px}.pv-lb-nav.next{right:-8px}
+@media(max-width:620px){.pv-lb-nav.prev{left:4px}.pv-lb-nav.next{right:4px}}
 .read-shell-mj{max-width:880px;margin:0 auto}
 .ack-card{margin-top:20px;background:linear-gradient(180deg,var(--green-soft),#fff 75%);border:2px solid var(--green-2);border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow)}
 .ack-card.done{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--green-soft)}
@@ -1318,6 +1341,7 @@ const MUJ_MODS = [
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
   { grp:"Obchod" },
+  { key:"poptavky", icon:MUJ_IC.ticket, label:"Poptávky", gated:true },
   { key:"obchod", icon:MUJ_IC.users, label:"Rozdělení obchodníků", gated:true },
   { key:"reklamace", icon:MUJ_IC.shield, label:"Reklamace", gated:true },
   { key:"zadanikonstrukce", icon:MUJ_IC.file, label:"Zadání do konstrukce", gated:true },
@@ -1368,8 +1392,14 @@ async function initIntranet(){
   logoutBtn.style.display=""; side.style.display="";
   const adminBtn=document.getElementById("mujAdmin"); if(adminBtn) adminBtn.style.display = me.admin ? "" : "none";
   MUJ.email = me.employee.email; MUJ.name = me.employee.name; MUJ.admin = !!me.admin;
+  MUJ.poptavkyNew = (typeof me.poptavkyNew==="number") ? me.poptavkyNew : 0;
   await refreshMy();
   showDashboard();
+  // Živá aktualizace počtu nových poptávek (odznak v menu) — á 90 s.
+  if(!MUJ._poptavkyTimer){ MUJ._poptavkyTimer = setInterval(async function(){
+    try{ const m = await (await fetch("/api/me",{cache:"no-store"})).json();
+      if(m && typeof m.poptavkyNew==="number" && m.poptavkyNew!==MUJ.poptavkyNew){ MUJ.poptavkyNew=m.poptavkyNew; renderSidebar(); }
+    }catch(e){} }, 90000); }
 }
 async function refreshMy(){
   try{ MUJ.data = await (await fetch("/api/my",{cache:"no-store"})).json(); }
@@ -1377,7 +1407,7 @@ async function refreshMy(){
   if(!MUJ.data.library) MUJ.data.library = {folders:[],docs:[]};
   MUJ.modules = MUJ.data.modules || [];
 }
-function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
+function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="poptavky") return mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0; return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
 function mujCounts(){
   const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[]; const survs=d.surveys||[];
   return { dirs, libDocs, survs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length, survTodo:survs.filter(x=>!x.filled).length };
@@ -1385,7 +1415,7 @@ function mujCounts(){
 function plural(n,a,b,c){ return n===1?a:(n>=2&&n<=4?b:c); }
 function renderSidebar(){
   const c = mujCounts();
-  const counts = { directives:c.dirTodo, library:c.libTodo, pruzkumy:c.survTodo, dovolena:(MUJ.data&&MUJ.data.vacPending)||0 };
+  const counts = { directives:c.dirTodo, library:c.libTodo, pruzkumy:c.survTodo, dovolena:(MUJ.data&&MUJ.data.vacPending)||0, poptavky:(MUJ.poptavkyNew)||0 };
   let h='<nav class="mj-nav">'; let pendingGrp=null;
   MUJ_MODS.forEach(m=>{
     if(m.grp!==undefined){ pendingGrp=m.grp; return; }
@@ -1401,7 +1431,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="poptavky");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1475,6 +1505,7 @@ function mjGo(key){
   else if(key==="library") showLibrary(null);
   else if(key==="eshop") showEshop();
   else if(key==="kalkulace") showKalkulace();
+  else if(key==="poptavky") showPoptavky();
   else if(key==="svozesa") showSvozEsa();
   else if(key==="tridicilinka") showTridiciLinka();
   else if(key==="prekladiste") showPrekladiste();
@@ -2196,6 +2227,13 @@ function showKalkulace(){
   body.innerHTML='<iframe src="/kalkulace-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulace-lisy"></iframe>';
   window.scrollTo(0,0);
 }
+function showPoptavky(){
+  MUJ.view="poptavky"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!moduleVisible({key:"poptavky",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<iframe src="/poptavky-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Poptávky — nabídky k vyřízení"></iframe>';
+  window.scrollTo(0,0);
+}
 function showSvozEsa(){
   MUJ.view="svozesa"; renderSidebar();
   const body=document.getElementById("mujBody");
@@ -2713,7 +2751,9 @@ function showDashboard(){
   const body = document.getElementById("mujBody");
   const c = mujCounts();
   const first = (MUJ.name||"").split(" ")[0] || MUJ.name;
-  const totalTodo = c.dirTodo + c.libTodo;
+  const popVis = MUJ.admin || (MUJ.modules||[]).some(function(k){return ["kalkulace","obchod","obchodexp"].indexOf(k)>=0;});
+  const pop = popVis ? ((MUJ.poptavkyNew)||0) : 0;
+  const totalTodo = c.dirTodo + c.libTodo + pop;
   const dnesStr=new Date().toLocaleDateString("cs-CZ",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const vacPend0=(MUJ.data&&MUJ.data.vacPending)||0;
   const nMod=((MUJ.modules||[]).length)||0;
@@ -2748,6 +2788,7 @@ function showDashboard(){
   c.libDocs.filter(d=>d.requireAck && !d.acked).forEach(d=>{
     pend.push({ icon:MUJ_IC.book, t:d.title||"Dokument", sub:"Knihovna · verze "+d.v, act:'<button class="btn sm" onclick="openLibDoc(\''+d.id+'\','+d.v+')">Přečíst a potvrdit</button>' });
   });
+  if(pop>0){ pend.push({ icon:MUJ_IC.ticket, t:pop+' '+plural(pop,"nová poptávka","nové poptávky","nových poptávek"), sub:"Kalkulátor lisů · fronta k vyřízení", act:'<button class="btn sm" onclick="mjGo(\'poptavky\')">Zobrazit</button>' }); }
   // ----- Levý sloupec hubu: Aktuality + K vyřízení + Rychlý přístup + Provozy -----
   let mainH = '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>Aktuality</h3>'+
     (canPostAkt?'<button class="btn sm" type="button" onclick="aktNew()">+ Přidat</button>':'')+
@@ -3101,10 +3142,13 @@ function showProdukty(key){
   if(!PRODUKTY.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Katalog se připravuje.</p></div>'; body.innerHTML=h; window.scrollTo(0,0); return; }
   h+='<div class="prod-grid">';
   PRODUKTY.forEach(p=>{
+    const nv=((window.PRODUKTY_VARIANTS||{})[p.key]||[]).length;
     const cover = p.cover ? '<div class="prod-cover" style="background-image:url(\''+p.cover+'\')"></div>' : '<div class="prod-cover prod-cover-ph">'+mujIcon(MUJ_IC.box)+'</div>';
     h+='<div class="prod-card" onclick="showProdukty(\''+p.key+'\')">'+cover+
        '<div class="prod-body"><div class="prod-name">'+esc(p.name)+'</div>'+
-       '<div class="prod-sub">'+esc(p.shortDesc||'')+'</div></div></div>';
+       '<div class="prod-sub">'+esc(p.shortDesc||'')+'</div>'+
+       (nv?'<div class="prod-count">'+nv+' '+plural(nv,'varianta','varianty','variant')+'</div>':'')+
+       '</div></div>';
   });
   h+='</div>';
   body.innerHTML=h; window.scrollTo(0,0);
@@ -3125,7 +3169,6 @@ function renderProduktDetail(key){
   if(p.material) rows.push(['Materiál',p.material]);
   if(p.dimensions) rows.push(['Rozměry',p.dimensions]);
   if(p.volumes) rows.push(['Objemy',p.volumes]);
-  if(p.variants&&p.variants.length) rows.push(['Varianty / modely',p.variants.join(' · ')]);
   if(rows.length){
     h+='<div class="prod-specs">';
     rows.forEach(r=>{ h+='<div class="prod-spec"><div class="prod-spec-k">'+esc(r[0])+'</div><div class="prod-spec-v">'+esc(r[1])+'</div></div>'; });
@@ -3136,9 +3179,51 @@ function renderProduktDetail(key){
     p.keyFacts.forEach(f=>{ h+='<li>'+esc(f)+'</li>'; });
     h+='</ul>';
   }
+  // Varianty a provedení — vizuální galerie (ilustrace z výkresů/fotek)
+  const vs=(window.PRODUKTY_VARIANTS||{})[key]||[];
+  if(vs.length){
+    h+='<div class="dash-sec" style="margin-top:22px">Varianty a provedení ('+vs.length+')</div>';
+    h+='<p class="muted" style="margin:-6px 0 12px;font-size:13px">Klikni na ilustraci pro zvětšení. Zdroj: obchodní výkresy a fotodokumentace ze složky PRODUCTS.</p>';
+    h+='<div class="pv-grid">';
+    vs.forEach((v,i)=>{
+      const thumb = v.img ? '<img class="pv-thumb" loading="lazy" src="'+v.img+'" alt="'+esc(v.n)+'">'
+                          : '<div class="pv-thumb pv-ph">'+mujIcon(MUJ_IC.box)+'<span>podklad se doplňuje</span></div>';
+      h+='<div class="pv-card'+(v.img?' clickable':'')+'"'+(v.img?' onclick="openPvLightbox(\''+key+'\','+i+')"':'')+'>'+thumb+
+         '<div class="pv-b"><div class="pv-n">'+esc(v.n)+'</div>'+
+         (v.s?'<div class="pv-s">'+esc(v.s)+'</div>':'')+
+         (v.more?'<div class="pv-more">+ '+v.more+' dalších listů</div>':'')+'</div></div>';
+    });
+    h+='</div>';
+  }
   h+='</div></div>';
   body.innerHTML=h; window.scrollTo(0,0);
 }
+/* ---------- Produkty: lightbox pro ilustrace variant ---------- */
+var PVLB={imgs:[],idx:0,name:''};
+function openPvLightbox(key,i){
+  const v=((window.PRODUKTY_VARIANTS||{})[key]||[])[i]; if(!v) return;
+  PVLB.imgs=(v.g&&v.g.length)?v.g:(v.img?[v.img]:[]); PVLB.idx=0; PVLB.name=v.n;
+  if(!PVLB.imgs.length) return;
+  renderPvLightbox();
+}
+function renderPvLightbox(){
+  let el=document.getElementById("pvLightbox");
+  if(!el){ el=document.createElement("div"); el.id="pvLightbox"; el.className="pv-lb"; document.body.appendChild(el);
+    el.addEventListener("click",e=>{ if(e.target===el||e.target.classList.contains("pv-lb-close")) closePvLightbox(); });
+    document.addEventListener("keydown",e=>{ if(!document.getElementById("pvLightbox")||document.getElementById("pvLightbox").style.display==="none")return;
+      if(e.key==="Escape")closePvLightbox(); else if(e.key==="ArrowLeft")pvLbStep(-1); else if(e.key==="ArrowRight")pvLbStep(1); }); }
+  const multi=PVLB.imgs.length>1;
+  el.innerHTML='<div class="pv-lb-inner">'+
+    '<button class="pv-lb-close" title="Zavřít (Esc)">✕</button>'+
+    (multi?'<button class="pv-lb-nav prev" onclick="pvLbStep(-1)" title="Předchozí">‹</button>':'')+
+    '<img src="'+PVLB.imgs[PVLB.idx]+'" alt="">'+
+    (multi?'<button class="pv-lb-nav next" onclick="pvLbStep(1)" title="Další">›</button>':'')+
+    '<div class="pv-lb-cap">'+esc(PVLB.name)+(multi?(' · '+(PVLB.idx+1)+'/'+PVLB.imgs.length):'')+'</div>'+
+    '</div>';
+  el.style.display="flex";
+}
+function pvLbStep(d){ if(!PVLB.imgs.length)return; PVLB.idx=(PVLB.idx+d+PVLB.imgs.length)%PVLB.imgs.length; renderPvLightbox(); }
+function closePvLightbox(){ const el=document.getElementById("pvLightbox"); if(el) el.style.display="none"; }
 
 /* ---------- Tabs ---------- */
 document.getElementById("tabs").addEventListener("click", e=>{
