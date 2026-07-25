@@ -1408,6 +1408,20 @@ function buildKontakty() {
   return out;
 }
 
+// Množina e-mailů obchodníků z „Rozdělení obchodníků" (párováno na živou DB).
+function obchodniciEmailSet() {
+  const set = new Set();
+  try { buildObchodnici(readObchod().rows).forEach(o => { if (o.email) set.add(String(o.email).toLowerCase()); }); } catch (_) {}
+  return set;
+}
+// Je daný e-mail obchodník? = má přístup k modulu „obchod" NEBO je v Rozdělení obchodníků.
+// Slouží k implicitnímu přidělení role „obchodník" v modulu Konstrukce (zadávání zakázek).
+function isObchodnikEmail(email) {
+  email = (email || '').toLowerCase(); if (!email) return false;
+  try { if (employeeModules(email).indexOf('obchod') >= 0) return true; } catch (_) {}
+  return obchodniciEmailSet().has(email);
+}
+
 /* ---------- Obchod → Leady: kontakty z veřejné kalkulačky překladiště ----------
    Lead vzniká odesláním veřejného formuláře na /preklad (mimo přihlašovací závoru).
    Ukládá se do data/preklad-leady.json; obchodník (přístup „obchod" / správce) je vidí v záložce Leady. */
@@ -1695,6 +1709,7 @@ let konstrukceMod = null;
 try {
   konstrukceMod = require('./konstrukce').mount({
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
+    isObchodnik: isObchodnikEmail,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – konstrukce', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
   });

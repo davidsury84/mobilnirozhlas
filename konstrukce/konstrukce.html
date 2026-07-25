@@ -1039,7 +1039,25 @@ var TR={
   'Horizontální výztuha':{en:'Horizontal stiffener',de:'Horizontale Versteifung',pl:'Wzmocnienie poziome'},
   'Jiné poznámky vč. barevného odstínu (RAL)':{en:'Other notes incl. colour (RAL)',de:'Sonstige Bemerkungen inkl. Farbton (RAL)',pl:'Inne uwagi wraz z odcieniem (RAL)'},
   // časté hodnoty (celý řetězec)
-  'ne':{en:'no',de:'nein',pl:'nie'},'ano':{en:'yes',de:'ja',pl:'tak'},'vlevo':{en:'left',de:'links',pl:'lewo'},'vpravo':{en:'right',de:'rechts',pl:'prawo'}
+  'ne':{en:'no',de:'nein',pl:'nie'},'ano':{en:'yes',de:'ja',pl:'tak'},'vlevo':{en:'left',de:'links',pl:'lewo'},'vpravo':{en:'right',de:'rechts',pl:'prawo'},
+  // hodnoty std/opce dotazníku obsahující česká slova (rozměry a kódy typu „U 100×60×3" jsou univerzální, nechávají se)
+  '4/3 nebo jiné':{en:'4/3 or other',de:'4/3 oder anderes',pl:'4/3 lub inne'},
+  'typ A':{en:'type A',de:'Typ A',pl:'typ A'},
+  'typ H / sklopné / tunelové':{en:'type H / tilting / tunnel',de:'Typ H / kippbar / Tunnel',pl:'typ H / uchylne / tunelowe'},
+  '45/45, vytažená podlaha (VP 250)':{en:'45/45, extended floor (VP 250)',de:'45/45, verlängerter Boden (VP 250)',pl:'45/45, wysunięta podłoga (VP 250)'},
+  'jekl 100×80×4 S355':{en:'SHS 100×80×4 S355',de:'Vierkantrohr 100×80×4 S355',pl:'profil zamknięty 100×80×4 S355'},
+  'tr 89×6 / tr 114×6 S355':{en:'tube 89×6 / tube 114×6 S355',de:'Rohr 89×6 / Rohr 114×6 S355',pl:'rura 89×6 / rura 114×6 S355'},
+  'tr 159×6':{en:'tube 159×6',de:'Rohr 159×6',pl:'rura 159×6'},
+  '2křídlá':{en:'two-leaf',de:'zweiflügelig',pl:'dwuskrzydłowe'},
+  '1křídlá / klapka / jiné':{en:'single-leaf / flap / other',de:'einflügelig / Klappe / andere',pl:'jednoskrzydłowe / klapa / inne'},
+  'S hák (typ VSH)':{en:'S-hook (type VSH)',de:'S-Haken (Typ VSH)',pl:'hak S (typ VSH)'},
+  'holandské (VNL)':{en:'Dutch (VNL)',de:'holländisch (VNL)',pl:'holenderskie (VNL)'},
+  'mechanická / hydraulická / rolovací plachta aj.':{en:'mechanical / hydraulic / roll-up tarp etc.',de:'mechanisch / hydraulisch / Rollplane usw.',pl:'mechaniczna / hydrauliczna / plandeka rolowana itp.'},
+  'ano / 500 mm / 10 mm':{en:'yes / 500 mm / 10 mm',de:'ja / 500 mm / 10 mm',pl:'tak / 500 mm / 10 mm'},
+  'ano / vlevo ve směru jízdy':{en:'yes / left in direction of travel',de:'ja / links in Fahrtrichtung',pl:'tak / z lewej w kierunku jazdy'},
+  'ano / 2křídla (typ CE)':{en:'yes / two-leaf (type CE)',de:'ja / zweiflügelig (Typ CE)',pl:'tak / dwuskrzydłowe (typ CE)'},
+  'ano 60×60×4':{en:'yes 60×60×4',de:'ja 60×60×4',pl:'tak 60×60×4'},
+  'počet výztuh':{en:'number of ribs',de:'Anzahl der Versteifungen',pl:'liczba usztywnień'}
 };
 function tr(s){if(DQ_LANG==='cs'||!s)return s;var e=TR[s];return (e&&e[DQ_LANG])||s;}
 function reqTag(){return {cs:'poř.',en:'req.',de:'Wunsch',pl:'wym.'}[DQ_LANG]||'poř.';}
@@ -1314,7 +1332,7 @@ function renderNastaveni(m){
   h+='<div class="sec">Konstrukce — role</div>';
   h+=roleCard('Šéf konstrukce','sef',R.sef,'Řídí frontu, přiděluje práci, provádí interní kontrolu. Vidí vše v konstrukci.',false);
   h+=roleCard('Konstruktéři','konstrukter',R.konstrukter,'Zpracovávají přidělené výkresy. U každého lze nastavit týdenní fond hodin pro kapacity.',true);
-  h+=roleCard('Obchodníci','obchodnik',R.obchodnik,'Zadávají požadavky, potvrzují výkresy a odesílají náhledy klientům.',false);
+  h+=roleCard('Obchodníci','obchodnik',R.obchodnik,'Zadávají požadavky, potvrzují výkresy a odesílají náhledy klientům. Všichni s přístupem k modulu Obchod (a lidé z „Rozdělení obchodníků") mají zadávání do konstrukce implicitně — níže přidáváš jen výjimky navíc.',false);
   h+=roleCard('Ředitel (přehledy / KPI)','reditel',R.reditel,'Přístup jen pro čtení k reportům a KPI; příjemce eskalací.',false);
   // — výrobní oblasti + jejich ředitelé —
   h+='<div class="sec">Výroba — oblasti a výrobní ředitelé</div><div class="card"><p class="muted" style="margin-top:0">Každá výrobní oblast má svého ředitele (konkrétní osoba z databáze). Schválená zakázka se předává do vybrané oblasti a je na tahu její výrobní ředitel.</p>';

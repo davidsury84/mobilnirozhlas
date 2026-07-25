@@ -302,6 +302,8 @@ function mount(host) {
     const d = load();
     let r = email ? (d.roles[email] || '') : '';
     if (!r && email && isVyrobniReditel(d, email)) r = 'vyrobni-reditel';
+    // Obchodníci (přístup k modulu Obchod nebo v „Rozdělení obchodníků") mají roli obchodník implicitně.
+    if (!r && email && host.isObchodnik && host.isObchodnik(email)) r = 'obchodnik';
     return { email, name: e ? e.name : '', isAdmin: isAdm, role: r };
   }
   // Seznam zaměstnanců intranetu pro výběr osob k rolím (jen pro admina).
