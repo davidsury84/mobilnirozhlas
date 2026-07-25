@@ -60,7 +60,7 @@ function injectViewAsUI(html, req) {
       + '<a href="/view-as" style="color:#fff;margin-left:auto">Změnit</a>'
       + '<button onclick="fetch(\'/api/view-as/stop\',{method:\'POST\'}).then(function(){location.href=\'/\'})" style="background:#fff;color:#8a5600;border:0;border-radius:8px;padding:6px 12px;font:inherit;font-weight:700;cursor:pointer">Ukončit náhled</button></div>';
   } else if (isRealAdmin(req)) {
-    bar = '<a id="__valaunch" href="/view-as" title="Zobrazit aplikaci jako konkrétní zaměstnanec" style="position:fixed;right:16px;bottom:16px;z-index:2147483000;background:#0e8a43;color:#fff;font:700 13px Segoe UI,Arial;padding:9px 13px;border-radius:22px;text-decoration:none;box-shadow:0 3px 12px rgba(0,0,0,.25)">👤 Zobrazit jako…</a>';
+    bar = '<a id="__valaunch" href="/view-as" title="Zobrazit aplikaci jako konkrétní zaměstnanec" style="position:fixed;left:16px;bottom:16px;z-index:2147483000;background:#0e8a43;color:#fff;font:700 13px Segoe UI,Arial;padding:9px 13px;border-radius:22px;text-decoration:none;box-shadow:0 3px 12px rgba(0,0,0,.25)">👤 Zobrazit jako…</a>';
   }
   if (!bar) return html;
   const i = html.lastIndexOf('</body>');   // pozor: HTML má </body> i uvnitř JS template stringů → injektujeme před POSLEDNÍ
