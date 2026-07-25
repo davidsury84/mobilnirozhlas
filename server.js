@@ -156,6 +156,7 @@ const GRIT_FILE = path.join(ROOT, 'grit.html');              // test houževnato
 const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracovní spokojenosti (JSS)
 const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
 const ABROLL_FILE = path.join(ROOT, 'abroll-skoleni.html');  // interaktivní školení ABROLL + závěrečný test
+const PRODUKTY_FILE = path.join(ROOT, 'produkty-skoleni.html'); // interaktivní školení Produkty (znalosti obchodníků) + závěrečný test
 const KONCEPT_FILE = path.join(ROOT, 'intranet-koncept.html'); // náhledový koncept redesignu intranetu (SharePoint hub)
 const PUB_DIR  = path.join(DATA_DIR, 'published');
 const STATE_F  = path.join(DATA_DIR, 'state.json');
@@ -167,6 +168,7 @@ const GRIT_F   = path.join(DATA_DIR, 'grit-results.json');   // výsledky testu 
 const JSS_F    = path.join(DATA_DIR, 'jss-results.json');    // výsledky dotazníku pracovní spokojenosti
 const TW44_F   = path.join(DATA_DIR, 'tw44-results.json');   // výsledky testu kognitivní zátěže (neanonymní)
 const ABROLL_F = path.join(DATA_DIR, 'abroll-results.json'); // výsledky testu ABROLL (max 3 pokusy na osobu)
+const PRODUKTY_F = path.join(DATA_DIR, 'produkty-results.json'); // výsledky testu znalosti produktů (max 3 pokusy na osobu)
 const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
 const ACTLOG_F  = path.join(DATA_DIR, 'activity.json');   // jednoduchý log aktivity (přihlášení, pozvánky, průzkumy)
@@ -821,6 +823,36 @@ function recordAbroll(a) {
   writeJson(ABROLL_F, results);
   logActivity('abroll', { email, name }, 'Test ABROLL · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, ABROLL_MAX - rec.attempts.length), passed };
+}
+// Test znalosti produktů (školení obchodníků) – jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
+const PRODUKTY_MAX = 3;
+function produktyStatus(email) {
+  email = (email || '').toLowerCase();
+  const rec = readJson(PRODUKTY_F, []).find(r => (r.email || '').toLowerCase() === email);
+  const attempts = (rec && Array.isArray(rec.attempts)) ? rec.attempts : [];
+  const best = attempts.reduce((m, a) => Math.max(m, a.pct || 0), 0);
+  return { attemptsUsed: attempts.length, attemptsLeft: Math.max(0, PRODUKTY_MAX - attempts.length), best, passed: attempts.some(a => a.passed) };
+}
+function recordProdukty(a) {
+  const email = (a.email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const total = Math.max(0, Math.round(Number(a.total) || 0));
+  const correct = Math.max(0, Math.min(total, Math.round(Number(a.correct) || 0)));
+  const pct = Math.max(0, Math.min(100, Math.round(Number(a.pct) || 0)));
+  const passed = pct >= 80;
+  const results = readJson(PRODUKTY_F, []);
+  let rec = results.find(r => (r.email || '').toLowerCase() === email);
+  if (!rec) { rec = { email, name, dept, attempts: [] }; results.push(rec); }
+  rec.name = name; rec.dept = dept; if (!Array.isArray(rec.attempts)) rec.attempts = [];
+  if (rec.attempts.length >= PRODUKTY_MAX) { writeJson(PRODUKTY_F, results); return { blocked: true, attemptsUsed: rec.attempts.length }; }
+  rec.attempts.push({ correct, total, pct, passed, ts: Date.now() });
+  writeJson(PRODUKTY_F, results);
+  logActivity('produkty', { email, name }, 'Test znalosti produktů · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
+  return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, PRODUKTY_MAX - rec.attempts.length), passed };
 }
 // Klíče modulů, ke kterým má zaměstnanec přístup (přiděluje správce v administraci).
 function employeeModules(email) {
@@ -1997,6 +2029,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/abroll' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, abrollStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(ABROLL_F, [])); }
+    // Test znalosti produktů (školení obchodníků): GET = stav pokusů, POST = odeslání pokusu (max 3)
+    if (p === '/api/produkty' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, produktyStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/produkty' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordProdukty(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/produkty-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(PRODUKTY_F, [])); }
     // ---- Odeslání reportu průzkumu e-mailem (z detailu; jen správce) ----
     if (p === '/api/survey-report/send' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
@@ -2560,6 +2596,21 @@ const server = http.createServer(async (req, res) => {
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení ABROLL je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(ABROLL_FILE)) return send(res, 404, '<h1>Chybí abroll-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(ABROLL_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+
+    // ---- Sdílená data produktového katalogu (společná pro knihovnu i školení) ----
+    if (p === '/produkty-data.js') {
+      const f = path.join(ROOT, 'produkty-data.js');
+      if (!fs.existsSync(f)) return send(res, 200, 'window.PRODUKTY_SEED=[];', { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
+      return send(res, 200, fs.readFileSync(f, 'utf8'), { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+
+    // ---- Školení Produkty (interaktivní, znalosti obchodníků): za přihlášením (zaměstnanec nebo správce) ----
+    if (p === '/produkty-app') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Produkty je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!fs.existsSync(PRODUKTY_FILE)) return send(res, 404, '<h1>Chybí produkty-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(PRODUKTY_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----

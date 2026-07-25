@@ -9,6 +9,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 <!-- XLSX import/export zaměstnanců a statistik -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Sdílená data produktového katalogu (knihovna + školení) -->
+<script src="/produkty-data.js"></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -636,6 +638,25 @@ th.ob-delcol,td.ob-delcol{width:42px;text-align:center!important}
 .li-ic.folder{background:linear-gradient(150deg,var(--yellow),var(--yellow-2));color:#11271c}
 .li-chev{color:var(--line-strong);flex:none}
 .li-chev svg{width:20px;height:20px}
+/* Produktový katalog */
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+.prod-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:.15s;display:flex;flex-direction:column}
+.prod-card:hover{border-color:var(--line-strong);box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.prod-cover{height:150px;background-size:cover;background-position:center;background-color:#eef2ee}
+.prod-cover-ph{display:grid;place-items:center;background:var(--green-soft);color:var(--green-d)}
+.prod-cover-ph svg{width:46px;height:46px}
+.prod-body{padding:13px 15px}
+.prod-name{font-weight:700;font-size:15px;line-height:1.25}
+.prod-sub{color:var(--ink-soft);font-size:12.5px;margin-top:4px;line-height:1.4}
+.prod-detail{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.prod-hero{height:280px;background-size:cover;background-position:center;background-color:#eef2ee}
+.prod-detail-body{padding:24px 28px}
+.prod-specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:6px}
+.prod-spec{border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--paper-2,#fafbfa)}
+.prod-spec-k{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:600}
+.prod-spec-v{font-size:14px;margin-top:3px;line-height:1.45}
+ul.prod-facts{margin:6px 0 0;padding-left:20px}
+ul.prod-facts li{margin:7px 0;line-height:1.55}
 .read-shell-mj{max-width:880px;margin:0 auto}
 .ack-card{margin-top:20px;background:linear-gradient(180deg,var(--green-soft),#fff 75%);border:2px solid var(--green-2);border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow)}
 .ack-card.done{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--green-soft)}
@@ -1264,6 +1285,7 @@ const MUJ_IC = {
   ticket:'<path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5a2.5 2.5 0 0 0 0 5V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5a2.5 2.5 0 0 0 0-5V8z"/><line x1="13" y1="6" x2="13" y2="18" stroke-dasharray="2 2"/>',
   poll:'<line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="14"/>',
   warehouse:'<path d="M3 21V8.5l9-4 9 4V21"/><path d="M3 21h18"/><rect x="8" y="13" width="8" height="8"/><line x1="8" y1="17" x2="16" y2="17"/>',
+  box:'<path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>',
   droplet:'<path d="M12 3s6 6.4 6 10.5a6 6 0 0 1-12 0C6 9.4 12 3 12 3z"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>',
   cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.3 12.2a1.5 1.5 0 0 0 1.5 1.2h8a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/>',
@@ -2289,14 +2311,38 @@ async function showSkoleni(){
     : (used>=3 ? '<span class="pill red">✕ Nesplněno ('+best+' %)</span>'
     : (used>0 ? '<span class="pill amber">Rozpracováno · '+used+'/3 pokusů</span>' : '<span class="pill amber">○ Nezahájeno</span>'));
   const btnLabel = st.passed ? 'Otevřít znovu' : (used>=3 ? 'Prohlédnout' : (used>0 ? 'Pokračovat' : 'Spustit'));
+  // Test znalosti produktů (školení obchodníků)
+  let pst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false};
+  try{ pst=await (await fetch('/api/produkty?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
+  const pused=pst.attemptsUsed||0, pbest=pst.best||0;
+  const pbadge = pst.passed ? '<span class="pill green">✓ Splněno '+pbest+' %</span>'
+    : (pused>=3 ? '<span class="pill red">✕ Nesplněno ('+pbest+' %)</span>'
+    : (pused>0 ? '<span class="pill amber">Rozpracováno · '+pused+'/3 pokusů</span>' : '<span class="pill amber">○ Nezahájeno</span>'));
+  const pbtnLabel = pst.passed ? 'Otevřít znovu' : (pused>=3 ? 'Prohlédnout' : (pused>0 ? 'Pokračovat' : 'Spustit'));
   let h='<div class="dash-hero"><h2>Školení</h2><p>Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).</p></div>';
   h+='<div class="dash-sec">Dostupná školení</div>';
+  h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
+     '<div class="li-t">Produkty — znalosti obchodníků</div>'+
+     '<div class="muted" style="font-size:12px;margin-top:2px">Přehled sortimentu Elkoplast (kontejnery, muldy, nádoby, záchytné vany…) + závěrečný test znalostí</div></div></div>'+
+     '<div style="display:flex;align-items:center;gap:10px">'+pbadge+
+     '<button class="btn sm" onclick="openProdukty()">'+pbtnLabel+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">ABROLL — kódování a konfigurace</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">Interaktivní výuka názvů a konfigurace kontejnerů ABROLL + závěrečný test</div></div></div>'+
      '<div style="display:flex;align-items:center;gap:10px">'+badge+
      '<button class="btn sm" onclick="openAbroll()">'+btnLabel+'</button></div></div>';
   body.innerHTML=h; window.scrollTo(0,0);
+}
+function openProdukty(){
+  MUJ.view="skoleni"; renderSidebar();
+  const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
+  const body=document.getElementById("mujBody");
+  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
+      '<button class="btn ghost sm" onclick="showSkoleni()">← Zpět na školení</button>'+
+      '<span class="muted" style="font-size:13px">Na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy.</span></div>'+
+    '<iframe src="/produkty-app'+q+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#fff" title="Školení Produkty"></iframe>';
+  window.scrollTo(0,0);
 }
 function openAbroll(){
   MUJ.view="skoleni"; renderSidebar();
@@ -2970,6 +3016,13 @@ function showLibrary(folderId){
   const title = folderId ? (byId(folderId)?byId(folderId).name:"Knihovna") : "Knihovna";
   let h = crumb + '<div class="dash-hero" style="margin-bottom:16px"><h2>'+esc(title)+'</h2>'+(folderId?'':'<p>Pracovní řád, SOP a další dokumenty — uspořádané do složek.</p>')+'</div>';
 
+  // Na kořeni knihovny: prominentní vstup do produktového katalogu (sortiment Elkoplast).
+  if(!folderId){
+    h += '<div class="li-item clickable" onclick="showProdukty(null)" style="border-left:4px solid var(--green,#5aa532)"><div class="li-left"><div class="li-ic folder">'+mujIcon(MUJ_IC.box||MUJ_IC.folder)+'</div>'+
+      '<div><div class="li-t">Produkty</div><div class="muted" style="font-size:12px;margin-top:2px">Katalog sortimentu Elkoplast — kontejnery, muldy, nádoby, záchytné vany a další</div></div></div>'+
+      '<span class="li-chev">'+mujIcon(MUJ_IC.chev)+'</span></div>';
+  }
+
   const subs = childF(folderId).filter(ff=>subtreeCount(ff.id)>0).sort((a,b)=>a.name.localeCompare(b.name,"cs"));
   const here = docs.filter(d=>(d.folderId||null)===(folderId||null));
   if(!subs.length && !here.length){ h += '<div class="card pad"><p class="muted" style="margin:0">Tato složka je prázdná.</p></div>'; body.innerHTML=h; window.scrollTo(0,0); return; }
@@ -3033,6 +3086,58 @@ async function confirmLibDoc(id, v){
     await refreshMy();
     if(typeof toast==="function") toast("Seznámení potvrzeno");
   }catch(e){ if(btn){ btn.disabled=false; btn.textContent="Potvrdit seznámení"; } alert("Uložení se nepodařilo, zkuste to znovu."); }
+}
+
+/* ---------- Produktový katalog (v knihovně) ---------- */
+// Data sortimentu Elkoplast — zdroj: složka PRODUCTS (audit 7/2026). Cover fotky v /assets/produkty/.
+var PRODUKTY = window.PRODUKTY_SEED || [];
+function produktyById(key){ return PRODUKTY.find(p=>p.key===key); }
+function showProdukty(key){
+  MUJ.view="library"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(key){ return renderProduktDetail(key); }
+  let h='<div class="crumb"><a onclick="showLibrary(null)">'+mujIcon(MUJ_IC.book)+' Knihovna</a><span class="sep">›</span><span class="cur">Produkty</span></div>';
+  h+='<div class="dash-hero" style="margin-bottom:16px"><h2>Produkty</h2><p>Katalog sortimentu Elkoplast. Klikni na kategorii pro detail (popis, materiál, varianty, rozměry a klíčová fakta). Znalosti si můžeš ověřit ve <a onclick="showSkoleni()" style="cursor:pointer;text-decoration:underline">školení Produkty</a>.</p></div>';
+  if(!PRODUKTY.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Katalog se připravuje.</p></div>'; body.innerHTML=h; window.scrollTo(0,0); return; }
+  h+='<div class="prod-grid">';
+  PRODUKTY.forEach(p=>{
+    const cover = p.cover ? '<div class="prod-cover" style="background-image:url(\''+p.cover+'\')"></div>' : '<div class="prod-cover prod-cover-ph">'+mujIcon(MUJ_IC.box)+'</div>';
+    h+='<div class="prod-card" onclick="showProdukty(\''+p.key+'\')">'+cover+
+       '<div class="prod-body"><div class="prod-name">'+esc(p.name)+'</div>'+
+       '<div class="prod-sub">'+esc(p.shortDesc||'')+'</div></div></div>';
+  });
+  h+='</div>';
+  body.innerHTML=h; window.scrollTo(0,0);
+}
+function renderProduktDetail(key){
+  const body=document.getElementById("mujBody");
+  const p=produktyById(key);
+  if(!p){ return showProdukty(null); }
+  let h='<div class="crumb"><a onclick="showLibrary(null)">'+mujIcon(MUJ_IC.book)+' Knihovna</a><span class="sep">›</span><a onclick="showProdukty(null)">Produkty</a><span class="sep">›</span><span class="cur">'+esc(p.name)+'</span></div>';
+  h+='<div class="read-bar no-print"><button class="btn ghost sm" onclick="showProdukty(null)">← Zpět na produkty</button></div>';
+  h+='<div class="prod-detail">';
+  if(p.cover) h+='<div class="prod-hero" style="background-image:url(\''+p.cover+'\')"></div>';
+  h+='<div class="prod-detail-body">';
+  h+='<h2 style="margin:0 0 4px">'+esc(p.name)+'</h2>';
+  if(p.shortDesc) h+='<p class="muted" style="margin:0 0 14px;font-size:15px">'+esc(p.shortDesc)+'</p>';
+  if(p.description) h+='<p style="margin:0 0 16px;line-height:1.6">'+esc(p.description)+'</p>';
+  const rows=[];
+  if(p.material) rows.push(['Materiál',p.material]);
+  if(p.dimensions) rows.push(['Rozměry',p.dimensions]);
+  if(p.volumes) rows.push(['Objemy',p.volumes]);
+  if(p.variants&&p.variants.length) rows.push(['Varianty / modely',p.variants.join(' · ')]);
+  if(rows.length){
+    h+='<div class="prod-specs">';
+    rows.forEach(r=>{ h+='<div class="prod-spec"><div class="prod-spec-k">'+esc(r[0])+'</div><div class="prod-spec-v">'+esc(r[1])+'</div></div>'; });
+    h+='</div>';
+  }
+  if(p.keyFacts&&p.keyFacts.length){
+    h+='<div class="dash-sec" style="margin-top:18px">Klíčová fakta pro obchodníka</div><ul class="prod-facts">';
+    p.keyFacts.forEach(f=>{ h+='<li>'+esc(f)+'</li>'; });
+    h+='</ul>';
+  }
+  h+='</div></div>';
+  body.innerHTML=h; window.scrollTo(0,0);
 }
 
 /* ---------- Tabs ---------- */
