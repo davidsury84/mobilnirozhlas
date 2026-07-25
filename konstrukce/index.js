@@ -286,11 +286,13 @@ function mount(host) {
   function maModul(req) {
     if (host.isAdmin(req)) return true;
     const e = host.empSession(req); if (!e) return false;
+    const email = (e.email || '').toLowerCase();
     try {
       if ((host.employeeModules(e.email) || []).includes('konstrukce')) return true;
     } catch (_) {}
+    // Obchodníci (modul Obchod / Obchod EXP nebo „Rozdělení obchodníků") mají zadávání implicitně.
+    if (host.isObchodnik && host.isObchodnik(email)) return true;
     const d = load();
-    const email = (e.email || '').toLowerCase();
     return !!d.roles[email] || isVyrobniReditel(d, email);
   }
   // Efektivní role uživatele: admin vidí vše; jinak z číselníku rolí, případně

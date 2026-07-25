@@ -1416,9 +1416,10 @@ function obchodniciEmailSet() {
 }
 // Je daný e-mail obchodník? = má přístup k modulu „obchod" NEBO je v Rozdělení obchodníků.
 // Slouží k implicitnímu přidělení role „obchodník" v modulu Konstrukce (zadávání zakázek).
+const OBCHOD_MODULE_KEYS = ['obchod', 'obchodexp']; // Rozdělení obchodníků + Obchod EXP (export)
 function isObchodnikEmail(email) {
   email = (email || '').toLowerCase(); if (!email) return false;
-  try { if (employeeModules(email).indexOf('obchod') >= 0) return true; } catch (_) {}
+  try { const mods = employeeModules(email) || []; if (mods.some(m => OBCHOD_MODULE_KEYS.indexOf(m) >= 0)) return true; } catch (_) {}
   return obchodniciEmailSet().has(email);
 }
 
