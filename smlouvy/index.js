@@ -73,6 +73,19 @@ function mount(host) {
   // intranetu. Default = Simona; přepsatelné env SMLOUVY_SPRAVCI (čárkou odděl.).
   const SPRAVCI = (process.env.SMLOUVY_SPRAVCI || 'simona.janeckova@elkoplast.cz')
     .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+  // Příjemce týdenního upozornění na nezaevidované smlouvy. Uloženo v meta (edituje
+  // správce/admin v UI), s fallbackem na env a default (Simona). Kopie (Cc) default
+  // david.sury@elkoplast.cz — lze v UI přepsat i vymazat.
+  const DEFAULT_NOTIFY = SPRAVCI[0] || 'simona.janeckova@elkoplast.cz';
+  const DEFAULT_CC = 'david.sury@elkoplast.cz';
+  function notifyTo() { return (M.meta.get('notify_email') || process.env.SMLOUVY_SPRAVCE_EMAIL || DEFAULT_NOTIFY || '').trim(); }
+  function notifyCc() { const v = M.meta.get('notify_cc'); return (v == null ? DEFAULT_CC : v).trim(); }
+  // Nové soubory stažené z Disku, u kterých správce ještě nedoplnil údaje (= nezaevidované).
+  function nezaevidovane() {
+    return M.db.prepare(`SELECT id, cislo_smlouvy, drive_url, created_at FROM smlouva
+      WHERE created_by='drive-sync' AND je_placeholder=1 AND stav='aktivni' ORDER BY created_at DESC`).all();
+  }
   function jeSpravce(req) {
     const e = host.empSession(req);
     return !!(e && e.email && SPRAVCI.includes(String(e.email).toLowerCase()));
@@ -111,10 +124,11 @@ function mount(host) {
       zavazky: L.rozpadZavazku(M.smlouva.zavazky()),
       eskalovane: rows.filter((x) => x.stav === 'eskalovano').length,
       bounced: M.notifikace.bouncenute().length,
-      // Nové soubory stažené z Disku, u kterých Simona ještě nedoplnila údaje.
-      kDoplneni: M.db.prepare(`SELECT id, cislo_smlouvy, drive_url, created_at FROM smlouva
-        WHERE created_by='drive-sync' AND je_placeholder=1 AND stav='aktivni' ORDER BY created_at DESC`).all(),
+      // Nové soubory stažené z Disku, u kterých správce ještě nedoplnil údaje.
+      kDoplneni: nezaevidovane(),
       driveSync: !!(process.env.SMLOUVY_DRIVE_FOLDER_ID && drive.configured()),
+      // Nastavení týdenního upozornění (pro UI panel „Nové z Disku").
+      notify: { to: notifyTo(), cc: notifyCc(), last: M.meta.get('weekly_reminder_last') || null },
     };
   }
 
@@ -165,18 +179,46 @@ function mount(host) {
       nove.push({ id: s.id, name: f.name, url: f.webViewLink });
     }
     console.log('[smlouvy] drive sync: ve složce ' + files.length + ' souborů, od baseline nových ' + novejsi.length + ', založeno ' + nove.length);
-    if (nove.length) {
-      const to = process.env.SMLOUVY_SPRAVCE_EMAIL || host.eskalaceEmail;
-      if (to) {
-        const base = host.publicBaseUrl || '';
-        const lines = nove.map((n) => `• ${n.name}\n  PDF: ${n.url || '(odkaz v intranetu)'}`).join('\n');
-        try {
-          await host.deliver({ to, subject: `[Smlouvy] ${nove.length === 1 ? 'Nová smlouva na Disku — doplňte údaje' : nove.length + ' nových smluv na Disku — doplňte údaje'}`,
-            text: `Dobrý den,\n\nve složce smluv na Disku ${nove.length === 1 ? 'přibyl nový soubor' : 'přibyly nové soubory'}:\n\n${lines}\n\nProsíme o doplnění klíčových údajů (protistrana, platnost, výpovědní lhůta, hodnota, garant) v intranetu:\n${base ? base + '/smlouvy' : 'modul Smlouvy v intranetu'} — panel „Nové z Disku — čeká na doplnění".\n\nJakmile údaje uložíte, termíny smlouvy se začnou automaticky hlídat.` });
-        } catch (e) { console.error('[smlouvy] e-mail o nových z Disku selhal:', e.message); }
-      }
-    }
+    // Pozn.: e-mail se zde NEposílá. Upozornění řeší týdenní souhrn (tydenniUpominka),
+    // který se odešle jen když nějaká stažená smlouva stále čeká na zaevidování.
     return { nove: nove.length, celkem: files.length };
+  }
+
+  // ---- týdenní upozornění správci na NEZAEVIDOVANÉ smlouvy z Disku ----
+  // Odešle se jen když: (a) existují nezaevidované smlouvy a (b) od posledního
+  // odeslání uplynul aspoň týden (throttle v meta). `force` obejde throttle
+  // (tlačítko „Odeslat teď" v UI). Vždy s kopií na notifyCc() (default david.sury).
+  async function tydenniUpominka({ force = false } = {}) {
+    const pending = nezaevidovane();
+    if (!pending.length) return { pending: 0, odeslano: false };
+    const last = M.meta.get('weekly_reminder_last');
+    if (!force && last) {
+      const dny = (Date.now() - new Date(last).getTime()) / 86400000;
+      if (dny >= 0 && dny < 7) return { pending: pending.length, odeslano: false, skipped: 'naposledy před ' + Math.floor(dny) + ' dny' };
+    }
+    const to = notifyTo();
+    if (!to) return { pending: pending.length, odeslano: false, chyba: 'Není nastaven příjemce upozornění.' };
+    const cc = notifyCc() || undefined;
+    const base = host.publicBaseUrl || '';
+    const odkaz = base ? base + '/smlouvy' : 'modul Smlouvy v intranetu';
+    const jednotne = pending.length === 1;
+    const lines = pending.map((n) => `• ${n.cislo_smlouvy}${n.drive_url ? '\n  PDF: ' + n.drive_url : ''}`).join('\n');
+    const subject = `[Smlouvy] ${jednotne ? 'Nová smlouva na Disku čeká na zaevidování' : pending.length + ' smluv na Disku čeká na zaevidování'}`;
+    const text = `Dobrý den,\n\nna Google Disku ${jednotne ? 'je nová smlouva, která ještě není zaevidovaná' : 'jsou nové smlouvy, které ještě nejsou zaevidované'} v intranetu:\n\n${lines}\n\nProsíme o doplnění klíčových údajů (protistrana, platnost, výpovědní lhůta, hodnota, garant):\n${odkaz} — panel „Nové z Disku — čeká na doplnění".\n\nJakmile údaje uložíte, termíny smlouvy se začnou automaticky hlídat.\n\n(Toto upozornění chodí jednou týdně a jen tehdy, když nějaká smlouva čeká na zaevidování.)`;
+    const li = pending.map((n) => `<li style="margin:4px 0">${engineEsc(n.cislo_smlouvy)}${n.drive_url ? ` — <a href="${engineEsc(n.drive_url)}">otevřít PDF</a>` : ''}</li>`).join('');
+    const html = `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:560px;color:#2c3e50">
+      <p>Dobrý den,</p>
+      <p>na Google Disku ${jednotne ? 'je nová smlouva, která ještě <strong>není zaevidovaná</strong>' : `je <strong>${pending.length}</strong> nových smluv, které ještě <strong>nejsou zaevidované</strong>`} v intranetu:</p>
+      <ul style="padding-left:18px">${li}</ul>
+      <p>Prosíme o doplnění klíčových údajů (protistrana, platnost, výpovědní lhůta, hodnota, garant):<br>
+      <a href="${engineEsc(base ? base + '/smlouvy' : '#')}">${engineEsc(odkaz)}</a> — panel „Nové z Disku — čeká na doplnění“.</p>
+      <p style="color:#7f8c8d;font-size:13px">Jakmile údaje uložíte, termíny smlouvy se začnou automaticky hlídat.<br>
+      Toto upozornění chodí jednou týdně a jen tehdy, když nějaká smlouva čeká na zaevidování.</p>
+    </div>`;
+    await host.deliver({ to, cc, subject, text, html });
+    M.meta.set('weekly_reminder_last', new Date().toISOString());
+    console.log('[smlouvy] týdenní upomínka: odesláno na ' + to + (cc ? ' (kopie ' + cc + ')' : '') + ', nezaevidovaných ' + pending.length);
+    return { pending: pending.length, odeslano: true, to, cc: cc || null };
   }
 
   // ---- webhook (veřejné) ------------------------------------------
@@ -273,6 +315,12 @@ function mount(host) {
       }
       if (p === '/api/smlouvy/dashboard' && req.method === 'GET') { json(res, 200, dashboardData()); return true; }
 
+      // Nastavení příjemce týdenního upozornění (jen správce/admin).
+      if (p === '/api/smlouvy/nastaveni' && req.method === 'GET') {
+        if (!smiPsat(req)) { json(res, 403, { chyba: 'Jen správce/admin.' }); return true; }
+        json(res, 200, { notify_email: notifyTo(), notify_cc: notifyCc(), last: M.meta.get('weekly_reminder_last') || null, pending: nezaevidovane().length }); return true;
+      }
+
       if (p === '/api/smlouvy/list' && req.method === 'GET') {
         json(res, 200, M.smlouva.list({ kategorie: u.query.kategorie, garant: u.query.garant, stav: u.query.stav, q: u.query.q })); return true;
       }
@@ -340,6 +388,18 @@ function mount(host) {
         // Ruční spuštění synchronizace složky na Disku (jinak běží v ticku co 6 h).
         if (p === '/api/smlouvy/drive-sync') {
           try { json(res, 200, await driveSync()); } catch (e) { json(res, 200, { chyba: e.message }); }
+          return true;
+        }
+
+        // Uložení příjemce (a kopie) týdenního upozornění.
+        if (p === '/api/smlouvy/nastaveni') {
+          if (typeof b.notify_email === 'string') M.meta.set('notify_email', b.notify_email.trim());
+          if (typeof b.notify_cc === 'string') M.meta.set('notify_cc', b.notify_cc.trim());
+          json(res, 200, { notify_email: notifyTo(), notify_cc: notifyCc() }); return true;
+        }
+        // Odeslat upozornění hned (obejde týdenní throttle). Pošle jen pokud něco čeká.
+        if (p === '/api/smlouvy/upominka') {
+          try { json(res, 200, await tydenniUpominka({ force: true })); } catch (e) { json(res, 200, { chyba: e.message }); }
           return true;
         }
 
@@ -423,9 +483,12 @@ function mount(host) {
     catch (e) { console.error('[smlouvy] tick chyba:', e.message); }
     try { await driveSync(); }
     catch (e) { console.error('[smlouvy] drive sync chyba:', e.message); }
+    // Týdenní upozornění na nezaevidované smlouvy (vlastní 7denní throttle uvnitř).
+    try { await tydenniUpominka(); }
+    catch (e) { console.error('[smlouvy] týdenní upomínka chyba:', e.message); }
   }
 
-  return { handle, tick, _models: M, _dashboardData: dashboardData };
+  return { handle, tick, _models: M, _dashboardData: dashboardData, _tydenniUpominka: tydenniUpominka };
 }
 
 function engineEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }

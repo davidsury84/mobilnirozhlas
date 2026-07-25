@@ -449,12 +449,16 @@ function smtpSend(cfg, mail) {
       if (!secure && caps.indexOf('STARTTLS') >= 0) { await cmd('STARTTLS', [220]); sock.removeListener('data', onData); const t = await upgradeTLS(); sock = t; buf = ''; queue = []; sock.on('data', onData); sock.on('error', fail); r = await cmd('EHLO ' + ehloName(), [250]); caps = r.text.toUpperCase(); }
       if (cfg.user) { if (caps.indexOf('AUTH') >= 0 && caps.indexOf('LOGIN') >= 0) { await cmd('AUTH LOGIN', [334]); await cmd(b64(cfg.user), [334]); await cmd(b64(cfg.pass || ''), [235]); } else { await cmd('AUTH PLAIN ' + b64('\0' + cfg.user + '\0' + (cfg.pass || '')), [235]); } }
       const fromAddr = mail.fromAddr || cfg.user;
+      const ccList = mail.cc ? (Array.isArray(mail.cc) ? mail.cc : [mail.cc]).map((x) => String(x).trim()).filter(Boolean) : [];
       await cmd('MAIL FROM:<' + fromAddr + '>', [250]);
       await cmd('RCPT TO:<' + mail.to + '>', [250, 251]);
+      for (const c of ccList) await cmd('RCPT TO:<' + c + '>', [250, 251]);
       await cmd('DATA', [354]);
       const boundary = 'b_' + crypto.randomBytes(8).toString('hex');
       const fromHeader = mail.fromName ? (rfc2047(mail.fromName) + ' <' + fromAddr + '>') : fromAddr;
-      const headers = ['From: ' + fromHeader, 'To: <' + mail.to + '>', 'Subject: ' + rfc2047(mail.subject || ''), 'Date: ' + new Date().toUTCString(), 'Message-ID: <' + crypto.randomBytes(12).toString('hex') + '@' + host + '>', 'MIME-Version: 1.0', 'Content-Type: multipart/alternative; boundary="' + boundary + '"'].join('\r\n');
+      const headers = ['From: ' + fromHeader, 'To: <' + mail.to + '>'].concat(
+        ccList.length ? ['Cc: ' + ccList.map((c) => '<' + c + '>').join(', ')] : [],
+        ['Subject: ' + rfc2047(mail.subject || ''), 'Date: ' + new Date().toUTCString(), 'Message-ID: <' + crypto.randomBytes(12).toString('hex') + '@' + host + '>', 'MIME-Version: 1.0', 'Content-Type: multipart/alternative; boundary="' + boundary + '"']).join('\r\n');
       const textPart = '--' + boundary + '\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' + wrap76(Buffer.from(mail.text || '', 'utf8').toString('base64'));
       const htmlPart = '--' + boundary + '\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n' + wrap76(Buffer.from(mail.html || '', 'utf8').toString('base64'));
       let body = headers + '\r\n\r\n' + textPart + '\r\n' + htmlPart + '\r\n--' + boundary + '--\r\n';
@@ -479,7 +483,8 @@ function resendSend(mail) {
     const fromEmail = (mail.fromEmail || process.env.RESEND_FROM || 'onboarding@resend.dev').trim();
     const fromName = mail.fromName || '';
     const from = fromName ? (fromName + ' <' + fromEmail + '>') : fromEmail;
-    const payload = JSON.stringify({ from: from, to: [mail.to], subject: mail.subject || '', html: mail.html || undefined, text: mail.text || undefined });
+    const cc = mail.cc ? (Array.isArray(mail.cc) ? mail.cc : [mail.cc]).map((x) => String(x).trim()).filter(Boolean) : [];
+    const payload = JSON.stringify({ from: from, to: [mail.to], cc: cc.length ? cc : undefined, subject: mail.subject || '', html: mail.html || undefined, text: mail.text || undefined });
     const r = https.request({ method: 'POST', hostname: 'api.resend.com', path: '/emails', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, (resp) => {
       let d = ''; resp.on('data', c => d += c); resp.on('end', () => {
         if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(true);
