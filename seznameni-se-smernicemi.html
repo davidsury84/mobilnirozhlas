@@ -1486,7 +1486,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="poptavky");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -2282,12 +2282,49 @@ function showKalkulace(){
   body.innerHTML='<iframe src="/kalkulace-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulace-lisy"></iframe>';
   window.scrollTo(0,0);
 }
-function showPoptavky(){
+async function showPoptavky(){
   MUJ.view="poptavky"; renderSidebar();
   const body=document.getElementById("mujBody");
   if(!moduleVisible({key:"poptavky",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
-  body.innerHTML='<iframe src="/poptavky-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Poptávky — nabídky k vyřízení"></iframe>';
   window.scrollTo(0,0);
+  body.innerHTML='<div class="dash-hero"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><h2>Poptávky</h2><p>Poptávky odeslané z klientských kalkulaček lisů (Bramidan / Zentex). Odpovídejte přímo klientům — e-mail je v každém záznamu.</p></div><button class="btn sm" onclick="showPoptavky()">↻ Obnovit</button></div></div><div id="poptList"><p class="muted" style="padding:8px 2px">Načítám poptávky…</p></div>';
+  let leads=[], err=null;
+  try{ const r=await (await fetch("/api/poptavky",{cache:"no-store"})).json(); leads=r.leads||[]; err=r.error; }
+  catch(e){ err=e.message; }
+  const el=document.getElementById("poptList"); if(!el) return;
+  MUJ.poptavkyNew = leads.filter(l=>l.status==='nova').length; renderSidebar();
+  if(err && !leads.length){ el.innerHTML='<div class="card pad"><span class="pill amber">Chyba</span> Nepodařilo se načíst poptávky: '+esc(err)+'</div>'; return; }
+  if(!leads.length){ el.innerHTML='<div class="card pad" style="display:flex;align-items:center;gap:10px"><span class="pill green">✓ Hotovo</span><span class="muted">Žádné poptávky ve frontě.</span></div>'; return; }
+  el.innerHTML=leads.map(poptCard).join('');
+}
+function poptStav(s){
+  const m = s==='vyrizeno'?['#eceeea','#777','Vyřízeno']:(s==='vzato'?['#fff3c4','#8a6d00','Vzato']:['#d6f0df','#1f8a4c','Nová']);
+  return '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:999px;background:'+m[0]+';color:'+m[1]+'">'+m[2]+'</span>';
+}
+function poptCard(l){
+  const p=l.params||{};
+  const prod=(l.page==='zentex')?'Zentex':'Bramidan';
+  const meta=['👤 '+esc(l.name||'—')];
+  if(l.phone) meta.push('📞 <a href="tel:'+esc(l.phone)+'">'+esc(l.phone)+'</a>');
+  if(l.email) meta.push('✉ <a href="mailto:'+esc(l.email)+'">'+esc(l.email)+'</a>');
+  const row1=[];
+  if(p.recommendedModel) row1.push('<b>Doporučený model:</b> '+esc(p.recommendedModel));
+  if(p.tons!=null&&p.tons!=='') row1.push('<b>Tonáž:</b> '+esc(String(p.tons))+' t/měs');
+  if(p.materialLabel) row1.push('<b>Materiál:</b> '+esc(p.materialLabel));
+  if(p.carrierLabel) row1.push('<b>Vůz:</b> '+esc(p.carrierLabel));
+  const row2=[];
+  if(p.modeLabel) row2.push('<b>Forma:</b> '+esc(p.modeLabel));
+  if(p.price!=null&&p.price!=='') row2.push('<b style="color:#1f8a4c">'+esc(String(p.price))+' Kč</b>'+(p.priceLabel?' <span class="muted" style="font-size:12px">('+esc(p.priceLabel)+')</span>':''));
+  return '<div class="card pad" style="margin-bottom:12px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
+      '<div><div style="font-size:16px;font-weight:700">'+esc(l.company||'—')+'</div>'+
+        '<div class="muted" style="font-size:13px;margin-top:3px">'+meta.join(' · ')+'</div></div>'+
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+poptStav(l.status)+'<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:#eef1ec;color:#5b635c">'+prod+'</span></div>'+
+    '</div>'+
+    ((row1.length||row2.length)?'<div style="margin-top:10px;padding:10px 12px;background:#f7f9f5;border-radius:8px;font-size:13px;line-height:1.7">'+row1.join(' · ')+(row1.length&&row2.length?'<br>':'')+row2.join(' · ')+'</div>':'')+
+    (l.message?'<div class="muted" style="margin-top:8px;font-style:italic;font-size:13px">„'+esc(l.message)+'"</div>':'')+
+    '<div class="muted" style="margin-top:8px;font-size:12px">'+(l.createdAt?new Date(l.createdAt).toLocaleString('cs-CZ'):'')+(l.claimedName?' · vzal si: '+esc(l.claimedName):'')+'</div>'+
+  '</div>';
 }
 function showSvozEsa(){
   MUJ.view="svozesa"; renderSidebar();

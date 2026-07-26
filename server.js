@@ -420,6 +420,21 @@ function refreshPoptavkyCount() {
 }
 setTimeout(refreshPoptavkyCount, 3000);
 setInterval(refreshPoptavkyCount, 60 * 1000);
+// Plný výpis poptávek z nabídkové app (pro nativní seznam v intranetu). cb(err, leads[]).
+function fetchPoptavkyList(cb) {
+  try {
+    const u = new URL(NABIDKY_URL.replace(/\/$/, '') + '/api/leads/all');
+    const mod = u.protocol === 'http:' ? require('http') : https;
+    const rq = mod.get({ hostname: u.hostname, path: u.pathname, port: u.port || (u.protocol === 'http:' ? 80 : 443),
+      headers: NABIDKY_INGEST_SECRET ? { 'X-Ingest-Secret': NABIDKY_INGEST_SECRET } : {} }, (r) => {
+      let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => {
+        try { const j = JSON.parse(d); cb(null, (j && j.leads) || []); } catch (e) { cb(e); }
+      });
+    });
+    rq.on('error', cb);
+    rq.setTimeout(6000, () => { try { rq.destroy(new Error('Časový limit')); } catch (_) {} });
+  } catch (e) { cb(e); }
+}
 // HTTPS POST application/x-www-form-urlencoded → JSON (výměna kódu za token u Google)
 function httpsPostForm(hostname, pathName, form) {
   return new Promise((resolve, reject) => {
@@ -2179,6 +2194,19 @@ const server = http.createServer(async (req, res) => {
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
     if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); const ra = empSessionReal(req); const va = viewAsActive(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req), realAdmin: isRealAdmin(req), viewAs: va, real: (va && ra) ? { email: ra.email, name: ra.name } : (va ? { email: '', name: 'Správce' } : null), poptavkyNew: _poptavkyCache.n }); }
+
+    // Nativní výpis poptávek v intranetu (data z nabídkové app). Gating jako /poptavky-app.
+    if (p === '/api/poptavky' && req.method === 'GET') {
+      const e = empSession(req);
+      const mods = e ? (employeeModules(e.email) || []) : [];
+      const allowed = isAdmin(req) || mods.indexOf('kalkulace') >= 0 || mods.indexOf('obchod') >= 0 || mods.indexOf('obchodexp') >= 0;
+      if (!allowed) return send(res, 403, { error: 'Nemáte přístup k poptávkám.' });
+      return fetchPoptavkyList((err, leads) => {
+        if (err) return send(res, 200, { leads: [], error: err.message });
+        _poptavkyCache = { n: (leads || []).filter((l) => l.status === 'nova').length, at: Date.now() };
+        return send(res, 200, { leads: leads });
+      });
+    }
     // ---- „Zobrazit jako zaměstnanec" (impersonace, jen skutečný admin) ----
     if (p === '/api/view-as/employees' && req.method === 'GET') {
       if (!isRealAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
