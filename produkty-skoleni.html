@@ -229,6 +229,11 @@ th{background:#f0f8eb;color:#25451e}
 
 <script>
 var PRODUKTY = window.PRODUKTY_SEED || [];
+// Dvě samostatná školení: KOVO (ocel) a ROTO (plast). Typ z hash (typ=kovo|roto), výchozí kovo.
+var PROD_TYPE=(function(){ try{ var m=(location.hash||'').match(/typ=([^&]+)/i); return (m&&/roto/i.test(m[1]))?'roto':'kovo'; }catch(e){ return 'kovo'; } })();
+var PROD_ROTO_KEYS=['roto-kapaliny','odpad-plast','dum-zahrada','zimni-udrzba','sklad-plast'];
+function catGroup(k){ return PROD_ROTO_KEYS.indexOf(k)>=0?'roto':'kovo'; }
+PRODUKTY = PRODUKTY.filter(function(p){ return catGroup(p.key)===PROD_TYPE; });
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
 /* ---- Přehled sortimentu z dat ---- */
@@ -305,8 +310,25 @@ var QUESTIONS = [
     why:'Mobilní nádrže na naftu a AdBlue umožňují bezpečné skladování i výdej pohonných hmot v provozu — dopravci, zemědělci, lesnictví.' },
   { cat:'ROTO — kapaliny', q:'Jaký objem mají nádrže typu DC na ostatní kapaliny?',
     opts:['5000–9000 l','200–400 l','50–100 m³','9000 m³'], a:0,
-    why:'Nádrže typu DC pro ostatní kapaliny se dodávají v objemech 5000–9000 l, v nadzemním i podzemním provedení.' }
+    why:'Nádrže typu DC pro ostatní kapaliny se dodávají v objemech 5000–9000 l, v nadzemním i podzemním provedení.' },
+  { cat:'ROTO — odpad', q:'K čemu slouží kompostéry z řady Dům a zahrada?',
+    opts:['Ke kompostování bioodpadu','Na naftu','Na posypovou sůl','Na tabulové sklo'], a:0,
+    why:'Plastové kompostéry slouží ke kompostování bioodpadu — odolné povětrnosti, s odnímatelným víkem.' },
+  { cat:'ROTO — odpad', q:'Co je řada FATBOXX?',
+    opts:['Nádoby na kuchyňský / gastro odpad','Paletové boxy','Nádrže na naftu','Posypové vozíky'], a:0,
+    why:'FATBOXX = nádoby na kuchyňský a gastro odpad z plastové řady odpadového hospodářství.' },
+  { cat:'ROTO — materiál', q:'Jaká je hlavní výhoda plastových (PE) nádob oproti ocelovým?',
+    opts:['Lehké, nerezaví a lze je barevně odlišit podle frakce','Vyšší nosnost','Levnější svařování','Odolnost proti ohni'], a:0,
+    why:'Plastové (PE) nádoby jsou lehké, nerezaví, odolávají UV a mrazu a lze je barevně odlišit podle tříděné frakce.' },
+  { cat:'ROTO — zimní údržba', q:'V jakých provedeních jsou nádoby na zimní posyp?',
+    opts:['Polyethylenové (PE) i sklolaminátové (GRP)','Jen ocelové','Jen betonové','Jen dřevěné'], a:0,
+    why:'Nádoby na zimní posyp jsou v polyethylenovém (PE) i sklolaminátovém (GRP) provedení — odolné soli, mrazu a UV.' },
+  { cat:'ROTO — skladování', q:'Co patří do plastové řady skladování?',
+    opts:['Paletové boxy, plastové palety a přepravky','Abroll kontejnery','Muldy a skipy','Záchytné vany ocelové'], a:0,
+    why:'Plastová řada skladování zahrnuje paletové boxy, plastové palety, přepravky, skládací kontejnery a plastové USB kontejnery — hygienické a stohovatelné.' }
 ];
+// Rozdělení na dvě samostatná školení: KOVO (ocel) a ROTO (plast) — filtruj otázky podle typu.
+QUESTIONS = QUESTIONS.filter(function(q){ return (/^ROTO/i.test(q.cat)?'roto':'kovo')===PROD_TYPE; });
 
 var answers = {};
 (function setTestLead(){
@@ -345,7 +367,7 @@ function lockUI(){ var b=document.getElementById('finishBtn'); if(b){ b.disabled
 function setAttInfo(t){ var el=document.getElementById('attInfo'); if(el) el.textContent=t; }
 (async function initStatus(){
   if(!PROD.email){ setAttInfo('Test si můžeš vyzkoušet; výsledek se ukládá jen po přihlášení v intranetu.'); return; }
-  try{ var j=await (await fetch('/api/produkty?email='+encodeURIComponent(PROD.email),{cache:'no-store'})).json();
+  try{ var j=await (await fetch('/api/produkty?type='+PROD_TYPE+'&email='+encodeURIComponent(PROD.email),{cache:'no-store'})).json();
     PROD.attemptsUsed=(j&&j.attemptsUsed)||0;
     if(PROD.attemptsUsed>=3){ PROD.locked=true; lockUI(); setAttInfo('Vyčerpal(a) jsi všechny 3 pokusy'+(j.best?(' · nejlepší výsledek '+j.best+' %'):'')+'.'); }
     else setAttInfo(PROD.attemptsUsed>0 ? ('Využito pokusů: '+PROD.attemptsUsed+' / 3'+(j.best?(' · nejlepší '+j.best+' %'):'')) : 'Máš 3 pokusy na splnění testu (hranice 80 %).');
@@ -366,7 +388,7 @@ async function finishQuiz(){
   });
   var note='';
   if(PROD.email){
-    try{ var j=await (await fetch('/api/produkty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:PROD.email,name:PROD.name,correct:correct,total:total,pct:pct,passed:passed})})).json();
+    try{ var j=await (await fetch('/api/produkty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:PROD_TYPE,email:PROD.email,name:PROD.name,correct:correct,total:total,pct:pct,passed:passed})})).json();
       if(j&&j.blocked){ PROD.locked=true; PROD.attemptsUsed=3; lockUI(); note='<p style="color:#932b2b;font-weight:800;margin:8px 0 0">Vyčerpal(a) jsi všechny 3 pokusy — tento výsledek se už neuložil.</p>'; }
       else if(j&&j.ok){ PROD.attemptsUsed=j.attempt; if(j.attemptsLeft<=0){ PROD.locked=true; lockUI(); }
         note='<p style="margin:8px 0 0"><strong>Pokus '+j.attempt+' ze 3.</strong> '+(j.attemptsLeft>0?('Zbývají '+j.attemptsLeft+' pokusy.'):'Toto byl poslední pokus.')+' Výsledek byl odeslán vedení.</p>'; }
@@ -379,6 +401,24 @@ async function finishQuiz(){
   document.getElementById('pbar').style.width='100%'; document.getElementById('plabel').textContent=pct+' %';
   r.scrollIntoView({behavior:'smooth'});
 }
+/* ---- Přizpůsobení podle typu školení (KOVO/ROTO): skrytí lekcí, titulky, přečíslování ---- */
+(function applyType(){
+  var t=PROD_TYPE;
+  var hide=(t==='roto') ? ['s2','s3','s4','s5','s6'] : ['s7roto'];
+  hide.forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
+  var n=1;
+  document.querySelectorAll('.sec').forEach(function(sec){
+    if(sec.style.display==='none') return;
+    var num=sec.querySelector('.num'); if(num) num.textContent=n++;
+  });
+  var T={kovo:{h1:'Školení produktů — KOVO (kovové výrobky)', sub:'Ocelové kontejnery, muldy a nádoby + závěrečný test (80 % = splněno)', hero:'Poznej ocelovou řadu'},
+         roto:{h1:'Školení produktů — ROTO (plastové výrobky)', sub:'Plastové nádrže, nádoby a boxy + závěrečný test (80 % = splněno)', hero:'Poznej plastovou řadu ROTO'}};
+  var d=T[t]||T.kovo;
+  var h1=document.querySelector('.top-title h1'); if(h1) h1.textContent=d.h1;
+  var sub=document.querySelector('.top-title p'); if(sub) sub.textContent=d.sub;
+  var hero=document.querySelector('.hero h2'); if(hero) hero.textContent=d.hero;
+  document.title=d.h1;
+})();
 </script>
 </body>
 </html>
