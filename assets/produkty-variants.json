@@ -4352,5 +4352,173 @@
     "voll": "9000 l"
    }
   }
+ ],
+ "odpad-plast": [
+  {
+   "name": "Plastové kontejnery",
+   "img": "/assets/pv-odpad-plast-00-plastove-kontejnery.jpg",
+   "gallery": [
+    "/assets/pv-odpad-plast-00-plastove-kontejnery.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Polyethylenové kontejnery (tříděný sběr)",
+   "img": "/assets/pv-odpad-plast-01-pe-kontejnery.jpg",
+   "gallery": [
+    "/assets/pv-odpad-plast-01-pe-kontejnery.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Venkovní odpadkové koše",
+   "img": "/assets/pv-odpad-plast-02-venkovni-kose.jpg",
+   "gallery": [
+    "/assets/pv-odpad-plast-02-venkovni-kose.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Nádoby na kuchyňský odpad",
+   "img": "/assets/pv-odpad-plast-03-kuchynsky-odpad.jpg",
+   "gallery": [
+    "/assets/pv-odpad-plast-03-kuchynsky-odpad.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "FATBOXX — nádoby na kuchyňský odpad",
+   "img": "/assets/pv-odpad-plast-04-fatboxx.jpg",
+   "gallery": [
+    "/assets/pv-odpad-plast-04-fatboxx.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  }
+ ],
+ "dum-zahrada": [
+  {
+   "name": "Kompostéry",
+   "img": "/assets/pv-dum-zahrada-00-kompostery.jpg",
+   "gallery": [
+    "/assets/pv-dum-zahrada-00-kompostery.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Nádrže na vodu (designové)",
+   "img": "/assets/pv-dum-zahrada-01-nadrze-na-vodu.jpg",
+   "gallery": [
+    "/assets/pv-dum-zahrada-01-nadrze-na-vodu.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Štěpkovače a drtiče",
+   "img": "/assets/pv-dum-zahrada-02-stepkovace.jpg",
+   "gallery": [
+    "/assets/pv-dum-zahrada-02-stepkovace.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  }
+ ],
+ "zimni-udrzba": [
+  {
+   "name": "Nádoby na zimní posyp (polyethylenové)",
+   "img": "/assets/pv-zimni-udrzba-00-posyp-pe.jpg",
+   "gallery": [
+    "/assets/pv-zimni-udrzba-00-posyp-pe.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Nádoby na zimní posyp (sklolaminátové)",
+   "img": "/assets/pv-zimni-udrzba-01-posyp-sklolaminat.jpg",
+   "gallery": [
+    "/assets/pv-zimni-udrzba-01-posyp-sklolaminat.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Posypové vozíky",
+   "img": "/assets/pv-zimni-udrzba-02-posypove-voziky.jpg",
+   "gallery": [
+    "/assets/pv-zimni-udrzba-02-posypove-voziky.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  }
+ ],
+ "sklad-plast": [
+  {
+   "name": "Paletové boxy",
+   "img": "/assets/pv-sklad-plast-00-paletove-boxy.jpg",
+   "gallery": [
+    "/assets/pv-sklad-plast-00-paletove-boxy.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Plastové palety",
+   "img": "/assets/pv-sklad-plast-01-plastove-palety.jpg",
+   "gallery": [
+    "/assets/pv-sklad-plast-01-plastove-palety.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Plastové přepravky",
+   "img": "/assets/pv-sklad-plast-02-plastove-prepravky.jpg",
+   "gallery": [
+    "/assets/pv-sklad-plast-02-plastove-prepravky.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Skládací skladovací kontejnery",
+   "img": "/assets/pv-sklad-plast-03-skladaci-kontejnery.jpg",
+   "gallery": [
+    "/assets/pv-sklad-plast-03-skladaci-kontejnery.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Kontejnery USB (plastové)",
+   "img": "/assets/pv-sklad-plast-04-usb-plast.jpg",
+   "gallery": [
+    "/assets/pv-sklad-plast-04-usb-plast.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  }
  ]
 }
