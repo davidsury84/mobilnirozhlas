@@ -400,30 +400,16 @@ function empSession(req) { const imp = viewAsEmp(req); if (imp) return { email: 
 const SSO_SHARED_SECRET = process.env.SSO_SHARED_SECRET || SEC.secret; // nastav stejně jako INTRANET_SSO_SECRET v nabídkové app
 function ssoSign(payload) { const data = b64url(JSON.stringify(payload)); const sig = crypto.createHmac('sha256', SSO_SHARED_SECRET).update('sso:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
 const NABIDKY_URL = process.env.NABIDKY_URL || 'https://lisy-production.up.railway.app';
-// Počet NOVÝCH poptávek z nabídkové app (sdílená fronta „Nabídky k vyřízení") — pro odznak
-// v menu (položka „Poptávky") + hero „k vyřízení". Drženo v cache, obnovováno na pozadí (60 s).
+// Poptávky pro intranet se čtou z CMS klientských kalkulaček (lisy.elkoplast.cz) —
+// tam reálně přistávají „Příchozí poptávky". Endpoint /api/leads-export je chráněn
+// sdíleným X-Ingest-Secret (LEADS_INGEST_SECRET). Odznak = celkový počet poptávek.
+const POPTAVKY_URL = process.env.POPTAVKY_URL || 'https://lisy.elkoplast.cz';
 const NABIDKY_INGEST_SECRET = process.env.LEADS_INGEST_SECRET || '';
 let _poptavkyCache = { n: 0, at: 0 };
-function refreshPoptavkyCount() {
-  try {
-    const u = new URL(NABIDKY_URL.replace(/\/$/, '') + '/api/leads/count');
-    const mod = u.protocol === 'http:' ? require('http') : https;
-    const req = mod.get({ hostname: u.hostname, path: u.pathname, port: u.port || (u.protocol === 'http:' ? 80 : 443),
-      headers: NABIDKY_INGEST_SECRET ? { 'X-Ingest-Secret': NABIDKY_INGEST_SECRET } : {} }, (r) => {
-      let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => {
-        try { const j = JSON.parse(d); if (j && typeof j.nova === 'number') _poptavkyCache = { n: j.nova, at: Date.now() }; } catch (_) {}
-      });
-    });
-    req.on('error', () => {});
-    req.setTimeout(4000, () => { try { req.destroy(); } catch (_) {} });
-  } catch (_) {}
-}
-setTimeout(refreshPoptavkyCount, 3000);
-setInterval(refreshPoptavkyCount, 60 * 1000);
-// Plný výpis poptávek z nabídkové app (pro nativní seznam v intranetu). cb(err, leads[]).
+// Stáhne výpis poptávek z CMS. cb(err, leads[]).
 function fetchPoptavkyList(cb) {
   try {
-    const u = new URL(NABIDKY_URL.replace(/\/$/, '') + '/api/leads/all');
+    const u = new URL(POPTAVKY_URL.replace(/\/$/, '') + '/api/leads-export');
     const mod = u.protocol === 'http:' ? require('http') : https;
     const rq = mod.get({ hostname: u.hostname, path: u.pathname, port: u.port || (u.protocol === 'http:' ? 80 : 443),
       headers: NABIDKY_INGEST_SECRET ? { 'X-Ingest-Secret': NABIDKY_INGEST_SECRET } : {} }, (r) => {
@@ -435,6 +421,9 @@ function fetchPoptavkyList(cb) {
     rq.setTimeout(6000, () => { try { rq.destroy(new Error('Časový limit')); } catch (_) {} });
   } catch (e) { cb(e); }
 }
+function refreshPoptavkyCount() { fetchPoptavkyList((err, leads) => { if (!err) _poptavkyCache = { n: (leads || []).length, at: Date.now() }; }); }
+setTimeout(refreshPoptavkyCount, 3000);
+setInterval(refreshPoptavkyCount, 60 * 1000);
 // HTTPS POST application/x-www-form-urlencoded → JSON (výměna kódu za token u Google)
 function httpsPostForm(hostname, pathName, form) {
   return new Promise((resolve, reject) => {
@@ -2203,7 +2192,7 @@ const server = http.createServer(async (req, res) => {
       if (!allowed) return send(res, 403, { error: 'Nemáte přístup k poptávkám.' });
       return fetchPoptavkyList((err, leads) => {
         if (err) return send(res, 200, { leads: [], error: err.message });
-        _poptavkyCache = { n: (leads || []).filter((l) => l.status === 'nova').length, at: Date.now() };
+        _poptavkyCache = { n: (leads || []).length, at: Date.now() };
         return send(res, 200, { leads: leads });
       });
     }

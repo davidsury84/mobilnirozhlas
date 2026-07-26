@@ -2292,7 +2292,7 @@ async function showPoptavky(){
   try{ const r=await (await fetch("/api/poptavky",{cache:"no-store"})).json(); leads=r.leads||[]; err=r.error; }
   catch(e){ err=e.message; }
   const el=document.getElementById("poptList"); if(!el) return;
-  MUJ.poptavkyNew = leads.filter(l=>l.status==='nova').length; renderSidebar();
+  MUJ.poptavkyNew = leads.length; renderSidebar();
   if(err && !leads.length){ el.innerHTML='<div class="card pad"><span class="pill amber">Chyba</span> Nepodařilo se načíst poptávky: '+esc(err)+'</div>'; return; }
   if(!leads.length){ el.innerHTML='<div class="card pad" style="display:flex;align-items:center;gap:10px"><span class="pill green">✓ Hotovo</span><span class="muted">Žádné poptávky ve frontě.</span></div>'; return; }
   el.innerHTML=leads.map(poptCard).join('');
@@ -2319,11 +2319,11 @@ function poptCard(l){
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
       '<div><div style="font-size:16px;font-weight:700">'+esc(l.company||'—')+'</div>'+
         '<div class="muted" style="font-size:13px;margin-top:3px">'+meta.join(' · ')+'</div></div>'+
-      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+poptStav(l.status)+'<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:#eef1ec;color:#5b635c">'+prod+'</span></div>'+
+      '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:#eef1ec;color:#5b635c">'+prod+'</span>'+
     '</div>'+
     ((row1.length||row2.length)?'<div style="margin-top:10px;padding:10px 12px;background:#f7f9f5;border-radius:8px;font-size:13px;line-height:1.7">'+row1.join(' · ')+(row1.length&&row2.length?'<br>':'')+row2.join(' · ')+'</div>':'')+
     (l.message?'<div class="muted" style="margin-top:8px;font-style:italic;font-size:13px">„'+esc(l.message)+'"</div>':'')+
-    '<div class="muted" style="margin-top:8px;font-size:12px">'+(l.createdAt?new Date(l.createdAt).toLocaleString('cs-CZ'):'')+(l.claimedName?' · vzal si: '+esc(l.claimedName):'')+'</div>'+
+    '<div style="margin-top:8px;font-size:12px;color:#8a938a">'+((l.timestamp||l.createdAt)?new Date(l.timestamp||l.createdAt).toLocaleString('cs-CZ'):'')+' · '+(l.emailSent?'<span style="color:#1f8a4c;font-weight:600">✓ E-mail odeslán</span>':'<span style="color:#c0392b;font-weight:600">⚠ E-mail neodeslán</span>')+'</div>'+
   '</div>';
 }
 function showSvozEsa(){
