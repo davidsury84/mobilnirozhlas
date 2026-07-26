@@ -198,10 +198,25 @@ th{background:#f0f8eb;color:#25451e}
     </div>
   </div>
 
-  <!-- 7. Test -->
+  <!-- 7. ROTO — hospodaření s kapalinami -->
+  <div class="sec" id="s7roto">
+    <div class="sec-h"><div class="num">7</div><h3>ROTO — hospodaření s kapalinami</h3></div>
+    <p class="sec-lead">Plastová (rotačně tvářená) řada — jiný materiál i použití než ocelové kontejnery. Pozná se hned: skladování a manipulace s kapalinami.</p>
+    <div class="callout"><b>ROTO = rotačně tvářený polyethylen (PE).</b> Lehký, odolný proti korozi, UV i mrazu, bezúdržbový a recyklovatelný. Je to <b>samostatná materiálová řada</b> — nezaměňovat s ocelovými kontejnery a muldami.</div>
+    <div class="grid three">
+      <div class="card"><h4 style="margin:0 0 6px">Mobilní nádrže — nafta & AdBlue</h4><p class="muted" style="margin:0">Bezpečné skladování i <b>řízený výdej PHM</b> přímo v provozu — dopravci, zemědělci, lesnictví.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Nádrže na ostatní kapaliny (DC)</h4><p class="muted" style="margin:0">Univerzální nádrže typu DC, objem <b>5000–9000 l</b>; nadzemní i podzemní provedení.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">BrineGuard 9000</h4><p class="muted" style="margin:0">Nádrž na <b>solanku</b> (solný roztok) o objemu <b>9000 l</b> — zimní údržba komunikací.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Podzemní nádrže</h4><p class="muted" style="margin:0">Zemní provedení pro podpovrchové skladování pohonných hmot a kapalin.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Vsakovací tunely</h4><p class="muted" style="margin:0">Systém pro hospodaření s <b>dešťovou vodou</b> — vsakování a zadržování.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Vodoměrná šachta 100/140</h4><p class="muted" style="margin:0">Plastová kontrolní šachta pro vodoměry, rozměr 100/140 cm.</p></div>
+    </div>
+  </div>
+
+  <!-- 8. Test -->
   <div class="sec" id="s7">
-    <div class="sec-h"><div class="num">7</div><h3>Závěrečný test</h3></div>
-    <p class="sec-lead">16 otázek. Pro splnění potřebuješ alespoň 80 % (13 správně). Výsledek se ukládá vedení, máš max 3 pokusy.</p>
+    <div class="sec-h"><div class="num">8</div><h3>Závěrečný test</h3></div>
+    <p class="sec-lead" id="testLead">Pro splnění potřebuješ alespoň 80 %. Výsledek se ukládá vedení, máš max 3 pokusy.</p>
     <div id="attInfo" class="att-info" style="margin:0 0 14px"></div>
     <div id="quiz"></div>
     <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:4px">
@@ -278,10 +293,27 @@ var QUESTIONS = [
     why:'MGB = Müllgroßbehälter, velkoobjemová nádoba (1100/800 l). FL/FLH = ploché víko (Flachdeckel).' },
   { cat:'Speciály', q:'K čemu slouží bedny „BS" z kategorie na ploché sklo?',
     opts:['Fixují tabulové sklo ve svislé poloze pro bezpečnou přepravu','Na sběr střepů','Na kapaliny','Jako výměnná nástavba'], a:0,
-    why:'Bedny BS drží tabulové (ploché) sklo ve svislé poloze — bezpečná přeprava a skladování.' }
+    why:'Bedny BS drží tabulové (ploché) sklo ve svislé poloze — bezpečná přeprava a skladování.' },
+  { cat:'ROTO — kapaliny', q:'Z jakého materiálu je vyrobena řada ROTO (hospodaření s kapalinami)?',
+    opts:['Rotačně tvářený plast — polyethylen (PE)','Konstrukční ocel S235','Hardox 450','Nerez'], a:0,
+    why:'ROTO = rotačně tvářené plastové (PE) výrobky — samostatná materiálová řada, jiná než ocelové kontejnery a muldy.' },
+  { cat:'ROTO — kapaliny', q:'K čemu slouží nádrž BrineGuard 9000?',
+    opts:['Ke skladování solanky (solného roztoku) — 9000 l','Na naftu','Na dešťovou vodu','Na tabulové sklo'], a:0,
+    why:'BrineGuard 9000 je plastová nádrž na solanku (solný roztok) o objemu 9000 l — pro zimní údržbu komunikací.' },
+  { cat:'ROTO — kapaliny', q:'K čemu slouží mobilní plastové nádrže na naftu a AdBlue?',
+    opts:['K bezpečnému skladování a řízenému výdeji PHM přímo v provozu','Ke sběru komunálního odpadu','K přepravě sutě','Jako záchytná vana pod sudy'], a:0,
+    why:'Mobilní nádrže na naftu a AdBlue umožňují bezpečné skladování i výdej pohonných hmot v provozu — dopravci, zemědělci, lesnictví.' },
+  { cat:'ROTO — kapaliny', q:'Jaký objem mají nádrže typu DC na ostatní kapaliny?',
+    opts:['5000–9000 l','200–400 l','50–100 m³','9000 m³'], a:0,
+    why:'Nádrže typu DC pro ostatní kapaliny se dodávají v objemech 5000–9000 l, v nadzemním i podzemním provedení.' }
 ];
 
 var answers = {};
+(function setTestLead(){
+  var el=document.getElementById('testLead'); if(!el) return;
+  var need=Math.ceil(QUESTIONS.length*0.8);
+  el.textContent=QUESTIONS.length+' otázek. Pro splnění potřebuješ alespoň 80 % ('+need+' správně). Výsledek se ukládá vedení, máš max 3 pokusy.';
+})();
 (function renderQuiz(){
   var host=document.getElementById('quiz');
   host.innerHTML = QUESTIONS.map(function(q,i){
