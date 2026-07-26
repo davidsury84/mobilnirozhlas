@@ -400,6 +400,26 @@ function empSession(req) { const imp = viewAsEmp(req); if (imp) return { email: 
 const SSO_SHARED_SECRET = process.env.SSO_SHARED_SECRET || SEC.secret; // nastav stejně jako INTRANET_SSO_SECRET v nabídkové app
 function ssoSign(payload) { const data = b64url(JSON.stringify(payload)); const sig = crypto.createHmac('sha256', SSO_SHARED_SECRET).update('sso:' + data).digest('hex').slice(0, 32); return data + '.' + sig; }
 const NABIDKY_URL = process.env.NABIDKY_URL || 'https://lisy-production.up.railway.app';
+// Počet NOVÝCH poptávek z nabídkové app (sdílená fronta „Nabídky k vyřízení") — pro odznak
+// v menu (položka „Poptávky") + hero „k vyřízení". Drženo v cache, obnovováno na pozadí (60 s).
+const NABIDKY_INGEST_SECRET = process.env.LEADS_INGEST_SECRET || '';
+let _poptavkyCache = { n: 0, at: 0 };
+function refreshPoptavkyCount() {
+  try {
+    const u = new URL(NABIDKY_URL.replace(/\/$/, '') + '/api/leads/count');
+    const mod = u.protocol === 'http:' ? require('http') : https;
+    const req = mod.get({ hostname: u.hostname, path: u.pathname, port: u.port || (u.protocol === 'http:' ? 80 : 443),
+      headers: NABIDKY_INGEST_SECRET ? { 'X-Ingest-Secret': NABIDKY_INGEST_SECRET } : {} }, (r) => {
+      let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => {
+        try { const j = JSON.parse(d); if (j && typeof j.nova === 'number') _poptavkyCache = { n: j.nova, at: Date.now() }; } catch (_) {}
+      });
+    });
+    req.on('error', () => {});
+    req.setTimeout(4000, () => { try { req.destroy(); } catch (_) {} });
+  } catch (_) {}
+}
+setTimeout(refreshPoptavkyCount, 3000);
+setInterval(refreshPoptavkyCount, 60 * 1000);
 // HTTPS POST application/x-www-form-urlencoded → JSON (výměna kódu za token u Google)
 function httpsPostForm(hostname, pathName, form) {
   return new Promise((resolve, reject) => {
@@ -825,15 +845,21 @@ function recordAbroll(a) {
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, ABROLL_MAX - rec.attempts.length), passed };
 }
 // Test znalosti produktů (školení obchodníků) – jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
+// Dvě samostatná školení: KOVO (ocelové výrobky) a ROTO (plastové výrobky) — každé má vlastní soubor výsledků.
 const PRODUKTY_MAX = 3;
-function produktyStatus(email) {
+function produktyType(t) { return (String(t || '').toLowerCase() === 'roto') ? 'roto' : 'kovo'; }
+function produktyFile(t) { return path.join(DATA_DIR, 'produkty-' + produktyType(t) + '-results.json'); }
+const PRODUKTY_TYP_NAZEV = { kovo: 'Produkty KOVO', roto: 'Produkty ROTO' };
+function produktyStatus(email, type) {
   email = (email || '').toLowerCase();
-  const rec = readJson(PRODUKTY_F, []).find(r => (r.email || '').toLowerCase() === email);
+  const rec = readJson(produktyFile(type), []).find(r => (r.email || '').toLowerCase() === email);
   const attempts = (rec && Array.isArray(rec.attempts)) ? rec.attempts : [];
   const best = attempts.reduce((m, a) => Math.max(m, a.pct || 0), 0);
   return { attemptsUsed: attempts.length, attemptsLeft: Math.max(0, PRODUKTY_MAX - attempts.length), best, passed: attempts.some(a => a.passed) };
 }
 function recordProdukty(a) {
+  const type = produktyType(a.type);
+  const F = produktyFile(type);
   const email = (a.email || '').toLowerCase();
   const s = readJson(STATE_F, { employees: [], categories: [] });
   const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
@@ -844,14 +870,14 @@ function recordProdukty(a) {
   const correct = Math.max(0, Math.min(total, Math.round(Number(a.correct) || 0)));
   const pct = Math.max(0, Math.min(100, Math.round(Number(a.pct) || 0)));
   const passed = pct >= 80;
-  const results = readJson(PRODUKTY_F, []);
+  const results = readJson(F, []);
   let rec = results.find(r => (r.email || '').toLowerCase() === email);
   if (!rec) { rec = { email, name, dept, attempts: [] }; results.push(rec); }
   rec.name = name; rec.dept = dept; if (!Array.isArray(rec.attempts)) rec.attempts = [];
-  if (rec.attempts.length >= PRODUKTY_MAX) { writeJson(PRODUKTY_F, results); return { blocked: true, attemptsUsed: rec.attempts.length }; }
+  if (rec.attempts.length >= PRODUKTY_MAX) { writeJson(F, results); return { blocked: true, attemptsUsed: rec.attempts.length }; }
   rec.attempts.push({ correct, total, pct, passed, ts: Date.now() });
-  writeJson(PRODUKTY_F, results);
-  logActivity('produkty', { email, name }, 'Test znalosti produktů · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
+  writeJson(F, results);
+  logActivity('produkty', { email, name }, 'Test ' + PRODUKTY_TYP_NAZEV[type] + ' · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, PRODUKTY_MAX - rec.attempts.length), passed };
 }
 // Klíče modulů, ke kterým má zaměstnanec přístup (přiděluje správce v administraci).
@@ -2030,9 +2056,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(ABROLL_F, [])); }
     // Test znalosti produktů (školení obchodníků): GET = stav pokusů, POST = odeslání pokusu (max 3)
-    if (p === '/api/produkty' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, produktyStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/produkty' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, produktyStatus(eml, u.query.type), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/produkty' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordProdukty(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
-    if (p === '/api/produkty-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(PRODUKTY_F, [])); }
+    if (p === '/api/produkty-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(produktyFile(u.query.type), [])); }
     // ---- Odeslání reportu průzkumu e-mailem (z detailu; jen správce) ----
     if (p === '/api/survey-report/send' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
@@ -2152,7 +2178,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- intranet zaměstnanců: přihlášení přes Google (SSO) ----
-    if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); const ra = empSessionReal(req); const va = viewAsActive(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req), realAdmin: isRealAdmin(req), viewAs: va, real: (va && ra) ? { email: ra.email, name: ra.name } : (va ? { email: '', name: 'Správce' } : null) }); }
+    if (p === '/api/me' && req.method === 'GET') { const e = empSession(req); const ra = empSessionReal(req); const va = viewAsActive(req); return send(res, 200, { sso: ssoEnabled(), dev: devAllowed(req), employee: e ? { email: e.email, name: e.name } : null, admin: isAdmin(req), superadmin: isSuperadmin(req), realAdmin: isRealAdmin(req), viewAs: va, real: (va && ra) ? { email: ra.email, name: ra.name } : (va ? { email: '', name: 'Správce' } : null), poptavkyNew: _poptavkyCache.n }); }
     // ---- „Zobrazit jako zaměstnanec" (impersonace, jen skutečný admin) ----
     if (p === '/api/view-as/employees' && req.method === 'GET') {
       if (!isRealAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
@@ -2643,6 +2669,17 @@ const server = http.createServer(async (req, res) => {
         + '<body><div class="c"><h1>🧮 Kalkulace-lisy</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
         + '<p style="margin-top:12px;font-size:13px">Pro napojení vlož soubor <code>kalkulace-lisy.html</code> do projektu, nebo nastav proměnnou <code>KALKULACE_APP_URL</code> na adresu existující aplikace.</p></div></body></html>';
       return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- Poptávky (fronta „Nabídky k vyřízení" v nabídkové app): vloženo z intranetu, otevře přímo inbox ----
+    if (p === '/poptavky-app') {
+      const e = empSession(req);
+      const mods = e ? (employeeModules(e.email) || []) : [];
+      const allowed = isAdmin(req) || mods.indexOf('kalkulace') >= 0 || mods.indexOf('obchod') >= 0 || mods.indexOf('obchodexp') >= 0;
+      if (!allowed) return send(res, 403, '<h1>Přístup k Poptávkám nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      let target = NABIDKY_URL.replace(/\/$/, '') + '/?tab=inbox';
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += '&sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
     }
 
     // ---- Kalkulačka svoz ESA (modul): za přihlášením, přístup řídí správce, Google identita přes SSO token ----
