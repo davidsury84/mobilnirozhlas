@@ -3294,7 +3294,8 @@ function pvLimits(sp, maxVol, maxHm, maxLoad){
   if(sp.hm)   g+=pvGauge('Hmotnost', sp.hm+' kg', maxHm?val(sp.hm)/maxHm:0, 'hm');
   if(sp.load) g+=pvGauge('Nosnost', sp.load+' kg', maxLoad?val(sp.load)/maxLoad:0, 'load');
   let chips='';
-  if(sp.dim) chips+=pvChip('rozměr (mm)', sp.dim);
+  if(sp.voll) chips+=pvChip('objem', sp.voll);
+  if(sp.dim) chips+=pvChip('rozměr', sp.dim);
   if(sp.tl)  chips+=pvChip('plech (mm)', sp.tl);
   if(!g && !chips) return '';
   return '<div class="lim">'+(g?'<div class="lim-gauges">'+g+'</div>':'')+(chips?'<div class="lim-chips">'+chips+'</div>':'')+'</div>';

@@ -4271,5 +4271,86 @@
     "hm": "49"
    }
   }
+ ],
+ "roto-kapaliny": [
+  {
+   "name": "Mobilní nádrže na naftu (plastové)",
+   "img": "/assets/pv-roto-kapaliny-00-nafta.jpg",
+   "gallery": [
+    "/assets/pv-roto-kapaliny-00-nafta.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Nádrž na AdBlue",
+   "img": "/assets/pv-roto-kapaliny-01-adblue.jpg",
+   "gallery": [
+    "/assets/pv-roto-kapaliny-01-adblue.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Nádrže na ostatní kapaliny (typ DC)",
+   "img": "/assets/pv-roto-kapaliny-02-dc.jpg",
+   "gallery": [
+    "/assets/pv-roto-kapaliny-02-dc.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0,
+   "sp": {
+    "voll": "5000–9000 l"
+   }
+  },
+  {
+   "name": "Podzemní nádrže",
+   "img": "/assets/pv-roto-kapaliny-03-podzemni.jpg",
+   "gallery": [
+    "/assets/pv-roto-kapaliny-03-podzemni.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Vsakovací tunely",
+   "img": "/assets/pv-roto-kapaliny-04-vsakovaci.jpg",
+   "gallery": [
+    "/assets/pv-roto-kapaliny-04-vsakovaci.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0
+  },
+  {
+   "name": "Vodoměrná šachta 100/140",
+   "img": "/assets/pv-roto-kapaliny-05-vodomer.jpg",
+   "gallery": [
+    "/assets/pv-roto-kapaliny-05-vodomer.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0,
+   "sp": {
+    "dim": "100/140 cm"
+   }
+  },
+  {
+   "name": "Nádrž na solanku BrineGuard 9000",
+   "img": "/assets/pv-roto-kapaliny-06-brineguard.jpg",
+   "gallery": [
+    "/assets/pv-roto-kapaliny-06-brineguard.jpg"
+   ],
+   "nPhoto": 1,
+   "nPdf": 0,
+   "more": 0,
+   "sp": {
+    "voll": "9000 l"
+   }
+  }
  ]
 }
