@@ -157,6 +157,7 @@ const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracov
 const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
 const ABROLL_FILE = path.join(ROOT, 'abroll-skoleni.html');  // interaktivní školení ABROLL + závěrečný test
 const PRODUKTY_FILE = path.join(ROOT, 'produkty-skoleni.html'); // interaktivní školení Produkty (znalosti obchodníků) + závěrečný test
+const PRUMYSL_FILE = path.join(ROOT, 'prumysl-skoleni.html'); // interaktivní školení Průmysl (obchodník: skladování, Li-Ion, ADR) + závěrečný test
 const KONCEPT_FILE = path.join(ROOT, 'intranet-koncept.html'); // náhledový koncept redesignu intranetu (SharePoint hub)
 const PUB_DIR  = path.join(DATA_DIR, 'published');
 const STATE_F  = path.join(DATA_DIR, 'state.json');
@@ -169,6 +170,7 @@ const JSS_F    = path.join(DATA_DIR, 'jss-results.json');    // výsledky dotazn
 const TW44_F   = path.join(DATA_DIR, 'tw44-results.json');   // výsledky testu kognitivní zátěže (neanonymní)
 const ABROLL_F = path.join(DATA_DIR, 'abroll-results.json'); // výsledky testu ABROLL (max 3 pokusy na osobu)
 const PRODUKTY_F = path.join(DATA_DIR, 'produkty-results.json'); // výsledky testu znalosti produktů (max 3 pokusy na osobu)
+const PRUMYSL_F = path.join(DATA_DIR, 'prumysl-results.json'); // výsledky testu Průmysl (obchodník) — max 3 pokusy na osobu
 const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
 const ACTLOG_F  = path.join(DATA_DIR, 'activity.json');   // jednoduchý log aktivity (přihlášení, pozvánky, průzkumy)
@@ -883,6 +885,36 @@ function recordProdukty(a) {
   writeJson(F, results);
   logActivity('produkty', { email, name }, 'Test ' + PRODUKTY_TYP_NAZEV[type] + ' · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, PRODUKTY_MAX - rec.attempts.length), passed };
+}
+// Školení Průmysl (obchodník: skladování, Li-Ion baterie, ADR) – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
+const PRUMYSL_MAX = 3;
+function prumyslStatus(email) {
+  email = (email || '').toLowerCase();
+  const rec = readJson(PRUMYSL_F, []).find(r => (r.email || '').toLowerCase() === email);
+  const attempts = (rec && Array.isArray(rec.attempts)) ? rec.attempts : [];
+  const best = attempts.reduce((m, a) => Math.max(m, a.pct || 0), 0);
+  return { attemptsUsed: attempts.length, attemptsLeft: Math.max(0, PRUMYSL_MAX - attempts.length), best, passed: attempts.some(a => a.passed) };
+}
+function recordPrumysl(a) {
+  const email = (a.email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const total = Math.max(0, Math.round(Number(a.total) || 0));
+  const correct = Math.max(0, Math.min(total, Math.round(Number(a.correct) || 0)));
+  const pct = Math.max(0, Math.min(100, Math.round(Number(a.pct) || 0)));
+  const passed = pct >= 80;
+  const results = readJson(PRUMYSL_F, []);
+  let rec = results.find(r => (r.email || '').toLowerCase() === email);
+  if (!rec) { rec = { email, name, dept, attempts: [] }; results.push(rec); }
+  rec.name = name; rec.dept = dept; if (!Array.isArray(rec.attempts)) rec.attempts = [];
+  if (rec.attempts.length >= PRUMYSL_MAX) { writeJson(PRUMYSL_F, results); return { blocked: true, attemptsUsed: rec.attempts.length }; }
+  rec.attempts.push({ correct, total, pct, passed, ts: Date.now() });
+  writeJson(PRUMYSL_F, results);
+  logActivity('prumysl', { email, name }, 'Test Průmysl · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
+  return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, PRUMYSL_MAX - rec.attempts.length), passed };
 }
 // Klíče modulů, ke kterým má zaměstnanec přístup (přiděluje správce v administraci).
 function employeeModules(email) {
@@ -1671,26 +1703,54 @@ const VOC_OVERRIDES = {
   'jiří':'Jiří','jiri':'Jiří','hugo':'Hugo','otto':'Otto','leo':'Leo','timo':'Timo',
   'ondřej':'Ondřeji','ondrej':'Ondřeji'
 };
+/* 5. pád jednoho slova (křestní jméno nebo příjmení) */
+function vocWord(w) {
+  if (!w) return w;
+  const lower = w.toLowerCase();
+  const cap = (t) => (w[0] === w[0].toUpperCase()) ? (t.charAt(0).toUpperCase() + t.slice(1)) : t;
+  if (VOC_OVERRIDES[lower]) return cap(VOC_OVERRIDES[lower]);
+  if (lower.length < 2) return w;
+  if (/a$/.test(lower)) return cap(lower.slice(0,-1) + 'o');          // -a → -o (Jana→Jano, Svoboda→Svobodo)
+  if (/ie$/.test(lower)) return w;                                    // Marie, Lucie – beze změny
+  if (/[eiouyíáéěůúýó]$/.test(lower)) return w;                       // ostatní samohlásky beze změny (Jiří, Černý)
+  if (/[jščřžďťňc]$/.test(lower)) return cap(lower + 'i');            // měkké souhlásky → -i (Tomáš→Tomáši)
+  if (/ek$/.test(lower) && lower.length > 2) return cap(lower.slice(0,-2) + 'ku'); // -ek: Marek→Marku, Nováček→Nováčku
+  if (/ch$/.test(lower)) return cap(lower + 'u');                     // -ch → -chu (Vojtěch→Vojtěchu)
+  if (/[khg]$/.test(lower)) return cap(lower + 'u');                  // -k/-h/-g → +u (Menšík→Menšíku, Novák→Nováku)
+  if (/r$/.test(lower)) return cap(lower.slice(0,-1) + 'ře');         // -r → -ře (Petr→Petře)
+  if (/l$/.test(lower)) return cap(lower + 'e');                      // -l → -le (Michal→Michale)
+  if (/[dtnmvbszfp]$/.test(lower)) return cap(lower + 'e');           // tvrdé souhlásky → +e (David→Davide, Jan→Jane)
+  return w;
+}
 function vocCs(name) {
   if (!name) return name;
   const m = String(name).match(/^(\S+)(\s.*)?$/); if (!m) return name;
-  const first = m[1], rest = m[2] || '', lower = first.toLowerCase();
-  const cap = (t) => (first[0] === first[0].toUpperCase()) ? (t.charAt(0).toUpperCase() + t.slice(1)) : t;
-  if (VOC_OVERRIDES[lower]) return cap(VOC_OVERRIDES[lower]) + rest;
-  if (lower.length < 2) return name;
-  if (/a$/.test(lower)) return cap(lower.slice(0,-1) + 'o') + rest;          // -a → -o (Jana→Jano, Honza→Honzo)
-  if (/ie$/.test(lower)) return name;                                         // Marie, Lucie – beze změny
-  if (/[eiouyíáéěůúýó]$/.test(lower)) return name;                            // ostatní samohlásky beze změny (Jiří, Hugo)
-  if (/[jščřžďťňc]$/.test(lower)) return cap(lower + 'i') + rest;             // měkké souhlásky → -i (Tomáš→Tomáši)
-  if (/ek$/.test(lower) && lower.length > 2) return cap(lower.slice(0,-2) + 'ku') + rest; // -ek (mizící e): Marek→Marku, Radek→Radku
-  if (/ch$/.test(lower)) return cap(lower + 'u') + rest;                      // -ch → -chu (Vojtěch→Vojtěchu)
-  if (/[khg]$/.test(lower)) return cap(lower + 'u') + rest;                   // -k/-h/-g → +u (Patrik→Patriku)
-  if (/r$/.test(lower)) return cap(lower.slice(0,-1) + 'ře') + rest;          // -r → -ře (Petr→Petře)
-  if (/l$/.test(lower)) return cap(lower + 'e') + rest;                       // -l → -le (Michal→Michale)
-  if (/[dtnmvbszfp]$/.test(lower)) return cap(lower + 'e') + rest;            // tvrdé souhlásky → +e (David→Davide, Jan→Jane)
-  return name;
+  return vocWord(m[1]) + (m[2] || '');
 }
-function renderTpl(t, v) { return (t || '').replace(/\{(jmeno5|jmeno|smernice|odkaz)\}/g, (m, k) => (v[k] != null ? v[k] : m)); }
+/* Odhad pohlaví z jména (heuristika: slovník křestních jmen + koncovky). Vrací 'm' / 'f'. */
+const FEMALE_FIRST = new Set(['jana','petra','eva','marie','anna','lucie','kateřina','katerina','hana','lenka','veronika','martina','silvie','sylvie','simona','tereza','barbora','michaela','monika','zuzana','alena','ivana','jitka','helena','markéta','marketa','klára','klara','nikola','denisa','pavla','andrea','dagmar','iva','gabriela','renata','vendula','kristýna','kristyna','adéla','adela','natálie','natalie','alice','dana','olga','soňa','sona','vlasta','miroslava','jaroslava','ludmila','božena','bozena','květa','kveta','blanka','emilie','emílie','sylva','ilona','irena','radka','šárka','sarka','dominika','aneta','eliška','eliska','nela','laura','viktorie','johana','magdalena','magdaléna','žaneta','zaneta','pavlína','pavlina','romana','sabina','karolína','karolina','tereza','věra','vera']);
+const MALE_FIRST = new Set(['jan','petr','josef','pavel','jiří','jiri','martin','tomáš','tomas','jaroslav','miroslav','zdeněk','zdenek','václav','vaclav','michal','david','lukáš','lukas','jakub','milan','vladimír','vladimir','karel','františek','frantisek','ondřej','ondrej','roman','marek','radek','daniel','filip','stanislav','antonín','antonin','aleš','ales','libor','patrik','adam','matěj','matej','vojtěch','vojtech','dominik','richard','robert','ladislav','oldřich','oldrich','rostislav','bohumil','ivan','luboš','lubos','kamil','denis','štěpán','stepan','šimon','simon','vít','vit','hynek','arnošt','arnost']);
+function guessGender(name) {
+  if (!name) return 'm';
+  const parts = String(name).trim().split(/\s+/).filter(Boolean); if (!parts.length) return 'm';
+  const first = parts[0].toLowerCase();
+  const last = parts[parts.length - 1].toLowerCase();
+  if (FEMALE_FIRST.has(first)) return 'f';
+  if (MALE_FIRST.has(first)) return 'm';
+  if (/(ová|cká|ská|á)$/.test(last)) return 'f';   // ženská příjmení (Nováková, Malá, Novotná)
+  if (/ý$/.test(last)) return 'm';                 // Černý, Novotný
+  if (parts.length > 1) return /(a|ie|e)$/.test(first) ? 'f' : 'm'; // dle koncovky křestního jména
+  return 'm';                                      // jediný token, nejasné → muž (lze přepsat)
+}
+/* Formální oslovení „pane Nováku" / „paní Nováková" (5. pád, dle pohlaví). gender: 'm'|'f'|'' (auto). */
+function osloveniCs(name, gender) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  const surname = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+  const g = (gender === 'm' || gender === 'f') ? gender : guessGender(name);
+  return g === 'f' ? ('paní ' + surname) : ('pane ' + vocWord(surname));
+}
+function renderTpl(t, v) { return (t || '').replace(/\{(osloveni|jmeno5|jmeno|smernice|odkaz)\}/g, (m, k) => (v[k] != null ? v[k] : m)); }
 function toHtml(text, link, btnLabel) { let h = esc(text).replace(/\n/g, '<br>'); if (link) { const s = esc(link); h = h.split(s).join('<a href="' + s + '" style="color:#1f5d3f">' + s + '</a>') + '<div style="margin-top:18px"><a href="' + s + '" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-family:Arial,sans-serif;font-weight:bold">' + esc(btnLabel || 'Otevřít a potvrdit seznámení') + '</a></div>'; } return '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55">' + h + '</div>'; }
 function baseUrl(req) { return (CFG.publicUrl || (((req.headers['x-forwarded-proto'] || 'http')) + '://' + req.headers.host)).replace(/\/$/, ''); }
 /* Uvítací (pozvánkový) e-mail do intranetu — hezky nastylovaný, firemní barvy. Text (subject+body) je editovatelný. */
@@ -1699,7 +1759,7 @@ const DEFAULT_INVITE_BODY = 'Dobrý den {jmeno5},\n\nbyli jste pozváni do firem
 function intranetInviteMail(name, url, tpl) {
   tpl = tpl || {};
   const fn = (name || '').split(' ')[0] || name || '';
-  const vars = { jmeno: fn, jmeno5: vocCs(fn), odkaz: url };
+  const vars = { jmeno: fn, jmeno5: vocCs(fn), osloveni: osloveniCs(name), odkaz: url };
   const subject = renderTpl(tpl.subject || DEFAULT_INVITE_SUBJECT, vars);
   const bodyText = renderTpl(tpl.body || DEFAULT_INVITE_BODY, vars);
   const bodyHtml = '<p style="margin:0 0 14px">' + esc(bodyText).replace(/\n\n+/g, '</p><p style="margin:0 0 14px">').replace(/\n/g, '<br>') + '</p>';
@@ -2002,7 +2062,7 @@ const server = http.createServer(async (req, res) => {
       if (!process.env.RESEND_API_KEY && (!CFG.host || !CFG.user)) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
       const recipients = b.recipients || []; const results = []; const queue = recipients.slice();
       const useResend = !!process.env.RESEND_API_KEY;
-      async function worker() { while (queue.length) { const r = queue.shift(); const fn = ((r.name || '').split(' ')[0] || r.name || ''); const vars = { jmeno: fn, jmeno5: vocCs(fn), smernice: b.dirTitle || '', odkaz: r.link || '' }; const subject = renderTpl(b.subject, vars), text = renderTpl(b.body, vars); try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName, subject, text, html: toHtml(text, r.link, b.btnLabel) }); results.push({ email: r.email, ok: true }); } catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
+      async function worker() { while (queue.length) { const r = queue.shift(); const fn = ((r.name || '').split(' ')[0] || r.name || ''); const vars = { jmeno: fn, jmeno5: vocCs(fn), osloveni: osloveniCs(r.name, r.gender), smernice: b.dirTitle || '', odkaz: r.link || '' }; const subject = renderTpl(b.subject, vars), text = renderTpl(b.body, vars); try { await deliver({ to: r.email, fromAddr: b.fromEmail || CFG.user, fromEmail: b.fromEmail || undefined, fromName: b.fromName || CFG.fromName, subject, text, html: toHtml(text, r.link, b.btnLabel) }); results.push({ email: r.email, ok: true }); } catch (e) { results.push({ email: r.email, ok: false, error: e.message }); } if (useResend) await sleep(550); } }
       await Promise.all(Array.from({ length: useResend ? 1 : Math.min(3, recipients.length || 1) }, worker));
       return send(res, 200, { results });
     }
@@ -2063,6 +2123,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/produkty' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, produktyStatus(eml, u.query.type), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/produkty' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordProdukty(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/produkty-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(produktyFile(u.query.type), [])); }
+    // Školení Průmysl: GET = stav pokusů dané osoby, POST = odeslání pokusu (max 3)
+    if (p === '/api/prumysl' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, prumyslStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/prumysl' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordPrumysl(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/prumysl-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(PRUMYSL_F, [])); }
     // ---- Odeslání reportu průzkumu e-mailem (z detailu; jen správce) ----
     if (p === '/api/survey-report/send' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
@@ -2177,7 +2241,7 @@ const server = http.createServer(async (req, res) => {
       const b = JSON.parse(await readBody(req));
       const fn = ((b.name || '').split(' ')[0]) || b.name || '';
       const link = b.link || '';
-      const vars = { jmeno: fn, jmeno5: vocCs(fn), smernice: b.dirTitle || '', odkaz: link };
+      const vars = { jmeno: fn, jmeno5: vocCs(fn), osloveni: osloveniCs(b.name, b.gender), smernice: b.dirTitle || '', odkaz: link };
       return send(res, 200, { subject: renderTpl(b.subject || '', vars), html: toHtml(renderTpl(b.body || '', vars), link, b.btnLabel), mailReady: emailConfigured() });
     }
 
@@ -2654,6 +2718,14 @@ const server = http.createServer(async (req, res) => {
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Produkty je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(PRODUKTY_FILE)) return send(res, 404, '<h1>Chybí produkty-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(PRODUKTY_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+
+    // ---- Školení Průmysl (obchodník: skladování, Li-Ion, ADR): za přihlášením (zaměstnanec nebo správce) ----
+    if (p === '/prumysl-app') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Průmysl je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!fs.existsSync(PRUMYSL_FILE)) return send(res, 404, '<h1>Chybí prumysl-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(PRUMYSL_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----

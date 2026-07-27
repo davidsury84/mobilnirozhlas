@@ -2450,12 +2450,18 @@ async function showSkoleni(){
     const label = st.passed ? 'Otevřít znovu' : (u>=3 ? 'Prohlédnout' : (u>0 ? 'Pokračovat' : 'Spustit'));
     return { badge, label };
   }
-  let kst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, rst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false};
+  let kst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, rst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, pst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false};
   try{ kst=await (await fetch('/api/produkty?type=kovo&email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ rst=await (await fetch('/api/produkty?type=roto&email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
-  const kb=skolBadgeBtn(kst), rb=skolBadgeBtn(rst);
+  try{ pst=await (await fetch('/api/prumysl?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
+  const kb=skolBadgeBtn(kst), rb=skolBadgeBtn(rst), pb=skolBadgeBtn(pst);
   let h='<div class="dash-hero"><h2>Školení</h2><p>Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).</p></div>';
   h+='<div class="dash-sec">Dostupná školení</div>';
+  h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
+     '<div class="li-t">Průmysl — obchodník segmentu Skladování</div>'+
+     '<div class="muted" style="font-size:12px;margin-top:2px">Produktové kategorie skladování, Li-Ion baterie (rizika a příležitost), požární předpisy a ADR přeprava + závěrečný test</div></div></div>'+
+     '<div style="display:flex;align-items:center;gap:10px">'+pb.badge+
+     '<button class="btn sm" onclick="openPrumysl()">'+pb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">Produkty KOVO — kovové výrobky</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">Ocelové kontejnery, muldy, nádoby na separovaný sběr, záchytné vany a boxy + závěrečný test</div></div></div>'+
@@ -2495,6 +2501,17 @@ function openAbroll(){
       '<button class="btn ghost sm" onclick="showSkoleni()">← Zpět na školení</button>'+
       '<span class="muted" style="font-size:13px">Na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy.</span></div>'+
     '<iframe src="/abroll-app'+q+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#fff" title="Školení ABROLL"></iframe>';
+  window.scrollTo(0,0);
+}
+function openPrumysl(){
+  MUJ.view="skoleni"; renderSidebar();
+  const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
+  const body=document.getElementById("mujBody");
+  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
+      '<button class="btn ghost sm" onclick="showSkoleni()">← Zpět na školení</button>'+
+      '<span class="muted" style="font-size:13px">Školení <b>Průmysl</b> — na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
+    '<iframe src="/prumysl-app'+q+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#fff" title="Školení Průmysl"></iframe>';
   window.scrollTo(0,0);
 }
 function showSmlouvy(){
@@ -4935,6 +4952,7 @@ async function renderGritAdmin(){
   h+='<div class="divider" style="margin:26px 0"></div>'+ await jssBlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await tw44BlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await abrollBlockHtml();
+  h+='<div class="divider" style="margin:26px 0"></div>'+ await prumyslBlockHtml();
   box.innerHTML=h;
 }
 async function copyGritLinks(){
@@ -5151,6 +5169,49 @@ function exportAbroll(){
   const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
   const a=document.createElement("a"); a.href=url; a.download="abroll-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
+}
+/* ---- Školení Průmysl – závěrečný test (výsledky, max 3 pokusy) ---- */
+let PRUMYSL_RESULTS=[];
+async function prumyslBlockHtml(){
+  try{ const r=await fetch("/api/prumysl-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return ""; } PRUMYSL_RESULTS=await r.json(); }catch(e){ PRUMYSL_RESULTS=[]; }
+  let h='<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:8px"><strong>Školení Průmysl — závěrečný test</strong>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="exportPrumysl()">⬇ Export (XLSX)</button></div></div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">Interaktivní školení obchodníka segmentu Skladování (Li-Ion baterie, požární předpisy, ADR) v modulu „Školení". Test se vyhodnocuje automaticky, hranice splnění 80 %, <strong>max. 3 pokusy</strong> na osobu. Ukládá se každý pokus.</div>'+
+    '</div>';
+  const res=(PRUMYSL_RESULTS||[]).slice();
+  if(!res.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné výsledky školení Průmysl. Jakmile někdo dokončí test, objeví se tu.</p></div>'; return h; }
+  const bestOf=r=>{ const a=(r.attempts||[]); return a.reduce((m,x)=>Math.max(m,x.pct||0),0); };
+  const passedOf=r=>(r.attempts||[]).some(x=>x.passed);
+  const lastTs=r=>{ const a=(r.attempts||[]); return a.length?a[a.length-1].ts:0; };
+  const done=res.filter(passedOf).length;
+  h+='<div class="spread" style="margin:4px 0 12px"><h3 style="margin:0">Průmysl — přehled účastníků</h3></div>';
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Účastníků</div><strong style="font-size:20px">'+res.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Splnilo (≥80 %)</div><strong style="font-size:20px">'+done+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Nesplnilo</div><strong style="font-size:20px">'+(res.length-done)+'</strong></div></div>';
+  const groups={}; res.forEach(r=>{ const d=r.dept||"—"; (groups[d]=groups[d]||[]).push(r); });
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,"cs")).forEach(d=>{
+    const rows=groups[d].slice().sort((a,b)=>bestOf(b)-bestOf(a));
+    h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3></div>';
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">Pokusů</th><th class="num">Nejlepší</th><th>Stav</th><th>Poslední pokus</th></tr></thead><tbody>';
+    rows.forEach(r=>{ const best=bestOf(r), passed=passedOf(r), used=(r.attempts||[]).length, ts=lastTs(r);
+      h+='<tr><td>'+esc(r.name||r.email)+'</td><td class="muted">'+esc(r.email||"")+'</td>'+
+         '<td class="num">'+used+' / 3</td><td class="num">'+best+' %</td>'+
+         '<td>'+(passed?'<span class="pill green">✓ Splněno</span>':(used>=3?'<span class="pill red">✕ Nesplněno</span>':'<span class="pill amber">○ Probíhá</span>'))+'</td>'+
+         '<td class="muted">'+(ts?new Date(ts).toLocaleDateString("cs-CZ"):"—")+'</td></tr>'; });
+    h+='</tbody></table></div>';
+  });
+  return h;
+}
+function exportPrumysl(){
+  const res=PRUMYSL_RESULTS||[]; if(!res.length){ toast("Žádná data k exportu."); return; }
+  const rows=[["Jméno","E-mail","Oddělení","Pokusů","Nejlepší %","Splněno","Poslední pokus"]];
+  res.forEach(r=>{ const a=r.attempts||[]; const best=a.reduce((m,x)=>Math.max(m,x.pct||0),0); const passed=a.some(x=>x.passed); const ts=a.length?a[a.length-1].ts:0;
+    rows.push([r.name||r.email||"", r.email||"", r.dept||"", a.length, best, passed?"ano":"ne", ts?new Date(ts).toLocaleString("cs-CZ"):""]); });
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="prumysl-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
 }
 
 /* ============================================================
@@ -5426,6 +5487,12 @@ function openCandidateModal(id){
     <label class="field"><span>Jméno a příjmení</span><input type="text" id="cName" value="${e?esc(e.name):''}"></label>
     <label class="field"><span>E-mail</span><input type="email" id="cEmail" value="${e?esc(e.email):''}" placeholder="uchazec@email.cz"></label>
     <label class="field"><span>Pozice, o kterou se uchází</span><input type="text" id="cPos" value="${e&&e.position?esc(e.position):''}" placeholder="např. Skladník, Obchodní zástupce"></label>
+    <label class="field"><span>Pohlaví (oslovení „pane / paní")</span>
+      <select id="cGender">
+        <option value=""${!(e&&e.gender)?' selected':''}>Automaticky${e&&e.name?' — teď: '+(guessGender(e.name)==='f'?'paní':'pane'):''}</option>
+        <option value="m"${e&&e.gender==='m'?' selected':''}>Muž (pane)</option>
+        <option value="f"${e&&e.gender==='f'?' selected':''}>Žena (paní)</option>
+      </select></label>
     <label class="field"><span>Tagy (oddělené čárkou) — řídí, komu se rozesílá</span><input type="text" id="cTags" value="${e&&e.tags?esc(e.tags.join(', ')):''}" placeholder="např. Výběrové řízení 2026, Sklad"></label>`;
   document.getElementById("modalFoot").innerHTML=`
     <button class="btn ghost" onclick="closeModal()">Zrušit</button>
@@ -5437,12 +5504,13 @@ function saveCandidate(id){
   const email=document.getElementById("cEmail").value.trim().toLowerCase();
   if(!email){ alert("Zadej e-mail."); return; }
   const position=document.getElementById("cPos").value.trim();
+  const gender=(document.getElementById("cGender")||{}).value||"";
   const tags=(document.getElementById("cTags").value||"").split(",").map(s=>s.trim()).filter(Boolean);
   if(!DB.candidates) DB.candidates=[];
   const dup=DB.candidates.find(x=>x.email.toLowerCase()===email && x.id!==id);
   if(dup){ alert("E-mail už je mezi uchazeči."); return; }
-  if(id){ const e=DB.candidates.find(x=>x.id===id); e.name=name||email; e.email=email; e.position=position; e.tags=tags; }
-  else DB.candidates.push({id:uid(),name:name||email,email,position,tags});
+  if(id){ const e=DB.candidates.find(x=>x.id===id); e.name=name||email; e.email=email; e.position=position; e.gender=gender; e.tags=tags; }
+  else DB.candidates.push({id:uid(),name:name||email,email,position,gender,tags});
   save(); closeModal(); renderCandidates();
 }
 async function importCandidates(input){
@@ -5561,24 +5629,51 @@ function copyText(t){ if(navigator.clipboard){ navigator.clipboard.writeText(t).
 function personalLink(email){ const base=(DB.settings.baseUrl||"").trim(); return (base?base:"")+"#kdo="+encodeURIComponent(email); }
 /* Český 5. pád (oslovení) – stejná logika jako na serveru */
 const VOC_OVERRIDES={'pavel':'Pavle','karel':'Karle','zdeněk':'Zdeňku','zdenek':'Zdeňku','daniel':'Danieli','michael':'Michaeli','marcel':'Marcele','jiří':'Jiří','jiri':'Jiří','hugo':'Hugo','otto':'Otto','leo':'Leo','ondřej':'Ondřeji','ondrej':'Ondřeji'};
+function vocWord(w){
+  if(!w) return w;
+  const lower=w.toLowerCase();
+  const cap=(t)=>(w[0]===w[0].toUpperCase())?(t.charAt(0).toUpperCase()+t.slice(1)):t;
+  if(VOC_OVERRIDES[lower]) return cap(VOC_OVERRIDES[lower]);
+  if(lower.length<2) return w;
+  if(/a$/.test(lower)) return cap(lower.slice(0,-1)+"o");
+  if(/ie$/.test(lower)) return w;
+  if(/[eiouyíáéěůúýó]$/.test(lower)) return w;
+  if(/[jščřžďťňc]$/.test(lower)) return cap(lower+"i");
+  if(/ek$/.test(lower)&&lower.length>2) return cap(lower.slice(0,-2)+"ku");
+  if(/ch$/.test(lower)) return cap(lower+"u");
+  if(/[khg]$/.test(lower)) return cap(lower+"u");
+  if(/r$/.test(lower)) return cap(lower.slice(0,-1)+"ře");
+  if(/l$/.test(lower)) return cap(lower+"e");
+  if(/[dtnmvbszfp]$/.test(lower)) return cap(lower+"e");
+  return w;
+}
 function vocCs(name){
   if(!name) return name;
   const m=String(name).match(/^(\S+)(\s.*)?$/); if(!m) return name;
-  const first=m[1], rest=m[2]||"", lower=first.toLowerCase();
-  const cap=(t)=>(first[0]===first[0].toUpperCase())?(t.charAt(0).toUpperCase()+t.slice(1)):t;
-  if(VOC_OVERRIDES[lower]) return cap(VOC_OVERRIDES[lower])+rest;
-  if(lower.length<2) return name;
-  if(/a$/.test(lower)) return cap(lower.slice(0,-1)+"o")+rest;
-  if(/ie$/.test(lower)) return name;
-  if(/[eiouyíáéěůúýó]$/.test(lower)) return name;
-  if(/[jščřžďťňc]$/.test(lower)) return cap(lower+"i")+rest;
-  if(/ek$/.test(lower)&&lower.length>2) return cap(lower.slice(0,-2)+"ku")+rest;
-  if(/ch$/.test(lower)) return cap(lower+"u")+rest;
-  if(/[khg]$/.test(lower)) return cap(lower+"u")+rest;
-  if(/r$/.test(lower)) return cap(lower.slice(0,-1)+"ře")+rest;
-  if(/l$/.test(lower)) return cap(lower+"e")+rest;
-  if(/[dtnmvbszfp]$/.test(lower)) return cap(lower+"e")+rest;
-  return name;
+  return vocWord(m[1])+(m[2]||"");
+}
+/* Odhad pohlaví dle jména (heuristika) — stejná logika jako na serveru. Vrací 'm' / 'f'. */
+const FEMALE_FIRST=new Set(['jana','petra','eva','marie','anna','lucie','kateřina','katerina','hana','lenka','veronika','martina','silvie','sylvie','simona','tereza','barbora','michaela','monika','zuzana','alena','ivana','jitka','helena','markéta','marketa','klára','klara','nikola','denisa','pavla','andrea','dagmar','iva','gabriela','renata','vendula','kristýna','kristyna','adéla','adela','natálie','natalie','alice','dana','olga','soňa','sona','vlasta','miroslava','jaroslava','ludmila','božena','bozena','květa','kveta','blanka','emilie','emílie','sylva','ilona','irena','radka','šárka','sarka','dominika','aneta','eliška','eliska','nela','laura','viktorie','johana','magdalena','magdaléna','žaneta','zaneta','pavlína','pavlina','romana','sabina','karolína','karolina','věra','vera']);
+const MALE_FIRST=new Set(['jan','petr','josef','pavel','jiří','jiri','martin','tomáš','tomas','jaroslav','miroslav','zdeněk','zdenek','václav','vaclav','michal','david','lukáš','lukas','jakub','milan','vladimír','vladimir','karel','františek','frantisek','ondřej','ondrej','roman','marek','radek','daniel','filip','stanislav','antonín','antonin','aleš','ales','libor','patrik','adam','matěj','matej','vojtěch','vojtech','dominik','richard','robert','ladislav','oldřich','oldrich','rostislav','bohumil','ivan','luboš','lubos','kamil','denis','štěpán','stepan','šimon','simon','vít','vit','hynek','arnošt','arnost']);
+function guessGender(name){
+  if(!name) return 'm';
+  const parts=String(name).trim().split(/\s+/).filter(Boolean); if(!parts.length) return 'm';
+  const first=parts[0].toLowerCase();
+  const last=parts[parts.length-1].toLowerCase();
+  if(FEMALE_FIRST.has(first)) return 'f';
+  if(MALE_FIRST.has(first)) return 'm';
+  if(/(ová|cká|ská|á)$/.test(last)) return 'f';
+  if(/ý$/.test(last)) return 'm';
+  if(parts.length>1) return /(a|ie|e)$/.test(first)?'f':'m';
+  return 'm';
+}
+/* Formální oslovení „pane Nováku" / „paní Nováková" (dle pohlaví). gender: 'm'|'f'|'' (auto). */
+function osloveniCs(name, gender){
+  const parts=String(name||"").trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return "";
+  const surname=parts.length>1?parts[parts.length-1]:parts[0];
+  const g=(gender==='m'||gender==='f')?gender:guessGender(name);
+  return g==='f' ? ("paní "+surname) : ("pane "+vocWord(surname));
 }
 
 /* ---------- Komunikace se serverem ---------- */
@@ -5598,9 +5693,9 @@ async function publishToServer(id){
 }
 
 /* Klientský fallback náhledu e-mailu (když server /api/send-preview neodpoví) */
-function clientEmailHtml(subject, body, name, title, link, btnLabel){
+function clientEmailHtml(subject, body, name, title, link, btnLabel, gender){
   const fn=(name||"").split(" ")[0]||name||"";
-  const sub=v=>String(v||"").replace(/{jmeno5}/g,fn).replace(/{jmeno}/g,fn).replace(/{smernice}/g,title||"").replace(/{odkaz}/g,link||"");
+  const sub=v=>String(v||"").replace(/{osloveni}/g,osloveniCs(name,gender)).replace(/{jmeno5}/g,vocCs(fn)).replace(/{jmeno}/g,fn).replace(/{smernice}/g,title||"").replace(/{odkaz}/g,link||"");
   let h=esc(sub(body)).replace(/\n/g,"<br>");
   if(link){ const s=esc(link); h=h.split(s).join('<a href="'+s+'" style="color:#1f5d3f">'+s+'</a>')+'<div style="margin-top:18px"><a href="'+s+'" style="display:inline-block;background:#1f5d3f;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:bold">'+esc(btnLabel||"Otevřít a potvrdit")+'</a></div>'; }
   return { subject:sub(subject), html:'<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.55;padding:20px">'+h+'</div>' };
@@ -5977,7 +6072,7 @@ function openSendModal(id){
         <input type="text" id="mSubj" value="${esc(DEF.subj)}"></label>
       <label class="field" style="margin-bottom:6px"><span>Text e-mailu</span>
         <textarea id="mBody" style="min-height:140px">${esc(defBody)}</textarea></label>
-      <div class="muted" style="font-size:12px;margin-bottom:12px">Značky: <span class="mono">{jmeno}</span> (1. pád) · <span class="mono">{jmeno5}</span> (5. pád, oslovení – „Davide") · <span class="mono">{smernice}</span> · <span class="mono">{odkaz}</span></div>
+      <div class="muted" style="font-size:12px;margin-bottom:12px">Značky: <span class="mono">{jmeno}</span> (1. pád) · <span class="mono">{jmeno5}</span> (5. pád, oslovení – „Davide") · <span class="mono">{osloveni}</span> (formální „pane Nováku / paní Nováková") · <span class="mono">{smernice}</span> · <span class="mono">{odkaz}</span></div>
       <div class="inline-actions">
         <button class="btn" onclick="previewBulk('${id}')">👁 Náhled a rozeslat</button>
         <button class="btn ghost" onclick="refreshSend('${id}')">${S.isSurvey?'Načíst výsledky ze serveru':'Načíst potvrzení ze serveru'}</button>
@@ -6051,25 +6146,37 @@ function appConfirm(title, bodyHtml, okLabel){
   });
 }
 function ucSklon(n){ return n===1?"uchazeči":"uchazečům"; }
-/* Náhled e-mailu pro uchazeče — přímo v kartě Uchazeči o práci */
+/* Náhled + ÚPRAVA e-mailu pro uchazeče — přímo v kartě Uchazeči o práci (živý náhled, editovatelný předmět i text) */
 async function previewCand(id){
   const S=sendableOf(id); if(!S) return;
   const picked=pickedCands();
   if(!picked.length){ alert("Zaškrtni aspoň jednoho uchazeče."); return; }
   const out=document.getElementById("candResults"); if(out) out.innerHTML='<p class="muted">Připravuji náhled…</p>';
   if(S.isSurvey) await loadInvites(id,picked);
+  if(!out) return;
   const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
   const sample=picked[0], link=S.linkFor(sample.email);
-  const pv=await fetchEmailPreview({subject,body,name:sample.name,link,dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"});
-  if(!out) return;
+  const btn=S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení";
+  const g=sample.gender||guessGender(sample.name);
   out.innerHTML='<div class="card pad">'
-    +'<div class="spread" style="margin-bottom:8px"><b>Náhled e-mailu</b><span class="muted" style="font-size:12px">příjemce: '+esc(sample.name||sample.email)+'</span></div>'
-    +(pv.mailReady===false?'<div class="hint" style="margin-bottom:10px;background:var(--red-soft);border-color:#e3b7b1;color:#7a2520"><b>Pošta není nastavená</b> — vyplň ji v záložce Nastavení.</div>':'')
-    +'<div style="font-size:13px;margin-bottom:8px"><b>Předmět:</b> '+esc(pv.subject||subject)+'</div>'
-    +'<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden"><iframe id="candPrev" style="width:100%;height:38vh;border:0;background:#fff" title="Náhled e-mailu"></iframe></div>'
+    +'<div class="spread" style="margin-bottom:8px"><b>Náhled a úprava e-mailu</b><span class="muted" style="font-size:12px">vzor: '+esc(sample.name||sample.email)+' · '+(g==='f'?'paní':'pane')+'</span></div>'
+    +'<label class="field" style="margin-bottom:8px"><span>Předmět e-mailu</span><input type="text" id="candSubj" value="'+esc(subject)+'"></label>'
+    +'<label class="field" style="margin-bottom:4px"><span>Text e-mailu</span><textarea id="candBody" style="min-height:130px">'+esc(body)+'</textarea></label>'
+    +'<div class="muted" style="font-size:12px;margin:0 0 10px">Značky: <span class="mono">{osloveni}</span> (pane/paní + příjmení v 5. pádu, dle pohlaví) · <span class="mono">{jmeno5}</span> (křestní v 5. pádu) · <span class="mono">{smernice}</span> · <span class="mono">{odkaz}</span></div>'
+    +'<div class="muted" style="font-size:12px;margin-bottom:6px">Takto e-mail uvidí příjemce:</div>'
+    +'<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden"><iframe id="candPrev" style="width:100%;height:34vh;border:0;background:#fff" title="Náhled e-mailu"></iframe></div>'
     +'<div class="inline-actions" style="margin-top:12px"><button class="btn" onclick="sendToCands(\''+id+'\')">✉ Odeslat uchazečům ('+picked.length+')</button>'
     +'<button class="btn ghost" onclick="document.getElementById(\'candResults\').innerHTML=\'\'">Zavřít náhled</button></div></div>';
-  const ifr=document.getElementById("candPrev"); if(ifr) ifr.srcdoc=pv.html||'<p style="font-family:sans-serif;color:#777;padding:20px">Náhled se nepodařilo načíst.</p>';
+  const subEl=document.getElementById("candSubj"), bodyEl=document.getElementById("candBody"), ifr=document.getElementById("candPrev");
+  const render=()=>{
+    const s=subEl.value, b=bodyEl.value;
+    // zrcadlíme do hlavních polí, aby odeslání použilo právě upravený text
+    const mS=document.getElementById("mSubj"), mB=document.getElementById("mBody");
+    if(mS) mS.value=s; if(mB) mB.value=b;
+    const pv=clientEmailHtml(s,b,sample.name,S.title,link,btn,g);
+    if(ifr) ifr.srcdoc=pv.html||'<p style="font-family:sans-serif;color:#777;padding:20px">Náhled se nepodařilo načíst.</p>';
+  };
+  subEl.oninput=render; bodyEl.oninput=render; render();
   out.scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 /* Odeslání jen zaškrtnutým uchazečům (bez zaměstnanců) */
@@ -6086,7 +6193,7 @@ async function sendToCands(id){
   try{
     if(!S.isSurvey) await ensurePublished(id);
     if(S.isSurvey) await loadInvites(id,picked);
-    const payload={subject,body,recipients:picked.map(c=>({email:c.email,name:c.name,link:S.linkFor(c.email)})),dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"};
+    const payload={subject,body,recipients:picked.map(c=>({email:c.email,name:c.name,gender:c.gender||"",link:S.linkFor(c.email)})),dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"};
     if(prof){ payload.fromEmail=prof.fromEmail; payload.fromName=prof.fromName; }
     const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
     let j={}; try{ j=await res.json(); }catch(_){ }
@@ -6102,7 +6209,7 @@ async function sendOne(id,email){
   const S=sendableOf(id); if(!S) return;
   const aud=sendAudience(S);
   let r=aud.find(e=>(e.email||"").toLowerCase()===email.toLowerCase());
-  if(!r){ const c=(DB.candidates||[]).find(x=>(x.email||"").toLowerCase()===email.toLowerCase())||DB.employees.find(x=>(x.email||"").toLowerCase()===email.toLowerCase()); if(!c){ alert("Příjemce nenalezen."); return; } r={name:c.name,email:c.email}; }
+  if(!r){ const c=(DB.candidates||[]).find(x=>(x.email||"").toLowerCase()===email.toLowerCase())||DB.employees.find(x=>(x.email||"").toLowerCase()===email.toLowerCase()); if(!c){ alert("Příjemce nenalezen."); return; } r={name:c.name,email:c.email,gender:c.gender||""}; }
   if(DEMO){ toast("Ukázkový režim – e-maily se neodesílají"); return; }
   if(!(await appConfirm("Odeslat e-mail?", esc(r.name)+' <span class="mono" style="font-size:12px">&lt;'+esc(r.email)+'&gt;</span>', "✉ Odeslat"))) return;
   const subject=document.getElementById("mSubj").value, body=document.getElementById("mBody").value;
@@ -6110,7 +6217,7 @@ async function sendOne(id,email){
   try{
     if(!S.isSurvey) await ensurePublished(id);
     if(S.isSurvey) await loadInvites(id,[r]);
-    const payload={subject,body,recipients:[{email:r.email,name:r.name,link:S.linkFor(r.email)}],dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"};
+    const payload={subject,body,recipients:[{email:r.email,name:r.name,gender:r.gender||"",link:S.linkFor(r.email)}],dirTitle:S.title,btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"};
     if(prof){ payload.fromEmail=prof.fromEmail; payload.fromName=prof.fromName; }
     const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
     let j={}; try{ j=await res.json(); }catch(_){ }

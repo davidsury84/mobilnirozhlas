@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Školení Průmysl · ELKOPLAST CZ · interní školení</title>
+<style>
+:root{
+  --g:#0e8a43; --gd:#0a6b34; --gxd:#0E2917;
+  --ink:#212A24; --mut:#5F6B62; --line:#DFE8E1; --bg:#F2F5F2; --card:#FFFFFF;
+  --gl:#EAF4EC; --warn:#C77700; --warnbg:#FCF3E4; --bad:#B3362B; --badbg:#FBEBE9;
+  --r:14px; --sw:296px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:16px;line-height:1.62}
+button{font:inherit;cursor:pointer}
+a{color:#2B5D8A}
+
+/* ---------- layout ---------- */
+.app{display:flex;min-height:100vh}
+aside{width:var(--sw);flex:0 0 var(--sw);background:linear-gradient(180deg,#103120 0%,#0E2917 100%);
+  color:#D7E5DA;position:fixed;inset:0 auto 0 0;display:flex;flex-direction:column;z-index:40;
+  transition:transform .25s ease}
+.main{flex:1;margin-left:var(--sw);min-width:0;display:flex;flex-direction:column}
+@media (max-width:960px){
+  aside{transform:translateX(-100%);box-shadow:0 0 40px rgba(0,0,0,.35)}
+  aside.open{transform:none}
+  .main{margin-left:0}
+}
+#ovl{position:fixed;inset:0;background:rgba(10,20,13,.45);z-index:30;opacity:0;pointer-events:none;transition:opacity .2s}
+#ovl.on{opacity:1;pointer-events:auto}
+
+/* ---------- sidebar ---------- */
+.brand{display:flex;gap:12px;align-items:center;padding:20px 20px 14px}
+.mark{width:42px;height:42px;border-radius:11px;background:var(--g);display:grid;place-items:center;
+  color:#fff;font-weight:800;font-size:21px;letter-spacing:.5px;flex:0 0 42px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.22)}
+.brand b{display:block;color:#fff;font-size:15.5px;letter-spacing:.4px}
+.brand small{color:#9DB8A4;font-size:12px}
+.srch{padding:0 16px 12px;position:relative}
+.srch input{width:100%;padding:9px 12px 9px 34px;border-radius:10px;border:1px solid #2C4A36;
+  background:#16351f;color:#EAF2EC;font-size:13.5px;outline:none}
+.srch input::placeholder{color:#87A18E}
+.srch input:focus{border-color:var(--g)}
+.srch svg{position:absolute;left:26px;top:10px;width:15px;height:15px;stroke:#87A18E;fill:none;stroke-width:2}
+#res{position:absolute;left:12px;right:12px;top:44px;background:#fff;color:var(--ink);border-radius:12px;
+  box-shadow:0 14px 40px rgba(0,0,0,.35);max-height:330px;overflow:auto;display:none;z-index:60}
+#res.on{display:block}
+#res .ri{padding:9px 13px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;line-height:1.45}
+#res .ri:last-child{border-bottom:0}
+#res .ri:hover{background:var(--gl)}
+#res .ri b.k{color:var(--g);font-size:11px;text-transform:uppercase;letter-spacing:.4px;display:block}
+#res mark{background:#FCE39B;padding:0 1px;border-radius:3px}
+#res .none{padding:11px 13px;font-size:13px;color:var(--mut)}
+nav{flex:1;overflow-y:auto;padding:4px 12px 12px}
+nav::-webkit-scrollbar{width:8px}
+nav::-webkit-scrollbar-thumb{background:#2C4A36;border-radius:4px}
+.ntitle{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#7E9B87;padding:10px 10px 6px}
+.ni{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;
+  color:#D7E5DA;padding:8px 10px;border-radius:10px;font-size:13.8px;line-height:1.3}
+.ni:hover{background:#1A3A26}
+.ni.act{background:var(--g);color:#fff}
+.ni .no{width:24px;height:24px;flex:0 0 24px;border-radius:7px;background:#1D4029;display:grid;place-items:center;
+  font-size:11.5px;font-weight:700;color:#BCD6C2}
+.ni.act .no{background:rgba(255,255,255,.22);color:#fff}
+.ni .tt{flex:1}
+.ni .ok{width:16px;flex:0 0 16px;color:#63C87F;font-weight:700;font-size:13px;visibility:hidden}
+.ni.done .ok{visibility:visible}
+.ni.act .ok{color:#fff}
+.ni .sc{font-size:10.5px;font-weight:700;background:#1D4029;color:#9CC8A7;border-radius:6px;padding:2px 6px}
+.ni.act .sc{background:rgba(255,255,255,.22);color:#fff}
+.subnav{margin:2px 0 6px;padding-left:44px;display:flex;flex-direction:column;gap:1px}
+.sn{background:none;border:0;text-align:left;color:#A9C3B0;font-size:12.3px;padding:4px 8px;border-radius:7px;line-height:1.35}
+.sn:hover{background:#1A3A26;color:#fff}
+.sfoot{padding:12px 20px;font-size:11px;color:#7E9B87;border-top:1px solid #1D4029}
+
+/* ---------- topbar ---------- */
+.top{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:10px 22px;min-height:54px}
+#burger{display:none;background:none;border:1px solid var(--line);border-radius:9px;width:36px;height:36px;font-size:17px;color:var(--ink)}
+@media (max-width:960px){#burger{display:block}}
+.crumb{flex:1;font-size:13.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb b{color:var(--ink)}
+.prog{display:flex;align-items:center;gap:9px}
+.pbar{width:150px;height:8px;border-radius:99px;background:#E3EAE4;overflow:hidden}
+@media (max-width:520px){.pbar{width:80px}}
+#pfill{height:100%;width:0;background:linear-gradient(90deg,var(--g),#2FA35A);border-radius:99px;transition:width .4s}
+#ptext{font-size:12px;font-weight:700;color:var(--gd);min-width:66px}
+
+/* ---------- content ---------- */
+.wrap{padding:26px 22px 60px;flex:1}
+.view,.hero{display:none;max-width:920px;margin:0 auto;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);padding:38px 48px 30px;box-shadow:0 1px 2px rgba(20,40,25,.04)}
+@media (max-width:700px){.view,.hero{padding:24px 20px}}
+.view.act,.hero.act{display:block;animation:fin .25s ease}
+@keyframes fin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+h1{font-size:27px;line-height:1.25;color:var(--gd);margin:0 0 18px;padding-bottom:12px;position:relative}
+h1::after{content:"";position:absolute;left:0;bottom:0;width:64px;height:4px;border-radius:2px;background:var(--g)}
+h2{font-size:19.5px;color:var(--gd);margin:34px 0 10px;scroll-margin-top:70px}
+h3{font-size:16px;color:#3A463D;margin:22px 0 6px;scroll-margin-top:70px}
+p{margin:0 0 12px}
+p.ind{margin-left:26px}
+.muted{color:var(--mut)}
+.sm{font-size:13.2px}
+.flash{animation:fl 1.6s ease}
+@keyframes fl{0%,60%{background:#FCE39B}100%{background:transparent}}
+
+ul.bl{list-style:none;margin:0 0 14px;padding:0}
+ul.bl li{position:relative;padding-left:22px;margin:0 0 7px}
+ul.bl li.lv0::before{content:"";position:absolute;left:6px;top:.62em;width:7px;height:7px;border-radius:2px;background:var(--g)}
+ul.bl li.lv1{margin-left:24px}
+ul.bl li.lv1::before{content:"–";position:absolute;left:4px;color:var(--g);font-weight:700}
+
+/* tables */
+.tw{overflow-x:auto;margin:6px 0 16px;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.5;min-width:520px}
+th{background:var(--g);color:#fff;text-align:left;padding:9px 12px;font-size:13px;letter-spacing:.2px}
+td{padding:8px 12px;border-top:1px solid var(--line);vertical-align:top}
+tbody tr:nth-child(even){background:#F5F9F6}
+
+/* callouts */
+.co{border-radius:12px;padding:14px 18px;margin:14px 0 18px;border-left:5px solid var(--g);background:var(--gl)}
+.co p{margin:0 0 8px}.co p:last-child{margin:0}
+.co-warn{border-left-color:var(--warn);background:var(--warnbg)}
+.colab{color:var(--gd);letter-spacing:.4px;font-size:14px}
+.co-warn .colab{color:var(--warn)}
+
+/* checklist */
+ul.cl li.chk{padding:0;margin:0 0 8px}
+ul.cl li.chk::before{display:none}
+ul.cl li.chk label{display:flex;gap:11px;align-items:flex-start;background:#F7FAF7;border:1px solid var(--line);
+  border-radius:11px;padding:10px 14px;cursor:pointer;transition:background .15s,border-color .15s}
+ul.cl li.chk label:hover{border-color:#BFD3C4}
+ul.cl li.chk input{margin-top:4px;width:17px;height:17px;flex:0 0 17px;accent-color:var(--g)}
+ul.cl li.chk:has(input:checked) label{background:var(--gl);border-color:#BFD8C6}
+
+/* bottom nav */
+.bnav{display:flex;justify-content:space-between;gap:12px;margin-top:34px;padding-top:20px;border-top:1px solid var(--line)}
+.btn{border:0;border-radius:10px;padding:10px 18px;font-weight:600;font-size:14.5px;background:var(--g);color:#fff}
+.btn:hover{background:var(--gd)}
+.btn.ghost{background:#fff;color:var(--gd);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--g)}
+.btn[disabled]{opacity:.4;cursor:default}
+
+/* ---------- hero ---------- */
+.hero{padding:0;overflow:hidden}
+.hh{background:linear-gradient(135deg,#14532D 0%,#1F7A3C 62%,#2FA35A 100%);color:#fff;padding:46px 48px 40px}
+@media (max-width:700px){.hh{padding:30px 22px}}
+.badge{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);
+  border-radius:99px;padding:4px 13px;font-size:11.5px;letter-spacing:1.1px;text-transform:uppercase;margin-bottom:16px}
+.hh h1{color:#fff;font-size:31px;margin:0 0 10px;padding:0}
+.hh h1::after{display:none}
+.hh .sub{font-size:15.5px;color:#DDEBDF;max-width:640px;margin:0 0 6px}
+.hh .meta{font-size:12.5px;color:#B9D3BE;margin-top:14px}
+.hb{padding:30px 48px 40px}
+@media (max-width:700px){.hb{padding:22px 20px 28px}}
+.hb .lead{color:var(--mut);font-size:14.5px;margin-bottom:20px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:13px}
+.card{border:1px solid var(--line);border-radius:13px;padding:15px 17px;text-align:left;background:#fff;
+  display:flex;flex-direction:column;gap:7px;transition:border-color .15s,box-shadow .15s}
+.card:hover{border-color:var(--g);box-shadow:0 4px 14px rgba(20,83,45,.10)}
+.card .cn{font-size:11.5px;font-weight:800;letter-spacing:1px;color:var(--g);text-transform:uppercase}
+.card .ct{font-weight:700;font-size:15px;line-height:1.3}
+.card .cm{font-size:12.3px;color:var(--mut);margin-top:auto;display:flex;justify-content:space-between;align-items:center}
+.card .st{font-size:11px;font-weight:700;color:#fff;background:var(--g);border-radius:6px;padding:2px 7px;visibility:hidden}
+.card.done .st{visibility:visible}
+.hstart{margin:24px 0 6px;display:flex;gap:12px;flex-wrap:wrap}
+.btn.big{padding:13px 26px;font-size:15.5px}
+
+/* ---------- quiz ---------- */
+.qcard{border:1px solid var(--line);border-radius:13px;padding:16px 20px;margin:0 0 14px;background:#fff}
+.qcard.miss{border-color:var(--bad);box-shadow:0 0 0 3px var(--badbg)}
+.qq{font-weight:700;margin:0 0 10px}
+.qq .qn{color:var(--g)}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;
+  padding:9px 13px;margin-bottom:7px;cursor:pointer;font-size:14.6px;line-height:1.5;transition:background .12s,border-color .12s}
+.opt:hover{background:#F7FAF7;border-color:#BFD3C4}
+.opt input{margin-top:3px;accent-color:var(--g);width:16px;height:16px;flex:0 0 16px}
+.opt .ol{font-weight:700;color:var(--mut);flex:0 0 18px}
+.qz.locked .opt{pointer-events:none}
+.opt.good{background:var(--gl);border-color:var(--g)}
+.opt.good .ol{color:var(--g)}
+.opt.badpick{background:var(--badbg);border-color:var(--bad)}
+.opt.badpick .ol{color:var(--bad)}
+.qexpl{display:none;margin-top:8px;font-size:13.6px;border-radius:9px;padding:9px 13px;background:var(--gl);color:#274D33}
+.qexpl.bad{background:var(--badbg);color:#6E2C25}
+.qexpl.show{display:block}
+.qactions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:20px 0 6px}
+.qmsg{color:var(--bad);font-size:13.5px;font-weight:600;display:none}
+.qmsg.show{display:inline}
+.qres{display:none;border-radius:13px;padding:22px 24px;margin:0 0 18px;color:#fff;
+  background:linear-gradient(135deg,var(--gd),var(--g))}
+.qres.fail{background:linear-gradient(135deg,#8A5200,var(--warn))}
+.qres.show{display:block}
+.qres .big{font-size:34px;font-weight:800;line-height:1.1}
+.qres .vt{margin-top:6px;font-size:14.5px;opacity:.95;max-width:640px}
+
+/* ---------- print ---------- */
+@media print{
+  aside,.top,#ovl,.bnav,.qactions{display:none!important}
+  .main{margin:0}
+  .view,.hero{display:block!important;border:0;box-shadow:none;max-width:none;padding:0 0 24px;page-break-after:always}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+<div id="ovl"></div>
+<div class="app">
+  <aside id="sb">
+    <div class="brand">
+      <div class="mark">E</div>
+      <div><b>ELKOPLAST CZ</b><small>Interní vzdělávací aplikace</small></div>
+    </div>
+    <div class="srch">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.2-4.2"/></svg>
+      <input id="q" type="search" placeholder="Hledat ve školení…" autocomplete="off">
+      <div id="res"></div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="sfoot">Verze: červenec 2026 · stav předpisů ADR 2025<br>Pouze pro interní potřebu</div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <button id="burger" aria-label="Menu">☰</button>
+      <div class="crumb" id="crumb"></div>
+      <div class="prog"><div class="pbar"><div id="pfill"></div></div><span id="ptext">0 z 9</span></div>
+    </header>
+
+    <div class="wrap">
+      <div class="hero" id="home">
+        <div class="hh">
+          <span class="badge">Interní vzdělávací materiál</span>
+          <h1>Školení Průmysl</h1>
+          <p class="sub">Vzdělávací školení pro segment Skladování: 9 produktových kategorií, požárně bezpečnostní předpisy při skladování baterií a podmínky ADR přepravy Li-Ion baterií.</p>
+          <div class="meta">Verze: červenec 2026 · Stav předpisů: ADR 2025, právní stav k 26. 7. 2026 · Určeno pro adaptaci nových obchodníků segmentu Průmysl</div>
+        </div>
+        <div class="hb">
+          <div class="hstart">
+            <button class="btn big" id="startBtn">Začít školení →</button>
+            <button class="btn big ghost" id="testBtn">Přejít na závěrečný test</button>
+          </div>
+          <p class="lead">Doporučený postup: kapitola 2 je produktový základ (cca 2 h), kapitoly 3–5 odborný blok k Li-Ion bateriím (cca 2,5 h), kapitola 6 shrnuje praxi do checklistů a kapitola 7 obsahuje závěrečný test. Váš postup se ukazuje v liště nahoře — po zavření aplikace se nuluje.</p>
+          <div class="cards" id="cards"></div>
+        </div>
+      </div>
+
+<section class="view" id="sec-0">
+<h1>1. Úvod ke školení</h1>
+<p>Vítejte v adaptačním školení pro obchodníky segmentu Průmysl. Tento materiál vás provede produktovými kategoriemi oblasti Skladování společnosti ELKOPLAST CZ a poté vás podrobně seznámí s tématem, které je pro tento segment stále důležitější: bezpečné skladování lithium-iontových (Li-Ion) baterií a jejich přeprava podle dohody ADR.</p>
+<h2 id="1-1-co-budete-po-absolvovani-umet">1.1 Co budete po absolvování umět</h2>
+<ul class="bl"><li class="lv0">Popsat všech 9 produktových kategorií segmentu Skladování, jejich klíčové parametry, typické zákazníky a prodejní argumenty.</li><li class="lv0">Vést se zákazníkem kvalifikovaný rozhovor: klást správné zjišťovací otázky a rozpoznat příležitosti pro křížový prodej mezi kategoriemi.</li><li class="lv0">Vysvětlit rizika Li-Ion baterií (tepelný zvrat, toxické plyny, opětovné vznícení) a z nich plynoucí požadavky na skladování.</li><li class="lv0">Orientovat se v českých požárně bezpečnostních předpisech pro skladování baterií a v doporučeních (metodika GŘ HZS ČR, VdS 3103, požadavky pojišťoven).</li><li class="lv0">Vysvětlit, co je dohoda ADR, jak jsou v ní zařazeny lithiové baterie a jaké podmínky platí pro jejich přepravu (obaly, značení, doklady, školení osob, bezpečnostní poradce).</li><li class="lv0">Rozlišit tři režimy přepravy baterií (úleva SP 188, podlimitní přeprava, plný režim ADR) a přiřadit k nim vhodné produkty ELKOPLAST.</li></ul>
+<h2 id="1-2-jak-s-materialem-pracovat">1.2 Jak s materiálem pracovat</h2>
+<p>Materiál je členěn do modulů. Kapitola 2 je produktový základ, kapitoly 3 až 5 tvoří rozšiřující odborný blok k Li-Ion bateriím, kapitola 6 shrnuje praxi do checklistů a kapitola 7 obsahuje závěrečný test. Doporučený postup studia:</p>
+<div class="tw"><table><colgroup><col style="width:18.7%"><col style="width:59.2%"><col style="width:22.1%"></colgroup><thead><tr><th>Modul</th><th>Obsah</th><th>Doporučený čas</th></tr></thead><tbody><tr><td>Kapitola 2</td><td>Produktové kategorie segmentu Skladování</td><td>cca 2 hodiny</td></tr><tr><td>Kapitola 3</td><td>Li-Ion baterie: rizika a tržní příležitost</td><td>cca 30 minut</td></tr><tr><td>Kapitola 4</td><td>Požární bezpečnost při skladování baterií</td><td>cca 1 hodina</td></tr><tr><td>Kapitola 5</td><td>ADR: přeprava nebezpečných věcí</td><td>cca 1,5 hodiny</td></tr><tr><td>Kapitoly 6-8</td><td>Checklisty, závěrečný test, slovníček</td><td>cca 45 minut</td></tr></tbody></table></div>
+<h2 id="1-3-o-spolecnosti-elkoplast-cz">1.3 O společnosti ELKOPLAST CZ</h2>
+<p>ELKOPLAST CZ, s.r.o. je česká rodinná výrobní společnost se sídlem ve Zlíně (Štefánikova 2664). Historie sahá do roku 1991, kdy začala výroba sklolaminátových kontejnerů v Ostratě; samotná společnost byla založena v roce 1997. Dnes firma provozuje pět výrobních závodů (Ostrata, Bruntál, Supíkovice, Chomutov a Chróścina-Skorogoszcz v Polsku), zaměstnává zhruba 250 lidí, obsluhuje přibližně 2 350 aktivních zákazníků a dodává do 55 zemí. Součástí skupiny je i vlastní mezinárodní kamionová doprava (přes 50 vozidel, 17 vlastních souprav).</p>
+<ul class="bl"><li class="lv0"><strong>Výrobní technologie: </strong>kovovýroba, rotační odlévání polyethylenu, výroba ze sklolaminátu, laserové pálení a CNC ohýbání plechů. Díky vlastní výrobě lze nabízet úpravy na zakázku (rozměry, barvy RAL, loga, speciální provedení).</li><li class="lv0"><strong>Certifikace systémů řízení: </strong>ISO 9001 (kvalita), ISO 14001 (environment), ISO 45001 (BOZP).</li><li class="lv0"><strong>Produktové oblasti webu: </strong>Odpadové hospodářství, Dům a zahrada, Hospodaření s kapalinami, Zimní údržba a Skladování — právě oblast Skladování je jádrem segmentu Průmysl.</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> Silný úvodní argument u průmyslových zákazníků: český výrobce s vlastní kovovýrobou, lakovnou a dopravou. To znamená krátké dodací lhůty, dostupné náhradní díly a možnost přizpůsobit produkt provozu zákazníka — tedy to, co dovozci katalogového zboží nabídnou obtížně.</p></div>
+<h2 id="1-4-segment-skladovani-v-kostce">1.4 Segment Skladování v kostce</h2>
+<p>Devět kategorií segmentu pokrývá celý tok materiálu průmyslovým podnikem: od venkovních skladů (lodní a skládací kontejnery), přes manipulační obaly (přepravky, paletové boxy, palety, univerzální bedny), sběr technologického odpadu (výklopné kontejnery), ekologickou ochranu (záchytné vany a plošiny) až po specializované obaly na Li-Ion baterie. Přehled:</p>
+<div class="tw"><table><colgroup><col style="width:31.6%"><col style="width:37.5%"><col style="width:30.9%"></colgroup><thead><tr><th>Kategorie</th><th>Řeší potřebu</th><th>Typický zákazník</th></tr></thead><tbody><tr><td>Lodní kontejnery</td><td>okamžitý venkovní sklad, přestavby</td><td>stavebnictví, průmysl, obce</td></tr><tr><td>Li-Ion boxy a kontejnery (ADR)</td><td>bezpečné skladování a přeprava baterií</td><td>servisy EV, recyklace, výrobci</td></tr><tr><td>Skládací skladovací kontejnery</td><td>levný montovaný sklad, sklad olejů (FCB)</td><td>stavby, údržba, energetika</td></tr><tr><td>Záchytné vany a plošiny</td><td>ekologie: úniky olejů a chemikálií</td><td>výroba, sklady, zemědělství</td></tr><tr><td>Plastové přepravky</td><td>drobná manipulace, EURO modularita</td><td>potravinářství, montáž, logistika</td></tr><tr><td>Paletové boxy</td><td>velkoobjemová vratná logistika</td><td>automotive, zemědělství</td></tr><tr><td>Plastové palety</td><td>hygienická a exportní paletizace</td><td>export, potravinářství, farmacie</td></tr><tr><td>Kontejnery USB</td><td>univerzální ocelové bedny do výroby</td><td>strojírny, kovovýroba, slévárny</td></tr><tr><td>Výklopné kontejnery</td><td>třísky, šrot a odpad u linky</td><td>strojírenství, recyklace</td></tr></tbody></table></div>
+<p><em><span class="muted sm">Poznámka: Tento materiál je interní vzdělávací pomůcka. Technické parametry vycházejí z webu elkoplast.cz a produktových katalogů (stav k červenci 2026); před závaznou nabídkou vždy ověřte aktuální data, ceny a dostupnost. Právní pasáže (požární ochrana, ADR) jsou zjednodušeným výkladem pro obchodní praxi, nikoli právním poradenstvím.</span></em></p>
+</section>
+<section class="view" id="sec-1">
+<h1>2. Produktové kategorie segmentu Skladování</h1>
+<p>Každá kategorie je popsána ve stejné struktuře: co to je, klíčové produkty a parametry, komu a na co ji prodávat, prodejní argumenty a zjišťovací otázky. Parametry jsou převzaty z webu elkoplast.cz a produktových katalogů; slouží pro orientaci v rozhovoru se zákazníkem, nabídku vždy stavte na aktuálních datech.</p>
+<h2 id="2-1-lodni-kontejnery">2.1 Lodní kontejnery</h2>
+<p>Námořní ISO kontejnery v provedení <strong>„po jedné cestě“</strong> (one-way) — tedy téměř nové kusy, které absolvovaly jedinou plavbu. Robustní ocelová konstrukce z plechu Corten, vodotěsné a větruodolné: fungují jako okamžitě použitelný venkovní sklad bez stavební přípravy, případně jako základ pro přestavbu (dílna, vrátnice, technické zázemí).</p>
+<h3 id="klicove-produkty-a-parametry">Klíčové produkty a parametry</h3>
+<div class="tw"><table><colgroup><col style="width:28.7%"><col style="width:38.3%"><col style="width:33.1%"></colgroup><thead><tr><th>Velikost</th><th>Vnější rozměry (m)</th><th>Poznámka</th></tr></thead><tbody><tr><td>20' DC (Standard)</td><td>6,06 × 2,44 × 2,59</td><td>hlavní skladová položka</td></tr><tr><td>20' HC (High Cube)</td><td>6,06 × 2,44 × 2,89</td><td>vyšší o 30 cm</td></tr><tr><td>40' DV (Standard)</td><td>12,19 × 2,44 × 2,59</td><td>dvojnásobná délka</td></tr><tr><td>40' HC (High Cube)</td><td>12,19 × 2,44 × 2,89</td><td>největší objem</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0"><strong>Detail 20' DC: </strong>vnitřní rozměry 5,898 × 2,352 × 2,393 m, objem 33,2 m³, vlastní hmotnost cca 2 200 kg, nosnost 28 380 kg. Podlaha z překližky 28 mm, dvoukřídlé dveře s otevřením až 270° a 4 zámkovými tyčemi, 8 rohových zvedacích prvků pro jeřáb.</li><li class="lv0"><strong>Stav a kvalita: </strong>standard IICL (kvalitativní standard institutu pronajímatelů kontejnerů); barva dle aktuální nabídky, možnost přestříkání dle vzorníku RAL.</li></ul>
+<h3 id="komu-a-na-co">Komu a na co</h3>
+<ul class="bl"><li class="lv0">Stavební firmy (sklad nářadí a materiálu na stavbě), průmyslové areály (rychlé rozšíření skladové plochy), obce a technické služby, logistická centra, projekty přestaveb.</li></ul>
+<h3 id="prodejni-argumenty">Prodejní argumenty</h3>
+<ul class="bl"><li class="lv0">Stav téměř nového kontejneru za cenu výrazně nižší než u nového kusu — jedna plavba, žádný opotřebovaný „second hand“.</li><li class="lv0">Okamžité řešení: přiveze se, složí jeřábem a tentýž den slouží jako suchý, uzamykatelný sklad.</li><li class="lv0">Standardizované ISO rozměry a rohové prvky = snadná přeprava, stohování i budoucí prodej.</li></ul>
+<h3 id="na-co-se-zeptat-zakaznika">Na co se zeptat zákazníka</h3>
+<ul class="bl"><li class="lv0">Bude kontejner jen stát, nebo se s ním bude i přepravovat? Kdo zajistí složení na místě (jeřáb)? Požadovaná barva či RAL? Plánuje se přestavba (okna, elektro)?</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> Křížový prodej k Li-Ion segmentu: lodní kontejner s odstupem min. 5 m od budov je praktické řešení pro venkovní karanténní stanoviště poškozených baterií či vozidel po nehodě (viz kapitola 4). Pokud zákazník řeší hlavně cenu a dopravu, nabídněte jako alternativu skládací skladovací kontejner (kap. 2.3) — je lehčí a levnější na dopravu, lodní kontejner naopak vyhrává odolností a okamžitou použitelností.</p></div>
+<h2 id="2-2-kontejnery-a-boxy-pro-li-ion-baterie-adr">2.2 Kontejnery a boxy pro Li-Ion baterie (ADR)</h2>
+<p>Certifikované ocelové obaly pro <strong>skladování a silniční ADR přepravu lithium-iontových baterií</strong> — od článků a modulů až po celé trakční baterie elektromobilů — doplněné o bezpečnostní skříň pro interiérové skladování a nabíjení. Jde o strategickou, rychle rostoucí kategorii: poptávku táhne elektromobilita, e-kola a koloběžky, aku nářadí, fotovoltaická úložiště a povinnosti zpětného odběru. Odborné pozadí (proč baterie hoří, co říkají předpisy a ADR) probírají kapitoly 3 až 5 — zde se soustředíme na produkty.</p>
+<h3 id="klicove-produkty-a-parametry-2">Klíčové produkty a parametry</h3>
+<div class="tw"><table><colgroup><col style="width:20.9%"><col style="width:27.2%"><col style="width:51.8%"></colgroup><thead><tr><th>Produkt</th><th>Určení</th><th>Klíčové parametry</th></tr></thead><tbody><tr><td>CellCont 3021 / 1812</td><td>velké ADR kontejnery na celé trakční baterie EV</td><td>3000×2147×996 mm nebo 1800×1200×996 mm; max. brutto 1 700 kg; UN kód 50AX (velký obal, úroveň I. obalové skupiny); 14/10 zámků víka; 8 kotevních ok; ventilace přetlaku</td></tr><tr><td>ASP 600 / 800 / 1500 / 1800</td><td>univerzální ADR boxy na moduly a menší baterie</td><td>600–1800 l; brutto 600–1600 kg; žárově zinkovaná ocel (víko 3, boky 2, dno 2,5 mm); ASP 600/800 = UN 4AX (bedna), ASP 1500/1800 = UN 50AX (velký obal); UN schválení dle DIN 30741</td></tr><tr><td>USB 150 LTH</td><td>podlouhlý ADR box (baterie e-kol, menší moduly)</td><td>cca 1950×604×420 mm vně (web uvádí 1568×568×410 — pravděpodobně vnitřní rozměr, ověřit); nosnost 116 kg; ocel S-235, 2,5 mm; UN kód 4A/Y; 6 zámků, podklady pro ADR samolepky, kapsa na dokumenty</td></tr><tr><td>Skříň LOXXER</td><td>interiérové skladování a NABÍJENÍ menších baterií</td><td>1930×1145×745 mm, 450 kg; 4 požárně odolné police; samozavírací dveře; aktivní ventilace s odvodem; detekce kouře a teploty, alarm 94–106 dB(A); napojení na EPS; volitelné aerosolové hašení AFX 150; testováno dle VDMA 24994; napájení 380 V (opce 230 V), 4 nabíjecí lišty</td></tr></tbody></table></div>
+<h3 id="ktery-produkt-na-jakou-situaci-vazba-na-balici-pokyny-adr">Který produkt na jakou situaci (vazba na balicí pokyny ADR)</h3>
+<div class="tw"><table><colgroup><col style="width:35.0%"><col style="width:36.4%"><col style="width:28.7%"></colgroup><thead><tr><th>Stav baterie u zákazníka</th><th>Režim ADR (detail v kap. 5)</th><th>Vhodný produkt</th></tr></thead><tbody><tr><td>nové / nepoškozené baterie</td><td>P903 (bedny 4A) / LP903 (velké obaly 50A)</td><td>ASP, USB 150 LTH, CellCont</td></tr><tr><td>poškozené či vadné baterie</td><td>SP 376 → P908 / LP904</td><td>CellCont, ASP (s vhodnou výplní)</td></tr><tr><td>odpad k recyklaci/likvidaci</td><td>SP 377 → P909</td><td>ASP, USB 150 LTH</td></tr><tr><td>prototypy, malé série</td><td>SP 310 → P910 / LP905</td><td>ASP, CellCont</td></tr><tr><td>denní skladování + nabíjení v hale</td><td>mimo přepravu (skladování)</td><td>LOXXER</td></tr></tbody></table></div>
+<h3 id="prodejni-argumenty-2">Prodejní argumenty</h3>
+<ul class="bl"><li class="lv0"><strong>UN certifikace obalů: </strong>každý kus nese vyražený UN kód (např. „UN 4A/X600/S…/CZ/CIM…/ELKO“) — bez takového atestu nelze baterie v režimu ADR legálně přepravit. Písmeno X značí splnění nejpřísnější zkušební úrovně (I. obalová skupina).</li><li class="lv0"><strong>CellCont — unikátní požární prvek: </strong>plnicí rychlospojka umožňuje hasičům kontejner s hořící baterií přímo zaplavit vodou a poté řízeně vypustit. Silný argument pro pojišťovny a bezpečnostní techniky.</li><li class="lv0"><strong>ASP bez periodické recertifikace: </strong>pokud nejsou poškozené, nevyžadují opakovanou certifikaci — nižší provozní náklady proti obalům s povinnou obnovou atestu.</li><li class="lv0"><strong>Konstrukční bezpečnost: </strong>nehořlavá těsnění víka, výztuhy, kotevní oka pro fixaci, ventilace pro vyrovnání přetlaku, manipulace VZV i jeřábem, stohovatelnost.</li><li class="lv0"><strong>LOXXER řeší nejrizikovější moment — nabíjení: </strong>největší podíl požárů malé elektromobility vzniká právě při nabíjení (statistiky HZS, kap. 3). Skříň nabíjení fyzicky odděluje, hlídá a případně hasí.</li></ul>
+<h3 id="na-co-se-zeptat-zakaznika-2">Na co se zeptat zákazníka</h3>
+<ul class="bl"><li class="lv0">Jaké baterie řešíte (chemie, Wh, rozměry, hmotnost)? V jakém stavu — nové, použité, poškozené, k recyklaci? Potřebujete přepravovat po silnici, nebo jen skladovat? Kolik kusů najednou? Nabíjíte v objektu? Co požaduje vaše pojišťovna?</li></ul>
+<div class="co co-warn"><p><strong class="colab">POZOR</strong> V katalogu jsou drobné rozpory rozměrů (USB 150 LTH, výška ASP 1500 s víkem/bez víka) — před nabídkou ověřte. Katalog neuvádí balicí pokyn LP906 (kriticky poškozené baterie) ani výplně typu vermikulit či PyroBubbles; pokud je zákazník požaduje (u P908/P909 bývají nutné), konzultujte s produktovým manažerem. Kontaktní osoba kategorie dle webu: Petr Pšeja, +420 608 660 421, petr.pseja@elkoplast.cz.</p></div>
+<h2 id="2-3-skladaci-skladovaci-kontejnery">2.3 Skládací skladovací kontejnery</h2>
+<p>Plechové skladové kontejnery dodávané <strong>v demontovaném stavu</strong> — smontují se za 1 až 2 hodiny bez jeřábu. Řada FCA je určena pro běžný materiál, řada FCB má integrovanou záchytnou vanu pro skladování kapalin s rizikem úniku a hořlavin s bodem vzplanutí nad 100 °C (oleje, maziva — nikoli benzín či ředidla).</p>
+<h3 id="klicove-produkty-a-parametry-3">Klíčové produkty a parametry</h3>
+<div class="tw"><table><colgroup><col style="width:23.2%"><col style="width:35.0%"><col style="width:19.8%"><col style="width:22.1%"></colgroup><thead><tr><th>Model</th><th>Vnější rozměry (mm)</th><th>Hmotnost</th><th>Vana</th></tr></thead><tbody><tr><td>FCA 2</td><td>2250 × 2200 × 2200</td><td>395 kg</td><td>—</td></tr><tr><td>FCA 3</td><td>3000 × 2200 × 2200</td><td>450 kg</td><td>—</td></tr><tr><td>FCA 4</td><td>4000 × 2200 × 2200</td><td>560 kg</td><td>—</td></tr><tr><td>FCA 5</td><td>5000 × 2200 × 2200</td><td>670 kg</td><td>—</td></tr><tr><td>FCA 6</td><td>6000 × 2200 × 2200</td><td>780 kg</td><td>—</td></tr><tr><td>FCB 2 (s vanou)</td><td>2250 × 2200 × 2200</td><td>508 kg</td><td>202 l</td></tr><tr><td>FCB 3 (s vanou)</td><td>3000 × 2200 × 2200</td><td>605 kg</td><td>275 l</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0"><strong>Konstrukce: </strong>trapézový plech 0,75 mm, nosné profily 2 mm, dřevěná podlaha 35 mm (vana z plechu 2,5 mm). Vstupní profil dveří 1920 × 1950 mm; dvoukřídlé dveře na čele, volitelně i na boku.</li><li class="lv0"><strong>Zatížení: </strong>manipulace jeřábem do 1 500 kg, vozíkem do 3 000 kg; plošné zatížení podlahy 500 kg/m².</li><li class="lv0"><strong>Logistika: </strong>při přepravě lze stohovat až 7 vrstev demontovaných kontejnerů — výrazná úspora dopravného, zejména při více kusech.</li><li class="lv0"><strong>Příslušenství: </strong>regály, nosníky, záchytné police, spojovací sady (spojování více kontejnerů), okna, vedení vidlic, ocelová pozinkovaná podlaha, prášková barva, ventilační mřížky.</li></ul>
+<h3 id="prodejni-argumenty-a-otazky">Prodejní argumenty a otázky</h3>
+<ul class="bl"><li class="lv0">Nejlevnější cesta k uzamykatelnému skladu na odloučeném pracovišti; FCB je jednoduché řešení pro legální skladování olejů a maziv přímo v provozu.</li><li class="lv0">Otázky: Co přesně bude uvnitř (kapaliny → FCB; látky se zvláštními předpisy → jiné řešení)? Montáž vlastními silami, nebo dodat smontované? Kolik kusů (úspora na dopravě roste s počtem)?</li></ul>
+<div class="co co-info"><p><strong class="colab">SROVNÁNÍ</strong> Skládací vs. lodní kontejner: skládací je výrazně lehčí (395–780 kg vs. cca 2 200 kg), levnější na dopravu a projde i tam, kam jeřáb nemůže. Lodní kontejner naopak nevyžaduje montáž, je vodotěsný a unese násobně víc. Ideální dotaz: „Jak dlouho má sklad sloužit a co do něj poteče?“</p></div>
+<h2 id="2-4-zachytne-vany-a-pracovni-plosiny">2.4 Záchytné vany a pracovní plošiny</h2>
+<p>Polyethylenové (PE) vany a nízké plošiny pod sudy, IBC kontejnery a menší nádoby s oleji či chemikáliemi. Zachycují úniky při skladování a manipulaci: <strong>vany</strong> slouží k dlouhodobému skladování, <strong>plošiny a rampy</strong> k záchytu úkapů při stáčení a přečerpávání. PE nekoroduje, odolává většině chemikálií (oleje, kyseliny, louhy), UV záření i povětrnosti — na rozdíl od oceli je vhodný i pro agresivní látky a venkovní použití.</p>
+<h3 id="klicove-produkty-a-parametry-vyber">Klíčové produkty a parametry (výběr)</h3>
+<div class="tw"><table><colgroup><col style="width:35.0%"><col style="width:28.7%"><col style="width:18.7%"><col style="width:17.6%"></colgroup><thead><tr><th>Produkt</th><th>Rozměry (mm)</th><th>Záchytný objem</th><th>Hmotnost</th></tr></thead><tbody><tr><td>Vana na 1 sud (1840/NPP1)</td><td>1000 × 680 × 600</td><td>230 l</td><td>20 kg</td></tr><tr><td>Vana na 2 sudy (1840/NPP2)</td><td>1300 × 750 × 440</td><td>250 l</td><td>21 kg</td></tr><tr><td>Vana na 4 sudy (1840/NPP4)</td><td>1380 × 1290 × 480</td><td>485 l</td><td>41 kg</td></tr><tr><td>Vana na 4 sudy v řadě (NPP4S)</td><td>2445 × 660 × 270</td><td>235 l</td><td>34 kg</td></tr><tr><td>Vana na 1 IBC (1840/NPIBC)</td><td>1450 × 1450 × 1000</td><td>1 120 l</td><td>95 kg</td></tr><tr><td>Vana na 2 IBC (1840/NPIBC2)</td><td>2450 × 1450 × 575</td><td>1 130 l</td><td>119 kg</td></tr><tr><td>Plošina na 2 sudy (1840/PSF2)</td><td>1600 × 800 × 150</td><td>120 l</td><td>24 kg</td></tr><tr><td>Plošina na 4 sudy (1840/PSF4)</td><td>1600 × 1600 × 150</td><td>240 l</td><td>45 kg</td></tr><tr><td>Nájezdová rampa (PSF RAMP)</td><td>1000 × 750 × 150</td><td>—</td><td>9 kg</td></tr><tr><td>Vany na kanystry (CAN 20–100)</td><td>600×400 až 1200×800</td><td>20–100 l</td><td>3–14 kg</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0"><strong>Provedení: </strong>odnímatelné děrované desky (rošty) s výřezy pro ruce a protiskluzovou strukturou, otvory pro kontrolu hladiny a zasunutí čerpadla, kompatibilita s VZV a paletovými vozíky, plošinové segmenty lze spojovat do větších ploch.</li></ul>
+<h3 id="prodejni-argumenty-a-otazky-2">Prodejní argumenty a otázky</h3>
+<ul class="bl"><li class="lv0"><strong>Dimenzování (oborová praxe): </strong>záchytný objem vany musí pojmout přinejmenším objem největší skladované nádoby — 200l sud → vany NPP (230 l a více) vyhoví, 1000l IBC → NPIBC (1 120 l) vyhoví. Požadavky vycházejí z předpisů o ochraně vod (zákon č. 254/2001 Sb. o závadných látkách); konkrétní posouzení náleží ekologovi zákazníka.</li><li class="lv0">Otázky: Jaká látka se skladuje (chemická kompatibilita s PE)? Kolik sudů/IBC a v jakém uspořádání? Jen skladování, nebo i stáčení (→ plošiny a rampy)? Uvnitř, nebo venku?</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> Vany jsou ideální „vstupní“ produkt: rychlá objednávka, jasná legislativní motivace (kontroly ČIŽP, vodoprávní úřady) a přirozený cross-sell — stojany na sudy pro stáčení, IBC kontejnery, a u zákazníků s bateriovým hospodářstvím i záchyt úkapů elektrolytu v servisní zóně.</p></div>
+<h2 id="2-5-plastove-prepravky">2.5 Plastové přepravky</h2>
+<p>Hygienické, stohovatelné plastové bedny v <strong>EURO modulových rozměrech</strong> 400×300, 600×400 a 800×600 mm — beze zbytku skládají vrstvy na paletě 1200×800 mm a hodí se i na automatizované dopravníky. Plné přepravky (řada EG) pro drobné díly a vlhké provozy, perforované (řada EO) pro zboží vyžadující cirkulaci vzduchu; k dispozici víka (řada DE).</p>
+<h3 id="klicove-produkty-a-parametry-4">Klíčové produkty a parametry</h3>
+<div class="tw"><table><colgroup><col style="width:26.5%"><col style="width:30.9%"><col style="width:22.1%"><col style="width:20.6%"></colgroup><thead><tr><th>Řada</th><th>Půdorys (mm)</th><th>Výšky (mm)</th><th>Objemy</th></tr></thead><tbody><tr><td>EG plné</td><td>400 × 300</td><td>120–320</td><td>10–30 l</td></tr><tr><td>EG plné</td><td>600 × 400</td><td>75–420</td><td>15–88 l</td></tr><tr><td>EG plné</td><td>800 × 600</td><td>120–420</td><td>45–172 l</td></tr><tr><td>EO perforované</td><td>600 × 400</td><td>75–420</td><td>13–85 l</td></tr><tr><td>Víka DE</td><td>ke všem třem půdorysům</td><td>—</td><td>—</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0"><strong>Materiálové vlastnosti: </strong>odolnost vůči kyselinám a louhům, chladu i kontaktnímu teplu; hladké stěny pro snadné čištění; ergonomická držadla; standardní barva šedá; hmotnosti od 0,9 kg (EG 43/12) po 5,85 kg (EG 86/42).</li></ul>
+<h3 id="prodejni-argumenty-a-otazky-3">Prodejní argumenty a otázky</h3>
+<ul class="bl"><li class="lv0">Modularita: kombinace tří půdorysů beze ztrát vyplní paletu — argument pro štíhlou logistiku a automatizaci.</li><li class="lv0">Perforace = cirkulace vzduchu a odtok tekutin → delší trvanlivost ovoce, zeleniny, pečiva; navíc nižší hmotnost.</li><li class="lv0">Otázky: Co se bude přepravovat (potraviny → vyžádat prohlášení o shodě pro styk s potravinami; web atest výslovně neuvádí)? Ruční manipulace, nebo dopravníky? Potřeba vík či plombování?</li></ul>
+<div class="co co-warn"><p><strong class="colab">POZOR</strong> Web neuvádí nosnosti jednotlivých modelů ani materiál (HDPE/PP). U náročných aplikací — vysoké stohy, mrazírny, automatické linky — si parametry vyžádejte před nabídkou.</p></div>
+<h2 id="2-6-paletove-boxy">2.6 Paletové boxy</h2>
+<p>Velkoobjemové plastové boxy na paletové bázi (EURO 1200×800 a ISO 1200×1000 mm) pro skladování a přepravu sypkého či kusového zboží, s manipulací vysokozdvižným vozíkem. Tři konstrukční rodiny: <strong>plné</strong> (BBG/MBG), <strong>perforované</strong> (BBO/MBO) a <strong>skládací</strong> (KLK/KLG/KLO), vždy ve třech variantách podvozku — nožky, lyžiny (přípona K), kolečka (přípona R).</p>
+<h3 id="klicove-produkty-a-parametry-5">Klíčové produkty a parametry</h3>
+<div class="tw"><table><colgroup><col style="width:25.0%"><col style="width:32.0%"><col style="width:16.5%"><col style="width:26.5%"></colgroup><thead><tr><th>Řada</th><th>Rozměry (mm)</th><th>Objem</th><th>Poznámka</th></tr></thead><tbody><tr><td>BBG 1208</td><td>1200 × 800 × 790</td><td>535 l</td><td>plný, EURO půdorys</td></tr><tr><td>BBG 1210</td><td>1200 × 1000 × 790</td><td>670 l</td><td>plný, ISO půdorys</td></tr><tr><td>MBG 1210</td><td>1200 × 1000 × 1000</td><td>900 l</td><td>plný, zvýšený</td></tr><tr><td>BBO / MBO 1210</td><td>1200 × 1000 × 790/1000</td><td>670 / 900 l</td><td>perforované stěny i dno</td></tr><tr><td>KLK / KLG / KLO 1208</td><td>1200 × 800 × 1000</td><td>700 l</td><td>skládací; KLK s boční klapkou, KLO perforovaný</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0"><strong>Podvozky: </strong>nožky = nájezd vidlic ze všech čtyř stran; lyžiny = stabilita v regálech a na dopravnících; kolečka = ruční pojezd po hale. Hmotnosti boxů 21–47 kg dle provedení.</li><li class="lv0"><strong>Zatížení: </strong>kategorie uvádí „až 4 tuny“ — jde pravděpodobně o stohovací zatížení; nosnost konkrétního modelu si před nabídkou ověřte.</li></ul>
+<h3 id="prodejni-argumenty-a-otazky-4">Prodejní argumenty a otázky</h3>
+<ul class="bl"><li class="lv0">Skládací boxy po složení výrazně sníží výšku — méně kamionů na zpáteční (prázdné) cestě a úspora plochy skladu prázdných obalů. Klíčový argument pro vratnou logistiku v automotive.</li><li class="lv0">Boční klapka (KLK) umožňuje vychystávat díly, aniž by se box sundával z regálu.</li><li class="lv0">Otázky: Jak obrátková je vaše obalová smyčka (→ skládací)? Hmotnost náplně a počet stohovaných vrstev? Regálové zakládání (→ lyžiny)? Hygienické požadavky (→ plné, hladké stěny)?</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> Perforované boxy MBO/BBO jsou sezónní příležitost v zemědělství (sklizeň, chlazení, skladování brambor či ovoce) — poptávky choďte řešit s předstihem před sezónou.</p></div>
+<h2 id="2-7-plastove-palety">2.7 Plastové palety</h2>
+<p>Lehké plastové palety řady LP v půdorysech 600×400 až 1200×1000 mm, v provedení s <strong>nožkami</strong> (vkládatelné do sebe — úspora místa při zpětné dopravě) nebo se <strong>třemi lyžinami</strong> (stabilnější uložení). Určené pro export, hygienické provozy a vnitropodnikovou logistiku.</p>
+<h3 id="klicove-produkty-a-parametry-6">Klíčové produkty a parametry</h3>
+<div class="tw"><table><colgroup><col style="width:25.0%"><col style="width:27.6%"><col style="width:16.5%"><col style="width:30.9%"></colgroup><thead><tr><th>Model</th><th>Rozměry (mm)</th><th>Hmotnost</th><th>Orientační cena (e-shop, bez DPH)</th></tr></thead><tbody><tr><td>LP 64 (nožky)</td><td>600 × 400</td><td>—</td><td>cca 180 Kč</td></tr><tr><td>LP 86 (nožky)</td><td>800 × 600 × 130</td><td>2,96 kg</td><td>cca 240 Kč</td></tr><tr><td>LP 1208 (nožky)</td><td>1200 × 800 × 150</td><td>5,19 kg</td><td>cca 330 Kč</td></tr><tr><td>LP 1208K (lyžiny)</td><td>1200 × 800 × 160</td><td>6,76 kg</td><td>cca 730 Kč</td></tr><tr><td>LP 1210 (nožky)</td><td>1200 × 1000 × 150</td><td>6,68 kg</td><td>od cca 620 Kč</td></tr><tr><td>LP 1210K (lyžiny)</td><td>1200 × 1000 × 160</td><td>8,52 kg</td><td>—</td></tr></tbody></table></div>
+<h3 id="prodejni-argumenty-a-otazky-5">Prodejní argumenty a otázky</h3>
+<ul class="bl"><li class="lv0"><strong>Hmotnost: </strong>cca 5 kg proti 20–25 kg dřevěné EUR palety — úspora při letecké a exportní přepravě i lehčí ruční manipulace.</li><li class="lv0"><strong>Export bez formalit: </strong>plastové palety nepodléhají fytosanitárnímu ošetření ISPM-15 (povinnému u dřeva pro zámoří) — odpadá riziko zdržení zásilky na celnici kvůli razítku IPPC. (Oborová znalost, web ji výslovně neuvádí.)</li><li class="lv0"><strong>Hygiena: </strong>bez třísek, hřebíků a plísní; omyvatelné, konstantní hmotnost — vhodné pro potravinářství a farmacii.</li><li class="lv0">Otázky: Jednosměrný export, nebo vratná smyčka? Zakládáte palety do regálů (→ nutná regálová nosnost)? Myjete obaly?</li></ul>
+<div class="co co-warn"><p><strong class="colab">POZOR</strong> Web ani e-shop neuvádějí nosnosti palet (statickou/dynamickou/regálovou). Nikdy neslibujte konkrétní zatížení — vždy si vyžádejte data od produktového týmu, zvlášť u regálového zakládání.</p></div>
+<h2 id="2-8-kontejnery-usb-univerzalni-skladovaci-bedny">2.8 Kontejnery USB (univerzální skladovací bedny)</h2>
+<p>Zkratka USB = <strong>univerzální skladovací bedna</strong>. Robustní ocelové bedny pro sběr a dopravu tříděného odpadu, skladování polotovarů a hotových výrobků nebo sběr odpadu ve výrobě. Manipulace vysokozdvižným vozíkem nebo jeřábem; řada USBL je lehčí, nižší provedení z tenčího plechu.</p>
+<h3 id="klicove-produkty-a-parametry-7">Klíčové produkty a parametry</h3>
+<div class="tw"><table><colgroup><col style="width:16.5%"><col style="width:14.3%"><col style="width:30.5%"><col style="width:17.6%"><col style="width:20.9%"></colgroup><thead><tr><th>Typ</th><th>Objem</th><th>Rozměry (mm)</th><th>Nosnost</th><th>Vlastní hmotnost</th></tr></thead><tbody><tr><td>USB 0,5</td><td>500 l</td><td>1200 × 600 × 850</td><td>500 kg</td><td>130 kg</td></tr><tr><td>USB 1,0</td><td>1000 l</td><td>1200 × 1200 × 850</td><td>1 000 kg</td><td>200 kg</td></tr><tr><td>USB 2,0</td><td>2000 l</td><td>2400 × 1200 × 850</td><td>2 250 kg</td><td>280 kg</td></tr><tr><td>USBL 0,3</td><td>350 l</td><td>1000 × 800 × 600</td><td>2 000 kg</td><td>49 kg</td></tr><tr><td>USBL 0,4</td><td>410 l</td><td>1200 × 800 × 600</td><td>2 000 kg</td><td>53 kg</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0"><strong>Materiál a povrch: </strong>USB — ocelový plech 3/3 mm (standard) nebo 2/2 mm (úspornější volba), lakované nebo žárově zinkované; USBL — plech 1,5/1,5 mm, žárově zinkované.</li><li class="lv0"><strong>Stohování: </strong>USB až 3 bedny na sobě, USBL až 5 — úspora podlahové plochy.</li><li class="lv0"><strong>Orientační ceny (e-shop, bez DPH): </strong>USB 1,0 ve 2mm provedení cca 14 700 Kč, ve 3mm cca 16 400 Kč; dodání cca 4 týdny, záruka 2 roky.</li></ul>
+<h3 id="prodejni-argumenty-a-otazky-6">Prodejní argumenty a otázky</h3>
+<ul class="bl"><li class="lv0">Univerzální „pracant“ do výroby — šrot, třísky, polotovary, tříděný odpad. Volbou tloušťky plechu a povrchu (lak vs. žárový zinek) zákazník ladí poměr ceny a odolnosti.</li><li class="lv0">USBL je překvapení kategorie: při vlastní hmotnosti do 53 kg unese 2 tuny — ideální na těžké drobné díly s malým objemem.</li><li class="lv0">Otázky: Co se bude ukládat (hmotnost, abrazivita → tloušťka plechu)? Venku, nebo uvnitř (→ zinek vs. lak)? Stohujete? Manipulace jeřábem?</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> U zákazníků, kteří v USB bednách skladují nebo sváží baterie, přejděte na certifikovanou ADR variantu USB 150 LTH (kap. 2.2) — tvarově vychází ze stejné řady, ale má UN atest, nehořlavé těsnění a podklady pro ADR značení.</p></div>
+<h2 id="2-9-vyklopne-kontejnery">2.9 Výklopné kontejnery</h2>
+<p>Ocelové kontejnery pro sběr a přepravu třísek, šrotu a technologického odpadu, vyprazdňované <strong>přímo z vysokozdvižného vozíku</strong> — řidič neopouští kabinu (rychlost + BOZP). Pět řad podle způsobu výsypu: <strong>AMC</strong> (automatický výklop natlačením na hranu výsypu), <strong>VUC</strong> (výklop lankem z místa řidiče), <strong>VBB</strong> (otevírací dno), <strong>VS</strong> (lopatové, nabírání ze země) a <strong>VMC</strong> (manuální pojízdné).</p>
+<h3 id="klicove-produkty-a-parametry-8">Klíčové produkty a parametry</h3>
+<div class="tw"><table><colgroup><col style="width:19.8%"><col style="width:23.9%"><col style="width:18.7%"><col style="width:37.5%"></colgroup><thead><tr><th>Řada</th><th>Objemy</th><th>Nosnosti</th><th>Charakteristika</th></tr></thead><tbody><tr><td>AMC 300–2500 l</td><td>300 / 600 / 900 / 1100 / 1600 / 2500 l</td><td>1 100 – 2 300 kg</td><td>plně automatický cyklus: natlačení → výklop → návrat → zablokování; plech 2–3 mm; řetězová pojistka</td></tr><tr><td>VUC 150–1500 l</td><td>8 modelů 150–1500 l</td><td>1 100 – 1 800 kg</td><td>naklápění o 90° tahem lanka; snížená výška pro ruční plnění; RAL 5010; opce kolečka</td></tr><tr><td>VBB 500–2000 l</td><td>500–2000 l</td><td>1 000 – 2 000 kg</td><td>výsyp otevřením dna — materiál nepadá z výšky; přesné vyprázdnění; stohovatelné</td></tr><tr><td>VS 500–1000 l</td><td>500–1000 l</td><td>—</td><td>lopatové: nízká nabírací hrana, sběr ze země</td></tr><tr><td>VMC 250–600 l</td><td>250–600 l</td><td>—</td><td>manuální pojízdné pro provozy bez VZV</td></tr></tbody></table></div>
+<h3 id="volba-rady-a-otazky-na-zakaznika">Volba řady a otázky na zákazníka</h3>
+<ul class="bl"><li class="lv0">Časté výsypy bez obsluhy lanka → AMC. Nejlevnější univerzál → VUC. Výsyp do vysokého kontejneru bez naklápění, šetrné sypání (sklo, kovy) → VBB. Nabírání rozsypaného materiálu → VS. Bez vozíku po hale → VMC.</li><li class="lv0">Otázky: Jakou nosnost a výšku zdvihu má váš VZV (kritické u AMC 1600/2500 a VBB 2000)? Jak často vysýváte? Kam se sype (výška hrany velkoobjemového kontejneru)? Jaký materiál (ostré třísky → silnější plech)?</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> Argumentujte BOZP: každé opuštění kabiny vozíku je riziko úrazu a ztráta času. Automatický výklop AMC se u frekventovaných stanovišť zaplatí velmi rychle. Řady VS a VMC mějte v záloze pro menší provozy — detaily parametrů najdete v PDF katalogu kategorie.</p></div>
+<h2 id="2-10-rychly-tahak-potreba-zakaznika-reseni">2.10 Rychlý tahák: potřeba zákazníka → řešení</h2>
+<div class="tw"><table><colgroup><col style="width:50.0%"><col style="width:50.0%"></colgroup><thead><tr><th>Zákazník říká…</th><th>Nabídněte</th></tr></thead><tbody><tr><td>„Potřebuji rychle suchý sklad na dvůr.“</td><td>lodní kontejner 20'/40'; levnější alternativa: skládací FCA</td></tr><tr><td>„Skladujeme oleje a maziva v provozu.“</td><td>skládací kontejner FCB s vanou; záchytné vany pod sudy a IBC</td></tr><tr><td>„Stáčíme ze sudů, občas něco ukápne.“</td><td>záchytné pracovní plošiny PSF + rampy; stojany na sudy</td></tr><tr><td>„Řešíme drobné díly na lince.“</td><td>přepravky EG/EO + víka DE; k tomu plastové palety</td></tr><tr><td>„Vratné obaly nás stojí majlant na zpáteční dopravě.“</td><td>skládací paletové boxy KLG/KLK/KLO; palety LP s nožkami</td></tr><tr><td>„Exportujeme do zámoří.“</td><td>plastové palety LP (bez ISPM-15), paletové boxy</td></tr><tr><td>„Kam s třískami a šrotem u linky?“</td><td>výklopné kontejnery AMC/VUC/VBB; USB bedny jako mezisklad</td></tr><tr><td>„Máme e-kola / aku nářadí a nabíjíme v hale.“</td><td>skříň LOXXER; k tomu školení a dokumentace PO (kap. 4)</td></tr><tr><td>„Servisujeme elektromobily / sbíráme baterie.“</td><td>CellCont, ASP, USB 150 LTH dle stavu baterií (kap. 2.2 a 5)</td></tr><tr><td>„Pojišťovna po nás chce opatření ke skladu baterií.“</td><td>certifikované boxy + kontejnerové stanoviště s odstupem (kap. 4)</td></tr></tbody></table></div>
+</section>
+<section class="view" id="sec-2">
+<h1>3. Li-Ion baterie: rizika a tržní příležitost</h1>
+<p>Než se pustíme do předpisů, je třeba rozumět tomu, proč vůbec existují. Tato kapitola vysvětluje, co se v hořící baterii děje a proč je to jiný typ požáru, než na jaký jsou zákazníci zvyklí. Právě z těchto fyzikálních vlastností plynou všechny požadavky na skladování (kapitola 4) i přepravu (kapitola 5).</p>
+<h2 id="3-1-proc-je-to-rostouci-segment">3.1 Proč je to rostoucí segment</h2>
+<ul class="bl"><li class="lv0">Elektromobilita: každý servis, odtahová služba, pojišťovna a likvidátor se dříve či později potká s poškozenou trakční baterií.</li><li class="lv0">Malá elektromobilita a nářadí: e-kola, e-koloběžky, aku nářadí, drony — miliony baterií v oběhu, které se nabíjejí, skladují, reklamují a vracejí.</li><li class="lv0">Energetika: fotovoltaika a bateriová úložiště (BESS) v firmách i domácnostech.</li><li class="lv0">Legislativa: evropské nařízení o bateriích 2023/1542 zpřísňuje celý životní cyklus — cíle sběru (63 % přenosných baterií do konce 2027), povinný digitální pas baterie (od února 2027) a požadavky na recyklaci. Více baterií ve zpětném odběru = více poptávky po bezpečném skladování a ADR přepravě.</li><li class="lv0">Statistika HZS ČR: v roce 2023 hasiči evidovali 79 požárů zařízení s bateriovým pohonem, v roce 2024 už 98 (z toho 12 elektromobilů a 15 hybridů). Drtivou většinu tvoří elektrokoloběžky, elektrokola a další malá zařízení — a <strong>největší riziko vzniká při nabíjení</strong>.</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> Neprodáváte „bednu“, ale řešení rizika, které zákazníkovi pojmenovala pojišťovna, hasiči nebo vlastní bezpečnostní technik. Kdo rozumí obsahu kapitol 3–5, mluví se zákazníkem jazykem jeho rizik — a to prodává.</p></div>
+<h2 id="3-2-tepelny-zvrat-thermal-runaway-co-se-v-baterii-deje">3.2 Tepelný zvrat (thermal runaway) — co se v baterii děje</h2>
+<p><strong>Tepelný zvrat</strong> je neřízená, sama sebe urychlující exotermická reakce uvnitř článku. Jakmile teplo vznikající rozkladem převýší teplo odváděné, teplota skokově roste a děj už nelze zvenčí zastavit — lze jen chladit okolí a bránit přenosu na sousední články (tzv. propagaci).</p>
+<h2 id="3-3-typicke-priciny-iniciace">3.3 Typické příčiny iniciace</h2>
+<ul class="bl"><li class="lv0">Mechanické poškození: proražení, pád, deformace po nehodě — vnitřní zkrat.</li><li class="lv0">Elektrické přetěžování: přebití, nabíjení příliš velkým proudem, hluboké vybití s následným nabitím (růst dendritů), nabíjení pod bodem mrazu.</li><li class="lv0">Vnější zkrat nechráněných pólů — častá příčina u použitých baterií na sběrných místech.</li><li class="lv0">Vysoká okolní teplota či požár v okolí; výrobní vada, která se může projevit i po letech provozu.</li></ul>
+<h2 id="3-4-prubeh-incidentu-a-proc-se-spatne-hasi">3.4 Průběh incidentu a proč se špatně hasí</h2>
+<div class="tw"><table><colgroup><col style="width:16.5%"><col style="width:37.5%"><col style="width:46.0%"></colgroup><thead><tr><th>Fáze</th><th>Co se děje</th><th>Poznámka pro praxi</th></tr></thead><tbody><tr><td>1. Iniciace</td><td>poškozený či přehřátý článek, navenek často bez projevů</td><td>baterie bezpečně pracují do cca 80 °C; nad cca 125 °C nastupuje závažná degradace</td></tr><tr><td>2. Off-gassing</td><td>únik par elektrolytu pojistným ventilem</td><td>detekovatelné speciálními čidly dříve, než vznikne kouř — klíč k včasné detekci</td></tr><tr><td>3. Vzplanutí</td><td>prudký nárůst teploty, tryskající plameny</td><td>od prvních příznaků ke vzplanutí i cca 3 sekundy; teploty přes 660 °C, u celých baterií přes 1 000 °C</td></tr><tr><td>4. Propagace</td><td>řetězové šíření z článku na článek, riziko exploze plynů</td><td>cíl všech opatření: propagaci zastavit (odstupy, oddělení, chlazení)</td></tr><tr><td>5. Dohořívání</td><td>riziko opětovného vznícení hodiny až dny po uhašení</td><td>nutná karanténa, dohled, ideálně termokamera</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0"><strong>Hoří „sama od sebe“: </strong>rozkladem katodového materiálu si článek uvolňuje vlastní kyslík — požár nelze udusit (pěna, CO₂ ani prášek jej nezastaví).</li><li class="lv0"><strong>Toxické plyny: </strong>při hoření vzniká vysoce toxický a leptavý fluorovodík (HF) — měření uvádějí 20–200 mg HF na 1 Wh kapacity — dále CO, vodík a hořlavé páry elektrolytu; směs je výbušná. HZS výslovně varuje, že kouř z bateriových požárů je silně toxický.</li><li class="lv0"><strong>Jediná účinná obrana: </strong>masivní chlazení velkým množstvím vody, případně speciální hasiva (AVD — vodná disperze vermikulitu, enkapsulátor F-500 EA, hasicí granuláty typu PyroBubbles/Extover) a u hasičů ponoření baterie do kontejneru s vodou — přesně to umožňuje CellCont s plnicí rychlospojkou.</li><li class="lv0"><strong>Pozor na mýtus: </strong>hasicí přístroje třídy D jsou určeny na požáry kovů (kovové lithium), nikoli na Li-Ion baterie; běžný práškový přístroj zvládne nanejvýš počínající požár okolí.</li></ul>
+<div class="co co-info"><p><strong class="colab">SHRNUTÍ PRO OBCHODNÍKA</strong> Li-Ion požár = rychlý start, vlastní kyslík, toxický výbušný kouř, riziko návratu ohně po dnech. Proto předpisy a pojišťovny chtějí: oddělené skladování s odstupy, včasnou detekci, možnost masivního chlazení a karanténu poškozených kusů. Každý z těchto požadavků umí ELKOPLAST pokrýt konkrétním produktem.</p></div>
+</section>
+<section class="view" id="sec-3">
+<h1>4. Požárně bezpečnostní předpisy při skladování baterií</h1>
+<p>Tato kapitola odpovídá na nejčastější otázku zákazníků: „Co po mně vlastně zákon chce, když skladuji baterie?“ Krátká odpověď: obecné předpisy požární ochrany platí vždy, specifický závazný předpis pro lithiové baterie v ČR zatím neexistuje — a právě proto hrají zásadní roli doporučené metodiky a požadavky pojišťoven.</p>
+<h2 id="4-1-pravni-ramec-cr-co-plati-pro-kazdy-sklad">4.1 Právní rámec ČR — co platí pro každý sklad</h2>
+<ul class="bl"><li class="lv0"><strong>Zákon č. 133/1985 Sb., o požární ochraně: </strong>základní zákon. Podle § 4 musí každá firma začlenit své provozované činnosti do jedné ze tří kategorií: bez zvýšeného požárního nebezpečí, se zvýšeným požárním nebezpečím, nebo s vysokým požárním nebezpečím. Kritérii jsou mj. výskyt a množství hořlavých látek, nahodilé požární zatížení a počet osob. Sklad většího množství Li-Ion baterií (hořlavý elektrolyt, plasty, vysoké požární zatížení) se v praxi zpravidla začleňuje minimálně mezi činnosti se zvýšeným požárním nebezpečím. Začlenění zpracovává odborně způsobilá osoba (OZO) nebo technik PO — je to první krok, který musí provozovatel udělat.</li><li class="lv0"><strong>Vyhláška č. 246/2001 Sb., o požární prevenci: </strong>stanovuje povinnou dokumentaci PO (začlenění, požární řád, poplachové směrnice, evakuační plán, dokumentaci zdolávání požárů, požární knihu…), preventivní požární prohlídky (1× za 12 / 6 / 3 měsíce podle kategorie) a kontroly hasicích přístrojů minimálně jednou ročně. U činností s vysokým požárním nebezpečím je nutné posouzení požárního nebezpečí schvalované HZS kraje.</li><li class="lv0"><strong>Vyhláška č. 23/2008 Sb., o technických podmínkách požární ochrany staveb: </strong>závazné požadavky na stavby; zezávazňuje normové hodnoty řady ČSN 73 08xx (ČSN 73 0802 nevýrobní objekty, 73 0804 výrobní objekty, 73 0845 sklady). Zvláštní ustanovení o lithiových bateriích neobsahuje.</li></ul>
+<h2 id="4-2-specificky-predpis-pro-li-ion-zatim-ne-a-co-to-znamena">4.2 Specifický předpis pro Li-Ion? Zatím ne — a co to znamená</h2>
+<p>K červenci 2026 v ČR <strong>neexistuje zvláštní závazný právní předpis ani závazná ČSN specificky pro skladování lithiových baterií</strong> (obdobně je tomu ve většině EU — zákonodárce detailně reguluje přepravu přes ADR, nikoli skladování). V praxi se proto vychází z obecných předpisů výše a z doporučených dokumentů:</p>
+<ul class="bl"><li class="lv0"><strong>Metodické doporučení GŘ HZS ČR „Požární bezpečnost staveb — elektromobilita“ (2021): </strong>nezávazné, ale je to hlavní vodítko projektantů a HZS v ČR (viz 4.3).</li><li class="lv0"><strong>VdS 3103 „Lithiové baterie“ (aktuální vydání 2019-06): </strong>směrnice německých pojistitelů, de facto evropský standard prevence škod (viz 4.4).</li><li class="lv0"><strong>Příručka pro bezpečnou instalaci, servis a recyklaci bateriových systémů (AKU-BAT CZ a Solární asociace, září 2024): </strong>vznikla ve spolupráci s Českou asociací pojišťoven, TÜV SÜD Czech, ECOBAT a ČVUT — pokrývá umístění úložišť, požární bezpečnost i recyklaci.</li><li class="lv0"><strong>Pravidla kolektivních systémů (ECOBAT) pro sběrná místa: </strong>místo s více než 30 kg lithiových baterií se považuje za provozovnu se zvýšeným rizikem; doporučeny pevné kovové nádoby s nevodivou vložkou, prosypání vermikulitem a přelepení pólů.</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> „Žádný předpis neexistuje“ neznamená „nic nemusím“. Požadavky fakticky diktují pojišťovny v pojistných podmínkách — a ty se odkazují právě na VdS/FM a obdobné metodiky. Certifikovaný kontejner či box je pro zákazníka nejjednodušší doložitelný způsob, jak požadavky pojistitele splnit a udržet si pojistné plnění.</p></div>
+<h2 id="4-3-metodika-gr-hzs-cr-k-elektromobilite-sklady-baterii">4.3 Metodika GŘ HZS ČR k elektromobilitě — sklady baterií</h2>
+<ul class="bl"><li class="lv0">Doporučený minimálně IV. stupeň požární bezpečnosti (SPB) požárních úseků skladů baterií.</li><li class="lv0">Sklad více než 10 baterií elektromobilů = samostatný požární úsek s přístupem zvenčí v úrovni terénu.</li><li class="lv0">Do 10 baterií: doporučeno <strong>vnější skladování mimo budovu, například v kontejnerech s minimálně 5 m volného prostoru okolo</strong> (odstup od budov a hořlavých materiálů) — přesně tudy míří nabídka kontejnerového stanoviště ELKOPLAST.</li><li class="lv0">Vybavení: elektrická požární signalizace (EPS, ideálně s napojením na pult HZS), stabilní hasicí zařízení (SSHZ), zařízení pro odvod kouře a tepla (ZOKT).</li><li class="lv0">Detekce: doporučeny termokamery; maximální povolená teplota pro detekci 70 °C.</li><li class="lv0">Skladovací výšky: blokové skladování do 3 m, regálové do 6 m (s posouzením hasicího zařízení).</li></ul>
+<h2 id="4-4-vds-3103-kategorie-baterii-a-pozadavky">4.4 VdS 3103 — kategorie baterií a požadavky</h2>
+<div class="tw"><table><colgroup><col style="width:19.8%"><col style="width:28.7%"><col style="width:51.5%"></colgroup><thead><tr><th>Kategorie (Li-Ion)</th><th>Vymezení</th><th>Hlavní požadavky</th></tr></thead><tbody><tr><td>Malý výkon</td><td>do 100 Wh na baterii</td><td>obecná pravidla (ochrana pólů, UN 38.3, nenabíjet ve skladu); při objemu nad 7 m³ nebo nad 6 europalet se zachází jako se středním výkonem</td></tr><tr><td>Střední výkon</td><td>nad 100 Wh a do 12 kg (e-kola, aku nářadí)</td><td>požárně oddělené skladování, NEBO odstup min. 5 m od ostatních materiálů; hlásiče napojené na trvale obsazené místo; bez dalších opatření max. plocha 60 m² a výška 3 m</td></tr><tr><td>Vysoký výkon</td><td>nad 100 Wh a nad 12 kg (trakční, BESS)</td><td>individuální ochranná koncepce projednaná s pojistitelem: samostatné požární úseky, odstupy, automatické hašení</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0">Společné zásady VdS 3103: skladovat jen baterie prošlé zkouškami UN 38.3; chránit před zkratem a mechanickým poškozením; nenabíjet ve skladovacím prostoru; poškozené kusy okamžitě separovat (karanténa); základní odstup 2,5 m od hořlavých materiálů v prostorech bez sprinklerů; neskladovat společně s hořlavými kapalinami a oxidačními látkami.</li><li class="lv0">Sprinklerované sklady (VdS 3856, VdS CEA 4001, FM 7-112): bloky max. 20 m² s odstupy min. 3 m; zkoušky ukazují, že sprinklery požár baterií zcela neuhasí — jen brání šíření. FM u blokového skladování doporučuje stav nabití max. 60 %.</li></ul>
+<p><em>Poznámka: dílčí hodnoty (60 m², odstupy 2,5 vs. 5 m) se v pramenech mírně liší podle vydání a kontextu (se sprinklery / bez nich). Pro závazné projektové použití je nutný originál VdS 3103; pro obchodní rozhovor stačí řádové hodnoty výše.</em></p>
+<h2 id="4-5-desatero-bezpecneho-skladu-baterii-synteza-pro-praxi">4.5 Desatero bezpečného skladu baterií (syntéza pro praxi)</h2>
+<ul class="bl"><li class="lv0"><strong>1. Odděleně: </strong>samostatný požární úsek, nebo venkovní kontejnerové stanoviště s odstupem min. 5 m od budov a hořlavých materiálů.</li><li class="lv0"><strong>2. Omezené množství: </strong>skladovat jen provozně nutné množství; hlídat prahy (7 m³ / 6 palet u malých baterií, 10 baterií EV dle metodiky HZS, 30 kg na sběrných místech).</li><li class="lv0"><strong>3. Stav nabití: </strong>dlouhodobě skladovat při cca 30–50 % nabití (SOC) — nižší energie znamená obtížnější rozběh řetězové reakce.</li><li class="lv0"><strong>4. Klima: </strong>chladno, sucho, větrání; bez mrazu, přímého slunce a kondenzace.</li><li class="lv0"><strong>5. Ochrana pólů: </strong>přelepené póly, nevodivé vložky, ochrana proti zkratu a pádu.</li><li class="lv0"><strong>6. Jen testované kusy: </strong>skladovat baterie prošlé UN 38.3; nediagnostikované a podezřelé kusy rovnou do karantény.</li><li class="lv0"><strong>7. Detekce: </strong>EPS, ideálně aspirační detekce par elektrolytu (off-gas) a CO, termokamery s alarmem od 70 °C, napojení na stále obsazené místo.</li><li class="lv0"><strong>8. Správná hasiva: </strong>velké množství vody, AVD, F-500 EA, hasicí granuláty; nespoléhat na prášek, CO₂ ani přístroje třídy D.</li><li class="lv0"><strong>9. Karanténa: </strong>poškozené a nafouklé kusy ihned oddělit do atestovaných nádob s nehořlavou výplní, umístit venku v odstupu, sledovat teplotu.</li><li class="lv0"><strong>10. Nabíjení mimo sklad: </strong>nabíjet jen pod dohledem, certifikovanou nabíječkou, mimo únikové cesty — ideálně v odvětrané skříni s detekcí a hašením (LOXXER).</li></ul>
+<h2 id="4-6-protipozarni-prvky-a-vybaveni-firmy-prehled-pro-doporuce">4.6 Protipožární prvky a vybavení firmy — přehled pro doporučení zákazníkům</h2>
+<p>Zákazník neřeší jen „krabici na baterie“, ale celé protipožární vybavení provozu. Obchodník, který umí popsat i prvky mimo sortiment ELKOPLAST a správně je zkombinovat s našimi produkty, působí jako partner pro celé řešení. Přehled toho, co se ve firmách nejčastěji pořizuje:</p>
+<div class="tw"><table><colgroup><col style="width:28.7%"><col style="width:36.4%"><col style="width:35.0%"></colgroup><thead><tr><th>Prvek</th><th>K čemu slouží</th><th>Na co upozornit zákazníka</th></tr></thead><tbody><tr><td><strong>Hasicí deka na vozidla (Li-Ion / EV)</strong> — velkoformátová deka ze skelné tkaniny (cca 550 g/m²), odolnost ~600 °C trvale, krátkodobě až ~1100–1300 °C; rozměry cca 6×8 m, hmotnost ~25 kg; kvalitnější typy opakovaně použitelné (cca 10×)</td><td>přikrytí hořícího či podezřelého elektromobilu / vozíku: potlačí plameny, výrazně omezí kouř, sálavé teplo a šíření na okolní vozidla; slouží i preventivně (karanténní přikrytí vozidla po nehodě)</td><td>deka požár článku NEUHASÍ — baterie si vyrábí vlastní kyslík a pod dekou může dál reagovat; nutný trvalý dozor, měření teploty a počítat s opětovným vznícením</td></tr><tr><td><strong>Malá hasicí deka / rouška</strong> (cca 1,2×1,8 m a větší)</td><td>první zásah u malé elektromobility a spotřebičů: e-kola, koloběžky, aku nářadí; vhodná ke každému nabíjecímu místu</td><td>opět jen potlačení plamenů a kouře; malé deky bývají jednorázové</td></tr><tr><td><strong>Bezpečnostní vak na nabíjení a přenos baterií</strong> (např. Vlitex)</td><td>nabíjení a přenášení menších baterií (e-kola, nářadí) v ohnivzdorném obalu; omezení následků selhání při nabíjení</td><td>doplněk, ne náhrada nabíjecí skříně — bez detekce a hašení</td></tr><tr><td><strong>Bezpečnostní / nabíjecí skříň na baterie</strong> — typ „F90“: požární odolnost 90 minut zevnitř i zvenku (konstrukčně vychází z EN 14470-1, u baterií testy dle VDMA 24994)</td><td>interiérové skladování a hlídané nabíjení malých a středních baterií: ventilace, detekce kouře/teploty, alarm, zásuvky pro nabíjení, záchytná vana, volitelně vestavěné (aerosolové) hašení</td><td>právě tady má ELKOPLAST vlastní řešení — skříň LOXXER (kap. 2.2); u konkurenčních skříní ověřit, zda je odolnost testovaná i ZEVNITŘ ven</td></tr><tr><td><strong>Hasicí přístroje a hasiva na lithium</strong> — AVD (vodná disperze vermikulitu, přístroje Lith-EX 2–50 l), enkapsulátor F-500 EA (do 1 kV), hasicí granulát PyroBubbles / Extover</td><td>první zásah proškolenou obsluhou: AVD vytvoří nehořlavý krycí film, F-500 chladí a zapouzdřuje, granulátem se článek zasype a izoluje (granulát slouží i jako výplň karanténních obalů)</td><td>běžný prášek ABC a CO₂ článek neuhasí (jen okolní požár); přístroje třídy D jsou na KOVOVÉ lithium, ne na Li-Ion</td></tr><tr><td><strong>Detekce</strong> — EPS, aspirační hlásiče (off-gas), multisenzory kouř+CO, termokamery</td><td>nejrychlejší varování: únik par elektrolytu předchází požáru; termokamery s alarmem od 70 °C dle metodiky HZS; napojení na trvale obsazené místo / PCO</td><td>detekce má smysl jen s navazujícím postupem: kdo zasahuje, čím hasí, kam se kus odnese (karanténa)</td></tr><tr><td><strong>Stabilní hašení uzavřených úložišť</strong> — vodní mlha, aerosolová SHZ, inertizace (snížení O₂ na ~11 %)</td><td>ochrana bateriových místností a BESS kontejnerů; požadavek metodiky HZS (SSHZ) i pojistitelů u větších skladů</td><td>projekční záležitost (specializované firmy); ELKOPLAST dodává stavební část řešení — kontejnery a boxy</td></tr></tbody></table></div>
+<div class="co co-warn"><p><strong class="colab">POZOR</strong> Nejčastější omyl zákazníků: „koupím deku/přístroj a mám vyřešeno“. Hasicí deka ani ruční přístroj tepelný zvrat článku nezastaví — jen omezují šíření a získávají čas. Základem je vždy PREVENCE: oddělené certifikované skladování, hlídané nabíjení, detekce a karanténa (produkty ELKOPLAST), teprve pak represivní prvky.</p></div>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> Otázky „Čím byste dnes hořící baterii hasili? Máte u nabíjecích stání hasicí deku a AVD přístroj?“ otevírají dveře: deky, přístroje a detekci zákazník pořídí u specializovaných dodavatelů požární techniky, ale skříň LOXXER, karanténní boxy, ADR obaly a venkovní kontejnerové stanoviště dodáte vy. Doporučením celého řešení získáte důvěru — a objednávku té části, kterou máte v katalogu.</p></div>
+<h2 id="4-7-jak-pozadavky-pokryvaji-produkty-elkoplast">4.7 Jak požadavky pokrývají produkty ELKOPLAST</h2>
+<div class="tw"><table><colgroup><col style="width:50.0%"><col style="width:50.0%"></colgroup><thead><tr><th>Požadavek předpisů a pojišťoven</th><th>Řešení ELKOPLAST</th></tr></thead><tbody><tr><td>venkovní oddělené stanoviště s odstupem 5 m</td><td>lodní kontejner / kontejnerové stanoviště pro baterie s ADR boxy uvnitř</td></tr><tr><td>karanténa poškozených kusů</td><td>CellCont (zaplavitelný vodou), ASP s nehořlavým těsněním</td></tr><tr><td>bezpečné denní skladování a nabíjení malých baterií</td><td>skříň LOXXER (VDMA 24994, detekce, alarm, ventilace, opce hašení)</td></tr><tr><td>sběr odpadních baterií (nevodivost, prosypání)</td><td>ASP a USB 150 LTH; výplně konzultovat s produktovým týmem</td></tr><tr><td>záchyt úniků elektrolytu a provozních kapalin</td><td>záchytné vany a plošiny (kap. 2.4)</td></tr><tr><td>doložitelnost pro pojišťovnu</td><td>UN atesty obalů, testy dle VDMA, technická dokumentace výrobce</td></tr><tr><td>represivní prvky: hasicí deky, AVD/F-500 přístroje, granuláty, detekce (kap. 4.6)</td><td>mimo sortiment — doporučte specializované dodavatele požární techniky; ELKOPLAST dodá skříň LOXXER, karanténní boxy a kontejnerové stanoviště</td></tr></tbody></table></div>
+</section>
+<section class="view" id="sec-4">
+<h1>5. ADR: přeprava nebezpečných věcí po silnici</h1>
+<h2 id="5-1-co-je-adr">5.1 Co je ADR</h2>
+<p><strong>ADR</strong> je <strong>Dohoda o mezinárodní silniční přepravě nebezpečných věcí</strong> (Agreement concerning the International Carriage of Dangerous Goods by Road; zkratka pochází z francouzského „Accord relatif au transport international des marchandises Dangereuses par Route“). Od 1. 1. 2021 byl z názvu vypuštěn přívlastek „Evropská“, zkratka ADR ale zůstala.</p>
+<ul class="bl"><li class="lv0"><strong>Historie a správa: </strong>dohoda byla sjednána v Ženevě 30. září 1957 pod patronací EHK OSN a vstoupila v platnost 29. ledna 1968. Spravuje ji Evropská hospodářská komise OSN (UNECE); smluvními stranami je přes 50 států, nejen evropských.</li><li class="lv0"><strong>Dvouletý cyklus: </strong>technické přílohy se novelizují každé dva roky (liché roky). Aktuální edice ADR 2025 platí od 1. 1. 2025; do 30. 6. 2025 běželo přechodné období, od 1. 7. 2025 je závazná v plném rozsahu.</li><li class="lv0"><strong>Struktura: </strong>příloha A (části 1–7: všeobecná ustanovení, klasifikace, seznam nebezpečných věcí a zvláštní ustanovení, obaly a balicí pokyny, odesílatelské postupy — značení a doklady, konstrukce a zkoušení obalů, podmínky přepravy a manipulace) a příloha B (části 8–9: osádky, výbava a provoz vozidel, konstrukce a schvalování vozidel).</li><li class="lv0"><strong>Ukotvení v ČR: </strong>zákon č. 111/1994 Sb., o silniční dopravě (§ 22 a § 23) — ADR platí i pro vnitrostátní přepravu (v celé EU dle směrnice 2008/68/ES). Český překlad ADR 2025 zveřejňuje Ministerstvo dopravy na svém webu.</li><li class="lv0"><strong>Kontroly a sankce: </strong>na silnici kontroluje Policie ČR (spolu s Celní správou), v provozovnách dopravní úřady. Za porušení podmínek přepravy nebezpečných věcí hrozí odesílateli, dopravci či příjemci pokuta až 700 000 Kč; policie může na místě vybrat kauci 5 000–200 000 Kč a zabránit v další jízdě.</li></ul>
+<h2 id="5-2-devet-trid-nebezpecnosti">5.2 Devět tříd nebezpečnosti</h2>
+<div class="tw"><table><colgroup><col style="width:15.4%"><col style="width:41.9%"><col style="width:42.7%"></colgroup><thead><tr><th>Třída</th><th>Název</th><th>Příklady</th></tr></thead><tbody><tr><td>1</td><td>Výbušné látky a předměty</td><td>trhaviny, pyrotechnika</td></tr><tr><td>2</td><td>Plyny</td><td>propan-butan, acetylen, kyslík</td></tr><tr><td>3</td><td>Hořlavé kapaliny</td><td>benzin, nafta, ředidla</td></tr><tr><td>4.1 / 4.2 / 4.3</td><td>hořlavé tuhé látky / samozápalné / látky reagující s vodou</td><td>síra; bílý fosfor; karbid, kovové lithium</td></tr><tr><td>5.1 / 5.2</td><td>oxidující látky / organické peroxidy</td><td>peroxid vodíku; tvrdidla pryskyřic</td></tr><tr><td>6.1 / 6.2</td><td>toxické / infekční látky</td><td>kyanidy, pesticidy; klinický odpad</td></tr><tr><td>7</td><td>Radioaktivní materiál</td><td>zdravotnické zářiče</td></tr><tr><td>8</td><td>Žíravé látky</td><td>kyseliny, louhy, elektrolyt olověných akumulátorů</td></tr><tr><td>9</td><td>Jiné nebezpečné látky a předměty</td><td>LITHIOVÉ A SODÍKOVÉ BATERIE, azbest, suchý led, látky ohrožující ŽP</td></tr></tbody></table></div>
+<p><em>Zajímavost pro rozhovor: kovové lithium jako surovina patří do třídy 4.3 (s vodou vyvíjí hořlavý vodík), ale lithiové baterie jako výrobek patří do třídy 9 — mají vlastní, specifická pravidla.</em></p>
+<h2 id="5-3-kam-adr-radi-baterie">5.3 Kam ADR řadí baterie</h2>
+<div class="tw"><table><colgroup><col style="width:16.5%"><col style="width:43.0%"><col style="width:40.5%"></colgroup><thead><tr><th>UN číslo</th><th>Pojmenování</th><th>Poznámka</th></tr></thead><tbody><tr><td>UN 3480</td><td>LITHIOVÉ BATERIE IONTOVÉ (vč. polymerových)</td><td>samostatné články a baterie — hlavní položka pro naše produkty</td></tr><tr><td>UN 3481</td><td>Li-Ion baterie OBSAŽENÉ V ZAŘÍZENÍ nebo BALENÉ SE ZAŘÍZENÍM</td><td>např. nářadí s baterií v krabici</td></tr><tr><td>UN 3090 / 3091</td><td>LITHIOVÉ BATERIE KOVOVÉ (samostatné / v zařízení)</td><td>primární lithiové články</td></tr><tr><td>UN 3551 / 3552</td><td>SODÍKO-IONTOVÉ BATERIE (samostatné / v zařízení)</td><td>novinka ADR 2025; plně vybitý (zkratovaný) Na-Ion článek je z ADR vyňat (SP 400)</td></tr><tr><td>UN 3556–3558</td><td>vozidla poháněná Li-Ion / Li-metal / Na-Ion bateriemi</td><td>novinka ADR 2025, balicí pokyn P912; nahrazují dosavadní UN 3171</td></tr></tbody></table></div>
+<ul class="bl"><li class="lv0"><strong>Společné parametry UN 3480: </strong>třída 9 (klasifikační kód M4), bezpečnostní značka vzor 9A, bez obalové skupiny, kód omezení pro tunely (E). Omezená množství LQ = 0 a vyňatá množství EQ = E0 — tyto úlevy použít nelze; roli „malé cesty“ plní zvláštní ustanovení SP 188.</li><li class="lv0"><strong>Vždy platí UN 38.3: </strong>každý článek i baterie musí projít zkouškami dle Příručky zkoušek a kritérií OSN, odd. 38.3 (osm testů T1–T8: simulace výšky, teplotní cyklování, vibrace, ráz, vnější zkrat, náraz, přebití, nucené vybití). Bez UN 38.3 nesmí baterie na silnici v žádném režimu. Baterie vyrobené po 31. 12. 2011 musí mít na obalu vyznačenu energii ve Wh.</li></ul>
+<h2 id="5-4-obaly-un-certifikace-a-jak-cist-kod">5.4 Obaly: UN certifikace a jak číst kód</h2>
+<p>Pro plný režim ADR musí být baterie zabaleny v obalech schválených OSN, které splnily zkoušky (pádové, stohovací) na úrovni II. obalové skupiny. Schválení se prokazuje UN kódem vyraženým na obalu.</p>
+<ul class="bl"><li class="lv0"><strong>Příklad: UN 4A/X600/S/…/CZ/CIM… — </strong>4 = bedna, A = ocel (H = plast, G = lepenka; 1 = sud, 50A = tuhý velký obal ocelový); X = splněna úroveň obalové skupiny I (Y = II, Z = III) + max. hrubá hmotnost; S = pro tuhé látky; dále rok výroby, stát schválení a značka zkušebny/výrobce.</li><li class="lv0"><strong>Kdo certifikuje v ČR: </strong>příslušným orgánem je Ministerstvo dopravy, zkoušky a přidělování UN kódů provádějí pověřené zkušebny (např. CIMTO). Produkty ELKOPLAST z kapitoly 2.2 tyto atesty mají (4A, 4AX, 50AX).</li></ul>
+<h2 id="5-5-balici-pokyny-pro-baterie-cast-4-1-4-adr">5.5 Balicí pokyny pro baterie (část 4.1.4 ADR)</h2>
+<div class="tw"><table><colgroup><col style="width:17.6%"><col style="width:38.3%"><col style="width:44.1%"></colgroup><thead><tr><th>Pokyn</th><th>Pro co</th><th>Poznámka</th></tr></thead><tbody><tr><td>P903 / LP903</td><td>nové a nepoškozené baterie</td><td>standard; baterie od 12 kg s pevným pláštěm smějí i nezabalené na paletách či v ohrazeních; LP903 = velký obal pro jedinou baterii</td></tr><tr><td>P908 / LP904</td><td>poškozené nebo vadné baterie (SP 376)</td><td>jednotlivé uložení, nevodivá a nehořlavá výplň, těsný obal proti úniku elektrolytu</td></tr><tr><td>P909</td><td>baterie k likvidaci nebo recyklaci (SP 377)</td><td>úlevy pro malé články; kovové obaly s nevodivou vložkou</td></tr><tr><td>P910 / LP905</td><td>prototypy a malé série do 100 ks (SP 310)</td><td>bez UN 38.3; zesílené obaly</td></tr><tr><td>P911 / LP906</td><td>kriticky poškozené baterie (riziko tepelného zvratu)</td><td>speciální testované obaly; použití podléhá schválení příslušného orgánu</td></tr><tr><td>P912</td><td>vozidla s bateriemi (UN 3556–3558)</td><td>novinka ADR 2025</td></tr></tbody></table></div>
+<h2 id="5-6-znaceni-kusu-a-vozidel">5.6 Značení kusů a vozidel</h2>
+<ul class="bl"><li class="lv0"><strong>Značka pro baterie (dle 5.2.1.9): </strong>obdélník s červeným šrafovaným okrajem a symbolem poškozeného článku s plamenem, min. 100 × 100 mm (zmenšeně 100 × 70 mm), s uvedením UN čísla. Od ADR 2023 se již NEUVÁDÍ telefonní číslo; staré značky s telefonem lze používat jen do 31. 12. 2026 — upozorněte zákazníky, od ledna 2027 musí mít všechny kusy novou značku! Používá se v režimu SP 188.</li><li class="lv0"><strong>Bezpečnostní značka vzor 9A: </strong>nálepka 100 × 100 mm (sedm svislých pruhů nahoře, skupina článků s plamenem dole) — na kusech v podlimitním i plném režimu. Na vozidla a kontejnery patří velké nálepky vzoru 9 (nikoli 9A).</li><li class="lv0"><strong>Oranžové tabulky: </strong>hladké reflexní tabulky 40 × 30 cm vpředu a vzadu na dopravní jednotce — jen v plném režimu (nad podlimit).</li></ul>
+<h2 id="5-7-prepravni-doklad">5.7 Přepravní doklad</h2>
+<ul class="bl"><li class="lv0">Povinný zápis pro plný i podlimitní režim, v pořadí: <strong>„UN 3480 LITHIOVÉ BATERIE IONTOVÉ, 9, (E)“</strong> + počet a popis kusů, celková (hrubá) hmotnost, odesílatel a příjemce. U podlimitní přepravy navíc celkové množství za každou přepravní kategorii. U poškozených kusů zápis „PŘEPRAVA PODLE ZVLÁŠTNÍHO USTANOVENÍ 376“.</li><li class="lv0">V režimu SP 188 se přepravní doklad ADR nevyžaduje (doporučuje se však do dodacích dokladů poznamenat, že zásilka není předmětem ADR dle SP 188).</li></ul>
+<h2 id="5-8-tri-rezimy-prepravy-li-ion-baterii-srovnani">5.8 Tři režimy přepravy Li-Ion baterií — srovnání</h2>
+<p>Toto je nejdůležitější tabulka celé kapitoly. Rozhoduje velikost baterií a celkové množství na dopravní jednotce:</p>
+<div class="tw"><table><colgroup><col style="width:23.2%"><col style="width:25.4%"><col style="width:25.9%"><col style="width:25.6%"></colgroup><thead><tr><th>Požadavek</th><th>SP 188 („malé baterie“)</th><th>Podlimit 1.1.3.6 (do 333 kg)</th><th>Plný režim (nad 333 kg)</th></tr></thead><tbody><tr><td>Kdy platí</td><td>článek do 20 Wh, baterie do 100 Wh; kus do 30 kg</td><td>větší baterie, do 333 kg brutto na dopravní jednotku (přepravní kategorie 2)</td><td>nad 333 kg; a VŽDY u poškozených kusů dle SP 376 (kategorie 0)</td></tr><tr><td>Obal</td><td>pevný vnější obal, ochrana proti zkratu (bez UN atestu)</td><td>UN obal úrovně PG II (P903)</td><td>UN obal úrovně PG II (P903)</td></tr><tr><td>Značení kusu</td><td>značka pro baterie s UN číslem</td><td>nálepka 9A + UN číslo</td><td>nálepka 9A + UN číslo</td></tr><tr><td>Přepravní doklad</td><td>ne</td><td>ano (+ množství dle kategorií)</td><td>ano (úplný)</td></tr><tr><td>Řidič s osvědčením ADR</td><td>ne</td><td>ne (stačí poučení dle kap. 1.3)</td><td>ANO</td></tr><tr><td>Oranžové tabulky, písemné pokyny</td><td>ne</td><td>ne</td><td>ANO</td></tr><tr><td>Hasicí přístroj ve vozidle</td><td>nepovinný (doporučen)</td><td>min. 1 × 2 kg prášku</td><td>4–12 kg dle hmotnosti vozidla</td></tr><tr><td>Školení personálu dle kap. 1.3</td><td>doporučené minimum</td><td>ANO</td><td>ANO</td></tr><tr><td>Bezpečnostní poradce (DGSA)</td><td>ne</td><td>ne (výjimka)</td><td>ANO — od r. 2023 i odesílatel</td></tr><tr><td>Zkoušky UN 38.3 baterií</td><td>vždy</td><td>vždy</td><td>vždy</td></tr></tbody></table></div>
+<div class="co co-warn"><p><strong class="colab">POZOR</strong> Limit 333 kg se dle 1.1.3.6.3 ADR počítá jako celková BRUTTO hmotnost kusů (část českých webů chybně uvádí netto). A zásadní novinka ADR 2025 (SP 677): poškozené či vadné baterie přepravované dle SP 376 spadají vždy do přepravní kategorie 0 — podlimitní úlevy pro ně NELZE využít nikdy, bez ohledu na hmotnost.</p></div>
+<h2 id="5-9-lide-a-povinnosti-kdo-musi-co">5.9 Lidé a povinnosti: kdo musí co</h2>
+<ul class="bl"><li class="lv0"><strong>Povinnosti účastníků (kap. 1.4 ADR, § 23 zákona č. 111/1994 Sb.): </strong>odesílatel odpovídá za správné zatřídění, schválené obaly, značení a doklady; dopravce za způsobilé vozidlo, výbavu a osádku; příjemce za plynulé převzetí. Dalšími účastníky jsou balič, nakládce, plnič a vykládce.</li><li class="lv0"><strong>Školení podle kapitoly 1.3 ADR: </strong>VŠECHNY osoby podílející se na přepravě nebezpečných věcí (skladníci, baliči, expedienti, disponenti, řidiči podlimitních přeprav) musí být proškoleny před výkonem činnosti; dokumentaci o školení uchovává zaměstnavatel. ADR 2025 tuto povinnost dále zdůrazňuje.</li><li class="lv0"><strong>Osvědčení řidiče ADR (kap. 8.2): </strong>povinné pro přepravy nad limity 1.1.3.6. Školení provádějí střediska pověřená Ministerstvem dopravy, zkouška se skládá před komisařem; osvědčení platí 5 let.</li><li class="lv0"><strong>Bezpečnostní poradce DGSA (kap. 1.8.3): </strong>každý podnik, který nebezpečné věci odesílá, balí, nakládá, plní, přepravuje nebo vykládá, musí jmenovat bezpečnostního poradce s osvědčením (zkoušky v ČR zajišťuje Centrum dopravního výzkumu, platnost 5 let). Od 1. 1. 2023 se povinnost výslovně vztahuje i na ODESÍLATELE — tedy i na výrobce a e-shopy expedující baterie v plném režimu. Výjimka: podnik provádějící pouze podlimitní přepravy či přepravy v režimu vynětí (SP 188) poradce mít nemusí.</li></ul>
+<div class="co co-info"><p><strong class="colab">PRODEJNÍ TIP</strong> Otázka „Kdo je u vás bezpečnostní poradce ADR?“ je skvělý otvírák. Řada firem, které začaly expedovat větší baterie, o povinnosti od roku 2023 neví — pomůžete jim ji objevit dřív, než ji objeví kontrola. ELKOPLAST dodá certifikované obaly; školení 1.3 a poradce si zákazník zajistí u specializovaných firem.</p></div>
+<h2 id="5-10-poskozene-a-odpadni-baterie-nejcastejsi-realne-poptavky">5.10 Poškozené a odpadní baterie — nejčastější reálné poptávky</h2>
+<ul class="bl"><li class="lv0"><strong>Poškozené či vadné (SP 376): </strong>balení dle P908/LP904 — každý kus jednotlivě, nevodivá NEHOŘLAVÁ výplň (vermikulit, hasicí granulát), těsný obal. Kusy i doklad nesou zápis o SP 376. Od ADR 2025 vždy plný režim (kategorie 0).</li><li class="lv0"><strong>Kriticky poškozené (riziko tepelného zvratu — nafouklé, po nehodě, po požáru): </strong>jen v obalech dle P911/LP906 se schválením příslušného orgánu; obal musí prokazatelně zadržet účinky tepelného zvratu (žádný plamen vně, řízené odvětrání, omezená povrchová teplota). Zpravidla vozí jen specializovaní ADR dopravci.</li><li class="lv0"><strong>Odpadní baterie k recyklaci (SP 377, P909): </strong>kovové nádoby s nevodivou vložkou, ochrana proti zkratu; kusy značené „LITHIOVÉ BATERIE K LIKVIDACI/RECYKLACI“.</li><li class="lv0"><strong>Sběr od domácností (SP 636): </strong>použité malé baterie ze sběrných míst přepravované k třídění jsou za stanovených podmínek vyňaty z ostatních ustanovení ADR (balení dle P909); v ČR to organizují kolektivní systémy (ECOBAT).</li></ul>
+<h2 id="5-11-caste-chyby-z-praxe-a-co-za-ne-hrozi">5.11 Časté chyby z praxe (a co za ně hrozí)</h2>
+<ul class="bl"><li class="lv0">„Podlimit = žádné povinnosti.“ Omyl: i do 333 kg platí UN obaly, značení kusů, přepravní doklad, 2kg hasicí přístroj, zákazy společné nakládky a školení 1.3 — nejčastější zjištění kontrol.</li><li class="lv0">Stará značka pro baterie s telefonním číslem po 31. 12. 2026, chybějící UN číslo na značce, špatné rozměry.</li><li class="lv0">Odeslání nafouklé baterie v běžné krabici — mimo režim SP 376; od 2025 navíc vždy plný režim. Vysoké riziko i odpovědnost.</li><li class="lv0">Překročení 30 kg na kus u SP 188, chybějící údaj Wh na baterii, články bez UN 38.3.</li><li class="lv0">„Obyčejná krabice“ místo UN obalu, špatně sestavený certifikovaný obal, překročení max. hmotnosti obalu.</li><li class="lv0">Chybějící bezpečnostní poradce u odesílatele (povinnost od 2023) a neproškolený personál.</li><li class="lv0">Sankce: pokuty až 700 000 Kč, kauce na místě 5 000–200 000 Kč, odstavení vozidla; u nehod s bateriemi navíc problém s pojistným plněním.</li></ul>
+<h2 id="5-12-argumentace-produkty-elkoplast-v-reci-adr">5.12 Argumentace produkty ELKOPLAST v řeči ADR</h2>
+<ul class="bl"><li class="lv0">„Vozíte moduly nad 100 Wh? Pak potřebujete UN obal úrovně PG II — přesně to jsou <strong>ASP (4AX / 50AX)</strong> a <strong>USB 150 LTH (4A/Y)</strong>.“</li><li class="lv0">„Servisujete EV? Na poškozené trakční baterie dle SP 376 je stavěný <strong>CellCont</strong> — velký obal úrovně X, s kotevními oky, nehořlavým těsněním a možností zaplavení vodou.“</li><li class="lv0">„Sbíráte odpadní baterie? Pro režim P909 nabídneme <strong>ASP nebo USB 150 LTH</strong> a doporučíme nevodivé vložky a výplň.“</li><li class="lv0">„Boxy <strong>ASP</strong> nevyžadují periodickou recertifikaci — nižší náklady na vlastnictví po celou životnost.“</li><li class="lv0">„Skladujete a nabíjíte? To už není ADR, ale požární ochrana — tam patří <strong>LOXXER</strong> a kontejnerové stanoviště s odstupem 5 m (kap. 4).“</li></ul>
+</section>
+<section class="view" id="sec-5">
+<h1>6. Shrnutí pro praxi: checklist obchodníka</h1>
+<h2 id="6-1-zjistovaci-otazky-k-li-ion-prilezitosti-v-poradi-jak-je-">6.1 Zjišťovací otázky k Li-Ion příležitosti (v pořadí, jak je klást)</h2>
+<ul class="bl cl"><li class="chk"><label><input type="checkbox"><span><strong>1. Jaké baterie řešíte? </strong>Chemie (Li-Ion / Li-metal / Na-Ion), Wh na článek a baterii, rozměry a hmotnost → určuje UN číslo a možnost úlevy SP 188.</span></label></li><li class="chk"><label><input type="checkbox"><span><strong>2. V jakém stavu? </strong>Nové = P903; odpadní k recyklaci = P909; poškozené = P908; kriticky poškozené = P911/LP906 se schválením → určuje produkt a režim.</span></label></li><li class="chk"><label><input type="checkbox"><span><strong>3. Kolik toho vozíte najednou? </strong>Pod/nad 333 kg brutto rozhoduje o řidiči ADR, tabulkách a výbavě.</span></label></li><li class="chk"><label><input type="checkbox"><span><strong>4. Kdo je odesílatel? </strong>Povinnost bezpečnostního poradce DGSA od 1. 1. 2023 i pro odesílatele (mimo režim výjimek).</span></label></li><li class="chk"><label><input type="checkbox"><span><strong>5. Jak skladujete? </strong>Kategorie dle VdS 3103 (do 100 Wh / do 12 kg / nad 12 kg), odstupy, karanténní stání, stav nabití 30–50 % → kontejnerové stanoviště, boxy, LOXXER.</span></label></li><li class="chk"><label><input type="checkbox"><span><strong>6. Co na to vaše pojišťovna? </strong>Bez závazného předpisu rozhodují pojistné podmínky — certifikovaný obal je doložitelné plnění požadavků.</span></label></li><li class="chk"><label><input type="checkbox"><span><strong>7. Máte detekci a hasiva? </strong>EPS, aspirační detekce, termokamera od 70 °C; hasiva AVD / F-500 / granulát; hasicí deka u stání vozidel a nabíjecích míst; nabíjení v bezpečnostní skříni (kap. 4.6).</span></label></li><li class="chk"><label><input type="checkbox"><span><strong>8. Máte proškolený personál dle kap. 1.3 ADR a dokumentaci PO? </strong>Prostor pro doporučení specializovaných partnerů (školení, OZO, DGSA).</span></label></li></ul>
+<h2 id="6-2-nejdulezitejsi-cisla-ktera-musite-znat-zpameti">6.2 Nejdůležitější čísla, která musíte znát zpaměti</h2>
+<div class="tw"><table><colgroup><col style="width:25.0%"><col style="width:75.0%"></colgroup><thead><tr><th>Hodnota</th><th>Význam</th></tr></thead><tbody><tr><td>20 Wh / 100 Wh</td><td>limit článku / baterie pro úlevu SP 188 („malé baterie“)</td></tr><tr><td>30 kg</td><td>max. brutto hmotnost kusu v režimu SP 188</td></tr><tr><td>333 kg</td><td>podlimit 1.1.3.6 pro UN 3480 (brutto, přepravní kategorie 2) na dopravní jednotku</td></tr><tr><td>31. 12. 2026</td><td>konec platnosti starých značek pro baterie s telefonním číslem</td></tr><tr><td>1. 1. 2023</td><td>od kdy musí mít bezpečnostního poradce DGSA i odesílatel</td></tr><tr><td>5 m</td><td>doporučený odstup venkovního bateriového kontejneru od budov (metodika HZS)</td></tr><tr><td>10 baterií EV</td><td>práh metodiky HZS pro samostatný požární úsek skladu</td></tr><tr><td>100 Wh / 12 kg</td><td>hranice kategorií VdS 3103 (malý / střední / vysoký výkon)</td></tr><tr><td>30–50 % SOC</td><td>doporučený stav nabití pro dlouhodobé skladování</td></tr><tr><td>70 °C</td><td>max. teplota pro detekci termokamerami dle metodiky HZS</td></tr><tr><td>700 000 Kč</td><td>horní hranice pokuty za porušení podmínek přepravy nebezpečných věcí</td></tr></tbody></table></div>
+<h2 id="6-3-pravidla-profesionala">6.3 Pravidla profesionála</h2>
+<ul class="bl cl"><li class="chk"><label><input type="checkbox"><span>Nikdy neslibujte parametry, které nejsou v katalogu (nosnosti palet a přepravek, výplně Li-Ion boxů, LP906) — řekněte „ověřím a potvrdím písemně“, a udělejte to.</span></label></li><li class="chk"><label><input type="checkbox"><span>U Li-Ion poptávek vždy rozlišujte SKLADOVÁNÍ (požární ochrana, kap. 4) a PŘEPRAVU (ADR, kap. 5) — zákazníci to běžně směšují a vy vyniknete tím, že v tom máte pořádek.</span></label></li><li class="chk"><label><input type="checkbox"><span>Právní minimum komunikujte opatrně: nejsme právní kancelář ani DGSA poradce zákazníka; naše role je dodat certifikované produkty a nasměrovat na odborníky.</span></label></li><li class="chk"><label><input type="checkbox"><span>Vždy hledejte druhý produkt do nabídky: vana k sudům, víka k přepravkám, rampa k plošině, LOXXER k boxům, lodní kontejner ke karanténě.</span></label></li></ul>
+<div class="co co-info"><p><strong class="colab">PAMATUJTE</strong> Zákazník si nekupuje ocelovou bednu. Kupuje si klidný spánek: projde kontrolou, pojišťovna plní, hasiči nemají připomínky a sklad nevyhoří. Mluvte o tom.</p></div>
+</section>
+<section class="view" id="sec-6">
+<h1>7. Závěrečný test</h1>
+<p>Sedmnáct otázek, vždy jedna správná odpověď. Odpovězte na všechny otázky a stiskněte <strong>Vyhodnotit test</strong> — ke každé otázce dostanete vysvětlení s odkazem na kapitolu. Hranice splnění je <strong>80 % (14 ze 17)</strong>. Výsledek se ukládá vedení, máte <strong>max 3 pokusy</strong>.</p>
+<p class="muted sm" id="attInfo" style="margin:-4px 0 14px;font-weight:700">Načítám stav pokusů…</p>
+<div id="quiz"></div>
+</section>
+<section class="view" id="sec-7">
+<h1>8. Slovníček pojmů</h1>
+<div class="tw"><table><colgroup><col style="width:27.2%"><col style="width:72.8%"></colgroup><thead><tr><th>Pojem</th><th>Vysvětlení</th></tr></thead><tbody><tr><td>ADR</td><td>Dohoda o mezinárodní silniční přepravě nebezpečných věcí (Ženeva 1957, EHK OSN); technická pravidla v přílohách A a B, novelizace každé 2 roky — aktuálně ADR 2025.</td></tr><tr><td>RID / IMDG / IATA DGR</td><td>obdoby ADR pro železnici / námořní / leteckou přepravu; letecky platí pro samostatné Li-Ion baterie přísnější pravidla (max. 30 % SOC).</td></tr><tr><td>UN číslo</td><td>čtyřmístné identifikační číslo nebezpečné věci dle předpisů OSN (Li-Ion samostatné = UN 3480).</td></tr><tr><td>Třída 9 / vzor 9A</td><td>třída „jiné nebezpečné látky a předměty“; 9A je bezpečnostní nálepka pro kusy s bateriemi (na vozidla patří vzor 9).</td></tr><tr><td>Obalová skupina (PG)</td><td>míra nebezpečnosti I/II/III; baterie ji nemají přiřazenu, obaly však musí splnit zkušební úroveň PG II (písmeno X nebo Y v UN kódu obalu).</td></tr><tr><td>UN 38.3</td><td>zkušební předpis OSN pro články a baterie (8 testů T1–T8); podmínka jakékoli silniční přepravy.</td></tr><tr><td>SP (zvláštní ustanovení)</td><td>dodatečné podmínky či úlevy z kap. 3.3 ADR: SP 188 (malé baterie), 376 (poškozené), 377 (recyklace), 636 (sběr od domácností), 677 (poškozené = kategorie 0, novinka 2025).</td></tr><tr><td>LQ / EQ</td><td>omezená / vyňatá množství; pro lithiové baterie LQ 0 a EQ E0 — nelze využít, jedinou „malou cestou“ je SP 188.</td></tr><tr><td>P903, P908, P909, P910, P911 (LP…)</td><td>balicí pokyny pro baterie: standardní / poškozené / k recyklaci / prototypy / kriticky poškozené; LP varianty pro velké obaly.</td></tr><tr><td>DGSA (bezpečnostní poradce)</td><td>osoba s osvědčením dle kap. 1.8.3 ADR; od 1. 1. 2023 povinná i pro odesílatele; zkoušky v ČR zajišťuje Centrum dopravního výzkumu.</td></tr><tr><td>Školení dle kap. 1.3 ADR</td><td>povinné proškolení všech osob podílejících se na přepravě (skladník, balič, expedient, disponent) — i v podlimitním režimu.</td></tr><tr><td>Přepravní kategorie / 1.1.3.6</td><td>systém podlimitních množství; UN 3480 = kategorie 2, limit 333 kg brutto na dopravní jednotku; kategorie 0 = žádné úlevy.</td></tr><tr><td>Thermal runaway (tepelný zvrat)</td><td>neřízená exotermická řetězová reakce článku: prudký růst teploty, hořlavé a toxické plyny, riziko exploze; nelze uhasit, jen chladit a bránit šíření.</td></tr><tr><td>Off-gassing</td><td>únik par elektrolytu pojistným ventilem v rané fázi poruchy — nejrychlejší signál pro detekci (aspirační hlásiče).</td></tr><tr><td>SOC (State of Charge)</td><td>stav nabití v %; pro dlouhodobé skladování doporučeno cca 30–50 %.</td></tr><tr><td>BESS</td><td>Battery Energy Storage System — stacionární bateriové úložiště energie.</td></tr><tr><td>EPS / SSHZ / ZOKT</td><td>elektrická požární signalizace / stabilní hasicí zařízení / zařízení pro odvod kouře a tepla — výbava požadovaná metodikou HZS pro sklady baterií.</td></tr><tr><td>OZO (v PO)</td><td>odborně způsobilá osoba v požární ochraně (§ 11 zákona č. 133/1985 Sb.); zpracovává začlenění činností a dokumentaci PO.</td></tr><tr><td>VdS 3103</td><td>směrnice německých pojistitelů pro skladování lithiových baterií (kategorie do 100 Wh / do 12 kg / nad 12 kg); de facto evropský standard.</td></tr><tr><td>VDMA 24994</td><td>německý standard pro testování bezpečnostních skříní na baterie (dle něj testován LOXXER).</td></tr><tr><td>Karanténní box</td><td>atestovaný obal (ocel, nehořlavá výplň) pro izolaci poškozených či podezřelých baterií.</td></tr><tr><td>Hasicí deka na Li-Ion / EV</td><td>velkoformátová deka ze skelné tkaniny (cca 6×8 m, odolnost ~600 °C, krátkodobě až ~1300 °C, kvalitní typy opakovaně použitelné); potlačí plameny a kouř hořícího vozidla, článek ale neuhasí — nutný dozor a chlazení.</td></tr><tr><td>Bezpečnostní skříň na baterie („F90“)</td><td>skříň s požární odolností 90 minut zevnitř i zvenku (vychází z EN 14470-1, testy dle VDMA 24994); ventilace, detekce, alarm, nabíjecí zásuvky, volitelně vestavěné hašení — např. LOXXER.</td></tr><tr><td>AVD / F-500 / PyroBubbles</td><td>speciální hasiva na lithiové baterie: vodná disperze vermikulitu / enkapsulátor / granulát z expandovaného skla (užívaný i jako výplň obalů).</td></tr><tr><td>IICL</td><td>kvalitativní standard institutu pronajímatelů kontejnerů — měřítko stavu lodních kontejnerů.</td></tr><tr><td>ISPM-15</td><td>mezinárodní fytosanitární norma pro dřevěný obalový materiál; na plastové palety se nevztahuje.</td></tr><tr><td>IBC</td><td>Intermediate Bulk Container — přepravní nádoba na kapaliny, typicky 1 000 l.</td></tr><tr><td>EUR / ISO půdorys</td><td>1200 × 800 mm (EURO paleta) / 1200 × 1000 mm (průmyslová paleta) — základní moduly přepravek, boxů a palet.</td></tr></tbody></table></div>
+</section>
+<section class="view" id="sec-8">
+<h1>9. Zdroje a doporučené odkazy</h1>
+<h2 id="produktove-stranky-elkoplast-elkoplast-cz">Produktové stránky ELKOPLAST (elkoplast.cz)</h2>
+<ul class="bl"><li class="lv0"><strong>Sekce Skladování — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/skladovani" target="_blank" rel="noopener">https://www.elkoplast.cz/skladovani</a></span><span class="sm"> · rozcestník všech kategorií</span></li><li class="lv0"><strong>Lodní kontejnery — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/lodni-kontejnery" target="_blank" rel="noopener">https://www.elkoplast.cz/lodni-kontejnery</a></span><span class="sm"></span></li><li class="lv0"><strong>Li-Ion kontejnery a boxy (ADR) — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/kontejnery-a-boxy-pro-skladovani-a-adr-prepravu-li-ion-baterii" target="_blank" rel="noopener">https://www.elkoplast.cz/kontejnery-a-boxy-pro-skladovani-a-adr-prepravu-li-ion-baterii</a></span><span class="sm"> · vč. PDF katalogu s UN kódy a balicími pokyny</span></li><li class="lv0"><strong>Skládací skladovací kontejnery — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/skladaci-skladovaci-kontejnery-1" target="_blank" rel="noopener">https://www.elkoplast.cz/skladaci-skladovaci-kontejnery-1</a></span><span class="sm"></span></li><li class="lv0"><strong>Záchytné vany, plošiny, stojany — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/zachytne-vany-pracovni-plosiny-stojany-na-sudy" target="_blank" rel="noopener">https://www.elkoplast.cz/zachytne-vany-pracovni-plosiny-stojany-na-sudy</a></span><span class="sm"></span></li><li class="lv0"><strong>Plastové přepravky — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/plastove-prepravky" target="_blank" rel="noopener">https://www.elkoplast.cz/plastove-prepravky</a></span><span class="sm"></span></li><li class="lv0"><strong>Paletové boxy — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/paletove-boxy" target="_blank" rel="noopener">https://www.elkoplast.cz/paletove-boxy</a></span><span class="sm"></span></li><li class="lv0"><strong>Plastové palety — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/plastove-palety" target="_blank" rel="noopener">https://www.elkoplast.cz/plastove-palety</a></span><span class="sm"> · ceny na shop.elkoplast.cz</span></li><li class="lv0"><strong>Kontejnery USB — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/kontejnery-usb-1" target="_blank" rel="noopener">https://www.elkoplast.cz/kontejnery-usb-1</a></span><span class="sm"></span></li><li class="lv0"><strong>Výklopné kontejnery — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.elkoplast.cz/vyklopne-kontejnery-2" target="_blank" rel="noopener">https://www.elkoplast.cz/vyklopne-kontejnery-2</a></span><span class="sm"> · vč. PDF katalogu řad AMC/VUC/VBB/VS/VMC</span></li></ul>
+<h2 id="legislativa-a-uredni-zdroje">Legislativa a úřední zdroje</h2>
+<ul class="bl"><li class="lv0"><strong>Dohoda ADR 2025 — český překlad — </strong><span class="sm" style="color:#2B5D8A"><a href="https://md.gov.cz" target="_blank" rel="noopener">https://md.gov.cz</a> (sekce Přeprava nebezpečných věcí)</span><span class="sm"> · přílohy A a B, části 1–9</span></li><li class="lv0"><strong>ADR 2025 — originál UNECE — </strong><span class="sm" style="color:#2B5D8A"><a href="https://unece.org/transport/dangerous-goods" target="_blank" rel="noopener">https://unece.org/transport/dangerous-goods</a></span><span class="sm"> · anglické znění, aktuální stav smluvních stran</span></li><li class="lv0"><strong>Zákon č. 111/1994 Sb., o silniční dopravě — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.zakonyprolidi.cz/cs/1994-111" target="_blank" rel="noopener">https://www.zakonyprolidi.cz/cs/1994-111</a></span><span class="sm"> · § 22–23 přeprava nebezpečných věcí, § 35 sankce</span></li><li class="lv0"><strong>Zákon č. 133/1985 Sb., o požární ochraně — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.zakonyprolidi.cz/cs/1985-133" target="_blank" rel="noopener">https://www.zakonyprolidi.cz/cs/1985-133</a></span><span class="sm"> · § 4 začlenění činností</span></li><li class="lv0"><strong>Vyhláška č. 246/2001 Sb., o požární prevenci — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.zakonyprolidi.cz/cs/2001-246" target="_blank" rel="noopener">https://www.zakonyprolidi.cz/cs/2001-246</a></span><span class="sm"> · dokumentace PO, prohlídky</span></li><li class="lv0"><strong>Vyhláška č. 23/2008 Sb. — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.zakonyprolidi.cz/cs/2008-23" target="_blank" rel="noopener">https://www.zakonyprolidi.cz/cs/2008-23</a></span><span class="sm"> · technické podmínky požární ochrany staveb</span></li><li class="lv0"><strong>Osvědčení řidiče ADR — </strong><span class="sm" style="color:#2B5D8A"><a href="https://portal.gov.cz" target="_blank" rel="noopener">https://portal.gov.cz</a> (služba: osvědčení o školení řidiče)</span><span class="sm"> · kurzy, zkoušky, platnost 5 let</span></li><li class="lv0"><strong>Nařízení EU 2023/1542 o bateriích — </strong><span class="sm" style="color:#2B5D8A"><a href="https://eur-lex.europa.eu" target="_blank" rel="noopener">https://eur-lex.europa.eu</a></span><span class="sm"> · životní cyklus baterií, pas baterie od 2027</span></li></ul>
+<h2 id="metodiky-statistiky-a-odborne-materialy">Metodiky, statistiky a odborné materiály</h2>
+<ul class="bl"><li class="lv0"><strong>Metodické doporučení GŘ HZS ČR — elektromobilita — </strong><span class="sm" style="color:#2B5D8A"><a href="https://hzscr.gov.cz" target="_blank" rel="noopener">https://hzscr.gov.cz</a> (soubor: metodicke-doporuceni-elektromobilita)</span><span class="sm"> · sklady baterií: IV. SPB, odstupy 5 m, termokamery 70 °C</span></li><li class="lv0"><strong>Statistiky požárů bateriových zařízení — </strong><span class="sm" style="color:#2B5D8A"><a href="https://hzscr.gov.cz" target="_blank" rel="noopener">https://hzscr.gov.cz</a> (informační servis, březen 2025)</span><span class="sm"> · 2023: 79 požárů → 2024: 98 požárů; riziko při nabíjení</span></li><li class="lv0"><strong>VdS 3103 „Lithium-Batterien“ — </strong><span class="sm" style="color:#2B5D8A"><a href="https://vds.de" target="_blank" rel="noopener">https://vds.de</a></span><span class="sm"> · směrnice pojistitelů pro skladování (vydání 2019-06)</span></li><li class="lv0"><strong>Příručka AKU-BAT CZ a Solární asociace (9/2024) — </strong><span class="sm" style="color:#2B5D8A"><a href="https://solarniasociace.cz" target="_blank" rel="noopener">https://solarniasociace.cz</a></span><span class="sm"> · bezpečná instalace, servis a recyklace bateriových systémů; spolupráce ČAP, TÜV SÜD, ECOBAT</span></li><li class="lv0"><strong>ECOBAT — sběr a skladování lithiových baterií — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.ecobat.cz" target="_blank" rel="noopener">https://www.ecobat.cz</a></span><span class="sm"> · pravidla pro sběrná místa (30 kg, vermikulit, přelepené póly)</span></li><li class="lv0"><strong>ČESMAD Bohemia — mýty o podlimitu ADR — </strong><span class="sm" style="color:#2B5D8A"><a href="https://skoleni.prodopravce.cz/myty-o-podlimitu-adr" target="_blank" rel="noopener">https://skoleni.prodopravce.cz/myty-o-podlimitu-adr</a></span><span class="sm"> · co podlimit uvolňuje a co ne</span></li><li class="lv0"><strong>Výklad povinností DGSA — </strong><span class="sm" style="color:#2B5D8A"><a href="http://www.adr-dgsa.cz" target="_blank" rel="noopener">http://www.adr-dgsa.cz</a></span><span class="sm"> · kdy poradce není třeba (výjimky)</span></li><li class="lv0"><strong>UN certifikace obalů v praxi — </strong><span class="sm" style="color:#2B5D8A"><a href="https://hz-containers.com/cs/news/un-certifikace-obalu-typy-zkousek-znaceni-a-chyby-v-praxi/" target="_blank" rel="noopener">https://hz-containers.com/cs/news/un-certifikace-obalu-typy-zkousek-znaceni-a-chyby-v-praxi/</a></span><span class="sm"> · čtení UN kódu, zkoušky, CIMTO</span></li><li class="lv0"><strong>Hasicí deka Vlitex — parametry — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.vyzbrojna.cz/cz/305/4161/vlitex-hasici-deka.html" target="_blank" rel="noopener">https://www.vyzbrojna.cz/cz/305/4161/vlitex-hasici-deka.html</a></span><span class="sm"> · skelná tkanina 550 g/m², odolnost 600 °C / krátkodobě až 1300 °C, opakované použití</span></li><li class="lv0"><strong>Hašení lithiových baterií — technika v ČR — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.pozarnivyzbrojna.cz/c-373-haseni-lithiovych-baterii" target="_blank" rel="noopener">https://www.pozarnivyzbrojna.cz/c-373-haseni-lithiovych-baterii</a></span><span class="sm"> · AVD přístroje Lith-EX, granulát Extover, vaky Vlitex, bezpečnostní skříně</span></li><li class="lv0"><strong>Průvodce bezpečným skladováním Li-Ion baterií (DENIOS) — </strong><span class="sm" style="color:#2B5D8A"><a href="https://www.denios.cz/poradenstvi-know-how/denios-know-how/pruvodce-bezpecnym-skladovanim-li-ion-baterii" target="_blank" rel="noopener">https://www.denios.cz/poradenstvi-know-how/denios-know-how/pruvodce-bezpecnym-skladovanim-li-ion-baterii</a></span><span class="sm"> · skladovací vs. nabíjecí skříně, odolnost 90 minut zevnitř i vně</span></li></ul>
+<p><em><span class="muted sm">Tento materiál byl zpracován v červenci 2026 na základě veřejně dostupných informací z webu elkoplast.cz a výše uvedených zdrojů. Stav předpisů: ADR 2025 (v plném účinku od 1. 7. 2025), české předpisy PO ve znění k 26. 7. 2026. Materiál je určen výhradně pro interní vzdělávací potřebu; nenahrazuje právní poradenství, konzultaci s bezpečnostním poradcem DGSA ani s odborně způsobilou osobou v požární ochraně. Před závaznou nabídkou vždy ověřte aktuální technické parametry a ceny produktů.</span></em></p>
+</section>
+
+    </div>
+  </div>
+</div>
+<script id="appjs">
+"use strict";
+var NAV = [{"num":"1","title":"Úvod ke školení","subs":[{"id":"1-1-co-budete-po-absolvovani-umet","t":"1.1 Co budete po absolvování umět"},{"id":"1-2-jak-s-materialem-pracovat","t":"1.2 Jak s materiálem pracovat"},{"id":"1-3-o-spolecnosti-elkoplast-cz","t":"1.3 O společnosti ELKOPLAST CZ"},{"id":"1-4-segment-skladovani-v-kostce","t":"1.4 Segment Skladování v kostce"}]},{"num":"2","title":"Produktové kategorie segmentu Skladování","subs":[{"id":"2-1-lodni-kontejnery","t":"2.1 Lodní kontejnery"},{"id":"2-2-kontejnery-a-boxy-pro-li-ion-baterie-adr","t":"2.2 Kontejnery a boxy pro Li-Ion baterie (ADR)"},{"id":"2-3-skladaci-skladovaci-kontejnery","t":"2.3 Skládací skladovací kontejnery"},{"id":"2-4-zachytne-vany-a-pracovni-plosiny","t":"2.4 Záchytné vany a pracovní plošiny"},{"id":"2-5-plastove-prepravky","t":"2.5 Plastové přepravky"},{"id":"2-6-paletove-boxy","t":"2.6 Paletové boxy"},{"id":"2-7-plastove-palety","t":"2.7 Plastové palety"},{"id":"2-8-kontejnery-usb-univerzalni-skladovaci-bedny","t":"2.8 Kontejnery USB (univerzální skladovací bedny)"},{"id":"2-9-vyklopne-kontejnery","t":"2.9 Výklopné kontejnery"},{"id":"2-10-rychly-tahak-potreba-zakaznika-reseni","t":"2.10 Rychlý tahák: potřeba zákazníka → řešení"}]},{"num":"3","title":"Li-Ion baterie: rizika a tržní příležitost","subs":[{"id":"3-1-proc-je-to-rostouci-segment","t":"3.1 Proč je to rostoucí segment"},{"id":"3-2-tepelny-zvrat-thermal-runaway-co-se-v-baterii-deje","t":"3.2 Tepelný zvrat (thermal runaway) — co se v baterii děje"},{"id":"3-3-typicke-priciny-iniciace","t":"3.3 Typické příčiny iniciace"},{"id":"3-4-prubeh-incidentu-a-proc-se-spatne-hasi","t":"3.4 Průběh incidentu a proč se špatně hasí"}]},{"num":"4","title":"Požárně bezpečnostní předpisy při skladování baterií","subs":[{"id":"4-1-pravni-ramec-cr-co-plati-pro-kazdy-sklad","t":"4.1 Právní rámec ČR — co platí pro každý sklad"},{"id":"4-2-specificky-predpis-pro-li-ion-zatim-ne-a-co-to-znamena","t":"4.2 Specifický předpis pro Li-Ion? Zatím ne — a co to znamená"},{"id":"4-3-metodika-gr-hzs-cr-k-elektromobilite-sklady-baterii","t":"4.3 Metodika GŘ HZS ČR k elektromobilitě — sklady baterií"},{"id":"4-4-vds-3103-kategorie-baterii-a-pozadavky","t":"4.4 VdS 3103 — kategorie baterií a požadavky"},{"id":"4-5-desatero-bezpecneho-skladu-baterii-synteza-pro-praxi","t":"4.5 Desatero bezpečného skladu baterií (syntéza pro praxi)"},{"id":"4-6-protipozarni-prvky-a-vybaveni-firmy-prehled-pro-doporuce","t":"4.6 Protipožární prvky a vybavení firmy — přehled pro doporučení zákazníkům"},{"id":"4-7-jak-pozadavky-pokryvaji-produkty-elkoplast","t":"4.7 Jak požadavky pokrývají produkty ELKOPLAST"}]},{"num":"5","title":"ADR: přeprava nebezpečných věcí po silnici","subs":[{"id":"5-1-co-je-adr","t":"5.1 Co je ADR"},{"id":"5-2-devet-trid-nebezpecnosti","t":"5.2 Devět tříd nebezpečnosti"},{"id":"5-3-kam-adr-radi-baterie","t":"5.3 Kam ADR řadí baterie"},{"id":"5-4-obaly-un-certifikace-a-jak-cist-kod","t":"5.4 Obaly: UN certifikace a jak číst kód"},{"id":"5-5-balici-pokyny-pro-baterie-cast-4-1-4-adr","t":"5.5 Balicí pokyny pro baterie (část 4.1.4 ADR)"},{"id":"5-6-znaceni-kusu-a-vozidel","t":"5.6 Značení kusů a vozidel"},{"id":"5-7-prepravni-doklad","t":"5.7 Přepravní doklad"},{"id":"5-8-tri-rezimy-prepravy-li-ion-baterii-srovnani","t":"5.8 Tři režimy přepravy Li-Ion baterií — srovnání"},{"id":"5-9-lide-a-povinnosti-kdo-musi-co","t":"5.9 Lidé a povinnosti: kdo musí co"},{"id":"5-10-poskozene-a-odpadni-baterie-nejcastejsi-realne-poptavky","t":"5.10 Poškozené a odpadní baterie — nejčastější reálné poptávky"},{"id":"5-11-caste-chyby-z-praxe-a-co-za-ne-hrozi","t":"5.11 Časté chyby z praxe (a co za ně hrozí)"},{"id":"5-12-argumentace-produkty-elkoplast-v-reci-adr","t":"5.12 Argumentace produkty ELKOPLAST v řeči ADR"}]},{"num":"6","title":"Shrnutí pro praxi: checklist obchodníka","subs":[{"id":"6-1-zjistovaci-otazky-k-li-ion-prilezitosti-v-poradi-jak-je-","t":"6.1 Zjišťovací otázky k Li-Ion příležitosti (v pořadí, jak je klást)"},{"id":"6-2-nejdulezitejsi-cisla-ktera-musite-znat-zpameti","t":"6.2 Nejdůležitější čísla, která musíte znát zpaměti"},{"id":"6-3-pravidla-profesionala","t":"6.3 Pravidla profesionála"}]},{"num":"7","title":"Závěrečný test","subs":[]},{"num":"8","title":"Slovníček pojmů","subs":[]},{"num":"9","title":"Zdroje a doporučené odkazy","subs":[{"id":"produktove-stranky-elkoplast-elkoplast-cz","t":"Produktové stránky ELKOPLAST (elkoplast.cz)"},{"id":"legislativa-a-uredni-zdroje","t":"Legislativa a úřední zdroje"},{"id":"metodiky-statistiky-a-odborne-materialy","t":"Metodiky, statistiky a odborné materiály"}]}];
+var QUIZ = [
+ {q:"Co znamená zkratka USB v názvu kategorie „Kontejnery USB“?",o:["univerzální skladovací bedna","ultra silná bedna","univerzální stohovatelný box"],c:0,e:"Univerzální skladovací bedna (kap. 2.8)."},
+ {q:"Čím se liší skládací kontejnery řady FCB od řady FCA?",o:["vyšší nosností podlahy","integrovanou záchytnou vanou (pro oleje a hořlaviny s bodem vzplanutí nad 100 °C)","hliníkovou konstrukcí"],c:1,e:"FCB má integrovanou záchytnou vanu 202/275 l (kap. 2.3)."},
+ {q:"Zákazník exportuje do zámoří a zdržují ho fytosanitární formality u dřevěných palet. Jaký argument použijete?",o:["plastové palety LP mají vždy vyšší nosnost než dřevěné","dřevěné palety lze ošetřit postřikem přímo ve skladu","plastové palety nepodléhají ošetření ISPM-15, formality odpadají"],c:2,e:"Plastové palety nepodléhají ošetření ISPM-15 (kap. 2.7)."},
+ {q:"Zákazník potřebuje šetrně vysypávat sklo do vysokého velkoobjemového kontejneru bez naklápění. Kterou řadu výklopných kontejnerů doporučíte?",o:["AMC — automatický výklop","VBB — kontejner s otevíracím dnem","VS — lopatový kontejner"],c:1,e:"VBB sype otevřením dna, materiál nepadá z výšky (kap. 2.9)."},
+ {q:"Jak velký záchytný objem musí mít vana pod jedním 1000l IBC kontejnerem (dle oborové praxe)?",o:["alespoň objem největší skladované nádoby, tedy 1 000 l — vana NPIBC (1 120 l) vyhoví","10 % objemu nádoby, tedy 100 l","dvojnásobek objemu, tedy 2 000 l"],c:0,e:"Vana musí pojmout objem největší nádoby — NPIBC s 1 120 l vyhoví (kap. 2.4)."},
+ {q:"Proč nelze požár Li-Ion baterie „udusit“ (pěnou, CO₂, práškem)?",o:["protože hoří při příliš nízké teplotě","protože si článek rozkladem katodového materiálu uvolňuje vlastní kyslík","protože plameny hoří jen uvnitř obalu"],c:1,e:"Článek si rozkladem katodového materiálu uvolňuje vlastní kyslík (kap. 3.4)."},
+ {q:"Jaká je nejúčinnější obrana proti požáru Li-Ion baterií?",o:["práškový hasicí přístroj ABC","hasicí přístroj CO₂","masivní chlazení velkým množstvím vody, případně speciální hasiva (AVD, F-500, hasicí granulát)"],c:2,e:"Masivní chlazení vodou + speciální hasiva; prášek a CO₂ článek neuhasí (kap. 3.4, 4.5)."},
+ {q:"Jaký volný odstup od budov doporučuje metodika GŘ HZS ČR pro venkovní kontejnerové skladování baterií?",o:["minimálně 5 m","minimálně 1 m","minimálně 15 m"],c:0,e:"5 m volného prostoru okolo kontejneru (kap. 4.3)."},
+ {q:"Jaký stav nabití (SOC) se doporučuje pro dlouhodobé skladování Li-Ion baterií?",o:["100 % — plně nabité","cca 30–50 %","0 % — zcela vybité"],c:1,e:"30–50 % SOC (kap. 4.5)."},
+ {q:"Co je ADR?",o:["evropská norma pro konstrukci obalů","Dohoda o mezinárodní silniční přepravě nebezpečných věcí (sjednaná v Ženevě 1957, spravovaná EHK OSN)","česká vyhláška o skladování nebezpečných látek"],c:1,e:"Dohoda UNECE, Ženeva 1957; aktuálně platí ADR 2025 (kap. 5.1)."},
+ {q:"Do které třídy nebezpečnosti ADR patří lithiové baterie (UN 3480)?",o:["třída 4.3","třída 8","třída 9"],c:2,e:"Třída 9, bezpečnostní značka 9A; kovové lithium jako surovina je 4.3 (kap. 5.2, 5.3)."},
+ {q:"Pro jaké Li-Ion baterie platí úleva SP 188?",o:["články do 20 Wh a baterie do 100 Wh, kus do 30 kg brutto","všechny baterie do 300 Wh","baterie do 1 000 Wh, kus do 50 kg"],c:0,e:"20 Wh článek / 100 Wh baterie / 30 kg kus (kap. 5.8)."},
+ {q:"Co znamená podlimitní přeprava dle 1.1.3.6 pro UN 3480?",o:["do 1 000 kg bez jakýchkoli povinností","do 333 kg brutto na dopravní jednotku — bez ADR řidiče a oranžových tabulek, ale s UN obaly, značením kusů, dokladem a 2kg hasicím přístrojem","do 50 kg pouze pro vnitrostátní přepravu"],c:1,e:"333 kg brutto; úlevy jen z části povinností (kap. 5.8)."},
+ {q:"Jak se od ADR 2025 přepravuje poškozená (např. nafouklá) trakční baterie?",o:["v režimu SP 188, pokud je lehčí než 30 kg","podlimitně, pokud je do 333 kg","vždy v plném režimu — SP 376, obaly P908/LP904 (kriticky poškozená jen P911/LP906 se schválením), přepravní kategorie 0 dle SP 677"],c:2,e:"SP 376 + SP 677 = vždy přepravní kategorie 0, žádný podlimit (kap. 5.10)."},
+ {q:"Kdo musí mít od 1. 1. 2023 jmenovaného bezpečnostního poradce DGSA?",o:["pouze dopravci","kromě dopravců i odesílatelé (mimo režim výjimek — jen podlimitní přepravy či SP 188)","pouze příjemci zásilek"],c:1,e:"Povinnost rozšířena na odesílatele od 1. 1. 2023 (kap. 5.9)."},
+ {q:"Co dokáže hasicí deka přehozená přes hořící elektromobil?",o:["definitivně uhasí požár baterie, další zásah není nutný","potlačí plameny, kouř a šíření požáru — článek ale může pod dekou dál reagovat, nutný dozor a chlazení","na elektromobily se hasicí deky nesmí používat"],c:1,e:"Deka omezí šíření, kouř a sálání; článek si vyrábí vlastní kyslík — dozor a chlazení nutné (kap. 4.6)."},
+ {q:"Čím se bezpečnostní (nabíjecí) skříň na baterie typu „F90“ liší od běžné plechové skříně?",o:["silnějším plechem a vyšší nosností polic","požární odolností 90 minut zevnitř i zvenku, ventilací, detekcí a volitelným vestavěným hašením","je určena výhradně pro kovové lithium jako surovinu"],c:1,e:"90 minut odolnosti zevnitř i vně, ventilace, detekce, opce hašení — např. LOXXER (kap. 2.2, 4.6)."}
+];
+var PASS = 14, TESTIDX = 6;
+var LETTERS = ["a","b","c","d"];
+var done = {}, cur = -1, bestScore = null;
+
+/* ---------- napojení na intranet: identita + limit 3 pokusů + odeslání výsledku ---------- */
+var PRUM = { email:"", name:"", attemptsUsed:0, locked:false };
+(function(){ try{ var h=location.hash||""; var me=(h.match(/kdo=([^&]+)/i)||[])[1]; var nm=(h.match(/jmeno=([^&]+)/i)||[])[1]; if(me) PRUM.email=decodeURIComponent(me); if(nm) PRUM.name=decodeURIComponent(nm); }catch(e){} })();
+function setAtt(t){ var el=document.getElementById("attInfo"); if(el) el.textContent=t; }
+function lockTest(){ PRUM.locked=true; var b=document.getElementById("qeval"); if(b){ b.disabled=true; b.style.opacity=".5"; b.style.cursor="not-allowed"; } var rb=document.getElementById("qretry"); if(rb){ rb.disabled=true; rb.style.opacity=".5"; rb.style.cursor="not-allowed"; } }
+async function loadPrumStatus(){
+  if(!PRUM.email){ setAtt("Test lze vyhodnotit, ale bez přihlášení se výsledek neuloží."); return; }
+  try{
+    var j=await (await fetch("/api/prumysl?email="+encodeURIComponent(PRUM.email),{cache:"no-store"})).json();
+    PRUM.attemptsUsed=(j&&j.attemptsUsed)||0;
+    if(PRUM.attemptsUsed>=3){ lockTest(); setAtt("Vyčerpal(a) jste všechny 3 pokusy"+(j&&j.best?(" · nejlepší výsledek "+j.best+" %"):"")+"."); }
+    else setAtt(PRUM.attemptsUsed>0 ? ("Využito pokusů: "+PRUM.attemptsUsed+" / 3"+(j&&j.best?(" · nejlepší "+j.best+" %"):"")) : "Máte 3 pokusy na splnění testu (hranice 80 %). Výsledek se ukládá vedení.");
+  }catch(e){ setAtt("Máte 3 pokusy na splnění testu (hranice 80 %)."); }
+}
+
+var $ = function(s,el){ return (el||document).querySelector(s); };
+var $$ = function(s,el){ return Array.prototype.slice.call((el||document).querySelectorAll(s)); };
+
+/* ---------- nav ---------- */
+function buildNav(){
+  var nav = $("#nav");
+  var h = '<div class="ntitle">Obsah školení</div>';
+  h += '<button class="ni" data-i="-1"><span class="no">◈</span><span class="tt">Titulní přehled</span><span class="ok">✓</span></button>';
+  NAV.forEach(function(s,i){
+    h += '<button class="ni" data-i="'+i+'"><span class="no">'+s.num+'</span><span class="tt">'+s.title+'</span>'+
+      (i===TESTIDX && bestScore!==null ? '<span class="sc">'+bestScore+'/'+QUIZ.length+'</span>' : '')+
+      '<span class="ok">✓</span></button>';
+    if(i===cur && s.subs.length){
+      h += '<div class="subnav">'+s.subs.map(function(sb){
+        return '<button class="sn" data-i="'+i+'" data-id="'+sb.id+'">'+sb.t+'</button>';
+      }).join("")+'</div>';
+    }
+  });
+  nav.innerHTML = h;
+  $$(".ni",nav).forEach(function(b){
+    var i = +b.dataset.i;
+    if(i===cur) b.classList.add("act");
+    if(done[i]) b.classList.add("done");
+    b.onclick = function(){ show(i); };
+  });
+  $$(".sn",nav).forEach(function(b){
+    b.onclick = function(){
+      show(+b.dataset.i);
+      var el = document.getElementById(b.dataset.id);
+      if(el){ el.scrollIntoView({behavior:"smooth",block:"start"}); }
+      closeSb();
+    };
+  });
+}
+
+function buildCards(){
+  $("#cards").innerHTML = NAV.map(function(s,i){
+    return '<button class="card'+(done[i]?" done":"")+'" data-i="'+i+'">'+
+      '<span class="cn">Kapitola '+s.num+'</span><span class="ct">'+s.title+'</span>'+
+      '<span class="cm"><span>'+(i===TESTIDX ? QUIZ.length+" otázek" : (s.subs.length ? s.subs.length+" podkapitol" : "souhrn"))+'</span>'+
+      '<span class="st">'+(i===TESTIDX && bestScore!==null ? bestScore+"/"+QUIZ.length : "prostudováno")+'</span></span></button>';
+  }).join("");
+  $$("#cards .card").forEach(function(c){ c.onclick = function(){ show(+c.dataset.i); }; });
+}
+
+function progress(){
+  var n = Object.keys(done).length;
+  $("#pfill").style.width = (n/NAV.length*100)+"%";
+  $("#ptext").textContent = n+" z "+NAV.length;
+}
+
+function markDone(i){ if(i>=0 && !done[i]){ done[i]=1; progress(); } }
+
+function show(i){
+  cur = i;
+  $$(".view,.hero").forEach(function(v){ v.classList.remove("act"); });
+  var el = i<0 ? $("#home") : $("#sec-"+i);
+  el.classList.add("act");
+  $("#crumb").innerHTML = i<0 ? "<b>Školení Průmysl</b> · titulní přehled"
+    : "Kapitola "+NAV[i].num+" · <b>"+NAV[i].title+"</b>";
+  buildNav(); if(i<0) buildCards();
+  closeSb();
+  window.scrollTo({top:0});
+  document.querySelector(".wrap").scrollTop = 0;
+}
+
+/* bottom prev/next */
+function buildBnavs(){
+  NAV.forEach(function(s,i){
+    var d = document.createElement("div");
+    d.className = "bnav";
+    var prev = document.createElement("button");
+    prev.className = "btn ghost";
+    prev.textContent = i===0 ? "← Titulní přehled" : "← Kapitola "+NAV[i-1].num;
+    prev.onclick = function(){ show(i===0 ? -1 : i-1); };
+    var next = document.createElement("button");
+    next.className = "btn";
+    if(i===NAV.length-1){ next.textContent = "Dokončit školení"; next.onclick = function(){ markDone(i); show(-1); }; }
+    else { next.textContent = "Další kapitola →"; next.onclick = function(){ markDone(i); show(i+1); }; }
+    d.appendChild(prev); d.appendChild(next);
+    $("#sec-"+i).appendChild(d);
+  });
+}
+
+/* ---------- quiz ---------- */
+function buildQuiz(){
+  var host = $("#quiz");
+  var h = '<div class="qres" id="qres"><div class="big" id="qscore"></div><div class="vt" id="qverdict"></div></div><div class="qz" id="qz">';
+  QUIZ.forEach(function(item,qi){
+    h += '<div class="qcard" id="qc'+qi+'"><p class="qq"><span class="qn">'+(qi+1)+'.</span> '+item.q+'</p>';
+    item.o.forEach(function(op,oi){
+      h += '<label class="opt" data-q="'+qi+'" data-o="'+oi+'"><input type="radio" name="q'+qi+'" value="'+oi+'">'+
+        '<span class="ol">'+LETTERS[oi]+')</span><span>'+op+'</span></label>';
+    });
+    h += '<div class="qexpl" id="qe'+qi+'"></div></div>';
+  });
+  h += '</div><div class="qactions"><button class="btn" id="qeval">Vyhodnotit test</button>'+
+    '<button class="btn ghost" id="qretry" style="display:none">Zkusit znovu</button>'+
+    '<span class="qmsg" id="qmsg"></span></div>';
+  host.innerHTML = h;
+  $("#qeval").onclick = evalQuiz;
+  $("#qretry").onclick = resetQuiz;
+}
+
+function evalQuiz(){
+  if(PRUM.locked) return;
+  var missing = [];
+  QUIZ.forEach(function(item,qi){
+    $("#qc"+qi).classList.remove("miss");
+    if(!$('input[name="q'+qi+'"]:checked')) missing.push(qi);
+  });
+  var msg = $("#qmsg");
+  if(missing.length){
+    missing.forEach(function(qi){ $("#qc"+qi).classList.add("miss"); });
+    msg.textContent = "Zbývá zodpovědět: "+missing.length+" "+(missing.length===1?"otázka":(missing.length<5?"otázky":"otázek"))+".";
+    msg.classList.add("show");
+    $("#qc"+missing[0]).scrollIntoView({behavior:"smooth",block:"center"});
+    return;
+  }
+  msg.classList.remove("show");
+  var score = 0;
+  QUIZ.forEach(function(item,qi){
+    var pick = +$('input[name="q'+qi+'"]:checked').value;
+    var ok = pick===item.c;
+    if(ok) score++;
+    $$('.opt[data-q="'+qi+'"]').forEach(function(o){
+      var oi = +o.dataset.o;
+      if(oi===item.c) o.classList.add("good");
+      else if(oi===pick) o.classList.add("badpick");
+    });
+    var ex = $("#qe"+qi);
+    ex.innerHTML = (ok ? "Správně. " : "Správná odpověď: <strong>"+LETTERS[item.c]+")</strong> ")+item.e;
+    ex.className = "qexpl show"+(ok?"":" bad");
+  });
+  $("#qz").classList.add("locked");
+  $("#qeval").style.display = "none";
+  $("#qretry").style.display = "";
+  bestScore = (bestScore===null) ? score : Math.max(bestScore,score);
+  var res = $("#qres");
+  res.className = "qres show"+(score>=PASS?"":" fail");
+  $("#qscore").textContent = "Vaše skóre: "+score+" z "+QUIZ.length;
+  $("#qverdict").textContent = score>=16 ? "Výborně — jste připraveni na zákazníky."
+    : score>=PASS ? "Dobrý výsledek. Projděte si kapitoly u otázek, kde jste chybovali."
+    : "Pod doporučenou hranicí ("+PASS+" ze "+QUIZ.length+"). Vraťte se ke kapitolám 4 a 5 — právě tam se rozhoduje o důvěryhodnosti obchodníka v tomto segmentu.";
+  if(score>=PASS) markDone(TESTIDX);
+  buildNav();
+  res.scrollIntoView({behavior:"smooth",block:"center"});
+  // odeslání výsledku do intranetu (upsert dle e-mailu, max 3 pokusy, hranice 80 %)
+  var pct = Math.round(score/QUIZ.length*100);
+  if(PRUM.email && !PRUM.locked){
+    fetch("/api/prumysl",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:PRUM.email,name:PRUM.name,correct:score,total:QUIZ.length,pct:pct,passed:pct>=80})})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j&&j.blocked){ PRUM.attemptsUsed=3; lockTest(); setAtt("Vyčerpal(a) jste všechny 3 pokusy — tento výsledek se už neuložil."); }
+        else if(j&&j.ok){ PRUM.attemptsUsed=j.attempt; if(j.attemptsLeft<=0){ lockTest(); setAtt("Pokusy vyčerpány (3/3)."); } else setAtt("Využito pokusů: "+PRUM.attemptsUsed+" / 3 · zbývají "+j.attemptsLeft+"."); }
+      }).catch(function(){});
+  }
+}
+
+function resetQuiz(){
+  if(PRUM.locked) return;
+  buildQuiz();
+  if(PRUM.locked) lockTest();
+  $("#sec-"+TESTIDX).scrollIntoView({behavior:"smooth",block:"start"});
+  window.scrollTo({top:0});
+}
+
+/* ---------- search ---------- */
+var IDX = [];
+function norm(s){ return s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase(); }
+function buildIndex(){
+  NAV.forEach(function(s,i){
+    $$("#sec-"+i+" p, #sec-"+i+" li, #sec-"+i+" td, #sec-"+i+" h2, #sec-"+i+" h3").forEach(function(el){
+      var t = el.textContent.trim();
+      if(t.length>2) IDX.push({i:i,el:el,t:t,n:norm(t)});
+    });
+  });
+}
+function doSearch(){
+  var q = $("#q").value.trim();
+  var res = $("#res");
+  if(q.length<3){ res.classList.remove("on"); res.innerHTML=""; return; }
+  var nq = norm(q), out = [];
+  for(var k=0;k<IDX.length && out.length<20;k++){
+    var pos = IDX[k].n.indexOf(nq);
+    if(pos>-1) out.push({r:IDX[k],pos:pos});
+  }
+  if(!out.length){ res.innerHTML = '<div class="none">Nic nenalezeno pro „'+q.replace(/</g,"&lt;")+'“.</div>'; res.classList.add("on"); return; }
+  res.innerHTML = out.map(function(m,mi){
+    var t = m.r.t, a = Math.max(0,m.pos-40), b = Math.min(t.length,m.pos+q.length+60);
+    var snip = (a>0?"…":"")+t.slice(a,m.pos)+"<mark>"+t.slice(m.pos,m.pos+q.length)+"</mark>"+t.slice(m.pos+q.length,b)+(b<t.length?"…":"");
+    return '<div class="ri" data-m="'+mi+'"><b class="k">Kapitola '+NAV[m.r.i].num+' · '+NAV[m.r.i].title+'</b>'+snip+'</div>';
+  }).join("");
+  res.classList.add("on");
+  $$(".ri",res).forEach(function(r){
+    r.onmousedown = function(ev){
+      ev.preventDefault();
+      var m = out[+r.dataset.m];
+      show(m.r.i);
+      setTimeout(function(){
+        m.r.el.scrollIntoView({behavior:"smooth",block:"center"});
+        m.r.el.classList.remove("flash"); void m.r.el.offsetWidth; m.r.el.classList.add("flash");
+      },60);
+      res.classList.remove("on");
+      $("#q").value = "";
+    };
+  });
+}
+
+/* ---------- sidebar (mobile) ---------- */
+function closeSb(){ $("#sb").classList.remove("open"); $("#ovl").classList.remove("on"); }
+$("#burger").onclick = function(){ $("#sb").classList.add("open"); $("#ovl").classList.add("on"); };
+$("#ovl").onclick = closeSb;
+
+/* ---------- init ---------- */
+var st = null;
+$("#q").addEventListener("input", function(){ clearTimeout(st); st = setTimeout(doSearch,140); });
+$("#q").addEventListener("blur", function(){ setTimeout(function(){ $("#res").classList.remove("on"); },150); });
+document.addEventListener("keydown", function(e){
+  if(e.target.tagName==="INPUT" || e.target.tagName==="TEXTAREA") return;
+  if(e.key==="ArrowRight" && cur<NAV.length-1) show(cur+1);
+  if(e.key==="ArrowLeft" && cur>-1) show(cur-1);
+});
+$("#startBtn").onclick = function(){ show(0); };
+$("#testBtn").onclick = function(){ show(TESTIDX); };
+
+buildQuiz();
+buildBnavs();
+buildIndex();
+progress();
+show(-1);
+loadPrumStatus();
+</script>
+</body>
+</html>
