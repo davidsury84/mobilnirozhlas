@@ -127,6 +127,56 @@ const DOTAZNIK_MULDA = [
   ] },
 ];
 
+// ---- Dotazník SLD — kontejnery na separovaný sběr (papír/plast/sklo) --------
+// Vychází z produktové knihovny (řada SLD-SM/PM, 2,0–4,0 m³, Duo/Triglo, odhlučnění).
+const DOTAZNIK_SLD = [
+  { title: 'Základní údaje', fields: [
+    { k: 'objem', label: 'Objem (m³)', std: '3,0', opce: '2,0 / 2,5 / 3,5 / 4,0' },
+    { k: 'rada', label: 'Typ / řada', std: 'SM', opce: 'PM / SM-NOR' },
+    { k: 'rozmery', label: 'Rozměry (dle typu / výkresu)', type: 'text' },
+    { k: 'pocet', label: 'Počet ks', type: 'number' },
+    { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
+  ] },
+  { title: 'Provedení', fields: [
+    { k: 'frakce', label: 'Sbíraná frakce', std: 'papír', opce: 'plast / sklo / papír + plast' },
+    { k: 'komory', label: 'Komorové provedení', std: 'jednokomorové', opce: 'Duo (2 frakce) / Triglo (3 frakce)' },
+    { k: 'material', label: 'Materiál / plechy', std: 'ocel S235; plechy 2/3 mm', opce: 'silnější dle zadání' },
+    { k: 'vhoz', label: 'Vhozové otvory', std: 'dle frakce (standardní)', opce: 'atypické / počet dle zadání' },
+    { k: 'vyprazdneni', label: 'Vyprazdňování', std: 'spodní výsyp (dvířka)', opce: 'jeřábové / jiné' },
+    { k: 'uprava', label: 'Povrchová úprava', std: 'žárový zinek / základ', opce: 'lakované (RAL) — příplatek' },
+    { k: 'odhlucneni', label: 'Odhlučnění', std: 'ne', opce: 'ano (příplatek)' },
+  ] },
+  { title: 'Doplňky', fields: [
+    { k: 'zamek', label: 'Zámek / bezpečnostní vhoz', std: 'ne', opce: 'ano' },
+    { k: 'polep', label: 'Polep / grafika', std: 'ne', opce: 'ano' },
+    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
+  ] },
+];
+
+// ---- Dotazník ZÁCHYTNÉ VANY — sump pallets (sudy / IBC) ---------------------
+// Vychází z produktové knihovny (řada dle záchytného objemu 217/224/420/450/858 l).
+const DOTAZNIK_VANY = [
+  { title: 'Základní údaje', fields: [
+    { k: 'zachytnyObjem', label: 'Záchytný objem (l)', std: '217', opce: '224 / 420 / 450 / 858' },
+    { k: 'kapacita', label: 'Kapacita (sudy / IBC)', std: 'dle typu vany', opce: '1× IBC / 2–4 sudy / dle zadání' },
+    { k: 'rozmery', label: 'Půdorysné rozměry (délka × šířka)', type: 'text' },
+    { k: 'pocet', label: 'Počet ks', type: 'number' },
+    { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
+  ] },
+  { title: 'Provedení', fields: [
+    { k: 'material', label: 'Materiál', std: 'ocel (svařovaná vana)', opce: 'pozinkovaná / nerez' },
+    { k: 'rost', label: 'Pochozí rošt', std: 'ano (pozinkovaný rošt)', opce: 'bez roštu' },
+    { k: 'uprava', label: 'Povrchová úprava', std: 'žárový zinek', opce: 'lakované (RAL) / základ' },
+    { k: 'vidliceKapsy', label: 'Vidlicové kapsy (pro VZV)', std: 'ano', opce: 'ne' },
+    { k: 'norma', label: 'Provedení dle předpisů', std: 'pro nebezpečné / vodu znečišťující látky', opce: 'jiné' },
+  ] },
+  { title: 'Doplňky', fields: [
+    { k: 'vypust', label: 'Výpustný kohout', std: 'ne', opce: 'ano' },
+    { k: 'rampa', label: 'Nájezdová rampa', std: 'ne', opce: 'ano' },
+    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
+  ] },
+];
+
 // ---- Stavy zakázky (kap. 4 dokumentu) --------------------------------------
 const STAV = {
   novy:      { label: 'Nový',              onTurn: 'sef',        terminal: false },
@@ -173,6 +223,8 @@ const SEED_TYPES = [
   ...RADY_ABR.map(([key, name]) => ({ key, name, ...TYP_DEFAULTS, dotaznik: DOTAZNIK_ABROLL })),
   { key: 'city', name: 'CITY — uzavřený městský kontejner (hákový)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_CITY },
   { key: 'mulda', name: 'MULDA — skip / Absetzmulde (řetězová ramena)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_MULDA },
+  { key: 'sld', name: 'SLD — kontejner na separovaný sběr', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_SLD },
+  { key: 'vany', name: 'Záchytná vana (sump pallet)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_VANY },
 ];
 
 // ---- Číselník druhů práce pro evidenci (seed z reálného deníku konstrukce) --
