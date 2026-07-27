@@ -177,6 +177,57 @@ const DOTAZNIK_VANY = [
   ] },
 ];
 
+// ---- Dotazník USB/LSB — skladovací stohovací boxy --------------------------
+// Vychází z produktové knihovny (USB 0,5–2 m³ robustní; LSB 0,24–0,5 m³ lehké).
+const DOTAZNIK_BOXY = [
+  { title: 'Základní údaje', fields: [
+    { k: 'rada', label: 'Řada / typ boxu', std: 'USB (univerzální stohovací)', opce: 'LSB (lehký skladovací)' },
+    { k: 'velikost', label: 'Velikost / objem', std: 'USB 1 (1200×1200×850 ≈ 1 m³)', opce: '0,5 / 1,5 / 2 m³ · LSB 0,24–0,5 m³' },
+    { k: 'rozmery', label: 'Rozměry (délka × šířka × výška)', type: 'text' },
+    { k: 'pocet', label: 'Počet ks', type: 'number' },
+    { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
+  ] },
+  { title: 'Provedení', fields: [
+    { k: 'material', label: 'Materiál / plechy', std: 'ocel S235; stěny 2 mm', opce: 'silnější dle zadání' },
+    { k: 'vyztuhy', label: 'Výztuhy / rám', std: 'rohové výztuhy 5 mm', opce: 'rám z úhelníku L 60×60×3 (LSB)' },
+    { k: 'stohovani', label: 'Stohovatelnost', std: 'ano (stohovací prvky)', opce: 'ne' },
+    { k: 'vidliceKapsy', label: 'Vidlicové kapsy (pro VZV)', std: 'ano', opce: 'ne' },
+    { k: 'viko', label: 'Víko / zakrytí', std: 'bez (otevřený)', opce: 'víko / plachta' },
+    { k: 'dno', label: 'Dno / vyprazdňování', std: 'pevné dno', opce: 'sklopné dno / spodní výsyp' },
+    { k: 'uprava', label: 'Povrchová úprava', std: 'žárový zinek / základ', opce: 'lakované (RAL) — příplatek' },
+  ] },
+  { title: 'Doplňky', fields: [
+    { k: 'stitek', label: 'Štítek / číslování', std: 'ne', opce: 'ano' },
+    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
+  ] },
+];
+
+// ---- Dotazník SU — kontejnery na separovaný sběr (PA/DR/GL, velikosti S/M/L) -
+// Vychází z produktové knihovny (řada SU 3,0 a 5,0 m³; frakce papír/kartony/sklo).
+const DOTAZNIK_SU = [
+  { title: 'Základní údaje', fields: [
+    { k: 'objem', label: 'Objem (m³)', std: '3,0', opce: '5,0' },
+    { k: 'velikost', label: 'Velikost', std: 'M', opce: 'S / L' },
+    { k: 'frakce', label: 'Frakce / provedení', std: 'PA — papír', opce: 'DR — nápojové kartony/plast / GL — sklo' },
+    { k: 'pocet', label: 'Počet ks', type: 'number' },
+    { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
+  ] },
+  { title: 'Provedení', fields: [
+    { k: 'hrdlo', label: 'Vhozové hrdlo', std: 'jednohrdlové', opce: 'dvouhrdlové (2H)' },
+    { k: 'vhoz', label: 'Velikost vhozu', std: 'dle frakce (standardní)', opce: 'GL 160 / 220 / 330 (sklo) / atyp' },
+    { k: 'material', label: 'Materiál', std: 'ocel S235 (pilíř, podlaha)', opce: 'silnější dle zadání' },
+    { k: 'spoje', label: 'Spojovací materiál', std: 'M16', opce: 'jiné' },
+    { k: 'vyprazdneni', label: 'Vyprazdňování', std: 'spodní výsyp (jeřáb)', opce: 'jiné' },
+    { k: 'uprava', label: 'Povrchová úprava', std: 'žárový zinek / základ', opce: 'lakované (RAL) — příplatek' },
+    { k: 'sberatel', label: 'Sběratel (samostatná pozice)', std: 'ne', opce: 'ano (sběratel 5 m³)' },
+  ] },
+  { title: 'Doplňky', fields: [
+    { k: 'polep', label: 'Polep / grafika', std: 'ne', opce: 'ano' },
+    { k: 'zamek', label: 'Zámek / bezpečnostní vhoz', std: 'ne', opce: 'ano' },
+    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
+  ] },
+];
+
 // ---- Stavy zakázky (kap. 4 dokumentu) --------------------------------------
 const STAV = {
   novy:      { label: 'Nový',              onTurn: 'sef',        terminal: false },
@@ -225,6 +276,8 @@ const SEED_TYPES = [
   { key: 'mulda', name: 'MULDA — skip / Absetzmulde (řetězová ramena)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_MULDA },
   { key: 'sld', name: 'SLD — kontejner na separovaný sběr', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_SLD },
   { key: 'vany', name: 'Záchytná vana (sump pallet)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_VANY },
+  { key: 'boxy', name: 'USB / LSB — skladovací stohovací box', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_BOXY },
+  { key: 'su', name: 'SU — kontejner na separovaný sběr', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_SU },
 ];
 
 // ---- Číselník druhů práce pro evidenci (seed z reálného deníku konstrukce) --
