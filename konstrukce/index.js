@@ -66,6 +66,67 @@ const DOTAZNIK_ABROLL = [
   ] },
 ];
 
+// ---- Dotazník CITY — uzavřené městské abroll kontejnery (hákový nosič) ------
+// Vychází z produktové knihovny (řada CITY: CSD/DSD/POP/WDG/WDC/RAM/WFR).
+const DOTAZNIK_CITY = [
+  { title: 'Základní údaje', fields: [
+    { k: 'rada', label: 'Řada / provedení CITY', std: 'CSD (české uzavřené)', opce: 'DSD (dle DIN) / POP (popelničák) / WDG / WDC / RAM / WFR' },
+    { k: 'rozmery', label: 'Vnitřní rozměry (délka × šířka × výška)', type: 'text' },
+    { k: 'objem', label: 'Objem (m³)', std: '10,8 (CSD 3600×2000×1500)', opce: 'jiný dle rozměru (10–20 m³)' },
+    { k: 'pocet', label: 'Počet ks', type: 'number' },
+    { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
+  ] },
+  { title: 'Provedení', fields: [
+    { k: 'natahovani', label: 'Natahování (hákový nosič)', std: 'hák 1570 (DIN 30722)', opce: 'jiná výška háku' },
+    { k: 'prumerHaku', label: 'Průměr háku (mm)', std: '50', opce: '60' },
+    { k: 'material', label: 'Materiál / tloušťky plechů', std: 'S235; dno/bočnice 3/2 mm', opce: 'silnější (4/3, 5/3 mm)' },
+    { k: 'napojeniPodlaha', label: 'Napojení podlaha × bočnice', std: '45/45, vytažená podlaha (VP 250)', opce: 'R200/0° (K90)' },
+    { k: 'vrchniLem', label: 'Vrchní lem', std: 'jekl 100×80×4 S355', opce: 'tr 89×6 / tr 114×6 S355' },
+    { k: 'roztecVyztuhBocnice', label: 'Rozteč výztuh bočnice', std: '750 mm', opce: '500 mm' },
+    { k: 'profilVyztuhBocnice', label: 'Profil výztuh bočnice', std: 'U 100×60×3', opce: 'U 100×60×4' },
+    { k: 'zadniTramec', label: 'Zadní trámec', std: 'UPN 180', opce: '' },
+    { k: 'rolny', label: 'Rolny 2 ks (délka 300 mm)', std: 'tr 159×6', opce: 'bez rolen' },
+    { k: 'provedeniVrat', label: 'Provedení zadních vrat', std: '2křídlá', opce: '1křídlá / klapka / jiné' },
+    { k: 'zaviraniVrat', label: 'Zavírání vrat', std: 'S hák (typ VSH)', opce: 'holandské (VNL)' },
+    { k: 'strecha', label: 'Zakrytí / střecha', std: 'víko (uzavřený městský)', opce: 'plachta / rolovací plachta / bez' },
+    { k: 'zebrik', label: 'Žebřík (výška kont. min 1500 mm)', std: 'ano / vlevo ve směru jízdy', opce: 'ne' },
+    { k: 'centralniJisteni', label: 'Centrální jištění', std: 'ano / 2křídla (typ CE)', opce: 'ne' },
+  ] },
+  { title: 'Doplňky', fields: [
+    { k: 'dvojiteZavirani', label: 'Dvojité zavírání', std: 'ne', opce: 'ano' },
+    { k: 'spodniVysyp', label: 'Spodní výsyp / výpust', std: 'ne', opce: 'ano' },
+    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
+  ] },
+];
+
+// ---- Dotazník MULDA — skipy / Absetzmulden (řetězová/lanová ramena) ---------
+// Vychází z produktové knihovny (řada skips-muldy: AM/AMK/DMC/DMS/SMR/ASM; objemy 2,2–12 m³).
+const DOTAZNIK_MULDA = [
+  { title: 'Základní údaje', fields: [
+    { k: 'objem', label: 'Objem (m³)', std: '5,5', opce: '2,2 / 3,5 / 7,0 / 10,0 / 12,0' },
+    { k: 'rozmery', label: 'Vnitřní rozměry (délka × šířka × výška)', type: 'text' },
+    { k: 'pocet', label: 'Počet ks', type: 'number' },
+    { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
+  ] },
+  { title: 'Provedení', fields: [
+    { k: 'typMuldy', label: 'Typ muldy', std: 'AM — otevřená (Absetzmulde)', opce: 'AMK / DMC / DMS / DMP (s víkem) / SMR / ASM' },
+    { k: 'uchyceni', label: 'Systém uchycení (nosič)', std: 'řetězová / lanová ramena (Absetz)', opce: 'jeřábová (CRAN-MULDE) / jiné' },
+    { k: 'norma', label: 'Národní provedení / norma', std: 'CZ', opce: 'DIN / CH / NL / FR / PreZero' },
+    { k: 'plechy', label: 'Tloušťky plechů (dno/bočnice/čela)', std: '5/3/4 (534)', opce: '4/3/3 (433) / 6/4/4 (644) / 6/5/5 (655)' },
+    { k: 'material', label: 'Materiál', std: 'ocel S235', opce: 'Hardox 450 (otěruvzdorný)' },
+    { k: 'vyskaBocnic', label: 'Výška bočnic', std: 'dle objemu', opce: '890 mm (S_890mm)' },
+    { k: 'ramNosniky', label: 'Rám / nosníky', std: 'U / UPN profily', opce: 'zesílený rám' },
+    { k: 'zadniCelo', label: 'Zadní čelo', std: 'sklopná klapka', opce: 'dvoukřídlá vrata / pevné' },
+    { k: 'viko', label: 'Víko / zakrytí', std: 'bez (otevřená)', opce: 'ocelové víko (DMC/DMS) / plachta / síť' },
+    { k: 'vidliceKapsy', label: 'Vidlicové kapsy (pro VZV)', std: 'ne', opce: 'ano' },
+    { k: 'spodniVysyp', label: 'Spodní výsyp / výpust', std: 'ne', opce: 'ano' },
+  ] },
+  { title: 'Doplňky', fields: [
+    { k: 'vyztuhy', label: 'Přídavné vyztužení', std: 'ne', opce: 'ano (typ S1)' },
+    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
+  ] },
+];
+
 // ---- Stavy zakázky (kap. 4 dokumentu) --------------------------------------
 const STAV = {
   novy:      { label: 'Nový',              onTurn: 'sef',        terminal: false },
@@ -102,14 +163,17 @@ const RADY_ABR = [
   ['hbi', 'HBI — Hardox'],
   ['lwc', 'LWC — odlehčený'],
 ];
-const SEED_TYPES = RADY_ABR.map(([key, name]) => ({
-  key, name, standard: true,
-  normohodiny: 8, revizeNh: 2,
+const TYP_DEFAULTS = {
+  standard: true, normohodiny: 8, revizeNh: 2,
   lhutaZkresleniDays: 3, lhutaRevizeDays: 2, lhutaPrideleniDays: 1, lhutaKontrolaDays: 1,
   lhutaObchodnikDays: 1, lhutaKlientDays: 5, lhutaVyrobaDays: 1,
-  internalCheck: true, linkValidDays: 30,
-  dotaznik: DOTAZNIK_ABROLL, params: [],
-}));
+  internalCheck: true, linkValidDays: 30, params: [],
+};
+const SEED_TYPES = [
+  ...RADY_ABR.map(([key, name]) => ({ key, name, ...TYP_DEFAULTS, dotaznik: DOTAZNIK_ABROLL })),
+  { key: 'city', name: 'CITY — uzavřený městský kontejner (hákový)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_CITY },
+  { key: 'mulda', name: 'MULDA — skip / Absetzmulde (řetězová ramena)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_MULDA },
+];
 
 // ---- Číselník druhů práce pro evidenci (seed z reálného deníku konstrukce) --
 // kind: 'zakazka' = produktivní práce na konkrétní zakázce · 'rezie' = režie mimo zakázku
@@ -211,8 +275,10 @@ function mount(host) {
     if (!Array.isArray(d.types) || !d.types.length) d.types = JSON.parse(JSON.stringify(SEED_TYPES));
     // migrace na 6 řad ABROLL: starý jediný typ 'abroll' nahradíme řadami DSD/AFS/…
     if (!d.types.some(t => t.key === 'dsd')) d.types = JSON.parse(JSON.stringify(SEED_TYPES));
-    // dotazník řad držíme v synchronu s kódem
-    d.types.forEach(t => { if (SEED_TYPES.some(s => s.key === t.key)) t.dotaznik = JSON.parse(JSON.stringify(DOTAZNIK_ABROLL)); });
+    // doplň chybějící seed typy (CITY/MULDA přidané později) beze změny existujících
+    SEED_TYPES.forEach(s => { if (!d.types.some(t => t.key === s.key)) d.types.push(JSON.parse(JSON.stringify(s))); });
+    // dotazník seed typů držíme v synchronu s kódem — každý typ svůj (ABROLL řady, CITY, MULDA)
+    d.types.forEach(t => { const s = SEED_TYPES.find(x => x.key === t.key); if (s && s.dotaznik) t.dotaznik = JSON.parse(JSON.stringify(s.dotaznik)); });
     if (!Array.isArray(d.zakazky)) d.zakazky = [];
     if (!Array.isArray(d.notif)) d.notif = [];
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
