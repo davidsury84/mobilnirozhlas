@@ -123,6 +123,22 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .artpick>label{margin:0 0 4px;font-size:12.5px;font-weight:700;color:var(--g2)}
 .art-dd{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 26px rgba(0,0,0,.14);max-height:280px;overflow:auto;margin-top:3px}
 .art-i{padding:8px 11px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)}
+/* Vlastní výběr typu výrobku s plným podbarvením rodin */
+.tsel{position:relative}
+.tsel-trigger{width:100%;display:flex;align-items:center;gap:8px;padding:8px 10px;font:inherit;font-size:13.5px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;text-align:left}
+.tsel-trigger:hover{border-color:#c3ccc4}
+.tsel-cur{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.tsel-cur b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsel-arrow{color:var(--mut);font-size:11px;flex:0 0 auto}
+.tsel-dot{width:12px;height:12px;border-radius:3px;flex:0 0 auto;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.tsel-panel{position:absolute;left:0;right:0;top:100%;z-index:35;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.18);max-height:340px;overflow:auto;padding:5px}
+.tsel-glabel{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:9px 8px 4px;color:var(--mut)}
+.tsel-row{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;margin:2px 0;line-height:1.25}
+.tsel-row .tsel-nm{flex:1;min-width:0}
+.tsel-row:hover{filter:brightness(.95)}
+.tsel-row.sel{box-shadow:inset 0 0 0 2px rgba(0,0,0,.22);font-weight:700}
+.tsel-check{margin-left:auto;font-weight:800;display:none}
+.tsel-row.sel .tsel-check{display:inline}
 .art-i:last-child{border-bottom:0}.art-i:hover{background:#eef6f0}
 .art-info{font-size:12.5px;color:#245c39;margin-top:6px;min-height:16px}
 .art-tag{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:var(--g);color:#fff}
@@ -1191,38 +1207,66 @@ function collectDot(){
   })});
   return dot;
 }
-/* Barevné rozlišení rodin typů v rozbalovacím seznamu (optgroup + emoji čtvereček + podbarvení kde to prohlížeč umí). */
+/* Vlastní výběr typu výrobku s plným podbarvením rodin (nativní select barvy řádků na macOS neumí). */
 var TYP_FAM={dsd:'abroll',afs:'abroll',hbs:'abroll',sth:'abroll',hbi:'abroll',lwc:'abroll',city:'city',mulda:'mulda',sld:'sber',su:'sber',vany:'sklad',boxy:'sklad'};
 var FAM={
-  abroll:{label:'🟦 ABROLL — hákové kontejnery',dot:'🟦',bg:'#e3f2fd',fg:'#0d3c78'},
-  city:  {label:'🟥 CITY — uzavřené městské (hákové)',dot:'🟥',bg:'#fdecea',fg:'#b3261e'},
-  mulda: {label:'🟧 MULDA — skipy (řetězová ramena)',dot:'🟧',bg:'#fff3e0',fg:'#9a5b00'},
-  sber:  {label:'🟩 Separovaný sběr (SLD, SU)',dot:'🟩',bg:'#e8f5e9',fg:'#1b5e20'},
-  sklad: {label:'🟪 Skladování (boxy, záchytné vany)',dot:'🟪',bg:'#f3e5f5',fg:'#6a1b9a'}
+  abroll:{label:'ABROLL — hákové kontejnery',bg:'#e3f2fd',fg:'#0d3c78',dot:'#1565c0'},
+  city:  {label:'CITY — uzavřené městské (hákové)',bg:'#fdecea',fg:'#b3261e',dot:'#c62828'},
+  mulda: {label:'MULDA — skipy (řetězová ramena)',bg:'#fff3e0',fg:'#9a5b00',dot:'#e65100'},
+  sber:  {label:'Separovaný sběr (SLD, SU)',bg:'#e8f5e9',fg:'#1b5e20',dot:'#2e7d32'},
+  sklad: {label:'Skladování (boxy, záchytné vany)',bg:'#f3e5f5',fg:'#6a1b9a',dot:'#8e24aa'}
 };
 var FAM_ORDER=['abroll','city','mulda','sber','sklad'];
-function buildTypeOptions(state){
+function famOf(key){return FAM[TYP_FAM[key]||'other']||{label:'Ostatní',bg:'#f2f2f2',fg:'#333',dot:'#999'};}
+function tselTrigContent(key){
+  var t=(D.types||[]).find(function(x){return x.key===key})||{}; var fam=famOf(key);
+  return '<span class="tsel-dot" style="background:'+fam.dot+'"></span><b>'+esc(t.name||key||'—')+'</b>';
+}
+function buildTselPanel(selKey){
   var types=D.types||[], byFam={};
   types.forEach(function(t){var f=TYP_FAM[t.key]||'other';(byFam[f]=byFam[f]||[]).push(t);});
   var order=FAM_ORDER.slice(); Object.keys(byFam).forEach(function(f){if(order.indexOf(f)<0)order.push(f);});
   var h='';
   order.forEach(function(f){
     var list=byFam[f]; if(!list||!list.length)return;
-    var fam=FAM[f]||{label:'Ostatní',dot:'⬜',bg:'#f2f2f2',fg:'#333'};
-    h+='<optgroup label="'+esc(fam.label)+'">';
+    var fam=FAM[f]||{label:'Ostatní',bg:'#f2f2f2',fg:'#333',dot:'#999'};
+    h+='<div class="tsel-glabel"><span class="tsel-dot" style="background:'+fam.dot+'"></span>'+esc(fam.label)+'</div>';
     list.forEach(function(t){
-      h+='<option value="'+esc(t.key)+'" style="background:'+fam.bg+';color:'+fam.fg+'"'+(state.typKey===t.key?' selected':'')+'>'+fam.dot+' '+esc(t.name)+'</option>';
+      h+='<div class="tsel-row'+(t.key===selKey?' sel':'')+'" data-key="'+esc(t.key)+'" onclick="tselPick(\''+esc(t.key)+'\')" style="background:'+fam.bg+';color:'+fam.fg+'"><span class="tsel-dot" style="background:'+fam.dot+'"></span><span class="tsel-nm">'+esc(t.name)+'</span><span class="tsel-check">✓</span></div>';
     });
-    h+='</optgroup>';
   });
   return h;
+}
+function buildTypeSelect(state){
+  var key=state.typKey||((D.types&&D.types[0]&&D.types[0].key)||'');
+  return '<div class="tsel" id="tselWrap">'+
+    '<button type="button" class="tsel-trigger" onclick="tselToggle(event)"><span class="tsel-cur" id="tselCur">'+tselTrigContent(key)+'</span><span class="tsel-arrow">▾</span></button>'+
+    '<input type="hidden" id="nTyp" value="'+esc(key)+'">'+
+    '<div class="tsel-panel" id="tselPanel" style="display:none">'+buildTselPanel(key)+'</div></div>';
+}
+function tselToggle(ev){ if(ev)ev.stopPropagation(); var p=document.getElementById('tselPanel'); if(!p)return;
+  if(p.style.display!=='none'){tselClose();return;}
+  p.style.display='block'; var s=p.querySelector('.tsel-row.sel'); if(s)s.scrollIntoView({block:'nearest'});
+  document.addEventListener('mousedown',tselOutside,true); document.addEventListener('keydown',tselKey,true);
+}
+function tselClose(){ var p=document.getElementById('tselPanel'); if(p)p.style.display='none';
+  document.removeEventListener('mousedown',tselOutside,true); document.removeEventListener('keydown',tselKey,true);
+}
+function tselOutside(e){ var w=document.getElementById('tselWrap'); if(w&&!w.contains(e.target))tselClose(); }
+function tselKey(e){ if(e.key==='Escape')tselClose(); }
+function tselPick(key){
+  var inp=document.getElementById('nTyp'); if(inp)inp.value=key;
+  var cur=document.getElementById('tselCur'); if(cur)cur.innerHTML=tselTrigContent(key);
+  var p=document.getElementById('tselPanel'); if(p)[].slice.call(p.querySelectorAll('.tsel-row')).forEach(function(r){r.classList.toggle('sel',r.getAttribute('data-key')===key);});
+  tselClose();
+  DQ_PREFILL=null; artReset(); renderDotaznik();   // stejná reakce jako dřív u <select onchange>
 }
 function openNew(state){
   if(!state)DQ_ART='';
   state=state||{};DQ_PREFILL=state.dot||null;
   ensureKat();
   var head=state.head||{};
-  var typeOpts=buildTypeOptions(state);
+  var typeSel=buildTypeSelect(state);
   var langs=['cs','en','de','pl'].map(function(l){return '<button type="button" class="langb'+(DQ_LANG===l?' act':'')+'" onclick="langSwitch(\''+l+'\')">'+(l==='cs'?'CZ':l.toUpperCase())+'</button>'}).join('');
   var m=document.getElementById('modal');
   m.innerHTML='<div class="sheet dqmodal">'+
@@ -1231,7 +1275,7 @@ function openNew(state){
       '<div class="ssobar" style="margin:10px 0 0"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>'+esc(tr('Zadává'))+': <b>'+esc((ME&&(ME.name||ME.email))||'—')+'</b> · '+new Date().toLocaleDateString('cs-CZ')+' <span class="muted">('+esc(tr('automaticky z přihlášení (SSO)'))+')</span></span></div>'+
     '</div>'+
     '<div class="dqbody">'+
-      '<div class="dqhg"><div><label>'+esc(tr('Typ výrobku'))+'</label><select id="nTyp" onchange="DQ_PREFILL=null;artReset();renderDotaznik()">'+typeOpts+'</select></div>'+
+      '<div class="dqhg"><div><label>'+esc(tr('Typ výrobku'))+'</label>'+typeSel+'</div>'+
       '<div><label>'+esc(tr('Číslo poptávky / zakázky'))+'</label><input id="nPopt" value="'+esc(head.nPopt||'')+'"></div>'+
       '<div><label>'+esc(tr('Zákazník'))+' <span class="reqmark">*</span></label><input id="nZak" value="'+esc(head.nZak||'')+'"></div>'+
       '<div><label>'+esc(tr('Kontaktní osoba'))+'</label><input id="nKontakt" value="'+esc(head.nKontakt||'')+'"></div>'+
