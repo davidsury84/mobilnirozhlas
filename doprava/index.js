@@ -306,6 +306,9 @@ function mount(host) {
   // Účetní skutečnost: přibalený snapshot jako výchozí zdroj (živý zdroj přes env viz výše).
   let seedEkonomika = null;
   try { seedEkonomika = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed-ekonomika.json'), 'utf8')); } catch (_) {}
+  // Finanční plán tržeb (zatím statický snapshot „Plán tržeb aktuální.xlsx")
+  let seedPlan = null;
+  try { seedPlan = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed-plan.json'), 'utf8')); } catch (_) {}
   // Evidence řidičů a typů vozidel (v tabulkách není; plní správce přímo v modulu).
   const INFO_F = path.join(host.dataDir || __dirname, 'doprava-vozidla.json');
   function readInfo() { try { const i = JSON.parse(fs.readFileSync(INFO_F, 'utf8')); return (i && typeof i === 'object') ? i : {}; } catch { return {}; } }
@@ -480,7 +483,7 @@ function mount(host) {
           cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
           cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
         ].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, plan: seedPlan || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
