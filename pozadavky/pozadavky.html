@@ -63,6 +63,8 @@
     </div>
   </div>
 
+  <div id="cfgCard"></div>
+
   <div class="card" id="formCard" style="display:none">
     <div class="grid2">
       <label class="field">Kód produktu <input id="fKod" placeholder="např. 29577229"></label>
@@ -103,6 +105,7 @@ function render(){
   var isBuyer=!!role.isBuyer;
   $('#sub').textContent=isBuyer?'Fronta požadavků od E-shopu. Měňte stav — E-shop dostane e-mail.':'Vaše požadavky odeslané nákupčímu a jejich stav.';
   $('#newBtn').style.display=(role.isRequester||role.isAdmin)?'':'none';
+  if(role.isAdmin) renderCfg(); else $('#cfgCard').innerHTML='';
   // filtry (jen nákupčí)
   var fl=$('#filters');
   if(isBuyer){
@@ -167,6 +170,43 @@ async function submitReq(){
     $('#fKod').value='';$('#fNazev').value='';$('#fMn').value='';$('#fDuvod').value='';
     toggleForm(); toast('Požadavek #'+j.cislo+' odeslán'+(j.notified?' ('+j.notified+' nákupčí)':'')); load();
   }catch(e){ toast('Chyba: '+e.message); }
+}
+
+/* ---- Nastavení nákupčího (jen správce) — nákupčí je definován jménem ---- */
+var CFG={buyers:[],employees:[],loaded:false};
+async function renderCfg(){
+  var box=$('#cfgCard');
+  if(!CFG.loaded){
+    try{ var r=await fetch('/api/pozadavky/nastaveni',{cache:'no-store'}); if(r.ok){ var j=await r.json(); CFG.buyers=j.buyers||[]; CFG.employees=j.employees||[]; CFG.loaded=true; } else { box.innerHTML=''; return; } }
+    catch(e){ box.innerHTML=''; return; }
+  }
+  var chosen={}; CFG.buyers.forEach(function(b){chosen[b.email]=1});
+  var opts=CFG.employees.filter(function(e){return !chosen[e.email]}).map(function(e){return '<option value="'+esc(e.email)+'">'+esc(e.name)+' — '+esc(e.email)+'</option>'}).join('');
+  var chips=CFG.buyers.length?CFG.buyers.map(function(b){return '<span class="chip on" style="cursor:default">'+esc(b.name||b.email)+' <b title="Odebrat" style="cursor:pointer;margin-left:4px" onclick="cfgRemove(\''+esc(b.email)+'\')">✕</b></span>'}).join(' '):'<span style="color:var(--mut)">Zatím nikdo — požadavky vidí zatím jen správce a nechodí e-maily.</span>';
+  box.innerHTML='<div class="card" style="background:#f2f7ee;border-color:#cfe0c2">'
+    +'<div style="font-weight:700;margin-bottom:4px">🛒 Nákupčí — kdo dostává a řeší požadavky</div>'
+    +'<div style="color:var(--mut);font-size:13px;margin-bottom:10px">Vyberte konkrétní osobu (nebo více, kvůli zástupu). Jen tito lidé uvidí frontu požadavků, mohou měnit stav a dostávají e-mailem nový požadavek.</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+chips+'</div>'
+    +(opts?'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="cfgSel" style="min-width:240px;font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:9px">'+opts+'</select><button class="btn sm" onclick="cfgAdd()">Přidat jako nákupčího</button></div>':'<div style="color:var(--mut);font-size:13px">Všichni zaměstnanci už jsou přidáni.</div>')
+    +'</div>';
+}
+async function cfgSave(list){
+  try{
+    var r=await fetch('/api/pozadavky/nastaveni',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({buyers:list})});
+    var j=await r.json();
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return false; }
+    CFG.buyers=j.buyers||[]; renderCfg(); return true;
+  }catch(e){ toast('Chyba: '+e.message); return false; }
+}
+async function cfgAdd(){
+  var sel=$('#cfgSel'); if(!sel||!sel.value) return;
+  var em=sel.value; var emp=CFG.employees.find(function(e){return e.email===em});
+  var list=CFG.buyers.map(function(b){return {email:b.email,name:b.name}}); list.push({email:em,name:emp?emp.name:em});
+  if(await cfgSave(list)) toast('Nákupčí přidán');
+}
+async function cfgRemove(em){
+  var list=CFG.buyers.filter(function(b){return b.email!==em}).map(function(b){return {email:b.email,name:b.name}});
+  if(await cfgSave(list)) toast('Nákupčí odebrán');
 }
 
 async function changeStav(id){

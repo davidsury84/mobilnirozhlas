@@ -42,13 +42,20 @@ function mount(host) {
 
   // ---- perzistence ----
   function load() {
-    try { const j = JSON.parse(fs.readFileSync(DATA_F, 'utf8')); if (Array.isArray(j)) return { items: j, seq: j.length }; return j && Array.isArray(j.items) ? j : { items: [], seq: 0 }; }
-    catch (_) { return { items: [], seq: 0 }; }
+    let db;
+    try { const j = JSON.parse(fs.readFileSync(DATA_F, 'utf8')); db = Array.isArray(j) ? { items: j, seq: j.length } : (j && Array.isArray(j.items) ? j : { items: [], seq: 0 }); }
+    catch (_) { db = { items: [], seq: 0 }; }
+    if (!db.config) db.config = { buyers: [] };
+    if (!Array.isArray(db.config.buyers)) db.config.buyers = [];
+    return db;
   }
   function save(db) { try { fs.writeFileSync(DATA_F, JSON.stringify(db, null, 2)); } catch (e) { console.error('[pozadavky] zápis selhal:', e.message); } }
 
   // ---- role ----
   function mods(email) { try { return host.employeeModules(email) || []; } catch (_) { return []; } }
+  // Nákupčí je definován JMÉNEM (výběr správcem), ne modulem — uloženo v db.config.buyers.
+  function configBuyers() { return load().config.buyers; }
+  function isConfiguredBuyer(email) { email = (email || '').toLowerCase(); return !!email && configBuyers().some(b => (b.email || '').toLowerCase() === email); }
   function meOf(req) {
     const e = host.empSession(req);
     const email = e ? (e.email || '').toLowerCase() : '';
@@ -57,19 +64,22 @@ function mount(host) {
     return {
       email, name: e ? (e.name || '') : (admin ? 'Správce' : ''),
       isAdmin: admin,
-      isBuyer: admin || m.indexOf('nakupci') >= 0,
+      isBuyer: admin || isConfiguredBuyer(email),
       isRequester: admin || m.indexOf('eshop') >= 0,
     };
   }
   function maPristup(req) { const me = meOf(req); return me.isBuyer || me.isRequester; }
 
-  // Seznam nákupčích (pro notifikace a přehled) z živé DB zaměstnanců.
+  // Seznam nákupčích (pro notifikace a přehled) — vybraní správcem podle jména.
   function nakupci() {
+    return configBuyers().map(b => ({ email: (b.email || '').toLowerCase(), name: b.name || b.email || '' })).filter(b => b.email);
+  }
+  // Seznam zaměstnanců pro výběr nákupčího (z živé DB).
+  function employeesForPicker() {
     let emps = [];
     try { const s = host.getState ? host.getState() : null; emps = (s && s.employees) || []; } catch (_) {}
-    return emps.filter(e => Array.isArray(e.modules) && e.modules.indexOf('nakupci') >= 0)
-      .map(e => ({ email: (e.email || '').toLowerCase(), name: e.name || e.email || '' }))
-      .filter(e => e.email);
+    return emps.map(e => ({ email: (e.email || '').toLowerCase(), name: e.name || e.email || '' }))
+      .filter(e => e.email).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
   }
 
   // ---- e-mail ----
@@ -106,6 +116,8 @@ function mount(host) {
 
     try {
       if (p === '/api/pozadavky/me' && req.method === 'GET') return apiMe(req, res);
+      if (p === '/api/pozadavky/nastaveni' && req.method === 'GET') return apiCfgGet(req, res);
+      if (p === '/api/pozadavky/nastaveni' && req.method === 'POST') return apiCfgSet(req, res);
       if (p === '/api/pozadavky' && req.method === 'GET') return apiList(req, res);
       if (p === '/api/pozadavky' && req.method === 'POST') return apiCreate(req, res);
       if (p === '/api/pozadavky/stav' && req.method === 'POST') return apiStav(req, res);
@@ -122,6 +134,29 @@ function mount(host) {
   function apiMe(req, res) {
     const me = meOf(req);
     json(res, 200, { email: me.email, name: me.name, isAdmin: me.isAdmin, isBuyer: me.isBuyer, isRequester: me.isRequester, stavy: STAVY, buyers: nakupci().map(b => b.name), buyersCount: nakupci().length });
+    return true;
+  }
+
+  // ---- nastavení nákupčího (jen správce) ----
+  function apiCfgGet(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    json(res, 200, { buyers: configBuyers(), employees: employeesForPicker() });
+    return true;
+  }
+  async function apiCfgSet(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const incoming = Array.isArray(b.buyers) ? b.buyers : [];
+    const names = {}; employeesForPicker().forEach(e => { names[e.email] = e.name; });
+    const seen = {}; const buyers = [];
+    incoming.forEach(x => {
+      const email = (typeof x === 'string' ? x : (x && x.email) || '').toLowerCase();
+      if (!email || seen[email]) return; seen[email] = 1;
+      buyers.push({ email, name: (x && x.name) || names[email] || email });
+    });
+    const db = load(); db.config.buyers = buyers; save(db);
+    logAct('pozadavky', meOf(req), 'Nastaven nákupčí: ' + (buyers.map(x => x.name).join(', ') || '(nikdo)'));
+    json(res, 200, { ok: true, buyers });
     return true;
   }
 
@@ -211,7 +246,7 @@ function mount(host) {
 
   function baseUrlOf(req) { try { return host.baseUrl(req).replace(/\/$/, ''); } catch (_) { return ''; } }
 
-  return { handle };
+  return { handle, isConfiguredBuyer };
 }
 
 module.exports = { mount };
