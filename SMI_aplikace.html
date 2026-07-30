@@ -591,7 +591,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <details class="settings" style="margin:0 0 12px">
         <summary>🏷 Dodací lhůty a MOQ per skupina (SK) — přepis výchozích hodnot</summary>
         <div style="margin-top:10px">
-          <p class="muted" style="font-size:12px;margin:0 0 8px">Prázdné = dědí výchozí (globální nahoře). Vyplněné platí pro celou skupinu SK. U konkrétní položky lze přepsat v detailní tabulce dole (sloupce Lhůta / MOQ). Ukládá se v prohlížeči.</p>
+          <p class="muted" style="font-size:12px;margin:0 0 8px">Prázdné = dědí výchozí (globální nahoře). Vyplněné platí pro celou skupinu SK. U konkrétní položky lze přepsat v detailní tabulce dole (sloupce Lhůta / MOQ). Ukládá se v prohlížeči — pro přenos na jiný počítač použij export/import.</p>
+          <div class="toolbar" style="margin:0 0 10px;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn ghost" type="button" style="padding:6px 12px;font-size:12px" onclick="nkExportOv()" title="Uloží přepisy (skupiny i položky) do souboru JSON">⬇ Export nastavení</button>
+            <label class="btn ghost" style="padding:6px 12px;font-size:12px;cursor:pointer" title="Načte přepisy ze souboru JSON — přepíše aktuální">⬆ Import nastavení<input type="file" accept="application/json,.json" onchange="nkImportOv(this)" style="display:none"></label>
+            <button class="btn ghost" type="button" style="padding:6px 12px;font-size:12px" onclick="nkClearOv()" title="Smaže všechny přepisy — vše se vrátí na výchozí">🗑 Vyčistit přepisy</button>
+            <span id="nkOvInfo" class="muted" style="font-size:12px"></span>
+          </div>
           <div class="tblwrap" style="max-height:340px"><table id="nkGroupsTbl"></table></div>
         </div>
       </details>
@@ -1680,6 +1686,7 @@ function nkRenderGroups(){
         '<td class="num"><input type="number" min="0" data-gsk="'+esc(g.sk)+'" data-gk="L" value="'+(ov.L>0?ov.L:'')+'" placeholder="'+gdL+'" style="width:72px"></td>'+
         '<td class="num"><input type="number" min="0" data-gsk="'+esc(g.sk)+'" data-gk="MOQ" value="'+(ov.MOQ>0?ov.MOQ:'')+'" placeholder="'+gdM+'" style="width:64px"></td></tr>';
     }).join('')+'</tbody>';
+  const _oi=$('#nkOvInfo'); if(_oi){const c=nkOvCount(); _oi.textContent=(c.g||c.i)?('Aktivní přepisy: '+c.g+' skupin, '+c.i+' položek'):'Žádné přepisy — vše dědí výchozí';}
 }
 function nkOvCell(r,n,key){
   const id=String(r.ident||'').trim(), eff=key==='L'?n.L:n.MOQ;
@@ -1698,6 +1705,30 @@ document.addEventListener('change',function(e){
     if(!(NK_OV.i[id].L>0)&&!(NK_OV.i[id].MOQ>0))delete NK_OV.i[id]; hit=true;}
   if(hit){nkSaveOv(); try{renderNakup();}catch(err){}}
 });
+function nkOvCount(){return {g:Object.keys(NK_OV.g||{}).length,i:Object.keys(NK_OV.i||{}).length};}
+function nkExportOv(){
+  const c=nkOvCount(); if(!c.g&&!c.i){toast('Žádné přepisy k exportu');return;}
+  const data=JSON.stringify({app:'SMI-nakup-overrides',v:1,g:NK_OV.g||{},i:NK_OV.i||{}},null,2);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+  a.download='nakup-lhuty-moq.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  toast('Exportováno: '+c.g+' skupin, '+c.i+' položek');
+}
+function nkImportOv(input){
+  const f=input.files&&input.files[0]; if(!f){return;}
+  const r=new FileReader();
+  r.onload=function(e){try{const o=JSON.parse(e.target.result); if(!o||typeof o!=='object')throw 0;
+    const g=(o.g&&typeof o.g==='object')?o.g:{}, i=(o.i&&typeof o.i==='object')?o.i:{};
+    NK_OV={g:g,i:i}; nkSaveOv(); try{renderNakup();}catch(er){}
+    const c=nkOvCount(); toast('Importováno: '+c.g+' skupin, '+c.i+' položek');
+  }catch(err){alert('Neplatný soubor — očekává se JSON exportovaný tímto tlačítkem (pole g a i).');}
+    input.value='';};
+  r.readAsText(f);
+}
+function nkClearOv(){
+  const c=nkOvCount(); if(!c.g&&!c.i){toast('Žádné přepisy k vyčištění');return;}
+  if(!confirm('Vyčistit všechny přepisy dodací lhůty a MOQ? ('+c.g+' skupin, '+c.i+' položek)'))return;
+  NK_OV={g:{},i:{}}; nkSaveOv(); try{renderNakup();}catch(e){} toast('Přepisy vyčištěny');
+}
 function renderNakup(){
   try{nkCompute();}catch(e){console.error('nakup',e);return;}
   try{nkRenderGroups();}catch(e){}
