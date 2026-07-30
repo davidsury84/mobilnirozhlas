@@ -133,6 +133,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green-2)
 textarea{resize:vertical;min-height:90px}
 
 .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.miss-chip{display:inline-flex;align-items:center;gap:6px;background:var(--yellow-soft,#fdf3e2);border:1px solid #eacb8f;color:#7a5410;border-radius:999px;padding:2px 4px 2px 11px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.miss-mail{border:0;background:#e39b30;color:#fff;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:11px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto}
+.miss-mail:hover{background:#cf860f}
+.miss-wrap{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .pill.green{background:var(--green-soft);color:var(--green-d)}
 .pill.amber{background:var(--yellow-soft);color:var(--amber);border:1px solid #f3e0a0}
 .pill.gray{background:var(--bg-2);color:var(--ink-soft)}
@@ -5565,14 +5569,21 @@ function renderStats(){
   // Souhrn podle směrnic
   const sum=document.getElementById("dirSummary");
   if(!DB.directives.length){ sum.innerHTML='<p class="muted">Žádné směrnice.</p>'; }
-  else sum.innerHTML=`<table class="grid"><thead><tr><th>Směrnice</th><th>Seznámeno</th><th>Postup</th><th>Chybí</th></tr></thead><tbody>${
+  else sum.innerHTML=`<table class="grid"><thead><tr><th>Směrnice</th><th>Seznámeno</th><th>Postup</th><th>Neseznámení — celé jméno a připomenutí</th></tr></thead><tbody>${
     DB.directives.map(d=>{ const s=ackStats(d);
-      const missing=s.audience.filter(e=>!d.acks[e.email.toLowerCase()]).map(e=>e.name);
+      const missing=s.audience.filter(e=>!d.acks[e.email.toLowerCase()]);
+      const cell = missing.length
+        ? '<div class="miss-wrap">'
+          + missing.map(e=>'<span class="miss-chip">'+esc(e.name)
+              +'<button class="miss-mail" title="Odeslat připomenutí seznámení: '+esc(e.name)+'" onclick="remindOne(\''+d.id+'\',\''+esc(e.email)+'\')">✉</button></span>').join("")
+          + (missing.length>1?'<button class="btn ghost sm" onclick="remindMissing(\''+d.id+'\')">✉ Připomenout všem ('+missing.length+')</button>':'')
+          + '</div>'
+        : '<span class="pill green">vše hotovo</span>';
       return `<tr>
         <td><strong>${esc(d.title)}</strong></td>
         <td><span class="pill ${s.pct===100?'green':s.done?'amber':'gray'}">${s.done}/${s.total}</span></td>
         <td><div class="progress"><i style="width:${s.pct}%"></i></div></td>
-        <td class="muted" style="font-size:13px">${missing.length?esc(missing.join(", ")):'<span class="pill green">vše hotovo</span>'}</td>
+        <td style="font-size:13px">${cell}</td>
       </tr>`;
     }).join("")
   }</tbody></table>`;
@@ -5602,6 +5613,47 @@ function renderMatrix(){
     body+="</tr>";
   });
   m.innerHTML=head+body+"</tbody>";
+}
+
+/* ---- Připomenutí seznámení lidem, kteří se ještě nepotvrdili — přímo ze Statistik ---- */
+async function sendReminders(S, list){
+  const DEF=sendDefaults(S);
+  try{
+    if(!S.isSurvey) await ensurePublished(S.id);   // směrnice: aktuální obsah + funkční osobní odkazy
+    const recipients=list.map(e=>({email:e.email,name:e.name,link:S.linkFor(e.email)}));
+    toast("Odesílám "+recipients.length+" e-mailů…");
+    const payload={subject:DEF.subj, body:DEF.body, recipients, dirTitle:S.title,
+      btnLabel:S.isSurvey?"Otevřít průzkum":"Otevřít a potvrdit seznámení"};
+    const res=await fetch(apiBase()+"/api/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    let j={}; try{ j=await res.json(); }catch(_){}
+    if(!res.ok||j.error) throw new Error(j.error||("HTTP "+res.status));
+    const ok=(j.results||[]).filter(r=>r.ok).length, bad=(j.results||[]).filter(r=>!r.ok);
+    toast("Odesláno "+ok+(bad.length?(" · chyba "+bad.length):""));
+    if(bad.length){ alert("Část se nepodařilo odeslat:\n"+bad.map(b=>b.email+": "+(b.error||"")).join("\n")+(interpretMailError(bad[0].error)?("\n\n"+interpretMailError(bad[0].error)):"")); }
+  }catch(e){
+    alert("Rozeslání selhalo: "+e.message+(interpretMailError(e.message)?("\n\n"+interpretMailError(e.message)):""));
+  }
+}
+async function remindOne(dirId, email){
+  const S=sendableOf(dirId); if(!S) return;
+  const emp=DB.employees.find(e=>e.email.toLowerCase()===String(email).toLowerCase());
+  const name=emp?emp.name:email;
+  if(DEMO){ toast("Ukázkový režim – e-maily se neodesílají"); return; }
+  if(!mailIsReady()){ alert("Pošta není nastavená — vyplň ji v záložce Nastavení."); return; }
+  if(!(await appConfirm("Odeslat připomenutí seznámení?",
+      '<b>'+esc(name)+'</b> <span class="mono" style="font-size:12px">&lt;'+esc(email)+'&gt;</span><br><span class="muted">Směrnice: '+esc(S.title)+'</span>', "✉ Odeslat"))) return;
+  await sendReminders(S, [{email, name}]);
+}
+async function remindMissing(dirId){
+  const S=sendableOf(dirId); if(!S) return;
+  const d=DB.directives.find(x=>x.id===dirId); if(!d) return;
+  const missing=audienceOf(d).filter(e=>!d.acks[e.email.toLowerCase()]);
+  if(!missing.length){ toast("Všichni už jsou seznámeni."); return; }
+  if(DEMO){ toast("Ukázkový režim – e-maily se neodesílají"); return; }
+  if(!mailIsReady()){ alert("Pošta není nastavená — vyplň ji v záložce Nastavení."); return; }
+  const seznam='<div style="max-height:210px;overflow:auto;font-size:13px;line-height:1.7">'+missing.map(e=>esc(e.name)).join("<br>")+'</div>';
+  if(!(await appConfirm("Připomenout „"+esc(S.title)+"\" — "+missing.length+" "+(missing.length===1?"člověku":"lidem")+"?", seznam, "✉ Odeslat "+missing.length))) return;
+  await sendReminders(S, missing.map(e=>({email:e.email,name:e.name})));
 }
 
 function exportStatsXlsx(){
