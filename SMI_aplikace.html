@@ -588,6 +588,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <p style="margin:8px 0 2px;color:var(--mut)"><b>Filtrování:</b> v hlavičce každého sloupce je filtr (rozbalovací u textových sloupců, číselné porovnání u čísel — např. <code>&gt;100</code>). „Objemová sleva" je hodnota ve sloupci <b>Akce</b> (ne Kategorie) — najdeš ji ve filtrech sloupce Akce v záložkách Nové ceny, Mrtvé zásoby, SMI model a Vše.</p>
         </div>
       </details>
+      <details class="settings" style="margin:0 0 12px">
+        <summary>🏷 Dodací lhůty a MOQ per skupina (SK) — přepis výchozích hodnot</summary>
+        <div style="margin-top:10px">
+          <p class="muted" style="font-size:12px;margin:0 0 8px">Prázdné = dědí výchozí (globální nahoře). Vyplněné platí pro celou skupinu SK. U konkrétní položky lze přepsat v detailní tabulce dole (sloupce Lhůta / MOQ). Ukládá se v prohlížeči.</p>
+          <div class="tblwrap" style="max-height:340px"><table id="nkGroupsTbl"></table></div>
+        </div>
+      </details>
       <div class="toolbar">
         <input type="text" id="nkSearch" placeholder="Hledat položku…" style="min-width:240px">
         <select id="nkFilter"><option value="">Vše</option><option value="now">Objednat teď</option><option value="soon">Brzy</option><option value="season">Mimo sezónu</option><option value="ok">OK</option><option value="no">Nenakupovat</option></select>
@@ -1604,6 +1611,17 @@ function renderElko(){
 // ===== OPTIMALIZACE NÁKUPU (obrátka + sezónnost + zdražení + náklady skladu) =====
 function nkStd(a){if(a.length<2)return 0;const m=a.reduce((s,x)=>s+x,0)/a.length;return Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1));}
 let NK_PARAMS={};
+// Dodací lhůta a MOQ — přepisy per skupina (SK) a per položka (Identifikátor). Persistováno v prohlížeči.
+const NKOV_KEY='smi_nk_overrides_v1';
+let NK_OV={g:{},i:{}};
+try{const _o=JSON.parse(localStorage.getItem(NKOV_KEY)||'{}');NK_OV={g:_o.g||{},i:_o.i||{}};}catch(e){NK_OV={g:{},i:{}};}
+function nkSaveOv(){try{localStorage.setItem(NKOV_KEY,JSON.stringify(NK_OV));}catch(e){}}
+function nkGlobL(){return +($('#nkLead')?$('#nkLead').value:30)||30;}
+function nkGlobMOQ(){return Math.max(1,+($('#nkMOQ')?$('#nkMOQ').value:1)||1);}
+function nkResolveL(r){const id=String(r.ident||'').trim();if(id&&NK_OV.i[id]&&NK_OV.i[id].L>0)return NK_OV.i[id].L;const g=NK_OV.g[r.sk];if(g&&g.L>0)return g.L;return nkGlobL();}
+function nkResolveMOQ(r){const id=String(r.ident||'').trim();if(id&&NK_OV.i[id]&&NK_OV.i[id].MOQ>0)return NK_OV.i[id].MOQ;const g=NK_OV.g[r.sk];if(g&&g.MOQ>0)return g.MOQ;return nkGlobMOQ();}
+function nkOvSource(r,key){const id=String(r.ident||'').trim();if(id&&NK_OV.i[id]&&NK_OV.i[id][key]>0)return 'položka';const g=NK_OV.g[r.sk];if(g&&g[key]>0)return 'skupina';return 'výchozí';}
+
 function nkParams(){
   const totVal=ROWS.reduce((s,r)=>s+(r.BB||0),0);
   const cap=(+$('#nkCap').value||0)/100, wh=+$('#nkWh').value||0;
@@ -1616,11 +1634,10 @@ function nkParams(){
 function nkSeasonDemand(sales,start,months){let s=0;for(let k=0;k<Math.ceil(months);k++){const fr=Math.min(1,months-k);s+=(sales[(start+k)%12]||0)*fr;}return s;}
 function nkCompute(){
   const P=nkParams();const m0=new Date().getMonth();
-  const Lm=P.L/30;                         // dodací lhůta v měsících
   const coverM=Math.max(0.5,P.cover);      // cílové pokrytí v měsících
-  const windowM=Lm+coverM;                 // horizont plánování od TEĎ (lhůta + pokrytí)
   for(const r of ROWS){
     const sales=(r.sales||[]).map(x=>x||0);
+    const Lr=nkResolveL(r), Lm=Lr/30, MOQr=nkResolveMOQ(r), windowM=Lm+coverM;  // per-položka dodací lhůta + MOQ
     const D=sales.reduce((s,x)=>s+x,0), avgM=D/12;
     const siCur=avgM>0?sales[m0]/avgM:0, siNext=avgM>0?(sales[(m0+1)%12]+sales[(m0+2)%12])/(2*avgM):0;
     // Sezónní poptávka POUZE dopředu od aktuálního měsíce — neobjednáváme na to, co se prodává až za půl roku.
@@ -1641,7 +1658,7 @@ function nkCompute(){
       status='Mimo sezónu';when='—';reasons.push('teď se neprodává — objednat až před sezónou (ne rok dopředu)');
     }
     else if(stock<=rop){
-      rec=Math.max(P.MOQ,Math.round(target-stock));
+      rec=Math.max(MOQr,Math.round(target-stock));
       status='Objednat teď';when='teď';
       reasons.push('zásoba '+fmt(stock)+' ≤ bod obj. '+fmt(rop)+' · pokrýt '+(+coverM.toFixed(1))+' měs. dopředu');
       if(siCur>=1.3)reasons.push('v sezóně ('+fmt(siCur,1)+'×)');
@@ -1649,11 +1666,41 @@ function nkCompute(){
     }
     else if(daysToRop<=coverM*30){status='Brzy';when='za '+Math.round(daysToRop)+' dní';reasons.push('brzy pod bodem objednání');}
     else{status='OK';when=daysToRop===Infinity?'—':'za '+Math.round(daysToRop)+' dní';}
-    r._nk={D,avgM,siCur,siNext,rop,target,windowDem:Math.round(windowDem),eoq:Math.round(eoq),stock,cover,daysToRop,turn:r.BA?D/r.BA:0,rec,status,when,reason:reasons.join('; ')};
+    r._nk={D,avgM,siCur,siNext,rop,target,windowDem:Math.round(windowDem),eoq:Math.round(eoq),stock,cover,daysToRop,turn:r.BA?D/r.BA:0,rec,status,when,L:Lr,MOQ:MOQr,reason:reasons.join('; ')};
   }
 }
+function nkRenderGroups(){
+  const el=$('#nkGroupsTbl'); if(!el) return;
+  const gdL=nkGlobL(), gdM=nkGlobMOQ(), groups={};
+  for(const r of ROWS){const k=r.sk||'—'; if(!groups[k])groups[k]={sk:k,n:0,name:r.name||''}; groups[k].n++; if(!groups[k].name&&r.name)groups[k].name=r.name;}
+  const list=Object.values(groups).sort((a,b)=>String(a.sk).localeCompare(String(b.sk),'cs',{numeric:true}));
+  el.innerHTML='<thead><tr><th>Skupina SK</th><th>Ukázka sortimentu</th><th class="num">SKU</th><th class="num">Dodací lhůta [dní]</th><th class="num">MOQ</th></tr></thead><tbody>'+
+    list.map(g=>{const ov=NK_OV.g[g.sk]||{};
+      return '<tr><td><b>'+esc(g.sk)+'</b></td><td class="muted">'+esc((g.name||'').slice(0,42))+'</td><td class="num">'+g.n+'</td>'+
+        '<td class="num"><input type="number" min="0" data-gsk="'+esc(g.sk)+'" data-gk="L" value="'+(ov.L>0?ov.L:'')+'" placeholder="'+gdL+'" style="width:72px"></td>'+
+        '<td class="num"><input type="number" min="0" data-gsk="'+esc(g.sk)+'" data-gk="MOQ" value="'+(ov.MOQ>0?ov.MOQ:'')+'" placeholder="'+gdM+'" style="width:64px"></td></tr>';
+    }).join('')+'</tbody>';
+}
+function nkOvCell(r,n,key){
+  const id=String(r.ident||'').trim(), eff=key==='L'?n.L:n.MOQ;
+  if(!id) return '<td class="num muted">'+fmt(eff)+'</td>';
+  const ov=(NK_OV.i[id]&&NK_OV.i[id][key]>0)?NK_OV.i[id][key]:'';
+  return '<td class="num"><input type="number" min="0" data-iov="'+esc(id)+'" data-ik="'+key+'" value="'+ov+'" placeholder="'+fmt(eff)+'" style="width:58px"></td>';
+}
+// Delegace úprav přepisů (skupina / položka) — přepočítá a překreslí nákup.
+document.addEventListener('change',function(e){
+  const t=e.target; if(!t||!t.dataset)return; let hit=false;
+  if(t.dataset.gsk!=null&&t.dataset.gk){const sk=t.dataset.gsk,k=t.dataset.gk,v=parseFloat(t.value);
+    NK_OV.g[sk]=NK_OV.g[sk]||{}; if(v>0)NK_OV.g[sk][k]=v; else delete NK_OV.g[sk][k];
+    if(!(NK_OV.g[sk].L>0)&&!(NK_OV.g[sk].MOQ>0))delete NK_OV.g[sk]; hit=true;}
+  else if(t.dataset.iov!=null&&t.dataset.ik){const id=t.dataset.iov,k=t.dataset.ik,v=parseFloat(t.value);
+    NK_OV.i[id]=NK_OV.i[id]||{}; if(v>0)NK_OV.i[id][k]=v; else delete NK_OV.i[id][k];
+    if(!(NK_OV.i[id].L>0)&&!(NK_OV.i[id].MOQ>0))delete NK_OV.i[id]; hit=true;}
+  if(hit){nkSaveOv(); try{renderNakup();}catch(err){}}
+});
 function renderNakup(){
   try{nkCompute();}catch(e){console.error('nakup',e);return;}
+  try{nkRenderGroups();}catch(e){}
   const q=$('#nkSearch').value.toLowerCase(),f=$('#nkFilter').value;
   let rows=ROWS.map((r,i)=>({r,i})).filter(o=>(o.r.name||'').toLowerCase().includes(q)||String(o.r.ident||'').includes(q));
   const ord={'Objednat teď':0,'Brzy':1,'Mimo sezónu':2,'OK':3,'Nenakupovat':4};
@@ -1661,8 +1708,8 @@ function renderNakup(){
   const fmap={now:'Objednat teď',soon:'Brzy',season:'Mimo sezónu',ok:'OK',no:'Nenakupovat'};
   if(f)rows=rows.filter(o=>o.r._nk.status===fmap[f]);
   const sf={'Objednat teď':'c-dead','Brzy':'c-aging','Mimo sezónu':'c-slow','OK':'c-ok','Nenakupovat':'c-none'};
-  $('#nkTbl').innerHTML=`<thead><tr><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Roční prodej</th><th class="num">Sez. index (teď)</th><th class="num">Sklad ks</th><th class="num">Dní krytí</th><th class="num" title="Očekávaná poptávka za dodací lhůtu + cílové pokrytí od aktuálního měsíce">Poptávka (okno)</th><th class="num">Bod obj.</th><th class="num" title="Cílová zásoba po objednávce (jen na plánovací okno)">Cíl. zásoba</th><th class="num">Doporučeno obj.</th><th>Kdy</th><th>Stav</th><th>Důvod</th></tr></thead><tbody>`+
-    rows.slice(0,1500).map(o=>{const r=o.r,n=r._nk;return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.D)}</td><td class="num">${fmt(n.siCur,1)}×</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.windowDem)}</td><td class="num">${fmt(n.rop)}</td><td class="num">${fmt(n.target)}</td><td class="num"><b>${n.rec?fmt(n.rec):'—'}</b></td><td>${esc(n.when)}</td><td><span class="pill ${sf[n.status]}">${n.status}</span></td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+`</tbody>`;
+  $('#nkTbl').innerHTML=`<thead><tr><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Roční prodej</th><th class="num">Sez. index (teď)</th><th class="num">Sklad ks</th><th class="num">Dní krytí</th><th class="num" title="Očekávaná poptávka za dodací lhůtu + cílové pokrytí od aktuálního měsíce">Poptávka (okno)</th><th class="num">Bod obj.</th><th class="num" title="Cílová zásoba po objednávce (jen na plánovací okno)">Cíl. zásoba</th><th class="num">Doporučeno obj.</th><th class="num" title="Dodací lhůta pro tuto položku — dědí ze skupiny/globální, lze přepsat">Lhůta [dní]</th><th class="num" title="Min. obj. množství — dědí ze skupiny/globální, lze přepsat">MOQ</th><th>Kdy</th><th>Stav</th><th>Důvod</th></tr></thead><tbody>`+
+    rows.slice(0,1500).map(o=>{const r=o.r,n=r._nk;return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(n.D)}</td><td class="num">${fmt(n.siCur,1)}×</td><td class="num">${fmt(n.stock)}</td><td class="num">${n.cover===Infinity?'∞':fmt(n.cover,0)}</td><td class="num">${fmt(n.windowDem)}</td><td class="num">${fmt(n.rop)}</td><td class="num">${fmt(n.target)}</td><td class="num"><b>${n.rec?fmt(n.rec):'—'}</b></td>${nkOvCell(r,n,'L')}${nkOvCell(r,n,'MOQ')}<td>${esc(n.when)}</td><td><span class="pill ${sf[n.status]}">${n.status}</span></td><td class="muted" style="white-space:normal">${esc(n.reason)}</td></tr>`;}).join('')+`</tbody>`;
   const P=NK_PARAMS;
   const now=ROWS.filter(r=>r._nk&&r._nk.status==='Objednat teď').length;
   const recsum=ROWS.reduce((s,r)=>s+(r._nk?r._nk.rec:0),0);
