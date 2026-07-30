@@ -588,6 +588,30 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <p style="margin:8px 0 2px;color:var(--mut)"><b>Filtrování:</b> v hlavičce každého sloupce je filtr (rozbalovací u textových sloupců, číselné porovnání u čísel — např. <code>&gt;100</code>). „Objemová sleva" je hodnota ve sloupci <b>Akce</b> (ne Kategorie) — najdeš ji ve filtrech sloupce Akce v záložkách Nové ceny, Mrtvé zásoby, SMI model a Vše.</p>
         </div>
       </details>
+      <details class="settings" id="nkReportCfg" style="margin:0 0 12px;display:none">
+        <summary>📧 Týdenní e-mailové reporty — příjemci a zapnutí (jen správce)</summary>
+        <div style="margin-top:10px;font-size:13px">
+          <p class="muted" style="margin:0 0 10px">Dva automatické týdenní e-maily z aktuálních dat SMI: <b>„Co zlevnit"</b> (mrtvé/přeskladněné zásoby) a <b>„Co nakoupit"</b>. <span id="nkRepPeriod"></span></p>
+          <div style="display:grid;gap:10px;max-width:740px">
+            <label style="display:flex;flex-direction:column;gap:3px">🔻 „Co zlevnit" — komu poslat (více e-mailů oddělte čárkou)
+              <input type="text" id="nkRepMd" placeholder="email1@elkoplast.cz, email2@elkoplast.cz" style="padding:8px;font:inherit"></label>
+            <label style="display:flex;flex-direction:column;gap:3px">🛒 „Co nakoupit" — komu poslat
+              <input type="text" id="nkRepPu" placeholder="email1@elkoplast.cz, email2@elkoplast.cz" style="padding:8px;font:inherit"></label>
+            <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="nkRepEnabled"> Posílat automaticky každý týden</label>
+              <label style="display:flex;align-items:center;gap:6px">Den v týdnu <select id="nkRepDay" style="padding:5px"><option value="1">pondělí</option><option value="2">úterý</option><option value="3">středa</option><option value="4">čtvrtek</option><option value="5">pátek</option><option value="6">sobota</option><option value="0">neděle</option></select></label>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn" type="button" id="nkRepSave">Uložit</button>
+              <button class="btn ghost" type="button" onclick="window.open('/api/nakup-report/preview?type=markdown','_blank')">👁 Náhled „zlevnit"</button>
+              <button class="btn ghost" type="button" onclick="window.open('/api/nakup-report/preview?type=purchase','_blank')">👁 Náhled „nakoupit"</button>
+              <button class="btn ghost" type="button" id="nkRepSendMd">📤 Poslat „zlevnit" teď</button>
+              <button class="btn ghost" type="button" id="nkRepSendPu">📤 Poslat „nakoupit" teď</button>
+            </div>
+            <div class="muted" id="nkRepStatus" style="font-size:12px;min-height:16px"></div>
+          </div>
+        </div>
+      </details>
       <details class="settings" style="margin:0 0 12px">
         <summary>🏷 Dodací lhůty a MOQ per skupina (SK) — přepis výchozích hodnot</summary>
         <div style="margin-top:10px">
@@ -1729,9 +1753,43 @@ function nkClearOv(){
   if(!confirm('Vyčistit všechny přepisy dodací lhůty a MOQ? ('+c.g+' skupin, '+c.i+' položek)'))return;
   NK_OV={g:{},i:{}}; nkSaveOv(); try{renderNakup();}catch(e){} toast('Přepisy vyčištěny');
 }
+let NK_REPORT_LOADED=false;
+function nkLoadReportCfg(){
+  if(NK_REPORT_LOADED) return; NK_REPORT_LOADED=true;
+  fetch('/api/nakup-report/config',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject(r.status)).then(d=>{
+    const el=$('#nkReportCfg'); if(!el) return; el.style.display='';
+    const c=d.config||{}, st=d.state||{};
+    $('#nkRepMd').value=(c.markdownTo||[]).join(', ');
+    $('#nkRepPu').value=(c.purchaseTo||[]).join(', ');
+    $('#nkRepEnabled').checked=!!c.enabled;
+    $('#nkRepDay').value=String(c.weekday!=null?c.weekday:1);
+    $('#nkRepPeriod').textContent='Data: '+(d.dataPeriod||'?')+' ('+(d.dataRows||0)+' SKU)'+(st.lastAt?(' · naposledy odesláno '+new Date(st.lastAt).toLocaleString('cs-CZ')):' · zatím neodesláno');
+    const sb=$('#nkRepSave'); if(sb)sb.onclick=nkSaveReportCfg;
+    const bm=$('#nkRepSendMd'); if(bm)bm.onclick=()=>nkSendReport('markdown');
+    const bp=$('#nkRepSendPu'); if(bp)bp.onclick=()=>nkSendReport('purchase');
+  }).catch(()=>{/* nejsi správce → karta zůstane skrytá */});
+}
+function nkSaveReportCfg(){
+  const body={markdownTo:$('#nkRepMd').value,purchaseTo:$('#nkRepPu').value,enabled:$('#nkRepEnabled').checked,weekday:+$('#nkRepDay').value};
+  $('#nkRepStatus').textContent='Ukládám…';
+  fetch('/api/nakup-report/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
+    $('#nkRepStatus').textContent=d.ok?('✓ Uloženo'+(d.config&&d.config.enabled?' — automatické posílání zapnuto ('+['neděli','pondělí','úterý','středu','čtvrtek','pátek','sobotu'][d.config.weekday]+')':' — automatické posílání vypnuto')):('Chyba: '+(d.error||'')); 
+  }).catch(()=>{$('#nkRepStatus').textContent='Chyba uložení';});
+}
+function nkSendReport(type){
+  const label=type==='markdown'?'„Co zlevnit"':'„Co nakoupit"';
+  const to=(type==='markdown'?$('#nkRepMd'):$('#nkRepPu')).value.trim();
+  if(!to){$('#nkRepStatus').textContent='Nejdřív vyplň příjemce.';return;}
+  if(!confirm('Odeslat report '+label+' teď na:\n'+to+' ?')) return;
+  $('#nkRepStatus').textContent='Odesílám '+label+'…';
+  fetch('/api/nakup-report/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:type})}).then(r=>r.json()).then(d=>{
+    $('#nkRepStatus').textContent=d.ok?('✓ Odesláno '+label+' — '+d.count+' položek, příjemci: '+(d.to||[]).join(', ')):('Chyba odeslání: '+(d.error||'')); 
+  }).catch(()=>{$('#nkRepStatus').textContent='Chyba odeslání';});
+}
 function renderNakup(){
   try{nkCompute();}catch(e){console.error('nakup',e);return;}
   try{nkRenderGroups();}catch(e){}
+  try{nkLoadReportCfg();}catch(e){}
   const q=$('#nkSearch').value.toLowerCase(),f=$('#nkFilter').value;
   let rows=ROWS.map((r,i)=>({r,i})).filter(o=>(o.r.name||'').toLowerCase().includes(q)||String(o.r.ident||'').includes(q));
   const ord={'Objednat teď':0,'Brzy':1,'Mimo sezónu':2,'OK':3,'Nenakupovat':4};

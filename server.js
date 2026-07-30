@@ -1875,6 +1875,18 @@ try {
   console.error('[kontejnery] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Týdenní reporty nákupu" (co zlevnit / co nakoupit — e-maily z dat SMI) ----
+let nakupReportMod = null;
+try {
+  nakupReportMod = require('./nakup-report').mount({
+    send, readBody, deliver, isAdmin,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet ELKOPLAST — nákup', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+  });
+} catch (e) {
+  console.error('[nakup-report] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -1995,6 +2007,7 @@ const server = http.createServer(async (req, res) => {
     if (pozadavkyMod && await pozadavkyMod.handle(req, res)) return;
     // Modul „Lodní kontejnery" si obslouží vlastní cesty (/kontejnery*, /api/kontejnery*).
     if (kontejneryMod && await kontejneryMod.handle(req, res)) return;
+    if (nakupReportMod && await nakupReportMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
@@ -2925,6 +2938,8 @@ if (require.main === module) {
     // měsíční vyhodnocení – kontrola při startu a pak periodicky (každých 6 h)
     maybeSendMonthlyReport();
     setInterval(maybeSendMonthlyReport, 6 * 3600 * 1000);
+    // Týdenní reporty nákupu (co zlevnit / co nakoupit) — kontrola při startu a pak po 6 h (pojistka 1×/ISO-týden)
+    if (nakupReportMod) { nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 6 * 3600 * 1000); }
     // Hlídač smluv: denní notifikační běh (stejný 6h interval, vnitřní pojistka na 1×/den)
     if (smlouvyMod) {
       smlouvyMod.tick();
