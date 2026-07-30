@@ -234,6 +234,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <label>Práh pomalá obrátka <span class="unit">[měsíců bez prodeje]</span><input type="number" id="s_slow" value="4"></label>
         <label>Práh stárnoucí zásoba <span class="unit">[měsíců bez prodeje]</span><input type="number" id="s_aging" value="7"></label>
         <label>Práh mrtvá zásoba <span class="unit">[měsíců bez prodeje]</span><input type="number" id="s_dead" value="10"></label>
+        <label>Krytí – pomalá <span class="unit">[měsíců zásoby na skladě]</span><input type="number" id="s_covslow" value="12"></label>
+        <label>Krytí – stárnoucí <span class="unit">[měsíců zásoby na skladě]</span><input type="number" id="s_covaging" value="24"></label>
+        <label>Krytí – mrtvá (přeskladněno) <span class="unit">[měsíců zásoby na skladě]</span><input type="number" id="s_covdead" value="48"></label>
         <label>Sleva pomalá obrátka <span class="unit">[podíl, 0–1]</span><input type="number" step="0.01" id="s_d1" value="0.15"></label>
         <label>Sleva stárnoucí + mrtvá (strop) <span class="unit">[podíl, 0–1]</span><input type="number" step="0.01" id="s_d2" value="0.25"></label>
         <label>Roční ICC <span class="unit">[počítáno z reálných nákladů: kapitál + sklad ÷ hodnota zásob]</span><input type="number" step="0.001" id="s_icc" value="0.24" readonly title="Počítá se automaticky z kapitálové sazby a ročních nákladů skladu (zadané v záložce Optimalizace nákupu) dělených hodnotou zásob."></label>
@@ -906,7 +909,7 @@ function recalc(){
   const _wh=$('#nkWh')?(+$('#nkWh').value||0):0;
   const _effICC=_cap+(_totBB>0?_wh/_totBB:0);
   const _ie=$('#s_icc');if(_ie){_ie.value=_effICC.toFixed(3);_ie.readOnly=true;}
-  P={slow:+$('#s_slow').value,aging:+$('#s_aging').value,dead:+$('#s_dead').value,d1:+$('#s_d1').value,d2:+$('#s_d2').value,icc:_effICC,marg:+$('#s_marg').value,w:+$('#s_w').value,kinf:+$('#s_kinf').value,thr:+$('#s_thr').value};
+  P={slow:+$('#s_slow').value,aging:+$('#s_aging').value,dead:+$('#s_dead').value,d1:+$('#s_d1').value,d2:+$('#s_d2').value,icc:_effICC,marg:+$('#s_marg').value,w:+$('#s_w').value,kinf:+$('#s_kinf').value,thr:+$('#s_thr').value,covslow:+(($('#s_covslow')||{}).value||12),covaging:+(($('#s_covaging')||{}).value||24),covdead:+(($('#s_covdead')||{}).value||48)};
   const isND=n=>/náhradní díly/i.test(n||'');
   for(const it of ROWS){
     // sales je v kalendářním pořadí; nejnovější měsíc okna = COL.anchorMonthIdx → počítáme od něj zpět
@@ -914,22 +917,29 @@ function recalc(){
     let _gap=0,_lastMo=0;
     for(let k=0;k<12;k++){const ci2=((_anchor-k)%12+12)%12;if(it.sales[ci2]!=null&&it.sales[ci2]>0){_lastMo=ci2+1;break;}_gap++;}
     it.lastMonth=_lastMo;it.monthsNoSale=_lastMo===0?12:_gap;
-    if(it.AZ==null||it.AZ<=0)it.cat='Není skladem';
-    else if(it.monthsNoSale>=P.dead)it.cat='Mrtvá zásoba';
-    else if(it.monthsNoSale>=P.aging)it.cat='Stárnoucí zásoba';
-    else if(it.monthsNoSale>=P.slow)it.cat='Pomalá obrátka';else it.cat='Zdravá obrátka';
+    // Dlouhodobý horizont: krytí zásobou = měsíce zásoby (stav ÷ ø měsíční prodej). 240 ks při 2/rok = ~1458 měs = přeskladněno.
+    const _annual=it.sales.reduce((s,v)=>s+(v>0?v:0),0), _mps=_annual/12;
+    it.coverMonths=(it.AZ==null||it.AZ<=0)?0:(_mps>0?it.AZ/_mps:Infinity);
     it.nd=isND(it.name);
+    // Kategorie = HORŠÍ z obrátky (poslední prodej) a krytí zásobou (dlouhodobý horizont).
+    const _sevR=it.monthsNoSale>=P.dead?3:it.monthsNoSale>=P.aging?2:it.monthsNoSale>=P.slow?1:0;
+    const _sevC=it.coverMonths>=P.covdead?3:it.coverMonths>=P.covaging?2:it.coverMonths>=P.covslow?1:0;
+    const _sev=Math.max(_sevR,_sevC);
+    it.sev=_sev; it.sevBy=(_sevC>_sevR)?'krytí':'obrátka';
+    if(it.AZ==null||it.AZ<=0){it.cat='Není skladem';it.sev=-1;}
+    else it.cat=['Zdravá obrátka','Pomalá obrátka','Stárnoucí zásoba','Mrtvá zásoba'][_sev];
     if(it.AZ==null||it.AZ<=0)it.discModel=0;else if(it.nd)it.discModel=0;
-    else if(it.monthsNoSale>=P.aging)it.discModel=P.d2;else if(it.monthsNoSale>=P.slow)it.discModel=P.d1;else it.discModel=0;
+    else if(_sev>=2)it.discModel=P.d2;else if(_sev>=1)it.discModel=P.d1;else it.discModel=0;
     if(it.AZ==null||it.AZ<=0)it.prio='-';
-    else if(it.monthsNoSale>=P.dead&&it.BB>=50000)it.prio='A';
-    else if(it.monthsNoSale>=P.aging&&it.BB>=10000)it.prio='B';
-    else if(it.monthsNoSale>=P.slow)it.prio='C';else it.prio='-';
+    else if(_sev>=3&&it.BB>=50000)it.prio='A';
+    else if(_sev>=2&&it.BB>=10000)it.prio='B';
+    else if(_sev>=1)it.prio='C';else it.prio='-';
     it.iccCost=(it.AZ==null||it.AZ<=0)?0:(it.BB||0)*P.icc;
     it.unitPrice=(it.BB&&it.BA)?it.BB/it.BA:(it.BD&&it.BC?it.BD/it.BC:null);
     it.realPrice=(it.BD&&it.BC)?it.BD/it.BC:null;
+    const _covTxt=(it.AZ==null||it.AZ<=0)?'':(!isFinite(it.coverMonths)?' (bez prodeje 12 měs)':it.coverMonths>=24?' ('+(it.coverMonths/12).toFixed(it.coverMonths>=120?0:1)+' let zásoby)':' ('+Math.round(it.coverMonths)+' měs. zásoby)');
     it.comment=(it.AZ==null||it.AZ<=0)?'Položka bez zásoby':it.nd?'Kategorie ND - mimo plošný markdown':
-      it.monthsNoSale>=P.dead?'Urgentní likvidace zásoby':it.monthsNoSale>=P.aging?'Zahájit markdown':it.monthsNoSale>=P.slow?'Test elasticity trhu':'Bez zásahu';
+      ((_sev>=3?'Urgentní likvidace zásoby':_sev>=2?'Zahájit markdown':_sev>=1?'Test elasticity trhu':'Bez zásahu')+((it.sevBy==='krytí'&&_sev>=1)?' — přeskladněno'+_covTxt:''));
     computeRow(it);
   }
   buildErrors();render();
