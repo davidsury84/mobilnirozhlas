@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lodní kontejnery — prodej i pronájem | ELKOPLAST CZ</title>
+<meta name="description" content="Lodní kontejnery pro skladování, mobilní kanceláře, dílny, prodejní stánky i zázemí na stavbě. Prodej i pronájem, doprava po celé ČR, úpravy na míru. Nezávazná poptávka do 24 hodin.">
+<style>
+  :root{
+    --green:#2f7d32;--green-d:#1f5e22;--green-l:#4a9a4d;
+    --ink:#16211a;--soft:#5b6b60;--line:#e2e8e0;--paper:#fff;--bg:#f4f7f2;
+    --steel:#2b3a42;--steel-d:#1c2830;--accent:#e8a13a;
+    --wrap:1160px;--r:16px;--shadow:0 10px 30px rgba(20,40,25,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--paper);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  img,svg{max-width:100%;display:block}
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:0 22px}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:999px;padding:13px 24px;font-size:15px;font-weight:700;cursor:pointer;text-decoration:none;transition:transform .1s,box-shadow .2s,background .2s;font-family:inherit}
+  .btn.primary{background:var(--green);color:#fff;box-shadow:0 6px 18px rgba(47,125,50,.28)}
+  .btn.primary:hover{background:var(--green-d);transform:translateY(-1px)}
+  .btn.ghost{background:rgba(255,255,255,.14);color:#fff;border:1.5px solid rgba(255,255,255,.5)}
+  .btn.ghost:hover{background:rgba(255,255,255,.24)}
+  .btn.dark{background:var(--steel);color:#fff}
+  .btn.dark:hover{background:var(--steel-d)}
+  h2{font-size:clamp(26px,3.4vw,38px);line-height:1.15;letter-spacing:-.02em;font-weight:800}
+  .lead{color:var(--soft);font-size:18px;max-width:640px}
+  .eyebrow{display:inline-block;font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-bottom:12px}
+  section{padding:74px 0}
+  .center{text-align:center}.center .lead{margin:0 auto}
+
+  /* header */
+  header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:66px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:19px;letter-spacing:-.02em}
+  .brand .mark{width:34px;height:34px;border-radius:9px;background:var(--green);display:grid;place-items:center;color:#fff}
+  .brand small{display:block;font-size:11px;font-weight:600;color:var(--soft);letter-spacing:.04em}
+  .navlinks{display:flex;gap:26px;align-items:center}
+  .navlinks a{font-weight:600;font-size:15px;color:var(--soft);text-decoration:none}
+  .navlinks a:hover{color:var(--ink)}
+  @media(max-width:860px){.navlinks{display:none}}
+
+  /* hero */
+  .hero{position:relative;background:radial-gradient(1200px 600px at 80% -10%,#37474a,transparent),linear-gradient(160deg,#20303a 0%,#25403a 60%,#2f7d32 160%);color:#fff;overflow:hidden}
+  .hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center;padding-top:70px;padding-bottom:80px}
+  .hero h1{font-size:clamp(32px,4.6vw,54px);line-height:1.08;letter-spacing:-.025em;font-weight:900}
+  .hero p{margin-top:18px;font-size:19px;color:rgba(255,255,255,.85);max-width:520px}
+  .hero .cta{margin-top:30px;display:flex;gap:12px;flex-wrap:wrap}
+  .hero .stats{margin-top:34px;display:flex;gap:28px;flex-wrap:wrap}
+  .hero .stats b{display:block;font-size:26px;font-weight:900}
+  .hero .stats span{font-size:13px;color:rgba(255,255,255,.7)}
+  @media(max-width:860px){.hero .wrap{grid-template-columns:1fr;text-align:left}.hero .art{order:-1;max-width:360px}}
+
+  /* trust strip */
+  .strip{background:var(--steel);color:#fff}
+  .strip .wrap{display:flex;flex-wrap:wrap;gap:10px 34px;justify-content:center;padding:16px 22px;font-weight:600;font-size:14.5px}
+  .strip .wrap span{display:inline-flex;align-items:center;gap:8px;color:rgba(255,255,255,.9)}
+
+  /* grids */
+  .grid{display:grid;gap:18px}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:960px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:620px){.g4,.g3,.g2{grid-template-columns:1fr}}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:24px;transition:transform .12s,box-shadow .2s,border-color .2s}
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:#cfe0c8}
+  .ic{width:46px;height:46px;border-radius:12px;background:linear-gradient(150deg,#e8f4e6,#d3ecd0);display:grid;place-items:center;color:var(--green-d);margin-bottom:14px}
+  .card h3{font-size:18px;font-weight:800;margin-bottom:6px}
+  .card p{color:var(--soft);font-size:14.5px}
+  .sec-bg{background:var(--bg)}
+
+  /* advantages list */
+  .adv{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 34px}
+  @media(max-width:720px){.adv{grid-template-columns:1fr}}
+  .adv .row{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line)}
+  .adv .chk{flex:0 0 auto;width:30px;height:30px;border-radius:9px;background:var(--green);color:#fff;display:grid;place-items:center;font-weight:900}
+  .adv h4{font-size:16.5px;font-weight:800}
+  .adv p{color:var(--soft);font-size:14px}
+
+  /* types */
+  .type{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--paper);display:flex;flex-direction:column}
+  .type .top{background:linear-gradient(135deg,#33454e,#243138);padding:22px 22px 16px;color:#fff}
+  .type .top .dim{font-size:13px;color:rgba(255,255,255,.75);margin-top:4px}
+  .type .body{padding:18px 22px 22px}
+  .type ul{list-style:none;font-size:14px;color:var(--soft)}
+  .type li{padding:5px 0 5px 22px;position:relative}
+  .type li:before{content:"";position:absolute;left:0;top:12px;width:9px;height:9px;border-radius:50%;background:var(--green-l)}
+
+  /* steps */
+  .steps{counter-reset:s;display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  @media(max-width:860px){.steps{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.steps{grid-template-columns:1fr}}
+  .step{position:relative;padding:26px 20px 20px;border:1px dashed #cfd8cf;border-radius:var(--r);background:var(--paper)}
+  .step:before{counter-increment:s;content:counter(s);position:absolute;top:-16px;left:20px;width:36px;height:36px;border-radius:50%;background:var(--green);color:#fff;font-weight:900;display:grid;place-items:center;box-shadow:0 4px 10px rgba(47,125,50,.3)}
+  .step h4{margin:6px 0 6px;font-size:16.5px;font-weight:800}
+  .step p{color:var(--soft);font-size:14px}
+
+  /* form */
+  .formsec{background:linear-gradient(160deg,#20303a,#274038);color:#fff}
+  .formwrap{display:grid;grid-template-columns:.95fr 1.05fr;gap:40px;align-items:start}
+  @media(max-width:880px){.formwrap{grid-template-columns:1fr}}
+  .formsec h2{color:#fff}.formsec .lead{color:rgba(255,255,255,.82)}
+  .formsec ul{list-style:none;margin-top:22px}
+  .formsec ul li{padding:8px 0 8px 30px;position:relative;color:rgba(255,255,255,.9)}
+  .formsec ul li:before{content:"✓";position:absolute;left:0;color:var(--accent);font-weight:900}
+  .fcard{background:#fff;color:var(--ink);border-radius:20px;padding:26px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  .frow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:520px){.frow{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+  .field label{font-size:13px;font-weight:700;color:var(--soft)}
+  .field input,.field select,.field textarea{font-family:inherit;font-size:15px;color:var(--ink);padding:11px 13px;border:1.5px solid var(--line);border-radius:11px;background:#fbfcfb;transition:border-color .15s}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:0;border-color:var(--green-l);background:#fff}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+  .fnote{font-size:12.5px;color:var(--soft);margin-top:6px}
+  .ok{background:#e7f5e9;border:1px solid #bfe3c4;color:#1f5e22;border-radius:12px;padding:18px;font-weight:600;text-align:center}
+  .err{background:#fbecea;border:1px solid #e6bdb6;color:#8a2b20;border-radius:11px;padding:11px 13px;font-size:14px;margin-bottom:12px;display:none}
+
+  /* footer */
+  footer{background:var(--steel-d);color:rgba(255,255,255,.72);padding:44px 0 34px;font-size:14px}
+  footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  footer b{color:#fff}
+  footer a{color:#fff;text-decoration:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <div class="brand">
+      <div class="mark">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="7" width="19" height="10" rx="1"/><path d="M6 7v10M10 7v10M14 7v10M18 7v10"/></svg>
+      </div>
+      <div>ELKOPLAST<small>Lodní kontejnery</small></div>
+    </div>
+    <nav class="navlinks">
+      <a href="#vyuziti">Využití</a>
+      <a href="#vyhody">Výhody</a>
+      <a href="#typy">Typy</a>
+      <a href="#sluzby">Služby</a>
+      <a href="#poptavka" class="btn primary" style="padding:9px 18px">Nezávazná poptávka</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero" style="padding:0">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow" style="color:#bfe6c0">Prodej i pronájem · doprava po celé ČR</span>
+      <h1>Lodní kontejnery pro sklad, provoz i stavbu</h1>
+      <p>Odolné, mobilní a rychle dostupné řešení, kam potřebujete metry navíc — od skladu přes mobilní kancelář až po prodejní stánek. Nové i použité, standardní i upravené na míru.</p>
+      <div class="cta">
+        <a href="#poptavka" class="btn primary">Chci nezávaznou nabídku</a>
+        <a href="#vyuziti" class="btn ghost">Co s kontejnerem zvládnete</a>
+      </div>
+      <div class="stats">
+        <div><b>24 h</b><span>reakce na poptávku</span></div>
+        <div><b>10–40′</b><span>velikosti kontejnerů</span></div>
+        <div><b>ČR</b><span>doprava a montáž</span></div>
+      </div>
+    </div>
+    <div class="art">
+      <!-- stylizovaný lodní kontejner -->
+      <svg viewBox="0 0 460 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lodní kontejner">
+        <defs>
+          <linearGradient id="cA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f8f43"/><stop offset="1" stop-color="#2c6f30"/></linearGradient>
+          <linearGradient id="cB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#347a38"/><stop offset="1" stop-color="#245b28"/></linearGradient>
+        </defs>
+        <ellipse cx="230" cy="288" rx="200" ry="20" fill="#000" opacity=".18"/>
+        <!-- tělo -->
+        <rect x="40" y="86" width="380" height="168" rx="6" fill="url(#cA)"/>
+        <!-- horní/spodní rám -->
+        <rect x="34" y="80" width="392" height="16" rx="4" fill="#1f5e22"/>
+        <rect x="34" y="248" width="392" height="16" rx="4" fill="#1f5e22"/>
+        <!-- rohové sloupy -->
+        <rect x="34" y="80" width="20" height="184" rx="4" fill="#1a4d1d"/>
+        <rect x="406" y="80" width="20" height="184" rx="4" fill="#1a4d1d"/>
+        <!-- vlnitý plech -->
+        <g stroke="#2a672d" stroke-width="6" opacity=".55">
+          <line x1="70" y1="96" x2="70" y2="244"/><line x1="92" y1="96" x2="92" y2="244"/><line x1="114" y1="96" x2="114" y2="244"/><line x1="136" y1="96" x2="136" y2="244"/><line x1="158" y1="96" x2="158" y2="244"/><line x1="180" y1="96" x2="180" y2="244"/><line x1="202" y1="96" x2="202" y2="244"/><line x1="224" y1="96" x2="224" y2="244"/><line x1="246" y1="96" x2="246" y2="244"/><line x1="268" y1="96" x2="268" y2="244"/><line x1="290" y1="96" x2="290" y2="244"/><line x1="312" y1="96" x2="312" y2="244"/><line x1="334" y1="96" x2="334" y2="244"/><line x1="356" y1="96" x2="356" y2="244"/><line x1="378" y1="96" x2="378" y2="244"/>
+        </g>
+        <!-- dveře vpravo -->
+        <rect x="330" y="92" width="90" height="156" rx="3" fill="url(#cB)"/>
+        <line x1="375" y1="96" x2="375" y2="244" stroke="#173f19" stroke-width="4"/>
+        <rect x="360" y="150" width="8" height="40" rx="3" fill="#e8a13a"/>
+        <rect x="382" y="150" width="8" height="40" rx="3" fill="#e8a13a"/>
+        <!-- štítek -->
+        <rect x="150" y="150" width="120" height="40" rx="4" fill="#fff" opacity=".92"/>
+        <text x="210" y="176" text-anchor="middle" font-family="system-ui" font-weight="800" font-size="20" fill="#245b28">ELKOPLAST</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<div class="strip">
+  <div class="wrap">
+    <span>🛡️ Odolná ocel COR-TEN</span>
+    <span>⚡ Rychlé dodání</span>
+    <span>🔒 Bezpečné uzamčení</span>
+    <span>🚚 Doprava a usazení po ČR</span>
+    <span>🔧 Úpravy na míru</span>
+  </div>
+</div>
+
+<!-- VYUŽITÍ -->
+<section id="vyuziti">
+  <div class="wrap center" style="margin-bottom:40px">
+    <span class="eyebrow">Využití</span>
+    <h2>Co všechno s lodním kontejnerem zvládnete</h2>
+    <p class="lead">Jeden univerzální modul, který se přizpůsobí. Postavíte ho během hodin, přesunete podle potřeby a používáte roky.</p>
+  </div>
+  <div class="wrap">
+    <div class="grid g4">
+      <div class="card"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-5 9 5v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9z"/><path d="M3 9h18"/></svg></div><h3>Skladování</h3><p>Suché a zabezpečené místo pro materiál, zboží, nářadí i sezónní zásoby — bez stavebního povolení.</p></div>
+      <div class="card"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M8 18v2M16 18v2"/></svg></div><h3>Mobilní kancelář</h3><p>Zateplené zázemí s okny, elektrikou a dveřmi. Ideální na stavbu, pobočku i dočasný provoz.</p></div>
+      <div class="card"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 7l3 3-7 7-3 1 1-3 6-8z"/><path d="M4 20h16"/></svg></div><h3>Dílna a technika</h3><p>Uzamykatelná dílna, servisní zázemí nebo technická místnost pro stroje a rozvody.</p></div>
+      <div class="card"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8l1-3h14l1 3M4 8h16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8zM6 13v7h12v-7"/></svg></div><h3>Prodejní stánek</h3><p>Rychlá pop-up prodejna, výdejní místo e-shopu nebo bistro s výklopnou stěnou.</p></div>
+      <div class="card"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div><h3>Archiv a spisovna</h3><p>Chráněné místo pro dokumenty a archivaci mimo drahé kancelářské plochy.</p></div>
+      <div class="card"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/><path d="M2 4h3l2.5 12h11l2-8H6"/></svg></div><h3>Sklad pro e-shop</h3><p>Externí kapacita pro nárazovou sezónu i trvalý fulfillment — přesně tam, kde ji potřebujete.</p></div>
+      <div class="card"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6"/></svg></div><h3>Zázemí na stavbě</h3><p>Šatny, jídelna, kancelář stavbyvedoucího i uzamčený sklad — postaveno okamžitě.</p></div>
+      <div class="card"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-6 8 6M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg></div><h3>Bydlení a ubytovna</h3><p>Modulární obytné jednotky, ubytování pro sezónní pracovníky nebo rekreační objekt.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- VÝHODY -->
+<section id="vyhody" class="sec-bg">
+  <div class="wrap">
+    <div class="center" style="margin-bottom:38px">
+      <span class="eyebrow">Proč kontejner</span>
+      <h2>Výhody, které rozhodují</h2>
+      <p class="lead">Proti klasické stavbě i montovanému objektu vyhrává kontejner rychlostí, cenou a tím, že ho kdykoli přesunete.</p>
+    </div>
+    <div class="adv">
+      <div class="row"><div class="chk">✓</div><div><h4>Odolnost</h4><p>Ocelová konstrukce odolá počasí, zatížení i vloupání. Navržená na desítky let v exteriéru.</p></div></div>
+      <div class="row"><div class="chk">✓</div><div><h4>Mobilita</h4><p>Kdykoli naložíte a přemístíte. Kontejner roste a stěhuje se spolu s vaším provozem.</p></div></div>
+      <div class="row"><div class="chk">✓</div><div><h4>Rychlost</h4><p>Žádná zdlouhavá stavba — přivezeme, usadíme a druhý den používáte.</p></div></div>
+      <div class="row"><div class="chk">✓</div><div><h4>Cena</h4><p>Nižší pořizovací i provozní náklady než zděný objekt. Použité kusy ještě úspornější.</p></div></div>
+      <div class="row"><div class="chk">✓</div><div><h4>Zabezpečení</h4><p>Uzamykatelné celoocelové dveře, možnost mříží, alarmu a zámkových boxů.</p></div></div>
+      <div class="row"><div class="chk">✓</div><div><h4>Modularita</h4><p>Spojujte, stohujte a kombinujte více kontejnerů do větších celků a pater.</p></div></div>
+      <div class="row"><div class="chk">✓</div><div><h4>Bez povolení</h4><p>Jako dočasná stavba typicky bez složitého povolování — ušetříte čas i papírování.</p></div></div>
+      <div class="row"><div class="chk">✓</div><div><h4>Udržitelnost</h4><p>Druhá životnost přepravního kontejneru je ekologické a chytré využití zdrojů.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- TYPY -->
+<section id="typy">
+  <div class="wrap center" style="margin-bottom:38px">
+    <span class="eyebrow">Nabídka</span>
+    <h2>Typy kontejnerů</h2>
+    <p class="lead">Od malých skladových po velké kancelářské a chladírenské. Nevíte, co potřebujete? Poradíme podle využití.</p>
+  </div>
+  <div class="wrap">
+    <div class="grid g3">
+      <div class="type"><div class="top"><h3>20′ skladový</h3><div class="dim">≈ 6,06 × 2,44 × 2,59 m · ~33 m³</div></div><div class="body"><ul><li>Univerzál pro sklad i archiv</li><li>Snadná doprava i manipulace</li><li>Nové i použité provedení</li></ul></div></div>
+      <div class="type"><div class="top"><h3>40′ skladový</h3><div class="dim">≈ 12,19 × 2,44 × 2,59 m · ~67 m³</div></div><div class="body"><ul><li>Dvojnásobný prostor</li><li>Pro objemné zboží a materiál</li><li>Výhodné na 1 m³ plochy</li></ul></div></div>
+      <div class="type"><div class="top"><h3>High Cube (HC)</h3><div class="dim">výška ≈ 2,90 m · 20′ i 40′</div></div><div class="body"><ul><li>O 30 cm vyšší strop</li><li>Lepší pro obytné a kancelářské úpravy</li><li>Více prostoru pro regály</li></ul></div></div>
+      <div class="type"><div class="top"><h3>Chladírenský (reefer)</h3><div class="dim">řízená teplota · 20′ i 40′</div></div><div class="body"><ul><li>Chlazení a mražení</li><li>Potraviny, farma, gastro</li><li>Izolované stěny</li></ul></div></div>
+      <div class="type"><div class="top"><h3>Kancelářský / obytný</h3><div class="dim">zateplený · okna · elektro</div></div><div class="body"><ul><li>Zázemí, kancelář, šatna</li><li>Okna, dveře, podlaha, topení</li><li>Připraveno k okamžitému užití</li></ul></div></div>
+      <div class="type"><div class="top"><h3>Na míru</h3><div class="dim">úpravy dle zadání</div></div><div class="body"><ul><li>Prostupy, vrata, příčky</li><li>Polepy a firemní branding</li><li>Spojování do sestav</li></ul></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- SLUŽBY -->
+<section id="sluzby" class="sec-bg">
+  <div class="wrap center" style="margin-bottom:38px">
+    <span class="eyebrow">Služby</span>
+    <h2>Postaráme se o celý proces</h2>
+  </div>
+  <div class="wrap">
+    <div class="grid g4">
+      <div class="card"><div class="ic">🛒</div><h3>Prodej</h3><p>Nové i prověřené použité kontejnery. Vyberete podle stavu, velikosti a rozpočtu.</p></div>
+      <div class="card"><div class="ic">📅</div><h3>Pronájem</h3><p>Krátkodobě i dlouhodobě, když řešíte dočasnou potřebu prostoru.</p></div>
+      <div class="card"><div class="ic">🚚</div><h3>Doprava a usazení</h3><p>Dovezeme a usadíme po celé ČR, včetně manipulace na místě.</p></div>
+      <div class="card"><div class="ic">🔧</div><h3>Úpravy na míru</h3><p>Okna, dveře, zateplení, elektro, příčky, polepy — připravíme přesně na váš účel.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PROCES -->
+<section>
+  <div class="wrap center" style="margin-bottom:44px">
+    <span class="eyebrow">Jak to probíhá</span>
+    <h2>Od poptávky ke kontejneru ve 4 krocích</h2>
+  </div>
+  <div class="wrap">
+    <div class="steps">
+      <div class="step"><h4>Poptávka</h4><p>Napíšete, k čemu kontejner chcete. Ozveme se do 24 hodin.</p></div>
+      <div class="step"><h4>Návrh a nabídka</h4><p>Obchodník doporučí typ a úpravy a připraví cenovou nabídku.</p></div>
+      <div class="step"><h4>Výroba a doprava</h4><p>Připravíme kontejner a naplánujeme dopravu na místo.</p></div>
+      <div class="step"><h4>Usazení a předání</h4><p>Usadíme, předáme a můžete rovnou používat.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- POPTÁVKA -->
+<section id="poptavka" class="formsec">
+  <div class="wrap">
+    <div class="formwrap">
+      <div>
+        <span class="eyebrow" style="color:#bfe6c0">Nezávazná poptávka</span>
+        <h2>Řekněte nám, co potřebujete</h2>
+        <p class="lead">Vyplňte pár údajů a obchodník ELKOPLAST vám připraví nabídku na míru. Nezávazně a zdarma.</p>
+        <ul>
+          <li>Reakce do 24 hodin v pracovní dny</li>
+          <li>Poradíme s výběrem typu i úprav</li>
+          <li>Prodej i pronájem, doprava po celé ČR</li>
+        </ul>
+      </div>
+      <div class="fcard">
+        <div class="err" id="err"></div>
+        <form id="poptForm" autocomplete="on">
+          <div class="frow">
+            <div class="field"><label for="jmeno">Jméno a příjmení *</label><input id="jmeno" name="jmeno" required maxlength="120"></div>
+            <div class="field"><label for="firma">Firma</label><input id="firma" name="firma" maxlength="160"></div>
+          </div>
+          <div class="frow">
+            <div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" maxlength="160" placeholder="vas@email.cz"></div>
+            <div class="field"><label for="telefon">Telefon</label><input id="telefon" name="telefon" maxlength="60" placeholder="+420…"></div>
+          </div>
+          <div class="frow">
+            <div class="field"><label for="typ">Typ kontejneru</label><select id="typ" name="typ"><option value="">— vyberte —</option></select></div>
+            <div class="field"><label for="rezim">Koupě / pronájem</label><select id="rezim" name="rezim"><option value="">— vyberte —</option></select></div>
+          </div>
+          <div class="frow">
+            <div class="field"><label for="pocet">Počet kusů</label><input id="pocet" name="pocet" type="number" min="1" step="1" placeholder="1"></div>
+            <div class="field"><label for="mesto">Místo dodání (město)</label><input id="mesto" name="mesto" maxlength="120"></div>
+          </div>
+          <div class="field"><label for="zprava">K čemu kontejner chcete? *</label><textarea id="zprava" name="zprava" rows="3" maxlength="4000" placeholder="Např. sklad na nářadí u dílny, ideálně použitý 20′…"></textarea></div>
+          <div class="hp" aria-hidden="true"><label>Nevyplňujte<input id="web" name="web" tabindex="-1" autocomplete="off"></label></div>
+          <button class="btn primary" type="submit" id="submitBtn" style="width:100%;justify-content:center;font-size:16px;padding:15px">Odeslat poptávku</button>
+          <div class="fnote">Odesláním souhlasíte se zpracováním údajů za účelem vyřízení poptávky. Neposíláme spam.</div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <b>ELKOPLAST CZ, s.r.o.</b><br>
+      IČO 25347942<br>
+      Lodní kontejnery — prodej, pronájem, úpravy na míru
+    </div>
+    <div>
+      <b>Poptávka</b><br>
+      <a href="#poptavka">Vyplnit poptávkový formulář</a><br>
+      Ozveme se do 24 hodin v pracovní dny.
+    </div>
+    <div style="align-self:flex-end;opacity:.7">© <span id="yr"></span> ELKOPLAST CZ</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var TYPY=["20′ skladový","40′ skladový","20′ High Cube","40′ High Cube","Chladírenský (reefer)","Kancelářský / obytný","Na míru / poradit"];
+  var REZIM=["Koupě","Pronájem","Ještě nevím"];
+  var selT=document.getElementById('typ'), selR=document.getElementById('rezim');
+  TYPY.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;selT.appendChild(o);});
+  REZIM.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;selR.appendChild(o);});
+  var y=document.getElementById('yr'); if(y) y.textContent='2026';
+  var form=document.getElementById('poptForm'), errB=document.getElementById('err'), btn=document.getElementById('submitBtn');
+  function val(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+  form.addEventListener('submit',function(ev){
+    ev.preventDefault();
+    errB.style.display='none';
+    var jmeno=val('jmeno'), email=val('email'), telefon=val('telefon'), zprava=val('zprava');
+    if(!jmeno){ showErr('Vyplňte prosím jméno.'); return; }
+    if(!email && !telefon){ showErr('Zadejte e-mail nebo telefon, ať se vám můžeme ozvat.'); return; }
+    if(!zprava){ showErr('Napište prosím krátce, k čemu kontejner chcete.'); return; }
+    var payload={jmeno:jmeno,firma:val('firma'),email:email,telefon:telefon,typ:val('typ'),rezim:val('rezim'),pocet:val('pocet'),mesto:val('mesto'),zprava:zprava,web:val('web')};
+    btn.disabled=true; btn.textContent='Odesílám…';
+    fetch('/api/kontejnery/poptavka',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+      .then(function(res){
+        if(!res.ok||res.j.chyba){ showErr(res.j.chyba||'Odeslání se nezdařilo, zkuste to prosím znovu.'); btn.disabled=false; btn.textContent='Odeslat poptávku'; return; }
+        form.parentNode.innerHTML='<div class="ok"><div style="font-size:34px;margin-bottom:8px">✓</div><b>Děkujeme, poptávka odešla.</b><br>Ozveme se vám do 24 hodin v pracovní dny.'+(res.j.cislo?'<div style="margin-top:8px;color:#3a6b3d;font-size:13px">Číslo poptávky: #'+res.j.cislo+'</div>':'')+'</div>';
+      })
+      .catch(function(e){ showErr('Spojení selhalo: '+e.message); btn.disabled=false; btn.textContent='Odeslat poptávku'; });
+  });
+  function showErr(m){ errB.textContent=m; errB.style.display='block'; }
+})();
+</script>
+</body>
+</html>

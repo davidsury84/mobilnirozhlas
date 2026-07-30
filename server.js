@@ -1863,6 +1863,18 @@ try {
   console.error('[pozadavky] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Lodní kontejnery" (veřejný web + poptávky) — samostatná složka ./kontejnery ----
+let kontejneryMod = null;
+try {
+  kontejneryMod = require('./kontejnery').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'ELKOPLAST — kontejnery', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+  });
+} catch (e) {
+  console.error('[kontejnery] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -1881,6 +1893,8 @@ const server = http.createServer(async (req, res) => {
   const reklamacePublic = p.startsWith('/reklamace/r/') || p.startsWith('/api/reklamace/verejny/');
   // Veřejné cesty klientské kalkulačky překladiště (lead-gen mimo přihlašovací závoru): stránka + odeslání leadu.
   const prekladPublic = p === '/preklad' || p === '/preklad.html' || (p === '/api/preklad-lead' && req.method === 'POST');
+  // Veřejné cesty modulu Lodní kontejnery: prezentační web + odeslání poptávky (bez přihlášení).
+  const kontejneryPublic = p === '/kontejnery' || (p === '/api/kontejnery/poptavka' && req.method === 'POST');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
@@ -1942,7 +1956,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -1979,6 +1993,8 @@ const server = http.createServer(async (req, res) => {
     if (reklamaceMod && await reklamaceMod.handle(req, res)) return;
     // Modul „Požadavky nákupu" si obslouží vlastní cesty (/pozadavky*, /api/pozadavky*).
     if (pozadavkyMod && await pozadavkyMod.handle(req, res)) return;
+    // Modul „Lodní kontejnery" si obslouží vlastní cesty (/kontejnery*, /api/kontejnery*).
+    if (kontejneryMod && await kontejneryMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
@@ -2459,7 +2475,8 @@ const server = http.createServer(async (req, res) => {
       const isApprover = isAdmin(req) || emps.some(x => x.id !== (me && me.id) && (x.email || '').toLowerCase() !== eml && (approverFor(x, emps) || {}).id === (me && me.id));
       const vacPending = readVac().requests.filter(r => r.status === 'pending' && (isAdmin(req) || (r.approverEmail || '').toLowerCase() === eml)).length;
       const isNakupci = !!(pozadavkyMod && pozadavkyMod.isConfiguredBuyer && pozadavkyMod.isConfiguredBuyer(e.email));
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, heroImage: (readJson(SITE_F, {}).heroImage) || null });
+      const isKontejnery = !!(kontejneryMod && kontejneryMod.isHandler && kontejneryMod.isHandler(e.email));
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 
     // ---- Aktuality (novinky na intranetu) ----
