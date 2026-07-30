@@ -986,9 +986,10 @@ function artPick(i){
   var rz=document.getElementById('dq_rozmery'); if(rz&&x.rozmery)rz.value=x.rozmery;
   var seg=document.querySelector('.dq2[data-k="provedeni"]');
   if(seg&&x.provedeni){
-    var std=seg.querySelector('.seg[data-v=standard]'), opce=seg.querySelector('.seg[data-v=opce]');
+    var std=seg.querySelector('.seg[data-v=standard]');
+    var opceMatch=null;seg.querySelectorAll('.seg[data-v=opce]').forEach(function(o){if(!opceMatch&&((o.getAttribute('data-optval')||'')+' '+o.textContent).indexOf(x.provedeni)>=0)opceMatch=o;});
     if(std&&std.textContent.indexOf(x.provedeni)>=0)segClick(std);
-    else if(opce&&opce.textContent.indexOf(x.provedeni)>=0)segClick(opce);
+    else if(opceMatch)segClick(opceMatch);
     else{var poz=seg.querySelector('.seg[data-v=pozadavek]');if(poz){segClick(poz);var rq=document.getElementById('dqr_provedeni');if(rq)rq.value=x.provedeni;}}
   }
   var info=document.getElementById('artInfo');
@@ -1202,7 +1203,7 @@ function val(id){return (document.getElementById(id)||{}).value||'';}
 function collectDot(){
   var t=curType(),dot={};
   (t.dotaznik||[]).forEach(function(sec){(sec.fields||[]).forEach(function(f){
-    if(f.std!==undefined){var volba=selVolba(f.k);if(volba==='pozadavek'){var rv=val('dqr_'+f.k);if(rv.trim())dot[f.k]={volba:'pozadavek',hodnota:rv.trim()};}else if(volba==='opce'){var od=val('dqo_'+f.k);dot[f.k]=(od&&od.trim())?{volba:'opce',detail:od.trim()}:{volba:'opce'};}else dot[f.k]={volba:volba};}
+    if(f.std!==undefined){var volba=selVolba(f.k);if(volba==='pozadavek'){var rv=val('dqr_'+f.k);if(rv.trim())dot[f.k]={volba:'pozadavek',hodnota:rv.trim()};}else if(volba==='opce'){var d={volba:'opce'};var ov=selOptVal(f.k);if(ov)d.hodnota=ov;var od=val('dqo_'+f.k);if(od&&od.trim())d.detail=od.trim();dot[f.k]=d;}else dot[f.k]={volba:volba};}
     else{var v=val('dq_'+f.k);if(v.trim())dot[f.k]=v.trim();}
   })});
   return dot;
@@ -1316,6 +1317,16 @@ function ralMark(k){
 }
 function selVolba(k){var s=document.querySelector('.dq2[data-k="'+k+'"] .seg.sel');return s?s.getAttribute('data-v'):'standard';}
 function seg(k,v,tag,label,cur){return '<button type="button" class="seg'+(cur===v?' sel':'')+'" data-v="'+v+'" onclick="segClick(this)"><span class="st">'+tag+'</span>'+esc(label||'—')+'</button>';}
+// jedna z více samostatných opcí (data-optval = zdrojová CZ hodnota, label = přeložený text)
+function segOpt(k,val,label,sel){return '<button type="button" class="seg'+(sel?' sel':'')+'" data-v="opce" data-optval="'+esc(val)+'" onclick="segClick(this)"><span class="st">opce</span>'+esc(label||'—')+'</button>';}
+function selOptVal(k){var s=document.querySelector('.dq2[data-k="'+k+'"] .seg.sel[data-v="opce"]');return s?(s.getAttribute('data-optval')||''):'';}
+// rozdělí opce na samostatné volby: přeloží celý řetězec, pak dělí dle „ / " (kousky zůstanou zarovnané); při nejednoznačnosti = jedna volba.
+function splitOpts(opceRaw){
+  if(!opceRaw)return [];
+  var valP=String(opceRaw).split(' / '), labP=String(tr(opceRaw)).split(' / ');
+  if(valP.length>=2 && labP.length===valP.length) return valP.map(function(v,i){return {val:v,lab:labP[i]};});
+  return [{val:opceRaw,lab:tr(opceRaw)}];
+}
 function segClick(el){var row=el.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});el.classList.add('sel');var v=el.getAttribute('data-v');
   var req=row.querySelector('.dq2-req');if(req)req.style.display=(v==='pozadavek'?'':'none');
   var ow=row.querySelector('.dq2-optwrap');if(ow)ow.style.display=(v==='opce'?'':'none');
@@ -1332,10 +1343,13 @@ function renderDotaznik(){
         if(f.std!==undefined){
           np++;
           var vol=(a&&a.volba)||'standard', rq=(a&&a.volba==='pozadavek')?(a.hodnota||''):'', oc=(a&&a.detail!=null)?a.detail:'';
-          var optInp=f.opceVstup?('<div class="dq2-optwrap" id="dqow_'+f.k+'" style="'+(vol==='opce'?'':'display:none')+'"><input class="dq2-opt" id="dqo_'+f.k+'" '+(f.opceVstup.num?'type="number" min="0" inputmode="numeric"':'')+' value="'+esc(oc)+'" placeholder="'+esc(tr(f.opceVstup.placeholder||''))+'" oninput="segSelect(this,\'opce\')">'+(f.opceVstup.unit?'<span class="dq2-unit">'+esc(f.opceVstup.unit)+'</span>':'')+'</div>'):'';
+          var curOpt=(a&&a.volba==='opce')?(a.hodnota||''):'';
+          var opts=splitOpts(f.opce), single=opts.length<=1;
+          var optSegs=opts.map(function(o){var sel=vol==='opce'&&(single||curOpt===o.val);return segOpt(f.k,o.val,o.lab,sel);}).join('');
+          var optInp=(f.opceVstup&&single)?('<div class="dq2-optwrap" id="dqow_'+f.k+'" style="'+(vol==='opce'?'':'display:none')+'"><input class="dq2-opt" id="dqo_'+f.k+'" '+(f.opceVstup.num?'type="number" min="0" inputmode="numeric"':'')+' value="'+esc(oc)+'" placeholder="'+esc(tr(f.opceVstup.placeholder||''))+'" oninput="segSelect(this,\'opce\')">'+(f.opceVstup.unit?'<span class="dq2-unit">'+esc(f.opceVstup.unit)+'</span>':'')+'</div>'):'';
           h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg">'+
             seg(f.k,'standard','std',tr(f.std),vol)+
-            (f.opce?seg(f.k,'opce','opt',tr(f.opce),vol):'')+
+            optSegs+
             seg(f.k,'pozadavek','✎',tr('vlastní'),vol)+
             '</div>'+optInp+
             '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
@@ -1370,7 +1384,7 @@ function createZak(){
     t.dotaznik.forEach(function(sec){(sec.fields||[]).forEach(function(f){
       if(f.std!==undefined){
         var volba=selVolba(f.k);
-        var hodnota=volba==='standard'?f.std:(volba==='opce'?f.opce:((document.getElementById('dqr_'+f.k)||{}).value||''));
+        var hodnota=volba==='standard'?f.std:(volba==='opce'?selOptVal(f.k):((document.getElementById('dqr_'+f.k)||{}).value||''));
         if(hodnota&&String(hodnota).trim()){dot[f.k]={volba:volba,hodnota:String(hodnota).trim()};
           if(volba==='opce'&&f.opceVstup){var od=(document.getElementById('dqo_'+f.k)||{}).value||'';if(od.trim())dot[f.k].detail=od.trim();}}
       }else{var v=(document.getElementById('dq_'+f.k)||{}).value||'';if(v.trim())dot[f.k]=v.trim();}
