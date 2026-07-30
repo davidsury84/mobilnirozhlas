@@ -276,6 +276,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="tab" data-pane="pokryti">🗓 Měsíční pokrytí</div>
       <div class="tab" data-pane="elko">🛒 Elkoplast</div>
       <div class="tab" data-pane="nakup">📦 Optimalizace nákupu</div>
+      <div class="tab" data-pane="nakupreq">🛒 Požádat nákupčího</div>
       <div class="tab" data-pane="eanalyza">📈 Analýza prodejů e-shopu</div>
       <div class="tab" data-pane="fulfillment">📐 Sklad. prostor (fulfillment)</div>
       <div class="tab" data-pane="navod">📖 Návod</div>
@@ -603,6 +604,28 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <details class="settings"><summary>🔬 Detailní tabulka (ROP, EOQ, obrátka, sezónnost…)</summary>
         <div class="tblwrap" style="margin-top:10px"><table id="nkTbl"></table></div>
       </details>
+    </div>
+    <div class="pane" id="pane-nakupreq">
+      <div class="note">Požádejte <b>nákupčího</b> o objednání konkrétního počtu kusů. Vyberte produkt (nese s sebou aktuální stav skladem a obrátku ze SMI), zadejte počet a důvod. Požadavek dorazí nákupčímu do intranetu i e-mailem; jeho stav pak vidíte v intranetu → <b>Požadavky nákupu</b>.</div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+          <div style="flex:2;min-width:260px;position:relative">
+            <label style="display:block;font-size:12px;color:var(--mut);font-weight:700;margin-bottom:4px">Produkt (hledat podle názvu nebo kódu)</label>
+            <input type="text" id="nrqSearch" placeholder="např. CLD-CO 240 nebo 29577229" autocomplete="off" style="width:100%">
+            <div id="nrqResults" style="display:none;position:absolute;z-index:20;left:0;right:0;background:#fff;border:1px solid var(--line,#ddd);border-radius:8px;box-shadow:0 6px 22px rgba(0,0,0,.12);max-height:280px;overflow:auto;margin-top:3px"></div>
+          </div>
+          <div style="flex:1;min-width:120px">
+            <label style="display:block;font-size:12px;color:var(--mut);font-weight:700;margin-bottom:4px">Počet kusů</label>
+            <input type="number" id="nrqQty" min="1" step="1" placeholder="např. 50" style="width:100%">
+          </div>
+        </div>
+        <div id="nrqPicked" style="display:none;margin-top:12px;padding:11px 13px;background:#f7f9f5;border-radius:9px"></div>
+        <label style="display:block;font-size:12px;color:var(--mut);font-weight:700;margin:14px 0 4px">Důvod / poznámka pro nákupčího</label>
+        <textarea id="nrqReason" rows="2" placeholder="proč to potřebujeme objednat (např. blíží se sezóna, opakovaná poptávka…)" style="width:100%"></textarea>
+        <div style="margin-top:12px"><button class="btn" id="nrqSend">🛒 Odeslat požadavek nákupčímu</button></div>
+      </div>
+      <h3 style="margin:16px 0 8px">Moje odeslané požadavky</h3>
+      <div id="nrqList"><div class="muted" style="padding:6px 2px">Načítám…</div></div>
     </div>
     <div class="pane" id="pane-seg">
       <div class="note">Segmentační analýza z reálných objednávek (7 295 objednávek, 953 produktů). Na jednom místě: <b>přehled segmentů</b>, <b>sezónnost</b> (kdy se co nakupuje), <b>cross-sell</b> (co se kupuje společně) a <b>ABC / prodejní výkon</b>.</div>
@@ -1080,8 +1103,75 @@ function renderParam(){
     `<span class="muted">Náklady skladu a kapitálovou sazbu zadáš v záložce 📦 Optimalizace nákupu (předvyplněno z reálných dat – doplňkové/skladové náklady 2025). „Odhad ročního ICC" položky = průměrná hodnota zásoby (Kč) × ICC. Tutéž sazbu používá i Optimalizace nákupu (efektivní sazba držení).</span>`;
 }
 const PANE_TBL={chyby:'errTbl',ceny:'priceTbl',mrtve:'deadTbl',vse:'allTbl',model:'modelTbl',elko:'elkoTbl',nakup:'nkTbl',seg:'csSalesTbl'};
-$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='historie')renderHistory();if(pane==='vyvoj'){refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='nakup')renderNakup();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
+$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='historie')renderHistory();if(pane==='vyvoj'){refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='nakup')renderNakup();if(pane==='nakupreq')renderNakupReq();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
 const _bulkBtn=$('#bulkApply');if(_bulkBtn)_bulkBtn.onclick=bulkApply;
+
+/* ===== Požadavek nákupčímu — E-shop žádá o objednání N kusů (→ intranet /api/pozadavky) ===== */
+let NRQ_SEL=null, _nrqBound=false;
+function nrqEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function renderNakupReq(){
+  if(!_nrqBound){
+    _nrqBound=true;
+    const s=document.getElementById('nrqSearch');
+    if(s){ s.addEventListener('input',nrqSearch); s.addEventListener('focus',nrqSearch); }
+    document.addEventListener('click',e=>{ const box=document.getElementById('nrqResults'); const sr=document.getElementById('nrqSearch'); if(box&&box.style.display!=='none'&&!box.contains(e.target)&&e.target!==sr) box.style.display='none'; });
+    const btn=document.getElementById('nrqSend'); if(btn) btn.onclick=nrqSend;
+  }
+  nrqLoadMine();
+}
+function nrqSearch(){
+  const inp=document.getElementById('nrqSearch'), box=document.getElementById('nrqResults');
+  if(!inp||!box) return;
+  const q=(inp.value||'').trim().toLowerCase();
+  if(!q){ box.style.display='none'; return; }
+  if(!Array.isArray(ROWS)||!ROWS.length){ box.innerHTML='<div style="padding:10px;color:#999">Nejprve nahrajte data (list „Obrat plasty").</div>'; box.style.display='block'; return; }
+  const hits=ROWS.filter(r=>{ const n=(r.name||'').toLowerCase(), id=String(r.ident||'').toLowerCase(); return n.indexOf(q)>=0||id.indexOf(q)>=0; }).slice(0,40);
+  if(!hits.length){ box.innerHTML='<div style="padding:10px;color:#999">Nic nenalezeno.</div>'; box.style.display='block'; return; }
+  box.innerHTML=hits.map(r=>{ const idx=ROWS.indexOf(r); return '<div class="nrq-hit" data-idx="'+idx+'" style="padding:8px 11px;cursor:pointer;border-bottom:1px solid #f0f0f0;font-size:13.5px"><b>'+nrqEsc(r.name||'—')+'</b> <span style="color:#888;font-family:monospace;font-size:12px">'+nrqEsc(r.ident||'')+'</span><br><span style="font-size:12px;color:#666">skladem '+(r.AZ==null?'?':r.AZ)+' ks · '+nrqEsc(r.cat||'')+'</span></div>'; }).join('');
+  box.querySelectorAll('.nrq-hit').forEach(el=>el.onclick=()=>{ nrqPick(ROWS[+el.dataset.idx]); box.style.display='none'; });
+  box.style.display='block';
+}
+function nrqPick(r){
+  if(!r) return;
+  NRQ_SEL=r;
+  document.getElementById('nrqSearch').value=r.name||r.ident||'';
+  const p=document.getElementById('nrqPicked');
+  p.style.display='block';
+  p.innerHTML='<div style="font-weight:700;font-size:15px">'+nrqEsc(r.name||'—')+'</div>'
+    +'<div style="font-size:12.5px;color:#666;font-family:monospace;margin-top:2px">kód '+nrqEsc(r.ident||'—')+'</div>'
+    +'<div style="margin-top:7px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:13px">'
+    +'<span><b>Skladem:</b> '+(r.AZ==null?'?':r.AZ)+' ks</span>'
+    +(r.cat?'<span>'+catPill(r.cat)+'</span>':'')+'</div>';
+}
+async function nrqSend(){
+  if(!NRQ_SEL){ toast('Vyberte produkt.'); return; }
+  const qty=parseInt(document.getElementById('nrqQty').value,10);
+  if(!(qty>0)){ toast('Zadejte kladný počet kusů.'); return; }
+  const reason=(document.getElementById('nrqReason').value||'').trim();
+  const btn=document.getElementById('nrqSend'); if(btn) btn.disabled=true;
+  try{
+    const r=await fetch('/api/pozadavky',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kod:NRQ_SEL.ident||'',nazev:NRQ_SEL.name||'',mnozstvi:qty,skladem:(NRQ_SEL.AZ==null?'':NRQ_SEL.AZ),obratka:NRQ_SEL.cat||'',duvod:reason,zdroj:'SMI'})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||('HTTP '+r.status))); return; }
+    toast('Požadavek #'+j.cislo+' odeslán nákupčímu'+(j.notified?' ('+j.notified+' nákupčí)':''));
+    NRQ_SEL=null;
+    document.getElementById('nrqSearch').value=''; document.getElementById('nrqQty').value=''; document.getElementById('nrqReason').value='';
+    document.getElementById('nrqPicked').style.display='none';
+    nrqLoadMine();
+  }catch(e){ toast('Chyba: '+e.message); }
+  finally{ if(btn) btn.disabled=false; }
+}
+async function nrqLoadMine(){
+  const el=document.getElementById('nrqList'); if(!el) return;
+  try{
+    const r=await fetch('/api/pozadavky',{cache:'no-store'});
+    if(!r.ok){ el.innerHTML='<div class="muted" style="padding:6px 2px">Nelze načíst ('+r.status+').</div>'; return; }
+    const j=await r.json(); const items=(j.items||[]); const stavy=j.stavy||{};
+    if(!items.length){ el.innerHTML='<div class="muted" style="padding:6px 2px">Zatím žádné požadavky.</div>'; return; }
+    const col={novy:['#e9f0fb','#1e63c4'],objednano:['#fdf3e2','#b06f00'],vyrizeno:['#dff2e4','#1f5e22'],zamitnuto:['#fbecea','#c0392b']};
+    el.innerHTML=items.slice(0,25).map(it=>{ const c=col[it.stav]||['#eee','#555']; return '<div style="border:1px solid #e4e8e0;border-radius:10px;padding:10px 13px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><b>#'+it.cislo+' · '+nrqEsc(it.nazev||it.kod||'')+'</b> <span style="color:#888">— '+it.mnozstvi+' ks</span>'+(it.duvod?'<div style="font-size:12px;color:#777;margin-top:2px">'+nrqEsc(it.duvod)+'</div>':'')+'</div><span style="font-size:11px;font-weight:800;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:'+c[0]+';color:'+c[1]+'">'+nrqEsc(stavy[it.stav]||it.stav)+'</span></div>'; }).join('');
+  }catch(e){ el.innerHTML='<div class="muted" style="padding:6px 2px">Chyba: '+nrqEsc(e.message)+'</div>'; }
+}
 
 // ---- per-column filtering ----
 const _FILT={};

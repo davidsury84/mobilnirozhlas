@@ -1851,6 +1851,18 @@ try {
   console.error('[reklamace] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Požadavky nákupu" (E-shop → nákupčí) — samostatná složka ./pozadavky ----
+let pozadavkyMod = null;
+try {
+  pozadavkyMod = require('./pozadavky').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – požadavky', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+  });
+} catch (e) {
+  console.error('[pozadavky] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -1965,6 +1977,8 @@ const server = http.createServer(async (req, res) => {
     if (konstrukceMod && await konstrukceMod.handle(req, res)) return;
     // Modul „Reklamace" si obslouží vlastní cesty (/reklamace*, /api/reklamace*).
     if (reklamaceMod && await reklamaceMod.handle(req, res)) return;
+    // Modul „Požadavky nákupu" si obslouží vlastní cesty (/pozadavky*, /api/pozadavky*).
+    if (pozadavkyMod && await pozadavkyMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).

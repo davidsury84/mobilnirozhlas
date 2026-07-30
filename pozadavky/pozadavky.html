@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Požadavky nákupu — ELKOPLAST CZ</title>
+<style>
+  :root{--green:#2f7d32;--green-d:#1f5e22;--ink:#1c1d1a;--mut:#7a837a;--line:#e4e8e0;--paper:#fff;--bg:#f6f8f4;--amber:#b06f00;--amber-soft:#fdf3e2;--red:#c0392b;--red-soft:#fbecea;--blue:#1e63c4;--blue-soft:#e9f0fb;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 22px 60px}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  h1{font-size:22px;margin:0}
+  .sub{color:var(--mut);font-size:13.5px;margin:4px 0 0}
+  .btn{border:1px solid var(--green);background:var(--green);color:#fff;border-radius:9px;padding:8px 14px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
+  .btn:hover{background:var(--green-d)}
+  .btn.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+  .btn.ghost:hover{background:#f0f3ee}
+  .btn.sm{padding:5px 10px;font-size:13px;border-radius:8px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 1px 2px rgba(20,30,15,.04);margin-bottom:14px}
+  .filters{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 13px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink)}
+  .chip.on{background:var(--green);color:#fff;border-color:var(--green)}
+  .req{border:1px solid var(--line);border-radius:14px;background:#fff;padding:15px 17px;margin-bottom:13px}
+  .req .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .req .name{font-size:16px;font-weight:700}
+  .req .code{color:var(--mut);font-size:12.5px;font-family:ui-monospace,Menlo,monospace}
+  .meta{display:flex;gap:8px 18px;flex-wrap:wrap;margin-top:10px;font-size:13.5px}
+  .meta b{font-weight:700}
+  .qty{font-size:18px;font-weight:800;color:var(--green-d);white-space:nowrap}
+  .badge{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .b-novy{background:var(--blue-soft);color:var(--blue)}
+  .b-objednano{background:var(--amber-soft);color:var(--amber)}
+  .b-vyrizeno{background:#dff2e4;color:var(--green-d)}
+  .b-zamitnuto{background:var(--red-soft);color:var(--red)}
+  .duvod{margin-top:10px;padding:9px 12px;background:#f7f9f5;border-radius:8px;font-size:13.5px;line-height:1.6}
+  .obr{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:#eef3ea;color:#4b6b3f}
+  .actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:13px;padding-top:12px;border-top:1px dashed var(--line)}
+  .actions select,.actions input{font-family:inherit;font-size:13.5px;padding:6px 9px;border:1px solid var(--line);border-radius:8px}
+  .actions input{flex:1;min-width:150px}
+  .hist{margin-top:10px;font-size:12.5px;color:var(--mut)}
+  .hist div{padding:1px 0}
+  .empty{color:var(--mut);padding:14px 2px}
+  .foot{color:var(--mut);font-size:12px;margin-top:6px}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mut);font-weight:600}
+  .field input,.field textarea{font-family:inherit;font-size:14px;color:var(--ink);padding:8px 10px;border:1px solid var(--line);border-radius:9px;font-weight:400}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1c1d1a;color:#fff;padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Požadavky nákupu</h1>
+      <p class="sub" id="sub">Načítám…</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn ghost sm" id="newBtn" style="display:none" onclick="toggleForm()">+ Nový požadavek</button>
+      <button class="btn ghost sm" onclick="load()">↻ Obnovit</button>
+    </div>
+  </div>
+
+  <div class="card" id="formCard" style="display:none">
+    <div class="grid2">
+      <label class="field">Kód produktu <input id="fKod" placeholder="např. 29577229"></label>
+      <label class="field">Počet kusů <input id="fMn" type="number" min="1" step="1" placeholder="např. 50"></label>
+    </div>
+    <label class="field" style="margin-top:12px">Název produktu <input id="fNazev" placeholder="např. Plastová nádoba CLD-CO 240 l černá"></label>
+    <label class="field" style="margin-top:12px">Důvod / poznámka <textarea id="fDuvod" rows="2" placeholder="proč to potřebujeme objednat"></textarea></label>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn" onclick="submitReq()">Odeslat nákupčímu</button>
+      <button class="btn ghost" onclick="toggleForm()">Zrušit</button>
+    </div>
+  </div>
+
+  <div class="filters" id="filters" style="display:none"></div>
+  <div id="list"><p class="empty">Načítám…</p></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var STATE={items:[],role:{},stavy:{},me:{},filter:''};
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2200)}
+function fmtDate(ts){try{return new Date(ts).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return''}}
+
+async function load(){
+  try{
+    var r=await fetch('/api/pozadavky',{cache:'no-store'});
+    if(!r.ok){ $('#list').innerHTML='<div class="card"><b>Chyba '+r.status+'</b> — '+esc((await r.json().catch(function(){return{}})).chyba||'nelze načíst')+'</div>'; return; }
+    var j=await r.json();
+    STATE.items=j.items||[]; STATE.role=j.role||{}; STATE.stavy=j.stavy||{}; STATE.me=j.me||{};
+    render();
+  }catch(e){ $('#list').innerHTML='<div class="card"><b>Chyba</b> — '+esc(e.message)+'</div>'; }
+}
+
+function render(){
+  var role=STATE.role;
+  var isBuyer=!!role.isBuyer;
+  $('#sub').textContent=isBuyer?'Fronta požadavků od E-shopu. Měňte stav — E-shop dostane e-mail.':'Vaše požadavky odeslané nákupčímu a jejich stav.';
+  $('#newBtn').style.display=(role.isRequester||role.isAdmin)?'':'none';
+  // filtry (jen nákupčí)
+  var fl=$('#filters');
+  if(isBuyer){
+    fl.style.display='';
+    var counts={'':STATE.items.length}; Object.keys(STATE.stavy).forEach(function(k){counts[k]=STATE.items.filter(function(x){return x.stav===k}).length});
+    var chips=[['','Vše']].concat(Object.keys(STATE.stavy).map(function(k){return [k,STATE.stavy[k]]}));
+    fl.innerHTML=chips.map(function(c){return '<span class="chip'+(STATE.filter===c[0]?' on':'')+'" onclick="setFilter(\''+c[0]+'\')">'+esc(c[1])+' <b>'+(counts[c[0]]||0)+'</b></span>'}).join('');
+  } else fl.style.display='none';
+
+  var items=STATE.items.slice();
+  if(isBuyer&&STATE.filter) items=items.filter(function(x){return x.stav===STATE.filter});
+  var list=$('#list');
+  if(!items.length){ list.innerHTML='<div class="card"><p class="empty" style="margin:0">'+(isBuyer?'Žádné požadavky v této kategorii.':'Zatím jste neodeslali žádný požadavek. Vytvořte ho v SMI aplikaci u produktu, nebo tlačítkem „+ Nový požadavek".')+'</p></div>'; return; }
+  list.innerHTML=items.map(function(it){return card(it,isBuyer)}).join('');
+}
+
+function card(it,isBuyer){
+  var st=it.stav||'novy';
+  var h='<div class="req">';
+  h+='<div class="top"><div style="min-width:0">'
+    +'<div class="name">#'+it.cislo+' · '+esc(it.nazev||it.kod||'—')+'</div>'
+    +(it.kod?'<div class="code">kód '+esc(it.kod)+'</div>':'')
+    +'</div><div style="text-align:right"><div class="qty">'+esc(String(it.mnozstvi))+' ks</div>'
+    +'<div style="margin-top:6px"><span class="badge b-'+st+'">'+esc(STATE.stavy[st]||st)+'</span></div></div></div>';
+  var m=[];
+  if(it.skladem!=null) m.push('<span><b>Skladem:</b> '+esc(String(it.skladem))+' ks</span>');
+  if(it.obratka) m.push('<span class="obr">'+esc(it.obratka)+'</span>');
+  m.push('<span><b>Žádá:</b> '+esc((it.requester&&it.requester.name)||(it.requester&&it.requester.email)||'—')+'</span>');
+  if(it.zdroj) m.push('<span style="color:#8a938a">zdroj: '+esc(it.zdroj)+'</span>');
+  h+='<div class="meta">'+m.join('')+'</div>';
+  if(it.duvod) h+='<div class="duvod">'+esc(it.duvod)+'</div>';
+  // historie (poslední 3)
+  var hs=(it.historie||[]).slice(-3).reverse();
+  if(hs.length>1||isBuyer){
+    h+='<div class="hist">'+hs.map(function(x){return '<div>'+fmtDate(x.at)+' — '+esc(STATE.stavy[x.stav]||x.stav)+(x.note?': '+esc(x.note):'')+(x.by&&x.by.name?' ('+esc(x.by.name)+')':'')+'</div>'}).join('')+'</div>';
+  } else {
+    h+='<div class="foot">Vytvořeno '+fmtDate(it.createdAt)+'</div>';
+  }
+  // akce nákupčího
+  if(isBuyer){
+    var opts=Object.keys(STATE.stavy).map(function(k){return '<option value="'+k+'"'+(k===st?' selected':'')+'>'+esc(STATE.stavy[k])+'</option>'}).join('');
+    h+='<div class="actions">'
+      +'<select id="sel_'+it.id+'">'+opts+'</select>'
+      +'<input id="note_'+it.id+'" placeholder="poznámka pro E-shop (nepovinné)">'
+      +'<button class="btn sm" onclick="changeStav(\''+it.id+'\')">Uložit stav</button></div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+function setFilter(f){ STATE.filter=f; render(); }
+function toggleForm(){ var c=$('#formCard'); c.style.display=c.style.display==='none'?'':'none'; }
+
+async function submitReq(){
+  var kod=$('#fKod').value.trim(), nazev=$('#fNazev').value.trim(), mn=parseInt($('#fMn').value,10), duvod=$('#fDuvod').value.trim();
+  if(!kod&&!nazev){ toast('Zadejte kód nebo název produktu.'); return; }
+  if(!(mn>0)){ toast('Zadejte kladný počet kusů.'); return; }
+  try{
+    var r=await fetch('/api/pozadavky',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kod:kod,nazev:nazev,mnozstvi:mn,duvod:duvod,zdroj:'intranet'})});
+    var j=await r.json();
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; }
+    $('#fKod').value='';$('#fNazev').value='';$('#fMn').value='';$('#fDuvod').value='';
+    toggleForm(); toast('Požadavek #'+j.cislo+' odeslán'+(j.notified?' ('+j.notified+' nákupčí)':'')); load();
+  }catch(e){ toast('Chyba: '+e.message); }
+}
+
+async function changeStav(id){
+  var stav=$('#sel_'+id).value, note=$('#note_'+id).value.trim();
+  try{
+    var r=await fetch('/api/pozadavky/stav',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,stav:stav,note:note})});
+    var j=await r.json();
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; }
+    toast('Stav uložen — E-shop informován e-mailem'); load();
+  }catch(e){ toast('Chyba: '+e.message); }
+}
+
+load();
+</script>
+</body>
+</html>
