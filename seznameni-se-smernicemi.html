@@ -2451,7 +2451,7 @@ function poptOpenUrl(l){
   const p=l.params||{};
   const q=new URLSearchParams();
   q.set('lead','1');
-  q.set('product', l.page==='zentex'?'zentex':'bramidan');
+  q.set('product', l.page==='bramidan'?'bramidan':'zentex');
   if(p.mode) q.set('mode', p.mode);
   if(p.tons!=null&&p.tons!=='') q.set('tons', String(p.tons));
   if(l.company) q.set('company', l.company);
@@ -2463,7 +2463,7 @@ function poptOpenUrl(l){
 }
 function poptCard(l){
   const p=l.params||{};
-  const prod=(l.page==='zentex')?'Zentex':'Bramidan';
+  const prod=(l.page==='bramidan')?'Bramidan':'Mobilní lisy';
   const meta=['👤 '+esc(l.name||'—')];
   if(l.phone) meta.push('📞 <a href="tel:'+esc(l.phone)+'">'+esc(l.phone)+'</a>');
   if(l.email) meta.push('✉ <a href="mailto:'+esc(l.email)+'">'+esc(l.email)+'</a>');
