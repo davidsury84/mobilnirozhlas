@@ -53,6 +53,9 @@ function mount(host) {
     if (!db.config) db.config = { notify: [] };
     if (!Array.isArray(db.config.notify)) db.config.notify = [];
     if (!Array.isArray(db.config.fotky)) db.config.fotky = [];
+    if (!Array.isArray(db.config.rotace)) db.config.rotace = [];   // obchodníci na střídačku (round-robin)
+    if (typeof db.config.rotaceIdx !== 'number') db.config.rotaceIdx = 0;
+    if (!Array.isArray(db.config.dohled)) db.config.dohled = [];   // kopie všech poptávek (kontrola)
     return db;
   }
   function save(db) { try { fs.writeFileSync(DATA_F, JSON.stringify(db, null, 2)); } catch (e) { console.error('[kontejnery] zápis selhal:', e.message); } }
@@ -173,9 +176,22 @@ function mount(host) {
       createdAt: now, updatedAt: now,
       historie: [{ stav: 'nova', note: 'Poptávka z webu', by: { name: jmeno }, at: now }],
     };
+    // Automatické přiřazení obchodníka na střídačku (round-robin).
+    let prideleno = null;
+    if (db.config.rotace.length) {
+      const n = db.config.rotace.length;
+      const idx = ((db.config.rotaceIdx % n) + n) % n;
+      const o = db.config.rotace[idx];
+      db.config.rotaceIdx = idx + 1;
+      if (o && o.email) {
+        item.obchodnik = { email: (o.email || '').toLowerCase(), name: o.name || o.email };
+        prideleno = item.obchodnik;
+        item.historie.push({ stav: 'nova', note: 'Automaticky přiřazeno (střídačka): ' + item.obchodnik.name, by: { name: 'systém' }, at: now });
+      }
+    }
     db.items.push(item);
     save(db);
-    logAct('kontejnery', { email, name: jmeno }, 'Nová poptávka kontejneru #' + item.cislo + (item.typ ? ' · ' + item.typ : ''));
+    logAct('kontejnery', { email, name: jmeno }, 'Nová poptávka kontejneru #' + item.cislo + (item.typ ? ' · ' + item.typ : '') + (prideleno ? ' → ' + prideleno.name : ''));
     const link = baseUrlOf(req) + '/#modul=kontejnery';
     const text = 'Nová poptávka lodního kontejneru z webu (#' + item.cislo + '):\n\n'
       + '• Jméno: ' + jmeno + (item.firma ? ' (' + item.firma + ')' : '') + '\n'
@@ -186,9 +202,16 @@ function mount(host) {
       + (item.pocet ? '• Počet: ' + item.pocet + ' ks\n' : '')
       + (item.mesto ? '• Místo: ' + item.mesto + '\n' : '')
       + (item.zprava ? '• Zpráva: ' + item.zprava + '\n' : '')
-      + '\nPřiřaďte obchodníka v intranetu → Lodní kontejnery:\n' + link;
-    for (const n of load().config.notify) await notify(n.email, 'Nová poptávka kontejneru #' + item.cislo, text);
-    json(res, 200, { ok: true, cislo: item.cislo });
+      + (prideleno ? '\n→ Přiřazeno (na střídačku): ' + prideleno.name + '\n' : '')
+      + '\nDetail v intranetu → Poptávky:\n' + link;
+    // Příjemci e-mailu: přiřazený obchodník + dohled (kopie ke kontrole) + obecní notify. Deduplikace.
+    const prijemci = [];
+    const addRec = (o) => { const e = (o && o.email || '').toLowerCase(); if (e && prijemci.indexOf(e) < 0) prijemci.push(e); };
+    if (prideleno) addRec(prideleno);
+    (db.config.dohled || []).forEach(addRec);
+    (db.config.notify || []).forEach(addRec);
+    for (const e of prijemci) await notify(e, 'Nová poptávka kontejneru #' + item.cislo + (prideleno ? ' — ' + prideleno.name : ''), text);
+    json(res, 200, { ok: true, cislo: item.cislo, prideleno: prideleno ? prideleno.name : null });
     return true;
   }
 
@@ -321,27 +344,48 @@ function mount(host) {
     json(res, 200, { ok: true, odeslano, item: it });
     return true;
   }
+  // Normalizace seznamu příjemců (e-mail povinný; jméno z DB, jinak e-mail). Nemusí to být zaměstnanci.
+  function normRecips(arr) {
+    const names = {}; employeesForPicker().forEach(e => { names[e.email] = e.name; });
+    const seen = {}; const out = [];
+    (Array.isArray(arr) ? arr : []).forEach(x => {
+      const email = (typeof x === 'string' ? x : (x && x.email) || '').toLowerCase().trim();
+      if (!email || seen[email] || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return; seen[email] = 1;
+      out.push({ email, name: (x && x.name) || names[email] || email });
+    });
+    return out;
+  }
   function apiCfgGet(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
-    json(res, 200, { notify: load().config.notify, employees: employeesForPicker() });
+    const db = load();
+    json(res, 200, { rotace: db.config.rotace, dohled: db.config.dohled, notify: db.config.notify, employees: employeesForPicker() });
     return true;
   }
   async function apiCfgSet(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
-    const incoming = Array.isArray(b.notify) ? b.notify : [];
-    const names = {}; employeesForPicker().forEach(e => { names[e.email] = e.name; });
-    const seen = {}; const notifyList = [];
-    incoming.forEach(x => {
-      const email = (typeof x === 'string' ? x : (x && x.email) || '').toLowerCase();
-      if (!email || seen[email]) return; seen[email] = 1;
-      notifyList.push({ email, name: (x && x.name) || names[email] || email });
-    });
-    const db = load(); db.config.notify = notifyList; save(db);
-    logAct('kontejnery', meOf(req), 'Nastaveni příjemci poptávek: ' + (notifyList.map(x => x.name).join(', ') || '(nikdo)'));
-    json(res, 200, { ok: true, notify: notifyList });
+    const db = load();
+    if (Array.isArray(b.rotace)) { db.config.rotace = normRecips(b.rotace); db.config.rotaceIdx = 0; }
+    if (Array.isArray(b.dohled)) { db.config.dohled = normRecips(b.dohled); }
+    if (Array.isArray(b.notify)) { db.config.notify = normRecips(b.notify); }
+    save(db);
+    logAct('kontejnery', meOf(req), 'Notifikace poptávek — střídačka: ' + (db.config.rotace.map(x => x.name).join(', ') || '(nikdo)') + ' · dohled: ' + (db.config.dohled.map(x => x.name).join(', ') || '(nikdo)'));
+    json(res, 200, { ok: true, rotace: db.config.rotace, dohled: db.config.dohled });
     return true;
   }
+
+  // Jednorázový seed notifikací dle zadání (střídačka Jana/Josef, kopie David) — jen při prvním startu.
+  (function initNotif() {
+    try {
+      const db = load();
+      if (!db.config._notifInit) {
+        db.config._notifInit = true;
+        if (!db.config.rotace.length) db.config.rotace = [{ email: 'jana.rychlikova@elkoplast.cz', name: 'Jana Rychlíková' }, { email: 'josef.beranek@elkoplast.cz', name: 'Josef Beránek' }];
+        if (!db.config.dohled.length) db.config.dohled = [{ email: 'david.sury@elkoplast.cz', name: 'David Surý' }];
+        save(db);
+      }
+    } catch (_) {}
+  })();
 
   return { handle, isHandler };
 }

@@ -2298,9 +2298,11 @@ async function showPoptavky(){
   const mods=MUJ.modules||[];
   const showLis = MUJ.admin || mods.indexOf("kalkulace")>=0 || mods.indexOf("obchod")>=0 || mods.indexOf("obchodexp")>=0;
   body.innerHTML='<div class="dash-hero"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><h2>Poptávky</h2><p>Klientské poptávky. Rozklikněte poptávku lodního kontejneru pro vyřízení a odeslání cenové nabídky.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn ghost sm" href="/kontejnery-fotky" target="_blank" rel="noopener" style="text-decoration:none">📷 Fotky na web</a><button class="btn sm" onclick="showPoptavky()">↻ Obnovit</button></div></div></div>'
+    +(MUJ.admin?'<div id="kontNotifCard" style="margin:14px 2px 4px"></div>':'')
     +'<h3 style="margin:16px 2px 8px;font-size:16px">🚢 Lodní kontejnery</h3><div id="kontList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin:26px 2px 8px;gap:10px;flex-wrap:wrap"><h3 style="margin:0;font-size:16px">🗜️ Mobilní lisy — přihlášky z dotazníku</h3><a class="btn ghost sm" href="/mobilni-lisy/sprava" target="_blank" rel="noopener">Otevřít plnou správu ↗</a></div><div id="lisList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>'
     +(showLis?'<div style="display:flex;justify-content:space-between;align-items:center;margin:26px 2px 8px;gap:10px;flex-wrap:wrap"><h3 style="margin:0;font-size:16px">🛠️ Kalkulačky lisů (Bramidan / Zentex)</h3><a class="btn ghost sm" href="/poptavky-app" target="_blank" rel="noopener">Otevřít plnou správu ↗</a></div><div id="poptList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>':'');
+  if(MUJ.admin) renderKontNotif();
   await loadKontejnerPoptavky();
   await loadLisPrihlasky();
   if(showLis){
@@ -2386,6 +2388,32 @@ async function lisSave(id,isAdmin){
     loadLisPrihlasky();
   }catch(e){ toast('Chyba: '+e.message); }
 }
+/* ---- Notifikace nových poptávek: střídačka (round-robin) + kopie ke kontrole ---- */
+let KNOTIF={rotace:[],dohled:[],employees:[]};
+async function renderKontNotif(){
+  const box=document.getElementById('kontNotifCard'); if(!box) return;
+  try{ const r=await fetch('/api/kontejnery/nastaveni',{cache:'no-store'}); if(!r.ok){ box.innerHTML=''; return; } const j=await r.json(); KNOTIF={rotace:j.rotace||[],dohled:j.dohled||[],employees:j.employees||[]}; }
+  catch(e){ box.innerHTML=''; return; }
+  function chips(list,kind){ return list.length? list.map(function(b,i){ return '<span class="miss-chip">'+(kind==='rotace'?((i+1)+'. '):'')+esc(b.name||b.email)+'<button class="miss-mail" title="Odebrat" onclick="knotifRemove(\''+kind+'\',\''+esc(b.email)+'\')">✕</button></span>'; }).join(' ') : '<span class="muted" style="font-size:13px">nikdo</span>'; }
+  const empOpts=KNOTIF.employees.map(function(e){return '<option value="'+esc(e.email)+'">'+esc(e.name)+'</option>'}).join('');
+  const lbl='font-size:12px;font-weight:800;color:#5b635c;text-transform:uppercase;letter-spacing:.03em';
+  box.innerHTML='<div class="card pad" style="background:#eef5ea;border-color:#cfe0c2">'
+    +'<div style="font-weight:700">🔔 Notifikace nových poptávek</div>'
+    +'<div class="muted" style="font-size:12.5px;margin:2px 0 12px">Nové poptávky se automaticky přiřazují a e-mailem posílají obchodníkům <b>na střídačku</b> (po jednom, dokola). Do <b>kopie ke kontrole</b> chodí každá poptávka.</div>'
+    +'<div style="margin-bottom:14px"><div style="'+lbl+'">Na střídačku (obchodníci)</div><div class="miss-wrap" style="margin-top:6px">'+chips(KNOTIF.rotace,'rotace')+'</div>'
+      +(empOpts?'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><select id="knRotSel" style="min-width:200px;font-family:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px"><option value="">— vyber obchodníka —</option>'+empOpts+'</select><button class="btn sm" onclick="knotifAddRot()">Přidat na střídačku</button></div>':'')+'</div>'
+    +'<div><div style="'+lbl+'">Kopie ke kontrole (vždy)</div><div class="miss-wrap" style="margin-top:6px">'+chips(KNOTIF.dohled,'dohled')+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><input id="knDohInput" placeholder="e-mail (např. david.sury@elkoplast.cz)" style="min-width:240px;font-family:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--line);border-radius:8px"><button class="btn sm" onclick="knotifAddDoh()">Přidat kopii</button></div></div>'
+    +'</div>';
+}
+async function knotifSave(){
+  try{ const r=await fetch('/api/kontejnery/nastaveni',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rotace:KNOTIF.rotace,dohled:KNOTIF.dohled})}); const j=await r.json(); if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return false; } KNOTIF.rotace=j.rotace||[]; KNOTIF.dohled=j.dohled||[]; renderKontNotif(); return true; }
+  catch(e){ toast('Chyba: '+e.message); return false; }
+}
+async function knotifAddRot(){ const sel=document.getElementById('knRotSel'); if(!sel||!sel.value) return; const em=sel.value; if(KNOTIF.rotace.some(function(x){return x.email===em})){ toast('Už je v seznamu.'); return; } const emp=KNOTIF.employees.find(function(e){return e.email===em}); KNOTIF.rotace.push({email:em,name:emp?emp.name:em}); if(await knotifSave()) toast('Přidáno na střídačku'); }
+async function knotifAddDoh(){ const inp=document.getElementById('knDohInput'); const em=(inp.value||'').trim().toLowerCase(); if(!em) return; if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Neplatný e-mail.'); return; } if(KNOTIF.dohled.some(function(x){return x.email===em})){ toast('Už je v seznamu.'); return; } const emp=KNOTIF.employees.find(function(e){return e.email===em}); KNOTIF.dohled.push({email:em,name:emp?emp.name:em}); if(await knotifSave()){ toast('Kopie přidána'); inp.value=''; } }
+async function knotifRemove(kind,email){ if(kind==='rotace') KNOTIF.rotace=KNOTIF.rotace.filter(function(x){return x.email!==email}); else KNOTIF.dohled=KNOTIF.dohled.filter(function(x){return x.email!==email}); if(await knotifSave()) toast('Odebráno'); }
+
 function kontStavBadge(st){
   const map={nova:['#e8f0fb','#1e63c4'],vresenu:['#fbf0dc','#a86a00'],nabidka:['#e6eefb','#274b8f'],uzavreno:['#dff2e4','#1f5e22'],zamitnuto:['#fbecea','#c0392b']};
   const c=map[st]||['#eef1ec','#5b635c']; const label=(KONT_POPT.stavy&&KONT_POPT.stavy[st])||st;
