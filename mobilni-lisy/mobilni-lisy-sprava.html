@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobilní lisy — přihlášky</title>
+<style>
+  :root{--green:#2f7d32;--green-d:#1f5e22;--ink:#16211a;--mut:#6b7a70;--line:#e2e8e0;--paper:#fff;--bg:#f4f7f2;--amber:#a86a00;--amber-soft:#fbf0dc;--red:#c0392b;--red-soft:#fbecea;--blue:#1e63c4;--blue-soft:#e8f0fb;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px 20px 60px}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+  h1{font-size:21px;margin:0}
+  .sub{color:var(--mut);font-size:13.5px;margin:4px 0 0}
+  .btn{border:1px solid var(--green);background:var(--green);color:#fff;border-radius:9px;padding:7px 13px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit}
+  .btn:hover{background:var(--green-d)}
+  .btn.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+  .btn.ghost:hover{background:#eef2ec}
+  .btn.sm{padding:5px 10px;font-size:13px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:15px 17px;margin-bottom:14px}
+  .filters{display:flex;gap:7px;flex-wrap:wrap;margin:14px 0}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 13px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink)}
+  .chip.on{background:var(--green);color:#fff;border-color:var(--green)}
+  .req{border:1px solid var(--line);border-radius:14px;background:#fff;padding:15px 17px;margin-bottom:13px}
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .name{font-size:16px;font-weight:700}
+  .contact{color:var(--mut);font-size:13px;margin-top:3px}
+  .contact a{color:var(--green-d)}
+  .badge{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .b-nova{background:var(--blue-soft);color:var(--blue)}
+  .b-kontakt{background:var(--amber-soft);color:var(--amber)}
+  .b-schuzka{background:#efeafb;color:#5b3fa0}
+  .b-nabidka{background:#e6eefb;color:#274b8f}
+  .b-uzavreno{background:#dff2e4;color:var(--green-d)}
+  .b-zamitnuto{background:var(--red-soft);color:var(--red)}
+  .answers{margin-top:11px;border-collapse:collapse;width:100%}
+  .answers td{padding:4px 12px 4px 0;font-size:13.5px;vertical-align:top}
+  .answers td.k{color:var(--mut);white-space:nowrap;width:1%;font-size:12.5px}
+  .answers td.v{font-weight:600}
+  .zprava{margin-top:10px;padding:9px 12px;background:#f7f9f5;border-radius:8px;font-size:13.5px;line-height:1.6}
+  .assigned{margin-top:10px;font-size:13px}
+  .assigned .who{font-weight:700;color:var(--green-d)}
+  .actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:13px;padding-top:12px;border-top:1px dashed var(--line)}
+  .actions select,.actions input{font-family:inherit;font-size:13.5px;padding:6px 9px;border:1px solid var(--line);border-radius:8px}
+  .actions input{flex:1;min-width:140px}
+  .hist{margin-top:10px;font-size:12.5px;color:var(--mut)}
+  .empty{color:var(--mut);padding:14px 2px}
+  .lbl{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.03em}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#16211a;color:#fff;padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div><h1>🗜️ Mobilní lisy — přihlášky</h1><p class="sub" id="sub">Načítám…</p></div>
+    <button class="btn ghost sm" onclick="load()">↻ Obnovit</button>
+  </div>
+
+  <div id="cfgCard"></div>
+  <div class="filters" id="filters" style="display:none"></div>
+  <div id="list"><p class="empty">Načítám…</p></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var STATE={items:[],role:{},stavy:{},employees:[],notify:[],report:{},filter:''};
+var CFGOPEN=false;
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2400)}
+function fmtDate(ts){try{return new Date(ts).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return''}}
+
+async function load(){
+  try{
+    var r=await fetch('/api/mobilni-lisy',{cache:'no-store'});
+    if(!r.ok){ $('#list').innerHTML='<div class="card"><b>Chyba '+r.status+'</b></div>'; return; }
+    var j=await r.json();
+    STATE.items=j.items||[]; STATE.role=j.role||{}; STATE.stavy=j.stavy||{}; STATE.employees=j.employees||[]; STATE.notify=j.notify||[]; STATE.report=j.report||{};
+    render();
+  }catch(e){ $('#list').innerHTML='<div class="card"><b>Chyba</b> — '+esc(e.message)+'</div>'; }
+}
+
+function render(){
+  var role=STATE.role;
+  $('#sub').textContent=role.isAdmin?'Přihlášky z dotazníku mobilní-lisy.cz. Přiřaďte obchodníka a sledujte stav.':'Přihlášky z dotazníku. Zpracujte přiřazené a aktualizujte stav.';
+  if(role.isAdmin) renderCfg(); else $('#cfgCard').innerHTML='';
+  var fl=$('#filters'); fl.style.display='';
+  var counts={'':STATE.items.length}; Object.keys(STATE.stavy).forEach(function(k){counts[k]=STATE.items.filter(function(x){return x.stav===k}).length});
+  var chips=[['','Vše']].concat(Object.keys(STATE.stavy).map(function(k){return [k,STATE.stavy[k]]}));
+  fl.innerHTML=chips.map(function(c){return '<span class="chip'+(STATE.filter===c[0]?' on':'')+'" onclick="setFilter(\''+c[0]+'\')">'+esc(c[1])+' <b>'+(counts[c[0]]||0)+'</b></span>'}).join('');
+
+  var items=STATE.items.slice();
+  if(STATE.filter) items=items.filter(function(x){return x.stav===STATE.filter});
+  var list=$('#list');
+  if(!items.length){ list.innerHTML='<div class="card"><p class="empty" style="margin:0">Žádné přihlášky v této kategorii.</p></div>'; return; }
+  list.innerHTML=items.map(card).join('');
+}
+
+function card(it){
+  var st=it.stav||'nova';
+  var isAdmin=!!STATE.role.isAdmin;
+  var h='<div class="req">';
+  h+='<div class="top"><div style="min-width:0">'
+    +'<div class="name">#'+it.cislo+' · '+esc(it.mesto||'—')+'</div>'
+    +'<div class="contact">'+esc(it.jmeno||'')+(it.pozice?' <span style="color:#9aa79d">('+esc(it.pozice)+')</span>':'')+'<br>'
+    +(it.email?'✉ <a href="mailto:'+esc(it.email)+'">'+esc(it.email)+'</a>':'')+(it.email&&it.telefon?' · ':'')+(it.telefon?'📞 <a href="tel:'+esc(it.telefon)+'">'+esc(it.telefon)+'</a>':'')+'</div>'
+    +'</div><div><span class="badge b-'+st+'">'+esc(STATE.stavy[st]||st)+'</span></div></div>';
+  // odpovědi z dotazníku
+  var pr=it.prehled||[];
+  if(pr.length){ h+='<table class="answers">'+pr.filter(function(r){return r[0]!=='Pozice'&&r[0]!=='Největší problém dvora'}).map(function(r){return '<tr><td class="k">'+esc(r[0])+'</td><td class="v">'+esc(r[1])+'</td></tr>'}).join('')+'</table>'; }
+  if(it.problem) h+='<div class="zprava"><b>Největší problém:</b> „'+esc(it.problem)+'"</div>';
+  h+='<div class="assigned">'+(it.obchodnik?('Obchodník: <span class="who">'+esc(it.obchodnik.name)+'</span>'):'<span style="color:var(--amber)">⚠ Nepřiřazeno</span>')+' · <span style="color:#9aa79d">'+fmtDate(it.createdAt)+'</span></div>';
+  var hs=(it.historie||[]).slice(-3).reverse();
+  if(hs.length){ h+='<div class="hist">'+hs.map(function(x){return '<div>'+fmtDate(x.at)+' — '+esc(STATE.stavy[x.stav]||x.stav)+(x.note?': '+esc(x.note):'')+(x.by&&x.by.name?' ('+esc(x.by.name)+')':'')+'</div>'}).join('')+'</div>'; }
+  h+='<div class="actions">';
+  if(isAdmin){
+    var oOpts='<option value="">— nepřiřazeno —</option>'+STATE.employees.map(function(e){return '<option value="'+esc(e.email)+'"'+(it.obchodnik&&it.obchodnik.email===e.email?' selected':'')+'>'+esc(e.name)+'</option>'}).join('');
+    h+='<span class="lbl">Obchodník</span><select id="ob_'+it.id+'">'+oOpts+'</select>';
+  }
+  var sOpts=Object.keys(STATE.stavy).map(function(k){return '<option value="'+k+'"'+(k===st?' selected':'')+'>'+esc(STATE.stavy[k])+'</option>'}).join('');
+  h+='<span class="lbl">Stav</span><select id="st_'+it.id+'">'+sOpts+'</select>';
+  h+='<input id="nt_'+it.id+'" placeholder="poznámka (nepovinné)">';
+  h+='<button class="btn sm" onclick="saveChange(\''+it.id+'\','+(isAdmin?'true':'false')+')">Uložit</button>';
+  h+='</div></div>';
+  return h;
+}
+
+function setFilter(f){ STATE.filter=f; render(); }
+
+async function saveChange(id, isAdmin){
+  var it=STATE.items.find(function(x){return x.id===id}); if(!it) return;
+  var body={id:id};
+  var stSel=document.getElementById('st_'+id); if(stSel) body.stav=stSel.value;
+  var nt=document.getElementById('nt_'+id); if(nt&&nt.value.trim()) body.note=nt.value.trim();
+  if(isAdmin){ var obSel=document.getElementById('ob_'+id); if(obSel) body.obchodnik=obSel.value; }
+  try{
+    var r=await fetch('/api/mobilni-lisy/prirad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var j=await r.json();
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; }
+    toast('Uloženo'+((body.obchodnik)?' — obchodník informován e-mailem':''));
+    load();
+  }catch(e){ toast('Chyba: '+e.message); }
+}
+
+/* ---- Nastavení příjemců (jen správce): notifikace nových přihlášek + týdenní report ---- */
+function renderCfg(){
+  var box=$('#cfgCard');
+  var chosen={}; STATE.notify.forEach(function(b){chosen[b.email]=1});
+  var opts=STATE.employees.filter(function(e){return !chosen[e.email]}).map(function(e){return '<option value="'+esc(e.email)+'">'+esc(e.name)+'</option>'}).join('');
+  var notifyChips=STATE.notify.length?STATE.notify.map(function(b){return '<span class="chip on" style="cursor:default">'+esc(b.name||b.email)+' <b title="Odebrat" style="cursor:pointer;margin-left:4px" onclick="notifyRemove(\''+esc(b.email)+'\')">✕</b></span>'}).join(' '):'<span style="color:var(--mut)">Nikdo — nové přihlášky nechodí e-mailem (uvidíte je tady v seznamu).</span>';
+  var rep=STATE.report||{}; var repTo=rep.to||[];
+  var repChips=repTo.length?repTo.map(function(b){return '<span class="chip on" style="cursor:default;background:#274b8f;border-color:#274b8f">'+esc(b.name||b.email)+' <b title="Odebrat" style="cursor:pointer;margin-left:4px" onclick="reportRemove(\''+esc(b.email)+'\')">✕</b></span>'}).join(' '):'<span style="color:var(--mut)">Nikdo — týdenní report se neposílá.</span>';
+  var dny=['neděli','pondělí','úterý','středu','čtvrtek','pátek','sobotu'];
+  var wdOpts=dny.map(function(d,i){return '<option value="'+i+'"'+((rep.weekday==null?1:rep.weekday)===i?' selected':'')+'>'+d.charAt(0).toUpperCase()+d.slice(1)+'</option>'}).join('');
+
+  box.innerHTML='<div class="card" style="background:#eef5ea;border-color:#cfe0c2">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="cfgToggle()"><div style="font-weight:700">⚙️ Kam „sbíhají" přihlášky a report</div><span class="btn ghost sm">'+(CFGOPEN?'Skrýt':'Upravit')+'</span></div>'
+    +(CFGOPEN?(
+        '<div style="margin-top:12px"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">🔔 Komu chodí každá nová přihláška e-mailem</div>'
+        +'<div style="color:var(--mut);font-size:13px;margin-bottom:9px">Obchodník / obchodníci, kterým mají mobilní lisy „sbíhat". Konkrétní přiřazení pak řešíte u každé přihlášky níže.</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:9px">'+notifyChips+'</div>'
+        +(opts?'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="notifySel" style="min-width:220px;font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:9px">'+opts+'</select><button class="btn sm" onclick="notifyAdd()">Přidat</button></div>':'<div style="color:var(--mut);font-size:13px">Všichni zaměstnanci už jsou přidáni.</div>')
+        +'</div>'
+        +'<hr style="border:0;border-top:1px solid #cfe0c2;margin:16px 0">'
+        +'<div><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">📧 Týdenní report — souhrn nových přihlášek</div>'
+        +'<div style="color:var(--mut);font-size:13px;margin-bottom:9px">Posílá se 1× týdně v <select id="repWeekday" onchange="reportWeekday(this.value)" style="font-family:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:7px">'+wdOpts+'</select>. Příjemci mohou být i mimo firmu.</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:9px">'+repChips+'</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input id="repEmail" type="email" placeholder="e-mail příjemce" style="min-width:220px;font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:9px"><button class="btn sm" onclick="reportAdd()">Přidat příjemce</button></div>'
+        +'<label style="display:flex;gap:8px;align-items:center;margin-top:11px;font-size:13.5px;color:var(--mut)"><input type="checkbox" id="repEnabled" '+(rep.enabled===false?'':'checked')+' onchange="reportEnabled(this.checked)" style="width:16px;height:16px"> Týdenní report zapnutý</label>'
+        +'</div>'
+      ):'')
+    +'</div>';
+}
+function cfgToggle(){ CFGOPEN=!CFGOPEN; renderCfg(); }
+
+async function cfgSave(patch, okMsg){
+  try{
+    var r=await fetch('/api/mobilni-lisy/nastaveni',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+    var j=await r.json();
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return false; }
+    STATE.notify=j.notify||[]; STATE.report=j.report||{}; renderCfg(); if(okMsg) toast(okMsg); return true;
+  }catch(e){ toast('Chyba: '+e.message); return false; }
+}
+function notifyAdd(){
+  var sel=$('#notifySel'); if(!sel||!sel.value) return;
+  var em=sel.value; var emp=STATE.employees.find(function(e){return e.email===em});
+  var list=STATE.notify.map(function(b){return {email:b.email,name:b.name}}); list.push({email:em,name:emp?emp.name:em});
+  cfgSave({notify:list},'Příjemce přidán');
+}
+function notifyRemove(em){ cfgSave({notify:STATE.notify.filter(function(b){return b.email!==em}).map(function(b){return {email:b.email,name:b.name}})},'Příjemce odebrán'); }
+function reportAdd(){
+  var inp=$('#repEmail'); if(!inp) return; var em=(inp.value||'').trim().toLowerCase();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Zadejte platný e-mail.'); return; }
+  var to=(STATE.report.to||[]).map(function(b){return {email:b.email,name:b.name}}); if(to.some(function(b){return b.email===em})){ toast('Už je v seznamu.'); return; }
+  to.push({email:em,name:em}); inp.value=''; cfgSave({report:{to:to}},'Příjemce reportu přidán');
+}
+function reportRemove(em){ var to=(STATE.report.to||[]).filter(function(b){return b.email!==em}).map(function(b){return {email:b.email,name:b.name}}); cfgSave({report:{to:to}},'Příjemce reportu odebrán'); }
+function reportWeekday(v){ cfgSave({report:{weekday:+v}},'Den odeslání změněn'); }
+function reportEnabled(on){ cfgSave({report:{enabled:!!on}}, on?'Report zapnutý':'Report vypnutý'); }
+
+load();
+</script>
+</body>
+</html>

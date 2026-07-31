@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobilní lisy pro sběrné dvory — ELKOPLAST CZ</title>
+<meta name="description" content="Mobilní lisovací kontejnery pro obce a sběrné dvory. Zjistěte, kolik ušetříte na svozech papíru a plastu. Vyplňte krátký dotazník a ozveme se vám.">
+<style>
+  :root{
+    --green:#2f7d32;--green-d:#1f5e22;--green-l:#eaf3e6;--ink:#16211a;--mut:#5f6d63;
+    --line:#e2e8e0;--paper:#fff;--bg:#f5f8f2;--amber:#a86a00;--red:#c0392b;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:16px;line-height:1.6}
+  a{color:var(--green-d)}
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px}
+  .btn{display:inline-block;border:1px solid var(--green);background:var(--green);color:#fff;border-radius:11px;padding:13px 24px;font-weight:700;font-size:16px;cursor:pointer;font-family:inherit;text-decoration:none;transition:background .15s}
+  .btn:hover{background:var(--green-d)}
+  .btn.big{padding:16px 30px;font-size:17px}
+
+  /* ---- hlavička ---- */
+  header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .navbar{display:flex;justify-content:space-between;align-items:center;height:62px}
+  .brand{font-weight:800;font-size:18px;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
+  .brand .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#2f7d32,#4ca64f);display:grid;place-items:center;color:#fff;font-size:16px}
+  .brand small{display:block;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.02em}
+
+  /* ---- hero ---- */
+  .hero{background:linear-gradient(160deg,#1f5e22,#2f7d32 60%,#3d8b40);color:#fff;padding:62px 0 70px}
+  .hero h1{font-size:38px;line-height:1.15;margin:0 0 16px;font-weight:800;letter-spacing:-.02em}
+  .hero p.lead{font-size:19px;max-width:660px;margin:0 0 26px;opacity:.95}
+  .hero .cta-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .hero .btn{background:#fff;color:var(--green-d);border-color:#fff}
+  .hero .btn:hover{background:#eef7ea}
+  .hero .note{font-size:14px;opacity:.85}
+  @media(max-width:640px){.hero h1{font-size:29px}.hero p.lead{font-size:17px}}
+
+  /* ---- štítky výhod ---- */
+  .badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:30px}
+  .badges span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:7px 15px;font-size:14px;font-weight:600}
+
+  section{padding:52px 0}
+  h2{font-size:27px;margin:0 0 10px;letter-spacing:-.01em}
+  .sub{color:var(--mut);font-size:17px;max-width:640px;margin:0 0 30px}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .feat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px}
+  .feat .ico{width:44px;height:44px;border-radius:11px;background:var(--green-l);display:grid;place-items:center;font-size:22px;margin-bottom:12px}
+  .feat h3{margin:0 0 6px;font-size:18px}
+  .feat p{margin:0;color:var(--mut);font-size:15px}
+
+  .how{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:22px}
+  @media(max-width:760px){.steps{grid-template-columns:1fr}}
+  .step{display:flex;gap:14px;align-items:flex-start}
+  .step .n{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--green);color:#fff;font-weight:800;display:grid;place-items:center}
+  .step h3{margin:0 0 3px;font-size:16px}
+  .step p{margin:0;color:var(--mut);font-size:14.5px}
+
+  /* ---- formulář ---- */
+  .formwrap{background:linear-gradient(160deg,#eef5ea,#f5f8f2)}
+  .formcard{background:#fff;border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:0 12px 40px -22px rgba(31,94,34,.4)}
+  @media(max-width:640px){.formcard{padding:22px 18px}}
+  fieldset{border:0;margin:0 0 8px;padding:0}
+  legend{font-weight:800;font-size:15px;color:var(--green-d);padding:14px 0 6px;letter-spacing:.01em}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:560px){.row{grid-template-columns:1fr}}
+  .fld{margin:10px 0}
+  .fld label{display:block;font-size:13.5px;font-weight:600;margin-bottom:5px}
+  .fld .hint{font-weight:400;color:var(--mut);font-size:12.5px}
+  .fld .req{color:var(--red)}
+  input,select,textarea{width:100%;font-family:inherit;font-size:15px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:0;border-color:var(--green);box-shadow:0 0 0 3px rgba(47,125,50,.14)}
+  textarea{resize:vertical;min-height:78px}
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .consent{display:flex;gap:10px;align-items:flex-start;margin:16px 0 6px;font-size:13.5px;color:var(--mut)}
+  .consent input{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+  .msg{margin-top:14px;font-size:14.5px;padding:12px 14px;border-radius:11px;display:none}
+  .msg.err{display:block;background:#fbecea;color:var(--red);border:1px solid #f0c9c3}
+  .msg.ok{display:block;background:#e7f4e9;color:var(--green-d);border:1px solid #bfe0c4}
+  .done{display:none;text-align:center;padding:26px 10px}
+  .done .tick{width:66px;height:66px;border-radius:50%;background:var(--green-l);color:var(--green);display:grid;place-items:center;font-size:34px;margin:0 auto 16px}
+  .done h3{font-size:22px;margin:0 0 8px}
+  .done p{color:var(--mut);margin:0}
+
+  footer{background:#16211a;color:#c7d2c8;padding:30px 0;font-size:14px}
+  footer a{color:#cfe6d1}
+  footer .frow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap navbar">
+    <div class="brand"><span class="logo">♻</span><span>Mobilní lisy<small>ELKOPLAST CZ, s.r.o.</small></span></div>
+    <a class="btn" href="#dotaznik" style="padding:9px 18px;font-size:15px">Nezávazný dotazník</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>Zlevněte svozy papíru a plastu na sběrném dvoře</h1>
+    <p class="lead">Mobilní lisovací kontejnery slisují objemný odpad přímo u vás. Výsledek: méně svozů, plné návozy a nižší náklady na dopravu. Řekněte nám, jak dnes svážíte — spočítáme vám úsporu.</p>
+    <div class="cta-row">
+      <a class="btn big" href="#dotaznik">Vyplnit dotazník (2 minuty)</a>
+      <span class="note">Nezávazné · odpovíme do několika pracovních dnů</span>
+    </div>
+    <div class="badges">
+      <span>♻ Papír i plast</span>
+      <span>📉 Až o desítky % méně svozů</span>
+      <span>🚛 Plné návozy místo poloprázdných</span>
+      <span>🔧 Servis po celé ČR</span>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>Proč mobilní lis na sběrný dvůr</h2>
+    <p class="sub">Objemný tříděný odpad zabírá v kontejneru hlavně vzduch. Lisováním z něj uděláte hutný balík — a jeden svoz odveze mnohem víc.</p>
+    <div class="grid">
+      <div class="feat"><div class="ico">📉</div><h3>Méně svozů</h3><p>Slisovaný papír a plast zaberou zlomek objemu. Kontejner se plní pomaleji, svozů ubyde.</p></div>
+      <div class="feat"><div class="ico">💰</div><h3>Nižší náklady na dopravu</h3><p>Platíte za odvezenou tunu, ne za vzduch. Plný návoz znamená výrazně nižší cenu za tunu.</p></div>
+      <div class="feat"><div class="ico">🧹</div><h3>Pořádek na dvoře</h3><p>Uzavřený lis místo přeplněných kontejnerů — čistší provoz, méně poletujícího odpadu.</p></div>
+      <div class="feat"><div class="ico">🔌</div><h3>Mobilní a soběstačný</h3><p>Hákové i řetězové provedení, varianty do míst bez pevné přípojky. Přesunete tam, kde je potřeba.</p></div>
+      <div class="feat"><div class="ico">🛠️</div><h3>Servis a záruka</h3><p>Vlastní servisní síť ELKOPLAST po celé ČR. Postaráme se o provoz i údržbu.</p></div>
+      <div class="feat"><div class="ico">📊</div><h3>Návrh na míru</h3><p>Podle vaší tonáže a četnosti svozu doporučíme velikost a typ lisu — bez zbytečného předimenzování.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="how">
+  <div class="wrap">
+    <h2>Jak to probíhá</h2>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div><h3>Vyplníte dotazník</h3><p>Pár údajů o tom, co a jak často svážíte. Zabere to dvě minuty.</p></div></div>
+      <div class="step"><div class="n">2</div><div><h3>Spočítáme úsporu</h3><p>Náš obchodník projde vaše čísla a připraví návrh řešení i odhad úspory.</p></div></div>
+      <div class="step"><div class="n">3</div><div><h3>Ozveme se vám</h3><p>Domluvíme detaily, případně prohlídku dvora. Vše nezávazně.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOTAZNÍK ============ -->
+<section class="formwrap" id="dotaznik">
+  <div class="wrap" style="max-width:760px">
+    <h2>Dotazník pro sběrný dvůr</h2>
+    <p class="sub">Čím přesnější údaje, tím lepší návrh a odhad úspory. Nevíte přesně? Odhadněte — políčka bez hvězdičky nejsou povinná.</p>
+
+    <div class="formcard">
+      <form id="frm" novalidate>
+        <!-- honeypot -->
+        <div class="hp"><label>Nevyplňujte<input type="text" name="web" tabindex="-1" autocomplete="off"></label></div>
+
+        <fieldset>
+          <legend>Kontaktní údaje</legend>
+          <div class="row">
+            <div class="fld"><label>Název města / obce <span class="req">*</span></label><input id="mesto" maxlength="160" autocomplete="organization" required></div>
+            <div class="fld"><label>Jméno a příjmení kontaktní osoby <span class="req">*</span></label><input id="jmeno" maxlength="160" autocomplete="name" required></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label>E-mail <span class="req">*</span></label><input id="email" type="email" maxlength="160" autocomplete="email" required></div>
+            <div class="fld"><label>Telefon</label><input id="telefon" type="tel" maxlength="60" autocomplete="tel"></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label>Vaše pracovní pozice</label><input id="pozice" maxlength="160" placeholder="např. vedoucí sběrného dvora"></div>
+            <div class="fld"><label>Kolik sběrných dvorů provozujete?</label><input id="pocetDvoru" maxlength="160" placeholder="např. 1"></div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Kontejnery a objemy</legend>
+          <div class="fld"><label>Jaké kontejnery používáte na papír a jaký mají objem? <span class="hint">— typ (hákový / řetězový) a přibližný objem, např. „hákový 20 m³"</span></label><input id="kontejneryPapir" maxlength="300" placeholder="např. hákový 20 m³"></div>
+          <div class="fld"><label>Jaké kontejnery používáte na plast a jaký mají objem?</label><input id="kontejneryPlast" maxlength="300" placeholder="např. řetězový 15 m³"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Svozy — jak často a kolik</legend>
+          <div class="row">
+            <div class="fld"><label>Jak často probíhá svoz papíru?</label><input id="svozPapirCetnost" maxlength="160" placeholder="např. 2× týdně"></div>
+            <div class="fld"><label>Jak často probíhá svoz plastu?</label><input id="svozPlastCetnost" maxlength="160" placeholder="např. 1× týdně"></div>
+          </div>
+          <div class="fld"><label>Kolik přibližně odvezete při jednom svozu?</label>
+            <div class="duo">
+              <input id="odvozPapirKg" maxlength="160" placeholder="Papír ___ kg">
+              <input id="odvozPlastKg" maxlength="160" placeholder="Plast ___ kg">
+            </div>
+          </div>
+          <div class="fld"><label>Kolik papíru a plastu přibližně svezete za rok?</label>
+            <div class="duo">
+              <input id="rocnePapirTun" maxlength="160" placeholder="Papír ___ tun/rok">
+              <input id="rocnePlastTun" maxlength="160" placeholder="Plast ___ tun/rok">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Co potřebujete vyřešit</legend>
+          <div class="fld"><label>Co je dnes největší problém vašeho sběrného dvora?</label><textarea id="problem" maxlength="4000" placeholder="např. přeplněné kontejnery, drahé svozy, málo místa…"></textarea></div>
+        </fieldset>
+
+        <label class="consent">
+          <input type="checkbox" id="souhlas">
+          <span>Beru na vědomí zpracování uvedených údajů společností <b>ELKOPLAST CZ, s.r.o.</b> za účelem vyhodnocení přihlášky a následného kontaktování. <span class="req">*</span></span>
+        </label>
+
+        <div class="msg" id="msg"></div>
+        <button class="btn big" type="submit" id="submit" style="width:100%;margin-top:14px">Odeslat dotazník</button>
+      </form>
+
+      <div class="done" id="done">
+        <div class="tick">✓</div>
+        <h3>Děkujeme, přihláška odešla</h3>
+        <p>Vaše údaje jsme předali obchodníkovi, který má mobilní lisy na starosti. Ozveme se vám do několika pracovních dnů.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap frow">
+    <div><b>ELKOPLAST CZ, s.r.o.</b> — mobilní lisovací kontejnery pro obce a sběrné dvory</div>
+    <div><a href="https://www.elkoplast.cz" target="_blank" rel="noopener">www.elkoplast.cz</a></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var frm=document.getElementById('frm'), msg=document.getElementById('msg'), btn=document.getElementById('submit');
+  function val(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+  function show(kind,text){msg.className='msg '+kind;msg.textContent=text;}
+  frm.addEventListener('submit',async function(ev){
+    ev.preventDefault();
+    var mesto=val('mesto'), jmeno=val('jmeno'), email=val('email');
+    if(!mesto||!jmeno||!email){show('err','Vyplňte prosím město/obec, jméno a e-mail.');return;}
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){show('err','Zkontrolujte prosím e-mail.');return;}
+    if(!document.getElementById('souhlas').checked){show('err','Bez souhlasu se zpracováním údajů nelze přihlášku odeslat.');return;}
+    var payload={
+      mesto:mesto, jmeno:jmeno, email:email, telefon:val('telefon'),
+      pozice:val('pozice'), pocetDvoru:val('pocetDvoru'),
+      kontejneryPapir:val('kontejneryPapir'), kontejneryPlast:val('kontejneryPlast'),
+      svozPapirCetnost:val('svozPapirCetnost'), svozPlastCetnost:val('svozPlastCetnost'),
+      odvozPapirKg:val('odvozPapirKg'), odvozPlastKg:val('odvozPlastKg'),
+      rocnePapirTun:val('rocnePapirTun'), rocnePlastTun:val('rocnePlastTun'),
+      problem:val('problem'), souhlas:true, web:val('web')
+    };
+    btn.disabled=true; btn.textContent='Odesílám…'; show('','');
+    try{
+      var r=await fetch('/api/mobilni-lisy/prihlaska',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      var j=await r.json().catch(function(){return{};});
+      if(!r.ok||j.chyba){ show('err', j.chyba||('Odeslání se nezdařilo ('+r.status+'). Zkuste to prosím znovu.')); btn.disabled=false; btn.textContent='Odeslat dotazník'; return; }
+      frm.style.display='none'; document.getElementById('done').style.display='block';
+      document.getElementById('done').scrollIntoView({behavior:'smooth',block:'center'});
+    }catch(e){ show('err','Spojení se nezdařilo. Zkontrolujte připojení a zkuste to znovu.'); btn.disabled=false; btn.textContent='Odeslat dotazník'; }
+  });
+})();
+</script>
+</body>
+</html>
