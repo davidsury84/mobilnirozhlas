@@ -1929,6 +1929,9 @@ const server = http.createServer(async (req, res) => {
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
 
+  // Starý odkaz /kontejnery → přesměruj na samostatnou aplikaci (klientský web). Veřejné, mimo závoru.
+  if (p === '/kontejnery' && req.method === 'GET') { const t = LODAKY_APP_URL || 'https://lodak.elkoplast.cz'; res.writeHead(302, { 'Location': t + (u.hash || '') }); return res.end(); }
+
   // ---- Jednorázový import směrnic (server-to-server; Bearer = SSO_SHARED_SECRET) ----
   // Tělo: { items: [{ title, html, kategorie?, zdrojUrl? }] }. Dedupe dle názvu; publikuje ihned.
   if (p === '/api/smernice-import' && req.method === 'POST') {
