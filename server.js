@@ -2904,6 +2904,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- Aplikace modulu Kalkulačka překladiště: za přihlášením, přístup řídí správce (vzor Kalkulace-lisy) ----
+    // Správa fotek na klientský web: přesměruje obchodníka/správce do aplikace (SSO) na stránku nahrávání fotek.
+    if (p === '/kontejnery-fotky') {
+      const e = empSession(req);
+      const allowed = (e && (employeeModules(e.email).indexOf('obchod') >= 0 || employeeModules(e.email).indexOf('obchodexp') >= 0)) || isAdmin(req)
+        || (e && kontejneryMod && kontejneryMod.isHandler && kontejneryMod.isHandler(e.email));
+      if (!allowed) return send(res, 403, '<h1>Přístup nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!LODAKY_APP_URL) return send(res, 200, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Aplikace lodních kontejnerů zatím není napojena (LODAKY_APP_URL).</p>', { 'Content-Type': 'text/html; charset=utf-8' });
+      let target = LODAKY_APP_URL + '/fotky';
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
+    }
     // Nacenění lodního kontejneru: přesměruje obchodníka do samostatné aplikace se SSO tokenem + id poptávky.
     if (p === '/kontejnery-nacenit') {
       const e = empSession(req);
