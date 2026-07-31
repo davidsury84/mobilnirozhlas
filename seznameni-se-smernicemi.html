@@ -1401,7 +1401,6 @@ const MUJ_MODS = [
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
   { grp:"Obchod" },
   { key:"pozadavky", icon:MUJ_IC.cart, label:"Požadavky nákupu", gated:true },
-  { key:"kontejnery", icon:MUJ_IC.warehouse, label:"Lodní kontejnery", gated:true },
   { key:"poptavky", icon:MUJ_IC.ticket, label:"Poptávky", gated:true },
   { key:"obchod", icon:MUJ_IC.users, label:"Rozdělení obchodníků", gated:true },
   { key:"reklamace", icon:MUJ_IC.shield, label:"Reklamace", gated:true },
@@ -1468,7 +1467,7 @@ async function refreshMy(){
   if(!MUJ.data.library) MUJ.data.library = {folders:[],docs:[]};
   MUJ.modules = MUJ.data.modules || [];
 }
-function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="kontejnery") return mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); if(m.key==="poptavky") return mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0; return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
+function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
 function mujCounts(){
   const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[]; const survs=d.surveys||[];
   return { dirs, libDocs, survs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length, survTodo:survs.filter(x=>!x.filled).length };
@@ -1492,7 +1491,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnery");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1579,7 +1578,6 @@ function mjGo(key){
   else if(key==="smlouvy") showSmlouvy();
   else if(key==="reklamace") showReklamace();
   else if(key==="pozadavky") showPozadavky();
-  else if(key==="kontejnery") showKontejnery();
   else if(key==="sortiment") showSortiment();
   else if(key==="adaptace") showAdaptace();
   else if(key==="dovolena") showDovolena();
@@ -2295,15 +2293,140 @@ async function showPoptavky(){
   const body=document.getElementById("mujBody");
   if(!moduleVisible({key:"poptavky",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   window.scrollTo(0,0);
-  body.innerHTML='<div class="dash-hero"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><h2>Poptávky</h2><p>Poptávky odeslané z klientských kalkulaček lisů (Bramidan / Zentex). Odpovídejte přímo klientům — e-mail je v každém záznamu.</p></div><button class="btn sm" onclick="showPoptavky()">↻ Obnovit</button></div></div><div id="poptList"><p class="muted" style="padding:8px 2px">Načítám poptávky…</p></div>';
-  let leads=[], err=null;
-  try{ const r=await (await fetch("/api/poptavky",{cache:"no-store"})).json(); leads=r.leads||[]; err=r.error; }
-  catch(e){ err=e.message; }
-  const el=document.getElementById("poptList"); if(!el) return;
-  MUJ.poptavkyNew = leads.length; renderSidebar();
-  if(err && !leads.length){ el.innerHTML='<div class="card pad"><span class="pill amber">Chyba</span> Nepodařilo se načíst poptávky: '+esc(err)+'</div>'; return; }
-  if(!leads.length){ el.innerHTML='<div class="card pad" style="display:flex;align-items:center;gap:10px"><span class="pill green">✓ Hotovo</span><span class="muted">Žádné poptávky ve frontě.</span></div>'; return; }
-  el.innerHTML=leads.map(poptCard).join('');
+  const mods=MUJ.modules||[];
+  const showLis = MUJ.admin || mods.indexOf("kalkulace")>=0 || mods.indexOf("obchod")>=0 || mods.indexOf("obchodexp")>=0;
+  body.innerHTML='<div class="dash-hero"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><h2>Poptávky</h2><p>Klientské poptávky. Rozklikněte poptávku lodního kontejneru pro vyřízení a odeslání cenové nabídky.</p></div><button class="btn sm" onclick="showPoptavky()">↻ Obnovit</button></div></div>'
+    +'<h3 style="margin:16px 2px 8px;font-size:16px">🚢 Lodní kontejnery</h3><div id="kontList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>'
+    +(showLis?'<h3 style="margin:26px 2px 8px;font-size:16px">🛠️ Kalkulačky lisů (Bramidan / Zentex)</h3><div id="poptList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>':'');
+  await loadKontejnerPoptavky();
+  if(showLis){
+    let leads=[], err=null;
+    try{ const r=await (await fetch("/api/poptavky",{cache:"no-store"})).json(); leads=r.leads||[]; err=r.error; }
+    catch(e){ err=e.message; }
+    const el=document.getElementById("poptList");
+    if(el){
+      if(err && !leads.length){ el.innerHTML='<div class="card pad"><span class="pill amber">Chyba</span> Nepodařilo se načíst: '+esc(err)+'</div>'; }
+      else if(!leads.length){ el.innerHTML='<div class="card pad" style="display:flex;align-items:center;gap:10px"><span class="pill green">✓</span><span class="muted">Žádné poptávky z kalkulaček.</span></div>'; }
+      else { el.innerHTML=leads.map(poptCard).join(''); }
+    }
+  }
+}
+let KONT_POPT={items:[],stavy:{},role:{},employees:[]}, KDET=null;
+async function loadKontejnerPoptavky(){
+  const el=document.getElementById("kontList"); if(!el) return;
+  try{
+    const r=await fetch("/api/kontejnery",{cache:"no-store"});
+    if(!r.ok){ el.innerHTML='<div class="card pad"><span class="muted">Nepodařilo se načíst poptávky kontejnerů ('+r.status+').</span></div>'; return; }
+    const j=await r.json();
+    KONT_POPT={items:j.items||[],stavy:j.stavy||{},role:j.role||{},employees:j.employees||[]};
+    const nnew=KONT_POPT.items.filter(x=>x.stav==='nova').length;
+    MUJ.poptavkyNew=(MUJ.poptavkyNew||0)+nnew; renderSidebar();
+    if(!KONT_POPT.items.length){ el.innerHTML='<div class="card pad" style="display:flex;align-items:center;gap:10px"><span class="pill green">✓</span><span class="muted">Žádné poptávky kontejnerů.</span></div>'; return; }
+    el.innerHTML=KONT_POPT.items.map(kontCard).join('');
+  }catch(e){ el.innerHTML='<div class="card pad"><span class="muted">Chyba: '+esc(e.message)+'</span></div>'; }
+}
+function kontStavBadge(st){
+  const map={nova:['#e8f0fb','#1e63c4'],vresenu:['#fbf0dc','#a86a00'],nabidka:['#e6eefb','#274b8f'],uzavreno:['#dff2e4','#1f5e22'],zamitnuto:['#fbecea','#c0392b']};
+  const c=map[st]||['#eef1ec','#5b635c']; const label=(KONT_POPT.stavy&&KONT_POPT.stavy[st])||st;
+  return '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:4px 10px;border-radius:999px;background:'+c[0]+';color:'+c[1]+'">'+esc(label)+'</span>';
+}
+function kontCard(it){
+  const st=it.stav||'nova';
+  const meta=[it.typ&&('📦 '+esc(it.typ)), it.rezim&&esc(it.rezim), it.pocet&&(esc(String(it.pocet))+' ks'), it.mesto&&('📍 '+esc(it.mesto))].filter(Boolean).join(' · ');
+  return '<div class="card pad" style="margin-bottom:10px;cursor:pointer" onclick="openKontejnerDetail(\''+it.id+'\')">'
+    +'<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+    +'<div><div style="font-size:16px;font-weight:700">#'+it.cislo+' · '+esc(it.jmeno||'—')+(it.firma?' <span class="muted" style="font-weight:500">('+esc(it.firma)+')</span>':'')+'</div>'
+    +(meta?'<div class="muted" style="font-size:13px;margin-top:3px">'+meta+'</div>':'')+'</div>'
+    +'<div style="text-align:right">'+kontStavBadge(st)+(it.obchodnik?'<div class="muted" style="font-size:12px;margin-top:6px">'+esc(it.obchodnik.name)+'</div>':'<div style="font-size:12px;margin-top:6px;color:#b06f00">Nepřiřazeno</div>')+(it.nabidka&&it.nabidka.odeslano?'<div style="font-size:11px;color:#1f8a4c;margin-top:3px">✓ Nabídka</div>':'')+'</div>'
+    +'</div>'
+    +(it.zprava?'<div class="muted" style="margin-top:8px;font-style:italic;font-size:13px">„'+esc(it.zprava)+'"</div>':'')
+    +'<div style="margin-top:8px;font-size:12px;color:#8a938a">'+new Date(it.createdAt).toLocaleString('cs-CZ')+' &nbsp;·&nbsp; rozklikněte pro vyřízení a nabídku ›</div>'
+    +'</div>';
+}
+function openKontejnerDetail(id){
+  const it=(KONT_POPT.items||[]).find(x=>x.id===id); if(!it) return;
+  KDET=it;
+  const body=document.getElementById("mujBody"); if(!body) return;
+  const st=it.stav||'nova', isAdmin=!!KONT_POPT.role.isAdmin, stavy=KONT_POPT.stavy||{};
+  const nb=it.nabidka||{};
+  const rows=(nb.radky&&nb.radky.length)?nb.radky:[{popis:(it.typ?('Lodní kontejner '+it.typ):'Lodní kontejner'),pocet:(it.pocet||1),cena:0}];
+  const dph=(nb.dph!=null)?nb.dph:21;
+  let h='<div style="max-width:900px;margin:0 auto;padding:8px 4px 50px">';
+  h+='<button class="btn ghost sm" onclick="showPoptavky()">‹ Zpět na poptávky</button>';
+  h+='<div class="card pad" style="margin-top:12px"><div class="spread" style="align-items:flex-start"><div>'
+    +'<h2 style="margin:0 0 4px">#'+it.cislo+' · '+esc(it.jmeno||'—')+'</h2>'
+    +'<div class="muted" style="font-size:13px">'+[it.firma&&esc(it.firma), it.email&&('✉ <a href="mailto:'+esc(it.email)+'">'+esc(it.email)+'</a>'), it.telefon&&('📞 <a href="tel:'+esc(it.telefon)+'">'+esc(it.telefon)+'</a>')].filter(Boolean).join(' · ')+'</div></div>'
+    +kontStavBadge(st)+'</div>'
+    +'<div style="margin-top:10px;font-size:13.5px;line-height:1.8">'+[it.typ&&('<b>Typ:</b> '+esc(it.typ)), it.rezim&&('<b>Režim:</b> '+esc(it.rezim)), it.pocet&&('<b>Počet:</b> '+esc(String(it.pocet))+' ks'), it.mesto&&('<b>Místo:</b> '+esc(it.mesto))].filter(Boolean).join(' &nbsp;·&nbsp; ')+'</div>'
+    +(it.zprava?'<div style="margin-top:10px;padding:10px 12px;background:#f7f9f5;border-radius:8px;font-size:13.5px">„'+esc(it.zprava)+'"</div>':'')+'</div>';
+  // Vyřídit
+  h+='<div class="card pad" style="margin-top:14px"><h3 style="margin:0 0 10px">Vyřídit poptávku</h3><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">';
+  if(isAdmin){ h+='<label class="muted" style="font-size:12px">Obchodník<select id="kd_ob" style="display:block;margin-top:3px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;min-width:170px"><option value="">— nepřiřazeno —</option>'+(KONT_POPT.employees||[]).map(e=>'<option value="'+esc(e.email)+'"'+(it.obchodnik&&it.obchodnik.email===e.email?' selected':'')+'>'+esc(e.name)+'</option>').join('')+'</select></label>'; }
+  h+='<label class="muted" style="font-size:12px">Stav<select id="kd_st" style="display:block;margin-top:3px;padding:7px 9px;border:1px solid var(--line);border-radius:8px">'+Object.keys(stavy).map(k=>'<option value="'+k+'"'+(k===st?' selected':'')+'>'+esc(stavy[k])+'</option>').join('')+'</select></label>';
+  h+='<label class="muted" style="font-size:12px;flex:1;min-width:170px">Poznámka<input id="kd_nt" placeholder="nepovinné" style="display:block;margin-top:3px;width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px"></label>';
+  h+='<button class="btn sm" onclick="kdSaveStav()">Uložit</button></div></div>';
+  // Nabídka
+  h+='<div class="card pad" style="margin-top:14px"><div class="spread"><h3 style="margin:0">Kalkulace — cenová nabídka</h3>'+(nb.odeslano?'<span class="pill green">✓ Odesláno '+(nb.odeslanoAt?new Date(nb.odeslanoAt).toLocaleDateString('cs-CZ'):'')+'</span>':'')+'</div>';
+  h+='<div style="overflow-x:auto"><table class="grid" style="margin-top:10px;width:100%;min-width:520px"><thead><tr><th style="text-align:left">Položka</th><th style="width:80px">Počet</th><th style="width:120px">Cena/ks</th><th style="width:120px;text-align:right">Řádek</th><th style="width:32px"></th></tr></thead><tbody id="kd_rows"></tbody></table></div>';
+  h+='<button class="btn ghost sm" style="margin-top:8px" onclick="knabAddRow()">+ Přidat položku</button>';
+  h+='<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-top:14px">';
+  h+='<label class="muted" style="font-size:12px">DPH %<input id="kd_dph" type="number" min="0" step="1" value="'+dph+'" oninput="knabRecalc()" style="display:block;margin-top:3px;width:76px;padding:7px 9px;border:1px solid var(--line);border-radius:8px"></label>';
+  h+='<label class="muted" style="font-size:12px">Platnost<input id="kd_plat" value="'+esc(nb.platnost||"14 dní")+'" style="display:block;margin-top:3px;width:120px;padding:7px 9px;border:1px solid var(--line);border-radius:8px"></label>';
+  h+='<div style="margin-left:auto;text-align:right;font-size:13.5px"><div class="muted">Mezisoučet: <b id="kd_sum">0</b></div><div class="muted">DPH: <b id="kd_dphv">0</b></div><div style="font-size:18px;font-weight:800;color:var(--green-d);margin-top:2px">Celkem: <span id="kd_tot">0</span></div></div></div>';
+  h+='<label class="muted" style="font-size:12px;display:block;margin-top:12px">Poznámka do nabídky<textarea id="kd_pozn" rows="2" style="display:block;margin-top:3px;width:100%;padding:9px;border:1px solid var(--line);border-radius:8px">'+esc(nb.poznamka||"")+'</textarea></label>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button class="btn ghost" onclick="knabSave(false)">Uložit nabídku</button><button class="btn" onclick="knabSave(true)"'+(it.email?"":" disabled")+'>✉ Odeslat nabídku klientovi</button></div>';
+  h+='<div class="muted" style="font-size:12px;margin-top:8px">'+(it.email?('Odešle se na '+esc(it.email)):'Poptávka nemá e-mail klienta — nabídku lze jen uložit.')+'</div>';
+  h+='</div></div>';
+  body.innerHTML=h;
+  knabRenderRows(rows);
+  window.scrollTo(0,0);
+}
+function knabRowHtml(r){
+  return '<tr><td><input class="kr-popis" value="'+esc(r.popis||"")+'" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px"></td>'
+    +'<td><input class="kr-pocet" type="number" min="0" step="1" value="'+(r.pocet!=null?r.pocet:"")+'" oninput="knabRecalc()" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;text-align:right"></td>'
+    +'<td><input class="kr-cena" type="number" min="0" step="1" value="'+(r.cena!=null?r.cena:"")+'" oninput="knabRecalc()" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;text-align:right"></td>'
+    +'<td class="kr-radek" style="text-align:right;font-weight:600">0</td>'
+    +'<td style="text-align:center"><button class="btn ghost sm" onclick="knabDelRow(this)" style="padding:3px 8px">✕</button></td></tr>';
+}
+function knabRenderRows(rows){ const tb=document.getElementById('kd_rows'); if(!tb) return; tb.innerHTML=(rows||[]).map(knabRowHtml).join(''); knabRecalc(); }
+function knabAddRow(){ const tb=document.getElementById('kd_rows'); if(!tb) return; tb.insertAdjacentHTML('beforeend', knabRowHtml({popis:'',pocet:1,cena:0})); knabRecalc(); }
+function knabDelRow(btn){ const tr=btn.closest('tr'); if(tr) tr.remove(); knabRecalc(); }
+function fmtKcJs(n){ return (Math.round(n*100)/100).toLocaleString('cs-CZ')+' Kč'; }
+function knabRecalc(){
+  let zaklad=0;
+  Array.from(document.querySelectorAll('#kd_rows tr')).forEach(tr=>{ const pocet=Number(tr.querySelector('.kr-pocet').value)||0, cena=Number(tr.querySelector('.kr-cena').value)||0; const radek=pocet*cena; zaklad+=radek; tr.querySelector('.kr-radek').textContent=fmtKcJs(radek); });
+  const dph=Number((document.getElementById('kd_dph')||{}).value)||0, dphv=zaklad*dph/100;
+  const s=document.getElementById('kd_sum'); if(s) s.textContent=fmtKcJs(zaklad);
+  const d=document.getElementById('kd_dphv'); if(d) d.textContent=fmtKcJs(dphv);
+  const t=document.getElementById('kd_tot'); if(t) t.textContent=fmtKcJs(zaklad+dphv);
+}
+function knabReadRows(){ return Array.from(document.querySelectorAll('#kd_rows tr')).map(tr=>({popis:tr.querySelector('.kr-popis').value.trim(), pocet:Number(tr.querySelector('.kr-pocet').value)||0, cena:Number(tr.querySelector('.kr-cena').value)||0})); }
+async function kdSaveStav(){
+  if(!KDET) return;
+  const b={id:KDET.id};
+  const ob=document.getElementById('kd_ob'); if(ob) b.obchodnik=ob.value;
+  const st=document.getElementById('kd_st'); if(st) b.stav=st.value;
+  const nt=document.getElementById('kd_nt'); if(nt&&nt.value.trim()) b.note=nt.value.trim();
+  try{
+    const r=await fetch('/api/kontejnery/prirad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+    const j=await r.json(); if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; }
+    toast('Uloženo'+(b.obchodnik?' — obchodník informován e-mailem':''));
+    const id=KDET.id; await loadKontejnerPoptavky(); openKontejnerDetail(id);
+  }catch(e){ toast('Chyba: '+e.message); }
+}
+async function knabSave(send){
+  if(!KDET) return;
+  const rows=knabReadRows().filter(r=>r.popis||r.pocet||r.cena);
+  if(!rows.length){ toast('Přidejte alespoň jednu položku nabídky.'); return; }
+  if(send && !KDET.email){ toast('Poptávka nemá e-mail klienta.'); return; }
+  if(send && !confirm('Odeslat cenovou nabídku klientovi na '+KDET.email+'?')) return;
+  const b={id:KDET.id, radky:rows, dph:Number((document.getElementById('kd_dph')||{}).value)||0, poznamka:(document.getElementById('kd_pozn')||{}).value||'', platnost:(document.getElementById('kd_plat')||{}).value||'', send:!!send};
+  try{
+    const r=await fetch('/api/kontejnery/nabidka',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+    const j=await r.json(); if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; }
+    toast(send?'Nabídka odeslána klientovi':'Nabídka uložena');
+    const id=KDET.id; await loadKontejnerPoptavky(); openKontejnerDetail(id);
+  }catch(e){ toast('Chyba: '+e.message); }
 }
 function poptStav(s){
   const m = s==='vyrizeno'?['#eceeea','#777','Vyřízeno']:(s==='vzato'?['#fff3c4','#8a6d00','Vzato']:['#d6f0df','#1f8a4c','Nová']);
@@ -2410,16 +2533,6 @@ function showPozadavky(){
   const body=document.getElementById("mujBody");
   if(!moduleVisible({key:"pozadavky",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/pozadavky" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f6f8f4" title="Požadavky nákupu — E-shop → nákupčí"></iframe>';
-  window.scrollTo(0,0);
-}
-function showKontejnery(){
-  MUJ.view="kontejnery"; renderSidebar();
-  const body=document.getElementById("mujBody");
-  if(!moduleVisible({key:"kontejnery",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
-  body.innerHTML='<div style="padding:10px 22px;background:var(--paper);border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
-    +'<strong>Lodní kontejnery — poptávky</strong>'
-    +'<a class="btn sm ghost" href="/kontejnery" target="_blank" rel="noopener" style="text-decoration:none">🌐 Otevřít veřejný web</a></div>'
-    +'<iframe src="/kontejnery/sprava" style="width:100%;height:calc(100vh - 122px);border:0;display:block;background:#f6f8f4" title="Lodní kontejnery — evidence poptávek"></iframe>';
   window.scrollTo(0,0);
 }
 function showZadaniKonstrukce(){

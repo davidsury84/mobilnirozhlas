@@ -1891,6 +1891,9 @@ const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
 
+  // Klientská doména lodaky.elkoplast.cz (alias na tuto app) — jen prezentace + poptávka, PŘED závorou.
+  if (kontejneryMod && await kontejneryMod.handleClientHost(req, res)) return;
+
   // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
   const invite = inviteVerify(u.query.i || '');
   const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/api/grit', '/api/jss', '/api/tw44'];

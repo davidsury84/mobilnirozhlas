@@ -26,6 +26,8 @@ const urlLib = require('url');
 
 const WEB_FILE = path.join(__dirname, 'kontejnery-web.html');
 const SPRAVA_FILE = path.join(__dirname, 'kontejnery-sprava.html');
+// Klientská doména — alias na TUTÉŽ aplikaci; servíruje jen prezentaci + poptávku (žádný intranet).
+const CLIENT_HOST = (process.env.KONTEJNERY_HOST || 'lodaky.elkoplast.cz').toLowerCase();
 
 const STAVY = {
   nova: 'Nová',
@@ -97,6 +99,27 @@ function mount(host) {
   function baseUrlOf(req) { try { return host.baseUrl(req).replace(/\/$/, ''); } catch (_) { return ''; } }
 
   // ======================================================================
+  //  KLIENTSKÁ DOMÉNA (lodaky.elkoplast.cz) — běží PŘED přihlašovací závorou.
+  //  Na této doméně servírujeme jen prezentační web + příjem poptávky; nic z
+  //  intranetu se sem nedostane (bezpečné oddělení klientů od interní aplikace).
+  // ======================================================================
+  function isClientHost(req) {
+    const h = (req.headers.host || '').toLowerCase().split(':')[0];
+    return h === CLIENT_HOST || h.startsWith('lodaky.');
+  }
+  async function handleClientHost(req, res) {
+    if (!isClientHost(req)) return false;
+    const u = urlLib.parse(req.url, true); const p = u.pathname;
+    if (p === '/healthz') return false; // healthz ať řeší server
+    if (p === '/api/kontejnery/poptavka' && req.method === 'POST') return apiPoptavka(req, res);
+    if (req.method === 'GET') {
+      if (!fs.existsSync(WEB_FILE)) { htmlOut(res, 404, '<h1>Chybí kontejnery-web.html</h1>'); return true; }
+      htmlOut(res, 200, fs.readFileSync(WEB_FILE, 'utf8')); return true;
+    }
+    json(res, 405, { chyba: 'Jen GET.' }); return true;
+  }
+
+  // ======================================================================
   //  ROUTER
   // ======================================================================
   async function handle(req, res) {
@@ -126,6 +149,7 @@ function mount(host) {
       if (p === '/api/kontejnery/me' && req.method === 'GET') return apiMe(req, res);
       if (p === '/api/kontejnery' && req.method === 'GET') return apiList(req, res);
       if (p === '/api/kontejnery/prirad' && req.method === 'POST') return apiPrirad(req, res);
+      if (p === '/api/kontejnery/nabidka' && req.method === 'POST') return apiNabidka(req, res);
       if (p === '/api/kontejnery/nastaveni' && req.method === 'GET') return apiCfgGet(req, res);
       if (p === '/api/kontejnery/nastaveni' && req.method === 'POST') return apiCfgSet(req, res);
     } catch (e) {
@@ -242,6 +266,52 @@ function mount(host) {
     json(res, 200, { ok: true, item: it });
     return true;
   }
+  // ---- kalkulace / nabídka (obchodník sestaví položky + ceny a odešle klientovi) ----
+  function pocitejNabidku(radky, dph) {
+    const r = (Array.isArray(radky) ? radky : []).map(x => {
+      const popis = String((x && x.popis) || '').trim().slice(0, 300);
+      const pocet = Math.max(0, Number(x && x.pocet) || 0);
+      const cena = Math.max(0, Number(x && x.cena) || 0);
+      return { popis, pocet, cena, radek: Math.round(pocet * cena * 100) / 100 };
+    }).filter(x => x.popis || x.radek);
+    const zaklad = Math.round(r.reduce((s, x) => s + x.radek, 0) * 100) / 100;
+    const sazba = Math.max(0, Number(dph) || 0);
+    const dphCastka = Math.round(zaklad * sazba / 100 * 100) / 100;
+    return { radky: r, zaklad, dph: sazba, dphCastka, celkem: Math.round((zaklad + dphCastka) * 100) / 100 };
+  }
+  function fmtKc(n) { return (Math.round(n * 100) / 100).toLocaleString('cs-CZ') + ' Kč'; }
+  async function apiNabidka(req, res) {
+    const me = meOf(req);
+    if (!me.isObchodnik) { json(res, 403, { chyba: 'Nemáte oprávnění.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const db = load();
+    const it = db.items.find(x => x.id === String(b.id || ''));
+    if (!it) { json(res, 404, { chyba: 'Poptávka nenalezena.' }); return true; }
+    const calc = pocitejNabidku(b.radky, b.dph);
+    if (!calc.radky.length) { json(res, 400, { chyba: 'Nabídka nemá žádné položky.' }); return true; }
+    const now = Date.now();
+    const send = !!b.send;
+    it.nabidka = { radky: calc.radky, zaklad: calc.zaklad, dph: calc.dph, dphCastka: calc.dphCastka, celkem: calc.celkem, mena: 'Kč', poznamka: String(b.poznamka || '').trim().slice(0, 2000), platnost: String(b.platnost || '').trim().slice(0, 60), by: { email: me.email, name: me.name }, updatedAt: now, odeslano: it.nabidka && it.nabidka.odeslano || false, odeslanoAt: it.nabidka && it.nabidka.odeslanoAt || null };
+    let odeslano = false;
+    if (send) {
+      if (!it.email) { json(res, 400, { chyba: 'Poptávka nemá e-mail klienta — nabídku nelze odeslat.' }); return true; }
+      const radkyText = calc.radky.map(r => '• ' + r.popis + '  —  ' + r.pocet + ' × ' + fmtKc(r.cena) + ' = ' + fmtKc(r.radek)).join('\n');
+      const text = 'Dobrý den' + (it.jmeno ? ', ' + it.jmeno : '') + ',\n\nděkujeme za vaši poptávku lodního kontejneru. Zasíláme nezávaznou cenovou nabídku:\n\n'
+        + radkyText + '\n\nMezisoučet: ' + fmtKc(calc.zaklad) + '\nDPH ' + calc.dph + ' %: ' + fmtKc(calc.dphCastka) + '\nCelkem: ' + fmtKc(calc.celkem) + '\n'
+        + (it.nabidka.platnost ? '\nPlatnost nabídky: ' + it.nabidka.platnost + '\n' : '')
+        + (it.nabidka.poznamka ? '\n' + it.nabidka.poznamka + '\n' : '')
+        + '\nV případě zájmu nebo dotazů nás neváhejte kontaktovat.\n\nS pozdravem\n' + (me.name || 'ELKOPLAST CZ') + '\nELKOPLAST CZ, s.r.o.';
+      await notify(it.email, 'Nabídka lodního kontejneru — ELKOPLAST CZ (poptávka #' + it.cislo + ')', text);
+      it.nabidka.odeslano = true; it.nabidka.odeslanoAt = now;
+      it.stav = 'nabidka'; odeslano = true;
+    }
+    it.updatedAt = now; it.historie = it.historie || [];
+    it.historie.push({ stav: it.stav, note: (send ? 'Nabídka odeslána klientovi' : 'Nabídka uložena') + ' (' + fmtKc(calc.celkem) + ')', by: { email: me.email, name: me.name }, at: now });
+    save(db);
+    logAct('kontejnery', { email: me.email, name: me.name }, 'Poptávka #' + it.cislo + ': ' + (send ? 'nabídka odeslána' : 'nabídka uložena') + ' ' + fmtKc(calc.celkem));
+    json(res, 200, { ok: true, odeslano, item: it });
+    return true;
+  }
   function apiCfgGet(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
     json(res, 200, { notify: load().config.notify, employees: employeesForPicker() });
@@ -264,7 +334,7 @@ function mount(host) {
     return true;
   }
 
-  return { handle, isHandler };
+  return { handle, handleClientHost, isHandler };
 }
 
 module.exports = { mount };
