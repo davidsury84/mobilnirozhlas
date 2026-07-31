@@ -2923,7 +2923,7 @@ const server = http.createServer(async (req, res) => {
       if (!allowed) return send(res, 403, '<h1>Přístup k nacenění nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!LODAKY_APP_URL) return send(res, 200, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Aplikace lodních kontejnerů zatím není napojena. Nastavte proměnnou <code>LODAKY_APP_URL</code> na adresu nasazené aplikace.</p>', { 'Content-Type': 'text/html; charset=utf-8' });
       const id = encodeURIComponent(u.query.id || '');
-      let target = LODAKY_APP_URL + '/nabidka?id=' + id;
+      let target = LODAKY_APP_URL + '/kalkulacka?id=' + id;
       if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += '&sso=' + encodeURIComponent(tok); }
       res.writeHead(302, { 'Location': target }); return res.end();
     }
