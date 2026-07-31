@@ -55,9 +55,34 @@ function mount(host) {
     catch (_) { db = { items: [], seq: 0 }; }
     if (!db.config) db.config = { notify: [] };
     if (!Array.isArray(db.config.notify)) db.config.notify = [];
+    if (!Array.isArray(db.config.fotky)) db.config.fotky = [];
     return db;
   }
   function save(db) { try { fs.writeFileSync(DATA_F, JSON.stringify(db, null, 2)); } catch (e) { console.error('[kontejnery] zápis selhal:', e.message); } }
+
+  // ---- fotky na veřejný web (banner + galerie) — nahrává správce z intranetu ----
+  const FOTKY_DIR = path.join(host.dataDir || __dirname, 'kontejnery-fotky');
+  try { if (!fs.existsSync(FOTKY_DIR)) fs.mkdirSync(FOTKY_DIR, { recursive: true }); } catch (_) {}
+  const FOTO_EXT = { 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  const FOTO_CT = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+  function saveFotka(dataUrl) {
+    const m = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
+    if (!m) return null;
+    const buf = Buffer.from(m[2], 'base64');
+    if (!buf.length || buf.length > 6e6) return null;
+    const name = crypto.randomBytes(8).toString('hex') + '.' + (FOTO_EXT[m[1]] || 'jpg');
+    try { fs.writeFileSync(path.join(FOTKY_DIR, name), buf); return name; } catch (_) { return null; }
+  }
+  function fotkySeznam() { return (load().config.fotky || []).map(f => (typeof f === 'string' ? { file: f, popis: '' } : f)).filter(f => f && f.file); }
+  function serveFotka(res, name) {
+    const safe = path.basename(String(name || ''));
+    const fp = path.join(FOTKY_DIR, safe);
+    if (!safe || !fs.existsSync(fp)) { host.send(res, 404, 'Nenalezeno', { 'Content-Type': 'text/plain' }); return true; }
+    const ext = (safe.split('.').pop() || '').toLowerCase();
+    try { res.writeHead(200, { 'Content-Type': FOTO_CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' }); res.end(fs.readFileSync(fp)); }
+    catch (_) { host.send(res, 500, 'Chyba', { 'Content-Type': 'text/plain' }); }
+    return true;
+  }
 
   // ---- role ----
   function mods(email) { try { return host.employeeModules(email) || []; } catch (_) { return []; } }
@@ -112,6 +137,8 @@ function mount(host) {
     const u = urlLib.parse(req.url, true); const p = u.pathname;
     if (p === '/healthz') return false; // healthz ať řeší server
     if (p === '/api/kontejnery/poptavka' && req.method === 'POST') return apiPoptavka(req, res);
+    if (p === '/api/kontejnery/fotky' && req.method === 'GET') { json(res, 200, { fotky: fotkySeznam().map(f => ({ url: '/kontejnery/foto/' + f.file, popis: f.popis || '' })) }); return true; }
+    if (p.startsWith('/kontejnery/foto/') && req.method === 'GET') return serveFotka(res, p.slice('/kontejnery/foto/'.length));
     if (req.method === 'GET') {
       if (!fs.existsSync(WEB_FILE)) { htmlOut(res, 404, '<h1>Chybí kontejnery-web.html</h1>'); return true; }
       htmlOut(res, 200, fs.readFileSync(WEB_FILE, 'utf8')); return true;
@@ -133,6 +160,9 @@ function mount(host) {
       htmlOut(res, 200, fs.readFileSync(WEB_FILE, 'utf8')); return true;
     }
     if (p === '/api/kontejnery/poptavka' && req.method === 'POST') return apiPoptavka(req, res);
+    // veřejné fotky pro prezentační web (banner + galerie)
+    if (p === '/api/kontejnery/fotky' && req.method === 'GET') { json(res, 200, { fotky: fotkySeznam().map(f => ({ url: '/kontejnery/foto/' + f.file, popis: f.popis || '' })) }); return true; }
+    if (p.startsWith('/kontejnery/foto/') && req.method === 'GET') return serveFotka(res, p.slice('/kontejnery/foto/'.length));
 
     // -------- INTERNÍ: evidence + přiřazení (vyžaduje přístup) --------
     const me = meOf(req);
@@ -152,6 +182,7 @@ function mount(host) {
       if (p === '/api/kontejnery/nabidka' && req.method === 'POST') return apiNabidka(req, res);
       if (p === '/api/kontejnery/nastaveni' && req.method === 'GET') return apiCfgGet(req, res);
       if (p === '/api/kontejnery/nastaveni' && req.method === 'POST') return apiCfgSet(req, res);
+      if (p === '/api/kontejnery/fotky' && req.method === 'POST') return apiFotky(req, res);
     } catch (e) {
       console.error('[kontejnery] chyba obsluhy:', e);
       json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true;
@@ -310,6 +341,32 @@ function mount(host) {
     save(db);
     logAct('kontejnery', { email: me.email, name: me.name }, 'Poptávka #' + it.cislo + ': ' + (send ? 'nabídka odeslána' : 'nabídka uložena') + ' ' + fmtKc(calc.celkem));
     json(res, 200, { ok: true, odeslano, item: it });
+    return true;
+  }
+  async function apiFotky(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku (fotka může být příliš velká, max ~5 MB).' }); return true; }
+    const db = load();
+    if (b.image) {
+      const name = saveFotka(b.image);
+      if (!name) { json(res, 400, { chyba: 'Nepodařilo se uložit — jen JPG/PNG/WEBP do 6 MB.' }); return true; }
+      db.config.fotky.push({ file: name, popis: String(b.popis || '').trim().slice(0, 120) });
+      save(db);
+      logAct('kontejnery', meOf(req), 'Přidána fotka na web');
+    } else if (b.remove) {
+      const rm = path.basename(String(b.remove));
+      db.config.fotky = (db.config.fotky || []).filter(f => (typeof f === 'string' ? f : f.file) !== rm);
+      save(db);
+      try { fs.unlinkSync(path.join(FOTKY_DIR, rm)); } catch (_) {}
+      logAct('kontejnery', meOf(req), 'Odebrána fotka z webu');
+    } else if (Array.isArray(b.order)) {
+      const cur = fotkySeznam(); const byFile = {}; cur.forEach(f => { byFile[f.file] = f; });
+      const seen = {}; const next = [];
+      b.order.forEach(x => { const f = path.basename(String(x)); if (byFile[f] && !seen[f]) { seen[f] = 1; next.push(byFile[f]); } });
+      cur.forEach(f => { if (!seen[f.file]) next.push(f); });
+      db.config.fotky = next; save(db);
+    } else { json(res, 400, { chyba: 'Nic k provedení.' }); return true; }
+    json(res, 200, { ok: true, fotky: fotkySeznam().map(f => ({ url: '/kontejnery/foto/' + f.file, popis: f.popis || '' })) });
     return true;
   }
   function apiCfgGet(req, res) {

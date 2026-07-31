@@ -1909,7 +1909,7 @@ const server = http.createServer(async (req, res) => {
   // Veřejné cesty klientské kalkulačky překladiště (lead-gen mimo přihlašovací závoru): stránka + odeslání leadu.
   const prekladPublic = p === '/preklad' || p === '/preklad.html' || (p === '/api/preklad-lead' && req.method === 'POST');
   // Veřejné cesty modulu Lodní kontejnery: prezentační web + odeslání poptávky (bez přihlášení).
-  const kontejneryPublic = p === '/kontejnery' || (p === '/api/kontejnery/poptavka' && req.method === 'POST');
+  const kontejneryPublic = p === '/kontejnery' || (p === '/api/kontejnery/poptavka' && req.method === 'POST') || (p === '/api/kontejnery/fotky' && req.method === 'GET') || (p.startsWith('/kontejnery/foto/') && req.method === 'GET');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });

@@ -118,6 +118,15 @@
   .ok{background:#e7f5e9;border:1px solid #bfe3c4;color:#1f5e22;border-radius:12px;padding:18px;font-weight:600;text-align:center}
   .err{background:#fbecea;border:1px solid #e6bdb6;color:#8a2b20;border-radius:11px;padding:11px 13px;font-size:14px;margin-bottom:12px;display:none}
 
+  /* galerie */
+  .gal{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:820px){.gal{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.gal{grid-template-columns:1fr}}
+  .gitem{margin:0;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);background:#dfe4dc;position:relative}
+  .gitem img{width:100%;height:240px;object-fit:cover;display:block;transition:transform .4s}
+  .gitem:hover img{transform:scale(1.05)}
+  .gitem figcaption{position:absolute;left:0;right:0;bottom:0;padding:12px;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;font-size:13px;font-weight:600}
+
   /* footer */
   footer{background:var(--steel-d);color:rgba(255,255,255,.72);padding:44px 0 34px;font-size:14px}
   footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
@@ -298,6 +307,16 @@
   </div>
 </section>
 
+<!-- GALERIE (naplní se fotkami z intranetu; skrytá, dokud nejsou) -->
+<section id="galSection" class="sec-bg" style="display:none">
+  <div class="wrap center" style="margin-bottom:34px">
+    <span class="eyebrow">V praxi</span>
+    <h2>Naše kontejnery v akci</h2>
+    <p class="lead">Ukázky reálného nasazení — sklad, kancelář, prodejní stánek i staveniště.</p>
+  </div>
+  <div class="wrap"><div class="gal" id="galGrid"></div></div>
+</section>
+
 <!-- POPTÁVKA -->
 <section id="poptavka" class="formsec">
   <div class="wrap">
@@ -385,6 +404,21 @@
       .catch(function(e){ showErr('Spojení selhalo: '+e.message); btn.disabled=false; btn.textContent='Odeslat poptávku'; });
   });
   function showErr(m){ errB.textContent=m; errB.style.display='block'; }
+
+  // Fotky z intranetu → hero (velká fotka) + galerie „V praxi". Když žádné nejsou, zůstane ilustrace.
+  fetch('/api/kontejnery/fotky',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+    var f=(j&&j.fotky)||[]; if(!f.length) return;
+    var art=document.querySelector('.hero .art');
+    if(art){ art.innerHTML='<img src="'+f[0].url+'" alt="Lodní kontejner ELKOPLAST" style="width:100%;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.42)">'; }
+    var g=document.getElementById('galGrid'), sec=document.getElementById('galSection');
+    if(g&&sec&&f.length){
+      g.innerHTML=f.map(function(x){
+        var cap=(x.popis||'').replace(/[<>]/g,'');
+        return '<figure class="gitem"><img src="'+x.url+'" alt="'+(cap||'Lodní kontejner v praxi').replace(/"/g,'&quot;')+'" loading="lazy">'+(cap?'<figcaption>'+cap+'</figcaption>':'')+'</figure>';
+      }).join('');
+      sec.style.display='';
+    }
+  }).catch(function(){});
 })();
 </script>
 </body>
