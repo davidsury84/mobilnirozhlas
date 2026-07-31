@@ -53,6 +53,7 @@ function s300(v) { return String(v == null ? '' : v).trim().slice(0, 300); }
 
 function mount(host) {
   const DATA_F = path.join(host.dataDir || __dirname, 'mobilni-lisy-prihlasky.json');
+  const BG_FILE = path.join(host.dataDir || __dirname, 'mobilni-lisy-pozadi.bin'); // obrázek pozadí dotazníku (na volume, ne v JSON)
 
   const json = (res, code, obj) => host.send(res, code, obj, { 'Cache-Control': 'no-store' });
   const htmlOut = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -72,6 +73,53 @@ function mount(host) {
     return db;
   }
   function save(db) { try { fs.writeFileSync(DATA_F, JSON.stringify(db, null, 2)); } catch (e) { console.error('[mobilni-lisy] zápis selhal:', e.message); } }
+
+  // ---- veřejná stránka dotazníku (s volitelným pozadím lisu) ----
+  function serveWeb(res) {
+    if (!fs.existsSync(WEB_FILE)) { htmlOut(res, 404, '<h1>Chybí mobilni-lisy-web.html</h1>'); return true; }
+    let html = fs.readFileSync(WEB_FILE, 'utf8');
+    try {
+      const db = load();
+      if (db.config && db.config.bg && fs.existsSync(BG_FILE)) {
+        // jemné pozadí lisu za formulářem (přes světlý překryv, aby formulář zůstal čitelný)
+        const style = '<style id="lisBg">.formwrap{background:linear-gradient(160deg,rgba(238,245,234,.80),rgba(245,248,242,.84)),url("/api/mobilni-lisy/pozadi") center/cover no-repeat}</style>';
+        html = html.replace('</head>', style + '</head>');
+      }
+    } catch (_) {}
+    htmlOut(res, 200, html);
+    return true;
+  }
+  function serveBg(res) {
+    try {
+      const db = load();
+      if (!db.config || !db.config.bg || !fs.existsSync(BG_FILE)) { json(res, 404, { chyba: 'Bez pozadí.' }); return true; }
+      const buf = fs.readFileSync(BG_FILE);
+      res.writeHead(200, { 'Content-Type': db.config.bg.type || 'image/jpeg', 'Cache-Control': 'public, max-age=300' });
+      res.end(buf);
+    } catch (_) { json(res, 404, { chyba: 'Bez pozadí.' }); }
+    return true;
+  }
+  async function apiBgSet(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const m = /^data:(image\/(?:jpeg|png|webp));base64,([\s\S]+)$/.exec(String(b.dataUrl || ''));
+    if (!m) { json(res, 400, { chyba: 'Nahrajte obrázek ve formátu JPG, PNG nebo WEBP.' }); return true; }
+    let buf; try { buf = Buffer.from(m[2], 'base64'); } catch (_) { json(res, 400, { chyba: 'Neplatný obrázek.' }); return true; }
+    if (!buf.length || buf.length > 4 * 1024 * 1024) { json(res, 400, { chyba: 'Obrázek musí být do 4 MB.' }); return true; }
+    try { fs.writeFileSync(BG_FILE, buf); } catch (_) { json(res, 500, { chyba: 'Uložení obrázku selhalo.' }); return true; }
+    const db = load(); db.config.bg = { type: m[1] }; save(db);
+    logAct('mobilni-lisy', meOf(req), 'Nastaveno pozadí dotazníku');
+    json(res, 200, { ok: true });
+    return true;
+  }
+  function apiBgDel(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    try { if (fs.existsSync(BG_FILE)) fs.unlinkSync(BG_FILE); } catch (_) {}
+    const db = load(); if (db.config) db.config.bg = null; save(db);
+    logAct('mobilni-lisy', meOf(req), 'Odebráno pozadí dotazníku');
+    json(res, 200, { ok: true });
+    return true;
+  }
 
   // Při prvním startu nasměruj nové přihlášky na obchodníka „Horálek" (dle portfolia),
   // pokud správce zatím nikoho nenastavil. Poté už do seznamu nesahá (respektuje volbu správce).
@@ -154,10 +202,8 @@ function mount(host) {
     const u = urlLib.parse(req.url, true); const p = u.pathname;
     if (p === '/healthz') return false; // healthz ať řeší server
     if (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') return apiPrihlaska(req, res);
-    if (req.method === 'GET') {
-      if (!fs.existsSync(WEB_FILE)) { htmlOut(res, 404, '<h1>Chybí mobilni-lisy-web.html</h1>'); return true; }
-      htmlOut(res, 200, fs.readFileSync(WEB_FILE, 'utf8')); return true;
-    }
+    if (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET') return serveBg(res);
+    if (req.method === 'GET') return serveWeb(res);
     json(res, 405, { chyba: 'Jen GET.' }); return true;
   }
 
@@ -169,11 +215,9 @@ function mount(host) {
     const p = u.pathname;
     if (p !== '/mobilni-lisy' && !p.startsWith('/mobilni-lisy/') && !p.startsWith('/api/mobilni-lisy')) return false;
 
-    // -------- VEŘEJNÉ: prezentační web + odeslání dotazníku --------
-    if ((p === '/mobilni-lisy' || p === '/mobilni-lisy/') && req.method === 'GET') {
-      if (!fs.existsSync(WEB_FILE)) { htmlOut(res, 404, '<h1>Chybí mobilni-lisy-web.html</h1>'); return true; }
-      htmlOut(res, 200, fs.readFileSync(WEB_FILE, 'utf8')); return true;
-    }
+    // -------- VEŘEJNÉ: prezentační web + odeslání dotazníku + obrázek pozadí --------
+    if ((p === '/mobilni-lisy' || p === '/mobilni-lisy/') && req.method === 'GET') return serveWeb(res);
+    if (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET') return serveBg(res);
     if (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') return apiPrihlaska(req, res);
 
     // -------- INTERNÍ: evidence + přiřazení (vyžaduje přístup) --------
@@ -192,6 +236,8 @@ function mount(host) {
       if (p === '/api/mobilni-lisy/prirad' && req.method === 'POST') return apiPrirad(req, res);
       if (p === '/api/mobilni-lisy/nastaveni' && req.method === 'GET') return apiCfgGet(req, res);
       if (p === '/api/mobilni-lisy/nastaveni' && req.method === 'POST') return apiCfgSet(req, res);
+      if (p === '/api/mobilni-lisy/pozadi' && req.method === 'POST') return apiBgSet(req, res);
+      if (p === '/api/mobilni-lisy/pozadi' && req.method === 'DELETE') return apiBgDel(req, res);
     } catch (e) {
       console.error('[mobilni-lisy] chyba obsluhy:', e);
       json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true;
@@ -261,7 +307,7 @@ function mount(host) {
     const me = meOf(req);
     const db = load();
     const items = db.items.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map(decorate);
-    json(res, 200, { items, stavy: STAVY, role: { isAdmin: me.isAdmin, isObchodnik: me.isObchodnik }, me: { email: me.email, name: me.name }, employees: employeesForPicker(), notify: db.config.notify, report: db.config.report });
+    json(res, 200, { items, stavy: STAVY, role: { isAdmin: me.isAdmin, isObchodnik: me.isObchodnik }, me: { email: me.email, name: me.name }, employees: employeesForPicker(), notify: db.config.notify, report: db.config.report, bg: !!(db.config && db.config.bg) });
     return true;
   }
   async function apiPrirad(req, res) {
@@ -313,7 +359,7 @@ function mount(host) {
   function apiCfgGet(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
     const db = load();
-    json(res, 200, { notify: db.config.notify, report: db.config.report, employees: employeesForPicker() });
+    json(res, 200, { notify: db.config.notify, report: db.config.report, employees: employeesForPicker(), bg: !!(db.config && db.config.bg) });
     return true;
   }
   async function apiCfgSet(req, res) {

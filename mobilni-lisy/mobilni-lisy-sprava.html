@@ -64,7 +64,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-var STATE={items:[],role:{},stavy:{},employees:[],notify:[],report:{},filter:''};
+var STATE={items:[],role:{},stavy:{},employees:[],notify:[],report:{},bg:false,filter:''};
 var CFGOPEN=false;
 var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
@@ -76,7 +76,7 @@ async function load(){
     var r=await fetch('/api/mobilni-lisy',{cache:'no-store'});
     if(!r.ok){ $('#list').innerHTML='<div class="card"><b>Chyba '+r.status+'</b></div>'; return; }
     var j=await r.json();
-    STATE.items=j.items||[]; STATE.role=j.role||{}; STATE.stavy=j.stavy||{}; STATE.employees=j.employees||[]; STATE.notify=j.notify||[]; STATE.report=j.report||{};
+    STATE.items=j.items||[]; STATE.role=j.role||{}; STATE.stavy=j.stavy||{}; STATE.employees=j.employees||[]; STATE.notify=j.notify||[]; STATE.report=j.report||{}; STATE.bg=!!j.bg;
     render();
   }catch(e){ $('#list').innerHTML='<div class="card"><b>Chyba</b> — '+esc(e.message)+'</div>'; }
 }
@@ -169,6 +169,12 @@ function renderCfg(){
         +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input id="repEmail" type="email" placeholder="e-mail příjemce" style="min-width:220px;font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:9px"><button class="btn sm" onclick="reportAdd()">Přidat příjemce</button></div>'
         +'<label style="display:flex;gap:8px;align-items:center;margin-top:11px;font-size:13.5px;color:var(--mut)"><input type="checkbox" id="repEnabled" '+(rep.enabled===false?'':'checked')+' onchange="reportEnabled(this.checked)" style="width:16px;height:16px"> Týdenní report zapnutý</label>'
         +'</div>'
+        +'<hr style="border:0;border-top:1px solid #cfe0c2;margin:16px 0">'
+        +'<div><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">🖼️ Pozadí dotazníku</div>'
+        +'<div style="color:var(--mut);font-size:13px;margin-bottom:9px">Obrázek lisu, který se jemně zobrazí za formulářem na veřejné stránce dotazníku. JPG, PNG nebo WEBP do 4 MB.</div>'
+        +(STATE.bg?'<div style="margin-bottom:9px"><img src="/api/mobilni-lisy/pozadi?t='+Date.now()+'" alt="Pozadí dotazníku" style="max-width:300px;width:100%;border:1px solid var(--line);border-radius:10px;display:block"></div>':'<div style="color:var(--mut);font-size:13px;margin-bottom:9px">Zatím bez pozadí — dotazník má výchozí zelené pozadí.</div>')
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="file" id="bgFile" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="bgUpload(this.files[0])"><button class="btn sm" onclick="document.getElementById(\'bgFile\').click()">'+(STATE.bg?'Změnit obrázek':'Nahrát obrázek')+'</button>'+(STATE.bg?'<button class="btn ghost sm" onclick="bgRemove()">Odebrat</button>':'')+'</div>'
+        +'</div>'
       ):'')
     +'</div>';
 }
@@ -198,6 +204,28 @@ function reportAdd(){
 function reportRemove(em){ var to=(STATE.report.to||[]).filter(function(b){return b.email!==em}).map(function(b){return {email:b.email,name:b.name}}); cfgSave({report:{to:to}},'Příjemce reportu odebrán'); }
 function reportWeekday(v){ cfgSave({report:{weekday:+v}},'Den odeslání změněn'); }
 function reportEnabled(on){ cfgSave({report:{enabled:!!on}}, on?'Report zapnutý':'Report vypnutý'); }
+function bgUpload(file){
+  if(!file) return;
+  if(file.size>4*1024*1024){ toast('Obrázek je větší než 4 MB.'); return; }
+  var rd=new FileReader();
+  rd.onload=async function(){
+    try{
+      var r=await fetch('/api/mobilni-lisy/pozadi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl:rd.result})});
+      var j=await r.json().catch(function(){return {};});
+      if(!r.ok){ toast(j.chyba||'Nahrání selhalo.'); return; }
+      STATE.bg=true; renderCfg(); toast('Pozadí nastaveno');
+    }catch(e){ toast('Chyba: '+e.message); }
+  };
+  rd.readAsDataURL(file);
+}
+async function bgRemove(){
+  if(!confirm('Odebrat pozadí dotazníku?')) return;
+  try{
+    var r=await fetch('/api/mobilni-lisy/pozadi',{method:'DELETE'});
+    if(!r.ok){ var j=await r.json().catch(function(){return {};}); toast(j.chyba||'Odebrání selhalo.'); return; }
+    STATE.bg=false; renderCfg(); toast('Pozadí odebráno');
+  }catch(e){ toast('Chyba: '+e.message); }
+}
 
 load();
 </script>
