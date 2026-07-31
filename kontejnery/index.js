@@ -33,6 +33,8 @@ const STAVY = {
 };
 // Typy kontejnerů nabízené ve formuláři (kvůli konzistenci evidence).
 const TYPY = ['20′ skladový', '40′ skladový', '20′ High Cube', '40′ High Cube', 'Chladírenský (reefer)', 'Kancelářský / obytný', 'Na míru / poradit'];
+// Obchodníci, kteří mohou být přiřazeni k poptávce lodních kontejnerů (dohledáni v DB zaměstnanců podle jména).
+const OBCHODNICI_JMENA = ['Jana Rychlíková', 'Josef Beránek'];
 const REZIM = ['Koupě', 'Pronájem', 'Ještě nevím'];
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
@@ -78,6 +80,18 @@ function mount(host) {
     try { const s = host.getState ? host.getState() : null; emps = (s && s.employees) || []; } catch (_) {}
     return emps.map(e => ({ email: (e.email || '').toLowerCase(), name: e.name || e.email || '' }))
       .filter(e => e.email).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  }
+  // Obchodníci pro přiřazení k poptávce = jen jmenovaní (OBCHODNICI_JMENA), dohledaní v DB (celé jméno + e-mail).
+  function normJm(s) { return String(s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, ' ').trim(); }
+  function obchodniciPicker() {
+    const emps = employeesForPicker();
+    const out = [];
+    OBCHODNICI_JMENA.forEach((cil) => {
+      const toks = normJm(cil).split(' ').filter(Boolean);
+      const found = emps.find(e => toks.every(t => normJm(e.name).indexOf(t) >= 0));
+      if (found && !out.some(x => x.email === found.email)) out.push(found);
+    });
+    return out;
   }
 
   // ---- e-mail ----
@@ -183,14 +197,14 @@ function mount(host) {
   // ======================================================================
   function apiMe(req, res) {
     const me = meOf(req);
-    json(res, 200, { email: me.email, name: me.name, isAdmin: me.isAdmin, isObchodnik: me.isObchodnik, stavy: STAVY, typy: TYPY, employees: employeesForPicker() });
+    json(res, 200, { email: me.email, name: me.name, isAdmin: me.isAdmin, isObchodnik: me.isObchodnik, stavy: STAVY, typy: TYPY, employees: obchodniciPicker() });
     return true;
   }
   function apiList(req, res) {
     const me = meOf(req);
     const db = load();
     let items = db.items.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    json(res, 200, { items, stavy: STAVY, role: { isAdmin: me.isAdmin, isObchodnik: me.isObchodnik }, me: { email: me.email, name: me.name }, employees: employeesForPicker(), notify: db.config.notify });
+    json(res, 200, { items, stavy: STAVY, role: { isAdmin: me.isAdmin, isObchodnik: me.isObchodnik }, me: { email: me.email, name: me.name }, employees: obchodniciPicker(), notify: db.config.notify });
     return true;
   }
   async function apiPrirad(req, res) {
