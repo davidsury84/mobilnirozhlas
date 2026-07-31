@@ -280,6 +280,12 @@ const SEED_TYPES = [
   { key: 'su', name: 'SU — kontejner na separovaný sběr', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_SU },
 ];
 
+// ---- Rodiny výrobků (skupiny) — pro přidělování konstruktérů dle skupiny -----
+const TYP_FAM = { dsd: 'abroll', afs: 'abroll', hbs: 'abroll', sth: 'abroll', hbi: 'abroll', lwc: 'abroll', city: 'city', mulda: 'mulda', sld: 'sber', su: 'sber', vany: 'sklad', boxy: 'sklad' };
+const FAM_LABEL = { abroll: 'ABROLL — hákové kontejnery', city: 'CITY — uzavřené městské', mulda: 'MULDA — skipy', sber: 'Separovaný sběr (SLD, SU)', sklad: 'Skladování (boxy, vany)' };
+const FAM_ORDER = ['abroll', 'city', 'mulda', 'sber', 'sklad'];
+function familyOf(typKey) { return TYP_FAM[typKey] || 'abroll'; }
+
 // ---- Číselník druhů práce pro evidenci (seed z reálného deníku konstrukce) --
 // kind: 'zakazka' = produktivní práce na konkrétní zakázce · 'rezie' = režie mimo zakázku
 const SEED_ACTIVITIES = [
@@ -377,6 +383,7 @@ function mount(host) {
     if (typeof d.seq !== 'number') d.seq = 0;
     if (!d.roles || typeof d.roles !== 'object') d.roles = {};
     if (!d.fond || typeof d.fond !== 'object') d.fond = {};      // email -> hodin/týden
+    if (!d.konstrukterGroups || typeof d.konstrukterGroups !== 'object') d.konstrukterGroups = {}; // email -> [rodiny výrobků]; prázdné = všechny
     if (!Array.isArray(d.types) || !d.types.length) d.types = JSON.parse(JSON.stringify(SEED_TYPES));
     // migrace na 6 řad ABROLL: starý jediný typ 'abroll' nahradíme řadami DSD/AFS/…
     if (!d.types.some(t => t.key === 'dsd')) d.types = JSON.parse(JSON.stringify(SEED_TYPES));
@@ -675,6 +682,7 @@ function mount(host) {
       if (p === '/api/konstrukce/notif-read' && req.method === 'POST') return apiNotifRead(req, res);
       if (p === '/api/konstrukce/admin/role' && req.method === 'POST') return apiAdminRole(req, res);
       if (p === '/api/konstrukce/admin/fond' && req.method === 'POST') return apiAdminFond(req, res);
+      if (p === '/api/konstrukce/admin/konstrukter-groups' && req.method === 'POST') return apiAdminKonstrGroups(req, res);
       if (p === '/api/konstrukce/admin/typ' && req.method === 'POST') return apiAdminTyp(req, res);
       if (p === '/api/konstrukce/admin/seed' && req.method === 'POST') return apiAdminSeed(req, res);
       if (p === '/api/konstrukce/admin/settings' && req.method === 'POST') return apiAdminSettings(req, res);
@@ -731,7 +739,8 @@ function mount(host) {
       zakazky: view,
       types: d.types,
       kapacita,
-      konstrukteri: employeesWithRole('konstrukter').map(em => ({ email: em, name: empName(em) })),
+      konstrukteri: employeesWithRole('konstrukter').map(em => ({ email: em, name: empName(em), groups: (d.konstrukterGroups[em] || []) })),
+      families: FAM_ORDER.map(k => ({ key: k, label: FAM_LABEL[k] })),
       strediska: (d.strediska || []).map(s => ({ key: s.key, label: s.label, reditelEmail: s.reditelEmail || '', reditelName: s.reditelEmail ? empName(s.reditelEmail) : '' })),
       adresy: (d.adresy || []).slice().sort((a, b) => a.localeCompare(b, 'cs')),
       roles: (me.isAdmin) ? roleAssignments(d) : undefined,
@@ -764,7 +773,7 @@ function mount(host) {
   // Přiřazení osob k rolím pro roli-centrickou administraci (role → seznam lidí).
   function roleAssignments(d) {
     const by = (role) => Object.keys(d.roles).filter(em => d.roles[em] === role)
-      .map(em => ({ email: em, name: empName(em), fond: d.fond[em] || null }))
+      .map(em => ({ email: em, name: empName(em), fond: d.fond[em] || null, groups: (d.konstrukterGroups[em] || []) }))
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'));
     return { sef: by('sef'), konstrukter: by('konstrukter'), obchodnik: by('obchodnik'), reditel: by('reditel') };
   }
@@ -778,7 +787,7 @@ function mount(host) {
     const myTimer = z.activeTimer && me && z.activeTimer.user === me.email ? z.activeTimer : null;
     return {
       id: z.id, cislo: z.cislo, createdAt: z.createdAt,
-      typKey: z.typKey, typName: t.name,
+      typKey: z.typKey, typName: t.name, family: familyOf(z.typKey), familyLabel: FAM_LABEL[familyOf(z.typKey)] || '',
       zakaznik: z.zakaznik, kontakt: z.kontakt, kontaktEmail: z.kontaktEmail,
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
       params: z.params || {}, dotaznik: z.dotaznik || null, artNo: z.artNo || '',
@@ -1217,6 +1226,19 @@ function mount(host) {
     if (!isNaN(h) && h > 0) d.fond[email] = h; else delete d.fond[email];
     save(d);
     json(res, 200, { ok: true });
+    return true;
+  }
+  // Skupiny výrobků, které konstruktér zpracovává (prázdné = všechny).
+  async function apiAdminKonstrGroups(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const email = String(b.email || '').toLowerCase().trim();
+    if (!email) { json(res, 400, { chyba: 'Chybí e-mail.' }); return true; }
+    const groups = (Array.isArray(b.groups) ? b.groups : []).map(g => String(g)).filter(g => FAM_ORDER.indexOf(g) >= 0);
+    const d = load();
+    if (groups.length) d.konstrukterGroups[email] = groups; else delete d.konstrukterGroups[email];
+    save(d);
+    json(res, 200, { ok: true, groups });
     return true;
   }
   async function apiAdminTyp(req, res) {

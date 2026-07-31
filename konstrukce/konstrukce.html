@@ -846,10 +846,14 @@ function actionsFor(z){
   return h;
 }
 function assignBlock(z){
-  return '<div class="card" style="background:#f3faf5"><b>Přidělit konstruktéra</b>'+recomHint()+
-    '<div class="row" style="margin-top:6px">'+konstrSelect('asg_'+z.id)+'<button class="btn sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přidělit</button></div></div>';
+  return '<div class="card" style="background:#f3faf5"><b>Přidělit konstruktéra</b>'+
+    '<div class="muted" style="font-size:12px;margin-top:2px">skupina výrobku: <b>'+esc(z.familyLabel||'—')+'</b></div>'+
+    recomHint(z.family)+
+    '<div class="row" style="margin-top:6px">'+konstrSelect('asg_'+z.id,z.family)+'<button class="btn sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přidělit</button></div></div>';
 }
-function assignReassign(z){return konstrSelect('asg_'+z.id)+'<button class="btn ghost sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přeřadit</button>'}
+function assignReassign(z){return konstrSelect('asg_'+z.id,z.family)+'<button class="btn ghost sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přeřadit</button>'}
+// konstruktér pokrývá rodinu, pokud nemá skupiny (=všechny) nebo ji má v seznamu
+function konstrCoversFamily(email,family){var c=(D.konstrukteri||[]).find(function(x){return x.email===email});if(!c)return true;return !family||!c.groups||!c.groups.length||c.groups.indexOf(family)>=0;}
 function vyrobaBlock(z,title,inline){
   var isRe=title.indexOf('Přeřadit')>=0;
   var inner=strediskoSelect('str_'+z.id,z.strediskoKey)+'<button class="btn '+(inline?'ghost ':'')+'sm" onclick="prideliStredisko(\''+z.id+'\',\'str_'+z.id+'\')">'+(isRe?'Přeřadit':'Přidělit')+'</button>';
@@ -871,13 +875,16 @@ function predatVyrobe(id){
   if(!s){alert('Vyberte výrobní oblast, do které zakázku předáváte.');return}
   api('/stav','POST',{id:id,action:'predat-vyrobe',stredisko:s}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba.');return}reloadData()});
 }
-function recomHint(){
-  var k=(D.kapacita||[])[0];
+function recomHint(family){
+  var cand=(D.kapacita||[]).filter(function(k){return konstrCoversFamily(k.email,family)});
+  var k=cand[0];
   return k?('<div class="muted" style="font-size:12.5px;margin-top:4px">Doporučeno: <b>'+esc(k.name)+'</b> (nejnižší vytížení '+k.vytizeni+' %)</div>'):'';
 }
-function konstrSelect(id){
+function konstrSelect(id,family){
+  var list=(D.konstrukteri||[]).filter(function(c){return konstrCoversFamily(c.email,family)});
   var opts='<option value="">— vyberte konstruktéra —</option>';
-  (D.konstrukteri||[]).forEach(function(c){opts+='<option value="'+esc(c.email)+'">'+esc(c.name)+'</option>'});
+  list.forEach(function(c){opts+='<option value="'+esc(c.email)+'">'+esc(c.name)+'</option>'});
+  if(!list.length)opts+='<option value="" disabled>(žádný konstruktér pro tuto skupinu — přiřaďte v Role a číselník)</option>';
   return '<select id="'+id+'" style="max-width:280px">'+opts+'</select>';
 }
 function konstrukterBlock(z){
@@ -1536,7 +1543,7 @@ function renderNastaveni(m){
   // — role s výběrem konkrétních osob z databáze —
   h+='<div class="sec">Konstrukce — role</div>';
   h+=roleCard('Šéf konstrukce','sef',R.sef,'Řídí frontu, přiděluje práci, provádí interní kontrolu. Vidí vše v konstrukci.',false);
-  h+=roleCard('Konstruktéři','konstrukter',R.konstrukter,'Zpracovávají přidělené výkresy. U každého lze nastavit týdenní fond hodin pro kapacity.',true);
+  h+=roleCard('Konstruktéři','konstrukter',R.konstrukter,'Zpracovávají přidělené výkresy. U každého nastavte týdenní fond hodin a skupiny výrobků, které dělá (MULDA/CITY apod. tak dostanou své konstruktéry). Při přidělování se nabídnou jen konstruktéři dané skupiny.',true,true);
   h+=roleCard('Obchodníci','obchodnik',R.obchodnik,'Zadávají požadavky, potvrzují výkresy a odesílají náhledy klientům. Všichni s přístupem k modulu Obchod (a lidé z „Rozdělení obchodníků") mají zadávání do konstrukce implicitně — níže přidáváš jen výjimky navíc.',false);
   h+=roleCard('Ředitel (přehledy / KPI)','reditel',R.reditel,'Přístup jen pro čtení k reportům a KPI; příjemce eskalací.',false);
   // — výrobní oblasti + jejich ředitelé —
@@ -1608,16 +1615,32 @@ function personPicker(id,sel,onchange,placeholder){
   emps.forEach(function(e){opts+='<option value="'+esc(e.email)+'"'+(sel===e.email?' selected':'')+'>'+esc(e.name)+'</option>'});
   return '<select id="'+id+'" onchange="'+onchange+'" style="width:100%;max-width:300px">'+opts+'</select>';
 }
-function roleCard(title,role,people,desc,withFond){
+function roleCard(title,role,people,desc,withFond,withGroups){
   var h='<div class="card"><b>'+esc(title)+'</b><p class="muted" style="margin:4px 0 8px">'+esc(desc)+'</p>';
   (people||[]).forEach(function(p){
-    h+='<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap"><div style="min-width:170px"><b>'+esc(p.name)+'</b><div class="sub">'+esc(p.email)+'</div></div>'+
+    h+='<div style="padding:6px 0;border-bottom:1px solid var(--line)">'+
+      '<div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap"><div style="min-width:170px"><b>'+esc(p.name)+'</b><div class="sub">'+esc(p.email)+'</div></div>'+
       (withFond?'<input type="number" style="width:130px" placeholder="fond h/týd" value="'+(p.fond||'')+'" onchange="setFond(\''+esc(p.email)+'\',this.value)">':'')+
-      '<button class="btn ghost sm" onclick="setRole(\''+esc(p.email)+'\',\'\')">Odebrat</button></div>';
+      '<button class="btn ghost sm" onclick="setRole(\''+esc(p.email)+'\',\'\')">Odebrat</button></div>'+
+      (withGroups?groupChecks(p):'')+
+      '</div>';
   });
   if(!people||!people.length)h+='<p class="muted" style="margin:6px 0">Zatím nikdo.</p>';
   h+='<div class="row" style="margin-top:8px">'+personPicker('add_'+role,'','addRolePerson(\''+role+'\',this.value)','+ přidat osobu…')+'</div></div>';
   return h;
+}
+function groupChecks(p){
+  var fams=D.families||[]; var g=p.groups||[];
+  var boxes=fams.map(function(f){
+    var ck=g.indexOf(f.key)>=0?' checked':'';
+    return '<label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#3a4a41"><input type="checkbox" style="width:auto" data-fam="'+esc(f.key)+'"'+ck+' onchange="saveKonstrGroups(\''+esc(p.email)+'\')"> '+esc(f.label)+'</label>';
+  }).join('');
+  return '<div class="kgrp" data-kemail="'+esc(p.email)+'" style="margin-top:7px"><div class="sub" style="margin-bottom:4px">Skupiny výrobků, které zpracovává <span class="muted">(nic zaškrtnuté = všechny)</span>:</div><div class="row" style="gap:8px 16px;flex-wrap:wrap">'+boxes+'</div></div>';
+}
+function saveKonstrGroups(email){
+  var wrap=document.querySelector('.kgrp[data-kemail="'+email+'"]'); if(!wrap)return;
+  var groups=[].slice.call(wrap.querySelectorAll('input[type=checkbox]:checked')).map(function(c){return c.getAttribute('data-fam')});
+  api('/admin/konstrukter-groups','POST',{email:email,groups:groups}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return} reloadData();});
 }
 function addRolePerson(role,email){if(!email)return;setRole(email,role)}
 function setReditel(key,selId){var email=(document.getElementById(selId)||{}).value||'';api('/admin/stredisko','POST',{key:key,reditel:email}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
