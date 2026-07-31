@@ -2911,7 +2911,7 @@ const server = http.createServer(async (req, res) => {
         || (e && kontejneryMod && kontejneryMod.isHandler && kontejneryMod.isHandler(e.email));
       if (!allowed) return send(res, 403, '<h1>Přístup nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!LODAKY_APP_URL) return send(res, 200, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Aplikace lodních kontejnerů zatím není napojena (LODAKY_APP_URL).</p>', { 'Content-Type': 'text/html; charset=utf-8' });
-      let target = LODAKY_APP_URL + '/fotky';
+      let target = LODAKY_APP_URL + '/spravce';
       if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
       res.writeHead(302, { 'Location': target }); return res.end();
     }
