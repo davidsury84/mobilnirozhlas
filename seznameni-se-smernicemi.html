@@ -2298,7 +2298,7 @@ async function showPoptavky(){
   body.innerHTML='<div class="dash-hero"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><h2>Poptávky</h2><p>Klientské poptávky. Rozklikněte poptávku lodního kontejneru pro vyřízení a odeslání cenové nabídky.</p></div><button class="btn sm" onclick="showPoptavky()">↻ Obnovit</button></div></div>'
     +'<h3 style="margin:16px 2px 8px;font-size:16px">🚢 Lodní kontejnery</h3><div id="kontList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin:26px 2px 8px;gap:10px;flex-wrap:wrap"><h3 style="margin:0;font-size:16px">🗜️ Mobilní lisy — přihlášky z dotazníku</h3><a class="btn ghost sm" href="/mobilni-lisy/sprava" target="_blank" rel="noopener">Otevřít plnou správu ↗</a></div><div id="lisList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>'
-    +(showLis?'<h3 style="margin:26px 2px 8px;font-size:16px">🛠️ Kalkulačky lisů (Bramidan / Zentex)</h3><div id="poptList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>':'');
+    +(showLis?'<div style="display:flex;justify-content:space-between;align-items:center;margin:26px 2px 8px;gap:10px;flex-wrap:wrap"><h3 style="margin:0;font-size:16px">🛠️ Kalkulačky lisů (Bramidan / Zentex)</h3><a class="btn ghost sm" href="/poptavky-app" target="_blank" rel="noopener">Otevřít plnou správu ↗</a></div><div id="poptList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>':'');
   await loadKontejnerPoptavky();
   await loadLisPrihlasky();
   if(showLis){
@@ -2447,6 +2447,20 @@ function poptStav(s){
   const m = s==='vyrizeno'?['#eceeea','#777','Vyřízeno']:(s==='vzato'?['#fff3c4','#8a6d00','Vzato']:['#d6f0df','#1f8a4c','Nová']);
   return '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:999px;background:'+m[0]+';color:'+m[1]+'">'+m[2]+'</span>';
 }
+function poptOpenUrl(l){
+  const p=l.params||{};
+  const q=new URLSearchParams();
+  q.set('lead','1');
+  q.set('product', l.page==='zentex'?'zentex':'bramidan');
+  if(p.mode) q.set('mode', p.mode);
+  if(p.tons!=null&&p.tons!=='') q.set('tons', String(p.tons));
+  if(l.company) q.set('company', l.company);
+  if(l.name) q.set('name', l.name);
+  const contact=[l.email,l.phone].filter(Boolean).join(' / ');
+  if(contact) q.set('contact', contact);
+  if(p.materialLabel) q.set('waste', p.materialLabel);
+  return '/poptavky-app?'+q.toString();
+}
 function poptCard(l){
   const p=l.params||{};
   const prod=(l.page==='zentex')?'Zentex':'Bramidan';
@@ -2469,7 +2483,10 @@ function poptCard(l){
     '</div>'+
     ((row1.length||row2.length)?'<div style="margin-top:10px;padding:10px 12px;background:#f7f9f5;border-radius:8px;font-size:13px;line-height:1.7">'+row1.join(' · ')+(row1.length&&row2.length?'<br>':'')+row2.join(' · ')+'</div>':'')+
     (l.message?'<div class="muted" style="margin-top:8px;font-style:italic;font-size:13px">„'+esc(l.message)+'"</div>':'')+
-    '<div style="margin-top:8px;font-size:12px;color:#8a938a">'+((l.timestamp||l.createdAt)?new Date(l.timestamp||l.createdAt).toLocaleString('cs-CZ'):'')+' · '+(l.emailSent?'<span style="color:#1f8a4c;font-weight:600">✓ E-mail odeslán</span>':'<span style="color:#c0392b;font-weight:600">⚠ E-mail neodeslán</span>')+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">'+
+      '<span style="font-size:12px;color:#8a938a">'+((l.timestamp||l.createdAt)?new Date(l.timestamp||l.createdAt).toLocaleString('cs-CZ'):'')+' · '+(l.emailSent?'<span style="color:#1f8a4c;font-weight:600">✓ E-mail odeslán</span>':'<span style="color:#c0392b;font-weight:600">⚠ E-mail neodeslán</span>')+'</span>'+
+      '<a class="btn sm" href="'+poptOpenUrl(l)+'" target="_blank" rel="noopener">Otevřít v Kalkulátoru lisů →</a>'+
+    '</div>'+
   '</div>';
 }
 function showSvozEsa(){

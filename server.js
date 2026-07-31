@@ -2826,13 +2826,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
     }
 
-    // ---- Poptávky (fronta „Nabídky k vyřízení" v nabídkové app): vloženo z intranetu, otevře přímo inbox ----
+    // ---- Poptávky (nabídková app „Kalkulátor lisů"): otevře konkrétní nabídku podle parametrů,
+    //      nebo (bez parametrů) frontu „Nabídky k vyřízení" (inbox). Parametry z URL propíšeme dál. ----
     if (p === '/poptavky-app') {
       const e = empSession(req);
       const mods = e ? (employeeModules(e.email) || []) : [];
       const allowed = isAdmin(req) || mods.indexOf('kalkulace') >= 0 || mods.indexOf('obchod') >= 0 || mods.indexOf('obchodexp') >= 0;
       if (!allowed) return send(res, 403, '<h1>Přístup k Poptávkám nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      let target = NABIDKY_URL.replace(/\/$/, '') + '/?tab=inbox';
+      // Předej průchozí parametry (lead/product/mode/tons/company/…) do nabídkové app; bez nich otevři inbox.
+      const inQ = new URL(req.url, 'http://x').searchParams;
+      inQ.delete('sso');
+      let qs = inQ.toString();
+      if (!qs) qs = 'tab=inbox';
+      let target = NABIDKY_URL.replace(/\/$/, '') + '/?' + qs;
       if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += '&sso=' + encodeURIComponent(tok); }
       res.writeHead(302, { 'Location': target }); return res.end();
     }
