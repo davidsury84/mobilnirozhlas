@@ -538,12 +538,14 @@ function ganttSetup(pd,pa){
     bar(tgt,'Plán (cíl)',totT,'plan')+
     bar(act,'Skutečnost&nbsp;(Ø)',(totA?Math.round(totA*10)/10:(pa.total!=null?pa.total:null)),'act')+
     '</div>';
-  // editovatelná legenda s cílovými dny
+  // legenda s cílovými dny — ODVOZENÉ z lhůt kroků (Postup / Role a číselník), jen pro čtení
+  var STEPS={obchod:'Přidělení',konstrukce:'Zkreslení + Interní kontrola',schvaleni:'Potvrzení + U klienta',vyroba:'Předání + Ve středisku'};
   var leg='<div class="ph-legend">';
   PHASES.forEach(function(p){
     var a=pa[p.k];
     leg+='<div class="ph-item"><div class="nm"><span class="dotc" style="background:'+p.col+'"></span>'+esc(p.lab)+'</div>'+
-      '<div class="ctl"><input id="pd_'+p.k+'" type="number" min="0" value="'+(pd[p.k]!=null?pd[p.k]:'')+'"> <span class="muted">prac. dní (cíl)</span></div>'+
+      '<div class="ctl"><b style="font-size:16px">'+(pd[p.k]!=null?pd[p.k]:'—')+'</b> <span class="muted">prac. dní (cíl)</span></div>'+
+      '<div class="sub">z kroků: '+esc(STEPS[p.k]||'')+'</div>'+
       '<div class="sub">Ø skutečně: '+(a==null?'—':a+' prac. dní')+'</div></div>';
   });
   leg+='</div>';
@@ -553,9 +555,10 @@ function ganttSetup(pd,pa){
 function setupCard(){
   var st=D.settings||{}, pd=D.phaseDays||(st.phaseDays||{}), pa=D.phaseAvg||{};
   var rec=(st.reportRecipients||[]).join(', ');
-  var h='<div class="sec">SET-UP procesu — cílové doby fází</div><div class="card"><p class="muted" style="margin-top:0">Cílové doby jednotlivých fází v <b>pracovních dnech</b> na časové ose (Ganttův graf). <b>Plán (cíl)</b> = co si nastavíte, <b>Skutečnost (Ø)</b> = průměr z historie zakázek.</p>';
+  var refTyp=D.phaseDaysType||'standardní typ';
+  var h='<div class="sec">SET-UP procesu — cílové doby fází</div><div class="card"><p class="muted" style="margin-top:0">Cílové doby fází na časové ose (Ganttův graf). <b>Plán (cíl)</b> se <b>odvozuje z lhůt jednotlivých kroků</b> (Postup zpracování / Role a číselník, dle typu „'+esc(refTyp)+'"), <b>Skutečnost (Ø)</b> = průměr z historie zakázek. Fáze a kroky jsou tak jeden provázaný celek.</p>';
   h+=ganttSetup(pd,pa);
-  h+='<div style="margin-top:14px"><button class="btn sm" onclick="saveSetupDays()">Uložit cílové dny</button></div></div>';
+  h+='<div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="setFilter(\'workflow\')">Upravit lhůty kroků → Postup (schéma)</button><span class="muted" style="font-size:12px">Cílové dny fází zde nejsou samostatně editovatelné — mění se úpravou lhůt kroků.</span></div></div>';
   // --- Notifikace a eskalace (kdy se posílají) ---
   var nf=st.notif||{};
   var dnames=['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota'];
@@ -583,7 +586,6 @@ function saveNotif(){
   var notif={ warnPct:Number(g('nf_warn').value)||80, clientRemind1:Number(g('nf_cr1').value)||0, clientRemind2:Number(g('nf_cr2').value)||0, overdueEmail:g('nf_oe').checked, directorDigest:g('nf_dd').checked };
   api('/admin/settings','POST',{notif:notif}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return} reloadData();});
 }
-function saveSetupDays(){ var pd={}; ['obchod','konstrukce','schvaleni','vyroba'].forEach(function(k){var el=document.getElementById('pd_'+k); if(el)pd[k]=Number(el.value)||0;}); api('/admin/settings','POST',{phaseDays:pd}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba');return} reloadData();}); }
 function saveReport(){ var en=document.getElementById('repEnabled').checked; var rec=(document.getElementById('repRec').value||'').split(/[,;\n]/).map(function(s){return s.trim()}).filter(Boolean); var freq=document.getElementById('repFreq').value; var dow=Number(document.getElementById('repDow').value); api('/admin/settings','POST',{reportEnabled:en,reportRecipients:rec,reportFreq:freq,reportDow:dow}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba');return} reloadData();}); }
 function sendReportNow(){ if(!confirm('Odeslat report příjemcům teď?'))return; api('/admin/report','POST',{}).then(function(o){ if(!o.ok){alert(o.j.chyba||'Chyba');return} var pv=document.getElementById('repPrev'); pv.style.display='block'; pv.textContent=(o.j.text||''); alert('Odesláno '+o.j.sent+' příjemcům.'); }); }
 function previewReport(){ api('/admin/report').then(function(o){ if(!o.ok){alert(o.j.chyba||'Chyba');return} var pv=document.getElementById('repPrev'); pv.style.display='block'; pv.textContent=(o.j.text||''); }); }

@@ -427,6 +427,19 @@ function mount(host) {
     return { obchod: avg(acc.obchod), konstrukce: avg(acc.konstrukce), schvaleni: avg(acc.schvaleni), vyroba: avg(acc.vyroba), total: avg(total),
       n: { obchod: acc.obchod.length, konstrukce: acc.konstrukce.length, schvaleni: acc.schvaleni.length, vyroba: acc.vyroba.length, total: total.length } };
   }
+  // Referenční (standardní) typ pro cílové doby fází na dashboardu.
+  function refType(d) { return (d.types || []).find(t => t.standard) || (d.types || [])[0] || {}; }
+  // Cílové doby fází ODVOZENÉ z per-krokových lhůt typu (jediný zdroj pravdy = Postup / Role a číselník).
+  // Kroky jsou offsety od bodu 0 → konec fáze = nejzazší offset jejích kroků; délka fáze = rozdíl konců.
+  function phaseDaysFromType(t) {
+    t = t || {};
+    const n = v => Math.max(0, Number(v) || 0);
+    const obchodEnd = n(t.lhutaPrideleniDays);
+    const konstrEnd = Math.max(n(t.lhutaZkresleniDays), n(t.lhutaKontrolaDays), obchodEnd);
+    const schvalEnd = Math.max(n(t.lhutaObchodnikDays), n(t.lhutaKlientDays), konstrEnd);
+    const vyrobaEnd = Math.max(n(t.lhutaVyrobaDays), n(t.lhutaStrediskoDays), schvalEnd);
+    return { obchod: obchodEnd, konstrukce: konstrEnd - obchodEnd, schvaleni: schvalEnd - konstrEnd, vyroba: vyrobaEnd - schvalEnd };
+  }
   function isoWeekKey(ts) { const dt = new Date(ts); const day = (dt.getUTCDay() + 6) % 7; const th = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate() - day + 3)); const wk = 1 + Math.round((th - new Date(Date.UTC(th.getUTCFullYear(), 0, 4))) / 604800000); return th.getUTCFullYear() + '-W' + String(wk).padStart(2, '0'); }
   function buildWeeklyReport(d) {
     const now = Date.now();
@@ -434,7 +447,7 @@ function mount(host) {
     const overdue = open.filter(z => semafor(z) === 'red');
     const byPhase = { obchod: 0, konstrukce: 0, schvaleni: 0, vyroba: 0 };
     open.forEach(z => { const ph = PHASE_OF[z.stav]; if (ph) byPhase[ph]++; });
-    const ps = computePhaseStats(d), pd = (d.settings && d.settings.phaseDays) || {};
+    const ps = computePhaseStats(d), pd = phaseDaysFromType(refType(d));
     const pa = (v, tgt) => (v == null ? '\u2014' : v + ' d') + (tgt ? ' (cíl ' + tgt + ' d)' : '');
     let t = 'Týdenní přehled \u2014 Konstrukce (' + fmtDate(now) + ')\n\n';
     t += 'Otevřených zakázek: ' + open.length + '\nPo termínu: ' + overdue.length + '\n\n';
@@ -727,7 +740,8 @@ function mount(host) {
       notifUnread: myNotif.filter(n => !n.read).length,
       now: Date.now(),
       settings: me.isAdmin ? d.settings : undefined,
-      phaseDays: (d.settings && d.settings.phaseDays) || {},
+      phaseDays: phaseDaysFromType(refType(d)),
+      phaseDaysType: refType(d).name || '',
       phaseAvg: computePhaseStats(d),
       phaseLabel: PHASE_LABEL,
     });
@@ -1765,7 +1779,7 @@ function mount(host) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen spravce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
     const d = load(); d.settings = d.settings || {};
-    if (b.phaseDays && typeof b.phaseDays === 'object') { d.settings.phaseDays = d.settings.phaseDays || {}; ['obchod', 'konstrukce', 'schvaleni', 'vyroba'].forEach(k => { if (b.phaseDays[k] != null) d.settings.phaseDays[k] = Math.max(0, Number(b.phaseDays[k]) || 0); }); }
+    // phaseDays se už neukládá — cílové doby fází se odvozují z lhůt kroků (Postup / Role a číselník).
     if (typeof b.reportEnabled === 'boolean') d.settings.reportEnabled = b.reportEnabled;
     if (Array.isArray(b.reportRecipients)) d.settings.reportRecipients = b.reportRecipients.map(e => String(e).trim().toLowerCase()).filter(Boolean);
     if (b.reportFreq === 'daily' || b.reportFreq === 'weekly') d.settings.reportFreq = b.reportFreq;
