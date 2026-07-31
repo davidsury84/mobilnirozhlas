@@ -141,6 +141,7 @@ const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace �
 const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://tridici-linka-production.up.railway.app'; // aplikace „Design třídicí linky" — digitální dvojče (repo tridici-linka-railway); lze přepsat proměnnou
 const TRIDICI_LINKA_APP_FILE = path.join(ROOT, 'design-tridici-linky.html'); // alternativně lokální soubor (stejně jako u Kalkulace-lisy)
 const PREKLADISTE_APP_URL = process.env.PREKLADISTE_APP_URL || ''; // aplikace „Kalkulačka překladiště" — prodejní kalkulačka (repo prekladiste-kalkulacka); doplň URL nasazení
+const LODAKY_APP_URL = (process.env.LODAKY_APP_URL || '').replace(/\/$/, ''); // aplikace „Lodní kontejnery" (repo lodni-kontejnery) — nacenění obchodníka přes SSO
 const PREKLADISTE_APP_FILE = path.join(ROOT, 'kalkulacka-prekladiste.html'); // alternativně lokální soubor
 const PREKLAD_VEREJNY_FILE = path.join(ROOT, 'preklad-verejny.html'); // veřejný klientský funnel (lead-gen kalkulačka překladiště, mimo přihlašovací závoru)
 const KOVOKALK_APP_FILE = path.join(ROOT, 'kalkulacka-kovo.html'); // modul „Kalkulace KOVO" — variabilní kalkulačka nacenění výrobků kovovýroby
@@ -1868,11 +1869,23 @@ let kontejneryMod = null;
 try {
   kontejneryMod = require('./kontejnery').mount({
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
-    dataDir: DATA_DIR,
+    dataDir: DATA_DIR, ssoSecret: SSO_SHARED_SECRET,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'ELKOPLAST — kontejnery', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
   });
 } catch (e) {
   console.error('[kontejnery] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
+// ---- Modul „Mobilní lisy" (mobilní-lisy.cz — veřejný web + dotazník → přihlášky) ----
+let mobilniLisyMod = null;
+try {
+  mobilniLisyMod = require('./mobilni-lisy').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'ELKOPLAST — mobilní lisy', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+  });
+} catch (e) {
+  console.error('[mobilni-lisy] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
 // ---- Modul „Týdenní reporty nákupu" (co zlevnit / co nakoupit — e-maily z dat SMI) ----
@@ -1891,8 +1904,8 @@ const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
 
-  // Klientská doména lodaky.elkoplast.cz (alias na tuto app) — jen prezentace + poptávka, PŘED závorou.
-  if (kontejneryMod && await kontejneryMod.handleClientHost(req, res)) return;
+  // Klientská doména mobilní-lisy.cz (alias na tuto app) — jen prezentace + dotazník, PŘED závorou.
+  if (mobilniLisyMod && await mobilniLisyMod.handleClientHost(req, res)) return;
 
   // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
   const invite = inviteVerify(u.query.i || '');
@@ -1908,8 +1921,10 @@ const server = http.createServer(async (req, res) => {
   const reklamacePublic = p.startsWith('/reklamace/r/') || p.startsWith('/api/reklamace/verejny/');
   // Veřejné cesty klientské kalkulačky překladiště (lead-gen mimo přihlašovací závoru): stránka + odeslání leadu.
   const prekladPublic = p === '/preklad' || p === '/preklad.html' || (p === '/api/preklad-lead' && req.method === 'POST');
-  // Veřejné cesty modulu Lodní kontejnery: prezentační web + odeslání poptávky (bez přihlášení).
-  const kontejneryPublic = p === '/kontejnery' || (p === '/api/kontejnery/poptavka' && req.method === 'POST') || (p === '/api/kontejnery/fotky' && req.method === 'GET') || (p.startsWith('/kontejnery/foto/') && req.method === 'GET');
+  // Server-to-server cesty modulu Lodní kontejnery (Bearer = SSO tajemství) z aplikace lodni-kontejnery.
+  const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST');
+  // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
+  const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
@@ -1971,7 +1986,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -2010,6 +2025,8 @@ const server = http.createServer(async (req, res) => {
     if (pozadavkyMod && await pozadavkyMod.handle(req, res)) return;
     // Modul „Lodní kontejnery" si obslouží vlastní cesty (/kontejnery*, /api/kontejnery*).
     if (kontejneryMod && await kontejneryMod.handle(req, res)) return;
+    // Modul „Mobilní lisy" si obslouží vlastní cesty (/mobilni-lisy*, /api/mobilni-lisy*).
+    if (mobilniLisyMod && await mobilniLisyMod.handle(req, res)) return;
     if (nakupReportMod && await nakupReportMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
@@ -2492,7 +2509,8 @@ const server = http.createServer(async (req, res) => {
       const vacPending = readVac().requests.filter(r => r.status === 'pending' && (isAdmin(req) || (r.approverEmail || '').toLowerCase() === eml)).length;
       const isNakupci = !!(pozadavkyMod && pozadavkyMod.isConfiguredBuyer && pozadavkyMod.isConfiguredBuyer(e.email));
       const isKontejnery = !!(kontejneryMod && kontejneryMod.isHandler && kontejneryMod.isHandler(e.email));
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, heroImage: (readJson(SITE_F, {}).heroImage) || null });
+      const isLisy = !!(mobilniLisyMod && mobilniLisyMod.isHandler && mobilniLisyMod.isHandler(e.email));
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 
     // ---- Aktuality (novinky na intranetu) ----
@@ -2877,6 +2895,18 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- Aplikace modulu Kalkulačka překladiště: za přihlášením, přístup řídí správce (vzor Kalkulace-lisy) ----
+    // Nacenění lodního kontejneru: přesměruje obchodníka do samostatné aplikace se SSO tokenem + id poptávky.
+    if (p === '/kontejnery-nacenit') {
+      const e = empSession(req);
+      const allowed = (e && (employeeModules(e.email).indexOf('obchod') >= 0 || employeeModules(e.email).indexOf('obchodexp') >= 0)) || isAdmin(req)
+        || (e && kontejneryMod && kontejneryMod.isHandler && kontejneryMod.isHandler(e.email));
+      if (!allowed) return send(res, 403, '<h1>Přístup k nacenění nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!LODAKY_APP_URL) return send(res, 200, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Aplikace lodních kontejnerů zatím není napojena. Nastavte proměnnou <code>LODAKY_APP_URL</code> na adresu nasazené aplikace.</p>', { 'Content-Type': 'text/html; charset=utf-8' });
+      const id = encodeURIComponent(u.query.id || '');
+      let target = LODAKY_APP_URL + '/nabidka?id=' + id;
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += '&sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
+    }
     if (p === '/prekladiste-app') {
       const e = empSession(req);
       const allowed = (e && employeeModules(e.email).indexOf('prekladiste') >= 0) || isAdmin(req);
@@ -2943,6 +2973,8 @@ if (require.main === module) {
     setInterval(maybeSendMonthlyReport, 6 * 3600 * 1000);
     // Týdenní reporty nákupu (co zlevnit / co nakoupit) — kontrola při startu a pak po 6 h (pojistka 1×/ISO-týden)
     if (nakupReportMod) { nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 6 * 3600 * 1000); }
+    // Týdenní report přihlášek mobilních lisů (souhrn nových přihlášek z dotazníku) — 1×/ISO-týden.
+    if (mobilniLisyMod) { mobilniLisyMod.tick(); setInterval(() => mobilniLisyMod.tick(), 6 * 3600 * 1000); }
     // Hlídač smluv: denní notifikační běh (stejný 6h interval, vnitřní pojistka na 1×/den)
     if (smlouvyMod) {
       smlouvyMod.tick();

@@ -24,11 +24,6 @@ const path = require('path');
 const crypto = require('crypto');
 const urlLib = require('url');
 
-const WEB_FILE = path.join(__dirname, 'kontejnery-web.html');
-const SPRAVA_FILE = path.join(__dirname, 'kontejnery-sprava.html');
-// Klientská doména — alias na TUTÉŽ aplikaci; servíruje jen prezentaci + poptávku (žádný intranet).
-const CLIENT_HOST = (process.env.KONTEJNERY_HOST || 'lodaky.elkoplast.cz').toLowerCase();
-
 const STAVY = {
   nova: 'Nová',
   vresenu: 'V řešení',
@@ -59,30 +54,6 @@ function mount(host) {
     return db;
   }
   function save(db) { try { fs.writeFileSync(DATA_F, JSON.stringify(db, null, 2)); } catch (e) { console.error('[kontejnery] zápis selhal:', e.message); } }
-
-  // ---- fotky na veřejný web (banner + galerie) — nahrává správce z intranetu ----
-  const FOTKY_DIR = path.join(host.dataDir || __dirname, 'kontejnery-fotky');
-  try { if (!fs.existsSync(FOTKY_DIR)) fs.mkdirSync(FOTKY_DIR, { recursive: true }); } catch (_) {}
-  const FOTO_EXT = { 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-  const FOTO_CT = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
-  function saveFotka(dataUrl) {
-    const m = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
-    if (!m) return null;
-    const buf = Buffer.from(m[2], 'base64');
-    if (!buf.length || buf.length > 6e6) return null;
-    const name = crypto.randomBytes(8).toString('hex') + '.' + (FOTO_EXT[m[1]] || 'jpg');
-    try { fs.writeFileSync(path.join(FOTKY_DIR, name), buf); return name; } catch (_) { return null; }
-  }
-  function fotkySeznam() { return (load().config.fotky || []).map(f => (typeof f === 'string' ? { file: f, popis: '' } : f)).filter(f => f && f.file); }
-  function serveFotka(res, name) {
-    const safe = path.basename(String(name || ''));
-    const fp = path.join(FOTKY_DIR, safe);
-    if (!safe || !fs.existsSync(fp)) { host.send(res, 404, 'Nenalezeno', { 'Content-Type': 'text/plain' }); return true; }
-    const ext = (safe.split('.').pop() || '').toLowerCase();
-    try { res.writeHead(200, { 'Content-Type': FOTO_CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' }); res.end(fs.readFileSync(fp)); }
-    catch (_) { host.send(res, 500, 'Chyba', { 'Content-Type': 'text/plain' }); }
-    return true;
-  }
 
   // ---- role ----
   function mods(email) { try { return host.employeeModules(email) || []; } catch (_) { return []; } }
@@ -128,61 +99,28 @@ function mount(host) {
   //  Na této doméně servírujeme jen prezentační web + příjem poptávky; nic z
   //  intranetu se sem nedostane (bezpečné oddělení klientů od interní aplikace).
   // ======================================================================
-  function isClientHost(req) {
-    const h = (req.headers.host || '').toLowerCase().split(':')[0];
-    return h === CLIENT_HOST || h.startsWith('lodaky.');
-  }
-  async function handleClientHost(req, res) {
-    if (!isClientHost(req)) return false;
-    const u = urlLib.parse(req.url, true); const p = u.pathname;
-    if (p === '/healthz') return false; // healthz ať řeší server
-    if (p === '/api/kontejnery/poptavka' && req.method === 'POST') return apiPoptavka(req, res);
-    if (p === '/api/kontejnery/fotky' && req.method === 'GET') { json(res, 200, { fotky: fotkySeznam().map(f => ({ url: '/kontejnery/foto/' + f.file, popis: f.popis || '' })) }); return true; }
-    if (p.startsWith('/kontejnery/foto/') && req.method === 'GET') return serveFotka(res, p.slice('/kontejnery/foto/'.length));
-    if (req.method === 'GET') {
-      if (!fs.existsSync(WEB_FILE)) { htmlOut(res, 404, '<h1>Chybí kontejnery-web.html</h1>'); return true; }
-      htmlOut(res, 200, fs.readFileSync(WEB_FILE, 'utf8')); return true;
-    }
-    json(res, 405, { chyba: 'Jen GET.' }); return true;
-  }
-
   // ======================================================================
   //  ROUTER
   // ======================================================================
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true);
     const p = u.pathname;
-    if (p !== '/kontejnery' && !p.startsWith('/kontejnery/') && !p.startsWith('/api/kontejnery')) return false;
+    if (!p.startsWith('/api/kontejnery')) return false;
 
-    // -------- VEŘEJNÉ: prezentační web + odeslání poptávky --------
-    if ((p === '/kontejnery' || p === '/kontejnery/') && req.method === 'GET') {
-      if (!fs.existsSync(WEB_FILE)) { htmlOut(res, 404, '<h1>Chybí kontejnery-web.html</h1>'); return true; }
-      htmlOut(res, 200, fs.readFileSync(WEB_FILE, 'utf8')); return true;
-    }
-    if (p === '/api/kontejnery/poptavka' && req.method === 'POST') return apiPoptavka(req, res);
-    // veřejné fotky pro prezentační web (banner + galerie)
-    if (p === '/api/kontejnery/fotky' && req.method === 'GET') { json(res, 200, { fotky: fotkySeznam().map(f => ({ url: '/kontejnery/foto/' + f.file, popis: f.popis || '' })) }); return true; }
-    if (p.startsWith('/kontejnery/foto/') && req.method === 'GET') return serveFotka(res, p.slice('/kontejnery/foto/'.length));
+    // -------- SERVER-TO-SERVER (Bearer = SSO tajemství): z aplikace lodni-kontejnery --------
+    if (p === '/api/kontejnery/ingest' && req.method === 'POST') return apiIngest(req, res);
+    if (p === '/api/kontejnery/detail' && req.method === 'GET') return apiDetail(req, res);
+    if (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') return apiNabidkaExt(req, res);
 
-    // -------- INTERNÍ: evidence + přiřazení (vyžaduje přístup) --------
+    // -------- INTERNÍ: rozdělovník poptávek (vyžaduje přístup obchodníka) --------
     const me = meOf(req);
-    if (!me.isObchodnik) {
-      if (p.startsWith('/api/')) json(res, 403, { chyba: 'K poptávkám kontejnerů nemáte přístup.' });
-      else htmlOut(res, 403, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">K poptávkám kontejnerů nemáte přístup. Přístupy přiděluje správce intranetu.</p>');
-      return true;
-    }
-    if ((p === '/kontejnery/sprava' || p === '/kontejnery/sprava/') && req.method === 'GET') {
-      if (!fs.existsSync(SPRAVA_FILE)) { htmlOut(res, 404, '<h1>Chybí kontejnery-sprava.html</h1>'); return true; }
-      htmlOut(res, 200, fs.readFileSync(SPRAVA_FILE, 'utf8')); return true;
-    }
+    if (!me.isObchodnik) { json(res, 403, { chyba: 'K poptávkám kontejnerů nemáte přístup.' }); return true; }
     try {
       if (p === '/api/kontejnery/me' && req.method === 'GET') return apiMe(req, res);
       if (p === '/api/kontejnery' && req.method === 'GET') return apiList(req, res);
       if (p === '/api/kontejnery/prirad' && req.method === 'POST') return apiPrirad(req, res);
-      if (p === '/api/kontejnery/nabidka' && req.method === 'POST') return apiNabidka(req, res);
       if (p === '/api/kontejnery/nastaveni' && req.method === 'GET') return apiCfgGet(req, res);
       if (p === '/api/kontejnery/nastaveni' && req.method === 'POST') return apiCfgSet(req, res);
-      if (p === '/api/kontejnery/fotky' && req.method === 'POST') return apiFotky(req, res);
     } catch (e) {
       console.error('[kontejnery] chyba obsluhy:', e);
       json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true;
@@ -214,6 +152,9 @@ function mount(host) {
       mesto: String(b.mesto || '').trim().slice(0, 120),
       pocet: (b.pocet === '' || b.pocet == null || isNaN(Number(b.pocet))) ? null : Math.max(1, Math.round(Number(b.pocet))),
       zprava: String(b.zprava || '').trim().slice(0, 4000),
+      cenaOd: (b.cenaOd == null || isNaN(Number(b.cenaOd))) ? null : Math.round(Number(b.cenaOd)),
+      cenaDo: (b.cenaDo == null || isNaN(Number(b.cenaDo))) ? null : Math.round(Number(b.cenaDo)),
+      konfigurace: String(b.konfigurace || '').trim().slice(0, 300) || null,
       stav: 'nova', obchodnik: null,
       createdAt: now, updatedAt: now,
       historie: [{ stav: 'nova', note: 'Poptávka z webu', by: { name: jmeno }, at: now }],
@@ -311,10 +252,32 @@ function mount(host) {
     return { radky: r, zaklad, dph: sazba, dphCastka, celkem: Math.round((zaklad + dphCastka) * 100) / 100 };
   }
   function fmtKc(n) { return (Math.round(n * 100) / 100).toLocaleString('cs-CZ') + ' Kč'; }
-  async function apiNabidka(req, res) {
-    const me = meOf(req);
-    if (!me.isObchodnik) { json(res, 403, { chyba: 'Nemáte oprávnění.' }); return true; }
+  // Bearer ověření (server-to-server z aplikace lodni-kontejnery).
+  function bearerOk(req) {
+    const auth = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!auth || !host.ssoSecret) return false;
+    try { return crypto.timingSafeEqual(Buffer.from(auth), Buffer.from(String(host.ssoSecret))); } catch (_) { return false; }
+  }
+  // Ingest poptávky z klientské aplikace (push).
+  async function apiIngest(req, res) {
+    if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
+    return apiPoptavka(req, res);
+  }
+  // Detail poptávky pro nástroj obchodníka v aplikaci.
+  function apiDetail(req, res) {
+    if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
+    const u = urlLib.parse(req.url, true);
+    const it = load().items.find(x => x.id === String(u.query.id || ''));
+    if (!it) { json(res, 404, { chyba: 'Poptávka nenalezena.' }); return true; }
+    json(res, 200, { item: it, stavy: STAVY }); return true;
+  }
+  // Odeslání nabídky z nástroje obchodníka (aplikace) — počítá, e-mailuje klientovi, aktualizuje poptávku.
+  async function apiNabidkaExt(req, res) {
+    if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    return _applyNabidka(res, b, b.by || {});
+  }
+  async function _applyNabidka(res, b, by) {
     const db = load();
     const it = db.items.find(x => x.id === String(b.id || ''));
     if (!it) { json(res, 404, { chyba: 'Poptávka nenalezena.' }); return true; }
@@ -322,7 +285,8 @@ function mount(host) {
     if (!calc.radky.length) { json(res, 400, { chyba: 'Nabídka nemá žádné položky.' }); return true; }
     const now = Date.now();
     const send = !!b.send;
-    it.nabidka = { radky: calc.radky, zaklad: calc.zaklad, dph: calc.dph, dphCastka: calc.dphCastka, celkem: calc.celkem, mena: 'Kč', poznamka: String(b.poznamka || '').trim().slice(0, 2000), platnost: String(b.platnost || '').trim().slice(0, 60), by: { email: me.email, name: me.name }, updatedAt: now, odeslano: it.nabidka && it.nabidka.odeslano || false, odeslanoAt: it.nabidka && it.nabidka.odeslanoAt || null };
+    const byWho = { email: (by && by.email) || '', name: (by && by.name) || '' };
+    it.nabidka = { radky: calc.radky, zaklad: calc.zaklad, dph: calc.dph, dphCastka: calc.dphCastka, celkem: calc.celkem, mena: 'Kč', poznamka: String(b.poznamka || '').trim().slice(0, 2000), platnost: String(b.platnost || '').trim().slice(0, 60), by: byWho, updatedAt: now, odeslano: it.nabidka && it.nabidka.odeslano || false, odeslanoAt: it.nabidka && it.nabidka.odeslanoAt || null };
     let odeslano = false;
     if (send) {
       if (!it.email) { json(res, 400, { chyba: 'Poptávka nemá e-mail klienta — nabídku nelze odeslat.' }); return true; }
@@ -331,42 +295,16 @@ function mount(host) {
         + radkyText + '\n\nMezisoučet: ' + fmtKc(calc.zaklad) + '\nDPH ' + calc.dph + ' %: ' + fmtKc(calc.dphCastka) + '\nCelkem: ' + fmtKc(calc.celkem) + '\n'
         + (it.nabidka.platnost ? '\nPlatnost nabídky: ' + it.nabidka.platnost + '\n' : '')
         + (it.nabidka.poznamka ? '\n' + it.nabidka.poznamka + '\n' : '')
-        + '\nV případě zájmu nebo dotazů nás neváhejte kontaktovat.\n\nS pozdravem\n' + (me.name || 'ELKOPLAST CZ') + '\nELKOPLAST CZ, s.r.o.';
+        + '\nV případě zájmu nebo dotazů nás neváhejte kontaktovat.\n\nS pozdravem\n' + (byWho.name || 'ELKOPLAST CZ') + '\nELKOPLAST CZ, s.r.o.';
       await notify(it.email, 'Nabídka lodního kontejneru — ELKOPLAST CZ (poptávka #' + it.cislo + ')', text);
       it.nabidka.odeslano = true; it.nabidka.odeslanoAt = now;
       it.stav = 'nabidka'; odeslano = true;
     }
     it.updatedAt = now; it.historie = it.historie || [];
-    it.historie.push({ stav: it.stav, note: (send ? 'Nabídka odeslána klientovi' : 'Nabídka uložena') + ' (' + fmtKc(calc.celkem) + ')', by: { email: me.email, name: me.name }, at: now });
+    it.historie.push({ stav: it.stav, note: (send ? 'Nabídka odeslána klientovi' : 'Nabídka uložena') + ' (' + fmtKc(calc.celkem) + ')', by: byWho, at: now });
     save(db);
-    logAct('kontejnery', { email: me.email, name: me.name }, 'Poptávka #' + it.cislo + ': ' + (send ? 'nabídka odeslána' : 'nabídka uložena') + ' ' + fmtKc(calc.celkem));
+    logAct('kontejnery', byWho, 'Poptávka #' + it.cislo + ': ' + (send ? 'nabídka odeslána' : 'nabídka uložena') + ' ' + fmtKc(calc.celkem));
     json(res, 200, { ok: true, odeslano, item: it });
-    return true;
-  }
-  async function apiFotky(req, res) {
-    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
-    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku (fotka může být příliš velká, max ~5 MB).' }); return true; }
-    const db = load();
-    if (b.image) {
-      const name = saveFotka(b.image);
-      if (!name) { json(res, 400, { chyba: 'Nepodařilo se uložit — jen JPG/PNG/WEBP do 6 MB.' }); return true; }
-      db.config.fotky.push({ file: name, popis: String(b.popis || '').trim().slice(0, 120) });
-      save(db);
-      logAct('kontejnery', meOf(req), 'Přidána fotka na web');
-    } else if (b.remove) {
-      const rm = path.basename(String(b.remove));
-      db.config.fotky = (db.config.fotky || []).filter(f => (typeof f === 'string' ? f : f.file) !== rm);
-      save(db);
-      try { fs.unlinkSync(path.join(FOTKY_DIR, rm)); } catch (_) {}
-      logAct('kontejnery', meOf(req), 'Odebrána fotka z webu');
-    } else if (Array.isArray(b.order)) {
-      const cur = fotkySeznam(); const byFile = {}; cur.forEach(f => { byFile[f.file] = f; });
-      const seen = {}; const next = [];
-      b.order.forEach(x => { const f = path.basename(String(x)); if (byFile[f] && !seen[f]) { seen[f] = 1; next.push(byFile[f]); } });
-      cur.forEach(f => { if (!seen[f.file]) next.push(f); });
-      db.config.fotky = next; save(db);
-    } else { json(res, 400, { chyba: 'Nic k provedení.' }); return true; }
-    json(res, 200, { ok: true, fotky: fotkySeznam().map(f => ({ url: '/kontejnery/foto/' + f.file, popis: f.popis || '' })) });
     return true;
   }
   function apiCfgGet(req, res) {
@@ -391,7 +329,7 @@ function mount(host) {
     return true;
   }
 
-  return { handle, handleClientHost, isHandler };
+  return { handle, isHandler };
 }
 
 module.exports = { mount };
