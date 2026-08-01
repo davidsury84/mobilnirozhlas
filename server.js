@@ -137,6 +137,7 @@ const SMI_APP_FILE = path.join(ROOT, 'SMI_aplikace.html');   // hotová SMI apli
 const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu Kalkulace-lisy (napojí se později)
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
 const LOXXER_KALK_APP_URL = process.env.LOXXER_KALK_APP_URL || 'https://loxxer-kalkulace-production.up.railway.app'; // LOXXER Kalkulátor (Railway); interní nástroj obchodníka na nabídky LOXXER
+const LOXXER_WEB_URL = process.env.LOXXER_WEB_URL || 'https://loxxer-production.up.railway.app'; // Veřejná prezentace LOXXER (Railway); má /admin na správu fotky a textů
 const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
 const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace „Hlídač sortimentu" (repo ranges-watchdog)
 const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://tridici-linka-production.up.railway.app'; // aplikace „Design třídicí linky" — digitální dvojče (repo tridici-linka-railway); lze přepsat proměnnou
@@ -2837,6 +2838,16 @@ const server = http.createServer(async (req, res) => {
       if (!allowed) return send(res, 403, '<h1>Přístup k LOXXER — kalkulace nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       let target = LOXXER_KALK_APP_URL;
       if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += (LOXXER_KALK_APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
+    }
+
+    // ---- LOXXER — správa prezentace (fotka/texty na veřejném webu); bezešvě přes SSO, jen správce nebo osoba s modulem LOXXER-kalkulace ----
+    if (p === '/loxxer-web-admin') {
+      const e = empSession(req);
+      const allowed = isAdmin(req) || (e && employeeModules(e.email).indexOf('loxxerkalk') >= 0);
+      if (!allowed) return send(res, 403, '<h1>Ke správě prezentace LOXXER nemáte přístup.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      let target = LOXXER_WEB_URL.replace(/\/$/, '') + '/admin';
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
       res.writeHead(302, { 'Location': target }); return res.end();
     }
 
