@@ -128,6 +128,8 @@ function mount(host) {
     if (p === '/api/kontejnery/ingest' && req.method === 'POST') return apiIngest(req, res);
     if (p === '/api/kontejnery/detail' && req.method === 'GET') return apiDetail(req, res);
     if (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') return apiNabidkaExt(req, res);
+    if (p === '/api/kontejnery/nastaveni-ext' && req.method === 'GET') return apiCfgGetExt(req, res);
+    if (p === '/api/kontejnery/nastaveni-ext' && req.method === 'POST') return apiCfgSetExt(req, res);
 
     // -------- INTERNÍ: rozdělovník poptávek (vyžaduje přístup obchodníka) --------
     const me = meOf(req);
@@ -355,6 +357,25 @@ function mount(host) {
       out.push({ email, name: (x && x.name) || names[email] || email });
     });
     return out;
+  }
+  // Data konfigurace (sdílené pro session i Bearer/aplikaci).
+  function cfgData() { const db = load(); return { rotace: db.config.rotace, dohled: db.config.dohled, employees: employeesForPicker() }; }
+  function cfgApply(b) {
+    const db = load();
+    if (Array.isArray(b.rotace)) { db.config.rotace = normRecips(b.rotace); db.config.rotaceIdx = 0; }
+    if (Array.isArray(b.dohled)) { db.config.dohled = normRecips(b.dohled); }
+    save(db);
+    return { rotace: db.config.rotace, dohled: db.config.dohled };
+  }
+  // Bearer (server-to-server z aplikace /spravce) — správu obchodníků/notifikací dělá aplikace.
+  function apiCfgGetExt(req, res) { if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; } json(res, 200, cfgData()); return true; }
+  async function apiCfgSetExt(req, res) {
+    if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const out = cfgApply(b);
+    logAct('kontejnery', { name: (b.by && b.by.name) || 'aplikace' }, 'Notifikace poptávek upraveny z aplikace — střídačka: ' + (out.rotace.map(x => x.name).join(', ') || '(nikdo)') + ' · dohled: ' + (out.dohled.map(x => x.name).join(', ') || '(nikdo)'));
+    json(res, 200, { ok: true, rotace: out.rotace, dohled: out.dohled });
+    return true;
   }
   function apiCfgGet(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }

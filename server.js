@@ -1922,7 +1922,7 @@ const server = http.createServer(async (req, res) => {
   // Veřejné cesty klientské kalkulačky překladiště (lead-gen mimo přihlašovací závoru): stránka + odeslání leadu.
   const prekladPublic = p === '/preklad' || p === '/preklad.html' || (p === '/api/preklad-lead' && req.method === 'POST');
   // Server-to-server cesty modulu Lodní kontejnery (Bearer = SSO tajemství) z aplikace lodni-kontejnery.
-  const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST');
+  const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext');
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
 
@@ -2912,7 +2912,7 @@ const server = http.createServer(async (req, res) => {
       if (!allowed) return send(res, 403, '<h1>Přístup nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!LODAKY_APP_URL) return send(res, 200, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Aplikace lodních kontejnerů zatím není napojena (LODAKY_APP_URL).</p>', { 'Content-Type': 'text/html; charset=utf-8' });
       let target = LODAKY_APP_URL + '/spravce';
-      if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
       res.writeHead(302, { 'Location': target }); return res.end();
     }
     // Nacenění lodního kontejneru: přesměruje obchodníka do samostatné aplikace se SSO tokenem + id poptávky.
@@ -2924,7 +2924,7 @@ const server = http.createServer(async (req, res) => {
       if (!LODAKY_APP_URL) return send(res, 200, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Aplikace lodních kontejnerů zatím není napojena. Nastavte proměnnou <code>LODAKY_APP_URL</code> na adresu nasazené aplikace.</p>', { 'Content-Type': 'text/html; charset=utf-8' });
       const id = encodeURIComponent(u.query.id || '');
       let target = LODAKY_APP_URL + '/kalkulacka?id=' + id;
-      if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += '&sso=' + encodeURIComponent(tok); }
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += '&sso=' + encodeURIComponent(tok); }
       res.writeHead(302, { 'Location': target }); return res.end();
     }
     if (p === '/prekladiste-app') {
