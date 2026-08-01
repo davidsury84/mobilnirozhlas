@@ -832,6 +832,7 @@ function mount(host) {
       roles: (me.isAdmin) ? roleAssignments(d) : undefined,
       employees: (me.isAdmin) ? adminEmployees() : undefined,
       workflow: d.workflow,                            // pravidlo toku (graf) — pro schéma i plátno
+      workflowDraft: (me.isAdmin) ? (d.workflowDraft || null) : undefined,  // rozpracovaný koncept plátna
       roleLabels: ROLE_LABELS,
       notif: myNotif.slice(0, 40),
       notifUnread: myNotif.filter(n => !n.read).length,
@@ -1035,7 +1036,8 @@ function mount(host) {
 
     // Brána řízená pravidlem (grafem): akce je dostupná jen tam, kde v aktuálním
     // stavu existuje hrana. Když admin upraví plátno, projeví se to tady.
-    if (!wfActionAllowed(action, z.stav)) {
+    const gedge = wfEdge(action, z.stav);   // hrana pravidla (z výchozího stavu) — pro oznámení dle pravidla
+    if (!gedge) {
       json(res, 400, { chyba: 'Akce „' + action + '" není v tomto kroku (' + ((STAV[z.stav] && STAV[z.stav].label) || z.stav) + ') povolena.' });
       return true;
     }
@@ -1184,6 +1186,18 @@ function mount(host) {
       default: err = 'Neznámá akce „' + action + '".';
     }
     if (err) { json(res, 400, { chyba: err }); return true; }
+    // Oznámení dle pravidla: hrana může mít notify=[role,…] → e-mail + notifikace
+    // všem uvedeným rolím naráz (např. dvě role současně). Doplněk k pevným e-mailům.
+    if (gedge && Array.isArray(gedge.notify) && gedge.notify.length) {
+      const stLbl = (STAV[z.stav] && STAV[z.stav].label) || z.stav;
+      const co = gedge.label || action;
+      const seen = {};
+      gedge.notify.forEach(role => employeesWithRole(role).forEach(em => {
+        if (!em || seen[em]) return; seen[em] = true;
+        notify(d, em, 'Zakázka ' + z.cislo + ' — ' + co + ' (nyní: ' + stLbl + ').', z.id);
+        mail(em, 'Konstrukce · ' + z.cislo + ' · ' + co, 'Zakázka ' + z.cislo + ' (' + z.zakaznik + '): ' + co + '.\nAktuální krok: ' + stLbl + '.');
+      }));
+    }
     save(d);
     json(res, 200, { ok: true });
     return true;
@@ -1345,8 +1359,34 @@ function mount(host) {
   function apiAdminWorkflowGet(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
     const d = load();
-    json(res, 200, { ok: true, workflow: d.workflow, roleLabels: ROLE_LABELS, seed: SEED_WORKFLOW });
+    json(res, 200, { ok: true, workflow: d.workflow, draft: d.workflowDraft || null, roleLabels: ROLE_LABELS, seed: SEED_WORKFLOW });
     return true;
+  }
+  // Sanitizace grafu z plátna (společné pro koncept i publikaci).
+  function cleanWorkflow(wf) {
+    const cleanNodes = (wf.nodes || []).map(n => ({
+      id: String(n.id).slice(0, 40), label: String(n.label || n.id).slice(0, 80),
+      onTurn: n.onTurn ? String(n.onTurn).slice(0, 40) : null,
+      terminal: !!n.terminal, hold: !!n.hold, noSemafor: !!n.noSemafor,
+      phase: n.phase ? String(n.phase).slice(0, 20) : undefined,
+      lhutaKey: n.lhutaKey ? String(n.lhutaKey).slice(0, 40) : undefined,
+      lhutaFrom: n.lhutaFrom === 'step' ? 'step' : undefined,
+      kind: String(n.kind || 'normal').slice(0, 20),
+      x: Math.round(Number(n.x) || 0), y: Math.round(Number(n.y) || 0),
+    }));
+    const cleanEdges = (wf.edges || []).map(e => ({
+      action: String(e.action || '').slice(0, 40),
+      from: e.from === null ? null : String(e.from).slice(0, 40),
+      to: String(e.to || '').slice(0, 40),
+      altTo: e.altTo ? String(e.altTo).slice(0, 40) : undefined,
+      roles: Array.isArray(e.roles) ? e.roles.map(r => String(r).slice(0, 40)) : [],
+      notify: Array.isArray(e.notify) ? e.notify.map(r => String(r).slice(0, 40)) : [],
+      kind: String(e.kind || 'forward').slice(0, 20),
+      source: String(e.source || 'user').slice(0, 20),
+      label: String(e.label || '').slice(0, 80),
+      needNote: !!e.needNote, needPlant: !!e.needPlant, needPdf: !!e.needPdf, needVyrobni: !!e.needVyrobni,
+    })).filter(e => e.action);
+    return { nodes: cleanNodes, edges: cleanEdges, version: (Number(wf.version) || 1) };
   }
   // Validace: musí existovat start (kind='start') i konec (terminal), žádný
   // neterminální stav bez odchozí hrany, hrany musí odkazovat na existující uzly.
@@ -1373,32 +1413,23 @@ function mount(host) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
     const wf = b.workflow;
-    const errv = validateWorkflow(wf);
-    if (errv) { json(res, 400, { chyba: errv }); return true; }
+    if (!wf || typeof wf !== 'object') { json(res, 400, { chyba: 'Chybí pravidlo.' }); return true; }
+    const mode = b.mode === 'draft' ? 'draft' : 'publish';
+    const cleaned = cleanWorkflow(wf);
     const d = load();
-    // sanitizace uzlů (jen povolená pole; souřadnice čísla)
-    const cleanNodes = wf.nodes.map(n => ({
-      id: String(n.id).slice(0, 40), label: String(n.label || n.id).slice(0, 80),
-      onTurn: n.onTurn ? String(n.onTurn).slice(0, 40) : null,
-      terminal: !!n.terminal, hold: !!n.hold, noSemafor: !!n.noSemafor,
-      phase: n.phase ? String(n.phase).slice(0, 20) : undefined,
-      lhutaKey: n.lhutaKey ? String(n.lhutaKey).slice(0, 40) : undefined,
-      lhutaFrom: n.lhutaFrom === 'step' ? 'step' : undefined,
-      kind: String(n.kind || 'normal').slice(0, 20),
-      x: Math.round(Number(n.x) || 0), y: Math.round(Number(n.y) || 0),
-    }));
-    const cleanEdges = wf.edges.map(e => ({
-      action: String(e.action || '').slice(0, 40),
-      from: e.from === null ? null : String(e.from).slice(0, 40),
-      to: String(e.to || '').slice(0, 40),
-      altTo: e.altTo ? String(e.altTo).slice(0, 40) : undefined,
-      roles: Array.isArray(e.roles) ? e.roles.map(r => String(r).slice(0, 40)) : [],
-      kind: String(e.kind || 'forward').slice(0, 20),
-      source: String(e.source || 'user').slice(0, 20),
-      label: String(e.label || '').slice(0, 80),
-      needNote: !!e.needNote, needPlant: !!e.needPlant, needPdf: !!e.needPdf, needVyrobni: !!e.needVyrobni,
-    })).filter(e => e.action);
-    d.workflow = { nodes: cleanNodes, edges: cleanEdges, version: (Number(wf.version) || 1) };
+    if (mode === 'draft') {
+      // průběžný koncept — bez tvrdé validace (může být rozpracovaný), neovlivní běh
+      cleaned.savedAt = Date.now();
+      d.workflowDraft = cleaned;
+      save(d);
+      json(res, 200, { ok: true, draft: true, savedAt: cleaned.savedAt });
+      return true;
+    }
+    // publikace naostro — validace + nasazení do reálného toku, koncept se zahodí
+    const errv = validateWorkflow(cleaned);
+    if (errv) { json(res, 400, { chyba: errv }); return true; }
+    d.workflow = cleaned;
+    delete d.workflowDraft;
     save(d);
     json(res, 200, { ok: true, workflow: d.workflow });
     return true;
