@@ -1396,6 +1396,7 @@ const MUJ_MODS = [
   { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
   { grp:"Kalkulačky" },
   { key:"kalkulace", icon:MUJ_IC.calc, label:"Kalkulace-lisy", gated:true },
+  { key:"loxxerkalk", icon:MUJ_IC.calc, label:"LOXXER — kalkulace", gated:true },
   { key:"svozesa", icon:MUJ_IC.calc, label:"Kalkulačka svoz ESA", gated:true },
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
@@ -1492,7 +1493,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1566,6 +1567,7 @@ function mjGo(key){
   else if(key==="library") showLibrary(null);
   else if(key==="eshop") showEshop();
   else if(key==="kalkulace") showKalkulace();
+  else if(key==="loxxerkalk") showLoxxerKalk();
   else if(key==="poptavky") showPoptavky();
   else if(key==="kontejnerykalk") showKontejneryKalk();
   else if(key==="svozesa") showSvozEsa();
@@ -2288,6 +2290,11 @@ function showKalkulace(){
   const body=document.getElementById("mujBody");
   if((MUJ.modules||[]).indexOf("kalkulace")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/kalkulace-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulace-lisy"></iframe>';
+}
+function showLoxxerKalk(){
+  MUJ.view="loxxerkalk"; renderSidebar();
+  if(!moduleVisible({key:"loxxerkalk",gated:true})){ document.getElementById("mujBody").innerHTML='<div class="card pad" style="margin:26px">K modulu „LOXXER — kalkulace" nemáte přístup. Přiděluje správce.</div>'; return; }
+  document.getElementById("mujBody").innerHTML='<iframe src="/loxxerkalk-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#0e1116" title="LOXXER — kalkulace"></iframe>';
   window.scrollTo(0,0);
 }
 async function showPoptavky(){
@@ -3127,7 +3134,7 @@ function showDashboard(){
     provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
     mainH += '</div>';
   }
-  const kalk = [["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.calc,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.calc,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const kalk = [["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["loxxerkalk","LOXXER — kalkulace",MUJ_IC.calc,"LOXXER — tvorba nabídek"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.calc,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.calc,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(kalk.length){
     mainH += '<div class="dash-sec">Kalkulačky</div><div class="dash-grid">';
     kalk.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
@@ -4206,7 +4213,7 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[

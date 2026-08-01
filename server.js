@@ -136,6 +136,7 @@ load();
 const SMI_APP_FILE = path.join(ROOT, 'SMI_aplikace.html');   // hotová SMI aplikace (modul E-shop)
 const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu Kalkulace-lisy (napojí se později)
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
+const LOXXER_KALK_APP_URL = process.env.LOXXER_KALK_APP_URL || 'https://loxxer-kalkulace-production.up.railway.app'; // LOXXER Kalkulátor (Railway); interní nástroj obchodníka na nabídky LOXXER
 const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
 const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace „Hlídač sortimentu" (repo ranges-watchdog)
 const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://tridici-linka-production.up.railway.app'; // aplikace „Design třídicí linky" — digitální dvojče (repo tridici-linka-railway); lze přepsat proměnnou
@@ -2827,6 +2828,16 @@ const server = http.createServer(async (req, res) => {
         + '<body><div class="c"><h1>🧮 Kalkulace-lisy</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
         + '<p style="margin-top:12px;font-size:13px">Pro napojení vlož soubor <code>kalkulace-lisy.html</code> do projektu, nebo nastav proměnnou <code>KALKULACE_APP_URL</code> na adresu existující aplikace.</p></div></body></html>';
       return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- LOXXER — kalkulace (interní nástroj obchodníka na nabídky LOXXER; iframe + SSO, jako Kalkulace-lisy) ----
+    if (p === '/loxxerkalk-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('loxxerkalk') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k LOXXER — kalkulace nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      let target = LOXXER_KALK_APP_URL;
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += (LOXXER_KALK_APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
     }
 
     // ---- Poptávky (nabídková app „Kalkulátor lisů"): otevře konkrétní nabídku podle parametrů,
