@@ -300,8 +300,10 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .pl-chks label input{width:auto}
 .pl-hint{font-size:11.5px;color:var(--mut);background:#f7faf6;border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.4}
 .pl-del{background:#fdecec;color:var(--red);border:1px solid #f3caca;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;margin-top:12px;width:100%}
-.pl-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin:2px 0 10px}
+.pl-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--mut);margin:2px 0 6px}
+.pl-legend b{color:var(--ink);font-weight:700;margin-right:2px}
 .pl-legend i{display:inline-block;width:22px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.pl-legend-n i{width:13px;height:13px;border-radius:3px}
 </style>
 </head>
 <body>
@@ -740,7 +742,10 @@ function renderPlatno(m){
     '<button class="btn sm ghost" onclick="plSeed()">Obnovit výchozí (seed)</button>'+
     '<button class="btn sm ghost" onclick="plFull()">'+(PL.full?'✕ Zavřít celou obrazovku':'⛶ Celá obrazovka')+'</button>'+
     dirty+'</div>';
-  var legend='<div class="pl-legend">'+
+  var nodeLeg=[['Obchodník','var(--blue)'],['Šéf konstrukce','var(--purple)'],['Konstruktér','#e65100'],['Výkonný ředitel výroby','#00838f'],['Klient','var(--g)'],['Pozastavení','var(--amber)'],['Konec / storno','#546e7a']];
+  var legend='<div class="pl-legend pl-legend-n"><b>Uzly (kdo je na tahu):</b>'+
+    nodeLeg.map(function(k){return '<span><i style="background:'+k[1]+'"></i>'+esc(k[0])+'</span>'}).join('')+'</div>'+
+    '<div class="pl-legend"><b>Šipky (přechody):</b>'+
     PL_EKINDS.map(function(k){return '<span><i style="background:'+plEdgeColor(k[0])+'"></i>'+esc(k[1])+'</span>'}).join('')+'</div>';
   var nodesHtml=(PL.wf.nodes||[]).map(function(n){return plNodeHtml(n)}).join('');
   var stage='<div class="pl-stage" id="plStage"><div class="pl-canvas" id="plCanvas">'+
