@@ -264,6 +264,38 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .tl-n.red b{color:var(--red)}.tl-n.amber b{color:var(--amber)}.tl-n.green b{color:var(--g3)}
 .tl-late{margin-top:10px;display:inline-flex;align-items:center;gap:7px;background:var(--red);color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;line-height:1}
 .tl-late b{font-weight:800}
+/* ---- plátno pravidla toku (workflow editor) ---- */
+.pl-tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.pl-tb .btn{white-space:nowrap}
+.pl-dirty{color:var(--amber);font-weight:700;font-size:12.5px}
+.pl-wrap{display:flex;gap:12px;align-items:flex-start}
+.pl-stage{flex:1;min-width:0;position:relative;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;height:620px}
+.pl-canvas{position:relative;width:1780px;height:560px;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:22px 22px}
+.pl-svg{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.pl-edge{fill:none;stroke-width:2.2;cursor:pointer;pointer-events:stroke}
+.pl-edge-hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer;pointer-events:stroke}
+.pl-elabel{font-size:11px;fill:var(--ink);paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;cursor:pointer;pointer-events:auto}
+.pl-node{position:absolute;width:168px;border-radius:11px;background:#fff;border:2px solid var(--gray);box-shadow:0 2px 7px rgba(0,0,0,.08);user-select:none}
+.pl-node.sel{box-shadow:0 0 0 3px rgba(14,138,67,.35),0 3px 10px rgba(0,0,0,.14)}
+.pl-node .hd{padding:8px 10px;border-radius:9px 9px 0 0;color:#fff;font-weight:800;font-size:12.5px;cursor:grab;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.pl-node .bd{padding:7px 10px 9px;font-size:11.5px;color:var(--mut);line-height:1.35}
+.pl-node .bd b{color:var(--ink)}
+.pl-badge{display:inline-block;font-size:10px;font-weight:700;background:rgba(255,255,255,.25);border-radius:6px;padding:1px 5px}
+.pl-dot{position:absolute;right:-9px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:var(--g);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);cursor:crosshair}
+.pl-dot:hover{background:var(--g3);transform:translateY(-50%) scale(1.15)}
+.pl-insp{width:320px;min-width:320px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;max-height:620px;overflow:auto}
+.pl-insp h3{margin:0 0 10px;font-size:15px}
+.pl-insp label{display:block;font-size:11.5px;color:var(--mut);font-weight:700;margin:9px 0 3px}
+.pl-insp input[type=text],.pl-insp input[type=number],.pl-insp select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit}
+.pl-insp .rowck{display:flex;align-items:center;gap:7px;margin:6px 0;font-size:12.5px;color:var(--ink);font-weight:600}
+.pl-insp .rowck input{width:auto}
+.pl-chks{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.pl-chks label{display:inline-flex;align-items:center;gap:5px;background:#f2f5f0;border:1px solid var(--line);border-radius:7px;padding:4px 8px;margin:0;font-size:12px;color:var(--ink);cursor:pointer}
+.pl-chks label input{width:auto}
+.pl-hint{font-size:11.5px;color:var(--mut);background:#f7faf6;border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.4}
+.pl-del{background:#fdecec;color:var(--red);border:1px solid #f3caca;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;margin-top:12px;width:100%}
+.pl-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut);margin:2px 0 10px}
+.pl-legend i{display:inline-block;width:22px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
 </style>
 </head>
 <body>
@@ -355,7 +387,7 @@ function renderSide(){
   if(ME.isAdmin||ME.role==='sef'){h+='<div class="grp">Konstrukce</div>';h+='<button class="chip'+(FILTER==='kapacity'?' act':'')+'" onclick="setFilter(\'kapacity\')"><span>Kapacity</span></button>';}
   if(ME.isAdmin||ME.role==='reditel'){h+='<button class="chip'+(FILTER==='kpi'?' act':'')+'" onclick="setFilter(\'kpi\')"><span>KPI ředitele</span></button>';}
   if(ME.isAdmin||ME.role==='konstrukter'||ME.role==='sef'||ME.role==='reditel'){h+='<div class="grp">Evidence</div>';h+='<button class="chip'+(FILTER==='evidence'?' act':'')+'" onclick="setFilter(\'evidence\')"><span>Evidence práce</span></button>';}
-  if(ME.isAdmin){h+='<div class="grp">Správa</div>';h+='<button class="chip'+(FILTER==='nastaveni'?' act':'')+'" onclick="setFilter(\'nastaveni\')"><span>Role a číselník</span></button>';}
+  if(ME.isAdmin){h+='<div class="grp">Správa</div>';h+='<button class="chip'+(FILTER==='nastaveni'?' act':'')+'" onclick="setFilter(\'nastaveni\')"><span>Role a číselník</span></button>';h+='<button class="chip'+(FILTER==='platno'?' act':'')+'" onclick="setFilter(\'platno\')"><span>🧩 Pravidlo toku (plátno)</span></button>';}
   document.getElementById('side').innerHTML=h;
 }
 var NAVHIST=[];
@@ -385,6 +417,7 @@ function renderMain(){
   if(FILTER==='kapacity')return renderKapacity(m);
   if(FILTER==='kpi')return renderKpi(m);
   if(FILTER==='workflow')return renderWorkflow(m);
+  if(FILTER==='platno')return renderPlatno(m);
   if(FILTER==='evidence')return renderTimesheet(m);
   if(FILTER==='nastaveni')return renderNastaveni(m);
   var titleMap={mine:'Na tahu u mě',novy:'Nové — rozdělit do závodu',prideleni:'K přidělení konstruktéra',prace:'Ve zkreslení',kontrola:'Interní kontrola',obchodnik:'U obchodníka',klient:'U klienta',schvaleno:'K výrobní dokumentaci',vyroba:'Ve výrobě',red:'Po termínu',open:'Otevřené zakázky',all:'Všechny zakázky'};
@@ -664,6 +697,236 @@ function saveWorkflowDays(){
   var payload={}; for(var k in base)payload[k]=base[k];   // zachovej název, params, dotazník, internalCheck…
   document.querySelectorAll('.wfd').forEach(function(el){ payload[el.getAttribute('data-f')]=Math.max(0,parseInt(el.value,10)||0); });
   api('/admin/typ','POST',payload).then(function(o){ if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return} reloadData(); });
+}
+
+/* ================= PLÁTNO — pravidlo toku (workflow editor) ================= */
+var PL={wf:null,sel:null,dirty:false,conn:null,drag:null};
+var PL_LHUTY=[['','bez termínu'],['lhutaPrideleniDays','Přidělení (od zadání)'],['lhutaZkresleniDays','Zkreslení (od zadání)'],['lhutaKontrolaDays','Kontrola (od zadání)'],['lhutaObchodnikDays','Obchodník (od zadání)'],['lhutaKlientDays','Klient (od zadání)'],['lhutaVyrobaDays','Výrobní dok. (od zadání)'],['lhutaRevizeDays','Revize (od zahájení)']];
+var PL_PHASES=[['','—'],['obchod','Obchod'],['konstrukce','Konstrukce'],['schvaleni','Schválení'],['vyroba','Výroba']];
+var PL_KINDS=[['start','Start (zadání)'],['normal','Běžný krok'],['klient','Klient (veřejný náhled)'],['hold','Pozastavení'],['end','Konec (terminál)']];
+var PL_EKINDS=[['forward','Vpřed'],['reject','Zamítnout / vrátit'],['revize','Revize'],['hold','Pozastavit'],['self','Beze změny stavu'],['klient','Klient'],['system','Systém']];
+function plRoles(){var r=D.roleLabels||{obchodnik:'Obchodník',sef:'Šéf konstrukce',konstrukter:'Konstruktér',reditel:'Ředitel','vykonny-reditel':'Výkonný ředitel výroby',klient:'Klient'};return r;}
+function plRoleLabel(r){return (D.roleLabels&&D.roleLabels[r])||r||'—';}
+function plClone(o){return JSON.parse(JSON.stringify(o))}
+function plNode(id){return (PL.wf.nodes||[]).find(function(n){return n.id===id})}
+function plNodeColor(n){
+  if(n.terminal||n.kind==='end')return '#546e7a';
+  if(n.hold||n.kind==='hold')return 'var(--amber)';
+  var r=n.onTurn;
+  if(n.kind==='klient'||r==='klient')return 'var(--g)';
+  if(r==='sef')return 'var(--purple)';
+  if(r==='konstrukter')return '#e65100';
+  if(r==='obchodnik')return 'var(--blue)';
+  if(r==='vykonny-reditel'||r==='vyrobni-reditel')return '#00838f';
+  return 'var(--gray)';
+}
+function plEdgeColor(k){return {forward:'var(--g)',reject:'var(--red)',revize:'var(--amber)',hold:'#b06f00',self:'var(--gray)',klient:'var(--blue)',system:'#90a4ae'}[k]||'var(--g)'}
+function plInit(){PL.wf=plClone(D.workflow||{nodes:[],edges:[]});PL.sel=null;PL.dirty=false;PL.conn=null;}
+function plDrawable(e){return e.from&&e.from!=='*'&&plNode(e.from)&&e.to&&String(e.to).charAt(0)!=='@'&&plNode(e.to);}
+
+function renderPlatno(m){
+  if(!PL.wf)plInit();
+  var dirty=PL.dirty?'<span class="pl-dirty">● neuložené změny</span>':'';
+  var tb='<div class="pl-tb">'+
+    '<button class="btn sm" onclick="plAddNode()">+ Stav</button>'+
+    '<button class="btn sm" onclick="plSave()">💾 Uložit pravidlo</button>'+
+    '<button class="btn sm ghost" onclick="plReset()">Zahodit změny</button>'+
+    '<button class="btn sm ghost" onclick="plSeed()">Obnovit výchozí (seed)</button>'+
+    dirty+'</div>';
+  var legend='<div class="pl-legend">'+
+    PL_EKINDS.map(function(k){return '<span><i style="background:'+plEdgeColor(k[0])+'"></i>'+esc(k[1])+'</span>'}).join('')+'</div>';
+  var nodesHtml=(PL.wf.nodes||[]).map(function(n){return plNodeHtml(n)}).join('');
+  var stage='<div class="pl-stage" id="plStage"><div class="pl-canvas" id="plCanvas">'+
+    '<svg class="pl-svg" id="plSvg"><defs>'+
+    '<marker id="plArrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="context-stroke"></path></marker>'+
+    '</defs></svg>'+nodesHtml+'</div></div>';
+  m.innerHTML='<div class="head"><h2>Pravidlo toku — plátno</h2></div>'+
+    '<p class="muted" style="margin:0 0 10px">Uzly = stavy zakázky, šipky = přechody. Táhni uzel za hlavičku, spoj uzly tažením ze zeleného kolečka, klikni pro úpravu. Změny se projeví v reálném toku po uložení.</p>'+
+    tb+legend+
+    '<div class="pl-wrap">'+stage+'<div class="pl-insp" id="plInsp"></div></div>'+
+    '<p class="muted" style="margin-top:10px;font-size:12px">Systémové a globální přechody (zadání, pozastavení odkudkoli, storno, přeřazení závodu) se needitují na plátně — jsou pevnou součástí mechaniky.</p>';
+  plWireCanvas();
+  plDrawEdges();
+  plRenderInsp();
+}
+function plNodeHtml(n){
+  var col=plNodeColor(n);
+  var sel=(PL.sel&&PL.sel.t==='node'&&PL.sel.id===n.id)?' sel':'';
+  var sub=[];
+  sub.push('<b>'+esc(plRoleLabel(n.onTurn))+'</b>');
+  if(n.phase)sub.push(esc((PL_PHASES.find(function(p){return p[0]===n.phase})||['',n.phase])[1]));
+  var kindLbl=(PL_KINDS.find(function(k){return k[0]===n.kind})||['','']);
+  var tag=n.terminal?'konec':(n.hold?'pauza':(n.kind==='start'?'start':(n.kind==='klient'?'klient':'')));
+  return '<div class="pl-node'+sel+'" id="pln_'+esc(n.id)+'" data-id="'+esc(n.id)+'" style="left:'+(n.x||20)+'px;top:'+(n.y||20)+'px">'+
+    '<div class="hd" style="background:'+col+'" data-drag="'+esc(n.id)+'"><span>'+esc(n.label||n.id)+'</span>'+(tag?'<span class="pl-badge">'+esc(tag)+'</span>':'')+'</div>'+
+    '<div class="bd">'+sub.join(' · ')+'</div>'+
+    '<div class="pl-dot" data-dot="'+esc(n.id)+'" title="Táhni pro spojení"></div></div>';
+}
+function plNodeAnchor(id,side){
+  var el=document.getElementById('pln_'+id);if(!el)return null;
+  var x=el.offsetLeft,y=el.offsetTop,w=el.offsetWidth,h=el.offsetHeight;
+  if(side==='r')return {x:x+w,y:y+h/2};
+  if(side==='l')return {x:x,y:y+h/2};
+  if(side==='t')return {x:x+w/2,y:y};
+  if(side==='b')return {x:x+w/2,y:y+h};
+  return {x:x+w/2,y:y+h/2};
+}
+function plDrawEdges(){
+  var svg=document.getElementById('plSvg');if(!svg)return;
+  // vyčisti staré cesty (nech defs)
+  Array.prototype.slice.call(svg.querySelectorAll('.pl-edge,.pl-edge-hit,.pl-elabel')).forEach(function(e){e.remove()});
+  (PL.wf.edges||[]).forEach(function(e,i){
+    if(!plDrawable(e))return;
+    var a,b,path;
+    if(e.to===e.from){ // self-smyčka nahoře
+      var t=plNodeAnchor(e.from,'t');if(!t)return;
+      path='M'+(t.x-16)+','+t.y+' C'+(t.x-30)+','+(t.y-46)+' '+(t.x+30)+','+(t.y-46)+' '+(t.x+16)+','+t.y;
+      a={x:t.x-16,y:t.y}; b={x:t.x+16,y:t.y}; var lx=t.x,ly=t.y-40;
+    }else{
+      var s=plNode(e.from),d=plNode(e.to);
+      var down=(d.y||0)>=(s.y||0)-30;
+      a=plNodeAnchor(e.from, ((d.x||0)>=(s.x||0))?'r':'l');
+      b=plNodeAnchor(e.to, ((d.x||0)>=(s.x||0))?'l':'r');
+      if(!a||!b)return;
+      var dx=Math.max(40,Math.abs(b.x-a.x)/2);
+      path='M'+a.x+','+a.y+' C'+(a.x+dx)+','+a.y+' '+(b.x-dx)+','+b.y+' '+b.x+','+b.y;
+      var lx=(a.x+b.x)/2,ly=(a.y+b.y)/2-6;
+    }
+    var col=plEdgeColor(e.kind);
+    var hit=document.createElementNS('http://www.w3.org/2000/svg','path');
+    hit.setAttribute('class','pl-edge-hit');hit.setAttribute('d',path);hit.setAttribute('data-ei',i);
+    hit.addEventListener('click',function(){PL.sel={t:'edge',i:i};plRefresh();});
+    svg.appendChild(hit);
+    var p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('class','pl-edge');p.setAttribute('d',path);p.setAttribute('stroke',col);
+    p.setAttribute('marker-end','url(#plArrow)');
+    if(e.kind==='reject'||e.kind==='revize')p.setAttribute('stroke-dasharray','6 4');
+    if(PL.sel&&PL.sel.t==='edge'&&PL.sel.i===i){p.setAttribute('stroke-width','3.6');}
+    p.addEventListener('click',function(){PL.sel={t:'edge',i:i};plRefresh();});
+    svg.appendChild(p);
+    var lbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('class','pl-elabel');lbl.setAttribute('x',lx);lbl.setAttribute('y',ly);lbl.setAttribute('text-anchor','middle');
+    lbl.textContent=e.label||e.action;
+    lbl.addEventListener('click',function(){PL.sel={t:'edge',i:i};plRefresh();});
+    svg.appendChild(lbl);
+  });
+}
+function plRefresh(){ // překreslí uzly (výběr/barvy), hrany i inspektor bez ztráty PL.wf
+  var canvas=document.getElementById('plCanvas');if(!canvas){renderMain();return}
+  // aktualizuj třídy výběru na uzlech
+  (PL.wf.nodes||[]).forEach(function(n){var el=document.getElementById('pln_'+n.id);if(el)el.className='pl-node'+((PL.sel&&PL.sel.t==='node'&&PL.sel.id===n.id)?' sel':'');});
+  plDrawEdges();plRenderInsp();
+  var dd=document.querySelector('.pl-dirty');
+  if(PL.dirty&&!dd){var tb=document.querySelector('.pl-tb');if(tb)tb.insertAdjacentHTML('beforeend','<span class="pl-dirty">● neuložené změny</span>');}
+}
+function plWireCanvas(){
+  var canvas=document.getElementById('plCanvas');if(!canvas)return;
+  canvas.addEventListener('mousedown',function(ev){
+    var dot=ev.target.getAttribute&&ev.target.getAttribute('data-dot');
+    if(dot){ev.preventDefault();plStartConn(dot,ev);return;}
+    var dragId=ev.target.getAttribute&&ev.target.getAttribute('data-drag');
+    if(dragId){ev.preventDefault();plStartDrag(dragId,ev);return;}
+    // klik do prázdna zruší výběr
+    if(ev.target.id==='plCanvas'||ev.target.id==='plSvg'){PL.sel=null;plRefresh();}
+  });
+}
+function plStartDrag(id,ev){
+  var n=plNode(id);if(!n)return;
+  var sx=ev.clientX,sy=ev.clientY,ox=n.x||0,oy=n.y||0,moved=false;
+  var el=document.getElementById('pln_'+id);
+  function mm(e){var dx=e.clientX-sx,dy=e.clientY-sy;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;n.x=Math.max(0,Math.round(ox+dx));n.y=Math.max(0,Math.round(oy+dy));el.style.left=n.x+'px';el.style.top=n.y+'px';plDrawEdges();}
+  function mu(){document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);if(moved){PL.dirty=true;}PL.sel={t:'node',id:id};plRefresh();}
+  document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+}
+function plStartConn(id,ev){
+  var canvas=document.getElementById('plCanvas'),svg=document.getElementById('plSvg');
+  var start=plNodeAnchor(id,'r');
+  var tmp=document.createElementNS('http://www.w3.org/2000/svg','path');
+  tmp.setAttribute('class','pl-edge');tmp.setAttribute('stroke','var(--g3)');tmp.setAttribute('stroke-dasharray','5 4');tmp.setAttribute('marker-end','url(#plArrow)');
+  svg.appendChild(tmp);
+  var rect=canvas.getBoundingClientRect();
+  function mm(e){var mx=e.clientX-rect.left+canvas.parentNode.scrollLeft,my=e.clientY-rect.top+canvas.parentNode.scrollTop;tmp.setAttribute('d','M'+start.x+','+start.y+' L'+mx+','+my);}
+  function mu(e){
+    document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);tmp.remove();
+    var tgt=e.target.closest?e.target.closest('.pl-node'):null;
+    if(tgt){var to=tgt.getAttribute('data-id');plAddEdge(id,to);}
+  }
+  document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+}
+function plAddEdge(from,to){
+  PL.wf.edges.push({action:'akce'+(PL.wf.edges.length+1),from:from,to:to,roles:[],kind:(from===to?'self':'forward'),source:'user',label:'nový přechod',needNote:false});
+  PL.dirty=true;PL.sel={t:'edge',i:PL.wf.edges.length-1};plRefresh();
+}
+function plAddNode(){
+  var id='stav'+(PL.wf.nodes.length+1),i=1;while(plNode(id)){i++;id='stav'+(PL.wf.nodes.length+i);}
+  PL.wf.nodes.push({id:id,label:'Nový stav',onTurn:'konstrukter',kind:'normal',phase:'konstrukce',x:60,y:420});
+  PL.dirty=true;PL.sel={t:'node',id:id};renderMain();
+}
+function plField(label,html){return '<label>'+esc(label)+'</label>'+html}
+function plSelect(val,opts,onchange){return '<select onchange="'+onchange+'">'+opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(String(o[0])===String(val||'')?' selected':'')+'>'+esc(o[1])+'</option>'}).join('')+'</select>'}
+function plRenderInsp(){
+  var box=document.getElementById('plInsp');if(!box)return;
+  if(!PL.sel){box.innerHTML='<h3>Vlastnosti</h3><div class="pl-hint">Klikni na uzel (stav) nebo šipku (přechod) pro úpravu. Nový stav přidáš tlačítkem <b>+ Stav</b>, přechod nakreslíš tažením ze zeleného kolečka uzlu.</div>';return}
+  if(PL.sel.t==='node')return plInspNode(box);
+  return plInspEdge(box);
+}
+function plInspNode(box){
+  var n=plNode(PL.sel.id);if(!n){PL.sel=null;return plRenderInsp();}
+  var roleOpts=[['','— nikdo —']].concat(Object.keys(plRoles()).filter(function(r){return r!=='klient'&&r!==''}).map(function(r){return [r,plRoleLabel(r)]}));
+  var h='<h3>Stav: '+esc(n.label||n.id)+'</h3>';
+  h+=plField('Název (label)','<input type="text" value="'+esc(n.label||'')+'" oninput="plSetNode(\'label\',this.value)">');
+  h+=plField('Kdo je na tahu (role)',plSelect(n.onTurn,roleOpts,'plSetNode(\'onTurn\',this.value)'));
+  h+=plField('Fáze (dashboard)',plSelect(n.phase,PL_PHASES,'plSetNode(\'phase\',this.value)'));
+  h+=plField('Typ uzlu',plSelect(n.kind,PL_KINDS,'plSetNode(\'kind\',this.value)'));
+  h+=plField('Lhůta kroku',plSelect(n.lhutaKey,PL_LHUTY,'plSetNode(\'lhutaKey\',this.value)'));
+  h+='<div class="pl-chks">'+
+    '<label><input type="checkbox" '+(n.lhutaFrom==='step'?'checked':'')+' onchange="plSetNode(\'lhutaFrom\',this.checked?\'step\':null)">lhůta od zahájení kroku</label>'+
+    '<label><input type="checkbox" '+(n.terminal?'checked':'')+' onchange="plSetNode(\'terminal\',this.checked)">koncový (terminál)</label>'+
+    '<label><input type="checkbox" '+(n.hold?'checked':'')+' onchange="plSetNode(\'hold\',this.checked)">pozastavení</label>'+
+    '<label><input type="checkbox" '+(n.noSemafor?'checked':'')+' onchange="plSetNode(\'noSemafor\',this.checked)">bez semaforu</label>'+
+    '</div>';
+  h+='<div class="pl-hint" style="margin-top:10px">ID stavu: <b>'+esc(n.id)+'</b> (neměnné). Lhůta se počítá z číselníku typu výrobku podle zvoleného klíče.</div>';
+  h+='<button class="pl-del" onclick="plDelNode()">Smazat stav</button>';
+  box.innerHTML=h;
+}
+function plInspEdge(box){
+  var e=PL.wf.edges[PL.sel.i];if(!e){PL.sel=null;return plRenderInsp();}
+  var nodeOpts=[['','—']].concat((PL.wf.nodes||[]).map(function(n){return [n.id,n.label||n.id]}));
+  var h='<h3>Přechod</h3>';
+  h+='<div class="pl-hint" style="margin-bottom:8px">'+esc(plNodeLbl(e.from))+' &nbsp;→&nbsp; '+esc(plNodeLbl(e.to))+'</div>';
+  h+=plField('Popisek (na šipce)','<input type="text" value="'+esc(e.label||'')+'" oninput="plSetEdge(\'label\',this.value)">');
+  h+=plField('Klíč akce (action)','<input type="text" value="'+esc(e.action||'')+'" oninput="plSetEdge(\'action\',this.value)">');
+  h+=plField('Cílový stav',plSelect(e.to,nodeOpts,'plSetEdge(\'to\',this.value)'));
+  h+=plField('Typ přechodu',plSelect(e.kind,PL_EKINDS,'plSetEdge(\'kind\',this.value)'));
+  var roles=e.roles||[];
+  h+='<label>Kdo smí (role)</label><div class="pl-chks">'+
+    Object.keys(plRoles()).filter(function(r){return r!==''}).map(function(r){return '<label><input type="checkbox" '+(roles.indexOf(r)>=0?'checked':'')+' onchange="plSetEdgeRole(\''+r+'\',this.checked)">'+esc(plRoleLabel(r))+'</label>'}).join('')+'</div>';
+  h+='<label>Podmínky</label><div class="pl-chks">'+
+    '<label><input type="checkbox" '+(e.needNote?'checked':'')+' onchange="plSetEdge(\'needNote\',this.checked)">poznámka povinná</label>'+
+    '<label><input type="checkbox" '+(e.needPlant?'checked':'')+' onchange="plSetEdge(\'needPlant\',this.checked)">vybrat závod</label>'+
+    '<label><input type="checkbox" '+(e.needPdf?'checked':'')+' onchange="plSetEdge(\'needPdf\',this.checked)">vyžadovat PDF</label>'+
+    '<label><input type="checkbox" '+(e.needVyrobni?'checked':'')+' onchange="plSetEdge(\'needVyrobni\',this.checked)">vyžadovat výrobní dok.</label>'+
+    '</div>';
+  h+='<div class="pl-hint" style="margin-top:10px">Mechanika akce (e-maily, tokeny, zámek verze) je vázaná na klíč akce a je pevná. Přejmenování klíče u standardní akce může rozvázat mechaniku — používej hlavně pro nové vlastní přechody.</div>';
+  h+='<button class="pl-del" onclick="plDelEdge()">Smazat přechod</button>';
+  box.innerHTML=h;
+}
+function plNodeLbl(id){if(id===null)return '(zadání)';if(id==='*')return '(odkudkoli)';if(String(id).charAt(0)==='@')return id;var n=plNode(id);return n?(n.label||n.id):id;}
+function plSetNode(k,v){var n=plNode(PL.sel.id);if(!n)return;if(v===null)delete n[k];else n[k]=v;PL.dirty=true;if(k==='label'){var el=document.getElementById('pln_'+n.id);if(el){el.querySelector('.hd span').textContent=v||n.id;}}else{plRefresh();}}
+function plSetEdge(k,v){var e=PL.wf.edges[PL.sel.i];if(!e)return;e[k]=v;PL.dirty=true;if(k==='label'||k==='action'){plDrawEdges();}else{plRefresh();}}
+function plSetEdgeRole(r,on){var e=PL.wf.edges[PL.sel.i];if(!e)return;e.roles=e.roles||[];var i=e.roles.indexOf(r);if(on&&i<0)e.roles.push(r);if(!on&&i>=0)e.roles.splice(i,1);PL.dirty=true;}
+function plDelNode(){var n=plNode(PL.sel.id);if(!n)return;if(!confirm('Smazat stav "'+(n.label||n.id)+'" a jeho přechody?'))return;var id=n.id;PL.wf.nodes=PL.wf.nodes.filter(function(x){return x.id!==id});PL.wf.edges=PL.wf.edges.filter(function(x){return x.from!==id&&x.to!==id});PL.dirty=true;PL.sel=null;renderMain();}
+function plDelEdge(){if(!confirm('Smazat tento přechod?'))return;PL.wf.edges.splice(PL.sel.i,1);PL.dirty=true;PL.sel=null;renderMain();}
+function plReset(){if(PL.dirty&&!confirm('Zahodit neuložené změny a načíst uložené pravidlo?'))return;plInit();renderMain();}
+function plSeed(){api('/admin/workflow','GET').then(function(o){if(!o.ok){alert('Nelze načíst seed.');return}if(!confirm('Nahradit plátno výchozím (seed) pravidlem? Neuloží se, dokud nekliknete Uložit.'))return;PL.wf=plClone(o.j.seed);PL.sel=null;PL.dirty=true;renderMain();});}
+function plSave(){
+  api('/admin/workflow','POST',{workflow:PL.wf}).then(function(o){
+    if(!o.ok){alert('Uložení selhalo: '+((o.j&&o.j.chyba)||'chyba'));return}
+    PL.dirty=false;
+    reloadData();
+    setTimeout(function(){PL.wf=plClone(D.workflow);PL.sel=null;renderMain();},60);
+    alert('Pravidlo toku uloženo. Projeví se v reálném workflow.');
+  });
 }
 
 /* ---- notifikace ---- */
