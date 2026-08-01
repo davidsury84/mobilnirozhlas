@@ -136,6 +136,7 @@ function mount(host) {
       if (p === '/api/kontejnery/me' && req.method === 'GET') return apiMe(req, res);
       if (p === '/api/kontejnery' && req.method === 'GET') return apiList(req, res);
       if (p === '/api/kontejnery/prirad' && req.method === 'POST') return apiPrirad(req, res);
+      if (p === '/api/kontejnery/smazat' && req.method === 'POST') return apiSmazat(req, res);
       if (p === '/api/kontejnery/nastaveni' && req.method === 'GET') return apiCfgGet(req, res);
       if (p === '/api/kontejnery/nastaveni' && req.method === 'POST') return apiCfgSet(req, res);
     } catch (e) {
@@ -373,6 +374,32 @@ function mount(host) {
     json(res, 200, { ok: true, rotace: db.config.rotace, dohled: db.config.dohled });
     return true;
   }
+
+  // Smazání poptávky (jen správce).
+  async function apiSmazat(req, res) {
+    const me = meOf(req);
+    if (!me.isAdmin) { json(res, 403, { chyba: 'Smazat poptávku může jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const db = load(); const id = String(b.id || ''); const before = db.items.length;
+    db.items = db.items.filter(x => x.id !== id);
+    if (db.items.length === before) { json(res, 404, { chyba: 'Poptávka nenalezena.' }); return true; }
+    save(db); logAct('kontejnery', me, 'Smazána poptávka ' + id);
+    json(res, 200, { ok: true }); return true;
+  }
+
+  // Jednorázový úklid testovacích poptávek (e-maily @example.*, jména TEST…/Klient N) — jen při prvním startu.
+  (function purgeTest() {
+    try {
+      const db = load();
+      if (!db.config._testPurged) {
+        db.config._testPurged = true;
+        const before = db.items.length;
+        db.items = db.items.filter(x => !(/@example\.(cz|com)$/i.test(x.email || '') || /^TEST\b/i.test(String(x.jmeno || '')) || /^Klient \d/.test(String(x.jmeno || ''))));
+        save(db);
+        if (before !== db.items.length) console.log('[kontejnery] úklid: smazáno ' + (before - db.items.length) + ' testovacích poptávek');
+      }
+    } catch (_) {}
+  })();
 
   // Jednorázový seed notifikací dle zadání (střídačka Jana/Josef, kopie David) — jen při prvním startu.
   (function initNotif() {
