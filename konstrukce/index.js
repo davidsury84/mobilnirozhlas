@@ -229,18 +229,78 @@ const DOTAZNIK_SU = [
 ];
 
 // ---- Stavy zakázky (kap. 4 dokumentu) --------------------------------------
-const STAV = {
-  novy:      { label: 'Nový — rozdělení do závodu', onTurn: 'vykonny-reditel', terminal: false }, // výkonný ředitel výroby přiřadí závod
-  prideleni: { label: 'Přidělení konstruktéra',     onTurn: 'sef',         terminal: false },      // šéf konstrukce přidělí konstruktéra
-  prace:     { label: 'Obchodní dokumentace (zkreslení)', onTurn: 'konstrukter', terminal: false },
-  kontrola:  { label: 'Interní kontrola',  onTurn: 'sef',        terminal: false },
-  obchodnik: { label: 'U obchodníka',      onTurn: 'obchodnik',  terminal: false },
-  klient:    { label: 'U klienta',         onTurn: 'obchodnik',  terminal: false }, // hlídá obchodník
-  revize:    { label: 'Revize',            onTurn: 'konstrukter', terminal: false },
-  podklady:  { label: 'Čeká na podklady',  onTurn: 'obchodnik',  terminal: false, hold: true },
-  schvaleno: { label: 'Schváleno — výrobní dokumentace', onTurn: 'konstrukter', terminal: false }, // konstrukce vloží výrobní dokumentaci
-  dokonceno: { label: 'Ve výrobě / Hotovo', onTurn: null,        terminal: true },
-  zamitnuto: { label: 'Zamítnuto / Storno', onTurn: null,        terminal: true },
+// SEED_STAV = výchozí definice stavů. Za běhu se čte z d.workflow.nodes (živé
+// pravidlo editovatelné na plátně); tento seed slouží k prvnímu vytvoření
+// pravidla a jako fallback. Metadata stavu:
+//   onTurn   = role, která je „na tahu"
+//   phase    = fáze procesu (obchod|konstrukce|schvaleni|vyroba) pro dashboard
+//   lhutaKey = klíč lhůty z číselníku typu (offset od bodu 0 = zadání)
+//   lhutaFrom= 'bod0' (výchozí) | 'step' (revize běží od začátku kroku)
+//   kind     = start|klient|hold|end|normal (pro plátno a efekty)
+const SEED_STAV = {
+  novy:      { label: 'Nový — rozdělení do závodu', onTurn: 'vykonny-reditel', terminal: false, phase: 'obchod',     lhutaKey: 'lhutaPrideleniDays', kind: 'start' },
+  prideleni: { label: 'Přidělení konstruktéra',     onTurn: 'sef',            terminal: false, phase: 'obchod',     lhutaKey: 'lhutaPrideleniDays', kind: 'normal' },
+  prace:     { label: 'Obchodní dokumentace (zkreslení)', onTurn: 'konstrukter', terminal: false, phase: 'konstrukce', lhutaKey: 'lhutaZkresleniDays', kind: 'normal' },
+  kontrola:  { label: 'Interní kontrola',  onTurn: 'sef',        terminal: false, phase: 'konstrukce', lhutaKey: 'lhutaKontrolaDays', kind: 'normal' },
+  obchodnik: { label: 'U obchodníka',      onTurn: 'obchodnik',  terminal: false, phase: 'schvaleni',  lhutaKey: 'lhutaObchodnikDays', kind: 'normal' },
+  klient:    { label: 'U klienta',         onTurn: 'obchodnik',  terminal: false, phase: 'schvaleni',  lhutaKey: 'lhutaKlientDays', kind: 'klient' }, // hlídá obchodník
+  revize:    { label: 'Revize',            onTurn: 'konstrukter', terminal: false, phase: 'konstrukce', lhutaKey: 'lhutaRevizeDays', lhutaFrom: 'step', kind: 'normal' },
+  podklady:  { label: 'Čeká na podklady',  onTurn: 'obchodnik',  terminal: false, phase: 'konstrukce', hold: true, kind: 'hold' },
+  schvaleno: { label: 'Schváleno — výrobní dokumentace', onTurn: 'konstrukter', terminal: false, phase: 'vyroba', lhutaKey: 'lhutaVyrobaDays', noSemafor: true, kind: 'normal' }, // konstrukce vloží výrobní dokumentaci
+  dokonceno: { label: 'Ve výrobě / Hotovo', onTurn: null,        terminal: true,  phase: 'vyroba', kind: 'end' },
+  zamitnuto: { label: 'Zamítnuto / Storno', onTurn: null,        terminal: true,  kind: 'end' },
+};
+
+// ---- PRAVIDLO WORKFLOW (graf) — zdroj pravdy toku zakázky -------------------
+// Uzly = stavy (z SEED_STAV + souřadnice x,y pro plátno), hrany = přechody.
+// Hrana:
+//   action  = klíč akce (shoduje se s efektem v apiTransition / systémovou akcí)
+//   from    = zdrojový stav (nebo '*' = z libovolného neterminálního stavu)
+//   to      = cílový stav (u self-akcí = from; u dynamických viz altTo)
+//   altTo   = alternativní cíl (zkresleno: kontrola vs. obchodník dle internalCheck)
+//   roles   = kdo smí (metadata + gate dostupnosti akce)
+//   kind    = forward|reject|revize|hold|self|system|klient (barva/typ hrany)
+//   source  = user (tlačítko v appce) | system (apiAssign/create) | klient (veřejný náhled)
+//   needNote= vyžaduje poznámku
+const WF_NODE_XY = {
+  novy: [40, 60], prideleni: [250, 60], prace: [460, 60], kontrola: [670, 60],
+  obchodnik: [880, 60], klient: [1090, 60], schvaleno: [1300, 60], dokonceno: [1510, 60],
+  revize: [460, 250], podklady: [670, 250], zamitnuto: [1090, 250],
+};
+const SEED_WF_EDGES = [
+  { action: 'create',            from: null,        to: 'novy',      roles: ['obchodnik'],                      kind: 'system', source: 'system', label: 'Nová zakázka (zadání)' },
+  { action: 'rozdel-zavod',      from: 'novy',      to: 'prideleni', roles: ['vykonny-reditel', 'sef'],         kind: 'forward', source: 'user', label: 'Rozdělit do závodu', needPlant: true },
+  { action: 'prideli',           from: 'prideleni', to: 'prace',     roles: ['sef'],                            kind: 'forward', source: 'system', label: 'Přidělit konstruktéra' },
+  { action: 'zkresleno',         from: 'prace',     to: 'kontrola',  altTo: 'obchodnik',                        roles: ['konstrukter'], kind: 'forward', source: 'user', label: 'Zkresleno → kontrola' },
+  { action: 'zkresleno',         from: 'revize',    to: 'kontrola',  altTo: 'obchodnik',                        roles: ['konstrukter'], kind: 'forward', source: 'user', label: 'Revize zkreslena → kontrola' },
+  { action: 'kontrola-ok',       from: 'kontrola',  to: 'obchodnik', roles: ['sef'],                            kind: 'forward', source: 'user', label: 'Kontrola OK' },
+  { action: 'kontrola-vrat',     from: 'kontrola',  to: 'prace',     roles: ['sef'],                            kind: 'reject',  source: 'user', label: 'Vrátit z kontroly', needNote: true },
+  { action: 'obchodnik-ok',      from: 'obchodnik', to: 'obchodnik', roles: ['obchodnik'],                      kind: 'self',    source: 'user', label: 'Obchodník potvrdil' },
+  { action: 'obchodnik-vrat',    from: 'obchodnik', to: 'prace',     roles: ['obchodnik'],                      kind: 'reject',  source: 'user', label: 'Připomínky obchodníka', needNote: true },
+  { action: 'odeslat-klientovi', from: 'obchodnik', to: 'klient',    roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Odeslat klientovi', needPdf: true },
+  { action: 'schvalit',          from: 'klient',    to: 'schvaleno', roles: ['klient'],                         kind: 'klient',  source: 'klient', label: 'Klient schválil' },
+  { action: 'pripominky',        from: 'klient',    to: 'revize',    roles: ['klient'],                         kind: 'revize',  source: 'klient', label: 'Klient poslal připomínky' },
+  { action: 'zamitnout',         from: 'klient',    to: 'zamitnuto', roles: ['klient'],                         kind: 'reject',  source: 'klient', label: 'Klient zamítl' },
+  { action: 'vlozit-vyrobni-dok', from: 'schvaleno', to: 'dokonceno', roles: ['konstrukter'],                   kind: 'forward', source: 'user', label: 'Vložit výrobní dokumentaci', needVyrobni: true },
+  { action: 'hold',              from: '*',         to: 'podklady',  roles: ['obchodnik', 'sef'],               kind: 'hold',    source: 'user', label: 'Pozastavit (čeká na podklady)', needNote: true },
+  { action: 'unhold',            from: 'podklady',  to: '@prev',     roles: ['obchodnik', 'sef'],               kind: 'forward', source: 'user', label: 'Podklady doplněny' },
+  { action: 'storno',            from: '*',         to: 'zamitnuto', roles: ['obchodnik', 'reditel'],           kind: 'reject',  source: 'user', label: 'Storno', needNote: true },
+  { action: 'prideli-zavod',     from: '*',         to: '@self',     roles: ['vykonny-reditel', 'sef'],         kind: 'self',    source: 'user', label: 'Přeřadit závod' },
+];
+function buildSeedWorkflow() {
+  const nodes = Object.keys(SEED_STAV).map(id => {
+    const s = SEED_STAV[id]; const xy = WF_NODE_XY[id] || [40, 40];
+    return Object.assign({ id, x: xy[0], y: xy[1] }, JSON.parse(JSON.stringify(s)));
+  });
+  return { nodes, edges: JSON.parse(JSON.stringify(SEED_WF_EDGES)), version: 1 };
+}
+const SEED_WORKFLOW = buildSeedWorkflow();
+
+// Popisky rolí pro schéma / plátno (kdo je „na tahu")
+const ROLE_LABELS = {
+  obchodnik: 'Obchodník', sef: 'Šéf konstrukce', konstrukter: 'Konstruktér',
+  reditel: 'Ředitel', 'vykonny-reditel': 'Výkonný ředitel výroby', 'vyrobni-reditel': 'Výrobní ředitel závodu',
+  klient: 'Klient', '': '—',
 };
 
 // ---- Výrobní oblasti / střediska (seed — editovatelné v adminu) -------------
@@ -370,6 +430,24 @@ function mount(host) {
   const json = (res, code, obj) => host.send(res, code, obj, { 'Cache-Control': 'no-store' });
   const htmlOut = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
 
+  // ---- živé pravidlo workflow (graf) --------------------------------------
+  // STAV = tabulka stavů odvozená z d.workflow.nodes (přepisuje se v load()).
+  // Když admin upraví plátno, změní se onTurn / lhůty / fáze / dostupné akce.
+  let STAV = {};
+  let WF = { nodes: [], edges: [] };
+  function syncWorkflow(d) {
+    WF = d.workflow || { nodes: [], edges: [] };
+    STAV = {};
+    (WF.nodes || []).forEach(n => { STAV[n.id] = n; });
+    // fallback: doplň případně chybějící stavy ze seedu, ať kód nespadne
+    for (const k in SEED_STAV) if (!STAV[k]) STAV[k] = Object.assign({ id: k }, SEED_STAV[k]);
+  }
+  // Najde hranu grafu pro akci z daného stavu ('*' = odkudkoli).
+  function wfEdge(action, fromStav) {
+    return (WF.edges || []).find(e => e.action === action && (e.from === fromStav || e.from === '*')) || null;
+  }
+  function wfActionAllowed(action, fromStav) { return !!wfEdge(action, fromStav); }
+
   // ---- perzistence ---------------------------------------------------------
   // Práh (podíl lhůty) pro upozornění „blíží se termín" — drží se v synchronu s d.settings.notif.warnPct.
   let WARN_FRAC = 0.8;
@@ -393,6 +471,15 @@ function mount(host) {
     if (!Array.isArray(d.zakazky)) d.zakazky = [];
     // Migrace na nový tok: staré koncové stavy (byly už schválené a ve výrobě) → dokončeno; ať nespadnou na neznámém STAV.
     d.zakazky.forEach(z => { if (z.stav === 'vyroba' || z.stav === 'stredisko') { z.stav = 'dokonceno'; if (!z.closedAt) z.closedAt = Date.now(); z.deadline = null; } });
+    // ---- pravidlo workflow (graf) — vytvoř při prvním běhu, jinak dosync uzly/hrany ----
+    if (!d.workflow || typeof d.workflow !== 'object' || !Array.isArray(d.workflow.nodes) || !d.workflow.nodes.length) {
+      d.workflow = JSON.parse(JSON.stringify(SEED_WORKFLOW));
+    } else {
+      if (!Array.isArray(d.workflow.edges)) d.workflow.edges = JSON.parse(JSON.stringify(SEED_WORKFLOW.edges));
+      // doplň chybějící seed uzly (nové stavy přidané v kódu) beze změny pozic/úprav uživatele
+      SEED_WORKFLOW.nodes.forEach(sn => { if (!d.workflow.nodes.some(n => n.id === sn.id)) d.workflow.nodes.push(JSON.parse(JSON.stringify(sn))); });
+    }
+    syncWorkflow(d);
     if (!Array.isArray(d.notif)) d.notif = [];
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
     if (!Array.isArray(d.timesheet)) d.timesheet = [];
@@ -454,7 +541,7 @@ function mount(host) {
     const open = (d.zakazky || []).filter(z => STAV[z.stav] && !STAV[z.stav].terminal);
     const overdue = open.filter(z => semafor(z) === 'red');
     const byPhase = { obchod: 0, konstrukce: 0, schvaleni: 0, vyroba: 0 };
-    open.forEach(z => { const ph = PHASE_OF[z.stav]; if (ph) byPhase[ph]++; });
+    open.forEach(z => { const ph = (STAV[z.stav] && STAV[z.stav].phase) || PHASE_OF[z.stav]; if (ph) byPhase[ph]++; });
     const ps = computePhaseStats(d), pd = phaseDaysFromType(refType(d));
     const pa = (v, tgt) => (v == null ? '\u2014' : v + ' d') + (tgt ? ' (cíl ' + tgt + ' d)' : '');
     let t = 'Týdenní přehled \u2014 Konstrukce (' + fmtDate(now) + ')\n\n';
@@ -584,12 +671,12 @@ function mount(host) {
   }
   function semafor(z) {
     const st = STAV[z.stav];
-    if (!st || st.terminal || st.hold || z.stav === 'schvaleno') return 'none';
+    if (!st || st.terminal || st.hold || st.noSemafor) return 'none';
     if (!z.deadline || !z.stepStartedAt) return 'green';
     const now = Date.now();
     if (now > z.deadline) return 'red';
-    // Okno pro „blíží se" počítáme od bodu 0 (zadání), u revize od začátku kroku.
-    const base = z.stav === 'revize' ? z.stepStartedAt : (z.createdAt || z.stepStartedAt);
+    // Okno pro „blíží se" počítáme od bodu 0 (zadání), u kroků od začátku kroku (lhutaFrom='step').
+    const base = (st.lhutaFrom === 'step') ? z.stepStartedAt : (z.createdAt || z.stepStartedAt);
     const total = z.deadline - base;
     const elapsed = now - base;
     if (total > 0 && elapsed >= WARN_FRAC * total) return 'amber';
@@ -619,18 +706,14 @@ function mount(host) {
     // Lhůty kroků jsou OFFSETY od bodu 0 (zadání = z.createdAt) — dny se NESČÍTAJÍ.
     // Termín kroku = zadání + N prac. dní; stejné N u dvou kroků = stejné datum.
     const bod0 = z.createdAt || z.stepStartedAt;
-    const offsetMap = {
-      novy: t.lhutaPrideleniDays, prideleni: t.lhutaPrideleniDays, prace: t.lhutaZkresleniDays, kontrola: t.lhutaKontrolaDays,
-      obchodnik: t.lhutaObchodnikDays, klient: t.lhutaKlientDays,
-      schvaleno: t.lhutaVyrobaDays,
-    };
-    if (stav === 'revize') {
-      // Revize = iterační přepracování (v2, v3…) bez pevného ukotvení k bodu 0 → lhůta běží od začátku kroku.
-      const rd = t.lhutaRevizeDays;
-      z.deadline = rd ? addBusinessDays(z.stepStartedAt, rd) : null;
+    // Lhůta se čte z uzlu grafu: lhutaKey = klíč lhůty v číselníku typu;
+    // lhutaFrom='step' (revize) běží od začátku kroku, jinak offset od bodu 0.
+    const node = STAV[stav] || {};
+    const days = node.lhutaKey ? Number(t[node.lhutaKey]) : 0;
+    if (node.lhutaFrom === 'step') {
+      z.deadline = days ? addBusinessDays(z.stepStartedAt, days) : null;
     } else {
-      const off = offsetMap[stav];
-      z.deadline = off ? addBusinessDays(bod0, off) : null;
+      z.deadline = days ? addBusinessDays(bod0, days) : null;
     }
     // vyčistíme eskalační příznaky pro nový krok
     z.esc = { key: stav + ':' + (z.versions.length || 0) };
@@ -684,6 +767,8 @@ function mount(host) {
       if (p === '/api/konstrukce/admin/role' && req.method === 'POST') return apiAdminRole(req, res);
       if (p === '/api/konstrukce/admin/fond' && req.method === 'POST') return apiAdminFond(req, res);
       if (p === '/api/konstrukce/admin/konstrukter-groups' && req.method === 'POST') return apiAdminKonstrGroups(req, res);
+      if (p === '/api/konstrukce/admin/workflow' && req.method === 'GET') return apiAdminWorkflowGet(req, res);
+      if (p === '/api/konstrukce/admin/workflow' && req.method === 'POST') return apiAdminWorkflowSave(req, res);
       if (p === '/api/konstrukce/admin/typ' && req.method === 'POST') return apiAdminTyp(req, res);
       if (p === '/api/konstrukce/admin/seed' && req.method === 'POST') return apiAdminSeed(req, res);
       if (p === '/api/konstrukce/admin/settings' && req.method === 'POST') return apiAdminSettings(req, res);
@@ -746,6 +831,8 @@ function mount(host) {
       adresy: (d.adresy || []).slice().sort((a, b) => a.localeCompare(b, 'cs')),
       roles: (me.isAdmin) ? roleAssignments(d) : undefined,
       employees: (me.isAdmin) ? adminEmployees() : undefined,
+      workflow: d.workflow,                            // pravidlo toku (graf) — pro schéma i plátno
+      roleLabels: ROLE_LABELS,
       notif: myNotif.slice(0, 40),
       notifUnread: myNotif.filter(n => !n.read).length,
       now: Date.now(),
@@ -945,6 +1032,13 @@ function mount(host) {
     const isKon = me.isAdmin || (me.role === 'konstrukter' && (z.assignedTo || '').toLowerCase() === me.email);
     const isVykonny = me.isAdmin || me.role === 'vykonny-reditel';       // výkonný ředitel výroby (rozděluje do závodů)
     let err = null;
+
+    // Brána řízená pravidlem (grafem): akce je dostupná jen tam, kde v aktuálním
+    // stavu existuje hrana. Když admin upraví plátno, projeví se to tady.
+    if (!wfActionAllowed(action, z.stav)) {
+      json(res, 400, { chyba: 'Akce „' + action + '" není v tomto kroku (' + ((STAV[z.stav] && STAV[z.stav].label) || z.stav) + ') povolena.' });
+      return true;
+    }
 
     switch (action) {
       case 'zkresleno': { // konstruktér → interní kontrola
@@ -1247,6 +1341,69 @@ function mount(host) {
     json(res, 200, { ok: true, groups });
     return true;
   }
+  // ---- pravidlo workflow (graf) — čtení / uložení z plátna -----------------
+  function apiAdminWorkflowGet(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    const d = load();
+    json(res, 200, { ok: true, workflow: d.workflow, roleLabels: ROLE_LABELS, seed: SEED_WORKFLOW });
+    return true;
+  }
+  // Validace: musí existovat start (kind='start') i konec (terminal), žádný
+  // neterminální stav bez odchozí hrany, hrany musí odkazovat na existující uzly.
+  function validateWorkflow(wf) {
+    if (!wf || !Array.isArray(wf.nodes) || !Array.isArray(wf.edges)) return 'Neplatná struktura pravidla.';
+    if (!wf.nodes.length) return 'Pravidlo nemá žádné stavy.';
+    const ids = new Set(wf.nodes.map(n => n.id));
+    if (ids.size !== wf.nodes.length) return 'Duplicitní ID stavu.';
+    if (!wf.nodes.some(n => n.kind === 'start')) return 'Chybí počáteční stav (start).';
+    if (!wf.nodes.some(n => n.terminal)) return 'Chybí koncový (terminální) stav.';
+    for (const e of wf.edges) {
+      if (e.from && e.from !== '*' && !ids.has(e.from)) return 'Hrana odkazuje na neexistující stav: ' + e.from;
+      if (e.to && !String(e.to).startsWith('@') && !ids.has(e.to)) return 'Hrana odkazuje na neexistující cíl: ' + e.to;
+    }
+    // každý neterminální, non-hold stav musí mít cestu dál (odchozí user/system/klient hranu)
+    for (const n of wf.nodes) {
+      if (n.terminal || n.hold) continue;
+      const out = wf.edges.some(e => (e.from === n.id) && !['hold', 'self'].includes(e.kind));
+      if (!out) return 'Stav „' + (n.label || n.id) + '" nemá žádný přechod dál.';
+    }
+    return null;
+  }
+  async function apiAdminWorkflowSave(req, res) {
+    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const wf = b.workflow;
+    const errv = validateWorkflow(wf);
+    if (errv) { json(res, 400, { chyba: errv }); return true; }
+    const d = load();
+    // sanitizace uzlů (jen povolená pole; souřadnice čísla)
+    const cleanNodes = wf.nodes.map(n => ({
+      id: String(n.id).slice(0, 40), label: String(n.label || n.id).slice(0, 80),
+      onTurn: n.onTurn ? String(n.onTurn).slice(0, 40) : null,
+      terminal: !!n.terminal, hold: !!n.hold, noSemafor: !!n.noSemafor,
+      phase: n.phase ? String(n.phase).slice(0, 20) : undefined,
+      lhutaKey: n.lhutaKey ? String(n.lhutaKey).slice(0, 40) : undefined,
+      lhutaFrom: n.lhutaFrom === 'step' ? 'step' : undefined,
+      kind: String(n.kind || 'normal').slice(0, 20),
+      x: Math.round(Number(n.x) || 0), y: Math.round(Number(n.y) || 0),
+    }));
+    const cleanEdges = wf.edges.map(e => ({
+      action: String(e.action || '').slice(0, 40),
+      from: e.from === null ? null : String(e.from).slice(0, 40),
+      to: String(e.to || '').slice(0, 40),
+      altTo: e.altTo ? String(e.altTo).slice(0, 40) : undefined,
+      roles: Array.isArray(e.roles) ? e.roles.map(r => String(r).slice(0, 40)) : [],
+      kind: String(e.kind || 'forward').slice(0, 20),
+      source: String(e.source || 'user').slice(0, 20),
+      label: String(e.label || '').slice(0, 80),
+      needNote: !!e.needNote, needPlant: !!e.needPlant, needPdf: !!e.needPdf, needVyrobni: !!e.needVyrobni,
+    })).filter(e => e.action);
+    d.workflow = { nodes: cleanNodes, edges: cleanEdges, version: (Number(wf.version) || 1) };
+    save(d);
+    json(res, 200, { ok: true, workflow: d.workflow });
+    return true;
+  }
+
   async function apiAdminTyp(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
@@ -1485,7 +1642,7 @@ function mount(host) {
     const remind1 = Number(cfg.clientRemind1) || 0, remind2 = Number(cfg.clientRemind2) || 0;
     for (const z of d.zakazky) {
       const st = STAV[z.stav];
-      if (!st || st.terminal || st.hold || z.stav === 'schvaleno') continue;
+      if (!st || st.terminal || st.hold || st.noSemafor) continue;
       if (!z.esc) z.esc = { key: z.stav + ':' + z.versions.length };
       const stepKey = z.stav + ':' + z.versions.length;
       if (z.esc.key !== stepKey) z.esc = { key: stepKey };
@@ -1512,7 +1669,7 @@ function mount(host) {
       if (!z.deadline) continue;
       const resp = responsibleEmail(z);
       // --- blíží se termín (oranžová, app-notifikace odpovědné osobě) — okno od bodu 0 (zadání) ---
-      const warnBase = z.stav === 'revize' ? z.stepStartedAt : (z.createdAt || z.stepStartedAt);
+      const warnBase = (st.lhutaFrom === 'step') ? z.stepStartedAt : (z.createdAt || z.stepStartedAt);
       if (warnBase && z.deadline > warnBase) {
         const frac = (now - warnBase) / (z.deadline - warnBase);
         if (frac >= warnFrac && now < z.deadline && !z.esc.warned80) {
