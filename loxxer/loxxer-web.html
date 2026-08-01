@@ -1,1476 +1,370 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="cs">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LOXXER — protipožární skříně na skladování a nabíjení Li-Ion baterií | ELKOPLAST CZ</title>
-<meta name="description" content="Bezpečně skladujte a nabíjejte lithiové baterie e-kol, koloběžek, nářadí a dronů. Protipožární skříně LOXXER zadrží požár baterie uvnitř a ochrání lidi i majetek. Prodej i pronájem — vyberte model v konfigurátoru.">
+<meta name="description" content="Bezpečně skladujte a nabíjejte lithiové baterie e-kol, koloběžek, nářadí a dronů. Protipožární skříně LOXXER zadrží požár baterie uvnitř a ochrání lidi i majetek. K prodeji i k pronájmu — nezávazná poptávka.">
 <style>
-:root {
-  --white: #ffffff;
-  --off-white: #fafaf7;
-  --cream: #f5f3eb;
-  --black: #1a1c1e;
-  --ink: #2b3440;
-  --ink2: #555;
-  --muted: #888;
-  --gold: #ffce1f;
-  --gold-d: #b59000;
-  --gold-soft: #fff3c4;
-  --green: #2da55b;
-  --green-d: #1f8a4c;
-  --green-soft: #d6f0df;
-  --line: #e5e3da;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
-  --shadow: 0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
-}
+  :root{
+    --green:#2f7d32;--green-d:#1f5e22;--green-l:#eaf3e6;--ink:#12211a;--mut:#5f6d63;
+    --line:#e2e8e0;--paper:#fff;--bg:#f5f8f2;--amber:#e08a00;--amber-d:#b96f00;--red:#c0392b;--ink2:#0b140f;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:16px;line-height:1.6}
+  a{color:var(--green-d)}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  .btn{display:inline-block;border:1px solid var(--green);background:var(--green);color:#fff;border-radius:12px;padding:14px 26px;font-weight:700;font-size:16px;cursor:pointer;font-family:inherit;text-decoration:none;transition:transform .12s,background .15s;box-shadow:0 10px 26px -14px rgba(31,94,34,.7)}
+  .btn:hover{background:var(--green-d);transform:translateY(-1px)}
+  .btn.amber{border-color:var(--amber);background:var(--amber);box-shadow:0 10px 26px -14px rgba(224,138,0,.7)}
+  .btn.amber:hover{background:var(--amber-d)}
+  .btn.big{padding:17px 34px;font-size:17px}
+  .btn.ghost{background:transparent;border-color:rgba(255,255,255,.55);color:#fff;box-shadow:none}
+  .btn.ghost:hover{background:rgba(255,255,255,.12)}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+  /* ---- hlavička ---- */
+  header{position:absolute;top:0;left:0;right:0;z-index:20}
+  .navbar{display:flex;justify-content:space-between;align-items:center;height:70px}
+  .brand{font-weight:800;font-size:22px;letter-spacing:.06em;display:flex;align-items:center;gap:11px;color:#fff}
+  .brand .logo{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#e08a00,#2f7d32);display:grid;place-items:center;color:#fff;font-size:20px}
+  .brand small{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.8);letter-spacing:.02em}
 
-html { scroll-behavior: smooth; }
+  /* ---- HERO přes celou stránku ---- */
+  .hero{min-height:100vh;display:flex;align-items:center;color:#fff;position:relative;
+        background:linear-gradient(135deg,#0b140f 0%,#123018 45%,#1f5e22 100%)}
+  .hero::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(11,20,15,.55),rgba(11,20,15,0) 40%);pointer-events:none}
+  .hero .wrap{position:relative;z-index:2;padding-top:96px;padding-bottom:60px}
+  .kicker{display:inline-flex;align-items:center;gap:8px;background:rgba(224,138,0,.18);border:1px solid rgba(224,138,0,.5);color:#ffd699;border-radius:999px;padding:7px 15px;font-size:13.5px;font-weight:700;letter-spacing:.02em;margin-bottom:20px}
+  .hero h1{font-size:48px;line-height:1.08;margin:0 0 18px;font-weight:800;letter-spacing:-.02em;max-width:16ch}
+  .hero p.lead{font-size:20px;max-width:620px;margin:0 0 30px;color:rgba(255,255,255,.92)}
+  .hero .cta-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .hero .note{font-size:14px;color:rgba(255,255,255,.82);margin-top:16px}
+  .badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:34px}
+  .badges span{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:8px 15px;font-size:13.5px;font-weight:600}
+  .scrolldown{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.7);font-size:13px;z-index:2;text-align:center}
+  @media(max-width:720px){.hero h1{font-size:34px}.hero p.lead{font-size:18px}.hero .wrap{padding-top:110px}}
 
-body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--ink);
-  background: var(--white);
-  -webkit-font-smoothing: antialiased;
-}
+  section{padding:64px 0}
+  .center{text-align:center}
+  h2{font-size:31px;margin:0 0 12px;letter-spacing:-.01em}
+  .sub{color:var(--mut);font-size:18px;max-width:680px;margin:0 auto 34px}
+  section:not(.center) .sub{margin-left:0}
 
-h1, h2, h3, h4 {
-  font-family: 'Sora', 'Inter', sans-serif;
-  font-weight: 700;
-  color: var(--black);
-  letter-spacing: -0.02em;
-}
+  /* ---- riziko (proč vůbec) ---- */
+  .risk{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .riskgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:10px}
+  @media(max-width:760px){.riskgrid{grid-template-columns:1fr}}
+  .stat{background:linear-gradient(160deg,#fff,#fbf6ee);border:1px solid #f0e2cc;border-radius:16px;padding:24px}
+  .stat .big{font-size:34px;font-weight:800;color:var(--amber-d);line-height:1}
+  .stat p{margin:10px 0 0;color:var(--mut);font-size:15px}
 
-a { color: var(--green-d); text-decoration: none; }
-a:hover { text-decoration: underline; }
+  /* ---- benefity ---- */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .feat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px;transition:transform .12s,box-shadow .2s}
+  .feat:hover{transform:translateY(-3px);box-shadow:0 18px 40px -26px rgba(18,33,26,.5)}
+  .feat .ico{width:48px;height:48px;border-radius:12px;background:var(--green-l);display:grid;place-items:center;font-size:24px;margin-bottom:14px}
+  .feat h3{margin:0 0 6px;font-size:19px}
+  .feat p{margin:0;color:var(--mut);font-size:15px}
 
-.container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  /* ---- selling points (tmavý pruh) ---- */
+  .sell{background:linear-gradient(135deg,#12301a,#1f5e22);color:#fff}
+  .selllist{display:grid;grid-template-columns:1fr 1fr;gap:14px 34px;margin-top:26px}
+  @media(max-width:680px){.selllist{grid-template-columns:1fr}}
+  .selllist .li{display:flex;gap:13px;align-items:flex-start;font-size:16px}
+  .selllist .li .ck{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;color:#8ff0a0;font-weight:800}
+  .selllist .li b{display:block}
+  .selllist .li span{color:rgba(255,255,255,.82);font-size:14.5px}
 
-/* ===== NAV BAR ===== */
-.nav {
-  position: sticky; top: 0; z-index: 100;
-  background: rgba(255,255,255,0.95);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--line);
-  padding: 14px 0;
-}
-.nav-inner {
-  display: flex; align-items: center; justify-content: space-between;
-}
-.logo {
-  display: flex; align-items: center; gap: 10px;
-  font-family: 'Sora', sans-serif; font-weight: 800; font-size: 18px;
-  color: var(--black);
-}
-.logo-mark {
-  width: 36px; height: 36px;
-  background: var(--gold);
-  border-radius: 8px;
-  display: grid; place-items: center;
-  color: var(--black); font-weight: 800; font-size: 18px;
-}
-.nav-links { display: flex; gap: 28px; font-size: 14px; font-weight: 500; }
-.nav-links a { color: var(--ink); }
-.nav-cta {
-  background: var(--black); color: var(--white);
-  padding: 10px 20px; border-radius: 8px;
-  font-weight: 600; font-size: 14px;
-}
-.nav-cta:hover { background: var(--green-d); color: var(--white); text-decoration: none; }
-@media (max-width: 768px) { .nav-links { display: none; } }
-.logo-img { height: 40px; width: auto; max-width: 220px; object-fit: contain; display: block; }
+  /* ---- modely ---- */
+  .models{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  @media(max-width:760px){.models{grid-template-columns:1fr}}
+  .model{background:#fff;border:1px solid var(--line);border-radius:18px;padding:26px;position:relative;overflow:hidden}
+  .model.hi{border-color:#cfe0c2;box-shadow:0 20px 50px -30px rgba(31,94,34,.6)}
+  .model .tag{position:absolute;top:16px;right:16px;background:var(--green-l);color:var(--green-d);font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:5px 11px;border-radius:999px}
+  .model h3{margin:0 0 4px;font-size:22px}
+  .model .desc{color:var(--mut);font-size:14.5px;margin:0 0 14px}
+  .model ul{margin:0;padding:0;list-style:none}
+  .model li{padding:6px 0 6px 26px;position:relative;font-size:15px;border-top:1px solid #f0f3ee}
+  .model li:first-child{border-top:0}
+  .model li::before{content:"✓";position:absolute;left:0;top:6px;color:var(--green);font-weight:800}
 
-/* ===== ELKOPLAST NAV (replika z elkoplast.cz) ===== */
-.elko-nav { position: sticky; top: 0; z-index: 200; background: #fff; border-bottom: 1px solid #e6e6e6; box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
-.elko-nav-inner { max-width: 1180px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; height: 74px; }
-.elko-logo { display: flex; align-items: center; }
-.elko-logo img { height: 40px; width: auto; display: block; }
-.elko-collapse { display: flex; align-items: center; gap: 16px; margin-left: auto; }
-.elko-menu { display: flex; align-items: center; list-style: none; margin: 0; padding: 0; }
-.elko-menu > li { position: relative; }
-.elko-menu > li > a { display: flex; align-items: center; gap: 6px; padding: 12px 13px; font-size: 15px; font-weight: 700; color: #0a0a0a; text-decoration: none; white-space: nowrap; transition: color .15s; }
-.elko-menu > li > a:hover { color: #75b947; }
-.elko-menu .caret { width: 10px; height: 10px; opacity: .55; }
-.elko-sub { position: absolute; top: 100%; left: 0; min-width: 250px; background: #fff; border: 1px solid #e6e6e6; border-top: 3px solid #75b947; box-shadow: 0 14px 30px rgba(0,0,0,.13); list-style: none; margin: 0; padding: 8px 0; opacity: 0; visibility: hidden; transform: translateY(6px); transition: opacity .15s, transform .15s, visibility .15s; }
-.elko-menu > li.has-sub:hover > .elko-sub { opacity: 1; visibility: visible; transform: translateY(0); }
-.elko-sub li a { display: block; padding: 10px 22px; font-size: 14px; font-weight: 600; color: #2b3440; text-decoration: none; white-space: nowrap; }
-.elko-sub li a:hover { background: #f1f3f0; color: #75b947; }
-.elko-utils { display: flex; align-items: center; gap: 16px; padding-left: 8px; }
-.elko-stock { font-size: 14px; font-weight: 700; color: #75b947; text-decoration: none; white-space: nowrap; }
-.elko-stock:hover { text-decoration: underline; }
-.elko-eshop { background: #75b947; color: #fff; padding: 11px 22px; border-radius: 6px; font-size: 14px; font-weight: 700; text-decoration: none; white-space: nowrap; }
-.elko-eshop:hover { background: #689f3c; color: #fff; text-decoration: none; }
-.elko-burger { display: none; margin-left: auto; background: none; border: none; cursor: pointer; padding: 8px; }
-.elko-burger span { display: block; width: 26px; height: 2px; background: #0a0a0a; margin: 6px 0; transition: .2s; }
-@media (max-width: 980px) {
-  .elko-burger { display: block; }
-  .elko-collapse { position: absolute; top: 74px; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0; background: #fff; border-bottom: 1px solid #e6e6e6; box-shadow: 0 12px 24px rgba(0,0,0,.1); padding: 8px 0 16px; margin: 0; max-height: calc(100vh - 74px); overflow-y: auto; display: none; }
-  .elko-nav.open .elko-collapse { display: flex; }
-  .elko-menu { flex-direction: column; align-items: stretch; width: 100%; }
-  .elko-menu > li > a { padding: 14px 24px; justify-content: space-between; }
-  .elko-sub { position: static; opacity: 1; visibility: visible; transform: none; border: none; border-top: none; box-shadow: none; padding: 0 0 6px; min-width: 0; display: none; }
-  .elko-menu > li.has-sub.open > .elko-sub { display: block; }
-  .elko-sub li a { padding: 9px 38px; color: #555; }
-  .elko-utils { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px 24px 4px; }
-  .elko-stock { padding: 4px 0; }
-  .elko-eshop { text-align: center; }
-}
+  /* ---- kdo ---- */
+  .who{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+  .who span{background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 17px;font-weight:600;font-size:15px}
 
-/* ===== HERO ===== */
-.hero {
-  padding: 80px 0 100px;
-  background: linear-gradient(180deg, var(--off-white) 0%, var(--white) 100%);
-  position: relative; overflow: hidden;
-}
-.hero::before {
-  content: '';
-  position: absolute; top: -100px; right: -100px;
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, var(--gold-soft) 0%, transparent 70%);
-  opacity: 0.6;
-  z-index: 0;
-}
-.hero-inner { position: relative; z-index: 1; display: grid; grid-template-columns: 1.3fr 1fr; gap: 60px; align-items: center; }
-.hero-kicker {
-  display: inline-block;
-  background: var(--green-soft); color: var(--green-d);
-  padding: 6px 14px; border-radius: 100px;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-  margin-bottom: 22px;
-}
-.hero h1 {
-  font-size: clamp(36px, 5vw, 56px); line-height: 1.05;
-  margin-bottom: 24px;
-}
-.hero h1 .accent { color: var(--green); }
-.hero h1 .gold { background: var(--gold); padding: 0 8px; }
-.hero-sub {
-  font-size: 19px; color: var(--ink2);
-  margin-bottom: 32px; max-width: 540px;
-}
-.hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; }
-.btn-primary {
-  background: var(--gold); color: var(--black);
-  padding: 16px 32px; border-radius: 10px;
-  font-weight: 700; font-size: 15px;
-  border: none; cursor: pointer;
-  box-shadow: 0 4px 16px rgba(255,206,31,0.4);
-  transition: transform 0.15s, box-shadow 0.15s;
-  display: inline-flex; align-items: center; gap: 8px;
-}
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,206,31,0.5); text-decoration: none; }
-.btn-secondary {
-  background: transparent; color: var(--black);
-  padding: 16px 28px; border-radius: 10px;
-  font-weight: 600; font-size: 15px;
-  border: 2px solid var(--black); cursor: pointer;
-}
-.btn-secondary:hover { background: var(--black); color: var(--white); text-decoration: none; }
+  /* ---- formulář ---- */
+  .formwrap{background:linear-gradient(160deg,#eef5ea,#f5f8f2)}
+  .formcard{background:#fff;border:1px solid var(--line);border-radius:22px;padding:34px;box-shadow:0 20px 60px -34px rgba(31,94,34,.5)}
+  @media(max-width:640px){.formcard{padding:22px 18px}}
+  fieldset{border:0;margin:0 0 8px;padding:0}
+  legend{font-weight:800;font-size:15px;color:var(--green-d);padding:16px 0 6px;letter-spacing:.01em}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:560px){.row{grid-template-columns:1fr}}
+  .fld{margin:10px 0}
+  .fld label{display:block;font-size:13.5px;font-weight:600;margin-bottom:5px}
+  .fld .hint{font-weight:400;color:var(--mut);font-size:12.5px}
+  .fld .req{color:var(--red)}
+  input,select,textarea{width:100%;font-family:inherit;font-size:15px;padding:12px 13px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:0;border-color:var(--green);box-shadow:0 0 0 3px rgba(47,125,50,.14)}
+  textarea{resize:vertical;min-height:82px}
+  /* zájem — segment přepínač */
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+  @media(max-width:560px){.seg{grid-template-columns:1fr}}
+  .seg label{display:block;cursor:pointer}
+  .seg input{position:absolute;opacity:0;pointer-events:none}
+  .seg .opt{border:1.5px solid var(--line);border-radius:12px;padding:13px 12px;text-align:center;font-weight:700;font-size:15px;transition:all .12s;background:#fff}
+  .seg .opt small{display:block;font-weight:500;color:var(--mut);font-size:12px;margin-top:2px}
+  .seg input:checked+.opt{border-color:var(--green);background:var(--green-l);color:var(--green-d)}
+  .consent{display:flex;gap:10px;align-items:flex-start;margin:18px 0 6px;font-size:13.5px;color:var(--mut)}
+  .consent input{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+  .msg{margin-top:14px;font-size:14.5px;padding:12px 14px;border-radius:11px;display:none}
+  .msg.err{display:block;background:#fbecea;color:var(--red);border:1px solid #f0c9c3}
+  .done{display:none;text-align:center;padding:30px 10px}
+  .done .tick{width:70px;height:70px;border-radius:50%;background:var(--green-l);color:var(--green);display:grid;place-items:center;font-size:36px;margin:0 auto 16px}
+  .done h3{font-size:23px;margin:0 0 8px}
+  .done p{color:var(--mut);margin:0}
 
-.hero-visual {
-  position: relative; display: grid; place-items: center;
-}
-.hero-media {
-  width: 100%; max-width: 460px; border-radius: 24px;
-  box-shadow: var(--shadow-lg); border: 1px solid var(--line);
-  object-fit: cover; display: block; background: var(--white);
-}
-.hero-stats {
-  background: var(--white);
-  border-radius: 24px;
-  padding: 36px 32px;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--line);
-  width: 100%; max-width: 420px;
-}
-.hero-stat {
-  padding: 18px 0;
-  border-bottom: 1px solid var(--line);
-}
-.hero-stat:last-child { border-bottom: none; }
-.hero-stat-val {
-  font-family: 'Sora', sans-serif;
-  font-size: 36px; font-weight: 800; color: var(--black);
-  line-height: 1;
-}
-.hero-stat-val .unit { font-size: 18px; color: var(--green); font-weight: 600; }
-.hero-stat-lbl {
-  font-size: 13px; color: var(--muted);
-  text-transform: uppercase; letter-spacing: 0.06em;
-  font-weight: 600; margin-top: 6px;
-}
-
-@media (max-width: 768px) {
-  .hero-inner { grid-template-columns: 1fr; }
-  .hero-visual { display: none; }
-}
-
-/* ===== TRUST BAR ===== */
-.trust {
-  background: var(--black); color: var(--white);
-  padding: 28px 0;
-}
-.trust-inner {
-  display: flex; justify-content: space-around; gap: 32px;
-  flex-wrap: wrap; align-items: center;
-}
-.trust-item {
-  text-align: center;
-}
-.trust-num {
-  font-family: 'Sora', sans-serif;
-  font-size: 28px; font-weight: 800;
-  color: var(--gold); line-height: 1;
-}
-.trust-lbl {
-  font-size: 12px; color: rgba(255,255,255,0.7);
-  margin-top: 6px; text-transform: uppercase; letter-spacing: 0.05em;
-}
-
-/* ===== SECTION HEADERS ===== */
-section { padding: 80px 0; }
-.section-header {
-  text-align: center; margin-bottom: 50px;
-}
-.section-kicker {
-  display: inline-block;
-  font-size: 12px; font-weight: 800; color: var(--green-d);
-  letter-spacing: 0.08em; text-transform: uppercase;
-  margin-bottom: 12px;
-}
-.section-title {
-  font-size: clamp(28px, 4vw, 42px);
-  line-height: 1.15;
-  margin-bottom: 16px;
-}
-.section-sub {
-  font-size: 18px; color: var(--ink2);
-  max-width: 640px; margin: 0 auto;
-}
-
-/* ===== VÝHODY ===== */
-.advantages {
-  background: var(--off-white);
-}
-.adv-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
-}
-.adv-card {
-  background: var(--white);
-  border-radius: 16px;
-  padding: 32px 26px;
-  border: 1px solid var(--line);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-.adv-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
-.adv-ic {
-  width: 52px; height: 52px;
-  border-radius: 12px;
-  background: var(--green-soft);
-  color: var(--green-d);
-  display: grid; place-items: center;
-  margin-bottom: 18px;
-}
-.adv-ic svg { width: 26px; height: 26px; }
-.adv-card.gold .adv-ic { background: var(--gold-soft); color: var(--gold-d); }
-.adv-card h3 { font-size: 18px; margin-bottom: 10px; }
-.adv-card p { font-size: 14px; color: var(--ink2); line-height: 1.55; }
-@media (max-width: 900px) { .adv-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 500px) { .adv-grid { grid-template-columns: 1fr; } }
-
-/* ===== KALKULAČKA ===== */
-.calc {
-  background: linear-gradient(135deg, var(--black) 0%, var(--ink) 100%);
-  color: var(--white);
-  position: relative; overflow: hidden;
-}
-.calc::before {
-  content: '';
-  position: absolute; bottom: -150px; left: -100px;
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(255,206,31,0.15) 0%, transparent 70%);
-}
-.calc::after {
-  content: '';
-  position: absolute; top: -100px; right: -150px;
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(45,165,91,0.12) 0%, transparent 70%);
-}
-.calc .section-title { color: var(--white); position: relative; }
-.calc .section-sub { color: rgba(255,255,255,0.75); position: relative; }
-.calc .section-kicker { color: var(--gold); position: relative; }
-
-.calc-card {
-  background: var(--white);
-  color: var(--ink);
-  border-radius: 24px;
-  padding: 48px;
-  box-shadow: var(--shadow-lg);
-  max-width: 920px; margin: 0 auto;
-  position: relative; z-index: 1;
-}
-.calc-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 36px;
-}
-.calc-field {}
-.calc-field label {
-  display: block;
-  font-size: 13px; font-weight: 700; color: var(--black);
-  text-transform: uppercase; letter-spacing: 0.05em;
-  margin-bottom: 10px;
-}
-.calc-field-sub { font-size: 12px; color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; margin-top: 4px; }
-.calc-tonnage {
-  font-family: 'Sora', sans-serif;
-  font-size: 56px; font-weight: 800; color: var(--green);
-  line-height: 1;
-}
-.calc-tonnage .unit { font-size: 18px; color: var(--ink2); font-weight: 500; margin-left: 6px; }
-.range-slider {
-  width: 100%;
-  -webkit-appearance: none; appearance: none;
-  height: 8px; background: var(--cream); border-radius: 5px;
-  outline: none; margin: 18px 0 6px;
-}
-.range-slider::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none;
-  width: 28px; height: 28px;
-  background: var(--gold);
-  border: 3px solid var(--white);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  border-radius: 50%; cursor: pointer;
-}
-.range-slider::-moz-range-thumb {
-  width: 28px; height: 28px; background: var(--gold);
-  border: 3px solid var(--white); border-radius: 50%; cursor: pointer;
-}
-.range-scale {
-  display: flex; justify-content: space-between;
-  font-size: 11px; color: var(--muted); font-weight: 500;
-}
-
-.calc-select {
-  width: 100%; padding: 14px 16px;
-  font-family: inherit; font-size: 15px; font-weight: 500; color: var(--ink);
-  background: var(--off-white);
-  border: 2px solid var(--line);
-  border-radius: 12px;
-  cursor: pointer; outline: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%231a1c1e' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 16px center;
-}
-.calc-select:focus { border-color: var(--green); }
-
-.mode-pills {
-  display: flex; gap: 8px; margin-top: 8px;
-}
-.mode-pill {
-  flex: 1;
-  background: var(--off-white);
-  border: 2px solid var(--line);
-  border-radius: 10px;
-  padding: 12px 8px;
-  font-family: inherit; font-size: 14px; font-weight: 600;
-  color: var(--ink); cursor: pointer;
-  transition: all 0.15s;
-}
-.mode-pill.active {
-  background: var(--gold); border-color: var(--gold);
-  color: var(--black);
-}
-.mode-pill:not(.active):hover { border-color: var(--green); }
-
-/* ===== VÝSLEDEK ===== */
-.calc-result {
-  margin-top: 40px;
-  padding: 32px;
-  background: linear-gradient(135deg, var(--green-soft) 0%, var(--gold-soft) 100%);
-  border-radius: 16px;
-  border: 2px solid var(--green);
-}
-.result-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 22px; }
-.result-title {
-  font-size: 13px; font-weight: 800; color: var(--green-d);
-  letter-spacing: 0.06em; text-transform: uppercase;
-  margin-bottom: 4px;
-}
-.result-model {
-  font-family: 'Sora', sans-serif;
-  font-size: 30px; font-weight: 800; color: var(--black);
-  line-height: 1.1;
-}
-.result-tag {
-  background: var(--black); color: var(--white);
-  padding: 6px 12px; border-radius: 6px;
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-  align-self: flex-start;
-}
-
-.result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 22px; }
-.result-spec {}
-.result-spec-val {
-  font-family: 'Sora', sans-serif;
-  font-size: 20px; font-weight: 700; color: var(--black);
-}
-.result-spec-lbl {
-  font-size: 11px; color: var(--ink2);
-  margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
-}
-
-.result-price-box {
-  background: var(--white);
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 22px;
-}
-.result-price-lbl {
-  font-size: 12px; color: var(--muted);
-  text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;
-  margin-bottom: 6px;
-}
-.result-price {
-  font-family: 'Sora', sans-serif;
-  font-size: 44px; font-weight: 800; color: var(--green-d);
-  line-height: 1;
-}
-.result-price .unit { font-size: 16px; color: var(--ink2); font-weight: 500; }
-.result-price-dph {
-  font-size: 13px; color: var(--ink2); margin-top: 6px;
-}
-.result-price-dph b { color: var(--black); background: var(--gold-soft); padding: 2px 8px; border-radius: 4px; }
-
-.result-quote {
-  background: var(--white);
-  border-radius: 12px;
-  padding: 24px 26px;
-  margin-bottom: 22px;
-  border-left: 4px solid var(--green);
-}
-.result-quote-badge {
-  display: inline-block; background: var(--green-soft); color: var(--green-d);
-  padding: 4px 12px; border-radius: 100px;
-  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
-  margin-bottom: 10px;
-}
-.result-quote-title {
-  font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 800;
-  color: var(--black); line-height: 1.2;
-}
-.result-quote-text { font-size: 14px; color: var(--ink2); margin-top: 8px; line-height: 1.55; }
-
-.result-incl {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-  margin-bottom: 22px;
-}
-.result-incl-item {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: var(--ink); font-weight: 500;
-}
-.result-incl-item svg { width: 16px; height: 16px; color: var(--green); flex-shrink: 0; }
-
-.result-cta {
-  background: var(--black); color: var(--white);
-  padding: 18px 32px;
-  border: none; border-radius: 12px;
-  font-family: inherit; font-weight: 700; font-size: 16px;
-  cursor: pointer; width: 100%;
-  transition: background 0.15s;
-}
-.result-cta:hover { background: var(--green-d); }
-
-@media (max-width: 760px) {
-  .calc-grid { grid-template-columns: 1fr; gap: 28px; }
-  .calc-card { padding: 28px 20px; }
-  .result-grid { grid-template-columns: 1fr 1fr; }
-  .result-incl { grid-template-columns: 1fr; }
-}
-
-/* ===== O BRAMIDAN ===== */
-.about-bramidan {
-  background: var(--white);
-}
-.about-grid {
-  display: grid; grid-template-columns: 1fr 1.2fr; gap: 60px; align-items: center;
-}
-.about-grid h2 { font-size: clamp(28px, 4vw, 38px); margin-bottom: 20px; }
-.about-grid p { color: var(--ink2); margin-bottom: 18px; font-size: 16px; }
-.about-points { list-style: none; margin-top: 24px; }
-.about-points li {
-  display: flex; gap: 14px; padding: 12px 0;
-  border-bottom: 1px solid var(--line);
-}
-.about-points li:last-child { border-bottom: none; }
-.about-points-ic {
-  width: 32px; height: 32px;
-  background: var(--green-soft); color: var(--green-d);
-  border-radius: 8px;
-  display: grid; place-items: center; flex-shrink: 0;
-}
-.about-points-ic svg { width: 16px; height: 16px; }
-.about-points b { display: block; color: var(--black); font-size: 15px; margin-bottom: 2px; }
-.about-points span { font-size: 14px; color: var(--ink2); }
-
-.about-visual {
-  background: var(--off-white);
-  border-radius: 24px;
-  padding: 48px 36px;
-  border: 1px solid var(--line);
-  text-align: center;
-}
-.about-quote {
-  font-family: 'Sora', sans-serif;
-  font-size: 22px; line-height: 1.45;
-  color: var(--black); font-weight: 600;
-  margin: 20px 0;
-}
-.about-quote::before { content: '"'; color: var(--gold); font-size: 60px; line-height: 0; vertical-align: -20px; font-family: Georgia, serif; }
-.about-attr { font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-.about-flag {
-  display: inline-flex; align-items: center; gap: 10px;
-  background: var(--white); padding: 10px 16px; border-radius: 100px;
-  font-size: 13px; font-weight: 600;
-}
-.about-flag { color: var(--green-d); }
-
-@media (max-width: 900px) { .about-grid { grid-template-columns: 1fr; } }
-
-/* ===== CO NABÍZÍME ===== */
-.offer {
-  background: var(--off-white);
-}
-.offer-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px;
-}
-.offer-card {
-  background: var(--white);
-  border-radius: 20px;
-  padding: 36px 30px;
-  border: 2px solid var(--line);
-  position: relative;
-  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-}
-.offer-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--gold);
-  box-shadow: var(--shadow);
-}
-.offer-card.featured {
-  border-color: var(--green);
-  position: relative;
-}
-.offer-card.featured::before {
-  content: 'Nejpopulárnější';
-  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-  background: var(--green); color: var(--white);
-  padding: 5px 14px; border-radius: 100px;
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-}
-.offer-card h3 {
-  font-size: 22px; margin-bottom: 6px;
-}
-.offer-tagline {
-  color: var(--ink2); font-size: 14px; margin-bottom: 22px;
-}
-.offer-features {
-  list-style: none; padding-top: 22px; border-top: 1px solid var(--line);
-}
-.offer-features li {
-  display: flex; gap: 10px; padding: 9px 0;
-  font-size: 14px; color: var(--ink);
-}
-.offer-features li svg {
-  width: 18px; height: 18px; color: var(--green); flex-shrink: 0; margin-top: 2px;
-}
-@media (max-width: 900px) { .offer-grid { grid-template-columns: 1fr; gap: 20px; } }
-
-/* ===== CTA FORM ===== */
-.cta-section {
-  background: var(--green);
-  color: var(--white);
-  position: relative; overflow: hidden;
-}
-.cta-section::before {
-  content: '';
-  position: absolute; top: -100px; right: -100px;
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(255,206,31,0.3) 0%, transparent 70%);
-}
-.cta-inner {
-  display: grid; grid-template-columns: 1fr 1.1fr; gap: 60px; align-items: start;
-  position: relative; z-index: 1;
-}
-.cta-inner h2 {
-  font-size: clamp(28px, 4vw, 40px);
-  color: var(--white);
-  line-height: 1.15;
-  margin-bottom: 18px;
-}
-.cta-inner p {
-  color: rgba(255,255,255,0.92); font-size: 17px; margin-bottom: 14px;
-}
-.cta-checklist { list-style: none; margin-top: 24px; }
-.cta-checklist li {
-  padding: 8px 0; font-size: 15px;
-  display: flex; gap: 10px; align-items: center;
-}
-.cta-checklist li::before {
-  content: '✓'; color: var(--gold); font-weight: 800; font-size: 18px;
-}
-
-.cta-form {
-  background: var(--white);
-  color: var(--ink);
-  border-radius: 20px;
-  padding: 36px;
-  box-shadow: var(--shadow-lg);
-}
-.cta-form h3 { font-size: 22px; margin-bottom: 6px; }
-.cta-form-sub { font-size: 14px; color: var(--ink2); margin-bottom: 24px; }
-.cta-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.cta-form-group { display: flex; flex-direction: column; gap: 6px; }
-.cta-form-group.full { grid-column: 1 / -1; }
-.cta-form-group label {
-  font-size: 12px; font-weight: 700; color: var(--black);
-  text-transform: uppercase; letter-spacing: 0.05em;
-}
-.cta-form-group input, .cta-form-group textarea {
-  padding: 12px 14px; font-family: inherit; font-size: 14px;
-  background: var(--off-white);
-  border: 2px solid var(--line);
-  border-radius: 10px; outline: none;
-  color: var(--ink); resize: vertical;
-}
-.cta-form-group input:focus, .cta-form-group textarea:focus { border-color: var(--green); }
-.cta-form button {
-  margin-top: 20px;
-  background: var(--black); color: var(--white);
-  padding: 16px 24px;
-  border: none; border-radius: 10px;
-  font-family: inherit; font-weight: 700; font-size: 15px;
-  cursor: pointer; width: 100%;
-  transition: background 0.15s;
-}
-.cta-form button:hover { background: var(--green-d); }
-.cta-form-note { font-size: 11px; color: var(--muted); margin-top: 12px; text-align: center; }
-
-@media (max-width: 900px) { .cta-inner { grid-template-columns: 1fr; } .cta-form-grid { grid-template-columns: 1fr; } }
-
-/* ===== FAQ ===== */
-.faq { background: var(--white); }
-.faq-grid { display: grid; gap: 14px; max-width: 800px; margin: 0 auto; }
-.faq-item {
-  background: var(--off-white);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 22px 26px;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-.faq-item:hover { border-color: var(--green); }
-.faq-item summary {
-  font-weight: 700; font-size: 16px; color: var(--black);
-  list-style: none; display: flex; justify-content: space-between; align-items: center;
-}
-.faq-item summary::-webkit-details-marker { display: none; }
-.faq-item summary::after {
-  content: '+'; color: var(--green); font-size: 28px; font-weight: 700;
-  transition: transform 0.2s;
-}
-.faq-item[open] summary::after { content: '−'; }
-.faq-item[open] { background: var(--white); border-color: var(--green); }
-.faq-item p { margin-top: 14px; color: var(--ink2); font-size: 15px; line-height: 1.6; }
-
-/* ===== FOOTER ===== */
-footer {
-  background: var(--black);
-  color: rgba(255,255,255,0.8);
-  padding: 60px 0 28px;
-}
-.foot-grid {
-  display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 40px;
-  margin-bottom: 48px;
-}
-.foot-logo {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 16px;
-  font-family: 'Sora', sans-serif; font-weight: 800; font-size: 20px;
-  color: var(--white);
-}
-.foot-about { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.65); }
-.foot-col h4 {
-  color: var(--white); font-size: 14px;
-  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 18px;
-}
-.foot-col ul { list-style: none; }
-.foot-col li { padding: 6px 0; font-size: 14px; }
-.foot-col a { color: rgba(255,255,255,0.7); }
-.foot-col a:hover { color: var(--gold); text-decoration: none; }
-.foot-bottom {
-  padding-top: 28px; border-top: 1px solid rgba(255,255,255,0.1);
-  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px;
-  font-size: 13px; color: rgba(255,255,255,0.5);
-}
-
-@media (max-width: 900px) {
-  .foot-grid { grid-template-columns: 1fr 1fr; }
-}
-
-/* ===== MODAL ===== */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-  display: none; align-items: center; justify-content: center;
-  z-index: 1000; padding: 20px;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-  background: var(--white);
-  border-radius: 20px;
-  padding: 40px;
-  max-width: 500px; width: 100%;
-  text-align: center;
-  position: relative;
-}
-.modal h3 { font-size: 24px; margin-bottom: 10px; color: var(--green-d); }
-.modal p { color: var(--ink2); margin-bottom: 24px; }
-.modal button {
-  background: var(--gold); color: var(--black);
-  padding: 12px 28px;
-  border: none; border-radius: 10px;
-  font-weight: 700; cursor: pointer;
-}
-
-@media (max-width: 600px) {
-  .hero { padding: 50px 0 60px; }
-  section { padding: 50px 0; }
-}
+  footer{background:var(--ink2);color:#c7d2c8;padding:34px 0;font-size:14px}
+  footer a{color:#cfe6d1}
+  footer .frow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center}
 </style>
 </head>
 <body>
 
-<!-- ===== ELKOPLAST NAV (replika z elkoplast.cz) ===== -->
-<nav class="elko-nav" id="elkoNav">
-  <div class="elko-nav-inner">
-    <a href="https://www.elkoplast.cz/" target="_blank" rel="noopener" class="elko-logo">
-      <img id="brandLogo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGhlaWdodD0iNjA5LjIyNyIgd2lkdGg9IjI5NDUuODY3Ij48ZGVmcz48Y2xpcFBhdGggaWQ9ImEiIGNsaXBQYXRoVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNMCAyMjM3LjU1MmgzMzI1Ljk1MVYwSDB6Ii8+PC9jbGlwUGF0aD48L2RlZnM+PGcgY2xpcC1wYXRoPSJ1cmwoI2EpIiB0cmFuc2Zvcm09Im1hdHJpeCgxLjMzMzMzIDAgMCAtMS4zMzMzMyAtNzQ0LjM2OCAxODEyLjU2MikiPjxwYXRoIGQ9Ik02NDEuMDc5IDk2My4yNzdjLTEuMDEzLjA1OC0yLjAyLjE2NC0zLjAwNy4zMTYtMTUuNDU1IDIuMzQ4LTI3LjI5NiAxNS42OTgtMjcuMjk2IDMxLjgwNyAwIDEuNjQuMTIgMy4yNTUuMzU4IDQuODI3bC40NzUgMi45ODUuMTEuNjcgNDAuMTQyIDIzNy41NTQuMTMuNzEyYzIuOTE4IDE3LjY3IDE0LjgxOCAzMi4zMTMgMzAuODU0IDM5LjA3NWwuMjM3LjA5NWMzOC43MjIgMTYuNDg0IDgxLjMzIDI1LjYwNCAxMjYuMDcyIDI1LjYwNCA0NC44NzcgMCA4Ny42MTktOS4xNzMgMTI2LjQzNi0yNS43NjJsLjQyNy0uMTM3YzE1LjczNS02Ljg0NyAyNy4zODctMjEuMzE1IDMwLjI5OC0zOC43NDNsLjEwNi0uNjk2IDQwLjI3OC0yMzguNDAzLjQ3NC0yLjk4MWMuMjMzLTEuNTc3LjM1OS0zLjE4Ni4zNTktNC44MzEgMC0xNy43NzEtMTQuNDExLTMyLjE3Ni0zMi4xODEtMzIuMTc2bC0yLjYxMS0uMzE3YTE3MDMuNTM2IDE3MDMuNTM2IDAgMDAtMzMwLjA5LjI4eiIgZmlsbD0iIzZmYmYyZSIvPjxwYXRoIGQ9Ik0xMjE3Ljc0IDEyNDAuNHYtNDcuNjM2aC05Ny43ODN2LTM5LjQ4N2g3OC4wNHYtNDYuMzg2aC03OC4wNHYtNDQuNTA0aDk3Ljc4M3YtNDcuNjMxaC0xNTAuNDM2VjEyNDAuNHptODcuNzY0IDB2LTE3OC42MzVoNzIuNjc2di00Ny4wMWgtMTI1LjMzVjEyNDAuNHptNzUxLjc3OSAwdi0xNzguNjM1aDcyLjY3NnYtNDcuMDFIMjAwNC42M1YxMjQwLjR6bS01ODQuNDk1LTEzMi44NzloLTEyLjUzOHYtOTIuNzY3aC01MS4zOTd2MjI1LjY0M2g1MS4zOTd2LTg3Ljc0NWgxMi44NTVsNTkuNTQxIDg3Ljc0NWg1Ny45OGwtNzQuOS0xMTAuMzEgNzguMDMzLTExNS4zMzNoLTU5LjU0N3ptMTc0LjU3Ny05Mi43NjZjLTI3LjU4MiAwLTQyLjYyIDE1LjA0NC00Mi42MiA0Mi42MnYxNDAuNDAyYzAgMjcuNTc3IDE1LjAzOCA0Mi42MjEgNDIuNjIgNDIuNjIxaDgxLjc5NmMyNy41OCAwIDQyLjYyLTE1LjA0MyA0Mi42Mi00Mi42MnYtMTQwLjQwNGMwLTI3LjU3Ni0xNS4wNC00Mi42Mi00Mi42Mi00Mi42MnptMTAuMDI3IDUyLjY1M2MwLTMuNzYxIDEuODgzLTUuNjQ0IDUuNjM5LTUuNjQ0aDUwLjQ2NGMzLjc1NSAwIDUuNjM4IDEuODgzIDUuNjM4IDUuNjQ0djEyMC4zNDNjMCAzLjc2LTEuODgzIDUuNjQ0LTUuNjM4IDUuNjQ0aC01MC40NjRjLTMuNzU2IDAtNS42NC0xLjg4My01LjY0LTUuNjQ0em0yNzUuMTc1IDE3Mi45OTJjMjcuNTgyIDAgNDIuNjItMTUuMDQ0IDQyLjYyLTQyLjYydi02Ni4xM2MwLTI3LjU3Ni0xNS4wMzgtNDIuNjItNDIuNjItNDIuNjJoLTY3LjM4di03NC4yNzRoLTUyLjY1MlYxMjQwLjR6bS0xNS42NjYtMTA0Ljk5YzMuNzYgMCA1LjYzOSAxLjg4NCA1LjYzOSA1LjY0NXY0Ny4zMmMwIDMuNzY2LTEuODc4IDUuNjQ0LTUuNjQgNS42NDRoLTUxLjcxM3YtNTguNjA4em0yOTYuODA4LTcwLjUxNGwtMTMuNzg4LTUwLjE0MmgtNTIuMDI1bDcxLjQ1IDIyNS42NDRoNjAuODA0bDcyLjA3OS0yMjUuNjQ0aC01NC4yMmwtMTQuMDk4IDUwLjE0MnptMzUuMDk4IDEyNS42NzZsLTIyLjI1LTc5LjkxN2g0NC41MDR6bTIyNy44NTktLjk0MmMwIDMuNzYxLTEuODgzIDUuNjQ0LTUuNjM5IDUuNjQ0aC00NC4xOTJjLTMuNzYgMC01LjY0NC0xLjg4My01LjY0NC01LjY0NHYtMjUuNjk5YzAtMy40NDQgMS4yNTYtNC42OTkgNi41ODMtNS45NTVsNTguMjkxLTExLjkxYzMyLjkxLTYuNTc4IDQ1LjEzMS0xNC40MTYgNDUuMTMxLTQ1LjEyNnYtNDMuNTY0YzAtMjcuNTc2LTE1LjA0My00Mi42Mi00Mi42MjUtNDIuNjJoLTc4LjAzNWMtMjcuNTggMC00Mi42MiAxNS4wNDQtNDIuNjIgNDIuNjJ2MzEuMzM3aDUwLjc3di0yMy4xODdjMC0zLjc2IDEuODc3LTUuNjQ1IDUuNjQ0LTUuNjQ1aDQ4LjU3NWMzLjc2MSAwIDUuNjQgMS44ODQgNS42NCA1LjY0NXYyNy44OTJjMCAzLjQ0NS0yLjE5NiA0LjctNi41ODQgNS42NDRsLTU4LjI4NiAxMi4yMTdjLTMyLjkwOSA2LjktNDUuMTM2IDE0LjQxNi00NS4xMzYgNDUuMTM2djQxLjM2NGMwIDI3LjU3NyAxNS4wNDMgNDIuNjIxIDQyLjYyNSA0Mi42MjFoNzMuNjUxYzI3LjU3NyAwIDQyLjYyMS0xNS4wNDQgNDIuNjIxLTQyLjYydi0yOS4xNDloLTUwLjc3em03My42NjQgNTAuNzd2LTQ3LjAwOGg1Ni4wOTF2LTE3OC42NGg1Mi42NTJ2MTc4LjY0aDU2LjEwM3Y0Ny4wMDl6IiBmaWxsPSIjNDQ0MTQxIi8+PHBhdGggZD0iTTgxMi45MSAxMDQyLjM4bDM2LjM3NSA0Mi4xMTkuMDA1LTE0LjE3OSAzNC44MDgtLjAyNi0zMi4wNyA1NC44MDUgNDcuODkgMjcuNzg3IDQ1LjI0Ni03Ny43Ni0zNC42NS02MC4zOC02MS4yMjQuMDA1di0xNy4yOHptLTEwNC44ODMtMjcuNjE4bC0zNC44ODIgNjAuNDk2IDMwLjIxNCA1Mi40ODQtMTQuOTg2IDguNjI0IDU3LjI3OSA5LjE2MyAxOC4wMzQtNTIuNDk1LTEyLjE1MyA2Ljk5NC0xNy4xMDEtMjkuNzAyaDYzLjAwN3YtNTUuNTc1em0yMi45OTggMTU4LjA4NmwxOC4xMTkgMzEuNzA3IDE4LjI1NiAzMS43OC4zNDguMTE2YzEzLjE4IDQuMzgzIDI2Ljk3NSA2LjYwOSA0MC45OTUgNi42MDkgMTQuMzMyIDAgMjguNDItMi4zMjEgNDEuODY2LTYuOTA0bC4zNDMtLjExNiAyMi45MjQtMzkuNjc3IDEzLjEzNCA3LjY2OS0xOS4wNDItNTAuMzYzLTUwLjU5NSA5LjY5IDEwLjQ3IDYuMTE4LTE5LjAyNiAzMi41NzItMzEuNzUtNTUuNjM4eiIgZmlsbD0iI2ZmZiIvPjwvZz48L3N2Zz4=" alt="ELKOPLAST">
-    </a>
-    <button class="elko-burger" id="elkoBurger" aria-label="Menu"><span></span><span></span><span></span></button>
-    <div class="elko-collapse" id="elkoCollapse">
-      <ul class="elko-menu">
-        <li class="has-sub">
-          <a href="https://www.elkoplast.cz/produkty" target="_blank" rel="noopener">Produkty <svg class="caret" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1.5 6 6.5 11 1.5"/></svg></a>
-          <ul class="elko-sub">
-            <li><a href="https://www.elkoplast.cz/odpadove-hospodarstvi" target="_blank" rel="noopener">Odpadové hospodářství</a></li>
-            <li><a href="https://www.elkoplast.cz/dum-a-zahrada" target="_blank" rel="noopener">Dům a zahrada</a></li>
-            <li><a href="https://www.elkoplast.cz/hospodareni-s-kapalinami" target="_blank" rel="noopener">Hospodaření s kapalinami</a></li>
-            <li><a href="https://www.elkoplast.cz/zimni-udrzba" target="_blank" rel="noopener">Zimní údržba</a></li>
-            <li><a href="https://www.elkoplast.cz/skladovani" target="_blank" rel="noopener">Skladování</a></li>
-          </ul>
-        </li>
-        <li class="has-sub">
-          <a href="https://www.elkoplast.cz/sluzby" target="_blank" rel="noopener">Služby <svg class="caret" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1.5 6 6.5 11 1.5"/></svg></a>
-          <ul class="elko-sub">
-            <li><a href="https://www.elkoplast.cz/rotacni-odlevani" target="_blank" rel="noopener">Rotační odlévání</a></li>
-            <li><a href="https://www.elkoplast.cz/vyroba-ze-sklolaminatu" target="_blank" rel="noopener">Výroba ze sklolaminátu</a></li>
-            <li><a href="https://www.elkoplast.cz/kovovyroba" target="_blank" rel="noopener">Kovovýroba</a></li>
-            <li><a href="https://www.elkoplast.cz/doprava-o-nas" target="_blank" rel="noopener">Doprava</a></li>
-          </ul>
-        </li>
-        <li><a href="https://www.elkoplast.cz/reference" target="_blank" rel="noopener">Reference</a></li>
-        <li class="has-sub">
-          <a href="https://www.elkoplast.cz/o-nas" target="_blank" rel="noopener">O nás <svg class="caret" viewBox="0 0 12 8" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1.5 6 6.5 11 1.5"/></svg></a>
-          <ul class="elko-sub">
-            <li><a href="https://www.elkoplast.cz/o-nas#nase-vyroba" target="_blank" rel="noopener">Naše výroba</a></li>
-            <li><a href="https://www.elkoplast.cz/o-nas#doprava-nase" target="_blank" rel="noopener">Doprava</a></li>
-            <li><a href="https://www.elkoplast.cz/o-nas#pomahame-druhym" target="_blank" rel="noopener">Pomáháme druhým</a></li>
-            <li><a href="https://www.elkoplast.cz/o-nas#milniky" target="_blank" rel="noopener">Milníky</a></li>
-            <li><a href="https://www.elkoplast.cz/gdpr" target="_blank" rel="noopener">GDPR</a></li>
-            <li><a href="https://www.elkoplast.cz/o-nas#podpora-eu" target="_blank" rel="noopener">Podpora od EU</a></li>
-          </ul>
-        </li>
-        <li><a href="https://www.elkoplast.cz/kontakty" target="_blank" rel="noopener">Kontakty</a></li>
-      </ul>
-      <div class="elko-utils">
-        <a class="elko-stock" href="https://www.elkoplast.cz/skladova-nabidka" target="_blank" rel="noopener">Skladem</a>
-        <a class="elko-eshop" href="https://www.elkoplast.cz/navstivit-eshop" target="_blank" rel="noopener">e-shop</a>
-      </div>
+<header>
+  <div class="wrap navbar">
+    <div class="brand"><span class="logo">🔋</span><span>LOXXER<small>ELKOPLAST CZ, s.r.o.</small></span></div>
+    <a class="btn ghost" href="#poptavka">Nezávazná poptávka</a>
+  </div>
+</header>
+
+<!-- ============ HERO přes celou stránku ============ -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <span class="kicker">🔥 Lithiové baterie hoří jinak — buďte připraveni</span>
+    <h1>Skladujte a nabíjejte baterie bezpečně.</h1>
+    <p class="lead">Protipožární skříně <b>LOXXER</b> zadrží požár lithiové baterie uvnitř, spustí alarm a ochrání vaše lidi, budovu i provoz. Certifikované, chytré a připravené k okamžitému nasazení — <b>ke koupi i k pronájmu</b>.</p>
+    <div class="cta-row">
+      <a class="btn amber big" href="#poptavka">Chci nezávaznou nabídku</a>
+      <a class="btn ghost big" href="#benefity">Proč LOXXER?</a>
+    </div>
+    <p class="note">Odpovíme obvykle do 1–2 pracovních dnů · Poradíme s výběrem modelu · Prodej i pronájem</p>
+    <div class="badges">
+      <span>✔ Certifikace VDMA 24994 &amp; KIWA</span>
+      <span>✔ Požární odolnost až 90 min</span>
+      <span>✔ Automatické hašení aerosolem</span>
+      <span>✔ Chytré alarmy (SMS &amp; e-mail)</span>
     </div>
   </div>
-</nav>
-<script>
-// ELKOPLAST nav — mobilní hamburger + rozbalování submenu
-(function () {
-  const nav = document.getElementById('elkoNav');
-  const burger = document.getElementById('elkoBurger');
-  if (burger && nav) burger.addEventListener('click', () => nav.classList.toggle('open'));
-  document.querySelectorAll('.elko-menu > li.has-sub > a').forEach(a => {
-    a.addEventListener('click', e => {
-      if (window.innerWidth <= 980) { e.preventDefault(); a.parentElement.classList.toggle('open'); }
-    });
-  });
-})();
-</script>
+  <div class="scrolldown">↓ posuňte pro víc</div>
+</section>
 
-<!-- ===== HERO ===== -->
-<section class="hero">
-  <div class="container hero-inner">
-    <div>
-      <div class="hero-kicker">🔋 ELKOPLAST · LOXXER — skladování Li-Ion baterií</div>
-      <h1>
-        Skladujte baterie<br>
-        <span class="accent">bezpečně</span><br>
-        <span class="gold">a bez rizika požáru.</span>
-      </h1>
-      <p class="hero-sub">
-        Protipožární skříně LOXXER zadrží požár lithiové baterie uvnitř, spustí alarm
-        a ochrání vaše lidi, budovu i provoz. Vyberte si za 30 sekund model
-        přesně pro váš provoz — ke koupi i k pronájmu.
-      </p>
-      <div class="hero-ctas">
-        <a href="#kalkulacka" class="btn-primary">
-          Vybrat vhodnou skříň
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
-        <a href="#vyhody" class="btn-secondary">Proč LOXXER?</a>
-      </div>
-    </div>
-
-    <div class="hero-visual">
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <div class="hero-stat-val">až 90 min<span class="unit"></span></div>
-          <div class="hero-stat-lbl">Požární odolnost</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-val">VDMA<span class="unit"> 24994</span></div>
-          <div class="hero-stat-lbl">Certifikováno</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-val">24/7<span class="unit"></span></div>
-          <div class="hero-stat-lbl">Chytrý dohled (SMS &amp; e-mail)</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-val">3<span class="unit"> modely</span></div>
-          <div class="hero-stat-lbl">Pro každý provoz</div>
-        </div>
-      </div>
+<!-- ============ RIZIKO ============ -->
+<section class="risk center">
+  <div class="wrap">
+    <h2>Proč to řešit právě teď</h2>
+    <p class="sub">E-kola, koloběžky, aku nářadí a drony jsou všude. Lithiové baterie při přebití nebo poškození mohou zahořet během vteřin — s teplotou přes 500 °C, jedovatým kouřem a rizikem přeskoku požáru. Běžná skříň ani hasicí přístroj to nezastaví.</p>
+    <div class="riskgrid">
+      <div class="stat"><div class="big">&lt; 60 s</div><p>Od prvních příznaků k plnému zahoření baterie (thermal runaway). Na reakci nezbývá čas — musí zapracovat skříň.</p></div>
+      <div class="stat"><div class="big">500+ °C</div><p>Teplota hořící lithiové baterie. LOXXER požár uzavře uvnitř a brání jeho přeskoku na okolí.</p></div>
+      <div class="stat"><div class="big">1 skříň</div><p>Nahradí improvizovaná „bezpečná místa" a splní požadavky pojišťovny i normy PGS 37‑2 na jednom místě.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ===== TRUST BAR ===== -->
-<div class="trust">
-  <div class="container trust-inner">
-    <div class="trust-item">
-      <div class="trust-num">25+</div>
-      <div class="trust-lbl">let zkušeností</div>
-    </div>
-    <div class="trust-item">
-      <div class="trust-num">5</div>
-      <div class="trust-lbl">závodů ČR</div>
-    </div>
-    <div class="trust-item">
-      <div class="trust-num">500+</div>
-      <div class="trust-lbl">spokojených klientů</div>
-    </div>
-    <div class="trust-item">
-      <div class="trust-num">90 min</div>
-      <div class="trust-lbl">požární odolnost</div>
-    </div>
-    <div class="trust-item">
-      <div class="trust-num">100 %</div>
-      <div class="trust-lbl">servis a revize v ceně</div>
-    </div>
-  </div>
-</div>
-
-<!-- ===== VÝHODY ===== -->
-<section class="advantages" id="vyhody">
-  <div class="container">
-    <div class="section-header">
-      <div class="section-kicker">Proč LOXXER od ELKOPLASTu</div>
-      <h2 class="section-title">Čtyři důvody, proč nepodcenit lithiové baterie</h2>
-      <p class="section-sub">
-        Baterie e-kol, koloběžek a nářadí mohou při přebití nebo poškození zahořet během vteřin —
-        s teplotou přes 500 °C a rizikem přeskoku požáru. Skříň LOXXER to zvládne za vás.
-      </p>
-    </div>
-
-    <div class="adv-grid">
-      <div class="adv-card">
-        <div class="adv-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        </div>
-        <h3>Požár zůstane uvnitř</h3>
-        <p>Ohnivzdorná konstrukce s požární odolností až 90 minut a ohnivzdornými policemi brání přeskoku ohně mezi bateriemi i do okolí. Certifikace VDMA 24994 a KIWA.</p>
-      </div>
-
-      <div class="adv-card gold">
-        <div class="adv-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        </div>
-        <h3>Poplach dřív, než začne hořet</h3>
-        <p>Kouřová a teplotní čidla spustí sirénu a maják a okamžitě odešlou upozornění přes SMS a e-mail. O incidentu víte, i když jste zrovna jinde.</p>
-      </div>
-
-      <div class="adv-card">
-        <div class="adv-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-        </div>
-        <h3>Automatické hašení</h3>
-        <p>Volitelný aerosolový hasicí systém se při detekci sám aktivuje, baterii ochladí a udrží požár pod kontrolou — bez lidského zásahu.</p>
-      </div>
-
-      <div class="adv-card gold">
-        <div class="adv-ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="7" rx="1"/><circle cx="7" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M5 11l2-5h10l2 5"/></svg>
-        </div>
-        <h3>Nabíjení pod dohledem</h3>
-        <p>Každá police má vlastní zásuvkovou lištu. Nucená ventilace brání přehřívání a dveřní kontakty i chytrý software hlídají provoz 24/7.</p>
-      </div>
+<!-- ============ BENEFITY ============ -->
+<section id="benefity" class="center">
+  <div class="wrap">
+    <h2>Co vám LOXXER přinese</h2>
+    <p class="sub">Nekupujete plechovou skříň — kupujete klid, že se z jedné vadné baterie nestane požár haly.</p>
+    <div class="grid">
+      <div class="feat"><div class="ico">🛡️</div><h3>Požár zůstane uvnitř</h3><p>Ohnivzdorná konstrukce (EN 1364‑1) s požární odolností až 90 minut a ohnivzdornými policemi brání přeskoku ohně mezi bateriemi i do okolí.</p></div>
+      <div class="feat"><div class="ico">🚨</div><h3>Poplach dřív, než začne hořet</h3><p>Kouřová a teplotní čidla spustí sirénu a maják a okamžitě odešlou upozornění přes SMS a e‑mail. O incidentu víte, i když jste zrovna jinde.</p></div>
+      <div class="feat"><div class="ico">💧</div><h3>Automatické hašení</h3><p>Volitelný aerosolový hasicí systém se při detekci sám aktivuje, baterii ochladí a udrží požár pod kontrolou — bez lidského zásahu.</p></div>
+      <div class="feat"><div class="ico">🔌</div><h3>Nabíjení pod dohledem</h3><p>Každá police má vlastní zásuvkovou lištu. Při otevřených dveřích déle než 5 minut, výpadku nebo přehřátí se nabíjení automaticky přeruší.</p></div>
+      <div class="feat"><div class="ico">📜</div><h3>Klid s pojišťovnou i revizí</h3><p>Certifikace VDMA 24994 a KIWA, CE a soulad s PGS 37‑2. Doložitelná bezpečnost, kterou po vás chce pojišťovna i hasiči.</p></div>
+      <div class="feat"><div class="ico">🚚</div><h3>Připraveno k nasazení</h3><p>Aktivní ventilace proti přehřívání, samozavírací uzamykatelné dveře a výřezy pro paletový vozík ze všech stran — v případě incidentu skříň snadno vyvezete ven.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ===== KALKULAČKA ===== -->
-<section class="calc" id="kalkulacka">
-  <div class="container">
-    <div class="section-header">
-      <div class="section-kicker">⚡ Konfigurátor skříně</div>
-      <h2 class="section-title">Vyberte si skříň LOXXER za 30 sekund</h2>
-      <p class="section-sub">
-        Zadejte, kolik baterií nabíjíte, co skladujete a jakou formu dodávky chcete —
-        okamžitě uvidíte doporučený model pro váš provoz.
-      </p>
-    </div>
-
-    <div class="calc-card">
-      <div class="calc-grid">
-        <div class="calc-field">
-          <label>Kolik baterií najednou nabíjíte?</label>
-          <div class="calc-tonnage"><span id="tonsVal">8</span><span class="unit">baterií</span></div>
-          <input type="range" class="range-slider" id="tonsRange" min="1" max="24" step="1" value="8">
-          <div class="range-scale"><span>1</span><span>12</span><span>24</span></div>
-          <div class="calc-field-sub" style="margin-top:10px">Orientační — přesně doladíme při konzultaci.</div>
-
-          <label style="margin-top:24px">Kdo baterie nabíjí?</label>
-          <div class="mode-pills" id="carrierPills">
-            <button class="mode-pill active" data-use="central">Centrální sklad</button>
-            <button class="mode-pill" data-use="shared">Více uživatelů</button>
-          </div>
-          <div class="calc-field-sub" style="margin-top:8px">„Více uživatelů" = každý má svůj uzamykatelný box (model LOX12).</div>
-        </div>
-
-        <div class="calc-field">
-          <label>Co převážně skladujete?</label>
-          <select class="calc-select" id="materialSelect">
-            <option value="ekola" selected>Baterie e-kol a koloběžek</option>
-            <option value="naradi">Aku nářadí</option>
-            <option value="drony">Drony a RC modely</option>
-            <option value="mix">Více typů baterií</option>
-          </select>
-
-          <label style="margin-top:24px">Aerosolové hašení</label>
-          <div class="mode-pills" id="aerosolPills">
-            <button class="mode-pill active" data-aerosol="ano">Doporučujeme</button>
-            <button class="mode-pill" data-aerosol="ne">Ne</button>
-          </div>
-
-          <label style="margin-top:24px">Forma dodávky</label>
-          <div class="mode-pills" id="modePills">
-            <button class="mode-pill active" data-mode="rent">Pronájem</button>
-            <button class="mode-pill" data-mode="lease">Leasing</button>
-            <button class="mode-pill" data-mode="sale">Prodej</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- VÝSLEDEK -->
-      <div class="calc-result" id="result">
-        <div class="result-header">
-          <div>
-            <div class="result-title">Doporučená skříň pro váš provoz</div>
-            <div class="result-model" id="resultModel">LOXK2000 VDMA</div>
-          </div>
-          <div class="result-tag" id="resultSerie">VDMA 24994</div>
-        </div>
-
-        <div class="result-grid">
-          <div class="result-spec">
-            <div class="result-spec-val" id="resultVol">~16 baterií</div>
-            <div class="result-spec-lbl">Kapacita</div>
-          </div>
-          <div class="result-spec">
-            <div class="result-spec-val" id="resultForce">90 min</div>
-            <div class="result-spec-lbl">Požární odolnost</div>
-          </div>
-          <div class="result-spec">
-            <div class="result-spec-val" id="resultCarrier">Aerosol + alarm</div>
-            <div class="result-spec-lbl">Ochrana</div>
-          </div>
-        </div>
-
-        <div class="result-quote">
-          <span class="result-quote-badge">Cena na míru</span>
-          <div class="result-quote-title">Přesnou cenu vám spočítáme zdarma</div>
-          <p class="result-quote-text">
-            Každý provoz je jiný — finální cenu pronájmu, leasingu i prodeje
-            (vč. kompletního servisu) připravíme přesně pro vás. Pošlete nezávaznou
-            poptávku a obchodní zástupce se ozve do 24 hodin.
-          </p>
-        </div>
-
-        <div class="result-incl">
-          <div class="result-incl-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Doprava a instalace</div>
-          <div class="result-incl-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Zaškolení obsluhy</div>
-          <div class="result-incl-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Servis a roční revize</div>
-        </div>
-
-        <button class="result-cta" onclick="document.getElementById('kontakt').scrollIntoView({behavior:'smooth'})">
-          Chci nezávaznou nabídku →
-        </button>
-      </div>
+<!-- ============ SELLING POINTS ============ -->
+<section class="sell">
+  <div class="wrap">
+    <h2 style="color:#fff">Proč si vybrat LOXXER přes ELKOPLAST CZ</h2>
+    <p class="sub" style="color:rgba(255,255,255,.85);margin-left:0">Špičkové nizozemské skříně LOXXER s českým servisem, poradenstvím a smlouvou na míru.</p>
+    <div class="selllist">
+      <div class="li"><span class="ck">✓</span><div><b>Prodej i pronájem</b><span>Pořiďte skříň natrvalo, nebo si ji pronajměte s ročním servisem — bez velké počáteční investice.</span></div></div>
+      <div class="li"><span class="ck">✓</span><div><b>Poradíme s výběrem i umístěním</b><span>Podle typu baterií a provozu doporučíme model i počet skříní. Žádné přeplácení.</span></div></div>
+      <div class="li"><span class="ck">✓</span><div><b>Roční servis a revize</b><span>Certifikovaná roční prohlídka a testy udrží skříň i váš klid v kondici — a papíry pro pojišťovnu.</span></div></div>
+      <div class="li"><span class="ck">✓</span><div><b>Chytré monitorování</b><span>Volitelný M2M modul vás přes několik sítí spolehlivě informuje o stavu skříně 24/7.</span></div></div>
+      <div class="li"><span class="ck">✓</span><div><b>Napojení na vaši EPS</b><span>Skříň lze propojit s vaší stávající požární ústřednou (EN 12094).</span></div></div>
+      <div class="li"><span class="ck">✓</span><div><b>Rychlé dodání a instalace</b><span>Skladem dostupné modely, doprava i uvedení do provozu po celé ČR.</span></div></div>
     </div>
   </div>
 </section>
 
-<!-- ===== O BRAMIDAN ===== -->
-<section class="about-bramidan">
-  <div class="container">
-    <div class="about-grid">
-      <div>
-        <div class="section-kicker">O skříních LOXXER</div>
-        <h2>Bezpečnost prověřená certifikací</h2>
-        <p>
-          LOXXER jsou protipožární skříně pro skladování a nabíjení lithium-iontových
-          baterií — e-kol, koloběžek, aku nářadí, dronů a dalších zařízení. ELKOPLAST CZ
-          je dodává, instaluje a servisuje po celé ČR.
-        </p>
-        <p>
-          Najdete je v půjčovnách e-kol, servisech a dílnách, skladech, prodejnách
-          i firemních budovách — všude tam, kde se nabíjí víc baterií a kde by z jedné
-          vadné neměl vzniknout požár haly.
-        </p>
-
-        <ul class="about-points">
-          <li>
-            <div class="about-points-ic">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-            <div>
-              <b>3 modely pro každý provoz</b>
-              <span>Od kompaktní LOXK1100 přes velkou LOXK2000 VDMA po LOX12 s 12 uzamykatelnými boxy.</span>
-            </div>
-          </li>
-          <li>
-            <div class="about-points-ic">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-            <div>
-              <b>Certifikace VDMA 24994 &amp; KIWA</b>
-              <span>Ohnivzdorná konstrukce (EN 1364-1), požární odolnost až 90 minut a doložitelná bezpečnost pro pojišťovnu i hasiče.</span>
-            </div>
-          </li>
-          <li>
-            <div class="about-points-ic">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-            <div>
-              <b>Chytrá ochrana a hašení</b>
-              <span>Kouřová a teplotní detekce, audiovizuální alarm, nucená ventilace a volitelné aerosolové hašení s upozorněním přes SMS a e-mail.</span>
-            </div>
-          </li>
-          <li>
-            <div class="about-points-ic">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-            </div>
-            <div>
-              <b>Servis a roční revize</b>
-              <span>Certifikovaná roční prohlídka a bezpečnostní testy udrží skříň v kondici — a papíry pro pojišťovnu.</span>
-            </div>
-          </li>
+<!-- ============ MODELY ============ -->
+<section id="modely" class="center">
+  <div class="wrap">
+    <h2>Modely pro každý provoz</h2>
+    <p class="sub">Od menší dílny po půjčovnu e‑kol. Nevíte, který zvolit? Napište nám a poradíme.</p>
+    <div class="models" style="text-align:left">
+      <div class="model">
+        <div class="tag">Kompakt</div>
+        <h3>LOXXER 1850</h3>
+        <p class="desc">Skříň 1850 mm ve verzích BASIC / PREMIUM / ADVANCED — vyberete si přesně tolik bezpečnosti, kolik potřebujete.</p>
+        <ul>
+          <li>Požární odolnost 60–90 min, 4 police (nosnost 70 kg)</li>
+          <li>2 kouřová čidla, siréna a maják</li>
+          <li>PREMIUM/ADVANCED: aerosolové hašení, aktivní ventilace, chytrý software</li>
+          <li>ADVANCED: záložní UPS, schválená požární ústředna, KIWA K21045</li>
         </ul>
       </div>
-
-      <div class="about-visual">
-        <div class="about-flag">✓ VDMA 24994 &amp; KIWA · certifikováno</div>
-        <div class="about-quote">
-          Nekupujete plechovou skříň — kupujete klid, že se z jedné
-          vadné baterie nestane požár celé haly.
-        </div>
-        <div class="about-attr">— ELKOPLAST CZ · oficiální partner LOXXER</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ===== CO NABÍZÍME ===== -->
-<section class="offer" id="nabidka">
-  <div class="container">
-    <div class="section-header">
-      <div class="section-kicker">Co od nás dostanete</div>
-      <h2 class="section-title">Tři formy spolupráce</h2>
-      <p class="section-sub">
-        Vyberte si financování, které vám sedí. Pro každou variantu nabízíme
-        kompletní servis, dopravu i zaškolení.
-      </p>
-    </div>
-
-    <div class="offer-grid">
-      <div class="offer-card featured">
-        <h3>Pronájem</h3>
-        <p class="offer-tagline">Nejflexibilnější varianta — bez investice</p>
-        <ul class="offer-features">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Pevná měsíční sazba</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Kompletní servis v ceně</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Doba 12–60 měsíců</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Sleva 7–15 % při závazku 5+ let</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Žádné riziko poruchy — vše řešíme</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Možnost prodloužení nebo výměny modelu</li>
-        </ul>
-      </div>
-
-      <div class="offer-card">
-        <h3>Leasing</h3>
-        <p class="offer-tagline">Nižší splátky s opcí výkupu na konci</p>
-        <ul class="offer-features">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> O 30–40 % nižší splátka než pronájem</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Doba 60 měsíců (5 let)</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Daňově uznatelné dle § 24 ZDP</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Kompletní servis v ceně</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Na konci: výkup za 30 % / vrácení / prodloužení</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Vhodné pro velké stroje a CFO orientované firmy</li>
-        </ul>
-      </div>
-
-      <div class="offer-card">
-        <h3>Prodej</h3>
-        <p class="offer-tagline">Plné vlastnictví od prvního dne</p>
-        <ul class="offer-features">
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Jednorázová investice, skříň je vaše</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Daňové odpisy 5 let lineárně</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Záruka 24 měsíců</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Volitelné servisní balíčky</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Dodání do 30–60 dnů</li>
-          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Pro klienty s plnou kapitálovou výbavou</li>
+      <div class="model hi">
+        <div class="tag">Nejvyšší kapacita</div>
+        <h3>LOXXER LOXK2000 VDMA</h3>
+        <p class="desc">Velkoobjemová skříň certifikovaná dle VDMA 24994 pro nejnáročnější provozy a větší baterie.</p>
+        <ul>
+          <li>Certifikace VDMA 24994, ohnivzdorná konstrukce EN 1364‑1</li>
+          <li>4 ohnivzdorné police, 4 nabíjecí lišty, aktivní ventilace</li>
+          <li>Kouřová i teplotní detekce, audiovizuální alarm, RGB LED</li>
+          <li>Volitelně aerosolové hašení a M2M monitorování</li>
         </ul>
       </div>
     </div>
+    <div class="who">
+      <span>🚲 Půjčovny e‑kol a koloběžek</span>
+      <span>🔧 Servisy a dílny</span>
+      <span>🏭 Sklady a výroba</span>
+      <span>🛒 Prodejny elektrokol</span>
+      <span>🚁 Provozovatelé dronů</span>
+      <span>🏢 Firemní budovy</span>
+    </div>
   </div>
 </section>
 
-<!-- ===== CTA FORMULÁŘ ===== -->
-<section class="cta-section" id="kontakt">
-  <div class="container">
-    <div class="cta-inner">
-      <div>
-        <div class="section-kicker" style="color:var(--gold)">Začněme spolupracovat</div>
-        <h2>Získejte nezávaznou nabídku na míru — do 24 hodin</h2>
-        <p>
-          Vyplňte formulář a obchodní zástupce ELKOPLAST CZ vás kontaktuje
-          do 24 hodin s podrobnou nabídkou pro váš provoz.
-        </p>
-        <ul class="cta-checklist">
-          <li>Doporučení ideálního modelu LOXXER</li>
-          <li>Cenová nabídka na míru (prodej i pronájem)</li>
-          <li>Konzultace umístění a napojení na EPS</li>
-          <li>Bez závazků a skrytých poplatků</li>
-          <li>Kompletní nabídka v PDF</li>
-        </ul>
-      </div>
+<!-- ============ POPTÁVKA ============ -->
+<section class="formwrap" id="poptavka">
+  <div class="wrap" style="max-width:800px">
+    <h2 style="text-align:center">Nezávazná poptávka</h2>
+    <p class="sub center">Řekněte nám, co potřebujete skladovat — obchodník vám připraví nabídku na míru (koupě i pronájem). Políčka bez hvězdičky nejsou povinná.</p>
 
-      <div class="cta-form">
-        <h3>Nezávazná poptávka</h3>
-        <p class="cta-form-sub">Odpovíme do 24 hodin.</p>
+    <div class="formcard">
+      <form id="frm" novalidate>
+        <div class="hp"><label>Nevyplňujte<input type="text" name="web" tabindex="-1" autocomplete="off"></label></div>
 
-        <form id="contactForm" onsubmit="return handleSubmit(event)">
-          <div class="cta-form-grid">
-            <div class="cta-form-group full">
-              <label>Společnost</label>
-              <input type="text" name="company" placeholder="např. Recyklace ABC s.r.o." required>
+        <fieldset>
+          <legend>Mám zájem o</legend>
+          <div class="seg">
+            <label><input type="radio" name="zajem" value="koupe" checked><span class="opt">Koupi<small>skříň natrvalo</small></span></label>
+            <label><input type="radio" name="zajem" value="pronajem"><span class="opt">Pronájem<small>vč. servisu</small></span></label>
+            <label><input type="radio" name="zajem" value="poradit"><span class="opt">Zatím nevím<small>poradíte mi</small></span></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Kontaktní údaje</legend>
+          <div class="row">
+            <div class="fld"><label>Firma / organizace <span class="req">*</span></label><input id="firma" maxlength="160" autocomplete="organization" required></div>
+            <div class="fld"><label>Jméno a příjmení <span class="req">*</span></label><input id="jmeno" maxlength="160" autocomplete="name" required></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label>E-mail <span class="req">*</span></label><input id="email" type="email" maxlength="160" autocomplete="email" required></div>
+            <div class="fld"><label>Telefon</label><input id="telefon" type="tel" maxlength="60" autocomplete="tel"></div>
+          </div>
+          <div class="fld"><label>Vaše pracovní pozice</label><input id="pozice" maxlength="160" placeholder="např. vedoucí provozu, technik BOZP"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Co potřebujete skladovat</legend>
+          <div class="row">
+            <div class="fld"><label>Jaké baterie budete skladovat / nabíjet? <span class="hint">— typ zařízení</span></label><input id="baterie" maxlength="300" placeholder="např. baterie e-kol a koloběžek, aku nářadí"></div>
+            <div class="fld"><label>Přibližné množství baterií</label><input id="mnozstvi" maxlength="160" placeholder="např. 15–20 ks"></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label>Uvažovaný model <span class="hint">— nevadí, když nevíte</span></label>
+              <select id="model">
+                <option value="">Nevím / poradíte mi</option>
+                <option>LOXXER 1850 BASIC</option>
+                <option>LOXXER 1850 PREMIUM</option>
+                <option>LOXXER 1850 ADVANCED</option>
+                <option>LOXXER LOXK2000 VDMA</option>
+              </select>
             </div>
-            <div class="cta-form-group">
-              <label>Jméno a příjmení</label>
-              <input type="text" name="name" placeholder="Jan Novák" required>
-            </div>
-            <div class="cta-form-group">
-              <label>Telefon</label>
-              <input type="tel" name="phone" placeholder="+420 ...">
-            </div>
-            <div class="cta-form-group full">
-              <label>E-mail</label>
-              <input type="email" name="email" placeholder="email@firma.cz" required>
-            </div>
-            <div class="cta-form-group full">
-              <label>Zpráva (nepovinné)</label>
-              <textarea name="message" rows="3" placeholder="Co skladujete, kolik baterií, kam skříň umístíte, dotaz k pronájmu…"></textarea>
+            <div class="fld"><label>Počet skříní</label><input id="pocet" maxlength="160" placeholder="např. 1"></div>
+          </div>
+          <div class="row">
+            <div class="fld"><label>Kam skříň umístíte?</label><input id="umisteni" maxlength="160" placeholder="např. sklad, dílna, prodejna"></div>
+            <div class="fld"><label>Kdy to řešíte?</label>
+              <select id="termin">
+                <option value="">Vyberte…</option>
+                <option>Co nejdříve</option>
+                <option>Do 3 měsíců</option>
+                <option>Letos</option>
+                <option>Zatím se jen informuji</option>
+              </select>
             </div>
           </div>
+          <div class="fld"><label>Cokoliv dalšího, co bychom měli vědět</label><textarea id="zprava" maxlength="4000" placeholder="např. požadavek na napojení na EPS, dotaz k pronájmu, termín instalace…"></textarea></div>
+        </fieldset>
 
-          <button type="submit">
-            Odeslat poptávku →
-          </button>
+        <label class="consent">
+          <input type="checkbox" id="souhlas">
+          <span>Beru na vědomí zpracování uvedených údajů společností <b>ELKOPLAST CZ, s.r.o.</b> za účelem zpracování poptávky a následného kontaktování. <span class="req">*</span></span>
+        </label>
 
-          <div class="cta-form-note">
-            Odesláním souhlasíte se zpracováním osobních údajů. Data nesdílíme s třetími stranami.
-          </div>
-        </form>
+        <div class="msg" id="msg"></div>
+        <button class="btn amber big" type="submit" id="submit" style="width:100%;margin-top:14px">Odeslat poptávku</button>
+      </form>
+
+      <div class="done" id="done">
+        <div class="tick">✓</div>
+        <h3>Děkujeme, poptávka odešla</h3>
+        <p>Předali jsme ji obchodníkovi, který má LOXXER na starosti. Ozveme se vám s nabídkou do 1–2 pracovních dnů.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ===== FAQ ===== -->
-<section class="faq" id="faq">
-  <div class="container">
-    <div class="section-header">
-      <div class="section-kicker">Časté otázky</div>
-      <h2 class="section-title">Vše, co potřebujete vědět</h2>
-    </div>
-
-    <div class="faq-grid">
-      <details class="faq-item">
-        <summary>Proč nestačí běžná skříň nebo hasicí přístroj?</summary>
-        <p>
-          Lithiová baterie při tzv. thermal runaway hoří vlastním kyslíkem s teplotou
-          přes 500 °C a nelze ji uhasit běžným způsobem. Skříň LOXXER požár <b>uzavře uvnitř</b>,
-          spustí alarm a volitelně baterii ochladí aerosolem — zabrání přeskoku ohně na okolí.
-        </p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Který model si vybrat?</summary>
-        <p>
-          <b>LOXK1100</b> je kompaktní skříň pro menší počet baterií, <b>LOXK2000 VDMA</b>
-          je velká certifikovaná skříň se 4 policemi pro centrální sklad a <b>LOX12</b>
-          má 12 uzamykatelných boxů, kde si každý uživatel nabíjí vlastní baterii.
-          Pomůže vám konfigurátor výše — nebo poradíme.
-        </p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Jak funguje aerosolové hašení?</summary>
-        <p>
-          Při detekci kouře se certifikovaný aerosol okamžitě aktivuje a rozptýlí
-          do celého prostoru skříně. Baterii ochladí a udrží požár pod kontrolou —
-          <b>bez lidského zásahu</b>. U LOXK1100 a LOXK2000 je to volitelné příslušenství.
-        </p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Jak je to s certifikací a pojišťovnou?</summary>
-        <p>
-          Skříně jsou <b>CE</b>, LOXK2000 je testovaná a certifikovaná dle <b>VDMA 24994</b>,
-          konstrukce odpovídá <b>EN 1364-1</b> a přístup je v souladu s normou <b>PGS 37-2</b>.
-          Doložitelná bezpečnost, kterou po vás může chtít pojišťovna i hasiči.
-        </p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Koupit, nebo pronajmout?</summary>
-        <p>
-          Nabízíme obojí. <b>Pronájem</b> (i leasing) je bez velké počáteční investice
-          a s roční revizí v ceně; <b>prodej</b> znamená plné vlastnictví od prvního dne.
-          Ve formuláři zvolte, co vás zajímá — připravíme nabídku na míru.
-        </p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Jak probíhá instalace a napojení?</summary>
-        <p>
-          Skříň zaveze a nainstaluje náš technik, připojí ji k elektřině a zaškolí obsluhu.
-          Skříň lze propojit s vaší stávající požární ústřednou (EPS, EN 12094) a osadit
-          chytrým modulem pro dohled přes SMS a e-mail.
-        </p>
-      </details>
-
-      <details class="faq-item">
-        <summary>Kde najdu vaše pobočky?</summary>
-        <p>
-          ELKOPLAST CZ má 5 závodů v České republice, hlavní sídlo je ve Zlínském kraji.
-          Působíme po celé ČR i na Slovensku, servisní technici jsou rozmístěni regionálně
-          pro rychlou dostupnost.
-        </p>
-      </details>
-    </div>
-  </div>
-</section>
-
-<!-- ===== FOOTER ===== -->
 <footer>
-  <div class="container">
-    <div class="foot-grid">
-      <div>
-        <div class="foot-logo">
-          <span class="logo-mark" style="background:var(--gold)" data-brand-logo>E</span>
-          <span>ELKOPLAST CZ</span>
-        </div>
-        <p class="foot-about">
-          Dodavatel řešení pro nakládání s odpady v České republice a oficiální
-          partner LOXXER — protipožárních skříní pro bezpečné skladování a nabíjení
-          lithiových baterií.
-        </p>
-      </div>
-
-      <div class="foot-col">
-        <h4>LOXXER</h4>
-        <ul>
-          <li><a href="#vyhody">Výhody</a></li>
-          <li><a href="#kalkulacka">Konfigurátor</a></li>
-          <li><a href="#nabidka">Co nabízíme</a></li>
-          <li><a href="#faq">FAQ</a></li>
-        </ul>
-      </div>
-
-      <div class="foot-col">
-        <h4>Kontakt</h4>
-        <ul>
-          <li>ELKOPLAST CZ s.r.o.</li>
-          <li>Zlínský kraj, ČR</li>
-          <li><a href="https://www.elkoplast.cz" target="_blank">www.elkoplast.cz</a></li>
-          <li><a href="mailto:servis@elkoplast.cz">servis@elkoplast.cz</a></li>
-        </ul>
-      </div>
-
-      <div class="foot-col">
-        <h4>Společnost</h4>
-        <ul>
-          <li>IČ: 25347941</li>
-          <li>DIČ: CZ25347941</li>
-          <li>5 závodů v ČR</li>
-          <li>25+ let zkušeností</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="foot-bottom">
-      <div>© 2026 ELKOPLAST CZ s.r.o. · Všechna práva vyhrazena</div>
-      <div>LOXXER · protipožární skříně na Li-Ion baterie</div>
-    </div>
+  <div class="wrap frow">
+    <div><b>ELKOPLAST CZ, s.r.o.</b> — protipožární skříně LOXXER pro skladování a nabíjení lithiových baterií</div>
+    <div><a href="https://www.elkoplast.cz" target="_blank" rel="noopener">www.elkoplast.cz</a></div>
   </div>
 </footer>
 
-<!-- ===== MODAL ===== -->
-<div class="modal-overlay" id="thanksModal">
-  <div class="modal">
-    <h3>✓ Děkujeme za poptávku!</h3>
-    <p>Váš dotaz byl odeslán. Obchodní zástupce ELKOPLAST CZ vás kontaktuje do 24 hodin.</p>
-    <button onclick="document.getElementById('thanksModal').classList.remove('show')">OK, rozumím</button>
-  </div>
-</div>
-
 <script>
-// ===== DATA LOXXER (ceník 2025 — reseller EX WORKS, bez DPH) =====
-const LOXXER = [
-  { id:'LOXK1100', klass:'Malá skříň', cap:6, shelves:2, fireMin:60, aerosolOpt:true, suppression:false, cert:'',
-    ext:'584 × 760 × 1126 mm', list:4900, reseller:3675, aerosol:550,
-    desc:'Kompaktní protipožární skříň pro nabíjení a skladování menšího počtu baterií.' },
-  { id:'LOXK2000 VDMA', klass:'Velká skříň', cap:16, shelves:4, fireMin:90, aerosolOpt:true, suppression:false, cert:'VDMA 24994',
-    ext:'745 × 1145 × 1930 mm', list:8500, reseller:6375, aerosol:1400,
-    desc:'Velká certifikovaná skříň (VDMA) se 4 ohnivzdornými policemi a nabíjecí lištou na každém patře.' },
-  { id:'LOX12', klass:'Locker · 12 boxů', cap:12, shelves:12, fireMin:90, aerosolOpt:false, suppression:true, cert:'',
-    ext:'740 × 1950 × 1950 mm', list:9950, reseller:8457.5, aerosol:0,
-    desc:'Skříň s 12 uzamykatelnými boxy — každý uživatel nabíjí vlastní baterii.' },
-];
-
-const STATE = { count: 8, storage: 'ekola', use: 'central', aerosol: 'ano', mode: 'rent' };
-
-function recommendModel() {
-  let m;
-  if (STATE.use === 'shared') m = LOXXER.find(x => x.id === 'LOX12');
-  else if (STATE.count <= 6) m = LOXXER.find(x => x.id === 'LOXK1100');
-  else m = LOXXER.find(x => x.id === 'LOXK2000 VDMA');
-  const pocet = Math.max(1, Math.ceil(STATE.count / m.cap));
-  const aerosol = !!m.suppression || (STATE.aerosol === 'ano' && m.aerosolOpt);
-  return { m, pocet, aerosol };
-}
-
-function num(n) { return Math.round(n).toLocaleString('cs-CZ'); }
-
-function render() {
-  const r = recommendModel(), m = r.m;
-  document.getElementById('resultModel').textContent = m.id + (r.pocet > 1 ? '  ×' + r.pocet : '');
-  document.getElementById('resultSerie').textContent = m.cert || m.klass;
-  document.getElementById('resultVol').textContent = '~' + (m.cap * r.pocet) + ' baterií';
-  document.getElementById('resultForce').textContent = m.fireMin + ' min';
-  document.getElementById('resultCarrier').textContent = r.aerosol ? 'Aerosol + alarm' : 'Detekce + alarm';
-}
-
-document.getElementById('tonsRange').oninput = e => {
-  STATE.count = parseInt(e.target.value, 10);
-  document.getElementById('tonsVal').textContent = STATE.count;
-  render();
-};
-document.getElementById('materialSelect').onchange = e => { STATE.storage = e.target.value; render(); };
-function bindPills(id, key) {
-  document.getElementById(id).querySelectorAll('.mode-pill').forEach(btn => {
-    btn.onclick = () => {
-      STATE[key] = btn.dataset[key];
-      document.querySelectorAll('#' + id + ' .mode-pill').forEach(b => b.classList.toggle('active', b === btn));
-      render();
+(function(){
+  var frm=document.getElementById('frm'), msg=document.getElementById('msg'), btn=document.getElementById('submit');
+  function val(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+  function show(kind,text){msg.className='msg '+kind;msg.textContent=text;}
+  function zajem(){var r=document.querySelector('input[name="zajem"]:checked');return r?r.value:'koupe';}
+  frm.addEventListener('submit',async function(ev){
+    ev.preventDefault();
+    var firma=val('firma'), jmeno=val('jmeno'), email=val('email');
+    if(!firma||!jmeno||!email){show('err','Vyplňte prosím firmu/organizaci, jméno a e-mail.');return;}
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){show('err','Zkontrolujte prosím e-mail.');return;}
+    if(!document.getElementById('souhlas').checked){show('err','Bez souhlasu se zpracováním údajů nelze poptávku odeslat.');return;}
+    var payload={
+      firma:firma, jmeno:jmeno, email:email, telefon:val('telefon'), pozice:val('pozice'),
+      zajem:zajem(), model:val('model'), pocet:val('pocet'),
+      baterie:val('baterie'), mnozstvi:val('mnozstvi'), umisteni:val('umisteni'), termin:val('termin'),
+      zprava:val('zprava'), souhlas:true, web:val('web')
     };
+    btn.disabled=true; btn.textContent='Odesílám…'; show('','');
+    try{
+      var r=await fetch('/api/loxxer/poptavka',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      var j=await r.json().catch(function(){return{};});
+      if(!r.ok||j.chyba){ show('err', j.chyba||('Odeslání se nezdařilo ('+r.status+'). Zkuste to prosím znovu.')); btn.disabled=false; btn.textContent='Odeslat poptávku'; return; }
+      frm.style.display='none'; document.getElementById('done').style.display='block';
+      document.getElementById('done').scrollIntoView({behavior:'smooth',block:'center'});
+    }catch(e){ show('err','Spojení se nezdařilo. Zkontrolujte připojení a zkuste to znovu.'); btn.disabled=false; btn.textContent='Odeslat poptávku'; }
   });
-}
-bindPills('carrierPills', 'use');
-bindPills('aerosolPills', 'aerosol');
-bindPills('modePills', 'mode');
-
-function handleSubmit(e) {
-  e.preventDefault();
-  const form = e.target, btn = form.querySelector('button[type="submit"]'), t0 = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Odesílám…';
-  const d = new FormData(form), r = recommendModel();
-  const storageLabel = { ekola:'Baterie e-kol a koloběžek', naradi:'Aku nářadí', drony:'Drony a RC modely', mix:'Více typů baterií' }[STATE.storage];
-  const modeLabel = { rent:'Pronájem', lease:'Leasing', sale:'Prodej' }[STATE.mode];
-  const useLabel = STATE.use === 'shared' ? 'Více uživatelů (osobní boxy)' : 'Centrální sklad';
-  const cenaList = (r.m.list + (r.aerosol && r.m.aerosolOpt ? r.m.aerosol : 0)) * r.pocet;
-  const shrnuti = 'Kalkulačka LOXXER — ' + STATE.count + ' baterií · ' + storageLabel + ' · ' + useLabel
-    + ' · hašení: ' + (r.aerosol ? 'ano' : 'ne') + ' · forma: ' + modeLabel
-    + ' · doporučeno: ' + r.m.id + (r.pocet > 1 ? ' ×' + r.pocet : '')
-    + ' (orient. ' + num(cenaList) + ' € bez DPH)';
-  const zprava = (d.get('message') || '').trim();
-  const payload = {
-    firma: d.get('company'), jmeno: d.get('name'), email: d.get('email'), telefon: d.get('phone'),
-    souhlas: true, zajem: STATE.mode === 'sale' ? 'koupe' : 'pronajem',
-    model: r.m.id + (r.pocet > 1 ? ' ×' + r.pocet : ''),
-    zprava: (zprava ? zprava + '\n\n' : '') + shrnuti
-  };
-  fetch('/api/loxxer/poptavka', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-    .then(r => r.json()).then(res => { if (res.chyba) throw new Error(res.chyba); document.getElementById('thanksModal').classList.add('show'); form.reset(); })
-    .catch(err => alert('Chyba při odesílání: ' + (err.message || 'Zkuste to prosím znovu.')))
-    .finally(() => { btn.disabled = false; btn.textContent = t0; });
-  return false;
-}
-
-// Init
-render();
+})();
 </script>
-
-
-<script>
-// CMS: Načíst nastavení (logo, brand subtitle, company name)
-fetch('/api/public-settings').then(r => r.json()).then(s => {
-  if (s.logo && s.logo.dataUrl) {
-    document.querySelectorAll('[data-brand-logo]').forEach(el => {
-      const img = document.createElement('img');
-      img.src = s.logo.dataUrl;
-      img.alt = s.companyName || 'ELKOPLAST CZ';
-      img.style.cssText = 'height:36px;width:auto;object-fit:contain';
-      el.parentNode.replaceChild(img, el);
-    });
-  }
-  if (s.brandSubtitle) {
-    document.querySelectorAll('[data-subtitle]').forEach(el => {
-      el.textContent = '· ' + s.brandSubtitle;
-    });
-  }
-}).catch(() => {});
-</script>
-
 </body>
 </html>

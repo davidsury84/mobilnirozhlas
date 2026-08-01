@@ -87,7 +87,16 @@ function mount(host) {
   // ---- veřejná prezentační stránka (s volitelnou úvodní fotkou přes celou stránku) ----
   function serveWeb(res) {
     if (!fs.existsSync(WEB_FILE)) { htmlOut(res, 404, '<h1>Chybí loxxer-web.html</h1>'); return true; }
-    htmlOut(res, 200, fs.readFileSync(WEB_FILE, 'utf8'));
+    let html = fs.readFileSync(WEB_FILE, 'utf8');
+    try {
+      const db = load();
+      if (db.config && db.config.bg && fs.existsSync(BG_FILE)) {
+        // úvodní fotka přes celou stránku (přes tmavý překryv, aby text zůstal čitelný)
+        const style = '<style id="heroBg">.hero{background:linear-gradient(rgba(11,20,15,.62),rgba(11,20,15,.72)),url("/api/loxxer/pozadi") center/cover no-repeat}</style>';
+        html = html.replace('</head>', style + '</head>');
+      }
+    } catch (_) {}
+    htmlOut(res, 200, html);
     return true;
   }
   function serveBg(res) {
@@ -173,7 +182,13 @@ function mount(host) {
   function prehledRadky(it) {
     const r = [];
     if (it.zajem) r.push(['Zájem', ZAJEM[it.zajem] || it.zajem]);
-    if (it.model) r.push(['Doporučený model', it.model]);
+    if (it.model) r.push(['Uvažovaný model', it.model]);
+    if (it.pocet) r.push(['Počet skříní', it.pocet]);
+    if (it.baterie) r.push(['Druh baterií', it.baterie]);
+    if (it.mnozstvi) r.push(['Množství baterií', it.mnozstvi]);
+    if (it.umisteni) r.push(['Umístění skříně', it.umisteni]);
+    if (it.termin) r.push(['Časový horizont', it.termin]);
+    if (it.pozice) r.push(['Pozice kontaktu', it.pozice]);
     return r;
   }
 
@@ -264,8 +279,14 @@ function mount(host) {
       id: crypto.randomBytes(8).toString('hex'),
       cislo: db.seq,
       firma, jmeno, email, telefon,
+      pozice: s160(b.pozice),
       zajem,
       model: s160(b.model),
+      pocet: s160(b.pocet),
+      baterie: s300(b.baterie),
+      mnozstvi: s160(b.mnozstvi),
+      umisteni: s160(b.umisteni),
+      termin: s160(b.termin),
       zprava: String(b.zprava || '').trim().slice(0, 4000),
       stav: 'nova', obchodnik: null, nabidka: null,
       createdAt: now, updatedAt: now,
