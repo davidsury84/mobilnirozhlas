@@ -1572,8 +1572,8 @@ function renderNastaveni(m){
     '<div class="two"><div><label>E-mail konstruktéra</label><input id="impUser" placeholder="jmeno@elkoplast.cz"></div>'+
     '<div><label>Režim</label><select id="impMode"><option value="append">Přidat k existujícím</option><option value="replace">Nahradit jeho záznamy</option></select></div></div>'+
     '<div class="actions" style="margin-top:8px"><button class="btn sm" onclick="importEvidence()">Naimportovat historii</button></div><div class="err" id="impErr"></div></div>';
-  h+='<div class="sec">Ukázková data</div><div class="card"><p class="muted" style="margin-top:0">Nahraje ilustrativní scénář (7 zakázek napříč stavy, role, kapacity, notifikace) pro vyzkoušení modulu. Vše lze pak jedním tlačítkem smazat.</p>'+
-    '<div class="actions"><button class="btn sm" onclick="seedDemo(\'load\')">Nahrát ukázkový scénář</button><button class="btn warn sm" onclick="seedDemo(\'clear\')">Smazat všechna data</button></div></div>';
+  h+='<div class="sec">Reset dat (ostrý provoz)</div><div class="card"><p class="muted" style="margin-top:0">Smaže <b>všechny zakázky, role i konfiguraci</b> modulu a vrátí ho do prázdného výchozího stavu. Používejte jen při čistém startu — akce je nevratná.</p>'+
+    '<div class="actions"><button class="btn warn sm" onclick="seedDemo(\'clear\')">Smazat všechna data</button></div></div>';
   m.innerHTML=h;
 }
 function addActivity(){
@@ -1598,12 +1598,11 @@ function importEvidence(){
   api('/admin/import','POST',{user:user.trim().toLowerCase(),mode:mode}).then(function(o){if(!o.ok){err.textContent=o.j.chyba||'Chyba.';return}err.textContent='';alert('Naimportováno '+o.j.count+' záznamů. Otevřete „Evidence práce".')});
 }
 function seedDemo(mode){
-  if(mode==='clear'&&!confirm('Opravdu smazat VŠECHNA data modulu (zakázky, role i kapacity)? Tuto akci nelze vzít zpět.'))return;
-  api('/admin/seed','POST',{mode:mode}).then(function(o){
-    if(!o.ok){alert(o.j.chyba||'Chyba.');return}
+  if(!confirm('Opravdu smazat VŠECHNA data modulu (zakázky, role i konfiguraci)? Tuto akci nelze vzít zpět.'))return;
+  api('/admin/seed','POST',{mode:'clear'}).then(function(o){
+    if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}
     reloadData();
-    alert(mode==='clear'?'Všechna data modulu byla smazána.':'Nahráno '+o.j.count+' ukázkových zakázek. Projděte si je ve složce „Vše".');
-    if(mode!=='clear')setFilter('all');
+    alert('Všechna data modulu byla smazána.');
   });
 }
 function setRole(email,role){api('/admin/role','POST',{email:email,role:role}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
