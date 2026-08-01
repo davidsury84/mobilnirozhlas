@@ -281,6 +281,11 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .pl-edel{cursor:pointer}
 .pl-edel circle{fill:var(--red);stroke:#fff;stroke-width:2}
 .pl-edel text{fill:#fff;font-size:15px;font-weight:800;pointer-events:none}
+.pl-endh{fill:#fff;stroke-width:3;cursor:grab;pointer-events:auto}
+.pl-ecap{fill:var(--mut);font-size:10.5px;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.pl-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:4000;display:flex;align-items:center;justify-content:center}
+.pl-modal{background:#fff;border-radius:12px;padding:16px;width:min(760px,92vw);max-height:88vh;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.pl-modal textarea{width:100%;height:52vh;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical}
 .pl-elabel{font-size:11px;fill:var(--ink);paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;cursor:pointer;pointer-events:auto}
 .pl-node{position:absolute;width:168px;border-radius:11px;background:#fff;border:2px solid var(--gray);box-shadow:0 2px 7px rgba(0,0,0,.08);user-select:none}
 .pl-node.sel{box-shadow:0 0 0 3px rgba(14,138,67,.35),0 3px 10px rgba(0,0,0,.14)}
@@ -778,6 +783,7 @@ function renderPlatno(m){
     '<button class="btn sm" onclick="plSave()">💾 Uložit naostro</button>'+
     '<button class="btn sm ghost" onclick="plReset()">Zahodit změny</button>'+
     '<button class="btn sm ghost" onclick="plSeed()">Obnovit výchozí (seed)</button>'+
+    '<button class="btn sm ghost" onclick="plExport()">⧉ Export / Import JSON</button>'+
     '<button class="btn sm ghost" onclick="plFull()">'+(PL.full?'✕ Zavřít celou obrazovku':'⛶ Celá obrazovka')+'</button>'+
     '<span class="pl-zoom"><button class="btn sm ghost" onclick="plZoomBy(0.9)" title="Oddálit">−</button>'+
     '<span id="plZoomLbl">'+Math.round(PL.zoom*100)+' %</span>'+
@@ -872,7 +878,7 @@ function plDrawEdges(){
     lbl.textContent=e.label||e.action;
     lbl.addEventListener('click',selEdge);lbl.addEventListener('contextmenu',delEdge);
     svg.appendChild(lbl);
-    // u vybrané vazby červené × přímo na šipce = smazat
+    // u vybrané vazby: červené × (smazat) + koncové úchyty (přesunout přípoj) + nápověda
     if(isSel){
       var g=document.createElementNS('http://www.w3.org/2000/svg','g');
       g.setAttribute('class','pl-edel');g.setAttribute('transform','translate('+lx+','+(ly-20)+')');
@@ -882,8 +888,42 @@ function plDrawEdges(){
       var xx=document.createElementNS('http://www.w3.org/2000/svg','text');
       xx.setAttribute('text-anchor','middle');xx.setAttribute('dy','5.5');xx.textContent='×';
       g.appendChild(c);g.appendChild(xx);svg.appendChild(g);
+      // koncové úchyty — táhni na jiný uzel = přepojit (přesunout) začátek/konec
+      if(e.to!==e.from){
+        var hFrom=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        hFrom.setAttribute('class','pl-endh');hFrom.setAttribute('cx',a.x);hFrom.setAttribute('cy',a.y);hFrom.setAttribute('r','8');hFrom.setAttribute('stroke',col);
+        hFrom.addEventListener('mousedown',function(ev2){plStartReroute(i,'from',{x:b.x,y:b.y},ev2);});
+        var tF=document.createElementNS('http://www.w3.org/2000/svg','title');tF.textContent='Táhni = přepojit začátek na jiný uzel';hFrom.appendChild(tF);
+        svg.appendChild(hFrom);
+        var hTo=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        hTo.setAttribute('class','pl-endh');hTo.setAttribute('cx',b.x);hTo.setAttribute('cy',b.y);hTo.setAttribute('r','8');hTo.setAttribute('stroke',col);
+        hTo.addEventListener('mousedown',function(ev2){plStartReroute(i,'to',{x:a.x,y:a.y},ev2);});
+        var tT=document.createElementNS('http://www.w3.org/2000/svg','title');tT.textContent='Táhni = přepojit konec na jiný uzel';hTo.appendChild(tT);
+        svg.appendChild(hTo);
+      }
+      var cap=document.createElementNS('http://www.w3.org/2000/svg','text');
+      cap.setAttribute('class','pl-ecap');cap.setAttribute('x',lx);cap.setAttribute('y',ly+16);cap.setAttribute('text-anchor','middle');
+      cap.textContent='× smazat · táhni ● konec = přesunout';
+      svg.appendChild(cap);
     }
   });
+}
+// Přepojení konce vazby (přesunout) — táhni koncový úchyt na jiný uzel.
+function plStartReroute(i,which,fixedPt,ev){
+  ev.preventDefault();ev.stopPropagation();
+  var canvas=document.getElementById('plCanvas'),svg=document.getElementById('plSvg');var z=PL.zoom||1;
+  var tmp=document.createElementNS('http://www.w3.org/2000/svg','path');
+  tmp.setAttribute('class','pl-edge');tmp.setAttribute('stroke','var(--g3)');tmp.setAttribute('stroke-dasharray','5 4');tmp.setAttribute('marker-end','url(#plArrow)');
+  svg.appendChild(tmp);
+  var rect=canvas.getBoundingClientRect();var sx=ev.clientX,sy=ev.clientY,moved=false;
+  function mm(e){if(Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy)>5)moved=true;var mx=(e.clientX-rect.left)/z,my=(e.clientY-rect.top)/z;tmp.setAttribute('d','M'+fixedPt.x+','+fixedPt.y+' L'+mx+','+my);}
+  function mu(e){
+    document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);tmp.remove();
+    if(!moved)return;
+    var tgt=e.target.closest?e.target.closest('.pl-node'):null;
+    if(tgt){var id=tgt.getAttribute('data-id');var ed=PL.wf.edges[i];if(ed){if(which==='to')ed.to=id;else ed.from=id;PL.dirty=true;plAutosave();PL.sel={t:'edge',i:i};renderMain();}}
+  }
+  document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
 }
 function plRefresh(){ // překreslí uzly (výběr/barvy), hrany i inspektor bez ztráty PL.wf
   var canvas=document.getElementById('plCanvas');if(!canvas){renderMain();return}
@@ -1035,6 +1075,27 @@ function plSave(){
     setTimeout(function(){PL.wf=plClone(D.workflow);PL.sel=null;renderMain();},60);
     alert('Pravidlo toku uloženo naostro. Projeví se v reálném workflow.');
   });
+}
+function plExport(){
+  var wrap=document.createElement('div');wrap.className='pl-modal-bg';
+  wrap.onclick=function(e){if(e.target===wrap)wrap.remove();};
+  wrap.innerHTML='<div class="pl-modal"><h3 style="margin:0">Pravidlo toku — JSON (aktuální stav plátna)</h3>'+
+    '<p class="muted" style="margin:0;font-size:12px">Zkopíruj a pošli mi tento JSON, když chceš, abych se podíval na aktuální stav plátna. Nebo sem vlož upravený JSON a klikni <b>Načíst do plátna</b> (uloží se jako koncept, naostro až tlačítkem Uložit).</p>'+
+    '<textarea id="plJson" spellcheck="false"></textarea>'+
+    '<div class="row" style="gap:8px;justify-content:flex-end;flex-wrap:wrap">'+
+    '<button class="btn sm ghost" id="plCopy">Kopírovat</button>'+
+    '<button class="btn sm" id="plLoad">Načíst do plátna</button>'+
+    '<button class="btn sm ghost" id="plCloseM">Zavřít</button></div></div>';
+  document.body.appendChild(wrap);
+  var ta=document.getElementById('plJson');ta.value=JSON.stringify(PL.wf,null,2);
+  document.getElementById('plCopy').onclick=function(){ta.select();try{navigator.clipboard.writeText(ta.value);}catch(_){document.execCommand('copy');}this.textContent='Zkopírováno ✓';};
+  document.getElementById('plCloseM').onclick=function(){wrap.remove();};
+  document.getElementById('plLoad').onclick=function(){
+    var o;try{o=JSON.parse(ta.value);}catch(err){alert('Neplatný JSON: '+err.message);return;}
+    if(!o||!Array.isArray(o.nodes)||!Array.isArray(o.edges)){alert('JSON musí obsahovat pole nodes a edges.');return;}
+    if(!confirm('Nahradit plátno tímto JSON? Uloží se jako koncept, naostro až tlačítkem Uložit.'))return;
+    PL.wf=o;PL.sel=null;PL.dirty=true;plAutosave();wrap.remove();renderMain();
+  };
 }
 
 /* ---- notifikace ---- */
