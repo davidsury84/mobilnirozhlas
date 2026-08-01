@@ -2836,7 +2836,7 @@ const server = http.createServer(async (req, res) => {
       const allowed = (e && employeeModules(e.email).indexOf('loxxerkalk') >= 0) || isAdmin(req);
       if (!allowed) return send(res, 403, '<h1>Přístup k LOXXER — kalkulace nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       let target = LOXXER_KALK_APP_URL;
-      if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += (LOXXER_KALK_APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += (LOXXER_KALK_APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
       res.writeHead(302, { 'Location': target }); return res.end();
     }
 
