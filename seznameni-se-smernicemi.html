@@ -1403,6 +1403,7 @@ const MUJ_MODS = [
   { grp:"Obchod" },
   { key:"pozadavky", icon:MUJ_IC.cart, label:"Požadavky nákupu", gated:true },
   { key:"poptavky", icon:MUJ_IC.ticket, label:"Poptávky", gated:true },
+  { key:"loxxer", icon:MUJ_IC.shield, label:"LOXXER", gated:true },
   { key:"obchod", icon:MUJ_IC.users, label:"Rozdělení obchodníků", gated:true },
   { key:"reklamace", icon:MUJ_IC.shield, label:"Reklamace", gated:true },
   { key:"zadanikonstrukce", icon:MUJ_IC.file, label:"Zadání do konstrukce", gated:true },
@@ -1468,7 +1469,7 @@ async function refreshMy(){
   if(!MUJ.data.library) MUJ.data.library = {folders:[],docs:[]};
   MUJ.modules = MUJ.data.modules || [];
 }
-function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery)||!!(MUJ.data&&MUJ.data.isLisy); if(m.key==="kontejnerykalk") return mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
+function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery)||!!(MUJ.data&&MUJ.data.isLisy); if(m.key==="loxxer") return mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isLoxxer); if(m.key==="kontejnerykalk") return mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
 function mujCounts(){
   const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[]; const survs=d.surveys||[];
   return { dirs, libDocs, survs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length, survTodo:survs.filter(x=>!x.filled).length };
@@ -1567,6 +1568,7 @@ function mjGo(key){
   else if(key==="eshop") showEshop();
   else if(key==="kalkulace") showKalkulace();
   else if(key==="poptavky") showPoptavky();
+  else if(key==="loxxer") showLoxxer();
   else if(key==="kontejnerykalk") showKontejneryKalk();
   else if(key==="svozesa") showSvozEsa();
   else if(key==="tridicilinka") showTridiciLinka();
@@ -2290,6 +2292,96 @@ function showKalkulace(){
   body.innerHTML='<iframe src="/kalkulace-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulace-lisy"></iframe>';
   window.scrollTo(0,0);
 }
+/* ===================== LOXXER — poptávky, nabídky, statistika ===================== */
+var LOX={items:[],role:{},stavy:{},nabidkaTypy:{},zajemy:{},stats:null,employees:[],filter:''};
+function loxDate(ts){try{return new Date(ts).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch(e){return''}}
+async function showLoxxer(){
+  MUJ.view="loxxer"; renderSidebar();
+  var body=document.getElementById("mujBody");
+  if(!moduleVisible({key:"loxxer",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<div class="dash-hero"><div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><h2>LOXXER — protipožární skříně na Li-Ion baterie</h2><p>Poptávky z veřejné stránky. Přiřaďte obchodníka, zaznamenejte odeslané nabídky a sledujte statistiku.</p></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn ghost sm" href="/loxxer" target="_blank" rel="noopener">Veřejná stránka ↗</a><a class="btn ghost sm" href="/loxxer/sprava" target="_blank" rel="noopener">Plná správa ↗</a><button class="btn sm" onclick="showLoxxer()">↻ Obnovit</button></div></div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 2px 4px"><a class="btn ghost sm" href="/loxxer/smlouva/prodej" target="_blank" rel="noopener">📄 Smlouva — prodej</a><a class="btn ghost sm" href="/loxxer/smlouva/pronajem" target="_blank" rel="noopener">📄 Smlouva — pronájem</a></div>'
+    +'<div id="loxStats"></div><div id="loxFilters" style="margin:14px 2px 6px"></div><div id="loxList"><p class="muted" style="padding:6px 2px">Načítám…</p></div>';
+  await loxLoad();
+  window.scrollTo(0,0);
+}
+async function loxLoad(){
+  try{
+    var r=await fetch("/api/loxxer",{cache:"no-store"});
+    if(!r.ok){ document.getElementById("loxList").innerHTML='<div class="card pad">Chyba '+r.status+'</div>'; return; }
+    var j=await r.json();
+    LOX.items=j.items||[]; LOX.role=j.role||{}; LOX.stavy=j.stavy||{}; LOX.nabidkaTypy=j.nabidkaTypy||{}; LOX.zajemy=j.zajemy||{}; LOX.stats=j.stats||null; LOX.employees=j.employees||[];
+    loxRender();
+  }catch(e){ document.getElementById("loxList").innerHTML='<div class="card pad">Chyba — '+esc(e.message)+'</div>'; }
+}
+function loxRender(){
+  var s=LOX.stats, sc=document.getElementById("loxStats");
+  if(sc){ sc.innerHTML = s ? ('<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px" class="loxstats">'
+    +loxStat(s.celkem,'Poptávek','')+loxStat(s.nove,'Nových','')+loxStat(s.nabidky,'Nabídek odesláno','#b96f00')
+    +loxStat(s.prodej,'z toho prodej','#1f5e22')+loxStat(s.pronajem,'z toho pronájem','#1e63c4')+loxStat(s.uzavreno,'Uzavřeno','')+'</div>') : ''; }
+  var counts={'':LOX.items.length}; Object.keys(LOX.stavy).forEach(function(k){counts[k]=LOX.items.filter(function(x){return x.stav===k}).length});
+  var chips=[['','Vše']].concat(Object.keys(LOX.stavy).map(function(k){return [k,LOX.stavy[k]]}));
+  document.getElementById("loxFilters").innerHTML='<div style="display:flex;gap:7px;flex-wrap:wrap">'+chips.map(function(c){return '<span class="chip'+(LOX.filter===c[0]?' on':'')+'" style="cursor:pointer;border:1px solid #e2e8e0;background:'+(LOX.filter===c[0]?'#2f7d32':'#fff')+';color:'+(LOX.filter===c[0]?'#fff':'#16211a')+';border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600" onclick="loxSetFilter(\''+c[0]+'\')">'+esc(c[1])+' '+(counts[c[0]]||0)+'</span>'}).join('')+'</div>';
+  var items=LOX.items.slice(); if(LOX.filter) items=items.filter(function(x){return x.stav===LOX.filter});
+  var list=document.getElementById("loxList");
+  if(!items.length){ list.innerHTML='<div class="card pad"><span class="muted">Žádné poptávky v této kategorii.</span></div>'; return; }
+  list.innerHTML=items.map(loxCard).join('');
+}
+function loxStat(n,l,color){ return '<div class="card" style="padding:12px 13px"><div style="font-size:23px;font-weight:800;line-height:1'+(color?';color:'+color:'')+'">'+n+'</div><div style="font-size:11px;color:#6b7a70;margin-top:5px;text-transform:uppercase;letter-spacing:.03em;font-weight:700">'+l+'</div></div>'; }
+function loxSetFilter(f){ LOX.filter=f; loxRender(); }
+function loxCard(it){
+  var st=it.stav||'nova', isAdmin=!!LOX.role.isAdmin;
+  var zbg={koupe:'#dff2e4;color:#1f5e22',pronajem:'#e8f0fb;color:#1e63c4'}[it.zajem]||'#eef2ec;color:#6b7a70';
+  var zj=it.zajem?(' <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:'+zbg+';text-transform:uppercase;letter-spacing:.03em">'+esc(LOX.zajemy[it.zajem]||it.zajem)+'</span>'):'';
+  var h='<div class="card" style="padding:15px 17px;margin-bottom:12px">';
+  h+='<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div style="min-width:0"><div style="font-size:16px;font-weight:700">#'+it.cislo+' · '+esc(it.firma||'—')+zj+'</div>'
+    +'<div style="color:#6b7a70;font-size:13px;margin-top:3px">'+esc(it.jmeno||'')+(it.pozice?' ('+esc(it.pozice)+')':'')+'<br>'
+    +(it.email?'✉ <a href="mailto:'+esc(it.email)+'">'+esc(it.email)+'</a>':'')+(it.email&&it.telefon?' · ':'')+(it.telefon?'📞 <a href="tel:'+esc(it.telefon)+'">'+esc(it.telefon)+'</a>':'')+'</div></div>'
+    +'<div><span style="font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;background:#eef2ec;text-transform:uppercase;letter-spacing:.03em">'+esc(LOX.stavy[st]||st)+'</span></div></div>';
+  var pr=(it.prehled||[]).filter(function(r){return r[0]!=='Zájem'&&r[0]!=='Pozice kontaktu'});
+  if(pr.length){ h+='<table style="margin-top:10px;border-collapse:collapse">'+pr.map(function(r){return '<tr><td style="padding:3px 12px 3px 0;color:#6b7a70;font-size:12.5px;vertical-align:top;white-space:nowrap">'+esc(r[0])+'</td><td style="padding:3px 0;font-size:13.5px;font-weight:600">'+esc(r[1])+'</td></tr>'}).join('')+'</table>'; }
+  if(it.zprava) h+='<div style="margin-top:9px;padding:8px 11px;background:#f7f9f5;border-radius:8px;font-size:13.5px">„'+esc(it.zprava)+'"</div>';
+  if(it.nabidka&&it.nabidka.typ) h+='<div style="margin-top:9px;padding:8px 11px;background:#eef5ea;border:1px solid #cfe0c2;border-radius:8px;font-size:13px">📤 <b>Odeslána nabídka:</b> '+esc(LOX.nabidkaTypy[it.nabidka.typ]||it.nabidka.typ)+(it.nabidka.castka?' · '+esc(it.nabidka.castka):'')+' <span style="color:#9aa79d">('+loxDate(it.nabidka.at)+(it.nabidka.by&&it.nabidka.by.name?', '+esc(it.nabidka.by.name):'')+')</span></div>';
+  h+='<div style="margin-top:9px;font-size:13px">'+(it.obchodnik?('Obchodník: <b style="color:#1f5e22">'+esc(it.obchodnik.name)+'</b>'):'<span style="color:#b96f00">⚠ Nepřiřazeno</span>')+' · <span style="color:#9aa79d">'+loxDate(it.createdAt)+'</span></div>';
+  // akce
+  h+='<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:11px;border-top:1px dashed #e2e8e0">';
+  if(isAdmin){ var oo='<option value="">— nepřiřazeno —</option>'+LOX.employees.map(function(e){return '<option value="'+esc(e.email)+'"'+(it.obchodnik&&it.obchodnik.email===e.email?' selected':'')+'>'+esc(e.name)+'</option>'}).join('');
+    h+='<select id="lxo_'+it.id+'" style="font-size:13px;padding:5px 8px;border:1px solid #e2e8e0;border-radius:8px">'+oo+'</select>'; }
+  var so=Object.keys(LOX.stavy).map(function(k){return '<option value="'+k+'"'+(k===st?' selected':'')+'>'+esc(LOX.stavy[k])+'</option>'}).join('');
+  h+='<select id="lxs_'+it.id+'" style="font-size:13px;padding:5px 8px;border:1px solid #e2e8e0;border-radius:8px">'+so+'</select>';
+  h+='<input id="lxn_'+it.id+'" placeholder="poznámka" style="font-size:13px;padding:5px 8px;border:1px solid #e2e8e0;border-radius:8px;flex:1;min-width:110px">';
+  h+='<button class="btn sm" onclick="loxSave(\''+it.id+'\','+(isAdmin?'true':'false')+')">Uložit</button>';
+  if(isAdmin) h+='<button class="btn ghost sm" style="border-color:#e0b4ae;color:#c0392b" onclick="loxDelete(\''+it.id+'\','+it.cislo+')">🗑</button>';
+  h+='</div>';
+  h+='<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px"><span style="font-size:11px;font-weight:700;color:#6b7a70;text-transform:uppercase">Odeslal(a) jsem nabídku</span>';
+  h+='<select id="lxbt_'+it.id+'" style="font-size:13px;padding:5px 8px;border:1px solid #e2e8e0;border-radius:8px">'+Object.keys(LOX.nabidkaTypy).map(function(k){return '<option value="'+k+'"'+(it.nabidka&&it.nabidka.typ===k?' selected':'')+'>'+esc(LOX.nabidkaTypy[k])+'</option>'}).join('')+'</select>';
+  h+='<input id="lxbc_'+it.id+'" placeholder="částka / poznámka" value="'+(it.nabidka&&it.nabidka.castka?esc(it.nabidka.castka):'')+'" style="font-size:13px;padding:5px 8px;border:1px solid #e2e8e0;border-radius:8px;flex:1;min-width:110px">';
+  h+='<button class="btn sm" onclick="loxNabidka(\''+it.id+'\')">📤 Zaznamenat</button></div>';
+  h+='</div>';
+  return h;
+}
+async function loxSave(id,isAdmin){
+  var body={id:id}; var st=document.getElementById('lxs_'+id); if(st) body.stav=st.value;
+  var nt=document.getElementById('lxn_'+id); if(nt&&nt.value.trim()) body.note=nt.value.trim();
+  if(isAdmin){ var ob=document.getElementById('lxo_'+id); if(ob) body.obchodnik=ob.value; }
+  try{ var r=await fetch('/api/loxxer/prirad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); var j=await r.json();
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; } toast('Uloženo'+(body.obchodnik?' — obchodník informován':'')); loxLoad();
+  }catch(e){ toast('Chyba: '+e.message); }
+}
+async function loxNabidka(id){
+  var typ=document.getElementById('lxbt_'+id).value, castka=(document.getElementById('lxbc_'+id).value||'').trim();
+  try{ var r=await fetch('/api/loxxer/nabidka',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,typ:typ,castka:castka})}); var j=await r.json();
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; } toast('Nabídka zaznamenána'); loxLoad();
+  }catch(e){ toast('Chyba: '+e.message); }
+}
+async function loxDelete(id,cislo){
+  if(!confirm('Smazat poptávku #'+cislo+'?')) return;
+  try{ var r=await fetch('/api/loxxer/smazat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}); var j=await r.json();
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; } toast('Smazáno'); loxLoad();
+  }catch(e){ toast('Chyba: '+e.message); }
+}
+
 async function showPoptavky(){
   MUJ.view="poptavky"; renderSidebar();
   const body=document.getElementById("mujBody");

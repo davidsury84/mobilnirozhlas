@@ -1888,6 +1888,18 @@ try {
   console.error('[mobilni-lisy] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „LOXXER" (protipožární skříně na Li-Ion baterie — veřejný web + poptávka) ----
+let loxxerMod = null;
+try {
+  loxxerMod = require('./loxxer').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'ELKOPLAST — LOXXER', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+  });
+} catch (e) {
+  console.error('[loxxer] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 // ---- Modul „Týdenní reporty nákupu" (co zlevnit / co nakoupit — e-maily z dat SMI) ----
 let nakupReportMod = null;
 try {
@@ -1906,6 +1918,8 @@ const server = http.createServer(async (req, res) => {
 
   // Klientská doména mobilní-lisy.cz (alias na tuto app) — jen prezentace + dotazník, PŘED závorou.
   if (mobilniLisyMod && await mobilniLisyMod.handleClientHost(req, res)) return;
+  // Klientská doména loxxer.* (alias na tuto app) — jen prezentace + poptávka, PŘED závorou.
+  if (loxxerMod && await loxxerMod.handleClientHost(req, res)) return;
 
   // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
   const invite = inviteVerify(u.query.i || '');
@@ -1925,6 +1939,8 @@ const server = http.createServer(async (req, res) => {
   const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext');
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
+  // Veřejné cesty modulu LOXXER: prezentační web + odeslání poptávky + úvodní fotka (bez přihlášení).
+  const loxxerPublic = p === '/loxxer' || (p === '/api/loxxer/poptavka' && req.method === 'POST') || (p === '/api/loxxer/pozadi' && req.method === 'GET');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
@@ -1989,7 +2005,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !loxxerPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -2030,6 +2046,8 @@ const server = http.createServer(async (req, res) => {
     if (kontejneryMod && await kontejneryMod.handle(req, res)) return;
     // Modul „Mobilní lisy" si obslouží vlastní cesty (/mobilni-lisy*, /api/mobilni-lisy*).
     if (mobilniLisyMod && await mobilniLisyMod.handle(req, res)) return;
+    // Modul „LOXXER" si obslouží vlastní cesty (/loxxer*, /api/loxxer*).
+    if (loxxerMod && await loxxerMod.handle(req, res)) return;
     if (nakupReportMod && await nakupReportMod.handle(req, res)) return;
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
@@ -2513,7 +2531,8 @@ const server = http.createServer(async (req, res) => {
       const isNakupci = !!(pozadavkyMod && pozadavkyMod.isConfiguredBuyer && pozadavkyMod.isConfiguredBuyer(e.email));
       const isKontejnery = !!(kontejneryMod && kontejneryMod.isHandler && kontejneryMod.isHandler(e.email));
       const isLisy = !!(mobilniLisyMod && mobilniLisyMod.isHandler && mobilniLisyMod.isHandler(e.email));
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, heroImage: (readJson(SITE_F, {}).heroImage) || null });
+      const isLoxxer = !!(loxxerMod && loxxerMod.isAny && loxxerMod.isAny(e.email));
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, isLoxxer: isLoxxer, heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 
     // ---- Aktuality (novinky na intranetu) ----
@@ -2995,6 +3014,8 @@ if (require.main === module) {
     if (nakupReportMod) { nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 6 * 3600 * 1000); }
     // Týdenní report přihlášek mobilních lisů (souhrn nových přihlášek z dotazníku) — 1×/ISO-týden.
     if (mobilniLisyMod) { mobilniLisyMod.tick(); setInterval(() => mobilniLisyMod.tick(), 6 * 3600 * 1000); }
+    // Týdenní report poptávek LOXXER (souhrn nových poptávek + nabídek) — 1×/ISO-týden.
+    if (loxxerMod) { loxxerMod.tick(); setInterval(() => loxxerMod.tick(), 6 * 3600 * 1000); }
     // Hlídač smluv: denní notifikační běh (stejný 6h interval, vnitřní pojistka na 1×/den)
     if (smlouvyMod) {
       smlouvyMod.tick();
