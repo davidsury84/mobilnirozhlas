@@ -391,6 +391,8 @@ function mount(host) {
     // dotazník seed typů držíme v synchronu s kódem — každý typ svůj (ABROLL řady, CITY, MULDA)
     d.types.forEach(t => { const s = SEED_TYPES.find(x => x.key === t.key); if (s && s.dotaznik) t.dotaznik = JSON.parse(JSON.stringify(s.dotaznik)); });
     if (!Array.isArray(d.zakazky)) d.zakazky = [];
+    // Migrace na nový tok: staré koncové stavy (byly už schválené a ve výrobě) → dokončeno; ať nespadnou na neznámém STAV.
+    d.zakazky.forEach(z => { if (z.stav === 'vyroba' || z.stav === 'stredisko') { z.stav = 'dokonceno'; if (!z.closedAt) z.closedAt = Date.now(); z.deadline = null; } });
     if (!Array.isArray(d.notif)) d.notif = [];
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
     if (!Array.isArray(d.timesheet)) d.timesheet = [];
