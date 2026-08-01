@@ -242,11 +242,7 @@ function renderCfg(){
         +'<label style="display:flex;gap:8px;align-items:center;margin-top:11px;font-size:13.5px;color:var(--mut)"><input type="checkbox" id="repEnabled" '+(rep.enabled===false?'':'checked')+' onchange="reportEnabled(this.checked)" style="width:16px;height:16px"> Týdenní report zapnutý</label>'
         +'</div>'
         +'<hr style="border:0;border-top:1px solid #cfe0c2;margin:16px 0">'
-        +'<div><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">🖼️ Úvodní fotka prezentace (přes celou stránku)</div>'
-        +'<div style="color:var(--mut);font-size:13px;margin-bottom:9px">Fotka skříně LOXXER na pozadí úvodní části veřejné stránky /loxxer. JPG, PNG nebo WEBP do 6 MB. Doporučeno na šířku, min. 1600 px.</div>'
-        +(STATE.bg?'<div style="margin-bottom:9px"><img src="/api/loxxer/pozadi?t='+Date.now()+'" alt="Úvodní fotka" style="max-width:340px;width:100%;border:1px solid var(--line);border-radius:10px;display:block"></div>':'<div style="color:var(--mut);font-size:13px;margin-bottom:9px">Zatím bez fotky — úvod má výchozí tmavě zelené pozadí.</div>')
-        +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="file" id="bgFile" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="bgUpload(this.files[0])"><button class="btn sm" onclick="document.getElementById(\'bgFile\').click()">'+(STATE.bg?'Změnit fotku':'Nahrát fotku')+'</button>'+(STATE.bg?'<button class="btn ghost sm" onclick="bgRemove()">Odebrat</button>':'')+'<a class="btn ghost sm" href="/loxxer" target="_blank" rel="noopener">Otevřít veřejnou stránku ↗</a></div>'
-        +'</div>'
+        +'<div style="color:var(--mut);font-size:13px">Veřejná prezentace a konfigurátor: <a href="/loxxer" target="_blank" rel="noopener">otevřít stránku ↗</a> (design a obsah spravuje ELKOPLAST CMS).</div>'
       ):'')
     +'</div>';
 }
