@@ -330,6 +330,15 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .pl-zoom #plZoomLbl{min-width:46px;text-align:center;font-weight:700;font-size:12.5px;color:var(--ink)}
 .pl-zoomwrap{position:relative;width:2000px;height:900px}
 .pl-num{position:absolute;left:-11px;top:-11px;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:2}
+/* ---- dashboard tracker toku (styl sledování zásilky) ---- */
+.kc-track{position:relative;display:flex;justify-content:space-between;align-items:flex-start;gap:4px;padding:16px 10px 10px;overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.kc-line{position:absolute;left:44px;right:44px;top:33px;height:3px;background:var(--line);z-index:0}
+.kc-step{position:relative;z-index:1;flex:1 0 auto;min-width:84px;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;text-align:center}
+.kc-dot{width:34px;height:34px;border-radius:50%;background:var(--card);border:2px solid var(--line);color:var(--mut);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;transition:transform .1s}
+.kc-dot.on{background:var(--g);border-color:var(--g);color:#fff}
+.kc-step:hover .kc-dot{border-color:var(--g);transform:scale(1.08)}
+.kc-slabel{font-size:11.5px;color:var(--mut);line-height:1.25;max-width:100px}
+.kc-step:hover .kc-slabel{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -557,6 +566,11 @@ function renderDash(m){
   z.forEach(function(x){ if(!isTerminal(x.stav)){ var ph=mapPh[x.stav]; if(ph)PH[ph]++; }});
   var pa=D.phaseAvg||{}, pd=D.phaseDays||{};
   var h='<div class="head"><h2>Přehled konstrukce</h2></div>';
+  var track=[['Nové','novy',c.novy],['Přidělení','prideleni',c.prideleni],['Zkreslení','prace',c.prace],['Kontrola','kontrola',c.kontrola],['U obchodníka','obchodnik',c.obchodnik],['U klienta','klient',c.klient],['Výrobní dok.','schvaleno',c.schvaleno],['Ve výrobě','vyroba',c.vyr]];
+  h+='<div class="sec">Kde jsou zakázky v toku</div>'+
+    '<div class="kc-track"><div class="kc-line"></div>'+
+    track.map(function(s){return '<div class="kc-step" onclick="setFilter(\''+s[1]+'\')" title="'+esc(s[0])+' — '+(s[2]||0)+' zakázek"><div class="kc-dot'+(s[2]>0?' on':'')+'">'+(s[2]||0)+'</div><div class="kc-slabel">'+esc(s[0])+'</div></div>';}).join('')+
+    '</div>';
   h+='<div class="kpi">'+
     kcLink(c.open,'Otevřených','open')+
     kcLink(c.red,'Po termínu','red')+
