@@ -1021,14 +1021,17 @@ function plInspNode(box){
   h+=plField('Kdo je na tahu (role)',plSelect(n.onTurn,roleOpts,'plSetNode(\'onTurn\',this.value)'));
   h+=plField('Fáze (dashboard)',plSelect(n.phase,PL_PHASES,'plSetNode(\'phase\',this.value)'));
   h+=plField('Typ uzlu',plSelect(n.kind,PL_KINDS,'plSetNode(\'kind\',this.value)'));
-  h+=plField('Lhůta kroku',plSelect(n.lhutaKey,PL_LHUTY,'plSetNode(\'lhutaKey\',this.value)'));
+  var refT=(D.types&&D.types[0])||{};
+  var lhOpts=PL_LHUTY.map(function(o){var v=o[0]?refT[o[0]]:null;return [o[0],o[1]+(o[0]&&v!=null?(' — '+v+' d'):'')];});
+  h+=plField('Termín kroku (za kolik prac. dní má být hotový)',plSelect(n.lhutaKey,lhOpts,'plSetNode(\'lhutaKey\',this.value)'));
+  h+='<div class="pl-hint" style="margin-top:2px;margin-bottom:2px">Počet dní se bere z <b>číselníku typu výrobku</b> (Role a číselník → lhůty), ne z plátna — proto vybíráš „přihrádku". Čísla za pomlčkou jsou aktuální hodnoty typu „'+esc(refT.name||refT.key||'—')+'". „od zadání" = počítá se od bodu 0.</div>';
   h+='<div class="pl-chks">'+
     '<label><input type="checkbox" '+(n.lhutaFrom==='step'?'checked':'')+' onchange="plSetNode(\'lhutaFrom\',this.checked?\'step\':null)">lhůta od zahájení kroku</label>'+
     '<label><input type="checkbox" '+(n.terminal?'checked':'')+' onchange="plSetNode(\'terminal\',this.checked)">koncový (terminál)</label>'+
     '<label><input type="checkbox" '+(n.hold?'checked':'')+' onchange="plSetNode(\'hold\',this.checked)">pozastavení</label>'+
     '<label><input type="checkbox" '+(n.noSemafor?'checked':'')+' onchange="plSetNode(\'noSemafor\',this.checked)">bez semaforu</label>'+
     '</div>';
-  h+='<div class="pl-hint" style="margin-top:10px">ID stavu: <b>'+esc(n.id)+'</b> (neměnné). Lhůta se počítá z číselníku typu výrobku podle zvoleného klíče.</div>';
+  h+='<div class="pl-hint" style="margin-top:10px">ID stavu: <b>'+esc(n.id)+'</b> (neměnné).</div>';
   h+='<button class="pl-del" onclick="plDelNode()">Smazat stav</button>';
   box.innerHTML=h;
 }
