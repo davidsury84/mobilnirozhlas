@@ -1955,11 +1955,23 @@ function mount(host) {
     try { fs.mkdirSync(FILES_DIR, { recursive: true }); } catch (_) {}
     save({ seq: 0, roles: {}, fond: {}, konstrukterGroups: {}, types: JSON.parse(JSON.stringify(SEED_TYPES)), zakazky: [], notif: [] });
   }
+  // Smaže JEN zakázky + jejich notifikace a nahrané soubory; role, číselník,
+  // střediska, nastavení, evidenci práce i pravidla toku (workflow) ponechá.
+  function clearZakazky() {
+    const d = load();
+    try { if (fs.existsSync(FILES_DIR)) fs.rmSync(FILES_DIR, { recursive: true, force: true }); } catch (_) {}
+    try { fs.mkdirSync(FILES_DIR, { recursive: true }); } catch (_) {}
+    d.zakazky = [];
+    d.notif = [];
+    save(d);
+  }
   async function apiAdminSeed(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
-    // Pouze reset (smazání všech dat) — generátor ukázkových dat byl pro ostrý provoz odstraněn.
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    if (b.mode === 'zakazky') { clearZakazky(); json(res, 200, { ok: true, cleared: 'zakazky' }); return true; }
+    // 'clear' = úplný reset (i role/konfigurace) — jen při čistém startu
     demoClear();
-    json(res, 200, { ok: true, cleared: true });
+    json(res, 200, { ok: true, cleared: 'all' });
     return true;
   }
 

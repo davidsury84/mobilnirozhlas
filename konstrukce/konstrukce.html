@@ -2038,7 +2038,11 @@ function renderNastaveni(m){
     '<div class="two"><div><label>E-mail konstruktéra</label><input id="impUser" placeholder="jmeno@elkoplast.cz"></div>'+
     '<div><label>Režim</label><select id="impMode"><option value="append">Přidat k existujícím</option><option value="replace">Nahradit jeho záznamy</option></select></div></div>'+
     '<div class="actions" style="margin-top:8px"><button class="btn sm" onclick="importEvidence()">Naimportovat historii</button></div><div class="err" id="impErr"></div></div>';
-  h+='<div class="sec">Reset dat (ostrý provoz)</div><div class="card"><p class="muted" style="margin-top:0">Smaže <b>všechny zakázky, role i konfiguraci</b> modulu a vrátí ho do prázdného výchozího stavu. Používejte jen při čistém startu — akce je nevratná.</p>'+
+  h+='<div class="sec">Reset dat</div><div class="card">'+
+    '<p class="muted" style="margin-top:0"><b>Smazat testovací zakázky</b> — odstraní jen zakázky a jejich notifikace/soubory (ať přes ně nechodí žádné e-maily). <b>Role, číselník, střediska, nastavení, evidenci práce i pravidla toku ponechá.</b> Toto použij pro úklid testovacích dat.</p>'+
+    '<div class="actions"><button class="btn sm" onclick="seedDemo(\'zakazky\')">Smazat testovací zakázky</button></div>'+
+    '<hr style="border:0;border-top:1px solid var(--line);margin:14px 0">'+
+    '<p class="muted" style="margin-top:0">⚠️ <b>Úplný reset</b> — smaže <b>všechno</b> (zakázky, role, číselník, střediska, nastavení, evidenci práce). Jen při čistém startu, nevratné.</p>'+
     '<div class="actions"><button class="btn warn sm" onclick="seedDemo(\'clear\')">Smazat všechna data</button></div></div>';
   m.innerHTML=h;
 }
@@ -2064,11 +2068,15 @@ function importEvidence(){
   api('/admin/import','POST',{user:user.trim().toLowerCase(),mode:mode}).then(function(o){if(!o.ok){err.textContent=o.j.chyba||'Chyba.';return}err.textContent='';alert('Naimportováno '+o.j.count+' záznamů. Otevřete „Evidence práce".')});
 }
 function seedDemo(mode){
-  if(!confirm('Opravdu smazat VŠECHNA data modulu (zakázky, role i konfiguraci)? Tuto akci nelze vzít zpět.'))return;
-  api('/admin/seed','POST',{mode:'clear'}).then(function(o){
+  var justZak=(mode==='zakazky');
+  var q=justZak
+    ? 'Smazat všechny zakázky a jejich notifikace/soubory? Role, číselník a nastavení zůstanou. Tuto akci nelze vzít zpět.'
+    : 'Opravdu smazat VŠECHNA data modulu (zakázky, role i konfiguraci)? Tuto akci nelze vzít zpět.';
+  if(!confirm(q))return;
+  api('/admin/seed','POST',{mode:justZak?'zakazky':'clear'}).then(function(o){
     if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}
     reloadData();
-    alert('Všechna data modulu byla smazána.');
+    alert(justZak?'Testovací zakázky byly smazány. Role a nastavení zůstaly zachovány.':'Všechna data modulu byla smazána.');
   });
 }
 function setRole(email,role){api('/admin/role','POST',{email:email,role:role}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
