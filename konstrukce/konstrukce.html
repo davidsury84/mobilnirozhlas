@@ -270,6 +270,15 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .pl-dirty{color:var(--amber);font-weight:700;font-size:12.5px}
 .pl-savestat{color:var(--mut);font-size:12px;font-style:italic}
 .pl-testbadge{display:inline-block;margin-left:10px;font-size:12px;font-weight:800;color:#8a5a00;background:#fff3d6;border:1px solid #f0d48a;border-radius:20px;padding:3px 11px;vertical-align:middle}
+.pl-desc{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.pl-desc .d-head{font-weight:800;font-size:13.5px;margin-bottom:8px;color:var(--g2)}
+.pl-desc .d-list{margin:0;padding-left:0;list-style:none;counter-reset:none}
+.pl-desc .d-list li{padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px;line-height:1.4}
+.pl-desc .d-num{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:800;margin-right:6px}
+.pl-desc .d-meta{color:var(--mut);font-size:12px}
+.pl-desc .d-out{margin:3px 0 0 26px;color:#33513f;font-size:12.5px}
+.pl-desc .d-out.d-warn{color:var(--red);font-weight:600}
+.pl-desc .d-glob{margin-top:8px;color:var(--mut);font-size:12.5px}
 .pl-famrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#eef4fb;border:1px solid #cfe0f2;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px}
 .pl-famrow select{padding:6px 9px;border:1px solid var(--line);border-radius:8px;font:inherit;font-weight:700}
 .pl-faminfo{color:var(--mut);font-size:12px}
@@ -745,6 +754,13 @@ function plStepNumbers(){
 var PL_LHUTY=[['','bez termínu'],['lhutaPrideleniDays','Přidělení (od zadání)'],['lhutaZkresleniDays','Zkreslení (od zadání)'],['lhutaKontrolaDays','Kontrola (od zadání)'],['lhutaObchodnikDays','Obchodník (od zadání)'],['lhutaKlientDays','Klient (od zadání)'],['lhutaVyrobaDays','Výrobní dok. (od zadání)'],['lhutaRevizeDays','Revize (od zahájení)']];
 var PL_PHASES=[['','—'],['obchod','Obchod'],['konstrukce','Konstrukce'],['schvaleni','Schválení'],['vyroba','Výroba']];
 var PL_KINDS=[['start','Start (zadání)'],['normal','Běžný krok'],['klient','Klient (veřejný náhled)'],['hold','Pozastavení'],['end','Konec (terminál)']];
+var PL_KIND_DESC={
+  start:'Vstupní bod — sem zakázka vzniká (zadání). Měl by být právě jeden.',
+  normal:'Běžný pracovní krok workflow.',
+  klient:'Krok u klienta — veřejný náhled výkresu a jeho rozhodnutí (schválí / připomínky / zamítne).',
+  hold:'Pozastavení — lhůty se zastaví (čeká se na podklady), semafor neběží.',
+  end:'Konec — terminální stav, zakázka je uzavřená (hotovo/zamítnuto). Nevede z něj žádný přechod.'
+};
 var PL_EKINDS=[['forward','Vpřed'],['reject','Zamítnout / vrátit'],['revize','Revize'],['hold','Pozastavit'],['self','Beze změny stavu'],['klient','Klient'],['system','Systém']];
 function plRoles(){var r=D.roleLabels||{obchodnik:'Obchodník',sef:'Šéf konstrukce',konstrukter:'Konstruktér',reditel:'Ředitel','vykonny-reditel':'Výkonný ředitel výroby',klient:'Klient'};return r;}
 function plRoleLabel(r){return (D.roleLabels&&D.roleLabels[r])||r||'—';}
@@ -826,12 +842,38 @@ function renderPlatno(m){
     '<p class="muted" style="margin:0 0 8px;font-size:12.5px">Toto je <b>návrhové plátno (sandbox)</b>. Úpravy se ukládají jako koncept a do <b>reálného workflow se promítnou teprve po „Uložit naostro"</b> (s potvrzením). Táhni uzel za hlavičku, plátno posuneš tažením prázdné plochy, přechod nakreslíš tažením ze zeleného kolečka, klikni na uzel/šipku pro úpravu.</p>'+
     famRow+tb+legend+
     '<div class="pl-wrap">'+stage+'<div class="pl-insp hidden" id="plInsp"></div></div>'+
+    '<div class="pl-desc" id="plDesc"></div>'+
     '</div>';
   plWireCanvas();
   plApplyZoom();
   plDrawEdges();
   plRenderInsp();
+  plRenderDesc();
 }
+// Automatický textový popis toku (co se bude dít) — generuje se z plátna.
+function plDescribe(){
+  var steps=plStepNumbers();
+  var refT=(D.types&&D.types[0])||{};
+  var ordered=(PL.wf.nodes||[]).slice().sort(function(a,b){return (steps[a.id]||99)-(steps[b.id]||99)});
+  var rows=ordered.map(function(n){
+    var meta=[];
+    if(n.kind==='start')meta.push('vstup/zadání');
+    if(n.hold)meta.push('pozastavení');
+    if(n.terminal)meta.push('konec');
+    meta.push('na tahu: '+plRoleLabel(n.onTurn));
+    if(!n.terminal&&n.lhutaKey&&refT[n.lhutaKey]!=null)meta.push('do '+refT[n.lhutaKey]+' prac. dní'+(n.lhutaFrom==='step'?' od zahájení':' od zadání'));
+    var outs=(PL.wf.edges||[]).filter(function(e){return e.from===n.id&&plNode(e.to)&&e.to!==n.id;});
+    var outHtml=n.terminal?''
+      :(outs.length?'<div class="d-out">'+outs.map(function(e){return '↳ '+esc(e.label||e.action)+' → <b>'+esc((plNode(e.to)||{}).label||e.to)+'</b>';}).join('')+'</div>'
+        :(n.hold?'<div class="d-out">↳ po doplnění podkladů pokračuje zpět (viz „Kdykoli")</div>'
+          :'<div class="d-out d-warn">⚠ odsud nevede žádný přechod dál</div>'));
+    return '<li><span class="d-num">'+(steps[n.id]||'')+'</span> <b>'+esc(n.label||n.id)+'</b> <span class="d-meta">('+esc(meta.join(' · '))+')</span>'+outHtml+'</li>';
+  }).join('');
+  var glob=(PL.wf.edges||[]).filter(function(e){return e.from==='*'||String(e.to).charAt(0)==='@';}).map(function(e){return esc((e.label||e.action)+(e.from==='*'?' (odkudkoli)':''));});
+  var globTxt=glob.length?'<div class="d-glob"><b>Kdykoli během toku:</b> '+glob.join(' · ')+'</div>':'';
+  return '<ol class="d-list">'+rows+'</ol>'+globTxt;
+}
+function plRenderDesc(){var el=document.getElementById('plDesc');if(!el)return;el.innerHTML='<div class="d-head">📝 Co se bude dít (automaticky z plátna'+(PL.fam?' — skupina: '+esc((D.families||[]).reduce(function(a,f){return f.key===PL.fam?f.label:a},PL.fam)):'')+')</div>'+plDescribe();}
 function plNodeHtml(n,step){
   var col=plNodeColor(n);
   var sel=(PL.sel&&PL.sel.t==='node'&&PL.sel.id===n.id)?' sel':'';
@@ -949,7 +991,7 @@ function plRefresh(){ // překreslí uzly (výběr/barvy), hrany i inspektor bez
   var canvas=document.getElementById('plCanvas');if(!canvas){renderMain();return}
   // aktualizuj třídy výběru na uzlech
   (PL.wf.nodes||[]).forEach(function(n){var el=document.getElementById('pln_'+n.id);if(el)el.className='pl-node'+((PL.sel&&PL.sel.t==='node'&&PL.sel.id===n.id)?' sel':'');});
-  plDrawEdges();plRenderInsp();
+  plDrawEdges();plRenderInsp();plRenderDesc();
   var dd=document.querySelector('.pl-dirty');
   if(PL.dirty&&!dd){var tb=document.querySelector('.pl-tb');if(tb){var stat=document.getElementById('plSaveStat');tb.insertBefore(Object.assign(document.createElement('span'),{className:'pl-dirty',textContent:'● nepublikováno'}),stat||null);}}
 }
@@ -1016,8 +1058,13 @@ function plStartConn(id,ev){
   document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
 }
 function plAddEdge(from,to){
-  PL.wf.edges.push({action:'akce'+(PL.wf.edges.length+1),from:from,to:to,roles:[],kind:(from===to?'self':'forward'),source:'user',label:'nový přechod',needNote:false});
-  PL.dirty=true;PL.sel={t:'edge',i:PL.wf.edges.length-1};plRefresh();
+  PL.wf.edges.push({action:'akce'+(PL.wf.edges.length+1),from:from,to:to,roles:[],notify:[],kind:(from===to?'self':'forward'),source:'user',label:'nový přechod',needNote:false});
+  PL.dirty=true;plAutosave();PL.sel={t:'edge',i:PL.wf.edges.length-1};renderMain();
+}
+// Přidá další přechod z daného stavu (rozvětvení = z jednoho místa na víc věcí).
+function plAddEdgeFrom(fromId){
+  var other=(PL.wf.nodes||[]).find(function(n){return n.id!==fromId;});
+  plAddEdge(fromId, other?other.id:fromId);
 }
 function plAddNode(){
   var id='stav'+(PL.wf.nodes.length+1),i=1;while(plNode(id)){i++;id='stav'+(PL.wf.nodes.length+i);}
@@ -1042,6 +1089,7 @@ function plInspNode(box){
   h+=plField('Kdo je na tahu (role)',plSelect(n.onTurn,roleOpts,'plSetNode(\'onTurn\',this.value)'));
   h+=plField('Fáze (dashboard)',plSelect(n.phase,PL_PHASES,'plSetNode(\'phase\',this.value)'));
   h+=plField('Typ uzlu',plSelect(n.kind,PL_KINDS,'plSetNode(\'kind\',this.value)'));
+  h+='<div class="pl-hint" style="margin-top:2px">'+esc(PL_KIND_DESC[n.kind]||'')+'</div>';
   var refT=(D.types&&D.types[0])||{};
   var lhOpts=PL_LHUTY.map(function(o){var v=o[0]?refT[o[0]]:null;return [o[0],o[1]+(o[0]&&v!=null?(' — '+v+' d'):'')];});
   h+=plField('Termín kroku (za kolik prac. dní má být hotový)',plSelect(n.lhutaKey,lhOpts,'plSetNode(\'lhutaKey\',this.value)'));
@@ -1052,6 +1100,9 @@ function plInspNode(box){
     '<label><input type="checkbox" '+(n.hold?'checked':'')+' onchange="plSetNode(\'hold\',this.checked)">pozastavení</label>'+
     '<label><input type="checkbox" '+(n.noSemafor?'checked':'')+' onchange="plSetNode(\'noSemafor\',this.checked)">bez semaforu</label>'+
     '</div>';
+  var outCount=(PL.wf.edges||[]).filter(function(e){return e.from===n.id&&plNode(e.to)&&e.to!==n.id;}).length;
+  h+='<div style="margin-top:12px"><button class="btn sm ghost" style="width:100%" onclick="plAddEdgeFrom(\''+esc(n.id)+'\')">+ Přidat přechod z tohoto stavu</button>'+
+     '<div class="pl-hint" style="margin-top:4px">Odsud teď vede <b>'+outCount+'</b> '+(outCount===1?'přechod':'přechodů')+'. Přidej další a pošleš z jednoho místa na víc věcí (rozvětvení). Přechod můžeš taky nakreslit tažením ze zeleného kolečka.</div></div>';
   h+='<div class="pl-hint" style="margin-top:10px">ID stavu: <b>'+esc(n.id)+'</b> (neměnné).</div>';
   h+='<button class="pl-del" onclick="plDelNode()">Smazat stav</button>';
   box.innerHTML=h;
@@ -1078,6 +1129,7 @@ function plInspEdge(box){
     '<label><input type="checkbox" '+(e.needVyrobni?'checked':'')+' onchange="plSetEdge(\'needVyrobni\',this.checked)">vyžadovat výrobní dok.</label>'+
     '</div>';
   h+='<div class="pl-hint" style="margin-top:10px">„Oznámit" pošle při tomto přechodu e-mail i notifikaci všem zaškrtnutým rolím naráz (např. dvě role současně) — nad rámec pevných e-mailů akce. Mechanika akce (tokeny, zámek verze) je vázaná na klíč akce.</div>';
+  h+='<button class="btn sm ghost" style="width:100%;margin-top:10px" onclick="plAddEdgeFrom(\''+esc(e.from)+'\')">+ Rozvětvit — další přechod ze stavu „'+esc(plNodeLbl(e.from))+'"</button>';
   h+='<button class="pl-del" onclick="plDelEdge()">Smazat přechod</button>';
   box.innerHTML=h;
 }
