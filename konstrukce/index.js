@@ -479,6 +479,10 @@ function mount(host) {
       // doplň chybějící seed uzly (nové stavy přidané v kódu) beze změny pozic/úprav uživatele
       SEED_WORKFLOW.nodes.forEach(sn => { if (!d.workflow.nodes.some(n => n.id === sn.id)) d.workflow.nodes.push(JSON.parse(JSON.stringify(sn))); });
     }
+    // Per-skupinová pravidla (návrh v sandboxu) + jejich koncepty. Engine je zatím
+    // nekonzumuje (produkce jede na výchozím d.workflow) — go-live je samostatný krok.
+    if (!d.workflowByFam || typeof d.workflowByFam !== 'object') d.workflowByFam = {};
+    if (!d.workflowDraftByFam || typeof d.workflowDraftByFam !== 'object') d.workflowDraftByFam = {};
     syncWorkflow(d);
     if (!Array.isArray(d.notif)) d.notif = [];
     if (!Array.isArray(d.activities) || !d.activities.length) d.activities = JSON.parse(JSON.stringify(SEED_ACTIVITIES));
@@ -1359,7 +1363,16 @@ function mount(host) {
   function apiAdminWorkflowGet(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
     const d = load();
-    json(res, 200, { ok: true, workflow: d.workflow, draft: d.workflowDraft || null, roleLabels: ROLE_LABELS, seed: SEED_WORKFLOW });
+    const fam = String((urlLib.parse(req.url, true).query || {}).fam || '');
+    const famList = FAM_ORDER.map(k => ({ key: k, label: FAM_LABEL[k] }));
+    if (fam && FAM_ORDER.indexOf(fam) >= 0) {
+      // per-skupina: pokud výjimka neexistuje, nabídni kopii výchozího jako základ (inherited)
+      const has = !!d.workflowByFam[fam];
+      const wf = has ? d.workflowByFam[fam] : JSON.parse(JSON.stringify(d.workflow));
+      json(res, 200, { ok: true, fam, inherited: !has, workflow: wf, draft: d.workflowDraftByFam[fam] || null, families: famList, roleLabels: ROLE_LABELS, seed: SEED_WORKFLOW });
+      return true;
+    }
+    json(res, 200, { ok: true, fam: '', workflow: d.workflow, draft: d.workflowDraft || null, families: famList, roleLabels: ROLE_LABELS, seed: SEED_WORKFLOW });
     return true;
   }
   // Sanitizace grafu z plátna (společné pro koncept i publikaci).
@@ -1415,23 +1428,25 @@ function mount(host) {
     const wf = b.workflow;
     if (!wf || typeof wf !== 'object') { json(res, 400, { chyba: 'Chybí pravidlo.' }); return true; }
     const mode = b.mode === 'draft' ? 'draft' : 'publish';
+    const fam = String(b.fam || '');
+    const isFam = fam && FAM_ORDER.indexOf(fam) >= 0;
     const cleaned = cleanWorkflow(wf);
     const d = load();
     if (mode === 'draft') {
       // průběžný koncept — bez tvrdé validace (může být rozpracovaný), neovlivní běh
       cleaned.savedAt = Date.now();
-      d.workflowDraft = cleaned;
+      if (isFam) d.workflowDraftByFam[fam] = cleaned; else d.workflowDraft = cleaned;
       save(d);
-      json(res, 200, { ok: true, draft: true, savedAt: cleaned.savedAt });
+      json(res, 200, { ok: true, draft: true, fam: isFam ? fam : '', savedAt: cleaned.savedAt });
       return true;
     }
-    // publikace naostro — validace + nasazení do reálného toku, koncept se zahodí
+    // publikace — validace; výchozí jde do reálného toku, per-skupina se uloží jako pravidlo skupiny
     const errv = validateWorkflow(cleaned);
     if (errv) { json(res, 400, { chyba: errv }); return true; }
-    d.workflow = cleaned;
-    delete d.workflowDraft;
+    if (isFam) { d.workflowByFam[fam] = cleaned; delete d.workflowDraftByFam[fam]; }
+    else { d.workflow = cleaned; delete d.workflowDraft; }
     save(d);
-    json(res, 200, { ok: true, workflow: d.workflow });
+    json(res, 200, { ok: true, fam: isFam ? fam : '', workflow: cleaned });
     return true;
   }
 

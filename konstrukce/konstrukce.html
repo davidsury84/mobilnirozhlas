@@ -270,6 +270,9 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .pl-dirty{color:var(--amber);font-weight:700;font-size:12.5px}
 .pl-savestat{color:var(--mut);font-size:12px;font-style:italic}
 .pl-testbadge{display:inline-block;margin-left:10px;font-size:12px;font-weight:800;color:#8a5a00;background:#fff3d6;border:1px solid #f0d48a;border-radius:20px;padding:3px 11px;vertical-align:middle}
+.pl-famrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#eef4fb;border:1px solid #cfe0f2;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px}
+.pl-famrow select{padding:6px 9px;border:1px solid var(--line);border-radius:8px;font:inherit;font-weight:700}
+.pl-faminfo{color:var(--mut);font-size:12px}
 .pl-root.full{position:fixed;inset:0;z-index:3000;background:var(--bg);margin:0;padding:12px 18px 16px;overflow:auto}
 .pl-wrap{position:relative}
 .pl-stage{width:100%;position:relative;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;height:640px;cursor:grab}
@@ -722,7 +725,7 @@ function saveWorkflowDays(){
 }
 
 /* ================= PLÁTNO — pravidlo toku (workflow editor) ================= */
-var PL={wf:null,sel:null,dirty:false,conn:null,drag:null,full:false,zoom:1};
+var PL={wf:null,sel:null,dirty:false,conn:null,drag:null,full:false,zoom:1,fam:'',inherited:false};
 var PL_GRID=22;                     // krok mřížky (px) pro přichytávání
 function plSnap(v){return Math.round(v/PL_GRID)*PL_GRID}
 // pořadová čísla kroků: BFS od startu přes hrany vpřed/klient
@@ -769,10 +772,20 @@ function plAutosave(){
   clearTimeout(PL._asT);
   var st=document.getElementById('plSaveStat');if(st)st.textContent='ukládám koncept…';
   PL._asT=setTimeout(function(){
-    api('/admin/workflow','POST',{workflow:PL.wf,mode:'draft'}).then(function(o){
+    api('/admin/workflow','POST',{workflow:PL.wf,mode:'draft',fam:PL.fam}).then(function(o){
       var el=document.getElementById('plSaveStat');if(el)el.textContent=o.ok?('koncept uložen '+fdt(Date.now()).slice(-5)):'koncept se neuložil';
     });
   },700);
+}
+function plSwitchFam(fam){
+  api('/admin/workflow'+(fam?('?fam='+encodeURIComponent(fam)):''),'GET').then(function(o){
+    if(!o.ok){alert('Nelze načíst pravidlo skupiny.');return;}
+    PL.fam=o.j.fam||''; PL.inherited=!!o.j.inherited; PL.sel=null;
+    var draft=o.j.draft;
+    if(draft&&draft.nodes&&draft.nodes.length){PL.wf=draft;PL.dirty=true;PL.fromDraft=true;}
+    else{PL.wf=o.j.workflow;PL.dirty=false;PL.fromDraft=false;}
+    renderMain();
+  });
 }
 function plDrawable(e){return e.from&&e.from!=='*'&&plNode(e.from)&&e.to&&String(e.to).charAt(0)!=='@'&&plNode(e.to);}
 
@@ -796,6 +809,12 @@ function renderPlatno(m){
     nodeLeg.map(function(k){return '<span><i style="background:'+k[1]+'"></i>'+esc(k[0])+'</span>'}).join('')+'</div>'+
     '<div class="pl-legend"><b>Šipky (přechody):</b>'+
     PL_EKINDS.map(function(k){return '<span><i style="background:'+plEdgeColor(k[0])+'"></i>'+esc(k[1])+'</span>'}).join('')+'</div>';
+  var famOpts='<option value=""'+(PL.fam===''?' selected':'')+'>Výchozí (všechny typy)</option>'+
+    (D.families||[]).map(function(f){return '<option value="'+esc(f.key)+'"'+(f.key===PL.fam?' selected':'')+'>'+esc(f.label)+'</option>'}).join('');
+  var famInfo=PL.fam
+    ? '<span class="pl-faminfo">🧪 Návrh pro skupinu — ukládá se, ostrý per-skupinový provoz zapneme na tvůj pokyn.'+(PL.inherited?' Zatím dědí výchozí tok — uprav a ulož pro vlastní pravidlo skupiny.':'')+'</span>'
+    : '<span class="pl-faminfo">Řídí reálný provoz (po „Uložit naostro").</span>';
+  var famRow='<div class="pl-famrow"><b>Pravidlo pro:</b> <select id="plFamSel" onchange="plSwitchFam(this.value)">'+famOpts+'</select>'+famInfo+'</div>';
   var steps=plStepNumbers();
   var nodesHtml=(PL.wf.nodes||[]).map(function(n){return plNodeHtml(n,steps[n.id])}).join('');
   var stage='<div class="pl-stage" id="plStage"><div class="pl-zoomwrap" id="plZoomWrap"><div class="pl-canvas" id="plCanvas">'+
@@ -805,7 +824,7 @@ function renderPlatno(m){
   m.innerHTML='<div class="pl-root'+(PL.full?' full':'')+'" id="plRoot">'+
     '<div class="head" style="margin-bottom:6px"><h2>Pravidlo toku — plátno <span class="pl-testbadge">🧪 Testovací / návrhový režim</span></h2></div>'+
     '<p class="muted" style="margin:0 0 8px;font-size:12.5px">Toto je <b>návrhové plátno (sandbox)</b>. Úpravy se ukládají jako koncept a do <b>reálného workflow se promítnou teprve po „Uložit naostro"</b> (s potvrzením). Táhni uzel za hlavičku, plátno posuneš tažením prázdné plochy, přechod nakreslíš tažením ze zeleného kolečka, klikni na uzel/šipku pro úpravu.</p>'+
-    tb+legend+
+    famRow+tb+legend+
     '<div class="pl-wrap">'+stage+'<div class="pl-insp hidden" id="plInsp"></div></div>'+
     '</div>';
   plWireCanvas();
@@ -941,8 +960,9 @@ function plWireCanvas(){
     if(dotEl){ev.preventDefault();plStartConn(dotEl.getAttribute('data-dot'),ev);return;}
     var dragEl=ev.target.closest?ev.target.closest('[data-drag]'):null;
     if(dragEl){ev.preventDefault();plStartDrag(dragEl.getAttribute('data-drag'),ev);return;}
-    // klik/tažení do prázdna = posun plátna (pan) + zrušení výběru
-    if(!ev.target.closest||!ev.target.closest('.pl-node')){plStartPan(ev);}
+    // pan spustíme JEN při tažení prázdné plochy (samotné plátno) — ať klik na
+    // šipku/uzel není přebit panem (jinak by se šipka při překreslení ztratila).
+    if(ev.target&&ev.target.id==='plCanvas'){plStartPan(ev);}
   });
   // kolečko = zoom (na pozici kurzoru)
   stage.addEventListener('wheel',function(e){e.preventDefault();var r=stage.getBoundingClientRect();plZoomAt(e.deltaY<0?1.1:0.9,e.clientX-r.left,e.clientY-r.top);},{passive:false});
@@ -1069,16 +1089,19 @@ function plSetEdgeRole(r,on){var e=PL.wf.edges[PL.sel.i];if(!e)return;e.roles=e.
 function plSetEdgeNotify(r,on){var e=PL.wf.edges[PL.sel.i];if(!e)return;e.notify=e.notify||[];var i=e.notify.indexOf(r);if(on&&i<0)e.notify.push(r);if(!on&&i>=0)e.notify.splice(i,1);PL.dirty=true;plAutosave();}
 function plDelNode(){var n=plNode(PL.sel.id);if(!n)return;if(!confirm('Smazat stav "'+(n.label||n.id)+'" a jeho přechody?'))return;var id=n.id;PL.wf.nodes=PL.wf.nodes.filter(function(x){return x.id!==id});PL.wf.edges=PL.wf.edges.filter(function(x){return x.from!==id&&x.to!==id});PL.dirty=true;PL.sel=null;plAutosave();renderMain();}
 function plDelEdge(){if(!confirm('Smazat tento přechod (vazbu)?'))return;PL.wf.edges.splice(PL.sel.i,1);PL.dirty=true;PL.sel=null;plAutosave();renderMain();}
-function plReset(){if(PL.dirty&&!confirm('Zahodit rozpracovaný koncept a načíst naposledy publikované pravidlo?'))return;PL.wf=plClone(D.workflow||{nodes:[],edges:[]});PL.dirty=false;PL.fromDraft=false;PL.sel=null;api('/admin/workflow','POST',{workflow:PL.wf,mode:'draft'});renderMain();}
+function plReset(){if(PL.dirty&&!confirm('Zahodit rozpracovaný koncept a načíst naposledy uložené pravidlo?'))return;plSwitchFam(PL.fam);}
 function plSeed(){api('/admin/workflow','GET').then(function(o){if(!o.ok){alert('Nelze načíst seed.');return}if(!confirm('Nahradit plátno výchozím (seed) pravidlem? Uloží se jako koncept, naostro až tlačítkem Uložit.'))return;PL.wf=plClone(o.j.seed);PL.sel=null;PL.dirty=true;plAutosave();renderMain();});}
 function plSave(){
-  if(!confirm('Uložit pravidlo NAOSTRO? Projeví se v reálném workflow konstrukce u nově zakládaných i běžících zakázek.'))return;
-  api('/admin/workflow','POST',{workflow:PL.wf,mode:'publish'}).then(function(o){
+  var msg=PL.fam
+    ? 'Uložit pravidlo pro tuto skupinu? Uloží se jako pravidlo skupiny (ostrý per-skupinový provoz se zapne až na tvůj pokyn).'
+    : 'Uložit pravidlo NAOSTRO? Projeví se v reálném workflow konstrukce u nově zakládaných i běžících zakázek.';
+  if(!confirm(msg))return;
+  api('/admin/workflow','POST',{workflow:PL.wf,mode:'publish',fam:PL.fam}).then(function(o){
     if(!o.ok){alert('Uložení selhalo: '+((o.j&&o.j.chyba)||'chyba'));return}
-    PL.dirty=false;PL.fromDraft=false;
-    reloadData();
-    setTimeout(function(){PL.wf=plClone(D.workflow);PL.sel=null;renderMain();},60);
-    alert('Pravidlo toku uloženo naostro. Projeví se v reálném workflow.');
+    PL.dirty=false;PL.fromDraft=false;PL.inherited=false;
+    if(!PL.fam){reloadData();setTimeout(function(){PL.wf=plClone(D.workflow);PL.sel=null;renderMain();},60);}
+    else{PL.sel=null;renderMain();}
+    alert(PL.fam?'Pravidlo skupiny uloženo (návrh).':'Pravidlo toku uloženo naostro. Projeví se v reálném workflow.');
   });
 }
 function plExport(){
