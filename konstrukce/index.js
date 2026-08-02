@@ -592,8 +592,20 @@ function mount(host) {
     return { email, name: e ? e.name : '', isAdmin: isAdm, role: r };
   }
   // Seznam zaměstnanců intranetu pro výběr osob k rolím (jen pro admina).
+  // Celé jméno „Jméno Příjmení". Když adresář má jen křestní jméno (nebo nic),
+  // doplní příjmení z e-mailu (jmeno.prijmeni@…). Diakritiku křestního jména
+  // z adresáře zachová, příjmení z e-mailu jen zkapitalizuje.
+  function displayName(name, email) {
+    name = String(name || '').trim();
+    if (name.indexOf(' ') > 0) return name;                 // už celé jméno
+    const lp = String(email || '').split('@')[0];
+    const parts = lp.split(/[._-]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1));
+    if (name && parts.length >= 2) return name + ' ' + parts.slice(1).join(' ');  // křestní (s diakritikou) + příjmení z e-mailu
+    if (parts.length) return parts.join(' ');
+    return name || email || '';
+  }
   function adminEmployees() {
-    try { return (host.getState().employees || []).map(x => ({ email: (x.email || '').toLowerCase(), name: x.name || x.email })).filter(x => x.email).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs')); }
+    try { return (host.getState().employees || []).map(x => ({ email: (x.email || '').toLowerCase(), name: displayName(x.name, x.email) })).filter(x => x.email).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs')); }
     catch (_) { return []; }
   }
   function empName(email) {
@@ -601,7 +613,7 @@ function mount(host) {
     try {
       const s = host.getState ? host.getState() : { employees: [] };
       const m = (s.employees || []).find(x => (x.email || '').toLowerCase() === email.toLowerCase());
-      return (m && m.name) || email;
+      return displayName(m && m.name, email);
     } catch (_) { return email; }
   }
   function employeesWithRole(role) {
