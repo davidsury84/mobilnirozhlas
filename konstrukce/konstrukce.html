@@ -339,6 +339,17 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .kc-step:hover .kc-dot{border-color:var(--g);transform:scale(1.08)}
 .kc-slabel{font-size:11.5px;color:var(--mut);line-height:1.25;max-width:100px}
 .kc-step:hover .kc-slabel{color:var(--ink)}
+/* ---- tracker u zakázky (styl sledování zásilky) ---- */
+.ot-cap{text-align:center;color:var(--mut);font-size:13px;margin:2px 0 12px}
+.ot-track{display:flex;align-items:flex-start;overflow-x:auto;padding:2px 2px 4px;margin-bottom:14px}
+.ot-step{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;width:66px}
+.ot-conn{flex:1 1 auto;min-width:14px;height:3px;background:var(--line);margin-top:12px;border-radius:2px}
+.ot-conn.on{background:var(--g)}
+.ot-dot{width:24px;height:24px;border-radius:50%;background:var(--card);border:3px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;font-weight:800}
+.ot-dot.done{background:var(--g);border-color:var(--g)}
+.ot-dot.cur{border-color:var(--g);background:var(--card);box-shadow:0 0 0 4px var(--green-soft)}
+.ot-lab{font-size:10.5px;color:var(--mut);line-height:1.2}
+.ot-lab.cur{color:var(--ink);font-weight:800}
 </style>
 </head>
 <body>
@@ -1229,7 +1240,7 @@ function renderDrawer(z){
   d.innerHTML='<div class="dhead"><div><div class="row"><span class="dot '+z.semafor+'"></span><h2 style="margin:0;font-size:18px">'+esc(z.cislo)+'</h2><span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span></div>'+
       '<div class="muted" style="margin-top:3px">'+esc(z.zakaznik)+' · '+esc(z.typName)+'</div></div><button class="x" onclick="closeDrawer()">×</button></div>'+
     '<div class="dbody">'+
-      stepFlow(z)+
+      orderTrack(z)+
       '<div class="kv">'+
         '<b>Na tahu</b><span>'+esc(z.responsibleName||'—')+'</span>'+
         '<b>Termín kroku</b><span>'+fdate(z.deadline)+semaforText(z)+'</span>'+
@@ -1268,6 +1279,29 @@ function stepDays(z){
     days[k]=Math.max(0,Math.round((end-starts[k])/86400000));
   });
   return days;
+}
+function orderTrack(z){
+  var stages=[{k:'novy',l:'Rozdělení do závodu'},{k:'prideleni',l:'Přidělení'},{k:'prace',l:'Zkreslení'},{k:'kontrola',l:'Kontrola'},{k:'obchodnik',l:'U obchodníka'},{k:'klient',l:'U klienta'},{k:'schvaleno',l:'Výrobní dok.'},{k:'dokonceno',l:'Ve výrobě / Hotovo'}];
+  var order=stages.map(function(s){return s.k});
+  var cur=z.stav, eff=cur;
+  if(cur==='revize')eff='prace';
+  if(cur==='podklady')eff=z.prevStav||'prace';
+  var zam=(cur==='zamitnuto');
+  var ci=zam?-1:order.indexOf(eff);
+  var loc=z.strediskoName?(' · závod '+esc(z.strediskoName)):'';
+  var cap= zam?'<span style="color:var(--red);font-weight:700">✕ Zamítnuto / storno</span>'
+    : cur==='podklady'?'<span style="color:var(--amber);font-weight:700">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</span>'
+    : '<b>'+esc(z.stavLabel)+'</b>'+loc+(z.deadline?(' · termín '+fdate(z.deadline)):'');
+  var parts=[];
+  stages.forEach(function(s,i){
+    if(i>0)parts.push('<div class="ot-conn'+((!zam&&i<=ci)?' on':'')+'"></div>');
+    var cls=(!zam&&i<ci)?'done':((!zam&&i===ci)?'cur':'fut');
+    var lab=s.l;
+    if(s.k==='novy'&&z.strediskoName)lab='Závod: '+z.strediskoName;
+    if(i===ci&&cur==='revize')lab='Revize v'+(z.versionCount||'');
+    parts.push('<div class="ot-step"><div class="ot-dot '+cls+'">'+(cls==='done'?'✓':'')+'</div><div class="ot-lab'+(i===ci&&!zam?' cur':'')+'">'+esc(lab)+'</div></div>');
+  });
+  return '<div class="ot-cap">Aktuální krok: '+cap+'</div><div class="ot-track">'+parts.join('')+'</div>';
 }
 function stepFlow(z){
   var stages=[{k:'novy',l:'Rozdělení do závodu',r:'vyr'},{k:'prideleni',l:'Přidělení',r:'sef'},{k:'prace',l:'Zkreslení',r:'kon'},{k:'kontrola',l:'Kontrola',r:'sef'},{k:'obchodnik',l:'Obchodník',r:'obch'},{k:'klient',l:'U klienta',r:'kli'},{k:'schvaleno',l:'Výrobní dok.',r:'kon'},{k:'dokonceno',l:'Ve výrobě',r:'sys'}];
