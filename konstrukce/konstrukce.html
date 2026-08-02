@@ -269,6 +269,7 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .pl-tb .btn{white-space:nowrap}
 .pl-dirty{color:var(--amber);font-weight:700;font-size:12.5px}
 .pl-savestat{color:var(--mut);font-size:12px;font-style:italic}
+.pl-testbadge{display:inline-block;margin-left:10px;font-size:12px;font-weight:800;color:#8a5a00;background:#fff3d6;border:1px solid #f0d48a;border-radius:20px;padding:3px 11px;vertical-align:middle}
 .pl-root.full{position:fixed;inset:0;z-index:3000;background:var(--bg);margin:0;padding:12px 18px 16px;overflow:auto}
 .pl-wrap{position:relative}
 .pl-stage{width:100%;position:relative;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;height:640px;cursor:grab}
@@ -802,8 +803,8 @@ function renderPlatno(m){
     '<marker id="plArrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="context-stroke"></path></marker>'+
     '</defs></svg>'+nodesHtml+'</div></div></div>';
   m.innerHTML='<div class="pl-root'+(PL.full?' full':'')+'" id="plRoot">'+
-    '<div class="head" style="margin-bottom:6px"><h2>Pravidlo toku — plátno</h2></div>'+
-    '<p class="muted" style="margin:0 0 8px;font-size:12.5px">Táhni uzel za hlavičku, plátno posuneš tažením prázdné plochy, přechod nakreslíš tažením ze zeleného kolečka. Klikni na uzel/šipku pro úpravu. Změny se projeví v reálném toku po uložení.</p>'+
+    '<div class="head" style="margin-bottom:6px"><h2>Pravidlo toku — plátno <span class="pl-testbadge">🧪 Testovací / návrhový režim</span></h2></div>'+
+    '<p class="muted" style="margin:0 0 8px;font-size:12.5px">Toto je <b>návrhové plátno (sandbox)</b>. Úpravy se ukládají jako koncept a do <b>reálného workflow se promítnou teprve po „Uložit naostro"</b> (s potvrzením). Táhni uzel za hlavičku, plátno posuneš tažením prázdné plochy, přechod nakreslíš tažením ze zeleného kolečka, klikni na uzel/šipku pro úpravu.</p>'+
     tb+legend+
     '<div class="pl-wrap">'+stage+'<div class="pl-insp hidden" id="plInsp"></div></div>'+
     '</div>';
