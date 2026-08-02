@@ -838,8 +838,8 @@ function plNodeAnchor(id,side){
 }
 function plDrawEdges(){
   var svg=document.getElementById('plSvg');if(!svg)return;
-  // vyčisti staré cesty (nech defs)
-  Array.prototype.slice.call(svg.querySelectorAll('.pl-edge,.pl-edge-hit,.pl-elabel')).forEach(function(e){e.remove()});
+  // vyčisti staré cesty i dekorace vybrané vazby (nech defs), ať se nenavršují
+  Array.prototype.slice.call(svg.querySelectorAll('.pl-edge,.pl-edge-hit,.pl-elabel,.pl-edel,.pl-endh,.pl-ecap')).forEach(function(e){e.remove()});
   (PL.wf.edges||[]).forEach(function(e,i){
     if(!plDrawable(e))return;
     var a,b,path;
