@@ -536,8 +536,25 @@ function deliver(mail) { return process.env.RESEND_API_KEY ? resendSend(mail) : 
 /* ============================================================
    stav (směrnice/zaměstnanci) + potvrzení
    ============================================================ */
+// Celé jméno „Jméno Příjmení". Když adresář má jen křestní jméno (nebo nic),
+// doplní příjmení z e-mailu (jmeno.prijmeni@…). Křestní s diakritikou zachová,
+// příjmení z e-mailu jen zkapitalizuje. Používá se globálně (adresář = celá app).
+function displayName(name, email) {
+  name = String(name || '').trim();
+  if (name.indexOf(' ') > 0) return name;                 // už celé jméno
+  const lp = String(email || '').split('@')[0];
+  const parts = lp.split(/[._-]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1));
+  if (name && parts.length >= 2) return name + ' ' + parts.slice(1).join(' ');
+  if (parts.length) return parts.join(' ');
+  return name || email || '';
+}
+// Vrací true, pokud u jména chybí příjmení (jednoslovné / prázdné).
+function needsSurname(name) { return !String(name || '').trim() || String(name).trim().indexOf(' ') <= 0; }
+
 function getState() {
   const s = readJson(STATE_F, { categories: [], employees: [], directives: [], profiles: [] });
+  // Doplň celé jméno pro zobrazení ve všech modulech (bez zápisu na disk).
+  (s.employees || []).forEach(e => { if (e && needsSurname(e.name)) e.name = displayName(e.name, e.email); });
   const acks = readJson(ACKS_F, []);
   (s.directives || []).forEach(d => {
     const merged = Object.assign({}, d.acks || {});
@@ -557,9 +574,25 @@ function ensureEmployee(email, name) {
   const s = readJson(STATE_F, { categories: [], employees: [], directives: [], profiles: [] });
   s.employees = s.employees || [];
   let e = s.employees.find(x => (x.email || '').toLowerCase() === email);
-  if (!e) { e = { id: 'g' + crypto.randomBytes(6).toString('hex'), name: name || email, email, cats: [] }; s.employees.push(e); writeJson(STATE_F, s); }
+  if (!e) {
+    e = { id: 'g' + crypto.randomBytes(6).toString('hex'), name: displayName(name, email), email, cats: [] };
+    s.employees.push(e); writeJson(STATE_F, s);
+  } else if (needsSurname(e.name)) {
+    // dopočítej příjmení stávajícímu (křestní z Google + příjmení z e-mailu) a ulož
+    const full = displayName(e.name || name, email);
+    if (full && full !== e.name) { e.name = full; writeJson(STATE_F, s); }
+  }
   return e;
 }
+// Jednorázový backfill při startu: doplní příjmení do uloženého adresáře.
+(function backfillEmployeeNames() {
+  try {
+    const s = readJson(STATE_F, { employees: [] });
+    let changed = 0;
+    (s.employees || []).forEach(e => { if (e && needsSurname(e.name)) { const full = displayName(e.name, e.email); if (full && full !== e.name) { e.name = full; changed++; } } });
+    if (changed) { writeJson(STATE_F, s); console.log('[adresář] doplněno příjmení u ' + changed + ' zaměstnanců'); }
+  } catch (_) {}
+})();
 // Komu je položka (směrnice/dokument) určena: základ = všem / dle oddělení; pak zúžení TAGY (má-li položka tagy, musí zaměstnanec mít shodný tag).
 function assignedTo(item, emp) {
   const cats = (emp && emp.cats) || [], tags = (emp && emp.tags) || [];
