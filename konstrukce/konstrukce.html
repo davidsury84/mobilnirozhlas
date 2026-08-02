@@ -356,6 +356,18 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .ot-item-head .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
 .ot-item .ot-cap{text-align:left;margin:0 0 10px}
 .ot-item .ot-track{margin-bottom:6px}
+.ot-item.red{border-left:4px solid var(--red)}
+.ot-item.amber{border-left:4px solid var(--amber)}
+.ot-prob{font-size:12.5px;font-weight:700;margin:0 0 10px;padding:6px 10px;border-radius:8px}
+.ot-prob.red{color:var(--red);background:#fdecec}
+.ot-prob.amber{color:var(--amber);background:#fff3d6}
+.ot-dot.cur.red{border-color:var(--red);box-shadow:0 0 0 4px #fdecec}
+.ot-dot.cur.amber{border-color:var(--amber);box-shadow:0 0 0 4px #fff3d6}
+.dfilts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.dfilt{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:6px 13px;font:inherit;font-size:13px;font-weight:600;color:#3a4a41;cursor:pointer}
+.dfilt:hover{background:#f0f3ee}
+.dfilt.act{background:var(--g);color:#fff;border-color:var(--g)}
+.dfilt b{font-weight:800}
 </style>
 </head>
 <body>
@@ -381,7 +393,8 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 <div class="modal" id="modal"></div>
 
 <script>
-var D=null, ME=null, FILTER='dash', SEL=null;
+var D=null, ME=null, FILTER='dash', SEL=null, DASHF='active';
+function setDashF(k){DASHF=k;renderMain();}
 var TS={from:null,to:null,user:'',data:null,editing:null};
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fdate(ts){if(!ts)return'—';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'+d.getUTCFullYear()}
@@ -586,10 +599,18 @@ function renderDash(m){
   // Seznam aktivních zakázek — každá s vlastním trackerem (styl sledování zásilky)
   var rank={red:0,amber:1,green:2,none:3};
   var active=z.filter(function(x){return !isTerminal(x.stav)}).sort(function(a,b){var ra=(rank[a.semafor]==null?3:rank[a.semafor]),rb=(rank[b.semafor]==null?3:rank[b.semafor]);if(ra!==rb)return ra-rb;return (a.deadline||8e15)-(b.deadline||8e15);});
-  h+='<div class="sec">Aktivní zakázky ('+active.length+')</div>';
-  if(!active.length)h+='<div class="empty">Žádné aktivní zakázky.</div>';
-  else h+=active.map(function(x){return '<div class="ot-item" onclick="openDrawer(\''+x.id+'\')">'+
+  var nRed=active.filter(function(x){return x.semafor==='red'}).length;
+  var nAmb=active.filter(function(x){return x.semafor==='amber'||x.stav==='podklady'}).length;
+  var nMine=active.filter(function(x){return x.responsible===ME.email}).length;
+  var shown=active.filter(function(x){ if(DASHF==='red')return x.semafor==='red'; if(DASHF==='amber')return x.semafor==='amber'||x.stav==='podklady'; if(DASHF==='mine')return x.responsible===ME.email; return true; });
+  var fbtn=function(k,lab,n){return '<button class="dfilt'+(DASHF===k?' act':'')+'" onclick="setDashF(\''+k+'\')">'+lab+' <b>'+n+'</b></button>';};
+  h+='<div class="sec">Aktivní zakázky</div>'+
+    '<div class="dfilts">'+fbtn('active','Vše',active.length)+fbtn('red','🔴 Po termínu',nRed)+fbtn('amber','🟠 Blíží se / pozastavené',nAmb)+fbtn('mine','Na tahu u mě',nMine)+'</div>';
+  if(!shown.length)h+='<div class="empty">Žádné zakázky v tomto filtru.</div>';
+  else h+=shown.map(function(x){ var pi=problemInfo(x); var cc=pi?pi.cls:'';
+    return '<div class="ot-item'+(cc?' '+cc:'')+'" onclick="openDrawer(\''+x.id+'\')">'+
       '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span><b>'+esc(x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span></div>'+
+      (pi?'<div class="ot-prob '+pi.cls+'">'+pi.text+'</div>':'')+
       orderTrack(x)+'</div>';}).join('');
   h+='<div class="kpi">'+
     kcLink(c.open,'Otevřených','open')+
@@ -1289,6 +1310,14 @@ function stepDays(z){
   });
   return days;
 }
+function czDays(n){n=Math.abs(n);return n===1?'den':(n>=2&&n<=4?'dny':'dní');}
+function problemInfo(z){
+  var now=(D&&D.now)||Date.now();
+  if(z.stav==='podklady')return {cls:'amber',text:'⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')};
+  if(z.semafor==='red'&&z.deadline){var dd=Math.max(1,Math.round((now-z.deadline)/86400000));return {cls:'red',text:'🔴 Po termínu o '+dd+' '+czDays(dd)+' — krok „'+esc(z.stavLabel)+'", na tahu '+esc(z.responsibleName||'—')+(z.stav==='klient'?' (klient nereaguje)':'')};}
+  if(z.semafor==='amber'&&z.deadline){var rd=Math.max(0,Math.round((z.deadline-now)/86400000));return {cls:'amber',text:'🟠 Blíží se termín — zbývá '+rd+' '+czDays(rd)+' — krok „'+esc(z.stavLabel)+'", na tahu '+esc(z.responsibleName||'—')};}
+  return null;
+}
 function orderTrack(z){
   var stages=[{k:'novy',l:'Rozdělení do závodu'},{k:'prideleni',l:'Přidělení'},{k:'prace',l:'Zkreslení'},{k:'kontrola',l:'Kontrola'},{k:'obchodnik',l:'U obchodníka'},{k:'klient',l:'U klienta'},{k:'schvaleno',l:'Výrobní dok.'},{k:'dokonceno',l:'Ve výrobě / Hotovo'}];
   var order=stages.map(function(s){return s.k});
@@ -1305,6 +1334,7 @@ function orderTrack(z){
   stages.forEach(function(s,i){
     if(i>0)parts.push('<div class="ot-conn'+((!zam&&i<=ci)?' on':'')+'"></div>');
     var cls=(!zam&&i<ci)?'done':((!zam&&i===ci)?'cur':'fut');
+    if(cls==='cur'&&(z.semafor==='red'||z.semafor==='amber'))cls+=' '+z.semafor;
     var lab=s.l;
     if(s.k==='novy'&&z.strediskoName)lab='Závod: '+z.strediskoName;
     if(i===ci&&cur==='revize')lab='Revize v'+(z.versionCount||'');
