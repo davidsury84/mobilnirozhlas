@@ -1058,7 +1058,8 @@ function plInspEdge(box){
   box.innerHTML=h;
 }
 function plNodeLbl(id){if(id===null)return '(zadání)';if(id==='*')return '(odkudkoli)';if(String(id).charAt(0)==='@')return id;var n=plNode(id);return n?(n.label||n.id):id;}
-function plSetNode(k,v){var n=plNode(PL.sel.id);if(!n)return;if(v===null)delete n[k];else n[k]=v;PL.dirty=true;plAutosave();if(k==='label'){var el=document.getElementById('pln_'+n.id);if(el){el.querySelector('.hd span').textContent=v||n.id;}}else{plRefresh();}}
+function plUpdateNode(id){var el=document.getElementById('pln_'+id);if(!el){renderMain();return;}var n=plNode(id);if(!n)return;var steps=plStepNumbers();var tmp=document.createElement('div');tmp.innerHTML=plNodeHtml(n,steps[id]);el.parentNode.replaceChild(tmp.firstChild,el);plDrawEdges();}
+function plSetNode(k,v){var n=plNode(PL.sel.id);if(!n)return;if(v===null)delete n[k];else n[k]=v;PL.dirty=true;plAutosave();if(k==='label'){var el=document.getElementById('pln_'+n.id);if(el){el.querySelector('.hd span').textContent=v||n.id;}else plUpdateNode(n.id);}else{plUpdateNode(n.id);plRenderInsp();}}
 function plSetEdge(k,v){var e=PL.wf.edges[PL.sel.i];if(!e)return;e[k]=v;PL.dirty=true;plAutosave();if(k==='label'||k==='action'){plDrawEdges();}else{plRefresh();}}
 function plSetEdgeRole(r,on){var e=PL.wf.edges[PL.sel.i];if(!e)return;e.roles=e.roles||[];var i=e.roles.indexOf(r);if(on&&i<0)e.roles.push(r);if(!on&&i>=0)e.roles.splice(i,1);PL.dirty=true;plAutosave();}
 function plSetEdgeNotify(r,on){var e=PL.wf.edges[PL.sel.i];if(!e)return;e.notify=e.notify||[];var i=e.notify.indexOf(r);if(on&&i<0)e.notify.push(r);if(!on&&i>=0)e.notify.splice(i,1);PL.dirty=true;plAutosave();}
