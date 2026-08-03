@@ -27,9 +27,11 @@ const urlLib = require('url');
 const STAVY = {
   nova: 'Nová',
   vresenu: 'V řešení',
-  nabidka: 'Nabídka odeslána',
+  nabidka: 'Odeslána nabídka',
+  ozvat: 'Ozvat se / zjistit stav',
+  realizace: 'Realizace',
   uzavreno: 'Uzavřeno (objednáno)',
-  zamitnuto: 'Zamítnuto / ztraceno',
+  zamitnuto: 'Bez úspěchu',
 };
 // Typy kontejnerů nabízené ve formuláři (kvůli konzistenci evidence).
 const TYPY = ['20′ skladový', '40′ skladový', '20′ High Cube', '40′ High Cube', 'Chladírenský (reefer)', 'Kancelářský / obytný', 'Na míru / poradit'];
@@ -148,6 +150,7 @@ function mount(host) {
     if (p === '/api/kontejnery/nastaveni-ext' && req.method === 'POST') return apiCfgSetExt(req, res);
     if (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') return apiCenikExt(req, res);
     if (p === '/api/kontejnery/list-ext' && req.method === 'GET') return apiListExt(req, res);
+    if (p === '/api/kontejnery/update-ext' && req.method === 'POST') return apiUpdateExt(req, res);
 
     // -------- INTERNÍ: rozdělovník poptávek (vyžaduje přístup obchodníka) --------
     const me = meOf(req);
@@ -335,15 +338,42 @@ function mount(host) {
     if (!it) { json(res, 404, { chyba: 'Poptávka nenalezena.' }); return true; }
     json(res, 200, { item: it, stavy: STAVY }); return true;
   }
-  // Seznam OTEVŘENÝCH poptávek (nevyřízené) pro výběr v kalkulačce — Bearer.
+  // Seznam poptávek pro kalkulačku — Bearer. Otevřené + vyřízené (vyřízené kreslí kalkulačka „pod čarou").
   function apiListExt(req, res) {
     if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
     const items = load().items
-      .filter(x => x.stav === 'nova' || x.stav === 'vresenu')
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-      .slice(0, 200)
-      .map(x => ({ id: x.id, cislo: x.cislo, jmeno: x.jmeno, firma: x.firma, email: x.email, telefon: x.telefon, typ: x.typ, rezim: x.rezim, pocet: x.pocet, mesto: x.mesto, zprava: x.zprava, stav: x.stav, obchodnik: x.obchodnik, createdAt: x.createdAt, poradit: /porad|na m[íi]ru/i.test((x.typ || '') + ' ' + (x.zprava || '') + ' ' + (x.rezim || '')) }));
-    json(res, 200, { items }); return true;
+      .slice(0, 300)
+      .map(x => ({ id: x.id, cislo: x.cislo, jmeno: x.jmeno, firma: x.firma, email: x.email, telefon: x.telefon, typ: x.typ, rezim: x.rezim, pocet: x.pocet, mesto: x.mesto, zprava: x.zprava, stav: x.stav, obchodnik: x.obchodnik, createdAt: x.createdAt, updatedAt: x.updatedAt || null, poznamka: x.interniPoznamka || '', poznamkaBy: x.poznamkaBy || null, poradit: /porad|na m[íi]ru/i.test((x.typ || '') + ' ' + (x.zprava || '') + ' ' + (x.rezim || '')) }));
+    json(res, 200, { items, stavy: STAVY }); return true;
+  }
+  // Změna stavu / sdílené poznámky z kalkulačky (aplikace lodních kontejnerů) — Bearer.
+  async function apiUpdateExt(req, res) {
+    if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const db = load();
+    const it = db.items.find(x => x.id === String(b.id || ''));
+    if (!it) { json(res, 404, { chyba: 'Poptávka nenalezena.' }); return true; }
+    const by = { email: String((b.by && b.by.email) || ''), name: String((b.by && b.by.name) || 'kalkulačka') };
+    const now = Date.now();
+    const zmena = [];
+    if (b.stav !== undefined) {
+      if (!STAVY[b.stav]) { json(res, 400, { chyba: 'Neznámý stav.' }); return true; }
+      it.stav = b.stav; zmena.push('stav → ' + STAVY[b.stav]);
+    }
+    if (b.poznamka !== undefined) {
+      it.interniPoznamka = String(b.poznamka || '').trim().slice(0, 4000);
+      it.poznamkaBy = { name: by.name || by.email, at: now };
+      zmena.push('poznámka upravena');
+    }
+    if (!zmena.length) { json(res, 400, { chyba: 'Nic ke změně.' }); return true; }
+    it.updatedAt = now;
+    it.historie = it.historie || [];
+    it.historie.push({ stav: it.stav, note: zmena.join(', ') + ' (z kalkulačky)', by, at: now });
+    save(db);
+    logAct('kontejnery', by, 'Poptávka #' + it.cislo + ' (kalkulačka): ' + zmena.join(', '));
+    json(res, 200, { ok: true, item: { id: it.id, stav: it.stav, poznamka: it.interniPoznamka || '', poznamkaBy: it.poznamkaBy || null } });
+    return true;
   }
   // Odeslání nabídky z nástroje obchodníka (aplikace) — počítá, e-mailuje klientovi, aktualizuje poptávku.
   async function apiNabidkaExt(req, res) {
