@@ -194,6 +194,20 @@ for (const d of [DATA_DIR, PUB_DIR, UPLOADS_DIR]) if (!fs.existsSync(d)) fs.mkdi
 function readJson(f, def) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return def; } }
 function writeJson(f, obj) { fs.writeFileSync(f, JSON.stringify(obj, null, 2), 'utf8'); }
 
+// Jednorázově: přidej Tomáši Buršovi přístup k modulu „kontejnery" (Lodní kontejnery). Běží dokud ho ve state nenajde.
+(function seedTomasKontejnery() {
+  try {
+    const s = readJson(STATE_F, null);
+    if (!s || !Array.isArray(s.employees) || s._seedTomasKontejnery) return;
+    const e = s.employees.find(x => (x.email || '').toLowerCase() === 'tomas.bursa@elkoplast.cz');
+    if (!e) { console.log('[seed] Tomáš Burša zatím není ve state — přidělte modul „kontejnery" ručně v Přístupech.'); return; }
+    if (!Array.isArray(e.modules)) e.modules = [];
+    if (e.modules.indexOf('kontejnery') < 0) e.modules.push('kontejnery');
+    s._seedTomasKontejnery = true; writeJson(STATE_F, s);
+    console.log('[seed] Tomáš Burša → přidán modul „kontejnery".');
+  } catch (err) { console.error('[seed] tomas kontejnery:', err.message); }
+})();
+
 /* ---------- jednoduchý log aktivity + stav pozvánek ---------- */
 // Zapíše událost do logu (posledních 500). Typy: login, admin-login, invite-sent, invite-accepted, survey.
 function logActivity(type, who, detail) {
