@@ -2398,10 +2398,13 @@ function kontStavBadge(st){
   const c=map[st]||['#eef1ec','#5b635c']; const label=(KONT_POPT.stavy&&KONT_POPT.stavy[st])||st;
   return '<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:4px 10px;border-radius:999px;background:'+c[0]+';color:'+c[1]+'">'+esc(label)+'</span>';
 }
+function kontNeedsCall(it){ return /porad|na m[íi]ru/i.test((it.typ||'')+' '+(it.zprava||'')+' '+(it.rezim||'')); }
 function kontCard(it){
   const st=it.stav||'nova';
+  const call=kontNeedsCall(it);
   const meta=[it.typ&&('📦 '+esc(it.typ)), it.rezim&&esc(it.rezim), it.pocet&&(esc(String(it.pocet))+' ks'), it.mesto&&('📍 '+esc(it.mesto))].filter(Boolean).join(' · ');
-  return '<div class="card pad" style="margin-bottom:10px;cursor:pointer" onclick="openKontejnerDetail(\''+it.id+'\')">'
+  return '<div class="card pad" style="margin-bottom:10px;cursor:pointer'+(call?';background:#fff7d6;border:1.5px solid #e8c14a':'')+'" onclick="openKontejnerDetail(\''+it.id+'\')">'
+    +(call?'<div style="display:inline-block;background:#e0a400;color:#fff;font-weight:800;font-size:12.5px;padding:3px 10px;border-radius:999px;margin-bottom:8px">📞 Nutné volat! — klient chce poradit</div>':'')
     +'<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">'
     +'<div><div style="font-size:16px;font-weight:700">#'+it.cislo+' · '+esc(it.jmeno||'—')+(it.firma?' <span class="muted" style="font-weight:500">('+esc(it.firma)+')</span>':'')+'</div>'
     +(meta?'<div class="muted" style="font-size:13px;margin-top:3px">'+meta+'</div>':'')+'</div>'
@@ -2419,7 +2422,8 @@ function openKontejnerDetail(id){
   const nb=it.nabidka||{};
   let h='<div style="max-width:820px;margin:0 auto;padding:8px 4px 50px">';
   h+='<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" onclick="showPoptavky()">‹ Zpět na poptávky</button>'+(isAdmin?'<button class="btn ghost sm" style="border-color:#e0b4ae;color:#c0392b" onclick="kdSmazat(\''+it.id+'\')">🗑 Smazat poptávku</button>':'')+'</div>';
-  h+='<div class="card pad" style="margin-top:12px"><div class="spread" style="align-items:flex-start"><div>'
+  if(kontNeedsCall(it)) h+='<div style="margin-top:12px;background:#e0a400;color:#fff;font-weight:800;font-size:15px;padding:10px 14px;border-radius:12px">📞 Nutné volat! — klient chce poradit'+(it.telefon?' — <a href="tel:'+esc(it.telefon)+'" style="color:#fff;text-decoration:underline">'+esc(it.telefon)+'</a>':'')+'</div>';
+  h+='<div class="card pad" style="margin-top:12px'+(kontNeedsCall(it)?';background:#fff7d6;border:1.5px solid #e8c14a':'')+'"><div class="spread" style="align-items:flex-start"><div>'
     +'<h2 style="margin:0 0 4px">#'+it.cislo+' · '+esc(it.jmeno||'—')+(it.firma?' <span class="muted" style="font-size:15px;font-weight:500">('+esc(it.firma)+')</span>':'')+'</h2>'
     +'<div class="muted" style="font-size:13px">'+[it.email&&('✉ <a href="mailto:'+esc(it.email)+'">'+esc(it.email)+'</a>'), it.telefon&&('📞 <a href="tel:'+esc(it.telefon)+'">'+esc(it.telefon)+'</a>')].filter(Boolean).join(' · ')+'</div></div>'
     +kontStavBadge(st)+'</div>'
