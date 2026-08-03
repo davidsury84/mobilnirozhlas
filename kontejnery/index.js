@@ -39,6 +39,8 @@ const REZIM = ['Koupě', 'Pronájem', 'Ještě nevím'];
 // Google tabulka, kam padají poptávky (i z Meta lead reklam). ID lze přepsat proměnnou.
 const SHEET_ID_DEFAULT = process.env.KONTEJNERY_SHEET_ID || '11SjL5D9-S0HG0D4zNE5eS0zU-uC2U64GcL4Pgqnm4pk';
 const SHEET_RANGE = 'A1:Z10000';
+// Oficiální ceník (Google tabulka sdílená se SA) — zdroj cen pro kalkulačku.
+const CENIK_SHEET_ID = process.env.KONTEJNERY_CENIK_SHEET_ID || '1VCRFfaM4V_Il1-EoEyu70OfvyBzenQEG';
 // Výchozí příjemci týdenního reportu (odeslané + nevyřízené nabídky). Odpovědné osoby = obchodníci na střídačku.
 const REPORT_TO_DEFAULT = [{ email: 'david.sury@elkoplast.cz', name: 'David Surý' }, { email: 'tomas.bursa@elkoplast.cz', name: 'Tomáš Burša' }];
 
@@ -581,6 +583,12 @@ function mount(host) {
       }
     } catch (_) {}
   })();
+
+  // Jednorázový peek struktury oficiálního ceníku (kvůli správnému mapování sloupců) — pouze log.
+  setTimeout(async () => {
+    try { if (!host.sheetsGet) return; const r = await host.sheetsGet(CENIK_SHEET_ID, 'A1:Z15'); const v = (r && r.values) || []; console.log('[kontejnery] CENÍK peek — řádků: ' + v.length + ' | ' + JSON.stringify(v.slice(0, 10))); }
+    catch (e) { console.log('[kontejnery] CENÍK peek chyba: ' + e.message); }
+  }, 9000);
 
   return { handle, isHandler, syncSheet, tick };
 }
