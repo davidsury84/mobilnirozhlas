@@ -151,6 +151,7 @@ function mount(host) {
     if (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') return apiCenikExt(req, res);
     if (p === '/api/kontejnery/list-ext' && req.method === 'GET') return apiListExt(req, res);
     if (p === '/api/kontejnery/update-ext' && req.method === 'POST') return apiUpdateExt(req, res);
+    if (p === '/api/kontejnery/potvrdit-ext' && req.method === 'POST') return apiPotvrditExt(req, res);
 
     // -------- INTERNÍ: rozdělovník poptávek (vyžaduje přístup obchodníka) --------
     const me = meOf(req);
@@ -373,6 +374,36 @@ function mount(host) {
     save(db);
     logAct('kontejnery', by, 'Poptávka #' + it.cislo + ' (kalkulačka): ' + zmena.join(', '));
     json(res, 200, { ok: true, item: { id: it.id, stav: it.stav, poznamka: it.interniPoznamka || '', poznamkaBy: it.poznamkaBy || null } });
+    return true;
+  }
+  // Klient klikl v e-mailu na „Závazně objednávám" — Bearer z aplikace lodních kontejnerů.
+  async function apiPotvrditExt(req, res) {
+    if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const db = load();
+    const it = db.items.find(x => x.id === String(b.id || ''));
+    if (!it) { json(res, 404, { chyba: 'Poptávka nenalezena.' }); return true; }
+    const now = Date.now();
+    const uzPotvrzeno = it.stav === 'uzavreno';
+    it.stav = 'uzavreno';
+    it.klientPotvrdil = it.klientPotvrdil || { at: now };
+    it.updatedAt = now;
+    it.historie = it.historie || [];
+    it.historie.push({ stav: 'uzavreno', note: 'Klient ZÁVAZNĚ POTVRDIL objednávku (odkaz z e-mailu s nabídkou)', by: { name: it.jmeno || 'klient' }, at: now });
+    save(db);
+    logAct('kontejnery', { name: it.jmeno || 'klient' }, 'Poptávka #' + it.cislo + ': klient závazně potvrdil objednávku');
+    if (!uzPotvrzeno) {
+      const prijemci = []; const addRec = (o) => { const e = ((o && o.email) || '').toLowerCase(); if (e && prijemci.indexOf(e) < 0) prijemci.push(e); };
+      if (it.obchodnik) addRec(it.obchodnik); (db.config.dohled || []).forEach(addRec); (db.config.notify || []).forEach(addRec);
+      const text = 'Dobrý den,\n\nklient ZÁVAZNĚ POTVRDIL objednávku z cenové nabídky (#' + it.cislo + '):\n\n'
+        + '• Zákazník: ' + it.jmeno + (it.firma ? ' (' + it.firma + ')' : '') + '\n'
+        + (it.email ? '• E-mail: ' + it.email + '\n' : '') + (it.telefon ? '• Telefon: ' + it.telefon + '\n' : '')
+        + (it.typ ? '• Typ: ' + it.typ + '\n' : '') + (it.pocet ? '• Počet: ' + it.pocet + ' ks\n' : '')
+        + ((it.nabidka && Array.isArray(it.nabidka.radky) && it.nabidka.radky.length) ? '• Nabídka: ' + it.nabidka.radky.map(r => r.popis + ' ' + (Number(r.pocet) || 1) + '× ' + fmtKc(Number(r.cena) || 0)).join('; ') + '\n' : '')
+        + '\nKontaktujte klienta s podklady k fakturaci a termínem dodání.\nPoptávka je v intranetu označena jako Uzavřeno (objednáno).';
+      for (const em of prijemci) { try { await notify(em, '✅ Závazná objednávka kontejneru #' + it.cislo + ' — ' + (it.firma || it.jmeno), text); } catch (_) {} }
+    }
+    json(res, 200, { ok: true, stav: it.stav });
     return true;
   }
   // Odeslání nabídky z nástroje obchodníka (aplikace) — počítá, e-mailuje klientovi, aktualizuje poptávku.

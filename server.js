@@ -2027,7 +2027,7 @@ const server = http.createServer(async (req, res) => {
   // Veřejné cesty klientské kalkulačky překladiště (lead-gen mimo přihlašovací závoru): stránka + odeslání leadu.
   const prekladPublic = p === '/preklad' || p === '/preklad.html' || (p === '/api/preklad-lead' && req.method === 'POST');
   // Server-to-server cesty modulu Lodní kontejnery (Bearer = SSO tajemství) z aplikace lodni-kontejnery.
-  const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext') || (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') || (p === '/api/kontejnery/list-ext' && req.method === 'GET') || (p === '/api/kontejnery/update-ext' && req.method === 'POST');
+  const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext') || (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') || (p === '/api/kontejnery/list-ext' && req.method === 'GET') || (p === '/api/kontejnery/update-ext' && req.method === 'POST') || (p === '/api/kontejnery/potvrdit-ext' && req.method === 'POST');
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
 
