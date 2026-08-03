@@ -3054,7 +3054,7 @@ const server = http.createServer(async (req, res) => {
     // Nacenění lodního kontejneru: přesměruje obchodníka do samostatné aplikace se SSO tokenem + id poptávky.
     if (p === '/kontejnery-nacenit') {
       const e = empSession(req);
-      const allowed = (e && (employeeModules(e.email).indexOf('obchod') >= 0 || employeeModules(e.email).indexOf('obchodexp') >= 0)) || isAdmin(req)
+      const allowed = (e && (employeeModules(e.email).indexOf('obchod') >= 0 || employeeModules(e.email).indexOf('obchodexp') >= 0 || employeeModules(e.email).indexOf('kontejnerykalk') >= 0)) || isAdmin(req)
         || (e && kontejneryMod && kontejneryMod.isHandler && kontejneryMod.isHandler(e.email));
       if (!allowed) return send(res, 403, '<h1>Přístup k nacenění nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!LODAKY_APP_URL) return send(res, 200, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Aplikace lodních kontejnerů zatím není napojena. Nastavte proměnnou <code>LODAKY_APP_URL</code> na adresu nasazené aplikace.</p>', { 'Content-Type': 'text/html; charset=utf-8' });

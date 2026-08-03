@@ -1469,7 +1469,7 @@ async function refreshMy(){
   if(!MUJ.data.library) MUJ.data.library = {folders:[],docs:[]};
   MUJ.modules = MUJ.data.modules || [];
 }
-function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kontejnery")>=0||mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery)||!!(MUJ.data&&MUJ.data.isLisy); if(m.key==="kontejnerykalk") return mods.indexOf("kontejnery")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
+function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kontejnery")>=0||mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery)||!!(MUJ.data&&MUJ.data.isLisy); if(m.key==="kontejnerykalk") return mods.indexOf("kontejnerykalk")>=0||mods.indexOf("kontejnery")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
 function mujCounts(){
   const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[]; const survs=d.surveys||[];
   return { dirs, libDocs, survs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length, survTodo:survs.filter(x=>!x.filled).length };
@@ -2405,7 +2405,7 @@ function kontCard(it){
   const call=kontNeedsCall(it)&&!resolved;
   const resTag=resolved?(st==='nabidka'?'✓ Odesláno':'✓ Vyřešeno'):'';
   const meta=[it.typ&&('📦 '+esc(it.typ)), it.rezim&&esc(it.rezim), it.pocet&&(esc(String(it.pocet))+' ks'), it.mesto&&('📍 '+esc(it.mesto)), it.email&&('✉ '+esc(it.email)), it.telefon&&('📞 '+esc(it.telefon)), it.zdroj&&('· '+esc(it.zdroj))].filter(Boolean).join(' · ');
-  return '<div class="card pad" style="margin-bottom:10px;cursor:pointer'+(call?';background:#fff7d6;border:1.5px solid #e8c14a':'')+(resolved?';opacity:.6':'')+'" onclick="openKontejnerDetail(\''+it.id+'\')">'
+  return '<div class="card pad" style="margin-bottom:10px;cursor:pointer'+(call?';background:#fff7d6;border:1.5px solid #e8c14a':'')+(resolved?';opacity:.6':'')+'" onclick="showKontejneryKalk(\''+it.id+'\')">'
     +(call?'<div style="display:inline-block;background:#e0a400;color:#fff;font-weight:800;font-size:12.5px;padding:3px 10px;border-radius:999px;margin-bottom:8px">📞 Nutné volat! — klient chce poradit</div>':'')
     +(resTag?'<div style="display:inline-block;background:'+(st==='nabidka'?'#1f8a4c':'#8a938a')+';color:#fff;font-weight:700;font-size:12px;padding:2px 10px;border-radius:999px;margin-bottom:8px">'+resTag+'</div>':'')
     +'<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">'
@@ -2415,7 +2415,10 @@ function kontCard(it){
     +'</div>'
     +(it.zprava?'<div class="muted" style="margin-top:8px;font-style:italic;font-size:13px">„'+esc(it.zprava)+'"</div>':'')
     +(it.interniPoznamka?'<div style="margin-top:8px;padding:7px 10px;background:#fff8e6;border:1px solid #ecdca0;border-radius:8px;font-size:12.5px">📝 '+esc(it.interniPoznamka)+'</div>':'')
-    +'<div style="margin-top:8px;font-size:12px;color:#8a938a">'+new Date(it.createdAt).toLocaleString('cs-CZ')+' &nbsp;·&nbsp; rozklikněte pro vyřízení, poznámku a nabídku ›</div>'
+    +'<div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<span style="font-size:12px;color:#8a938a">'+new Date(it.createdAt).toLocaleString('cs-CZ')+' &nbsp;·&nbsp; klikněte pro nacenění v kalkulátoru ›</span>'
+    +'<button class="btn sm" onclick="event.stopPropagation();openKontejnerDetail(\''+it.id+'\')">📝 Detail / poznámka / stav</button>'
+    +'</div>'
     +'</div>';
 }
 function openKontejnerDetail(id){
@@ -2557,11 +2560,12 @@ function showPrekladiste(){
   body.innerHTML='<iframe src="/prekladiste-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Kalkulačka překladiště"></iframe>';
   window.scrollTo(0,0);
 }
-function showKontejneryKalk(){
+function showKontejneryKalk(leadId){
   MUJ.view="kontejnerykalk"; renderSidebar();
   const body=document.getElementById("mujBody");
   if(!moduleVisible({key:"kontejnerykalk",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
-  body.innerHTML='<iframe src="/kontejnery-nacenit" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f7f2" title="Kalkulačka lodních kontejnerů"></iframe>';
+  const src='/kontejnery-nacenit'+(leadId?('?id='+encodeURIComponent(leadId)):'');
+  body.innerHTML='<iframe src="'+src+'" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f7f2" title="Kalkulačka lodních kontejnerů"></iframe>';
   window.scrollTo(0,0);
 }
 let KOVO_TAB="vyroba";
@@ -4253,13 +4257,13 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
-  ["Agendy",["doprava","konstrukce","obchod","obchodexp","kontejnery","smlouvy","reklamace","sortiment","adaptace","freelo","aktuality"]]
+  ["Agendy",["doprava","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","adaptace","freelo","aktuality"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }
