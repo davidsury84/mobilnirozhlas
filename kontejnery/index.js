@@ -86,9 +86,10 @@ function mount(host) {
     return { email, name: e ? (e.name || '') : (admin ? 'Správce' : ''), isAdmin: admin, isObchodnik };
   }
   // Zaměstnanec, který má co dělat s kontejnerovými poptávkami (viditelnost dlaždice a přístup):
-  // je v seznamu notifikací (výchozí příjemce) NEBO má přiřazenou nějakou poptávku.
+  // má modul „kontejnery" (přiděleno správcem v Přístupech) NEBO je v seznamu notifikací NEBO má přiřazenou poptávku.
   function isHandler(email) {
     email = (email || '').toLowerCase(); if (!email) return false;
+    if (mods(email).indexOf('kontejnery') >= 0) return true;
     const db = load();
     if (db.config.notify.some(n => (n.email || '').toLowerCase() === email)) return true;
     return db.items.some(x => x.obchodnik && (x.obchodnik.email || '').toLowerCase() === email);
