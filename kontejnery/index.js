@@ -489,6 +489,22 @@ function mount(host) {
     }
     return null;
   }
+  // Datum vzniku poptávky se bere ze ZDROJOVÉ tabulky (sloupec created/datum), ne z okamžiku importu.
+  // Google Sheets vrací podle locale různé zápisy — podporujeme ISO (Meta), český zápis i sériové číslo Sheets.
+  function parseLeadDate(s) {
+    s = String(s || '').trim();
+    if (!s) return null;
+    if (/^\d+(?:[.,]\d+)?$/.test(s)) {                       // sériové číslo Sheets (dny od 30. 12. 1899)
+      const n = parseFloat(s.replace(',', '.'));
+      if (n > 20000 && n < 80000) return Math.round((n - 25569) * 86400000);
+    }
+    let m = /^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})(?:[\sT]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(s);   // 31.7.2026 18:23
+    if (m) { const t = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime(); return isFinite(t) ? t : null; }
+    m = /^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(s);                        // 2026-07-31 18:23[:45]
+    if (m) { const t = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)).getTime(); return isFinite(t) ? t : null; }
+    const t = Date.parse(s);                                  // ISO / RFC (Meta created_time)
+    return isFinite(t) ? t : null;
+  }
   function normHdr(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
   function pickCol(headers, cands) { for (const c of cands) { const i = headers.findIndex(h => h.indexOf(c) >= 0); if (i >= 0) return i; } return -1; }
   const COL_MAP = {
@@ -518,6 +534,8 @@ function mount(host) {
     const cell = (row, i) => (i >= 0 && i < row.length) ? String(row[i] || '').trim() : '';
     const now = Date.now();
     const created = [];
+    const rowByKey = {};                                     // klíč řádku → parsovaná data (i pro opravu už naimportovaných)
+    const rowQueue = [];                                     // fallback párování podle e-mail|telefon|jméno
     for (let ri = 1; ri < vals.length; ri++) {
       const row = vals[ri]; if (!row || !row.length) continue;
       const jmeno = cell(row, idx.jmeno).slice(0, 120);
@@ -526,11 +544,14 @@ function mount(host) {
       if (!jmeno && !email && !telefon) continue;                 // prázdný řádek
       const rawId = cell(row, idx.idcol);
       const key = rawId ? ('id:' + rawId) : ('h:' + crypto.createHash('sha1').update([email, telefon, cell(row, idx.created), jmeno].join('|')).digest('hex').slice(0, 16));
+      const createdTs = parseLeadDate(cell(row, idx.created));  // datum ZE zdrojového souboru
+      rowByKey[key] = { createdTs };
+      rowQueue.push({ trip: (email + '|' + telefon + '|' + jmeno).toLowerCase(), createdTs, used: false });
       if (seen.has(key)) continue;
       seen.add(key); db.config.leadKeys.push(key);
       db.seq = (db.seq || 0) + 1;
       const item = {
-        id: crypto.randomBytes(8).toString('hex'), cislo: db.seq,
+        id: crypto.randomBytes(8).toString('hex'), cislo: db.seq, leadKey: key,
         jmeno: jmeno || '(bez jména)', firma: cell(row, idx.firma).slice(0, 160),
         email, telefon,
         typ: cell(row, idx.typ).slice(0, 80) || null,
@@ -539,14 +560,27 @@ function mount(host) {
         zprava: cell(row, idx.zprava).slice(0, 4000),
         cenaOd: null, cenaDo: null, konfigurace: null,
         stav: 'nova', obchodnik: null, zdroj: 'Google tabulka / Meta',
-        createdAt: (function () { const t = Date.parse(cell(row, idx.created)); return isFinite(t) ? t : now; })(), updatedAt: now,
+        createdAt: createdTs || now, updatedAt: now,
         historie: [{ stav: 'nova', note: 'Import z Google tabulky (Meta)', by: { name: 'systém' }, at: now }],
       };
       assignRotace(db, item, now);
       db.items.push(item); created.push(item);
     }
+    // OPRAVA dřívějších importů: createdAt = datum z tabulky, ne kdy proběhl import do intranetu.
+    let fixed = 0;
+    db.items.forEach((it) => {
+      if (it.zdroj !== 'Google tabulka / Meta') return;
+      let ts = (it.leadKey && rowByKey[it.leadKey]) ? rowByKey[it.leadKey].createdTs : null;
+      if (ts == null) {
+        const trip = ((it.email || '') + '|' + (it.telefon || '') + '|' + (it.jmeno || '')).toLowerCase();
+        const r = rowQueue.find(x => !x.used && x.trip === trip && x.createdTs != null);
+        if (r) { r.used = true; ts = r.createdTs; }
+      }
+      if (ts != null && Math.abs(ts - (it.createdAt || 0)) > 60 * 1000) { it.createdAt = ts; fixed++; }
+    });
+    if (fixed) console.log('[kontejnery] opraveno createdAt dle tabulky u ' + fixed + ' poptávek');
     if (db.config.leadKeys.length > 8000) db.config.leadKeys = db.config.leadKeys.slice(-8000);
-    if (created.length || firstImport) { db.config._sheetBackfilled = true; save(db); }
+    if (created.length || firstImport || fixed) { db.config._sheetBackfilled = true; save(db); }
     // e-maily: při prvním (backfill) importu neposílej záplavu; jen napříště o nových
     if (created.length && !firstImport) {
       for (const it of created) {
