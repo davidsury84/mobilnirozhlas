@@ -276,6 +276,12 @@ function mount(host) {
       if (!STAVY[b.stav]) { json(res, 400, { chyba: 'Neznámý stav.' }); return true; }
       it.stav = b.stav; zmena.push('stav → ' + STAVY[b.stav]);
     }
+    // sdílená interní poznámka (vidí/edituje každý s přístupem)
+    if (b.poznamka !== undefined) {
+      it.interniPoznamka = String(b.poznamka || '').trim().slice(0, 4000);
+      it.poznamkaBy = { name: me.name || me.email, at: now };
+      zmena.push('poznámka upravena');
+    }
     if (!zmena.length && !note) { json(res, 400, { chyba: 'Nic ke změně.' }); return true; }
     it.updatedAt = now;
     it.historie = it.historie || [];
@@ -503,7 +509,7 @@ function mount(host) {
         zprava: cell(row, idx.zprava).slice(0, 4000),
         cenaOd: null, cenaDo: null, konfigurace: null,
         stav: 'nova', obchodnik: null, zdroj: 'Google tabulka / Meta',
-        createdAt: now, updatedAt: now,
+        createdAt: (function () { const t = Date.parse(cell(row, idx.created)); return isFinite(t) ? t : now; })(), updatedAt: now,
         historie: [{ stav: 'nova', note: 'Import z Google tabulky (Meta)', by: { name: 'systém' }, at: now }],
       };
       assignRotace(db, item, now);
