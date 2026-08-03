@@ -145,6 +145,7 @@ function mount(host) {
     if (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') return apiNabidkaExt(req, res);
     if (p === '/api/kontejnery/nastaveni-ext' && req.method === 'GET') return apiCfgGetExt(req, res);
     if (p === '/api/kontejnery/nastaveni-ext' && req.method === 'POST') return apiCfgSetExt(req, res);
+    if (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') return apiCenikExt(req, res);
 
     // -------- INTERNÍ: rozdělovník poptávek (vyžaduje přístup obchodníka) --------
     const me = meOf(req);
@@ -557,6 +558,52 @@ function mount(host) {
     } catch (e) { console.error('[kontejnery] report tick:', e.message); }
   }
 
+  // ======================================================================
+  //  OFICIÁLNÍ CENÍK — živé čtení z Google tabulky (přes servisní účet)
+  // ======================================================================
+  function cenikNum(s) { const t = String(s == null ? '' : s).replace(/[^\d]/g, ''); const n = parseInt(t, 10); return isFinite(n) ? n : 0; }
+  function cenikIso(d) { d = String(d || '').toLowerCase(); if (/40.{0,4}(hc|high)/.test(d)) return '40hc'; if (/20.{0,4}(hc|high)/.test(d)) return '20hc'; if (/40.{0,4}(dc|dv|dry|gp)/.test(d)) return '40dv'; if (/20.{0,4}(dc|dv|dry|gp)/.test(d)) return '20dv'; return ''; }
+  function parseCenikSheet(values) {
+    if (!Array.isArray(values) || !values.length) return null;
+    const low = s => String(s == null ? '' : s).toLowerCase();
+    let hi = -1;
+    for (let i = 0; i < values.length; i++) { const row = (values[i] || []).map(low); if (row.some(c => /selling price/.test(c)) || row.some(c => /elko name/.test(c))) { hi = i; break; } }
+    if (hi < 0) return null;
+    const hdr = (values[hi] || []).map(low);
+    const col = (re, def) => { const i = hdr.findIndex(c => re.test(c)); return i >= 0 ? i : def; };
+    const descrCol = col(/elko name|popis|n[áa]zev|description|konfigurace/, 1);
+    const totalCol = col(/total cost/, -1);
+    const sellCol = col(/selling price|prodejn/, -1);
+    const list = []; let marze = 0;
+    for (let i = hi + 1; i < values.length; i++) {
+      const row = values[i] || []; const descr = String(row[descrCol] || '').replace(/\s+/g, ' ').trim();
+      if (!descr) continue; const iso = cenikIso(descr); if (!iso) continue;
+      let nakup = totalCol >= 0 ? cenikNum(row[totalCol]) : 0; const sell = sellCol >= 0 ? cenikNum(row[sellCol]) : 0;
+      // marži spočítej přímo z dat (Selling / Total) — nejspolehlivější
+      if (!marze && nakup > 0 && sell > nakup) marze = Math.round((sell / nakup - 1) * 100);
+      if (!nakup && sell && marze) nakup = Math.round(sell / (1 + marze / 100));
+      if (!nakup) continue;
+      const k = iso + '-' + crypto.createHash('sha1').update(descr).digest('hex').slice(0, 6);
+      list.push({ k, label: descr, iso, nakup, oficial: true });
+    }
+    if (!marze) marze = 40;
+    return list.length ? { marze, list } : null;
+  }
+  let _cenikCache = null, _cenikAt = 0;
+  async function getCenikLive() {
+    if (_cenikCache && (Date.now() - _cenikAt) < 10 * 60 * 1000) return _cenikCache;
+    if (!host.sheetsGet) return _cenikCache;
+    try { const r = await host.sheetsGet(CENIK_SHEET_ID, 'A1:Z200'); const parsed = parseCenikSheet((r && r.values) || []); if (parsed) { _cenikCache = parsed; _cenikAt = Date.now(); } }
+    catch (e) { console.error('[kontejnery] ceník živé čtení:', e.message); }
+    return _cenikCache;
+  }
+  async function apiCenikExt(req, res) {
+    if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
+    const c = await getCenikLive();
+    if (c && c.list && c.list.length) json(res, 200, { ok: true, cenik: c }); else json(res, 200, { ok: false });
+    return true;
+  }
+
   // Jednorázový úklid testovacích poptávek (e-maily @example.*, jména TEST…/Klient N) — jen při prvním startu.
   (function purgeTest() {
     try {
@@ -583,12 +630,6 @@ function mount(host) {
       }
     } catch (_) {}
   })();
-
-  // Jednorázový peek struktury oficiálního ceníku (kvůli správnému mapování sloupců) — pouze log.
-  setTimeout(async () => {
-    try { if (!host.sheetsGet) return; const r = await host.sheetsGet(CENIK_SHEET_ID, 'A1:Z80'); const v = (r && r.values) || []; console.log('[kontejnery] CENÍK peek — řádků: ' + v.length + ' | ' + JSON.stringify(v.slice(0, 60))); }
-    catch (e) { console.log('[kontejnery] CENÍK peek chyba: ' + e.message); }
-  }, 9000);
 
   return { handle, isHandler, syncSheet, tick };
 }
