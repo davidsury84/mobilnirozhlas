@@ -36,6 +36,11 @@ const TYPY = ['20′ skladový', '40′ skladový', '20′ High Cube', '40′ Hi
 // Obchodníci, kteří mohou být přiřazeni k poptávce lodních kontejnerů (dohledáni v DB zaměstnanců podle jména).
 const OBCHODNICI_JMENA = ['Jana Rychlíková', 'Josef Beránek'];
 const REZIM = ['Koupě', 'Pronájem', 'Ještě nevím'];
+// Google tabulka, kam padají poptávky (i z Meta lead reklam). ID lze přepsat proměnnou.
+const SHEET_ID_DEFAULT = process.env.KONTEJNERY_SHEET_ID || '11SjL5D9-S0HG0D4zNE5eS0zU-uC2U64GcL4Pgqnm4pk';
+const SHEET_RANGE = 'A1:Z10000';
+// Výchozí příjemci týdenního reportu (odeslané + nevyřízené nabídky). Odpovědné osoby = obchodníci na střídačku.
+const REPORT_TO_DEFAULT = [{ email: 'david.sury@elkoplast.cz', name: 'David Surý' }, { email: 'tomas.bursa@elkoplast.cz', name: 'Tomáš Burša' }];
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
@@ -56,6 +61,14 @@ function mount(host) {
     if (!Array.isArray(db.config.rotace)) db.config.rotace = [];   // obchodníci na střídačku (round-robin)
     if (typeof db.config.rotaceIdx !== 'number') db.config.rotaceIdx = 0;
     if (!Array.isArray(db.config.dohled)) db.config.dohled = [];   // kopie všech poptávek (kontrola)
+    // Google tabulka poptávek + týdenní report
+    if (typeof db.config.sheetId !== 'string') db.config.sheetId = SHEET_ID_DEFAULT;
+    if (!Array.isArray(db.config.leadKeys)) db.config.leadKeys = [];   // deduplikace importovaných řádků
+    if (!db.config.report || typeof db.config.report !== 'object') db.config.report = { enabled: true, weekday: 1, to: [], lastWeek: '' };
+    if (typeof db.config.report.enabled !== 'boolean') db.config.report.enabled = true;
+    if (typeof db.config.report.weekday !== 'number') db.config.report.weekday = 1;   // pondělí
+    if (!Array.isArray(db.config.report.to)) db.config.report.to = [];
+    if (!db.config._reportSeeded) { db.config.report.to = REPORT_TO_DEFAULT.slice(); db.config._reportSeeded = true; }
     return db;
   }
   function save(db) { try { fs.writeFileSync(DATA_F, JSON.stringify(db, null, 2)); } catch (e) { console.error('[kontejnery] zápis selhal:', e.message); } }
@@ -408,6 +421,140 @@ function mount(host) {
     json(res, 200, { ok: true }); return true;
   }
 
+  // ======================================================================
+  //  IMPORT POPTÁVEK Z GOOGLE TABULKY (i z Meta lead reklam) → nevyřízené poptávky
+  // ======================================================================
+  function assignRotace(db, item, now) {
+    if (db.config.rotace.length) {
+      const n = db.config.rotace.length;
+      const idx = ((db.config.rotaceIdx % n) + n) % n;
+      const o = db.config.rotace[idx];
+      db.config.rotaceIdx = idx + 1;
+      if (o && o.email) {
+        item.obchodnik = { email: (o.email || '').toLowerCase(), name: o.name || o.email };
+        item.historie.push({ stav: 'nova', note: 'Automaticky přiřazeno (střídačka): ' + item.obchodnik.name, by: { name: 'systém' }, at: now });
+        return item.obchodnik;
+      }
+    }
+    return null;
+  }
+  function normHdr(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+  function pickCol(headers, cands) { for (const c of cands) { const i = headers.findIndex(h => h.indexOf(c) >= 0); if (i >= 0) return i; } return -1; }
+  const COL_MAP = {
+    jmeno: ['full name', 'full_name', 'fullname', 'jmeno', 'jméno', 'cele jmeno', 'name', 'kontakt', 'zakaznik'],
+    email: ['email', 'e-mail', 'mail'],
+    telefon: ['phone', 'phone_number', 'telefon', 'tel', 'mobil', 'cislo'],
+    firma: ['company', 'firma', 'spolecnost', 'organizace'],
+    typ: ['typ', 'kontejner', 'container', 'type', 'produkt'],
+    rezim: ['rezim', 'forma', 'koupe', 'pronajem'],
+    mesto: ['mesto', 'lokalita', 'city', 'misto', 'adresa', 'psc'],
+    zprava: ['zprava', 'poznamka', 'message', 'pozn', 'popis', 'note', 'text', 'dotaz'],
+    idcol: ['lead id', 'leadgen_id', 'lead_id', 'id'],
+    created: ['created', 'created_time', 'cas', 'time', 'timestamp', 'datum', 'date'],
+  };
+  async function syncSheet() {
+    const db = load();
+    const sheetId = db.config.sheetId;
+    if (!sheetId || !host.sheetsGet) return 0;
+    let vals;
+    try { const r = await host.sheetsGet(sheetId, SHEET_RANGE); vals = (r && r.values) || []; }
+    catch (e) { console.error('[kontejnery] Sheets čtení selhalo:', e.message); return 0; }
+    if (vals.length < 2) return 0;
+    const headers = vals[0].map(normHdr);
+    const idx = {}; Object.keys(COL_MAP).forEach(k => { idx[k] = pickCol(headers, COL_MAP[k]); });
+    const seen = new Set(db.config.leadKeys);
+    const firstImport = !db.config._sheetBackfilled;
+    const cell = (row, i) => (i >= 0 && i < row.length) ? String(row[i] || '').trim() : '';
+    const now = Date.now();
+    const created = [];
+    for (let ri = 1; ri < vals.length; ri++) {
+      const row = vals[ri]; if (!row || !row.length) continue;
+      const jmeno = cell(row, idx.jmeno).slice(0, 120);
+      const email = cell(row, idx.email).slice(0, 160);
+      const telefon = cell(row, idx.telefon).slice(0, 60);
+      if (!jmeno && !email && !telefon) continue;                 // prázdný řádek
+      const rawId = cell(row, idx.idcol);
+      const key = rawId ? ('id:' + rawId) : ('h:' + crypto.createHash('sha1').update([email, telefon, cell(row, idx.created), jmeno].join('|')).digest('hex').slice(0, 16));
+      if (seen.has(key)) continue;
+      seen.add(key); db.config.leadKeys.push(key);
+      db.seq = (db.seq || 0) + 1;
+      const item = {
+        id: crypto.randomBytes(8).toString('hex'), cislo: db.seq,
+        jmeno: jmeno || '(bez jména)', firma: cell(row, idx.firma).slice(0, 160),
+        email, telefon,
+        typ: cell(row, idx.typ).slice(0, 80) || null,
+        rezim: (function () { const rz = cell(row, idx.rezim); return REZIM.indexOf(rz) >= 0 ? rz : (rz ? rz.slice(0, 40) : null); })(),
+        mesto: cell(row, idx.mesto).slice(0, 120), pocet: null,
+        zprava: cell(row, idx.zprava).slice(0, 4000),
+        cenaOd: null, cenaDo: null, konfigurace: null,
+        stav: 'nova', obchodnik: null, zdroj: 'Google tabulka / Meta',
+        createdAt: now, updatedAt: now,
+        historie: [{ stav: 'nova', note: 'Import z Google tabulky (Meta)', by: { name: 'systém' }, at: now }],
+      };
+      assignRotace(db, item, now);
+      db.items.push(item); created.push(item);
+    }
+    if (db.config.leadKeys.length > 8000) db.config.leadKeys = db.config.leadKeys.slice(-8000);
+    if (created.length || firstImport) { db.config._sheetBackfilled = true; save(db); }
+    // e-maily: při prvním (backfill) importu neposílej záplavu; jen napříště o nových
+    if (created.length && !firstImport) {
+      for (const it of created) {
+        const prijemci = []; const addRec = (o) => { const e = (o && o.email || '').toLowerCase(); if (e && prijemci.indexOf(e) < 0) prijemci.push(e); };
+        if (it.obchodnik) addRec(it.obchodnik); (db.config.dohled || []).forEach(addRec); (db.config.notify || []).forEach(addRec);
+        const text = 'Nová poptávka lodního kontejneru z Google tabulky (Meta) (#' + it.cislo + '):\n\n'
+          + '• Jméno: ' + it.jmeno + (it.firma ? ' (' + it.firma + ')' : '') + '\n'
+          + (it.email ? '• E-mail: ' + it.email + '\n' : '') + (it.telefon ? '• Telefon: ' + it.telefon + '\n' : '')
+          + (it.typ ? '• Typ: ' + it.typ + '\n' : '') + (it.mesto ? '• Místo: ' + it.mesto + '\n' : '')
+          + (it.zprava ? '• Zpráva: ' + it.zprava + '\n' : '')
+          + (it.obchodnik ? '\n→ Přiřazeno (na střídačku): ' + it.obchodnik.name + '\n' : '')
+          + '\nDetail v intranetu → Poptávky.';
+        for (const e of prijemci) await notify(e, 'Nová poptávka kontejneru #' + it.cislo + (it.obchodnik ? ' — ' + it.obchodnik.name : ''), text);
+      }
+    }
+    if (created.length) console.log('[kontejnery] import z tabulky: ' + created.length + ' nových poptávek' + (firstImport ? ' (první naplnění, bez e-mailů)' : ''));
+    return created.length;
+  }
+
+  // ======================================================================
+  //  TÝDENNÍ REPORT — odeslané + nevyřízené nabídky (pojistka 1×/ISO-týden)
+  // ======================================================================
+  function isoWeek(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - day + 3); const f = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)); const wk = 1 + Math.round(((t - f) / 86400000 - 3 + ((f.getUTCDay() + 6) % 7)) / 7); return t.getUTCFullYear() + '-W' + String(wk).padStart(2, '0'); }
+  function fmtD(ts) { try { return new Date(ts).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }); } catch (_) { return ''; } }
+  function reportHtml(odeslane, nevyrizene, period) {
+    const line = (it) => '<tr><td style="padding:3px 8px 3px 0;font-size:13px;white-space:nowrap">#' + it.cislo + '</td>'
+      + '<td style="padding:3px 8px 3px 0;font-size:13px">' + esc(it.jmeno) + (it.firma ? ' (' + esc(it.firma) + ')' : '') + '</td>'
+      + '<td style="padding:3px 8px 3px 0;font-size:13px;color:#5b6b60">' + esc(it.typ || '—') + '</td>'
+      + '<td style="padding:3px 0;font-size:13px;color:#5b6b60">' + (it.obchodnik ? esc(it.obchodnik.name) : '<span style="color:#a86a00">nepřiřazeno</span>') + '</td></tr>';
+    const tbl = (arr) => arr.length ? '<table style="border-collapse:collapse;margin:4px 0 2px">' + arr.map(line).join('') + '</table>' : '<div style="color:#8a938a;font-size:13px">—</div>';
+    return '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;color:#16211a;max-width:640px">'
+      + '<h2 style="margin:0 0 4px">Lodní kontejnery — týdenní report</h2>'
+      + '<div style="color:#6b7a70;font-size:13px;margin-bottom:14px">Období ' + esc(period) + '.</div>'
+      + '<h3 style="font-size:15px;margin:14px 0 2px;color:#1f5e22">Odeslané nabídky (7 dní) — ' + odeslane.length + '</h3>' + tbl(odeslane)
+      + '<h3 style="font-size:15px;margin:16px 0 2px;color:#a4560f">Nevyřízené poptávky — ' + nevyrizene.length + '</h3>' + tbl(nevyrizene)
+      + '<hr style="border:0;border-top:1px solid #e6e9e3;margin:20px 0"><div style="font-size:12px;color:#8a938a">Automatický týdenní report · Intranet ELKOPLAST CZ → Lodní kontejnery.</div></div>';
+  }
+  async function tick() {
+    try {
+      const db = load(); const rep = db.config.report;
+      if (!rep.enabled || !Array.isArray(rep.to) || !rep.to.length) return;
+      const now = new Date(); const wk = isoWeek(now);
+      if (now.getDay() < rep.weekday) return;
+      if (rep.lastWeek === wk) return;
+      const since = now.getTime() - 7 * 24 * 3600 * 1000;
+      const odeslane = db.items.filter(x => x.stav === 'nabidka' && (x.updatedAt || 0) >= since).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      const nevyrizene = db.items.filter(x => x.stav === 'nova' || x.stav === 'vresenu').sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      const period = fmtD(since) + '–' + fmtD(now.getTime()) + ' (' + wk + ')';
+      const html = reportHtml(odeslane, nevyrizene, period);
+      const t = (it) => '#' + it.cislo + ' · ' + it.jmeno + (it.typ ? ' · ' + it.typ : '') + (it.obchodnik ? ' — ' + it.obchodnik.name : ' — nepřiřazeno');
+      const text = 'Lodní kontejnery — týdenní report (' + period + ')\n\n'
+        + 'ODESLANÉ NABÍDKY (7 dní): ' + odeslane.length + '\n' + (odeslane.map(t).join('\n') || '—') + '\n\n'
+        + 'NEVYŘÍZENÉ POPTÁVKY: ' + nevyrizene.length + '\n' + (nevyrizene.map(t).join('\n') || '—');
+      for (const r of rep.to) await notify(r.email, 'Lodní kontejnery — týdenní report (odeslané ' + odeslane.length + ' · nevyřízené ' + nevyrizene.length + ')', text, html);
+      rep.lastWeek = wk; rep.lastAt = now.toISOString(); save(db);
+      console.log('[kontejnery] týdenní report ' + wk + ' → ' + rep.to.map(r => r.email).join(', '));
+    } catch (e) { console.error('[kontejnery] report tick:', e.message); }
+  }
+
   // Jednorázový úklid testovacích poptávek (e-maily @example.*, jména TEST…/Klient N) — jen při prvním startu.
   (function purgeTest() {
     try {
@@ -435,7 +582,7 @@ function mount(host) {
     } catch (_) {}
   })();
 
-  return { handle, isHandler };
+  return { handle, isHandler, syncSheet, tick };
 }
 
 module.exports = { mount };
