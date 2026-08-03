@@ -146,6 +146,7 @@ function mount(host) {
     if (p === '/api/kontejnery/nastaveni-ext' && req.method === 'GET') return apiCfgGetExt(req, res);
     if (p === '/api/kontejnery/nastaveni-ext' && req.method === 'POST') return apiCfgSetExt(req, res);
     if (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') return apiCenikExt(req, res);
+    if (p === '/api/kontejnery/list-ext' && req.method === 'GET') return apiListExt(req, res);
 
     // -------- INTERNÍ: rozdělovník poptávek (vyžaduje přístup obchodníka) --------
     const me = meOf(req);
@@ -326,6 +327,16 @@ function mount(host) {
     const it = load().items.find(x => x.id === String(u.query.id || ''));
     if (!it) { json(res, 404, { chyba: 'Poptávka nenalezena.' }); return true; }
     json(res, 200, { item: it, stavy: STAVY }); return true;
+  }
+  // Seznam OTEVŘENÝCH poptávek (nevyřízené) pro výběr v kalkulačce — Bearer.
+  function apiListExt(req, res) {
+    if (!bearerOk(req)) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
+    const items = load().items
+      .filter(x => x.stav === 'nova' || x.stav === 'vresenu')
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 200)
+      .map(x => ({ id: x.id, cislo: x.cislo, jmeno: x.jmeno, firma: x.firma, email: x.email, telefon: x.telefon, typ: x.typ, rezim: x.rezim, pocet: x.pocet, mesto: x.mesto, zprava: x.zprava, stav: x.stav, obchodnik: x.obchodnik, createdAt: x.createdAt, poradit: /porad|na m[íi]ru/i.test((x.typ || '') + ' ' + (x.zprava || '') + ' ' + (x.rezim || '')) }));
+    json(res, 200, { items }); return true;
   }
   // Odeslání nabídky z nástroje obchodníka (aplikace) — počítá, e-mailuje klientovi, aktualizuje poptávku.
   async function apiNabidkaExt(req, res) {
