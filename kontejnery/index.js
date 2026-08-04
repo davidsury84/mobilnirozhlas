@@ -435,11 +435,16 @@ function mount(host) {
       await notify(it.email, 'Nabídka lodního kontejneru — ELKOPLAST CZ (poptávka #' + it.cislo + ')', text);
       it.nabidka.odeslano = true; it.nabidka.odeslanoAt = now;
       it.stav = 'nabidka'; odeslano = true;
+    } else if (b.odeslanoExterne) {
+      // Obchodník odeslal nabídku vlastním e-mailem (Gmail z kalkulačky) → poptávka je VYŘÍZENÁ: Odeslána nabídka.
+      it.nabidka.odeslano = true; it.nabidka.odeslanoAt = now;
+      it.stav = 'nabidka'; odeslano = true;
     }
     it.updatedAt = now; it.historie = it.historie || [];
-    it.historie.push({ stav: it.stav, note: (send ? 'Nabídka odeslána klientovi' : 'Nabídka uložena') + ' (' + fmtKc(calc.celkem) + ')', by: byWho, at: now });
+    const notePrefix = send ? 'Nabídka odeslána klientovi' : (b.odeslanoExterne ? 'Nabídka odeslána klientovi (e-mailem obchodníka z kalkulačky)' : 'Nabídka uložena');
+    it.historie.push({ stav: it.stav, note: notePrefix + ' (' + fmtKc(calc.celkem) + ')', by: byWho, at: now });
     save(db);
-    logAct('kontejnery', byWho, 'Poptávka #' + it.cislo + ': ' + (send ? 'nabídka odeslána' : 'nabídka uložena') + ' ' + fmtKc(calc.celkem));
+    logAct('kontejnery', byWho, 'Poptávka #' + it.cislo + ': ' + (odeslano ? 'nabídka odeslána' : 'nabídka uložena') + ' ' + fmtKc(calc.celkem));
     json(res, 200, { ok: true, odeslano, item: it });
     return true;
   }
