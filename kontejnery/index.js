@@ -545,13 +545,18 @@ function mount(host) {
     firma: ['company', 'firma', 'spolecnost', 'organizace'],
     typ: ['typ', 'kontejner', 'container', 'type', 'produkt'],
     rezim: ['rezim', 'forma', 'koupe', 'pronajem'],
-    mesto: ['mesto', 'lokalita', 'city', 'misto', 'adresa', 'psc'],
+    mesto: ['mesto', 'lokalita', 'city', 'misto', 'slozit', 'vydej', 'dodani', 'doruc', 'kam ', 'kam_', 'adresa', 'psc'],   // Meta: „kam_chcete_kontejner_složit?"
     zprava: ['zprava', 'poznamka', 'message', 'pozn', 'popis', 'note', 'text', 'dotaz'],
     idcol: ['lead id', 'leadgen_id', 'lead_id', 'id'],
     created: ['created', 'created_time', 'cas', 'time', 'timestamp', 'datum', 'date'],
     adresa: ['adresa', 'address', 'ulice', 'street'],
-    doprava: ['doprav', 'delivery', 'shipping', 'dovoz'],
+    doprava: ['doprav', 'nabidku', 'delivery', 'shipping', 'dovoz'],   // Meta: „jakou_si_přejete_cenovou_nabídku?" = s_dopravou / bez_dopravy
+    pocet: ['pocet', 'kusu', 'kusů', 'quantity', 'mnozstvi', 'ks'],
   };
+  // Meta formuláře mají hodnoty s podtržítky („20'_hc", „s_dopravou") — pro zobrazení je nahradíme mezerami.
+  function cleanTxt(s) { return String(s || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function parsePocet(s) { const m = /\d+/.exec(String(s || '')); return m ? Math.max(1, parseInt(m[0], 10)) : null; }
+  function cleanTel(s) { return String(s || '').replace(/^p:/i, '').trim(); }
   async function syncSheet() {
     const db = load();
     const sheetId = db.config.sheetId;
@@ -586,20 +591,28 @@ function mount(host) {
       const rawId = cell(row, idx.idcol);
       const key = rawId ? ('id:' + rawId) : ('h:' + crypto.createHash('sha1').update([email, telefon, cell(row, idx.created), jmeno].join('|')).digest('hex').slice(0, 16));
       const createdTs = parseLeadDate(cell(row, idx.created));  // datum ZE zdrojového souboru
-      rowByKey[key] = { createdTs };
-      rowQueue.push({ trip: (email + '|' + telefon + '|' + jmeno).toLowerCase(), createdTs, used: false });
+      const rowData = {
+        createdTs,
+        mesto: cleanTxt(cell(row, idx.mesto)).slice(0, 120),
+        adresa: cleanTxt(cell(row, idx.adresa)).slice(0, 240),
+        doprava: cleanTxt(cell(row, idx.doprava)).slice(0, 120),
+        pocet: parsePocet(cell(row, idx.pocet)),
+        telefon: cleanTel(telefon),
+      };
+      rowByKey[key] = rowData;
+      rowQueue.push({ trip: (email + '|' + telefon + '|' + jmeno).toLowerCase(), trip2: (email + '|' + cleanTel(telefon) + '|' + jmeno).toLowerCase(), data: rowData, used: false });
       if (seen.has(key)) continue;
       seen.add(key); db.config.leadKeys.push(key);
       db.seq = (db.seq || 0) + 1;
       const item = {
         id: crypto.randomBytes(8).toString('hex'), cislo: db.seq, leadKey: key,
         jmeno: jmeno || '(bez jména)', firma: cell(row, idx.firma).slice(0, 160),
-        email, telefon,
-        typ: cell(row, idx.typ).slice(0, 80) || null,
-        rezim: (function () { const rz = cell(row, idx.rezim); return REZIM.indexOf(rz) >= 0 ? rz : (rz ? rz.slice(0, 40) : null); })(),
-        mesto: cell(row, idx.mesto).slice(0, 120), pocet: null,
-        adresa: cell(row, idx.adresa).slice(0, 240) || null,
-        doprava: cell(row, idx.doprava).slice(0, 120) || null,
+        email, telefon: cleanTel(telefon),
+        typ: cleanTxt(cell(row, idx.typ)).slice(0, 80) || null,
+        rezim: (function () { const rz = cleanTxt(cell(row, idx.rezim)); return REZIM.indexOf(rz) >= 0 ? rz : (rz ? rz.slice(0, 40) : null); })(),
+        mesto: rowData.mesto, pocet: rowData.pocet,
+        adresa: rowData.adresa || null,
+        doprava: rowData.doprava || null,
         zprava: cell(row, idx.zprava).slice(0, 4000),
         cenaOd: null, cenaDo: null, konfigurace: null,
         stav: 'nova', obchodnik: null, zdroj: 'Google tabulka / Meta',
@@ -610,17 +623,26 @@ function mount(host) {
       db.items.push(item); created.push(item);
     }
     }
-    // OPRAVA dřívějších importů: createdAt = datum z tabulky, ne kdy proběhl import do intranetu.
+    // OPRAVA dřívějších importů: createdAt z tabulky + doplnění místa/adresy/dopravy/počtu/telefonu,
+    // které se dříve nemapovaly (jiné názvy sloupců v Meta formulářích).
     let fixed = 0;
     db.items.forEach((it) => {
       if (it.zdroj !== 'Google tabulka / Meta') return;
-      let ts = (it.leadKey && rowByKey[it.leadKey]) ? rowByKey[it.leadKey].createdTs : null;
-      if (ts == null) {
+      let rd = (it.leadKey && rowByKey[it.leadKey]) ? rowByKey[it.leadKey] : null;
+      if (!rd) {
         const trip = ((it.email || '') + '|' + (it.telefon || '') + '|' + (it.jmeno || '')).toLowerCase();
-        const r = rowQueue.find(x => !x.used && x.trip === trip && x.createdTs != null);
-        if (r) { r.used = true; ts = r.createdTs; }
+        const r = rowQueue.find(x => !x.used && (x.trip === trip || x.trip2 === trip));
+        if (r) { r.used = true; rd = r.data; }
       }
-      if (ts != null && Math.abs(ts - (it.createdAt || 0)) > 60 * 1000) { it.createdAt = ts; fixed++; }
+      if (!rd) return;
+      let ch = false;
+      if (rd.createdTs != null && Math.abs(rd.createdTs - (it.createdAt || 0)) > 60 * 1000) { it.createdAt = rd.createdTs; ch = true; }
+      if (!it.mesto && rd.mesto) { it.mesto = rd.mesto; ch = true; }
+      if (!it.adresa && rd.adresa) { it.adresa = rd.adresa; ch = true; }
+      if (!it.doprava && rd.doprava) { it.doprava = rd.doprava; ch = true; }
+      if (!it.pocet && rd.pocet) { it.pocet = rd.pocet; ch = true; }
+      if (it.telefon && /^p:/i.test(it.telefon)) { it.telefon = cleanTel(it.telefon); ch = true; }
+      if (ch) fixed++;
     });
     if (fixed) console.log('[kontejnery] opraveno createdAt dle tabulky u ' + fixed + ' poptávek');
     if (db.config.leadKeys.length > 8000) db.config.leadKeys = db.config.leadKeys.slice(-8000);
