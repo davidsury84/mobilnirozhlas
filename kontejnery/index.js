@@ -346,7 +346,7 @@ function mount(host) {
     const items = load().items
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
       .slice(0, 300)
-      .map(x => ({ id: x.id, cislo: x.cislo, jmeno: x.jmeno, firma: x.firma, email: x.email, telefon: x.telefon, typ: x.typ, rezim: x.rezim, pocet: x.pocet, mesto: x.mesto, adresa: x.adresa || '', doprava: x.doprava || '', zprava: x.zprava, stav: x.stav, obchodnik: x.obchodnik, createdAt: x.createdAt, updatedAt: x.updatedAt || null, poznamka: x.interniPoznamka || '', poznamkaBy: x.poznamkaBy || null, poradit: /porad|na m[íi]ru/i.test((x.typ || '') + ' ' + (x.zprava || '') + ' ' + (x.rezim || '')) }));
+      .map(x => ({ id: x.id, cislo: x.cislo, jmeno: x.jmeno, firma: x.firma, email: x.email, telefon: x.telefon, typ: x.typ, rezim: x.rezim, pocet: x.pocet, mesto: x.mesto, adresa: x.adresa || '', doprava: x.doprava || '', zprava: x.zprava, stav: x.stav, obchodnik: x.obchodnik, createdAt: x.createdAt, updatedAt: x.updatedAt || null, poznamka: x.interniPoznamka || '', poznamkaBy: x.poznamkaBy || null, klientPotvrdil: x.klientPotvrdil || null, poradit: /porad|na m[íi]ru/i.test((x.typ || '') + ' ' + (x.zprava || '') + ' ' + (x.rezim || '')) }));
     json(res, 200, { items, stavy: STAVY }); return true;
   }
   // Změna stavu / sdílené poznámky z kalkulačky (aplikace lodních kontejnerů) — Bearer.
