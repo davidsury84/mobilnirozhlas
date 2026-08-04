@@ -34,7 +34,8 @@ const STAVY = {
   zamitnuto: 'Bez úspěchu',
 };
 // Typy kontejnerů nabízené ve formuláři (kvůli konzistenci evidence).
-const TYPY = ['20′ skladový', '40′ skladový', '20′ High Cube', '40′ High Cube', 'Chladírenský (reefer)', 'Kancelářský / obytný', 'Na míru / poradit'];
+// Jen typy z oficiálního ceníku (žádný reefer / kancelářský / na míru) + možnost poradit.
+const TYPY = ['20′ skladový (DC)', '40′ skladový (DV)', '20′ High Cube', '40′ High Cube', 'Potřebuji poradit'];
 // Obchodníci, kteří mohou být přiřazeni k poptávce lodních kontejnerů (dohledáni v DB zaměstnanců podle jména).
 const OBCHODNICI_JMENA = ['Jana Rychlíková', 'Josef Beránek'];
 const REZIM = ['Koupě', 'Pronájem', 'Ještě nevím'];
