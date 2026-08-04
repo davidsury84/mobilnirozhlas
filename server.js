@@ -162,6 +162,7 @@ const ABROLL_FILE = path.join(ROOT, 'abroll-skoleni.html');  // interaktivní š
 const PRODUKTY_FILE = path.join(ROOT, 'produkty-skoleni.html'); // interaktivní školení Produkty (znalosti obchodníků) + závěrečný test
 const PRUMYSL_FILE = path.join(ROOT, 'prumysl-skoleni.html'); // interaktivní školení Průmysl (obchodník: skladování, Li-Ion, ADR) + závěrečný test
 const LOXXER_SKOLENI_FILE = path.join(ROOT, 'loxxer-skoleni.html'); // interaktivní školení LOXXER (obchodník: protipožární skříně na Li-Ion baterie) + závěrečný test
+const ACTS_SKOLENI_FILE = path.join(ROOT, 'acts-skoleni.html'); // interaktivní školení ACTS (železniční abroll kontejnery) + závěrečný test
 const KONCEPT_FILE = path.join(ROOT, 'intranet-koncept.html'); // náhledový koncept redesignu intranetu (SharePoint hub)
 const PUB_DIR  = path.join(DATA_DIR, 'published');
 const STATE_F  = path.join(DATA_DIR, 'state.json');
@@ -176,6 +177,7 @@ const ABROLL_F = path.join(DATA_DIR, 'abroll-results.json'); // výsledky testu 
 const PRODUKTY_F = path.join(DATA_DIR, 'produkty-results.json'); // výsledky testu znalosti produktů (max 3 pokusy na osobu)
 const PRUMYSL_F = path.join(DATA_DIR, 'prumysl-results.json'); // výsledky testu Průmysl (obchodník) — max 3 pokusy na osobu
 const LOXXER_SKOLENI_F = path.join(DATA_DIR, 'loxxer-skoleni-results.json'); // výsledky testu LOXXER (obchodník) — max 3 pokusy na osobu
+const ACTS_SKOLENI_F = path.join(DATA_DIR, 'acts-skoleni-results.json'); // výsledky testu ACTS (železniční abroll kontejnery) — max 3 pokusy na osobu
 const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
 const ACTLOG_F  = path.join(DATA_DIR, 'activity.json');   // jednoduchý log aktivity (přihlášení, pozvánky, průzkumy)
@@ -997,6 +999,36 @@ function recordLoxxerSkoleni(a) {
   writeJson(LOXXER_SKOLENI_F, results);
   logActivity('loxxer-skoleni', { email, name }, 'Test LOXXER · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, LOXXER_SKOLENI_MAX - rec.attempts.length), passed };
+}
+// Školení ACTS (železniční abroll kontejnery) – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
+const ACTS_SKOLENI_MAX = 3;
+function actsSkoleniStatus(email) {
+  email = (email || '').toLowerCase();
+  const rec = readJson(ACTS_SKOLENI_F, []).find(r => (r.email || '').toLowerCase() === email);
+  const attempts = (rec && Array.isArray(rec.attempts)) ? rec.attempts : [];
+  const best = attempts.reduce((m, a) => Math.max(m, a.pct || 0), 0);
+  return { attemptsUsed: attempts.length, attemptsLeft: Math.max(0, ACTS_SKOLENI_MAX - attempts.length), best, passed: attempts.some(a => a.passed) };
+}
+function recordActsSkoleni(a) {
+  const email = (a.email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const total = Math.max(0, Math.round(Number(a.total) || 0));
+  const correct = Math.max(0, Math.min(total, Math.round(Number(a.correct) || 0)));
+  const pct = Math.max(0, Math.min(100, Math.round(Number(a.pct) || 0)));
+  const passed = pct >= 80;
+  const results = readJson(ACTS_SKOLENI_F, []);
+  let rec = results.find(r => (r.email || '').toLowerCase() === email);
+  if (!rec) { rec = { email, name, dept, attempts: [] }; results.push(rec); }
+  rec.name = name; rec.dept = dept; if (!Array.isArray(rec.attempts)) rec.attempts = [];
+  if (rec.attempts.length >= ACTS_SKOLENI_MAX) { writeJson(ACTS_SKOLENI_F, results); return { blocked: true, attemptsUsed: rec.attempts.length }; }
+  rec.attempts.push({ correct, total, pct, passed, ts: Date.now() });
+  writeJson(ACTS_SKOLENI_F, results);
+  logActivity('acts-skoleni', { email, name }, 'Test ACTS · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
+  return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, ACTS_SKOLENI_MAX - rec.attempts.length), passed };
 }
 // Klíče modulů, ke kterým má zaměstnanec přístup (přiděluje správce v administraci).
 function employeeModules(email) {
@@ -2315,6 +2347,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/loxxer-skoleni' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, loxxerSkoleniStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/loxxer-skoleni' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordLoxxerSkoleni(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/loxxer-skoleni-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(LOXXER_SKOLENI_F, [])); }
+    if (p === '/api/acts-skoleni' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, actsSkoleniStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/acts-skoleni' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordActsSkoleni(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/acts-skoleni-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(ACTS_SKOLENI_F, [])); }
     // ---- Odeslání reportu průzkumu e-mailem (z detailu; jen správce) ----
     if (p === '/api/survey-report/send' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
@@ -2466,6 +2501,7 @@ const server = http.createServer(async (req, res) => {
         kovo: 'Produkty KOVO — kovové výrobky',
         roto: 'Produkty ROTO — plastové výrobky',
         abroll: 'ABROLL — kódování a konfigurace',
+        acts: 'ACTS — železniční abroll kontejnery',
       };
       const nazev = SKOLENI_NAZVY[String(b.skoleni || '')];
       if (!nazev) return send(res, 400, { error: 'Neznámé školení.' });
@@ -2963,6 +2999,14 @@ const server = http.createServer(async (req, res) => {
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení LOXXER je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(LOXXER_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí loxxer-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(LOXXER_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+
+    // ---- Školení ACTS (železniční abroll kontejnery): za přihlášením (zaměstnanec nebo správce) ----
+    if (p === '/acts-skoleni-app') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení ACTS je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!fs.existsSync(ACTS_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí acts-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(ACTS_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----

@@ -2670,12 +2670,13 @@ async function showSkoleni(){
     const label = st.passed ? 'Otevřít znovu' : (u>=3 ? 'Prohlédnout' : (u>0 ? 'Pokračovat' : 'Spustit'));
     return { badge, label };
   }
-  let kst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, rst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, pst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, lst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false};
+  let kst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, rst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, pst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, lst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, ast={attemptsUsed:0,attemptsLeft:3,best:0,passed:false};
   try{ kst=await (await fetch('/api/produkty?type=kovo&email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ rst=await (await fetch('/api/produkty?type=roto&email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ pst=await (await fetch('/api/prumysl?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ lst=await (await fetch('/api/loxxer-skoleni?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
-  const kb=skolBadgeBtn(kst), rb=skolBadgeBtn(rst), pb=skolBadgeBtn(pst), lb=skolBadgeBtn(lst);
+  try{ ast=await (await fetch('/api/acts-skoleni?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
+  const kb=skolBadgeBtn(kst), rb=skolBadgeBtn(rst), pb=skolBadgeBtn(pst), lb=skolBadgeBtn(lst), ab=skolBadgeBtn(ast);
   // Správce může kohokoli pozvat k absolvování (e-mailová pozvánka) — u všech školení.
   const inv=(key,nazev)=>MUJ.admin?'<button class="btn ghost sm" title="Pozvat zaměstnance k absolvování" onclick="skolPozvat(\''+key+'\',\''+nazev.replace(/'/g,"\\'")+'\')">✉ Pozvat</button>':'';
   let h='<div class="dash-hero"><h2>Školení</h2><p>Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).'+(MUJ.admin?' Jako správce můžete tlačítkem „✉ Pozvat" poslat komukoli e-mailovou pozvánku k absolvování.':'')+'</p></div>';
@@ -2705,6 +2706,11 @@ async function showSkoleni(){
      '<div class="muted" style="font-size:12px;margin-top:2px">Interaktivní výuka názvů a konfigurace kontejnerů ABROLL + závěrečný test</div></div></div>'+
      '<div style="display:flex;align-items:center;gap:10px">'+badge+inv('abroll','ABROLL — kódování a konfigurace')+
      '<button class="btn sm" onclick="openAbroll()">'+btnLabel+'</button></div></div>';
+  h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
+     '<div class="li-t">ACTS — železniční abroll kontejnery</div>'+
+     '<div class="muted" style="font-size:12px;margin-top:2px">Kombinovaná doprava silnice–železnice: princip překládky, konstrukce ACTS kontejneru, kódování ABR-ACTS a argumentář + závěrečný test</div></div></div>'+
+     '<div style="display:flex;align-items:center;gap:10px">'+ab.badge+inv('acts','ACTS — železniční abroll kontejnery')+
+     '<button class="btn sm" onclick="openActsSkoleni()">'+ab.label+'</button></div></div>';
   body.innerHTML=h; window.scrollTo(0,0);
 }
 
@@ -2804,6 +2810,17 @@ function openLoxxerSkoleni(){
       '<button class="btn ghost sm" onclick="showSkoleni()">← Zpět na školení</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>LOXXER</b> — na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
     '<iframe src="/loxxer-skoleni-app'+q+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#fff" title="Školení LOXXER"></iframe>';
+  window.scrollTo(0,0);
+}
+function openActsSkoleni(){
+  MUJ.view="skoleni"; renderSidebar();
+  const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
+  const body=document.getElementById("mujBody");
+  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
+      '<button class="btn ghost sm" onclick="showSkoleni()">← Zpět na školení</button>'+
+      '<span class="muted" style="font-size:13px">Školení <b>ACTS</b> — na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
+    '<iframe src="/acts-skoleni-app'+q+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#fff" title="Školení ACTS"></iframe>';
   window.scrollTo(0,0);
 }
 function showSmlouvy(){
@@ -5246,6 +5263,7 @@ async function renderGritAdmin(){
   h+='<div class="divider" style="margin:26px 0"></div>'+ await abrollBlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await prumyslBlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await loxxerSkoleniBlockHtml();
+  h+='<div class="divider" style="margin:26px 0"></div>'+ await actsSkoleniBlockHtml();
   box.innerHTML=h;
 }
 async function copyGritLinks(){
@@ -5549,6 +5567,50 @@ function exportLoxxerSkoleni(){
   const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
   const a=document.createElement("a"); a.href=url; a.download="loxxer-skoleni-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
+}
+
+/* ---- Školení ACTS – závěrečný test (výsledky, max 3 pokusy) ---- */
+let ACTS_SKOLENI_RESULTS=[];
+async function actsSkoleniBlockHtml(){
+  try{ const r=await fetch("/api/acts-skoleni-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return ""; } ACTS_SKOLENI_RESULTS=await r.json(); }catch(e){ ACTS_SKOLENI_RESULTS=[]; }
+  let h='<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:8px"><strong>Školení ACTS — závěrečný test</strong>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="exportActsSkoleni()">⬇ Export (XLSX)</button></div></div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">Interaktivní školení ACTS — železniční abroll kontejnery (kombinovaná doprava, konstrukce, kódování ABR-ACTS, argumentář) v modulu „Školení". Test se vyhodnocuje automaticky, hranice splnění 80 %, <strong>max. 3 pokusy</strong> na osobu. Ukládá se každý pokus.</div>'+
+    '</div>';
+  const res=(ACTS_SKOLENI_RESULTS||[]).slice();
+  if(!res.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné výsledky školení ACTS. Jakmile někdo dokončí test, objeví se tu.</p></div>'; return h; }
+  const bestOf=r=>{ const a=(r.attempts||[]); return a.reduce((m,x)=>Math.max(m,x.pct||0),0); };
+  const passedOf=r=>(r.attempts||[]).some(x=>x.passed);
+  const lastTs=r=>{ const a=(r.attempts||[]); return a.length?a[a.length-1].ts:0; };
+  const done=res.filter(passedOf).length;
+  h+='<div class="spread" style="margin:4px 0 12px"><h3 style="margin:0">ACTS — přehled účastníků</h3></div>';
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Účastníků</div><strong style="font-size:20px">'+res.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Splnilo (≥80 %)</div><strong style="font-size:20px">'+done+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Nesplnilo</div><strong style="font-size:20px">'+(res.length-done)+'</strong></div></div>';
+  const groups={}; res.forEach(r=>{ const d=r.dept||"—"; (groups[d]=groups[d]||[]).push(r); });
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,"cs")).forEach(d=>{
+    const rows=groups[d].slice().sort((a,b)=>bestOf(b)-bestOf(a));
+    h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3></div>';
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">Pokusů</th><th class="num">Nejlepší</th><th>Stav</th><th>Poslední pokus</th></tr></thead><tbody>';
+    rows.forEach(r=>{ const best=bestOf(r), passed=passedOf(r), used=(r.attempts||[]).length, ts=lastTs(r);
+      h+='<tr><td>'+esc(r.name||r.email)+'</td><td class="muted">'+esc(r.email||"")+'</td>'+
+         '<td class="num">'+used+' / 3</td><td class="num">'+best+' %</td>'+
+         '<td>'+(passed?'<span class="pill green">✓ Splněno</span>':(used>=3?'<span class="pill red">✕ Nesplněno</span>':'<span class="pill amber">○ Probíhá</span>'))+'</td>'+
+         '<td class="muted">'+(ts?new Date(ts).toLocaleDateString("cs-CZ"):"—")+'</td></tr>'; });
+    h+='</tbody></table></div>';
+  });
+  return h;
+}
+function exportActsSkoleni(){
+  const res=ACTS_SKOLENI_RESULTS||[]; if(!res.length){ toast("Žádná data k exportu."); return; }
+  const rows=[["Jméno","E-mail","Oddělení","Pokusů","Nejlepší %","Splněno","Poslední pokus"]];
+  res.forEach(r=>{ const a=r.attempts||[]; const best=a.reduce((m,x)=>Math.max(m,x.pct||0),0); const passed=a.some(x=>x.passed); const ts=a.length?a[a.length-1].ts:0;
+    rows.push([r.name||r.email||"", r.email||"", r.dept||"", a.length, best, passed?"ano":"ne", ts?new Date(ts).toLocaleString("cs-CZ"):""]); });
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="acts-skoleni-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
 }
 
 /* ============================================================

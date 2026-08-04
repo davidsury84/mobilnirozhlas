@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACTS – školení: železniční abroll kontejnery</title>
+<style>
+:root{
+  --green:#5aa532; --green2:#8cc63f; --green-d:#2f7430;
+  --dark:#1b1f23; --muted:#65707a; --line:#e3e7ea; --soft:#f5f8f3; --soft2:#eef6e8;
+  --warn:#fff7e0; --danger:#fff0f0; --ok:#e9f8e6; --rail:#2b6cb0;
+  --shadow:0 10px 30px rgba(20,40,20,.08); --radius:18px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--dark);background:#fff;line-height:1.5}
+button{cursor:pointer;font:inherit}
+.topbar{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,.04)}
+.topbar-inner{display:flex;align-items:center;gap:16px;padding:12px 22px;max-width:1180px;margin:0 auto}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.4px;color:var(--green);font-size:1.15rem;white-space:nowrap}
+.logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--green2));display:grid;place-items:center;color:#fff;font-weight:900}
+.top-title{flex:1;min-width:0}
+.top-title h1{margin:0;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-title p{margin:1px 0 0;color:var(--muted);font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.progress-wrap{width:230px;display:flex;align-items:center;gap:10px}
+.progress-label{font-size:.78rem;color:var(--muted);min-width:58px;text-align:right}
+.progress{height:9px;background:#e8eee4;border-radius:50px;overflow:hidden;flex:1}
+.progress span{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--green2));width:0%;transition:.35s}
+.wrap{max-width:1180px;margin:0 auto;padding:26px 22px 80px}
+.hero{background:linear-gradient(135deg,#eef4fb,#fff);border:1px solid var(--line);border-radius:26px;padding:26px 28px;box-shadow:var(--shadow);position:relative;overflow:hidden;margin-bottom:26px}
+.hero:after{content:"";position:absolute;right:-80px;bottom:-80px;width:260px;height:260px;border-radius:50%;background:rgba(43,108,176,.10)}
+.hero h2{font-size:1.9rem;margin:0 0 10px;line-height:1.14}
+.hero p{max-width:840px;color:#465249;margin:0 0 16px}
+.hero .claim{font-weight:800;color:var(--rail);font-size:1.02rem}
+.badge-row{display:flex;gap:10px;flex-wrap:wrap}
+.badge{background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 12px;color:#41513e;font-size:.85rem;display:inline-flex;gap:6px;align-items:center}
+.badge strong{color:var(--green)}
+.sec{margin:34px 0 0}
+.sec-h{display:flex;align-items:center;gap:12px;margin:0 0 4px}
+.sec-h .num{width:30px;height:30px;border-radius:9px;background:var(--soft2);color:var(--green-d);display:grid;place-items:center;font-weight:900;flex:none}
+.sec-h h3{margin:0;font-size:1.3rem}
+.sec-lead{color:var(--muted);margin:2px 0 16px 42px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px}
+.grid{display:grid;gap:16px}
+.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:980px){.grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:820px){.grid.two,.grid.three,.grid.four{grid-template-columns:1fr}.progress-wrap{display:none}}
+.callout{border-left:5px solid var(--green);background:#f8fff4;border-radius:14px;padding:14px 16px;margin:14px 0}
+.callout.warn{border-left-color:#d99b24;background:var(--warn)}
+.callout.rail{border-left-color:var(--rail);background:#eef4fb}
+.callout b{color:var(--green-d)}
+.callout.rail b{color:var(--rail)}
+.callout.warn b{color:#9a6a0d}
+.pill{display:inline-block;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;margin:2px;font-size:.82rem}
+.pill.green{border-color:#cfe8bf;background:#f3faee;color:#326c22;font-weight:800}
+.pill.rail{border-color:#bcd4ec;background:#eef4fb;color:#245a94;font-weight:800}
+.step{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px dashed #e7ebe6}
+.step:last-child{border-bottom:0}
+.step .n{width:28px;height:28px;border-radius:50%;background:var(--rail);color:#fff;font-weight:900;display:grid;place-items:center;flex:none;font-size:.9rem}
+.step h4{margin:0 0 2px;font-size:1rem}
+.step p{margin:0;color:var(--muted);font-size:.9rem}
+table{border-collapse:collapse;width:100%;font-size:.92rem;margin-top:6px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid #edf0ed;vertical-align:top}
+th{background:#f0f8eb;color:#25451e}
+td.tick{color:var(--green-d);font-weight:800}
+td.cross{color:#b7bdb4}
+.code-chip{display:inline-block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;background:#f2f6fa;border:1px solid #d8e2ec;border-radius:8px;padding:2px 8px;margin:1px;color:#24547f;font-weight:700}
+.obj{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:#fff;box-shadow:var(--shadow)}
+.obj .q{font-weight:800;color:#245a94;margin:0 0 6px}
+.obj .a{margin:0;color:#35443b;font-size:.92rem}
+.scenario{border:1px solid var(--line);border-radius:16px;background:#fff;padding:4px 16px;box-shadow:var(--shadow);margin:10px 0}
+.scenario summary{font-weight:800;cursor:pointer;padding:10px 0}
+.scenario .answer{margin:0 0 14px;padding:12px;border-radius:12px;background:#f4fbf0;border:1px solid #dcefd2;font-size:.92rem}
+.quiz-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:18px;box-shadow:var(--shadow);margin-bottom:14px}
+.quiz-q{font-weight:800;margin:0 0 4px}
+.quiz-cat{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.quiz-opts{display:grid;gap:8px}
+.quiz-opts button{border:1px solid #d6ded3;background:#fff;text-align:left;border-radius:12px;padding:11px 13px}
+.quiz-opts button:hover{border-color:var(--green)}
+.quiz-opts button.correct{background:#e8f8e3;border-color:#6eb957;font-weight:800}
+.quiz-opts button.wrong{background:#ffecec;border-color:#e08383}
+.quiz-opts button:disabled{cursor:default}
+.feedback{margin-top:10px;padding:10px 12px;border-radius:12px;background:#f6f8fa;color:#35443b;font-size:.9rem;display:none}
+.btn{border:0;background:var(--green);color:#fff;border-radius:999px;padding:12px 20px;font-weight:900}
+.btn:disabled{background:#b9cbb0}
+.btn.ghost{background:#fff;border:1px solid var(--line);color:var(--green-d)}
+.result{display:none;margin-top:16px;border:1px solid var(--line);border-radius:18px;padding:20px 22px;background:#fbfff8;box-shadow:var(--shadow)}
+.score-big{font-size:2.4rem;font-weight:900;color:var(--green);line-height:1}
+.att-info{margin-top:10px;font-weight:800;color:var(--green-d)}
+.muted{color:var(--muted)}
+.schema{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px;overflow-x:auto}
+.schema svg{display:block;min-width:640px;width:100%;height:auto}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-inner">
+  <div class="logo"><div class="logo-mark">E</div> ELKOPLAST</div>
+  <div class="top-title"><h1>ACTS — železniční abroll kontejnery</h1><p>Kombinovaná doprava silnice–železnice: princip, konstrukce, kódování a prodej + závěrečný test (80 % = splněno)</p></div>
+  <div class="progress-wrap"><div class="progress"><span id="pbar"></span></div><div class="progress-label" id="plabel">0 %</div></div>
+</div></div>
+
+<div class="wrap">
+  <div class="hero">
+    <h2>Jeden kontejner, silnice i železnice</h2>
+    <p><b>ACTS</b> (Abroll-Container-Transport-System) je systém kombinované dopravy, ve kterém tentýž <b>odvalovací (abroll) kontejner</b> jezdí po silnici na hákovém nosiči a po železnici na voze s otočnými rámy. Překládka probíhá <b>horizontálně, bez jeřábu a bez terminálu</b> — zvládne ji sám řidič během několika minut kdekoli u koleje se zpevněnou plochou. ELKOPLAST tyto kontejnery vyrábí jako typ <b>ABR-ACTS</b> v rámci produktové řady ABROLL. Toto školení tě naučí, jak systém funguje, čím se ACTS kontejner liší od běžného abrollu, jak se značí v našem katalogu a komu a jak ho nabízet.</p>
+    <p class="claim">„Materiál se nepřekládá — překládá se celý kontejner."</p>
+    <div class="badge-row">
+      <span class="badge"><strong>13</strong>&nbsp;lekcí</span>
+      <span class="badge"><strong>1570 mm</strong>&nbsp;výška hákového oka (NH1570)</span>
+      <span class="badge"><strong>0</strong>&nbsp;jeřábů potřeba k překládce</span>
+      <span class="badge"><strong>80 %</strong>&nbsp;hranice testu</span>
+      <span class="badge"><strong>3</strong>&nbsp;pokusy na test</span>
+    </div>
+  </div>
+
+  <!-- 1. Co je ACTS -->
+  <div class="sec" id="s1">
+    <div class="sec-h"><div class="num">1</div><h3>Co je ACTS a proč vznikl</h3></div>
+    <p class="sec-lead">Než vysvětlíš produkt, musíš umět vysvětlit systém — zákazník kupuje kontejner kvůli systému.</p>
+    <div class="grid three">
+      <div class="card"><h4 style="margin:0 0 6px">Zkratka a původ</h4><p class="muted" style="margin:0">ACTS = <b>Abroll-Container-Transport-System</b>. Systém byl vyvinut ve <b>Švýcarsku v 80. letech</b> a rozšířil se do dalších evropských zemí (Švýcarsko, Rakousko, Německo, Polsko, Česko). Cíl: dostat svoz odpadu a sypkých materiálů ze silnice na železnici.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Základní myšlenka</h4><p class="muted" style="margin:0">Nepřekládá se materiál, ale <b>celý kontejner</b>. Stejná nádoba se naplní u původce, po silnici dojede k železnici, po železnici ujede dálkovou trasu a po silnici dojede k cíli (spalovna, třídicí linka, hutě…).</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Klíčová výhoda</h4><p class="muted" style="margin:0">Překládka je <b>horizontální</b> — kontejner se mezi vozidlem a vagonem přetahuje hákem po rolnách. Není potřeba jeřáb, terminál ani druhý pracovník; stačí <b>zpevněná plocha vedle koleje</b>.</p></div>
+    </div>
+    <div class="callout warn"><b>ACTS není jen upravený ABROLL.</b> Je to <b>intermodální přepravní jednotka</b> — o použitelnosti rozhoduje současně kontejner, silniční nosič, otočný železniční rám, <b>konkrétní železniční vůz</b> a schválená trasa. Obchodník proto neprodává objem a tloušťku plechu, ale <b>ověřenou kompatibilitu celého systému</b>.</div>
+    <div class="callout rail"><b>Prodejní pravda:</b> zákazník s ACTS neřeší „kontejner", ale <b>logistický řetězec</b>. Kdo vozí velké objemy na dlouhé vzdálenosti (odpady, šrot, dřevo, uhlí), šetří železnicí náklady, emise i řidiče — a ACTS kontejner je vstupenka do tohoto řetězce.</div>
+  </div>
+
+  <!-- 2. Jak funguje překládka -->
+  <div class="sec" id="s2">
+    <div class="sec-h"><div class="num">2</div><h3>Jak funguje překládka — krok za krokem</h3></div>
+    <p class="sec-lead">Železniční vůz nese <b>otočné rámy</b> — podle typu vozu 2 až 4, jeden rám = jeden kontejner. Tohle je sekvence, kterou musíš umět vyprávět:</p>
+    <div class="card">
+      <div class="step"><div class="n">1</div><div><h4>Přistavení</h4><p>Vůz s otočnými rámy stojí na koleji, vedle je zpevněná plocha. Silniční vozidlo s hákovým (abroll) nosičem najede podél vozu.</p></div></div>
+      <div class="step"><div class="n">2</div><div><h4>Odjištění a natočení rámu</h4><p>Obsluha odjistí otočný rám a natočí ho šikmo do boku (zhruba o 30–45°) směrem k vozidlu. Rám tvoří „most" mezi vagonem a autem.</p></div></div>
+      <div class="step"><div class="n">3</div><div><h4>Zaháknutí</h4><p>Řidič couvne, hák nosiče zaklesne do <b>hákového oka kontejneru</b> (výška 1570 mm — proto kód natahování NH1570).</p></div></div>
+      <div class="step"><div class="n">4</div><div><h4>Přetažení po rolnách</h4><p>Hydraulika nosiče přetáhne kontejner z rámu na vozidlo (nebo obráceně). Kontejner se odvaluje po svých <b>zadních rolnách</b> a po vedení rámu.</p></div></div>
+      <div class="step"><div class="n">5</div><div><h4>Zpětné natočení a aretace</h4><p>Prázdný (nebo naopak naložený) rám se vrátí do podélné polohy a <b>zajistí aretací</b> — bez zajištění nesmí vůz vyjet.</p></div></div>
+      <div class="step"><div class="n">6</div><div><h4>Odjezd</h4><p>Celá výměna jednoho kontejneru trvá řádově <b>minuty</b> a zvládne ji řidič sám. Vlak může obsloužit více míst po trase („putující překladiště").</p></div></div>
+    </div>
+    <div class="schema" style="margin-top:16px">
+      <svg viewBox="0 0 900 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schéma překládky ACTS">
+        <rect x="0" y="200" width="900" height="6" fill="#c9d2da"/>
+        <rect x="40" y="188" width="360" height="12" rx="3" fill="#8ea7bd"/>
+        <circle cx="80" cy="206" r="12" fill="#4a5b6a"/><circle cx="150" cy="206" r="12" fill="#4a5b6a"/><circle cx="290" cy="206" r="12" fill="#4a5b6a"/><circle cx="360" cy="206" r="12" fill="#4a5b6a"/>
+        <g transform="rotate(-18 220 184)">
+          <rect x="90" y="168" width="260" height="16" rx="4" fill="#2b6cb0"/>
+          <rect x="100" y="108" width="240" height="60" rx="6" fill="#5aa532" opacity=".92"/>
+          <text x="220" y="146" font-family="Inter,Arial" font-size="20" font-weight="800" fill="#fff" text-anchor="middle">ACTS kontejner</text>
+        </g>
+        <text x="220" y="232" font-family="Inter,Arial" font-size="14" fill="#65707a" text-anchor="middle">železniční vůz s otočným rámem (natočeno k vozidlu)</text>
+        <rect x="560" y="150" width="120" height="50" rx="8" fill="#3b4754"/>
+        <rect x="680" y="120" width="180" height="80" rx="6" fill="#dfe7ee"/>
+        <circle cx="600" cy="206" r="16" fill="#20272e"/><circle cx="720" cy="206" r="16" fill="#20272e"/><circle cx="820" cy="206" r="16" fill="#20272e"/>
+        <path d="M690 200 L690 128 Q690 116 702 116 L740 116" stroke="#e5533c" stroke-width="8" fill="none" stroke-linecap="round"/>
+        <text x="745" y="232" font-family="Inter,Arial" font-size="14" fill="#65707a" text-anchor="middle">silniční vozidlo s hákovým nosičem</text>
+        <path d="M420 140 L520 140" stroke="#2b6cb0" stroke-width="5" stroke-dasharray="10 7" marker-end="url(#arr)"/>
+        <defs><marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#2b6cb0"/></marker></defs>
+        <text x="470" y="128" font-family="Inter,Arial" font-size="14" font-weight="800" fill="#2b6cb0" text-anchor="middle">horizontální přetažení hákem</text>
+      </svg>
+    </div>
+    <div class="callout"><b>Zapamatuj si:</b> žádný jeřáb, žádný vysokozdvižný vozík, žádné spreadery. Otočný rám + hákový nosič + rolny = celá „technologie" překládky. Právě proto je systém tak levný na infrastrukturu.</div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:var(--rail)">Požadavky na překladiště (benchmark ACTS AG / SBB)</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>Rovná a vodorovná kolej.</b></li>
+          <li>Zpevněná plocha cca <b>25 × 15 m na jeden vůz</b>, úroveň pokud možno shodná s temenem kolejnice.</li>
+          <li>Minimální vzdálenost <b>5 m od hlavní koleje</b> a 4,5 m od ostatních kolejí.</li>
+          <li>Během manipulace <b>zabrzděný vůz</b>, stanovený režim sousedních kolejí, případně <b>vypnutá a uzemněná trolej</b>.</li>
+        </ul>
+        <p class="muted" style="margin:8px 0 0;font-size:.86rem">Jde o švýcarský provozní benchmark, ne automaticky platný evropský standard — každé konkrétní místo musí potvrdit provozovatel infrastruktury.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:var(--rail)">Vozidla a nosiče v praxi</h4>
+        <p style="margin:0 0 8px">Podle provozovatele ACTS AG lze použít běžná <b>čtyř- nebo pětinápravová vozidla</b> s hákovým nebo řetězovým nosičem — pro samotnou překládku na rám se v praxi <b>lépe osvědčil řetězový systém</b> než hákový (srovnej si oba v lekci Videa).</p>
+        <p class="muted" style="margin:0;font-size:.88rem">Do zadání proto vždy patří, jaké nosiče zákazník reálně má — hák i řetěz jsou možné, ale kontejner a nosič musí být ověřená dvojice.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Konstrukce -->
+  <div class="sec" id="s3">
+    <div class="sec-h"><div class="num">3</div><h3>Čím se ACTS kontejner liší od běžného abrollu</h3></div>
+    <p class="sec-lead">Na první pohled vypadá jako každý jiný odvalovací kontejner. Rozdíly jsou v detailech — a přesně na ně se ptají technici zákazníka.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:var(--green-d)">Co má společné s abrollem</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>Hákové oko</b> pro natahovací hák — výška <b>1570 mm</b>; standardní publikované provedení ELKOPLAST má <b>sklopný hák NS 1570/50</b> (sklopení omezuje kolizi s železničním průjezdným profilem).</li>
+          <li><b>Zadní rolny</b>, po kterých se odvaluje při natahování a sesouvání.</li>
+          <li>Vyklápění a vyprazdňování stejnou technikou jako běžný abroll (zadní vrata, klapka, sklopné čelo…).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:var(--rail)">Co navíc vyžaduje železnice</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>Zesílená konstrukce rámu a podlahy</b> — rázy a vibrace na železnici (posun, rozjezdy) jsou tvrdší než na silnici.</li>
+          <li><b>Rozměrová a tvarová kompatibilita s otočným rámem</b> — kontejner musí přesně sednout do vedení rámu a jeho zajišťovacích prvků.</li>
+          <li><b>Zajištění proti posunu a nadskočení</b> na rámu (aretace) po celou dobu jízdy vlaku.</li>
+          <li>Průjezdný profil dráhy: šířka do cca <b>2,5 m</b> a omezená výška — proto se u ACTS hlídá celková výška víc než u silničního abrollu.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid four" style="margin-top:16px">
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Délky</h4><p class="muted" style="margin:0;font-size:.86rem">Typicky cca 5–7 m podle typu a objednávky (v kódu vždy přesný rozměr, např. <span class="code-chip">6500x2300x1500</span>).</p></div>
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Objemy</h4><p class="muted" style="margin:0;font-size:.86rem">Řádově 10–38 m³ podle výšky bočnic — od nízkých na šrot po vysoké na lehký odpad a štěpku.</p></div>
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Výbava</h4><p class="muted" style="margin:0;font-size:.86rem">Zadní vrata nebo klapka, plachta, síť, víka nebo <b>hydraulická střecha</b> — dle přepravovaného materiálu.</p></div>
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Materiál</h4><p class="muted" style="margin:0;font-size:.86rem">Konstrukční ocel; pro abrazivní materiály (šrot, suť) otěruvzdorné plechy typu Hardox na expozici.</p></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h4 style="margin:0 0 8px">Standardní publikované provedení ELKOPLAST ABR-ACTS</h4>
+      <div style="overflow-x:auto">
+      <table>
+        <tr><th>Konstrukční prvek</th><th>Provedení</th><th>K čemu to je</th></tr>
+        <tr><td>Materiál</td><td>ocel <b>S355</b></td><td>vyšší pevnost při rozumné táře</td></tr>
+        <tr><td>Plechy</td><td><b>5/3</b></td><td>obvykle podlaha 5 mm / bočnice 3 mm — v nabídce vždy potvrdit výkresem</td></tr>
+        <tr><td>Hák</td><td><b>sklopný NS 1570/50</b></td><td>sklopení kvůli železničnímu průjezdnému profilu</td></tr>
+        <tr><td>Přechod podlaha–bočnice</td><td>R200, kulatý roh</td><td>snazší vysypávání, materiál se nezachytává</td></tr>
+        <tr><td>Horní lem</td><td>trubka 89 × 6 mm, S355</td><td>brání rozevírání bočnic</td></tr>
+        <tr><td>Boční výztuhy</td><td>U 120 × 60 × 3 mm à 750 mm</td><td rowspan="2">rošt přenáší bodové a dynamické zatížení železnice</td></tr>
+        <tr><td>Podlahové výztuhy</td><td>U 120 × 60 × 4 mm à 750 mm</td></tr>
+        <tr><td>Zadní profil</td><td>UPN 180</td><td>zpevňuje otvor vrat</td></tr>
+        <tr><td>Železniční rolny</td><td>2 ks, délka 200 mm, trubka 159 × 8 mm</td><td>vedou kontejner po otočném rámu</td></tr>
+        <tr><td>Vrata</td><td>dvoukřídlá (alternativa: klapka)</td><td>univerzální přístup / rychlé vysypání</td></tr>
+        <tr><td>Zakrytí</td><td>rolovací plachta</td><td>ochrana proti úletu a srážkám</td></tr>
+        <tr><td>Jištění</td><td>centrální</td><td><b>nenahrazuje</b> železniční zajištění na otočném rámu</td></tr>
+      </table>
+      </div>
+      <p class="muted" style="margin:10px 0 0;font-size:.88rem">Provedení, rozměry, hrubá hmotnost, kompatibilita s konkrétním vozem a rozsah schválení se vždy stanovují v technické specifikaci zakázky.</p>
+    </div>
+    <div class="callout warn"><b>Pozor při specifikaci:</b> „abroll" ještě neznamená „ACTS". Běžný silniční abroll dle DIN na otočný rám <b>nepatří</b> — chybí mu železniční zesílení a garance kompatibility s rámem. V nabídce pro železniční provoz vždy pracuj s typem <b>ABR-ACTS</b>, ne s běžným ABR-DSD.</div>
+  </div>
+
+  <!-- 4. Vozy, rámy a hmotnostní limity -->
+  <div class="sec" id="s4w">
+    <div class="sec-h"><div class="num">4</div><h3>Vozy, rámy a hmotnostní limity</h3></div>
+    <p class="sec-lead">Maximální hrubá hmotnost není univerzální vlastnost „ACTS kontejneru". Vždy platí nejnižší z limitů celého řetězce.</p>
+    <div class="card">
+      <h4 style="margin:0 0 8px">Rozhodující pravidlo hmotnosti</h4>
+      <p style="margin:0 0 10px;font-size:1.05rem;text-align:center;background:#eef4fb;border-radius:12px;padding:14px"><b>max. náklad = min（limit kontejneru, vozu, otočného rámu, silniční soupravy, schválené trasy）− tára</b></p>
+      <p class="muted" style="margin:0;font-size:.9rem">Silniční limit soupravy je jiný než železniční limit vozu, a ten je jiný než únosnost rámu. Nabídka smí slibovat jen to nejnižší číslo — po ověření celé trasy.</p>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h4 style="margin:0 0 8px">Proč záleží na konkrétním voze (údaje ACTS AG)</h4>
+      <div style="overflow-x:auto">
+      <table>
+        <tr><th>Železniční vůz</th><th>Počet rámů</th><th>Délka kontejneru</th><th>Max. hrubá hmotnost kontejneru</th></tr>
+        <tr><td>Slps-x</td><td>3</td><td>do 5,95 m</td><td><b>16,5 t</b></td></tr>
+        <tr><td>Slnps-x</td><td>3</td><td>do 5,95 m</td><td><b>21 t</b></td></tr>
+        <tr><td>Sgmmns</td><td>2</td><td>do 6,75 m</td><td><b>30 t</b></td></tr>
+        <tr><td>Sggmrs(s)</td><td>4</td><td>7,25 m</td><td><b>20 t</b></td></tr>
+      </table>
+      </div>
+      <p class="muted" style="margin:10px 0 0;font-size:.88rem">Tentýž kontejner tedy smí na jednom voze vézt téměř dvakrát víc než na jiném. Novější řešení GATX (2026) používá <b>čtyři otočné rámy</b> pro kontejnery 5,95 m nebo <b>hybridní 20' jednotky ACTS/ISO</b> (horizontální i jeřábová manipulace) s max. 20 t na kontejner — hybrid je zajímavý obchodní směr.</p>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Objem × hustota — počítej vždy</h4>
+        <p style="margin:0">30 m³ štěpky při 0,30 t/m³ ≈ <b>9 t</b> — v pořádku. Stejný kontejner plný materiálu o hustotě 1,70 t/m³ by vážil <b>51 t</b> — pro ACTS zcela nereálné. <b>Objem nikdy nenavrhuj bez skutečné sypné hustoty</b>; u hustých materiálů narazíš na hmotnostní limit dávno před naplněním.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Rozměrový benchmark trhu</h4>
+        <p style="margin:0" class="muted">Evropská konkurence (Werner &amp; Weber) nabízí ACTS řadu cca <b>13–31 m³</b>: délka ~6,1 m, šířka 2,50–2,55 m, výška 1,27–2,63 m, tára 2,95–5,1 t; provozovatel ACTS AG používá i speciální <b>40 m³</b> kontejnery na velmi lehké materiály. Ber jako orientaci trhu — parametry ELKOPLAST vždy z technické specifikace zakázky.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Kódování v katalogu -->
+  <div class="sec" id="s4">
+    <div class="sec-h"><div class="num">5</div><h3>Kódování ACTS v katalogu ELKOPLAST</h3></div>
+    <p class="sec-lead">ACTS je jeden z typů řady ABROLL. Název výrobku je stavebnice — typ, rozměry, natahování, výbava.</p>
+    <div class="card">
+      <h4 style="margin:0 0 8px">Jak číst kód</h4>
+      <p style="margin:0 0 10px">Základ tvoří typ <span class="code-chip">ABR-ACTS</span> („Železniční kontejner / ACTS container" ze strany 3 kódovací tabulky ABROLL). Za ním následují bloky stejně jako u ostatních abrollů:</p>
+      <p style="margin:0 0 6px"><span class="code-chip">ABR-ACTS</span> → <span class="code-chip">6500x2300x1500-53</span> (d×š×v a objem) → <span class="code-chip">NH1570_60</span> (natahování, oko 1570 mm) → podlaha/bočnice → vrata či klapka (např. <span class="code-chip">KLS</span>) → rolny/čep → střecha nebo plachta (např. <span class="code-chip">SHP</span> = hydraulická střecha, panty vpravo).</p>
+      <p class="muted" style="margin:10px 0 0;font-size:.9rem">Detailně kódování procvičíš ve školení „ABROLL — kódování a konfigurace". Tady stačí vědět: <b>typ ACTS je základ kódu a rozhoduje o železniční kompatibilitě</b>; zbytek stavebnice je shodný s ostatními abrolly.</p>
+    </div>
+    <div class="grid three" style="margin-top:16px">
+      <div class="card"><h4 style="margin:0 0 6px">Reálná zakázka</h4><p class="muted" style="margin:0"><span class="code-chip">ABR-ACTS-WERNER</span> — zákaznické provedení ACTS pro konkrétního odběratele. Zákaznická přípona nikdy nenahrazuje technické zadání.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Reálná zakázka</h4><p class="muted" style="margin:0"><span class="code-chip">ABR-ACTS + hydraulická střecha</span> — na železnici je zakrytí nákladu proti úletu častým požadavkem; hydraulická střecha ho řeší bez ručního plachtování.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Reálná zakázka</h4><p class="muted" style="margin:0"><span class="code-chip">ABR-ACTS-KLS</span> — provedení se zadní klapkou (kód KLS) pro snadné vysypání sypkých materiálů.</p></div>
+    </div>
+    <div class="callout"><b>Nezaměňuj:</b> <span class="code-chip">ABR-DSD</span> = silniční kontejner dle DIN 30722-1, <span class="code-chip">ABR-DSD2</span> = DIN 30722-2, <span class="code-chip">ABR-AFS</span> = francouzská norma AFNOR, <span class="code-chip">ABR-ACTS</span> = <b>železniční systém ACTS</b>. Špatně zvolený typ na začátku kódu znehodnotí celou konfiguraci.</div>
+  </div>
+
+  <!-- 5. Komodity a segmenty -->
+  <div class="sec" id="s5">
+    <div class="sec-h"><div class="num">6</div><h3>Co se v ACTS vozí — volba podle materiálu</h3></div>
+    <p class="sec-lead">Hledej velké, opakující se objemy sypkého či volně loženého materiálu na delší vzdálenost — tam železnice vyhrává.</p>
+    <div class="grid three">
+      <div class="card"><h4 style="margin:0 0 6px">Komunální a tříděný odpad</h4><p class="muted" style="margin:0">Svozové firmy a města: odvoz odpadu do spaloven (ZEVO) a na třídicí linky. Klasické nasazení ACTS — velké objemy, pravidelná linka.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Kovový šrot</h4><p class="muted" style="margin:0">Výkupny a hutě: těžký abrazivní materiál, nižší bočnice, otěruvzdorné plechy. Železnice zvládne hmotnost, kterou silnice vozí neefektivně.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Dřevo, štěpka, biomasa</h4><p class="muted" style="margin:0">Pily, teplárny, elektrárny na biomasu: lehký objemný materiál → vysoké kontejnery, síť nebo plachta proti úletu.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Uhlí a sypké suroviny</h4><p class="muted" style="margin:0">Zásobování tepláren a průmyslu; vysypání klapkou (KLS) nebo vraty. Prašné materiály → zakrytí (víka, střecha).</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Stavební suť a zemina</h4><p class="muted" style="margin:0">Velké stavby a rekultivace: krátké silniční rozvozy okolo nádraží + dálková železniční přeprava.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Kaly a specifické odpady</h4><p class="muted" style="margin:0">ČOV a průmysl: uzavřená provedení s víky či střechou; u zvláštních odpadů vždy ověř legislativu přepravy.</p></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h4 style="margin:0 0 8px">Výchozí řešení podle materiálu</h4>
+      <div style="overflow-x:auto">
+      <table>
+        <tr><th>Materiál</th><th>Výchozí řešení</th><th>Hlavní riziko</th></tr>
+        <tr><td>Štěpka, lehké frakce</td><td>30–40 m³, lehká konstrukce, plachta</td><td>objem, úlet, vlhkost</td></tr>
+        <tr><td>Komunální / průmyslový odpad</td><td>20–30 m³, S355</td><td>proměnlivá hustota, kapalná fáze</td></tr>
+        <tr><td>RDF / SRF (palivo z odpadu)</td><td>26–40 m³, uzavřené zakrytí</td><td>úlet, požární režim</td></tr>
+        <tr><td>Šrot</td><td>13–23 m³, zesílená / otěruvzdorná konstrukce</td><td>rázy, otěr, deformace</td></tr>
+        <tr><td>Zemina, písek, kamenivo</td><td>13–20 m³, nízké těžiště</td><td>hmotnostní limit dřív než objem</td></tr>
+        <tr><td>Mokré materiály, kaly</td><td>těsněné provedení</td><td>únik kapaliny, koroze</td></tr>
+        <tr><td>Nebezpečné věci</td><td>individuální návrh</td><td>ADR/RID, konkrétní UN číslo</td></tr>
+      </table>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h4 style="margin:0 0 8px">Vrata, zakrytí a materiál — co musíš rozlišovat</h4>
+      <p style="margin:0 0 6px"><span class="pill">dvoukřídlá vrata</span> univerzální přístup a ruční vykládání · <span class="pill">horně zavěšená klapka</span> rychlé vysypávání · <span class="pill">kapalinotěsná klapka</span> jen s konstrukčním a zkušebním potvrzením · <span class="pill">otevřené provedení</span> hrubé materiály bez rizika úletu</p>
+      <p style="margin:0 0 6px"><span class="pill">rolovací plachta</span> lehké frakce a ochrana proti srážkám · <span class="pill">zdvihací víko</span> časté plnění, bezpečnější zakrytí · <span class="pill">pevná / hydraulická střecha</span> uzavřený provoz, omezené způsoby plnění</p>
+      <p style="margin:0"><span class="pill">S355</span> standardní průmyslový provoz · <span class="pill">otěruvzdorná ocel</span> šrot, kamenivo, abraziva · <span class="pill">těsněné svary a hladké přechody</span> jemné a mokré materiály</p>
+    </div>
+    <div class="callout warn"><b>Kdo je zákazník:</b> svozové a odpadové firmy, železniční nákladní dopravci a operátoři kombinované dopravy, města a ZEVO, výkupny šrotu, teplárny, pily. Spouštěče: nová linka do spalovny, nedostatek řidičů, ESG/emisní cíle, mýto a ceny nafty.</div>
+  </div>
+
+  <!-- 7. Normy a schvalování -->
+  <div class="sec" id="s6n">
+    <div class="sec-h"><div class="num">7</div><h3>Normy, schvalování a ADR/RID</h3></div>
+    <p class="sec-lead">Tady se nejsnáz udělá chyba, která zákazníka dostane do problémů. Nikdy neslibuj certifikaci, kterou nemáš černou na bílém.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:var(--green-d)">Řada DIN 30722 (aktualizace srpen 2025)</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>DIN 30722-1</b> — systém 1570, vozidla do 26 t</li>
+          <li><b>DIN 30722-2</b> — systém 1570, vozidla do 40 t</li>
+          <li><b>DIN 30722-3</b> — systém 900, vozidla do 12 t</li>
+        </ul>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Rozsah normy <b>není</b> automaticky povolená hrubá hmotnost konkrétního kontejneru — tu určuje řetězec z lekce 4.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:#b5361f">Zrušená DIN 30722-4</h4>
+        <p style="margin:0">Dřívější <b>DIN 30722-4:1994</b> pro silniční a železniční kontejnery je <b>od roku 2007 zrušena</b>. V nabídce se nesmí prezentovat jako platná certifikace — železniční způsobilost se dokládá jinak (viz níže).</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h4 style="margin:0 0 8px">Co je potřeba řešit pro železniční provoz</h4>
+      <p style="margin:0 0 8px">Schválení konstrukce pro konkrétní systém překládky · kompatibilita s otočným rámem a vozem · železniční průjezdný profil · kódování nakládací jednotky · identifikační a kódové tabulky · zkoušky konstrukce a zajištění · pravidla konkrétního železničního podniku.</p>
+      <p class="muted" style="margin:0;font-size:.9rem">Příručka UIC uvádí pro horizontálně překládané výměnné jednotky schvalování dle <b>UIC 591</b> a značení dle <b>UIC 596-6</b> — část starších UIC předpisů ale byla nahrazena novějšími pravidly či smluvními postupy, proto aktuální požadavky vždy ověř u dopravce. Ne-ISO intermodální jednotky se identifikují <b>ILU kódem dle EN 13044-1</b>: 4 písmena vlastníka + 6 číslic + kontrolní číslice.</p>
+    </div>
+    <div class="callout warn"><b>ADR/RID:</b> označení „ACTS" samo o sobě <b>neznamená</b> schválení pro nebezpečné věci. U kusově balených věcí se posuzují obaly, zajištění, značení a režim přepravy; <b>BK1/BK2</b> se týká volně ložených tuhých nebezpečných látek — BK2 (uzavřený kontejner) platí jen tehdy, když je tento způsob povolen pro konkrétní UN číslo a kontejner splní konstrukční a schvalovací požadavky. Pro železnici platí vedle ADR odpovídající RID; rozhodují aktuální <b>ADR 2025 / RID 2025</b>.</div>
+  </div>
+
+  <!-- 6. Výhody a argumentář -->
+  <div class="sec" id="s6">
+    <div class="sec-h"><div class="num">8</div><h3>Argumentář — proč ACTS</h3></div>
+    <p class="sec-lead">Srovnáváš vždy se dvěma alternativami: čistě silniční svoz a klasická jeřábová překládka (velké kontejnery ISO / ABROLL na jeřáb).</p>
+    <div style="overflow-x:auto">
+    <table>
+      <tr><th>Kritérium</th><th>ACTS</th><th>Jeřábová překládka</th><th>Jen silnice</th></tr>
+      <tr><td>Infrastruktura překládky</td><td class="tick">✓ jen zpevněná plocha u koleje</td><td class="cross">terminál s jeřábem</td><td class="cross">—</td></tr>
+      <tr><td>Personál překládky</td><td class="tick">✓ zvládne sám řidič</td><td class="cross">jeřábník + vazač</td><td class="cross">—</td></tr>
+      <tr><td>Čas na kontejner</td><td class="tick">✓ minuty</td><td>delší (manipulace jeřábem)</td><td>—</td></tr>
+      <tr><td>Dálková přeprava velkých objemů</td><td class="tick">✓ po železnici</td><td class="tick">✓ po železnici</td><td class="cross">kamiony, řidiči, mýto</td></tr>
+      <tr><td>Emise CO₂ na tunokilometr</td><td class="tick">✓ výrazně nižší</td><td class="tick">✓ nižší</td><td class="cross">nejvyšší</td></tr>
+      <tr><td>Flexibilita „poslední míle"</td><td class="tick">✓ tentýž kontejner jede po silnici</td><td>překládka nutná</td><td class="tick">✓</td></tr>
+    </table>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="obj"><p class="q">„Nemáme terminál ani jeřáb."</p><p class="a">Přesně proto existuje ACTS. Stačí kolej se zpevněnou plochou — otočný rám na voze a hákový nosič udělají všechno. Nulová investice do překládkové techniky.</p></div>
+      <div class="obj"><p class="q">„Železnice je pomalá a nepružná."</p><p class="a">Dálkový úsek jede vlak, krátké konce auto — a protože jde o tentýž kontejner, nikde se nečeká na přeložení materiálu. Výměna kontejneru na rámu trvá minuty.</p></div>
+      <div class="obj"><p class="q">„Máme už abroll kontejnery, ty použijeme."</p><p class="a">Běžný silniční abroll na otočný rám nepatří — nemá železniční zesílení ani garantovanou kompatibilitu s rámem a aretací. Nabídni provedení ABR-ACTS; nosič na autě zůstává stejný.</p></div>
+      <div class="obj"><p class="q">„Je to drahé."</p><p class="a">Počítej celý řetězec: úspora řidičů a nafty na dálkových trasách, žádný terminál, nižší emise (ESG reporting), kontejner slouží roky. ACTS je investice do logistiky, ne nákup plechu.</p></div>
+      <div class="obj"><p class="q">„Co úlet materiálu za jízdy vlaku?"</p><p class="a">Na železnici je zakrytí nákladu standardní požadavek — nabídni síť, plachtu, víka nebo hydraulickou střechu (reálně dodáváme, viz zakázka ABR-ACTS s hydraulickou střechou).</p></div>
+      <div class="obj"><p class="q">„Kdo nám zaručí, že to na vagon sedne?"</p><p class="a">Typ ABR-ACTS je konstruovaný přímo pro otočné rámy systému ACTS. Do zadání vždy uvedeme provozovatele vozů a typ rámu — kompatibilita je součást technického zadání, ne náhoda.</p></div>
+    </div>
+  </div>
+
+  <!-- 7. Bezpečnost a provoz -->
+  <div class="sec" id="s7">
+    <div class="sec-h"><div class="num">9</div><h3>Bezpečnost a provoz</h3></div>
+    <p class="sec-lead">Železnice odpouští méně než silnice. Tyhle zásady musí znát každý, kdo o ACTS mluví se zákazníkem.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:var(--green-d)">Před jízdou vlaku</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li>Otočný rám v podélné poloze a <b>zaaretovaný</b>; kontejner zajištěný na rámu.</li>
+          <li>Náklad <b>zakrytý</b> (síť/plachta/víka/střecha) a rozložený tak, aby nepřesahoval profil.</li>
+          <li>Vrata a klapky zavřené a zajištěné — na železnici se nesmí nic samovolně otevřít.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:var(--green-d)">Průběžná péče o kontejner</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li>Kontrola <b>hákového oka a rolen</b> — opotřebení či deformace = kontejner mimo provoz do opravy.</li>
+          <li>Kontrola rámu, podlahy a svarů po nárazech; deformovaný kontejner na rám nesedne.</li>
+          <li>Čitelné značení (vlastník, typ, nosnost, tára) a pravidelné revize dle předpisů provozovatele.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout warn"><b>Nikdy:</b> nenatáčej rám bez odjištění silou, nenechávej rám natočený bez dozoru, nepřetahuj kontejner s otevřenými vraty a nepouštěj na železnici kontejner s poškozeným okem nebo rolnami. Jedna vada zastaví celý vlak.</div>
+  </div>
+
+  <!-- 10. Povinné otázky před nabídkou -->
+  <div class="sec" id="s7q">
+    <div class="sec-h"><div class="num">10</div><h3>Povinné otázky před nabídkou</h3></div>
+    <p class="sec-lead">Bez těchto údajů nesmíš potvrdit užitečné zatížení, plný využitelný objem, železniční kompatibilitu ani ADR/RID způsobilost. Vytiskni si to jako checklist.</p>
+    <div class="grid three">
+      <div class="card">
+        <h4 style="margin:0 0 8px;color:var(--green-d)">Materiál a hmotnost</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li>přesný název materiálu + <b>fotografie frakce</b></li>
+          <li>minimální, průměrná a maximální <b>sypná hustota</b></li>
+          <li>hmotnost jedné plánované dávky</li>
+          <li>požadovaný objem a způsob plnění</li>
+          <li>korozní a abrazivní vlastnosti</li>
+          <li>četnost přepravních a vyklápěcích cyklů</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px;color:var(--rail)">Technika a kompatibilita</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li>způsob vyprazdňování (vrata / klapka / otevřené)</li>
+          <li>typ silničního nosiče — <b>hák, nebo řetěz</b></li>
+          <li>typ <b>železničního vozu a otočného rámu</b></li>
+          <li>max. hrubá hmotnost na konkrétní trase</li>
+          <li>požadavek na těsnost, zakrytí a jištění</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px;color:#9a6a0d">Legislativa a provoz</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li>UN číslo a ADR/RID režim (pokud připadá v úvahu)</li>
+          <li>požadované zkoušky, označení a dokumentace</li>
+          <li>země provozu a provozovatel železniční dopravy</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><b>Výstup:</b> teprve s kompletními odpověďmi lze sestavit úplný kód ABR-ACTS-…, potvrdit hmotnosti a slíbit kompatibilitu. Nabídka „od stolu" bez těchto dat je u železnice hazard.</div>
+  </div>
+
+  <!-- 11. Modelové situace -->
+  <div class="sec" id="s8">
+    <div class="sec-h"><div class="num">11</div><h3>Modelové situace</h3></div>
+    <p class="sec-lead">Zkus si odpovědět sám, pak rozklikni doporučené řešení.</p>
+    <details class="scenario"><summary>Svozová firma vozí komunální odpad 180 km do ZEVO třemi kamiony denně a řeší nedostatek řidičů.</summary>
+      <div class="answer"><b>Doporučení:</b> klasický ACTS případ. Dálkový úsek převést na železnici (vůz s otočnými rámy = 3 kontejnery), auta s hákovými nosiči nechat jen na svoz „posledních kilometrů" u nakládky a vykládky. Nabídni vysoké kontejnery ABR-ACTS se zakrytím (síť nebo hydraulická střecha) a klapkou/vraty podle technologie ZEVO. Argument: méně dálkových jízd = méně řidičů, nafty, mýta a emisí.</div>
+    </details>
+    <details class="scenario"><summary>Výkupna šrotu chce „nějaké abrolly na vlak" a tvrdí, že jim stačí ty, co už mají na autech.</summary>
+      <div class="answer"><b>Doporučení:</b> vysvětli rozdíl: běžný silniční abroll nemá železniční zesílení ani garantovanou kompatibilitu s otočným rámem. Pro železnici nabídni ABR-ACTS v nižším, zesíleném provedení s otěruvzdornými plechy (šrot je abrazivní a hutný — rozhoduje nosnost, ne objem). Jejich stávající hákové nosiče na autech zůstávají beze změny.</div>
+    </details>
+    <details class="scenario"><summary>Teplárna poptává přepravu štěpky po železnici a bojí se úletu materiálu a deště.</summary>
+      <div class="answer"><b>Doporučení:</b> štěpka je lehká a objemná → vysoké kontejnery ABR-ACTS (velký objem), zakrytí proti úletu a vodě: plachta, víka, nebo komfortně hydraulická střecha (kód SHP/SHL), kterou obsluha ovládá bez lezení nahoru. Vysypání vraty nebo klapkou dle zásobníku teplárny.</div>
+    </details>
+    <details class="scenario"><summary>Zákazník chce nabídku „ACTS 7 m s hydraulickou střechou" — co všechno si vyžádáš do zadání?</summary>
+      <div class="answer"><b>Checklist zadání:</b> ① přepravovaný materiál a jeho hustota (určí výšku/objem a plechy), ② přesné rozměry a objem, ③ provozovatel vozů a typ otočného rámu (kompatibilita), ④ způsob vyprazdňování (vrata/klapka/sklopné čelo), ⑤ zakrytí (střecha SHP/SHL, plachta, síť), ⑥ natahování NH1570 /50 nebo /60 dle nosičů zákazníka, ⑦ počet kusů a termín. Výsledkem je úplný kód ABR-ACTS-… bez dohadů.</div>
+    </details>
+  </div>
+
+  <!-- 9. Videa z praxe -->
+  <div class="sec" id="s9v">
+    <div class="sec-h"><div class="num">12</div><h3>Videa z praxe — jak překládka reálně vypadá</h3></div>
+    <p class="sec-lead">Oficiální záběry švýcarské ACTS AG (provozovatel systému). Čtyři krátká videa pokrývají obě operace i oba typy nosičů — všímej si natočení rámu, najetí vozidla a toho, že vše obsluhuje jediný člověk.</p>
+    <div class="grid two">
+      <div class="card" style="padding:14px">
+        <div style="position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000">
+          <iframe src="https://www.youtube-nocookie.com/embed/nFZeUHnvzDQ" title="ACTS: vykládka kontejneru z vagonu hákovým nosičem" style="position:absolute;inset:0;width:100%;height:100%;border:0" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <h4 style="margin:12px 0 4px">Vykládka z vagonu — hákový nosič <span class="pill rail">2:11</span></h4>
+        <p class="muted" style="margin:0;font-size:.88rem">Otočný rám se natočí k vozidlu, hák zaklesne do oka (1570 mm) a kontejner se přetáhne po rolnách na auto. Přesně sekvence z lekce 2.</p>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000">
+          <iframe src="https://www.youtube-nocookie.com/embed/paU3JvGbgnY" title="ACTS: nakládka kontejneru na vagon hákovým nosičem" style="position:absolute;inset:0;width:100%;height:100%;border:0" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <h4 style="margin:12px 0 4px">Nakládka na vagon — hákový nosič <span class="pill rail">2:30</span></h4>
+        <p class="muted" style="margin:0;font-size:.88rem">Opačný směr: vozidlo nasune kontejner na natočený rám, rám se vrátí do podélné polohy a zaaretuje před jízdou vlaku.</p>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000">
+          <iframe src="https://www.youtube-nocookie.com/embed/9-RNneXIltI" title="ACTS: vykládka kontejneru z vagonu řetězovým nosičem" style="position:absolute;inset:0;width:100%;height:100%;border:0" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <h4 style="margin:12px 0 4px">Vykládka z vagonu — řetězový nosič <span class="pill rail">2:41</span></h4>
+        <p class="muted" style="margin:0;font-size:.88rem">Stejná překládka s řetězovým natahováním (v kódování rozlišujeme řetězové a lanové provedení, kódy NR/NL). Zvládne i těžký 30t kontejner.</p>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000">
+          <iframe src="https://www.youtube-nocookie.com/embed/1gF69wOC51Y" title="ACTS: nakládka kontejneru na vagon řetězovým nosičem" style="position:absolute;inset:0;width:100%;height:100%;border:0" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </div>
+        <h4 style="margin:12px 0 4px">Nakládka na vagon — řetězový nosič <span class="pill rail">3:16</span></h4>
+        <p class="muted" style="margin:0;font-size:.88rem">Kompletní nakládka řetězovým nosičem včetně vyrovnání kontejneru na vedení rámu a zajištění.</p>
+      </div>
+    </div>
+    <div class="callout rail"><b>Tip pro obchodníka:</b> tahle videa klidně pošli zákazníkovi, který si neumí překládku představit — dvě minuty záběrů řeknou víc než hodina argumentace. Zdroj: oficiální YouTube kanál <a href="https://www.youtube.com/@actsabroll-container-trans3840" target="_blank" rel="noopener" style="color:var(--rail);font-weight:800">ACTS Abroll-Container-Transport-Service AG</a>.</div>
+  </div>
+
+  <!-- 13. Test -->
+  <div class="sec" id="s9">
+    <div class="sec-h"><div class="num">13</div><h3>Závěrečný test</h3></div>
+    <p class="sec-lead" id="testLead">Pro splnění potřebuješ alespoň 80 %. Výsledek se ukládá vedení, máš max 3 pokusy.</p>
+    <div id="attInfo" class="att-info" style="margin:0 0 14px"></div>
+    <div id="quiz"></div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:4px">
+      <button class="btn" id="finishBtn" onclick="finishQuiz()">Vyhodnotit test</button>
+      <button class="btn ghost" onclick="document.getElementById('s1').scrollIntoView()">↑ Zpět na začátek</button>
+    </div>
+    <div class="result" id="result"></div>
+  </div>
+</div>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+/* ---- Test ---- */
+var QUESTIONS = [
+  { cat:'Systém', q:'Co znamená zkratka ACTS?',
+    opts:['Abroll-Container-Transport-System','Automatic Container Terminal Service','Advanced Cargo Train Standard','Abfall-Container-Technik-Standard'], a:0,
+    why:'ACTS = Abroll-Container-Transport-System — systém kombinované dopravy odvalovacích kontejnerů silnice–železnice, vyvinutý ve Švýcarsku v 80. letech.' },
+  { cat:'Systém', q:'V čem je základní myšlenka systému ACTS?',
+    opts:['Nepřekládá se materiál, ale celý kontejner mezi silnicí a železnicí','Materiál se na terminálu přesype do vagonu','Kontejnery se na vagony zvedají jeřábem','Odpad se lisuje do balíků a páskuje'], a:0,
+    why:'Tentýž kontejner projede celým řetězcem: naplní se u původce, po silnici dojede ke koleji, dálkovou trasu ujede po železnici — materiál se nikde nepřesypává.' },
+  { cat:'Překládka', q:'Jak probíhá překládka kontejneru mezi vagonem a autem?',
+    opts:['Horizontálně — hákový nosič přetáhne kontejner přes natočený otočný rám','Vertikálně jeřábem s vahadlem','Vysokozdvižným vozíkem z čela','Sklopením celého vagonu'], a:0,
+    why:'Otočný rám vagonu se natočí do boku a hydraulika hákového nosiče kontejner horizontálně přetáhne po rolnách. Žádný jeřáb není potřeba.' },
+  { cat:'Překládka', q:'Co je k překládce ACTS potřeba na místě u koleje?',
+    opts:['Jen zpevněná plocha vedle koleje','Portálový jeřáb','Překládková rampa se zdvihem','Terminál s vahadly a spreadery'], a:0,
+    why:'Právě nulová potřeba překládkové infrastruktury je hlavní výhoda ACTS — stačí kolej a zpevněná plocha pro najetí vozidla.' },
+  { cat:'Překládka', q:'Kolik lidí typicky zvládne výměnu kontejneru na otočném rámu?',
+    opts:['Jeden — řidič vozidla s hákovým nosičem','Minimálně čtyři','Jeřábník, vazač a signalista','Celá směna terminálu'], a:0,
+    why:'Řidič sám odjistí a natočí rám, zahákne oko a kontejner přetáhne. Výměna trvá řádově minuty.' },
+  { cat:'Překládka', q:'Kolik kontejnerů nese železniční vůz systému ACTS?',
+    opts:['Podle typu vozu 2–4 — jeden na každém otočném rámu','Vždy přesně tři','Šest ve dvou vrstvách','Vždy jeden'], a:0,
+    why:'Jeden rám = jeden kontejner, ale počet rámů závisí na voze: Slps-x a Slnps-x mají 3, Sgmmns 2, Sggmrs(s) a nové řešení GATX 4.' },
+  { cat:'Konstrukce', q:'V jaké výšce je hákové oko ACTS kontejneru (kód natahování v katalogu)?',
+    opts:['1570 mm — kód NH1570','1000 mm — kód NH1000','2300 mm — kód NH2300','Výška je libovolná'], a:0,
+    why:'Hákové oko je ve výšce 1570 mm — v kódu natahování NH1570 (/50 nebo /60 dle průměru). Standardní publikované provedení ELKOPLAST má sklopný hák NS 1570/50 kvůli železničnímu profilu.' },
+  { cat:'Konstrukce', q:'Po čem se kontejner odvaluje při přetahování mezi rámem a vozidlem?',
+    opts:['Po zadních rolnách','Po vzduchovém polštáři','Po kolejničkách s kuličkami','Smýká se po ocelovém plechu'], a:0,
+    why:'Odvalovací (abroll) kontejner má vzadu rolny — po nich se odvaluje po vedení rámu i po nosiči vozidla.' },
+  { cat:'Konstrukce', q:'Čím se ACTS kontejner liší od běžného silničního abrollu?',
+    opts:['Zesílenou konstrukcí pro železnici a kompatibilitou s otočným rámem včetně zajištění','Jen barvou','Nemá hákové oko','Je vždy z hliníku'], a:0,
+    why:'Železnice znamená tvrdší rázy a vibrace → zesílený rám a podlaha; kontejner musí přesně sednout do vedení a aretace otočného rámu.' },
+  { cat:'Konstrukce', q:'Proč se u ACTS kontejnerů hlídá šířka (cca do 2,5 m) a celková výška?',
+    opts:['Kvůli průjezdnému profilu železniční dráhy','Kvůli ceně laku','Kvůli hmotnosti prázdného kontejneru','Kvůli šířce silnic'], a:0,
+    why:'Na železnici musí souprava projet průjezdným profilem dráhy — proto je u ACTS limitovaná šířka i výška přísněji než u čistě silničního provozu.' },
+  { cat:'Kódování', q:'Jakým kódem začíná železniční ACTS kontejner v katalogu ELKOPLAST?',
+    opts:['ABR-ACTS','ABR-DSD','ABR-AFS','ABR-HBI'], a:0,
+    why:'ABR-ACTS = „Železniční kontejner / ACTS container". ABR-DSD je silniční DIN 30722-1, ABR-AFS francouzská AFNOR, ABR-HBI hardoxové provedení.' },
+  { cat:'Kódování', q:'Co v kódu znamená blok 6500x2300x1500-53?',
+    opts:['Rozměry d×š×v v mm a objem','Číslo zakázky','Hmotnost a nosnost','Rok výroby a sérii'], a:0,
+    why:'Za typem následuje rozměrový blok: délka × šířka × výška v milimetrech a objem. Kód je stavebnice: typ → rozměry → natahování → výbava.' },
+  { cat:'Kódování', q:'Které kódy označují hydraulicky ovládanou střechu (panty vpravo/vlevo)?',
+    opts:['SHP / SHL','KLS / KLP','NH1570/50 / NH1570/60','NR / NL'], a:0,
+    why:'SHP = střecha hydraulická, panty vpravo; SHL = panty vlevo. KLS je klapka, NH1570 natahování, NR/NL řetězové vs. lanové natahování.' },
+  { cat:'Kódování', q:'Zákazník objedná běžný ABR-DSD a chce s ním jezdit na vagonech ACTS. Co je správně?',
+    opts:['Upozornit ho a nabídnout provedení ABR-ACTS — silniční abroll na otočný rám nepatří','Nechat to být, je to totéž','Doporučit mu jen silnější plachtu','Poslat ho ke konkurenci'], a:0,
+    why:'Běžný silniční abroll nemá železniční zesílení ani garantovanou kompatibilitu s rámem a aretací. Pro železnici vždy typ ABR-ACTS.' },
+  { cat:'Použití', q:'Který materiálový tok je pro ACTS nejtypičtější?',
+    opts:['Komunální odpad na dlouhou vzdálenost do spalovny (ZEVO)','Čerstvé potraviny v chladicím řetězci','Kusové zásilky e-shopů','Přeprava osobních aut'], a:0,
+    why:'Klasické nasazení ACTS: svoz komunálního a tříděného odpadu do ZEVO a na třídicí linky — velké pravidelné objemy na delší vzdálenost. Dále šrot, dřevo/štěpka, uhlí, suť.' },
+  { cat:'Použití', q:'Jak řešíš u štěpky nebo lehkého odpadu riziko úletu materiálu za jízdy vlaku?',
+    opts:['Zakrytím: síť, plachta, víka nebo hydraulická střecha','Nižší rychlostí vlaku','Ničím, na železnici se to neřeší','Postřikem vodou'], a:0,
+    why:'Na železnici je zakrytí nákladu standardní požadavek. Nabízíme síť, plachtu, víka i hydraulickou střechu (SHP/SHL) — reálně dodané u zakázky ABR-ACTS.' },
+  { cat:'Argumentace', q:'Zákazník: „Nemáme terminál ani jeřáb." Správná reakce?',
+    opts:['ACTS jeřáb ani terminál nepotřebuje — stačí zpevněná plocha u koleje','Nabídnout mu stavbu jeřábu','Vzdát to','Doporučit leteckou přepravu'], a:0,
+    why:'Nulová investice do překládkové techniky je hlavní argument ACTS: otočný rám + hákový nosič + rolny nahradí celý terminál.' },
+  { cat:'Argumentace', q:'Jaké provozní úspory ACTS zákazníkovi přináší oproti čistě silničnímu svozu?',
+    opts:['Méně dálkových jízd kamionů: úspora řidičů, nafty, mýta a emisí CO₂','Levnější pojištění budov','Nižší cenu elektřiny','Úsporu skladových regálů'], a:0,
+    why:'Dálkový úsek jede vlak, auta jen krátké konce. Ušetří se řidiči (kterých je nedostatek), palivo, mýto a výrazně klesnou emise na tunokilometr.' },
+  { cat:'Bezpečnost', q:'Co musí platit, než se vlak s ACTS kontejnery rozjede?',
+    opts:['Rámy v podélné poloze a zaaretované, kontejnery zajištěné, náklad zakrytý, vrata zavřená','Stačí zavřená vrata','Kontejnery mohou zůstat na natočených rámech','Nic zvláštního'], a:0,
+    why:'Před jízdou: rám podélně + aretace, kontejner zajištěný na rámu, náklad zakrytý a v profilu, vrata i klapky zavřené a zajištěné.' },
+  { cat:'Bezpečnost', q:'Kontejner má deformované hákové oko nebo poškozené rolny. Co s ním?',
+    opts:['Mimo provoz do opravy — na železnici nesmí','Používat dál, dokud drží','Jen ho víc namazat','Otočit ho okem dozadu'], a:0,
+    why:'Oko a rolny jsou nosné prvky celé manipulace. Deformace = kontejner mimo provoz; jedna vada dokáže zastavit celý vlak.' },
+  { cat:'Obchod', q:'Co si u poptávky ACTS vždy vyžádáš do technického zadání?',
+    opts:['Materiál, rozměry/objem, provozovatele vozů a typ rámu, způsob vyprazdňování, zakrytí, natahování a počet kusů','Jen barvu a termín','Jen cenu konkurence','Nic, vše je standard'], a:0,
+    why:'Checklist zadání: materiál a hustota, rozměry a objem, kompatibilita s rámem (provozovatel vozů), vrata/klapka, zakrytí, NH1570 /50 nebo /60, počet kusů a termín.' },
+  { cat:'Hmotnost', q:'Jak se určí maximální možný náklad ACTS kontejneru?',
+    opts:['Nejnižším z limitů kontejneru, vozu, otočného rámu, silniční soupravy a schválené trasy, minus tára','Vždy jen objemem kontejneru','Vždy únosností silničního nosiče','Normou DIN automaticky pro všechny případy'], a:0,
+    why:'Max. náklad = min(limit kontejneru, vozu, rámu, silniční soupravy, trasy) − tára. Např. na voze Slps-x smí kontejner vážit 16,5 t, na Sgmmns až 30 t.' },
+  { cat:'Hmotnost', q:'Zákazník chce 30 m³ kontejner na materiál s hustotou 1,7 t/m³. Co je správně?',
+    opts:['Upozornit, že plný by vážil cca 51 t — u hustých materiálů rozhoduje hmotnostní limit, ne objem','Prodat 30 m³, objem je objem','Doporučit ještě vyšší bočnice','Nic neřešit, vlak unese všechno'], a:0,
+    why:'30 m³ × 1,7 t/m³ = 51 t — pro ACTS nereálné. Pro srovnání: štěpka 0,3 t/m³ dá v 30 m³ jen cca 9 t. Objem se navrhuje vždy ze skutečné sypné hustoty.' },
+  { cat:'Překládka', q:'Jaké jsou referenční požadavky ACTS AG/SBB na překladiště?',
+    opts:['Rovná kolej, zpevněná plocha cca 25×15 m na vůz, odstupy od kolejí, zabrzděný vůz, případně vypnutá a uzemněná trolej','Stačí jakékoli pole u trati','Vyžaduje se portálový jeřáb','Nutná je krytá hala'], a:0,
+    why:'Benchmark ACTS AG/SBB: rovná a vodorovná kolej, plocha ~25×15 m v úrovni temene kolejnice, min. 5 m od hlavní koleje, zabrzděný vůz, režim sousedních kolejí, případně vypnutá a uzemněná trolej. Každé místo potvrzuje provozovatel infrastruktury.' },
+  { cat:'Normy', q:'Jak je to s normou DIN 30722-4 pro silniční a železniční kontejnery?',
+    opts:['Je od roku 2007 zrušena — nesmí se v nabídce prezentovat jako platná certifikace','Je to aktuální norma pro ACTS','Platí jen ve Švýcarsku','Nahrazuje ADR'], a:0,
+    why:'DIN 30722-4:1994 je od 2007 zrušena. Aktuální řada (08/2025): -1 systém 1570 do 26 t, -2 systém 1570 do 40 t, -3 systém 900 do 12 t. Železniční způsobilost se dokládá schválením konstrukce a kompatibility, ne zrušenou normou.' },
+  { cat:'Normy', q:'Čím se identifikuje ne-ISO intermodální jednotka (např. ACTS kontejner)?',
+    opts:['ILU kódem dle EN 13044-1 — 4 písmena vlastníka + 6 číslic + kontrolní číslice','SPZ tahače','Číslem faktury','QR kódem výrobce'], a:0,
+    why:'ILU kód dle EN 13044-1 identifikuje ne-ISO intermodální jednotky: čtyři písmena vlastníka, šest číslic a kontrolní číslice.' },
+  { cat:'ADR/RID', q:'Znamená označení „ACTS" automaticky schválení pro přepravu nebezpečných věcí?',
+    opts:['Ne — ADR/RID se řeší samostatně; BK2 platí jen pro povolená UN čísla a schválený kontejner','Ano, ACTS = ADR i RID','Ano, pokud má kontejner plachtu','Jen při přepravě do 50 km'], a:0,
+    why:'ACTS není ADR/RID schválení. BK1/BK2 se týká volně ložených tuhých nebezpečných látek; BK2 jen když to povoluje konkrétní UN číslo a kontejner splní konstrukční a schvalovací požadavky. Rozhodují ADR 2025 / RID 2025.' }
+];
+
+/* Zamíchání odpovědí — správná odpověď nesmí být vždy první; index a se přepočítá */
+QUESTIONS.forEach(function(q){ var correct=q.opts[q.a]; for(var i=q.opts.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=q.opts[i]; q.opts[i]=q.opts[j]; q.opts[j]=t; } q.a=q.opts.indexOf(correct); });
+
+var answers = {};
+(function setTestLead(){
+  var el=document.getElementById('testLead'); if(!el) return;
+  var need=Math.ceil(QUESTIONS.length*0.8);
+  el.textContent=QUESTIONS.length+' otázek. Pro splnění potřebuješ alespoň 80 % ('+need+' správně). Výsledek se ukládá vedení, máš max 3 pokusy.';
+})();
+(function renderQuiz(){
+  var host=document.getElementById('quiz');
+  host.innerHTML = QUESTIONS.map(function(q,i){
+    var opts = q.opts.map(function(o,oi){ return '<button data-q="'+i+'" data-o="'+oi+'" onclick="pick('+i+','+oi+')">'+esc(o)+'</button>'; }).join('');
+    return '<div class="quiz-card" data-card="'+i+'"><div class="quiz-cat">'+esc(q.cat)+' · otázka '+(i+1)+'/'+QUESTIONS.length+'</div>'+
+      '<div class="quiz-q">'+esc(q.q)+'</div><div class="quiz-opts">'+opts+'</div>'+
+      '<div class="feedback" data-fb="'+i+'"></div></div>';
+  }).join('');
+})();
+function pick(qi,oi){
+  if(AX.locked) return;
+  answers[qi]=oi; updateProgress();
+  var card=document.querySelector('.quiz-card[data-card="'+qi+'"]');
+  card.querySelectorAll('button').forEach(function(b){ b.classList.remove('correct','wrong'); var o=Number(b.dataset.o);
+    if(o===QUESTIONS[qi].a) b.classList.add('correct'); else if(o===oi) b.classList.add('wrong'); });
+  var fb=card.querySelector('.feedback'); fb.style.display='block';
+  fb.innerHTML=(oi===QUESTIONS[qi].a?'<b style="color:#2f7430">Správně.</b> ':'<b style="color:#932b2b">Nesprávně.</b> ')+esc(QUESTIONS[qi].why);
+}
+function updateProgress(){
+  var done=Object.keys(answers).length, pct=Math.round(done/QUESTIONS.length*100);
+  document.getElementById('pbar').style.width=pct+'%';
+  document.getElementById('plabel').textContent=pct+' %';
+}
+
+/* ---- Napojení na intranet: identita + limit 3 pokusů + odeslání výsledku ---- */
+var AX = { email:'', name:'', attemptsUsed:0, locked:false };
+(function(){ try{ var h=location.hash||''; var me=(h.match(/kdo=([^&]+)/i)||[])[1]; var nm=(h.match(/jmeno=([^&]+)/i)||[])[1]; if(me) AX.email=decodeURIComponent(me); if(nm) AX.name=decodeURIComponent(nm); }catch(e){} })();
+function lockUI(){ var b=document.getElementById('finishBtn'); if(b){ b.disabled=true; b.textContent='Pokusy vyčerpány (3/3)'; } }
+function setAttInfo(t){ var el=document.getElementById('attInfo'); if(el) el.textContent=t; }
+(async function initStatus(){
+  if(!AX.email){ setAttInfo('Test si můžeš vyzkoušet; výsledek se ukládá jen po přihlášení v intranetu.'); return; }
+  try{ var j=await (await fetch('/api/acts-skoleni?email='+encodeURIComponent(AX.email),{cache:'no-store'})).json();
+    AX.attemptsUsed=(j&&j.attemptsUsed)||0;
+    if(AX.attemptsUsed>=3){ AX.locked=true; lockUI(); setAttInfo('Vyčerpal(a) jsi všechny 3 pokusy'+(j.best?(' · nejlepší výsledek '+j.best+' %'):'')+'.'); }
+    else setAttInfo(AX.attemptsUsed>0 ? ('Využito pokusů: '+AX.attemptsUsed+' / 3'+(j.best?(' · nejlepší '+j.best+' %'):'')) : 'Máš 3 pokusy na splnění testu (hranice 80 %).');
+  }catch(e){ setAttInfo('Máš 3 pokusy na splnění testu (hranice 80 %).'); }
+})();
+async function finishQuiz(){
+  if(AX.locked){ lockUI(); return; }
+  var total=QUESTIONS.length, correct=0;
+  QUESTIONS.forEach(function(q,i){ if(answers[i]===q.a) correct++; });
+  var pct=Math.round(correct/total*100), passed=pct>=80;
+  QUESTIONS.forEach(function(q,i){
+    var card=document.querySelector('.quiz-card[data-card="'+i+'"]');
+    card.querySelectorAll('button').forEach(function(b){ var o=Number(b.dataset.o);
+      b.classList.remove('correct','wrong'); if(o===q.a) b.classList.add('correct'); else if(answers[i]===o) b.classList.add('wrong'); });
+    var fb=card.querySelector('.feedback'); fb.style.display='block';
+    fb.innerHTML=(answers[i]===q.a?'<b style="color:#2f7430">Správně.</b> ':'<b style="color:#932b2b">Nesprávně.</b> ')+esc(q.why);
+  });
+  var note='';
+  if(AX.email){
+    try{ var j=await (await fetch('/api/acts-skoleni',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:AX.email,name:AX.name,correct:correct,total:total,pct:pct,passed:passed})})).json();
+      if(j&&j.blocked){ AX.locked=true; AX.attemptsUsed=3; lockUI(); note='<p style="color:#932b2b;font-weight:800;margin:8px 0 0">Vyčerpal(a) jsi všechny 3 pokusy — tento výsledek se už neuložil.</p>'; }
+      else if(j&&j.ok){ AX.attemptsUsed=j.attempt; if(j.attemptsLeft<=0){ AX.locked=true; lockUI(); }
+        note='<p style="margin:8px 0 0"><strong>Pokus '+j.attempt+' ze 3.</strong> '+(j.attemptsLeft>0?('Zbývají '+j.attemptsLeft+' pokusy.'):'Toto byl poslední pokus.')+' Výsledek byl odeslán vedení.</p>'; }
+      setAttInfo(AX.locked?'Pokusy vyčerpány (3/3).':('Využito pokusů: '+AX.attemptsUsed+' / 3'));
+    }catch(e){}
+  }
+  var r=document.getElementById('result'); r.style.display='block';
+  r.innerHTML='<h3 style="margin:0 0 6px">Výsledek testu</h3><div class="score-big">'+pct+' %</div>'+
+    '<p style="margin:6px 0 0">'+correct+'/'+total+' správně. '+(passed?'<b style="color:#2f7430">Splněno ✓</b>':'Nesplněno — doporučujeme zopakovat lekce u špatně zodpovězených otázek.')+'</p>'+note;
+  document.getElementById('pbar').style.width='100%'; document.getElementById('plabel').textContent=pct+' %';
+  r.scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
