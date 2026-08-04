@@ -2435,6 +2435,44 @@ const server = http.createServer(async (req, res) => {
       });
     }
     // ---- „Zobrazit jako zaměstnanec" (impersonace, jen skutečný admin) ----
+    // ---- Školení: pozvánky k absolvování (jen správce) ----
+    if (p === '/api/skoleni/lide' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Jen správce.' });
+      const s = readJson(STATE_F, { employees: [] });
+      const list = (s.employees || []).filter(x => x && x.email).map(x => ({ email: x.email, name: x.name || x.email }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'));
+      return send(res, 200, { lide: list });
+    }
+    if (p === '/api/skoleni/pozvat' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Jen správce.' });
+      let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const SKOLENI_NAZVY = {
+        prumysl: 'Průmysl — obchodník segmentu Skladování',
+        loxxer: 'LOXXER — protipožární skříně na Li-Ion baterie',
+        kovo: 'Produkty KOVO — kovové výrobky',
+        roto: 'Produkty ROTO — plastové výrobky',
+        abroll: 'ABROLL — kódování a konfigurace',
+      };
+      const nazev = SKOLENI_NAZVY[String(b.skoleni || '')];
+      if (!nazev) return send(res, 400, { error: 'Neznámé školení.' });
+      const emails = (Array.isArray(b.emails) ? b.emails : []).map(e => String(e || '').trim().toLowerCase()).filter(e => /^[^@\s]+@[^@\s]+$/.test(e));
+      if (!emails.length) return send(res, 400, { error: 'Vyberte alespoň jednoho příjemce.' });
+      const poznamka = String(b.poznamka || '').trim().slice(0, 1000);
+      const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+      const link = proto + '://' + (req.headers['x-forwarded-host'] || req.headers.host || 'intranet.elkoplast.cz') + '/#modul=skoleni';
+      const me = empSession(req) || { email: '', name: 'správce' };
+      const text = 'Dobrý den,\n\nzveme vás k absolvování školení v intranetu ELKOPLAST:\n\n  ' + nazev + '\n\n'
+        + (poznamka ? 'Poznámka od správce: ' + poznamka + '\n\n' : '')
+        + 'Školení otevřete v intranetu v sekci Školení:\n' + link + '\n\n'
+        + 'Na konci školení je závěrečný test — hranice splnění 80 %, max. 3 pokusy.\n\nDěkujeme.\nIntranet ELKOPLAST';
+      const chyby = []; let sent = 0;
+      for (const to of emails) {
+        try { await deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST', subject: 'Pozvánka ke školení: ' + nazev, text, html: toHtml(text, '') }); sent++; }
+        catch (e) { chyby.push(to + ': ' + String(e.message || e)); }
+      }
+      logActivity('skoleni-pozvanka', { email: me.email, name: me.name }, 'Pozvánka ke školení „' + nazev + '" → ' + sent + '/' + emails.length + ' příjemců' + (chyby.length ? ' (chyby: ' + chyby.length + ')' : ''));
+      return send(res, 200, { ok: true, sent, chyby });
+    }
     if (p === '/api/view-as/employees' && req.method === 'GET') {
       if (!isRealAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const s = readJson(STATE_F, { employees: [] });

@@ -1457,6 +1457,9 @@ async function initIntranet(){
   MUJ.poptavkyNew = (typeof me.poptavkyNew==="number") ? me.poptavkyNew : 0;
   await refreshMy();
   showDashboard();
+  // Deep-link z e-mailů: /#modul=skoleni (i kontejnery ap.) otevře rovnou danou sekci.
+  const dm=location.hash.match(/modul=([a-z0-9]+)/i);
+  if(dm){ let k=dm[1].toLowerCase(); if(k==='kontejnery') k='poptavky'; try{ mjGo(k); }catch(e){} }
   // Živá aktualizace počtu nových poptávek (odznak v menu) — á 90 s.
   if(!MUJ._poptavkyTimer){ MUJ._poptavkyTimer = setInterval(async function(){
     try{ const m = await (await fetch("/api/me",{cache:"no-store"})).json();
@@ -2673,34 +2676,89 @@ async function showSkoleni(){
   try{ pst=await (await fetch('/api/prumysl?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ lst=await (await fetch('/api/loxxer-skoleni?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   const kb=skolBadgeBtn(kst), rb=skolBadgeBtn(rst), pb=skolBadgeBtn(pst), lb=skolBadgeBtn(lst);
-  let h='<div class="dash-hero"><h2>Školení</h2><p>Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).</p></div>';
+  // Správce může kohokoli pozvat k absolvování (e-mailová pozvánka) — u všech školení.
+  const inv=(key,nazev)=>MUJ.admin?'<button class="btn ghost sm" title="Pozvat zaměstnance k absolvování" onclick="skolPozvat(\''+key+'\',\''+nazev.replace(/'/g,"\\'")+'\')">✉ Pozvat</button>':'';
+  let h='<div class="dash-hero"><h2>Školení</h2><p>Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).'+(MUJ.admin?' Jako správce můžete tlačítkem „✉ Pozvat" poslat komukoli e-mailovou pozvánku k absolvování.':'')+'</p></div>';
   h+='<div class="dash-sec">Dostupná školení</div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">Průmysl — obchodník segmentu Skladování</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">Produktové kategorie skladování, Li-Ion baterie (rizika a příležitost), požární předpisy a ADR přeprava + závěrečný test</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+pb.badge+
+     '<div style="display:flex;align-items:center;gap:10px">'+pb.badge+inv('prumysl','Průmysl — obchodník segmentu Skladování')+
      '<button class="btn sm" onclick="openPrumysl()">'+pb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">LOXXER — protipožární skříně na Li-Ion baterie</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">Riziko lithiových požárů, princip a modelová řada LOXXER, cílové segmenty, prodej vs. pronájem a argumentář + závěrečný test</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+lb.badge+
+     '<div style="display:flex;align-items:center;gap:10px">'+lb.badge+inv('loxxer','LOXXER — protipožární skříně na Li-Ion baterie')+
      '<button class="btn sm" onclick="openLoxxerSkoleni()">'+lb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">Produkty KOVO — kovové výrobky</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">Ocelové kontejnery, muldy, nádoby na separovaný sběr, záchytné vany a boxy + závěrečný test</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+kb.badge+
+     '<div style="display:flex;align-items:center;gap:10px">'+kb.badge+inv('kovo','Produkty KOVO — kovové výrobky')+
      '<button class="btn sm" onclick="openProdukty(\'kovo\')">'+kb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">Produkty ROTO — plastové výrobky</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">Plastové nádrže na kapaliny, odpadové hospodářství, dům a zahrada, zimní údržba a skladování + závěrečný test</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+rb.badge+
+     '<div style="display:flex;align-items:center;gap:10px">'+rb.badge+inv('roto','Produkty ROTO — plastové výrobky')+
      '<button class="btn sm" onclick="openProdukty(\'roto\')">'+rb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">ABROLL — kódování a konfigurace</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">Interaktivní výuka názvů a konfigurace kontejnerů ABROLL + závěrečný test</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+badge+
+     '<div style="display:flex;align-items:center;gap:10px">'+badge+inv('abroll','ABROLL — kódování a konfigurace')+
      '<button class="btn sm" onclick="openAbroll()">'+btnLabel+'</button></div></div>';
   body.innerHTML=h; window.scrollTo(0,0);
+}
+
+/* ---- Pozvánka k absolvování školení (jen správce): výběr lidí + e-mail ---- */
+let SKOL_INV={lide:[],key:'',nazev:''};
+async function skolPozvat(key,nazev){
+  if(!MUJ.admin) return;
+  SKOL_INV.key=key; SKOL_INV.nazev=nazev;
+  if(!SKOL_INV.lide.length){
+    try{ const r=await fetch('/api/skoleni/lide',{cache:'no-store'}); const j=await r.json(); SKOL_INV.lide=(j&&j.lide)||[]; }catch(e){ SKOL_INV.lide=[]; }
+  }
+  if(!SKOL_INV.lide.length){ toast('Nepodařilo se načíst seznam zaměstnanců.'); return; }
+  let ov=document.getElementById('skolInvOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='skolInvOv'; document.body.appendChild(ov); }
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,21,18,.5);z-index:1000;display:grid;place-items:center;padding:20px';
+  ov.innerHTML='<div style="max-width:560px;width:100%;max-height:88vh;display:flex;flex-direction:column;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden">'
+    +'<div style="padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><b>✉ Pozvat ke školení: '+esc(nazev)+'</b><button class="btn ghost sm" onclick="skolPozvatZavri()">×</button></div>'
+    +'<div style="padding:12px 20px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+      +'<input id="skolInvQ" placeholder="Hledat jméno / e-mail…" style="flex:1;min-width:160px;padding:8px 12px;border:1.5px solid var(--line);border-radius:9px;font:inherit" oninput="skolInvFiltr()">'
+      +'<label style="font-size:13px;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="skolInvAll" onchange="skolInvVse(this.checked)"> vybrat zobrazené</label></div>'
+    +'<div id="skolInvList" style="flex:1;overflow:auto;padding:6px 20px"></div>'
+    +'<div style="padding:12px 20px;border-top:1px solid var(--line)">'
+      +'<input id="skolInvPozn" placeholder="Poznámka do e-mailu (nepovinné) — např. termín, do kdy školení absolvovat" style="width:100%;padding:8px 12px;border:1.5px solid var(--line);border-radius:9px;font:inherit;margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center"><span class="muted" style="font-size:12.5px" id="skolInvCnt">Vybráno: 0</span>'
+      +'<button class="btn" id="skolInvSend" onclick="skolPozvatOdesli()">Odeslat pozvánky</button></div></div></div>';
+  skolInvFiltr();
+}
+function skolInvFiltr(){
+  const q=((document.getElementById('skolInvQ')||{}).value||'').trim().toLowerCase();
+  const box=document.getElementById('skolInvList'); if(!box) return;
+  const vybrane=skolInvVybrane();
+  const lide=SKOL_INV.lide.filter(x=>!q||((x.name||'')+' '+(x.email||'')).toLowerCase().includes(q));
+  box.innerHTML=lide.length?lide.map(x=>'<label style="display:flex;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px solid #f0f3ef;cursor:pointer;font-size:14px">'
+    +'<input type="checkbox" class="skolInvChk" value="'+esc(x.email)+'"'+(vybrane.indexOf(x.email)>=0?' checked':'')+' onchange="skolInvCnt()">'
+    +'<span><b>'+esc(x.name)+'</b> <span class="muted" style="font-size:12px">'+esc(x.email)+'</span></span></label>').join('')
+    :'<p class="muted" style="padding:12px 4px">Nikdo neodpovídá hledání.</p>';
+  skolInvCnt();
+}
+function skolInvVybrane(){ return [...document.querySelectorAll('.skolInvChk:checked')].map(c=>c.value); }
+function skolInvVse(on){ document.querySelectorAll('.skolInvChk').forEach(c=>{c.checked=on;}); skolInvCnt(); }
+function skolInvCnt(){ const el=document.getElementById('skolInvCnt'); if(el) el.textContent='Vybráno: '+skolInvVybrane().length; }
+function skolPozvatZavri(){ const ov=document.getElementById('skolInvOv'); if(ov) ov.remove(); }
+async function skolPozvatOdesli(){
+  const emails=skolInvVybrane();
+  if(!emails.length){ toast('Vyberte alespoň jednoho zaměstnance.'); return; }
+  const btn=document.getElementById('skolInvSend'); if(btn){ btn.disabled=true; btn.textContent='Odesílám…'; }
+  try{
+    const r=await fetch('/api/skoleni/pozvat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({skoleni:SKOL_INV.key,emails:emails,poznamka:((document.getElementById('skolInvPozn')||{}).value||'')})});
+    const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Odeslání selhalo.'); if(btn){btn.disabled=false;btn.textContent='Odeslat pozvánky';} return; }
+    toast('Odesláno '+j.sent+' pozvánek'+((j.chyby&&j.chyby.length)?' · '+j.chyby.length+' se nepodařilo':''));
+    skolPozvatZavri();
+  }catch(e){ toast('Odeslání selhalo: '+e.message); if(btn){btn.disabled=false;btn.textContent='Odeslat pozvánky';} }
 }
 function openProdukty(typ){
   typ = (typ==='roto') ? 'roto' : 'kovo';
