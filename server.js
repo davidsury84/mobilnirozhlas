@@ -1392,6 +1392,20 @@ async function sheetsGet(spreadsheetId, range) {
     r.end();
   });
 }
+// Názvy všech listů tabulky (aby šly načítat i další listy, ne jen první).
+async function sheetsMeta(spreadsheetId) {
+  if (!GOOGLE_SA_CLIENT_EMAIL || !GOOGLE_SA_PRIVATE_KEY) throw new Error('Service account (GOOGLE_SA_*) není nastaven.');
+  const token = await sheetsGetToken();
+  const apiPath = '/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties.title';
+  return await new Promise((resolve, reject) => {
+    const r = https.request({ method: 'GET', hostname: 'sheets.googleapis.com', path: apiPath, headers: { 'Authorization': 'Bearer ' + token } }, resp => {
+      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(((j || {}).sheets || []).map(s => s.properties && s.properties.title).filter(Boolean)); reject(new Error('Sheets meta ' + resp.statusCode + ': ' + d.slice(0, 200))); });
+    });
+    r.on('error', e => reject(new Error('Spojení se Sheets: ' + e.message)));
+    r.setTimeout(20000, () => { try { r.destroy(new Error('Sheets: časový limit spojení.')); } catch (_) {} });
+    r.end();
+  });
+}
 
 /* ---------- Telefonní seznam (firemní kontakty dle středisek) ----------
    Zdroj: „Kontakty Elkoplast.xlsx" na Disku (owner lucie.sedlackova@elkoplast.cz,
@@ -1974,7 +1988,7 @@ let kontejneryMod = null;
 try {
   kontejneryMod = require('./kontejnery').mount({
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
-    dataDir: DATA_DIR, ssoSecret: SSO_SHARED_SECRET, sheetsGet,
+    dataDir: DATA_DIR, ssoSecret: SSO_SHARED_SECRET, sheetsGet, sheetsMeta,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'ELKOPLAST — kontejnery', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
   });
 } catch (e) {

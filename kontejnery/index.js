@@ -345,7 +345,7 @@ function mount(host) {
     const items = load().items
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
       .slice(0, 300)
-      .map(x => ({ id: x.id, cislo: x.cislo, jmeno: x.jmeno, firma: x.firma, email: x.email, telefon: x.telefon, typ: x.typ, rezim: x.rezim, pocet: x.pocet, mesto: x.mesto, zprava: x.zprava, stav: x.stav, obchodnik: x.obchodnik, createdAt: x.createdAt, updatedAt: x.updatedAt || null, poznamka: x.interniPoznamka || '', poznamkaBy: x.poznamkaBy || null, poradit: /porad|na m[íi]ru/i.test((x.typ || '') + ' ' + (x.zprava || '') + ' ' + (x.rezim || '')) }));
+      .map(x => ({ id: x.id, cislo: x.cislo, jmeno: x.jmeno, firma: x.firma, email: x.email, telefon: x.telefon, typ: x.typ, rezim: x.rezim, pocet: x.pocet, mesto: x.mesto, adresa: x.adresa || '', doprava: x.doprava || '', zprava: x.zprava, stav: x.stav, obchodnik: x.obchodnik, createdAt: x.createdAt, updatedAt: x.updatedAt || null, poznamka: x.interniPoznamka || '', poznamkaBy: x.poznamkaBy || null, poradit: /porad|na m[íi]ru/i.test((x.typ || '') + ' ' + (x.zprava || '') + ' ' + (x.rezim || '')) }));
     json(res, 200, { items, stavy: STAVY }); return true;
   }
   // Změna stavu / sdílené poznámky z kalkulačky (aplikace lodních kontejnerů) — Bearer.
@@ -549,17 +549,24 @@ function mount(host) {
     zprava: ['zprava', 'poznamka', 'message', 'pozn', 'popis', 'note', 'text', 'dotaz'],
     idcol: ['lead id', 'leadgen_id', 'lead_id', 'id'],
     created: ['created', 'created_time', 'cas', 'time', 'timestamp', 'datum', 'date'],
+    adresa: ['adresa', 'address', 'ulice', 'street'],
+    doprava: ['doprav', 'delivery', 'shipping', 'dovoz'],
   };
   async function syncSheet() {
     const db = load();
     const sheetId = db.config.sheetId;
     if (!sheetId || !host.sheetsGet) return 0;
-    let vals;
-    try { const r = await host.sheetsGet(sheetId, SHEET_RANGE); vals = (r && r.values) || []; }
-    catch (e) { console.error('[kontejnery] Sheets čtení selhalo:', e.message); return 0; }
-    if (vals.length < 2) return 0;
-    const headers = vals[0].map(normHdr);
-    const idx = {}; Object.keys(COL_MAP).forEach(k => { idx[k] = pickCol(headers, COL_MAP[k]); });
+    // Načti VŠECHNY listy tabulky (list 2 má navíc dopravu a adresu) — každý list má vlastní hlavičku.
+    let ranges = [SHEET_RANGE];
+    try {
+      if (host.sheetsMeta) { const titles = await host.sheetsMeta(sheetId); if (Array.isArray(titles) && titles.length) ranges = titles.map(t => "'" + String(t).replace(/'/g, "''") + "'!A1:Z10000"); }
+    } catch (e) { console.error('[kontejnery] Sheets meta selhalo (beru jen 1. list):', e.message); }
+    const listy = [];
+    for (const rg of ranges) {
+      try { const r = await host.sheetsGet(sheetId, rg); const v = (r && r.values) || []; if (v.length >= 2) listy.push(v); }
+      catch (e) { console.error('[kontejnery] Sheets čtení selhalo (' + rg + '):', e.message); }
+    }
+    if (!listy.length) return 0;
     const seen = new Set(db.config.leadKeys);
     const firstImport = !db.config._sheetBackfilled;
     const cell = (row, i) => (i >= 0 && i < row.length) ? String(row[i] || '').trim() : '';
@@ -567,6 +574,9 @@ function mount(host) {
     const created = [];
     const rowByKey = {};                                     // klíč řádku → parsovaná data (i pro opravu už naimportovaných)
     const rowQueue = [];                                     // fallback párování podle e-mail|telefon|jméno
+    for (const vals of listy) {
+    const headers = vals[0].map(normHdr);
+    const idx = {}; Object.keys(COL_MAP).forEach(k => { idx[k] = pickCol(headers, COL_MAP[k]); });
     for (let ri = 1; ri < vals.length; ri++) {
       const row = vals[ri]; if (!row || !row.length) continue;
       const jmeno = cell(row, idx.jmeno).slice(0, 120);
@@ -588,6 +598,8 @@ function mount(host) {
         typ: cell(row, idx.typ).slice(0, 80) || null,
         rezim: (function () { const rz = cell(row, idx.rezim); return REZIM.indexOf(rz) >= 0 ? rz : (rz ? rz.slice(0, 40) : null); })(),
         mesto: cell(row, idx.mesto).slice(0, 120), pocet: null,
+        adresa: cell(row, idx.adresa).slice(0, 240) || null,
+        doprava: cell(row, idx.doprava).slice(0, 120) || null,
         zprava: cell(row, idx.zprava).slice(0, 4000),
         cenaOd: null, cenaDo: null, konfigurace: null,
         stav: 'nova', obchodnik: null, zdroj: 'Google tabulka / Meta',
@@ -596,6 +608,7 @@ function mount(host) {
       };
       assignRotace(db, item, now);
       db.items.push(item); created.push(item);
+    }
     }
     // OPRAVA dřívějších importů: createdAt = datum z tabulky, ne kdy proběhl import do intranetu.
     let fixed = 0;

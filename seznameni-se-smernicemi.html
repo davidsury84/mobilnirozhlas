@@ -2407,7 +2407,7 @@ function kontCard(it){
   const resolved=(st==='nabidka'||st==='ozvat'||st==='realizace'||st==='uzavreno'||st==='zamitnuto');
   const call=kontNeedsCall(it)&&!resolved;
   const resTag=resolved?(st==='nabidka'?'✓ Odesláno':st==='ozvat'?'☎ Ozvat se':st==='realizace'?'🚚 Realizace':st==='zamitnuto'?'✕ Bez úspěchu':'✓ Vyřešeno'):'';
-  const meta=[it.typ&&('📦 '+esc(it.typ)), it.rezim&&esc(it.rezim), it.pocet&&(esc(String(it.pocet))+' ks'), it.mesto&&('📍 '+esc(it.mesto)), it.email&&('✉ '+esc(it.email)), it.telefon&&('📞 '+esc(it.telefon)), it.zdroj&&('· '+esc(it.zdroj))].filter(Boolean).join(' · ');
+  const meta=[it.typ&&('📦 '+esc(it.typ)), it.rezim&&esc(it.rezim), it.pocet&&(esc(String(it.pocet))+' ks'), it.mesto&&('📍 '+esc(it.mesto)), it.adresa&&it.adresa!==it.mesto&&('🏠 '+esc(it.adresa)), it.doprava&&('🚚 '+esc(it.doprava)), it.email&&('✉ '+esc(it.email)), it.telefon&&('📞 '+esc(it.telefon)), it.zdroj&&('· '+esc(it.zdroj))].filter(Boolean).join(' · ');
   return '<div class="card pad" style="margin-bottom:10px;cursor:pointer'+(call?';background:#fff7d6;border:1.5px solid #e8c14a':'')+(resolved?';opacity:.6':'')+'" onclick="showKontejneryKalk(\''+it.id+'\')">'
     +(call?'<div style="display:inline-block;background:#e0a400;color:#fff;font-weight:800;font-size:12.5px;padding:3px 10px;border-radius:999px;margin-bottom:8px">📞 Nutné volat! — klient chce poradit</div>':'')
     +(resTag?'<div style="display:inline-block;background:'+(st==='nabidka'||st==='realizace'||st==='uzavreno'?'#1f8a4c':st==='ozvat'?'#c07a00':'#8a938a')+';color:#fff;font-weight:700;font-size:12px;padding:2px 10px;border-radius:999px;margin-bottom:8px">'+resTag+'</div>':'')
