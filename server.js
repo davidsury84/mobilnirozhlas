@@ -143,6 +143,7 @@ const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace �
 const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://tridici-linka-production.up.railway.app'; // aplikace „Design třídicí linky" — digitální dvojče (repo tridici-linka-railway); lze přepsat proměnnou
 const TRIDICI_LINKA_APP_FILE = path.join(ROOT, 'design-tridici-linky.html'); // alternativně lokální soubor (stejně jako u Kalkulace-lisy)
 const PREKLADISTE_APP_URL = process.env.PREKLADISTE_APP_URL || ''; // aplikace „Kalkulačka překladiště" — prodejní kalkulačka (repo prekladiste-kalkulacka); doplň URL nasazení
+const LOZNYPLAN_APP_URL = (process.env.LOZNYPLAN_APP_URL || 'https://loznyplan-production.up.railway.app').replace(/\/$/, ''); // aplikace „Ložný plán" — plánování nakládky (repo loznyplan, Railway služba loznyplan)
 const LODAKY_APP_URL = (process.env.LODAKY_APP_URL || '').replace(/\/$/, ''); // aplikace „Lodní kontejnery" (repo lodni-kontejnery) — nacenění obchodníka přes SSO
 const PREKLADISTE_APP_FILE = path.join(ROOT, 'kalkulacka-prekladiste.html'); // alternativně lokální soubor
 const PREKLAD_VEREJNY_FILE = path.join(ROOT, 'preklad-verejny.html'); // veřejný klientský funnel (lead-gen kalkulačka překladiště, mimo přihlašovací závoru)
@@ -3179,6 +3180,17 @@ const server = http.createServer(async (req, res) => {
         + '<body><div class="c"><h1>♻️ Kalkulačka překladiště</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
         + '<p style="margin-top:12px;font-size:13px">Pro napojení nastav proměnnou <code>PREKLADISTE_APP_URL</code> na adresu nasazené aplikace (kalkulačka překladiště), nebo vlož soubor <code>kalkulacka-prekladiste.html</code> do projektu.</p></div></body></html>';
       return send(res, 200, ph2, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- Modul Ložný plán: plánování nakládky vozidel (samostatná app na Railway, SSO) ----
+    if (p === '/loznyplan-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('loznyplan') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k Ložnému plánu nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      // Přihlášený zaměstnanec → krátkodobý SSO token, aby se aplikace v iframu přihlásila SAMA
+      let target = LOZNYPLAN_APP_URL;
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += (target.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
     }
 
     // ---- Aplikace modulu Kalkulace KOVO: lokální variabilní kalkulačka nacenění ----
