@@ -278,8 +278,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="tab" data-pane="seg">📊 Segmentační analýza</div>
       <div class="tab" data-pane="pokryti">🗓 Měsíční pokrytí</div>
       <div class="tab" data-pane="elko">🛒 Elkoplast</div>
-      <div class="tab" data-pane="nakup">📦 Optimalizace nákupu</div>
-      <div class="tab" data-pane="objednavky">🛒 Objednávky (ERP)</div>
+      <div class="tab" data-pane="objednavky">📦 Optimalizace nákupu</div>
       <div class="tab" data-pane="nakupreq">🛒 Požádat nákupčího</div>
       <div class="tab" data-pane="eanalyza">📈 Analýza prodejů e-shopu</div>
       <div class="tab" data-pane="fulfillment">📐 Sklad. prostor (fulfillment)</div>
@@ -589,6 +588,42 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <p style="margin:8px 0 2px;color:var(--mut)"><b>Filtrování:</b> v hlavičce každého sloupce je filtr (rozbalovací u textových sloupců, číselné porovnání u čísel — např. <code>&gt;100</code>). „Objemová sleva" je hodnota ve sloupci <b>Akce</b> (ne Kategorie) — najdeš ji ve filtrech sloupce Akce v záložkách Nové ceny, Mrtvé zásoby, SMI model a Vše.</p>
         </div>
       </details>
+
+      <details class="settings" style="margin:0 0 12px">
+        <summary>🏷 Dodací lhůty a MOQ per skupina (SK) — přepis výchozích hodnot</summary>
+        <div style="margin-top:10px">
+          <p class="muted" style="font-size:12px;margin:0 0 8px">Prázdné = dědí výchozí (globální nahoře). Vyplněné platí pro celou skupinu SK. U konkrétní položky lze přepsat v detailní tabulce dole (sloupce Lhůta / MOQ). Ukládá se v prohlížeči — pro přenos na jiný počítač použij export/import.</p>
+          <div class="toolbar" style="margin:0 0 10px;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn ghost" type="button" style="padding:6px 12px;font-size:12px" onclick="nkExportOv()" title="Uloží přepisy (skupiny i položky) do souboru JSON">⬇ Export nastavení</button>
+            <label class="btn ghost" style="padding:6px 12px;font-size:12px;cursor:pointer" title="Načte přepisy ze souboru JSON — přepíše aktuální">⬆ Import nastavení<input type="file" accept="application/json,.json" onchange="nkImportOv(this)" style="display:none"></label>
+            <button class="btn ghost" type="button" style="padding:6px 12px;font-size:12px" onclick="nkClearOv()" title="Smaže všechny přepisy — vše se vrátí na výchozí">🗑 Vyčistit přepisy</button>
+            <span id="nkOvInfo" class="muted" style="font-size:12px"></span>
+          </div>
+          <div class="tblwrap" style="max-height:340px"><table id="nkGroupsTbl"></table></div>
+        </div>
+      </details>
+      <div class="toolbar">
+        <input type="text" id="nkSearch" placeholder="Hledat položku…" style="min-width:240px">
+        <select id="nkFilter"><option value="">Vše</option><option value="now">Objednat teď</option><option value="soon">Brzy</option><option value="season">Mimo sezónu</option><option value="ok">OK</option><option value="no">Nenakupovat</option></select>
+        <span style="flex:1"></span>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)">Doba nákupu [měs.]<input type="number" id="nkHorizon2" value="3" min="1" max="24" style="width:64px"></label>
+        <button class="btn" id="nkReport">📋 Sestava k nákupu</button>
+      </div>
+      <div style="margin:0 0 10px"><b id="nkCount" class="muted"></b></div>
+      <div id="nkOrderPanel" style="margin:0 0 16px">
+        <div class="kpis" id="nkOrderKpis"></div>
+        <div class="card" style="margin-top:10px">
+          <div class="spread" style="flex-wrap:wrap;gap:8px"><h3 style="margin:0">🛒 Objednací seznam — co a kolik objednat teď</h3>
+            <span class="muted" style="font-size:12px">Jen položky se stavem <b>Objednat teď</b> (zásoba pod bodem objednání a prodávají se v nejbližším okně). Detailní výpočet je v tabulce níže.</span></div>
+          <div class="tblwrap" style="max-height:460px"><table id="nkOrderTbl"></table></div>
+        </div>
+      </div>
+      <details class="settings"><summary>🔬 Detailní tabulka (ROP, EOQ, obrátka, sezónnost…)</summary>
+        <div class="tblwrap" style="margin-top:10px"><table id="nkTbl"></table></div>
+      </details>
+    </div>
+    <div class="pane" id="pane-objednavky">
+      <div class="note">Optimalizace objednávek: <b>ERP skladová pozice</b> (<b id="objDate">—</b>) × <b>poptávka z prodejů</b>. Z ERP: sklad, <b>K dispo</b> (sklad − nevykryté obj. zákazníků), objednáno u dodavatele, <b>dodací lhůta per položka</b>, nákupní cena. Poptávku bereme z prodejů (obrat plasty, sezónně). <b>Objednat = sezónní poptávka za (dodací lhůta + cíl. pokrytí) − (K dispo + Objednáno)</b>, jen když je pozice pod bodem objednání. Oversold (K dispo &lt; 0) = kritické.</div>
       <details class="settings" id="nkReportCfg" style="margin:0 0 12px;display:none">
         <summary>📧 Týdenní e-mailové reporty — příjemci a zapnutí (jen správce)</summary>
         <div style="margin-top:10px;font-size:13px">
@@ -627,46 +662,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           </div>
         </div>
       </details>
-      <details class="settings" style="margin:0 0 12px">
-        <summary>🏷 Dodací lhůty a MOQ per skupina (SK) — přepis výchozích hodnot</summary>
-        <div style="margin-top:10px">
-          <p class="muted" style="font-size:12px;margin:0 0 8px">Prázdné = dědí výchozí (globální nahoře). Vyplněné platí pro celou skupinu SK. U konkrétní položky lze přepsat v detailní tabulce dole (sloupce Lhůta / MOQ). Ukládá se v prohlížeči — pro přenos na jiný počítač použij export/import.</p>
-          <div class="toolbar" style="margin:0 0 10px;gap:8px;flex-wrap:wrap;align-items:center">
-            <button class="btn ghost" type="button" style="padding:6px 12px;font-size:12px" onclick="nkExportOv()" title="Uloží přepisy (skupiny i položky) do souboru JSON">⬇ Export nastavení</button>
-            <label class="btn ghost" style="padding:6px 12px;font-size:12px;cursor:pointer" title="Načte přepisy ze souboru JSON — přepíše aktuální">⬆ Import nastavení<input type="file" accept="application/json,.json" onchange="nkImportOv(this)" style="display:none"></label>
-            <button class="btn ghost" type="button" style="padding:6px 12px;font-size:12px" onclick="nkClearOv()" title="Smaže všechny přepisy — vše se vrátí na výchozí">🗑 Vyčistit přepisy</button>
-            <span id="nkOvInfo" class="muted" style="font-size:12px"></span>
-          </div>
-          <div class="tblwrap" style="max-height:340px"><table id="nkGroupsTbl"></table></div>
-        </div>
-      </details>
-      <div class="toolbar">
-        <input type="text" id="nkSearch" placeholder="Hledat položku…" style="min-width:240px">
-        <select id="nkFilter"><option value="">Vše</option><option value="now">Objednat teď</option><option value="soon">Brzy</option><option value="season">Mimo sezónu</option><option value="ok">OK</option><option value="no">Nenakupovat</option></select>
-        <span style="flex:1"></span>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)">Doba nákupu [měs.]<input type="number" id="nkHorizon2" value="3" min="1" max="24" style="width:64px"></label>
-        <button class="btn" id="nkReport">📋 Sestava k nákupu</button>
-      </div>
-      <div style="margin:0 0 10px"><b id="nkCount" class="muted"></b></div>
-      <div id="nkOrderPanel" style="margin:0 0 16px">
-        <div class="kpis" id="nkOrderKpis"></div>
-        <div class="card" style="margin-top:10px">
-          <div class="spread" style="flex-wrap:wrap;gap:8px"><h3 style="margin:0">🛒 Objednací seznam — co a kolik objednat teď</h3>
-            <span class="muted" style="font-size:12px">Jen položky se stavem <b>Objednat teď</b> (zásoba pod bodem objednání a prodávají se v nejbližším okně). Detailní výpočet je v tabulce níže.</span></div>
-          <div class="tblwrap" style="max-height:460px"><table id="nkOrderTbl"></table></div>
-        </div>
-      </div>
-      <details class="settings"><summary>🔬 Detailní tabulka (ROP, EOQ, obrátka, sezónnost…)</summary>
-        <div class="tblwrap" style="margin-top:10px"><table id="nkTbl"></table></div>
-      </details>
-    </div>
-    <div class="pane" id="pane-objednavky">
-      <div class="note">Optimalizace objednávek: <b>ERP skladová pozice</b> (<b id="objDate">—</b>) × <b>poptávka z prodejů</b>. Z ERP: sklad, <b>K dispo</b> (sklad − nevykryté obj. zákazníků), objednáno u dodavatele, <b>dodací lhůta per položka</b>, nákupní cena. Poptávku bereme z prodejů (obrat plasty, sezónně). <b>Objednat = sezónní poptávka za (dodací lhůta + cíl. pokrytí) − (K dispo + Objednáno)</b>, jen když je pozice pod bodem objednání. Oversold (K dispo &lt; 0) = kritické.</div>
       <div class="kpis" id="objKpis"></div>
       <div class="toolbar">
         <input type="text" id="objSearch" placeholder="Hledat položku / kód…" style="min-width:220px">
         <select id="objSup"><option value="">Všichni dodavatelé</option></select>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut)"><input type="checkbox" id="objOnly" checked> Jen k objednání</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut)" title="Kolik měsíců prodejů dopředu chceme mít na skladě (sezónně od aktuálního měsíce). Menší = štíhlejší sklad.">Cíl. pokrytí <input type="number" id="objCover" value="2" min="0.5" step="0.5" style="width:54px"> měs.</label>
         <span style="flex:1"></span>
         <button class="btn ghost" type="button" id="objExport">⬇ Objednací seznam (Excel)</button>
       </div>
@@ -1853,10 +1854,11 @@ async function renderObjednavky(){
     const sel=$('#objSup');if(sel)sel.innerHTML='<option value="">Všichni dodavatelé ('+(OBJ_DATA.rows||[]).length+')</option>'+sups.map(s=>'<option>'+esc(s)+'</option>').join('');
     const dt=$('#objDate');if(dt)dt.textContent=(OBJ_DATA.date||'?')+' · '+(OBJ_DATA.rows||[]).length+' položek';
   }
-  const smap=objSalesMap();let P;try{P=nkParams();}catch(e){P={cover:2,Z:1.65,MOQ:1};}
+  const smap=objSalesMap();const P={cover:Math.max(0.5,+(($('#objCover')&&$('#objCover').value)||2)),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
   (OBJ_DATA.rows||[]).forEach(x=>{x._o=objComputeOrder(x,smap[String(x.sk)+'-'+String(x.reg)],P,m0);});
-  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const ex=$('#objExport');if(ex)ex.onclick=objExport;}
+  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;}
+  try{nkLoadReportCfg();}catch(e){}
   objDraw();
 }
 function objDraw(){
