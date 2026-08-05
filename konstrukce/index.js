@@ -315,13 +315,14 @@ const SEED_STREDISKA = [
 
 // ---- Výchozí číselník typů výrobku (seed) — řady ABROLL kontejnerů ---------
 // 6 řad z ceníku ABR-XXX; všechny sdílí dotazník provedení (ABR-DSD) a výchozí lhůty.
+// Názvy řad dle oficiální „Typová řada ABR kontejnerů" (kódy ABR-XXX).
 const RADY_ABR = [
-  ['dsd', 'DSD — klasický (s mezivýztuhami)'],
-  ['afs', 'AFS — bez mezivýztuh pod podlahou'],
-  ['hbs', 'HBS — vyztužené dno (HB)'],
-  ['sth', 'STH — silnostěnný'],
-  ['hbi', 'HBI — Hardox'],
-  ['lwc', 'LWC — odlehčený'],
+  ['dsd', 'DSD — kontejnery v normě DIN (DIN 30722)'],
+  ['afs', 'AFS — kontejnery v normě AFNOR'],
+  ['hbs', 'HBS — Hardox „halbšálen" (půlkulaté provedení)'],
+  ['sth', 'STH — stohovací kontejnery dle DIN'],
+  ['hbi', 'HBI — Hardox velké vypouklé (BIG & strong)'],
+  ['lwc', 'LWC — lehké provedení Hardox / Strenx 700'],
 ];
 const TYP_DEFAULTS = {
   standard: true, normohodiny: 8, revizeNh: 2,
@@ -468,6 +469,11 @@ function mount(host) {
     SEED_TYPES.forEach(s => { if (!d.types.some(t => t.key === s.key)) d.types.push(JSON.parse(JSON.stringify(s))); });
     // dotazník seed typů držíme v synchronu s kódem — každý typ svůj (ABROLL řady, CITY, MULDA)
     d.types.forEach(t => { const s = SEED_TYPES.find(x => x.key === t.key); if (s && s.dotaznik) t.dotaznik = JSON.parse(JSON.stringify(s.dotaznik)); });
+    // Jednorázová oprava chybných názvů ABROLL řad (DIN/AFNOR/Hardox dle oficiální typové řady) — respektuje pozdější ruční přejmenování.
+    if (d._abrNamesFixed !== 1) {
+      RADY_ABR.forEach(([key, name]) => { const t = d.types.find(x => x.key === key); if (t) t.name = name; });
+      d._abrNamesFixed = 1;
+    }
     if (!Array.isArray(d.zakazky)) d.zakazky = [];
     // Migrace na nový tok: staré koncové stavy (byly už schválené a ve výrobě) → dokončeno; ať nespadnou na neznámém STAV.
     d.zakazky.forEach(z => { if (z.stav === 'vyroba' || z.stav === 'stredisko') { z.stav = 'dokonceno'; if (!z.closedAt) z.closedAt = Date.now(); z.deadline = null; } });
