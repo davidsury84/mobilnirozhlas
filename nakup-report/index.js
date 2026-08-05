@@ -15,6 +15,8 @@ function mount(host) {
   const CFG_F = path.join(host.dataDir || __dirname, 'nakup-report.json');          // config (writable)
   const STATE_F = path.join(host.dataDir || __dirname, 'nakup-report-state.json');  // stav odeslání (writable)
   const SRC_F = path.join(__dirname, '..', 'smi-nakup-data.json');                  // data SMI (commitnuto v kořeni)
+  const OBJ_F = path.join(__dirname, '..', 'smi-objednavky-data.json');             // ERP objednávkový export (MRP: sklad, průměr+SN, objednáno, dodací lhůta)
+  const loadObj = () => { try { return JSON.parse(fs.readFileSync(OBJ_F, 'utf8')); } catch (_) { return { rows: [], columns: [], date: '' }; } };
 
   const DEF_MD = ['michaela.lizancova@elkoplast.cz', 'jan.benicek@elkoplast.cz'];
   const DEF_PU = ['hana.faltynkova@elkoplast.cz', 'david.sury@elkoplast.cz'];
@@ -163,6 +165,8 @@ function mount(host) {
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true), p = u.pathname;
     if (!p.startsWith('/api/nakup-report')) return false;
+    // ERP objednávková data — čtení pro každého přihlášeného (globální SSO už ověřuje); optimalizace objednávek v appce.
+    if (p === '/api/nakup-report/objednavky' && req.method === 'GET') { json(res, 200, loadObj()); return true; }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
 
     if (p === '/api/nakup-report/config' && req.method === 'GET') {
