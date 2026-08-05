@@ -596,8 +596,22 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <div style="display:grid;gap:10px;max-width:740px">
             <label style="display:flex;flex-direction:column;gap:3px">🔻 „Co zlevnit" — komu poslat (více e-mailů oddělte čárkou)
               <input type="text" id="nkRepMd" placeholder="email1@elkoplast.cz, email2@elkoplast.cz" style="padding:8px;font:inherit"></label>
-            <label style="display:flex;flex-direction:column;gap:3px">🛒 „Co nakoupit" — komu poslat
+            <label style="display:flex;flex-direction:column;gap:3px">🛒 „Co nakoupit" (týdně, ze sezónního ROP) — komu poslat
               <input type="text" id="nkRepPu" placeholder="email1@elkoplast.cz, email2@elkoplast.cz" style="padding:8px;font:inherit"></label>
+            <div style="border-top:1px solid var(--line,#e4eaf1);margin-top:6px;padding-top:10px">
+              <label style="display:flex;flex-direction:column;gap:3px">🛒 <b>„Co objednat" (ERP, 1× za 14 dní)</b> — komu poslat
+                <input type="text" id="nkRepObj" placeholder="email1@elkoplast.cz, email2@elkoplast.cz" style="padding:8px;font:inherit"></label>
+              <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:8px">
+                <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="nkRepObjEn"> Posílat 1× za 14 dní</label>
+                <label style="display:flex;align-items:center;gap:6px">Den <select id="nkRepObjDay" style="padding:5px"><option value="1">pondělí</option><option value="2">úterý</option><option value="3">středa</option><option value="4">čtvrtek</option><option value="5">pátek</option><option value="6">sobota</option><option value="0">neděle</option></select></label>
+                <button class="btn ghost" type="button" onclick="window.open('/api/nakup-report/preview?type=objednavky','_blank')">👁 Náhled objednávky</button>
+                <button class="btn ghost" type="button" id="nkRepSendObj">📤 Poslat objednávky teď</button>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
+                <button class="btn ghost" type="button" id="nkSyncNow">🔄 Načíst nejnovější z Drive teď</button>
+                <span class="muted" id="nkDriveInfo" style="font-size:12px"></span>
+              </div>
+            </div>
             <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
               <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="nkRepEnabled"> Posílat automaticky každý týden</label>
               <label style="display:flex;align-items:center;gap:6px">Den v týdnu <select id="nkRepDay" style="padding:5px"><option value="1">pondělí</option><option value="2">úterý</option><option value="3">středa</option><option value="4">čtvrtek</option><option value="5">pátek</option><option value="6">sobota</option><option value="0">neděle</option></select></label>
@@ -1780,18 +1794,34 @@ function nkLoadReportCfg(){
     const sb=$('#nkRepSave'); if(sb)sb.onclick=nkSaveReportCfg;
     const bm=$('#nkRepSendMd'); if(bm)bm.onclick=()=>nkSendReport('markdown');
     const bp=$('#nkRepSendPu'); if(bp)bp.onclick=()=>nkSendReport('purchase');
+    if($('#nkRepObj'))$('#nkRepObj').value=(c.objednavkyTo||[]).join(', ');
+    if($('#nkRepObjEn'))$('#nkRepObjEn').checked=!!c.objednavkyEnabled;
+    if($('#nkRepObjDay'))$('#nkRepObjDay').value=String(c.objednavkyDay!=null?c.objednavkyDay:1);
+    const sy=d.sync||{}; const di=$('#nkDriveInfo');
+    if(di)di.innerHTML='ERP data: <b>'+(d.objDate||'?')+'</b> ('+(d.objRows||0)+' pol.)'+(sy.lastAt?(' · poslední Drive sync '+new Date(sy.lastAt).toLocaleString('cs-CZ')+(sy.lastFileName?(' ('+sy.lastFileName+')'):'')):' · zatím nesynchronizováno')+(d.driveConfigured?'':' · <b style="color:#b06f00">⚠ SA nenastaven</b>')+(d.saEmail?('<br>Sdílej složku Disku tomuto účtu (role Prohlížející): <b>'+d.saEmail+'</b>'):'');
+    const bo=$('#nkRepSendObj'); if(bo)bo.onclick=()=>nkSendReport('objednavky');
+    const sn=$('#nkSyncNow'); if(sn)sn.onclick=nkSyncNow;
   }).catch(()=>{/* nejsi správce → karta zůstane skrytá */});
 }
 function nkSaveReportCfg(){
-  const body={markdownTo:$('#nkRepMd').value,purchaseTo:$('#nkRepPu').value,enabled:$('#nkRepEnabled').checked,weekday:+$('#nkRepDay').value};
+  const body={markdownTo:$('#nkRepMd').value,purchaseTo:$('#nkRepPu').value,enabled:$('#nkRepEnabled').checked,weekday:+$('#nkRepDay').value,objednavkyTo:$('#nkRepObj')?$('#nkRepObj').value:'',objednavkyEnabled:$('#nkRepObjEn')?$('#nkRepObjEn').checked:false,objednavkyDay:$('#nkRepObjDay')?+$('#nkRepObjDay').value:1};
   $('#nkRepStatus').textContent='Ukládám…';
   fetch('/api/nakup-report/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
     $('#nkRepStatus').textContent=d.ok?('✓ Uloženo'+(d.config&&d.config.enabled?' — automatické posílání zapnuto ('+['neděli','pondělí','úterý','středu','čtvrtek','pátek','sobotu'][d.config.weekday]+')':' — automatické posílání vypnuto')):('Chyba: '+(d.error||'')); 
   }).catch(()=>{$('#nkRepStatus').textContent='Chyba uložení';});
 }
+function nkSyncNow(){
+  const di=$('#nkDriveInfo'); if(di)di.textContent='Načítám nejnovější soubor z Drive…';
+  fetch('/api/nakup-report/sync',{method:'POST'}).then(r=>r.json()).then(d=>{
+    if(!di)return;
+    if(d.ok){di.innerHTML='✓ '+(d.skipped?'Beze změny — ':'Načteno: ')+(d.file||'')+(d.rows?(' ('+d.rows+' pol.)'):'')+'. Otevři/obnov záložku 🛒 Objednávky (ERP).'; OBJ_DATA=null;}
+    else di.innerHTML='<b style="color:#b06f00">Chyba sync:</b> '+(d.error||'');
+  }).catch(()=>{if(di)di.textContent='Chyba sync';});
+}
 function nkSendReport(type){
-  const label=type==='markdown'?'„Co zlevnit"':'„Co nakoupit"';
-  const to=(type==='markdown'?$('#nkRepMd'):$('#nkRepPu')).value.trim();
+  const label=type==='markdown'?'„Co zlevnit"':type==='objednavky'?'„Co objednat (ERP)"':'„Co nakoupit"';
+  const fld=type==='markdown'?$('#nkRepMd'):type==='objednavky'?$('#nkRepObj'):$('#nkRepPu');
+  const to=(fld?fld.value:'').trim();
   if(!to){$('#nkRepStatus').textContent='Nejdřív vyplň příjemce.';return;}
   if(!confirm('Odeslat report '+label+' teď na:\n'+to+' ?')) return;
   $('#nkRepStatus').textContent='Odesílám '+label+'…';
