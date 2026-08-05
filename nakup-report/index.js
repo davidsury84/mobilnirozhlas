@@ -72,7 +72,6 @@ function mount(host) {
     let c = {}; try { c = JSON.parse(fs.readFileSync(CFG_F, 'utf8')) || {}; } catch (_) {}
     return {
       markdownTo: Array.isArray(c.markdownTo) ? c.markdownTo : DEF_MD.slice(),
-      purchaseTo: Array.isArray(c.purchaseTo) ? c.purchaseTo : DEF_PU.slice(),
       enabled: c.enabled !== undefined ? !!c.enabled : false,   // bezpečně vypnuto — zapne správce po náhledu
       weekday: (c.weekday >= 0 && c.weekday <= 6) ? c.weekday : 1, // 1 = pondělí
       // objednávkový report (ERP, 1× za 14 dní) — příjemci editovatelní správcem
@@ -157,26 +156,6 @@ function mount(host) {
     return { subject: 'Týdenní report — co zlevnit (mrtvé/přeskladněné zásoby) · ' + a.period, html: wrap('Co zlevnit — optimalizace mrtvých zásob', 'Stárnoucí, mrtvé a přeskladněné položky seřazené dle vázaného kapitálu', body, a.period), count: list.length, totTied };
   }
 
-  function buildPurchase(cfg) {
-    const a = analyze(cfg);
-    let list = a.items.filter(x => x.status === 'Objednat teď' && x.rec > 0);
-    list.sort((x, y) => y.orderVal - x.orderVal || y.rec - x.rec);
-    const totVal = list.reduce((s, x) => s + x.orderVal, 0), totKs = list.reduce((s, x) => s + x.rec, 0);
-    const top = list.slice(0, cfg.topN);
-    const rowsHtml = top.map(x =>
-      '<tr>' + td(esc(x.name)) + td('<span style="color:#8a938a">' + esc(x.ident) + '</span>') +
-      td(fmt(x.D), 1) + td(fmt(x.siCur, 1) + '×', 1) + td(fmt(x.AZ), 1) +
-      td('<b>' + fmt(x.rec) + '</b>', 1) + td(x.orderVal ? kc(x.orderVal) : '—', 1) + '</tr>').join('');
-    const body =
-      '<div style="background:#e7f0fb;border:1px solid #c9dcf0;border-radius:10px;padding:12px 14px;margin:0 0 14px">' +
-      '<b>' + fmt(list.length) + '</b> položek k objednání teď · celkem <b>' + fmt(totKs) + ' ks</b>' + (totVal ? ' (~' + kc(totVal) + ')' : '') + '. Objednává se štíhle na dodací lhůtu + ' + cfg.cover + ' měs. dopředu (sezónně, ne rok dopředu).</div>' +
-      '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
-      [th('Položka'), th('Identifikátor'), th('Roční prodej'), th('Sez. index'), th('Sklad ks'), th('Objednat ks'), th('Hodnota obj.')].join('') +
-      '</tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
-      (list.length > top.length ? '<p style="color:#8a938a;font-size:12px">… zobrazeno ' + top.length + ' z ' + list.length + ' (dle hodnoty objednávky). Kompletní seznam v aplikaci.</p>' : '');
-    return { subject: 'Týdenní report — co nakoupit · ' + a.period, html: wrap('Co nakoupit tento týden', 'Položky pod bodem objednání, které se prodávají v nejbližším sezónním okně', body, a.period), count: list.length, totVal, totKs };
-  }
-
   // ---------- objednávkový report (ERP pozice × poptávka z prodejů) ----------
   function computeOrderRow(x, sales, P, m0) {
     const D = sales ? sales.reduce((s, v) => s + (v || 0), 0) : 0;
@@ -225,7 +204,7 @@ function mount(host) {
   async function sendReport(kind, toList, cfg) {
     const to = cleanEmails(toList);
     if (!to.length) return { ok: false, error: 'žádný příjemce' };
-    const rep = kind === 'markdown' ? buildMarkdown(cfg) : kind === 'objednavky' ? buildObjednavky(cfg) : buildPurchase(cfg);
+    const rep = kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
     const from = (host.mailFrom && host.mailFrom.user) || '';
     const name = (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — nákup';
     try {
@@ -252,7 +231,7 @@ function mount(host) {
       // Týdenní zlevnění/nákup — volitelné (defaultně vypnuto)
       if (cfg.enabled && now.getDay() >= cfg.weekday) {
         const wk = isoWeek(now);
-        if (st.lastWeek !== wk) { const rM = await sendReport('markdown', cfg.markdownTo, cfg); const rP = await sendReport('purchase', cfg.purchaseTo, cfg); st.lastWeek = wk; st.lastAt = now.toISOString(); st.markdown = rM; st.purchase = rP; changed = true; }
+        if (st.lastWeek !== wk) { const rM = await sendReport('markdown', cfg.markdownTo, cfg); st.lastWeek = wk; st.lastAt = now.toISOString(); st.markdown = rM; changed = true; }
       }
       if (changed) try { fs.writeFileSync(STATE_F, JSON.stringify(st, null, 2)); } catch (_) {}
     } catch (e) { console.error('[nakup-report] tick:', e.message); }
@@ -276,7 +255,6 @@ function mount(host) {
       let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; }
       const next = Object.assign({}, loadCfg());
       if (b.markdownTo != null) next.markdownTo = cleanEmails(b.markdownTo);
-      if (b.purchaseTo != null) next.purchaseTo = cleanEmails(b.purchaseTo);
       if (b.enabled != null) next.enabled = !!b.enabled;
       if (b.weekday != null && b.weekday >= 0 && b.weekday <= 6) next.weekday = +b.weekday;
       if (b.objednavkyTo != null) next.objednavkyTo = cleanEmails(b.objednavkyTo);
@@ -290,15 +268,15 @@ function mount(host) {
       catch (e) { return json(res, 500, { ok: false, error: e.message }), true; }
     }
     if (p === '/api/nakup-report/preview' && req.method === 'GET') {
-      const cfg = loadCfg(); const kind = ['purchase', 'objednavky'].indexOf(u.query.type) >= 0 ? u.query.type : 'markdown';
-      const rep = kind === 'purchase' ? buildPurchase(cfg) : kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
+      const cfg = loadCfg(); const kind = u.query.type === 'objednavky' ? 'objednavky' : 'markdown';
+      const rep = kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
       return htmlOut(res, 200, rep.html), true;
     }
     if (p === '/api/nakup-report/send' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
       const cfg = loadCfg();
-      const kind = ['purchase', 'objednavky'].indexOf(b.type) >= 0 ? b.type : 'markdown';
-      const def = kind === 'markdown' ? cfg.markdownTo : kind === 'purchase' ? cfg.purchaseTo : cfg.objednavkyTo;
+      const kind = b.type === 'objednavky' ? 'objednavky' : 'markdown';
+      const def = kind === 'objednavky' ? cfg.objednavkyTo : cfg.markdownTo;
       const to = b.to ? cleanEmails(b.to) : def;
       const r = await sendReport(kind, to, cfg);
       return json(res, r.ok ? 200 : 500, r), true;
