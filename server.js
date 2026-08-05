@@ -1343,6 +1343,13 @@ function vacUsed(email, year) {
     .filter(r => r.status === 'approved' && (r.empEmail || '').toLowerCase() === email && new Date(r.from + 'T00:00:00').getFullYear() === year)
     .reduce((s, r) => s + (Number(r.days) || 0), 0);
 }
+// Zažádáno = součet dnů čekajících (nevyřízených) žádostí v daném roce.
+function vacPendingDays(email, year) {
+  email = (email || '').toLowerCase();
+  return readVac().requests
+    .filter(r => r.status === 'pending' && (r.empEmail || '').toLowerCase() === email && new Date(r.from + 'T00:00:00').getFullYear() === year)
+    .reduce((s, r) => s + (Number(r.days) || 0), 0);
+}
 
 // Kdo schvaluje dovolenou zaměstnance: 1) přiřazený nadřízený (managerId, „pod kým je"),
 // 2) vedoucí jeho střediska; jinak null → řeší admin.
@@ -2864,6 +2871,17 @@ const server = http.createServer(async (req, res) => {
       const admin = isAdmin(req);
       const list = readVac().requests.filter(r => r.status === 'pending' && (admin || (r.approverEmail || '').toLowerCase() === e.email.toLowerCase())).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
       return send(res, 200, { admin, requests: list });
+    }
+    // ---- Dovolená: konto zaměstnanců, které daný vedoucí schvaluje (jeho tým) ----
+    if (p === '/api/vacation/team' && req.method === 'GET') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const emps = getState().employees || []; const eml = e.email.toLowerCase(); const year = new Date().getFullYear();
+      const members = emps
+        .filter(x => (x.email || '').toLowerCase() !== eml)
+        .filter(x => { const ap = approverFor(x, emps); return ap && (ap.email || '').toLowerCase() === eml; })
+        .map(x => { const ent = vacEntitlement(x), used = vacUsed(x.email, year), pending = vacPendingDays(x.email, year); return { name: x.name, email: x.email, stredisko: x.stredisko || '', entitlement: ent, used, pending, remaining: Math.round((ent - used - pending) * 10) / 10 }; })
+        .sort((a, b) => (a.stredisko || '').localeCompare(b.stredisko || '', 'cs') || (a.name || '').localeCompare(b.name || '', 'cs'));
+      return send(res, 200, { year, members });
     }
     if (p === '/api/vacation/decide' && req.method === 'POST') {
       const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
