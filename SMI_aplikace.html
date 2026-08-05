@@ -663,7 +663,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <input type="text" id="objSearch" placeholder="Hledat položku / kód…" style="min-width:220px">
         <select id="objSup"><option value="">Všichni dodavatelé</option></select>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut)"><input type="checkbox" id="objOnly" checked> Jen k objednání</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut)" title="Kolik měsíců prodejů dopředu chceme mít na skladě (sezónně od aktuálního měsíce). Menší = štíhlejší sklad.">Cíl. pokrytí <input type="number" id="objCover" value="2" min="0.5" step="0.5" style="width:54px"> měs.</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mut)" title="Kolik měsíců prodejů dopředu chceme mít na skladě (sezónně od aktuálního měsíce). Menší = štíhlejší sklad.">Cíl. pokrytí <input type="text" inputmode="decimal" id="objCover" value="2" style="width:48px" title="Kolik měsíců prodejů dopředu držet (přijímá čárku i tečku, např. 6,5)"> měs.</label>
         <span style="flex:1"></span>
         <button class="btn ghost" type="button" id="objExport">⬇ Objednací seznam (Excel)</button>
       </div>
@@ -1848,7 +1848,7 @@ async function renderObjednavky(){
     const sel=$('#objSup');if(sel)sel.innerHTML='<option value="">Všichni dodavatelé ('+(OBJ_DATA.rows||[]).length+')</option>'+sups.map(s=>'<option>'+esc(s)+'</option>').join('');
     const dt=$('#objDate');if(dt)dt.textContent=(OBJ_DATA.date||'?')+' · '+(OBJ_DATA.rows||[]).length+' položek';
   }
-  const smap=objSalesMap();const P={cover:Math.max(0.5,+(($('#objCover')&&$('#objCover').value)||2)),Z:1.65,MOQ:1};
+  const smap=objSalesMap();const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
   (OBJ_DATA.rows||[]).forEach(x=>{x._o=objComputeOrder(x,smap[String(x.sk)+'-'+String(x.reg)],P,m0);});
   if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;}
