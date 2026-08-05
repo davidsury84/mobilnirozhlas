@@ -2036,7 +2036,7 @@ function adrRow(a,kind){
   var tag=kind==='osm'?'<span class="adr-b osm">OSM</span>':'<span class="adr-b">'+(DQ_LANG==='en'?'saved':DQ_LANG==='de'?'gesp.':DQ_LANG==='pl'?'zapis.':DQ_LANG==='ua'?'збереж.':'uloženo')+'</span>';
   return '<div class="adr-i" onmousedown="adrPick(this)" data-v="'+esc(a)+'">'+tag+'<span>'+esc(a)+'</span></div>';
 }
-function adrPick(el){var o=el.closest('.dq-o');var inp=o.querySelector('input');inp.value=el.getAttribute('data-v');var dd=o.querySelector('.adr-dd');if(dd)dd.style.display='none';}
+function adrPick(el){var o=el.closest('.dq2-seg')||el.closest('.dq2');if(!o)return;var inp=o.querySelector('input');if(!inp)return;inp.value=el.getAttribute('data-v');var dd=o.querySelector('.adr-dd');if(dd)dd.style.display='none';}
 function adrClose(){document.querySelectorAll('.adr-dd').forEach(function(d){d.style.display='none'})}
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 
