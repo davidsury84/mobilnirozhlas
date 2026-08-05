@@ -785,6 +785,7 @@ function mount(host) {
       if (p === '/api/konstrukce/timer' && req.method === 'POST') return apiTimer(req, res);
       if (p === '/api/konstrukce/komentar' && req.method === 'POST') return apiComment(req, res);
       if (p === '/api/konstrukce/termin' && req.method === 'POST') return apiDeadline(req, res);
+      if (p === '/api/konstrukce/cvz' && req.method === 'POST') return apiCvz(req, res);
       if (p === '/api/konstrukce/notif-read' && req.method === 'POST') return apiNotifRead(req, res);
       if (p === '/api/konstrukce/admin/role' && req.method === 'POST') return apiAdminRole(req, res);
       if (p === '/api/konstrukce/admin/fond' && req.method === 'POST') return apiAdminFond(req, res);
@@ -901,6 +902,8 @@ function mount(host) {
       typKey: z.typKey, typName: t.name, family: familyOf(z.typKey), familyLabel: FAM_LABEL[familyOf(z.typKey)] || '',
       zakaznik: z.zakaznik, kontakt: z.kontakt, kontaktEmail: z.kontaktEmail,
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
+      cvzHelios: z.cvzHelios || '',   // číslo výrobní zakázky z Heliosu (26C-001 apod.), ručně
+
       params: z.params || {}, dotaznik: z.dotaznik || null, artNo: z.artNo || '',
       stav: z.stav, stavLabel: STAV[z.stav].label, onTurn: STAV[z.stav].onTurn,
       obchodnikEmail: z.obchodnikEmail, obchodnikName: empName(z.obchodnikEmail),
@@ -1299,6 +1302,24 @@ function mount(host) {
     addComment(z, me, 'internal', text);
     save(d);
     json(res, 200, { ok: true });
+    return true;
+  }
+  // ---- číslo výrobní zakázky z Heliosu (ruční) -----------------------------
+  async function apiCvz(req, res) {
+    const me = roleOf(req);
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load();
+    const z = d.zakazky.find(x => x.id === b.id);
+    if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
+    if (!(me.isAdmin || me.role === 'sef' || me.role === 'vykonny-reditel' || me.role === 'vyrobni-reditel' || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email))) {
+      json(res, 403, { chyba: 'Číslo výrobní zakázky zapisuje šéf konstrukce, obchodník zakázky nebo výrobní/výkonný ředitel.' }); return true;
+    }
+    const cvz = String(b.cvz || '').trim().slice(0, 40);
+    const old = z.cvzHelios || '';
+    z.cvzHelios = cvz;
+    audit(z, me.email, 'Č. výrobní zakázky (Helios)', (old ? (old + ' → ') : '') + (cvz || '(smazáno)'));
+    save(d);
+    json(res, 200, { ok: true, cvz });
     return true;
   }
   function addComment(z, me, role, text) {

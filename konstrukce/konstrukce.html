@@ -1278,6 +1278,7 @@ function renderDrawer(z){
         '<b>Konstruktér</b><span>'+esc(z.assignedName||'—')+'</span>'+
         '<b>Kontakt klienta</b><span>'+esc(z.kontakt||'—')+(z.kontaktEmail?(' · '+esc(z.kontaktEmail)):'')+'</span>'+
         '<b>Poptávka</b><span>'+esc(z.cisloPoptavky||'—')+'</span>'+
+        '<b>Č. výrobní zakázky (Helios)</b><span><input id="cvzInp" value="'+esc(z.cvzHelios||'')+'" placeholder="např. 26C-001" style="width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:7px;font:inherit"> <button class="btn ghost sm" onclick="saveCvz(\''+z.id+'\')">Uložit</button></span>'+
         (z.artNo?('<b>ART NO.</b><span><b>'+esc(z.artNo)+'</b></span>'):'')+
         '<b>Odpracováno</b><span>'+hhmm(z.totalSec)+'</span>'+
         (z.revisionCount?('<b>Revizí</b><span>'+z.revisionCount+'</span>'):'')+
@@ -1326,7 +1327,7 @@ function orderTrack(z){
   if(cur==='podklady')eff=z.prevStav||'prace';
   var zam=(cur==='zamitnuto');
   var ci=zam?-1:order.indexOf(eff);
-  var loc=z.strediskoName?(' · závod '+esc(z.strediskoName)):'';
+  var loc=(z.strediskoName?(' · závod '+esc(z.strediskoName)):'')+(z.cvzHelios?(' · ČVZ '+esc(z.cvzHelios)):'');
   var cap= zam?'<span style="color:var(--red);font-weight:700">✕ Zamítnuto / storno</span>'
     : cur==='podklady'?'<span style="color:var(--amber);font-weight:700">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</span>'
     : '<b>'+esc(z.stavLabel)+'</b>'+loc+(z.deadline?(' · termín '+fdate(z.deadline)):'');
@@ -2218,6 +2219,7 @@ function seedDemo(mode){
     alert(justZak?'Testovací zakázky byly smazány. Role a nastavení zůstaly zachovány.':'Všechna data modulu byla smazána.');
   });
 }
+function saveCvz(id){var v=(document.getElementById('cvzInp')||{}).value||'';api('/cvz','POST',{id:id,cvz:v}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return}reloadData();})}
 function setRole(email,role){api('/admin/role','POST',{email:email,role:role}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function setFond(email,fond){api('/admin/fond','POST',{email:email,fond:fond}).then(function(){reloadData()})}
 function personPicker(id,sel,onchange,placeholder){
