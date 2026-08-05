@@ -118,9 +118,19 @@ function openDb(file) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.exec(SCHEMA);
-  // Migrace existující DB: ALTER přidá jen chybějící sloupce (jinak vyhodí a spolkneme).
-  for (const [tbl, col, typ] of [['smlouva', 'vypoved_zpusob', 'TEXT']]) {
-    try { db.exec(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${typ}`); } catch (_) { /* už existuje */ }
+  // Migrace existující DB: doplní CHYBĚJÍCÍ sloupce tabulky `smlouva` (ALTER ADD
+  // COLUMN je idempotentní — na existující sloupec vyhodí a spolkneme). Kryje DB
+  // vytvořené starším schématem (bez anotace / hodnota_typ / vypoved_zpusob …).
+  const SMLOUVA_MIGRACE = {
+    smer: 'TEXT', podtyp: 'TEXT', protistrana_ico: 'TEXT', predmet: 'TEXT',
+    anotace: 'TEXT', platnost_do: 'TEXT', platnost_podminka: 'TEXT',
+    vypovedni_lhuta_mesice: 'INTEGER', hodnota: 'REAL', hodnota_typ: 'TEXT',
+    hodnota_popis: 'TEXT', spravce_email: 'TEXT', stav_popis: 'TEXT',
+    drive_url: 'TEXT', vypoved_zpusob: 'TEXT', garant_email: 'TEXT',
+    je_placeholder: 'INTEGER',
+  };
+  for (const [col, typ] of Object.entries(SMLOUVA_MIGRACE)) {
+    try { db.exec(`ALTER TABLE smlouva ADD COLUMN ${col} ${typ}`); } catch (_) { /* už existuje */ }
   }
 
   const smlouva = {
