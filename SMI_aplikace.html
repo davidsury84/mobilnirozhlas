@@ -1839,7 +1839,7 @@ function objSeason(sales){
   const argmax=sales.map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v)[0].i;
   const isSeasonal=share>=0.55 && D>=12;
   const peak=MN_CZ[best]+'–'+MN_CZ[(best+2)%12];
-  return {isSeasonal,share,peak,peakMonth:argmax,tag:isSeasonal?('sez. '+peak):'stálá'};
+  return {isSeasonal,share,peak,peakMonth:argmax,winStart:best,tag:isSeasonal?('sez. '+peak):'stálá'};
 }
 function objSpotTxt(v){ return v==null?'—':(v>=10?fmt(v):(Math.round(v*10)/10).toString().replace('.',',')); }
 function objRenderSeason(){
@@ -1864,9 +1864,18 @@ function objForwardCover(position,sales,m0){
   return 48;
 }
 function objCoverTxt(cv){ if(cv===0)return '0'; if(!isFinite(cv))return '∞'; if(cv>=48)return '4+ r'; if(cv>=24)return (Math.round(cv/12*10)/10).toString().replace('.',',')+' r'; return (Math.round(cv*10)/10).toString().replace('.',',')+' m'; }
-function objComputeOrder(x,sales,P,m0){
+function objComputeOrder(x,sales,P,m0,sea){
   const D=sales?sales.reduce((s,v)=>s+v,0):0;
-  const Lm=(x.lead||0)/30, coverM=Math.max(0.5,P.cover), windowM=Lm+coverM;
+  const Lm=(x.lead||0)/30, coverM=Math.max(0.5,P.cover);
+  let windowM=Lm+coverM, ramp=false, rampTo='';
+  // Náběh sezóny: u sezónního produktu objednávej s předstihem (lhůta + cíl. pokrytí)
+  // před začátkem špičky a pokryj poptávku až do konce špičky.
+  if(sea && sea.isSeasonal && sea.winStart>=0){
+    const ws=sea.winStart, offset=((m0-ws)%12+12)%12, inPeak=offset<=2;
+    const distStart=((ws-m0)%12+12)%12;         // měsíců do začátku špičky
+    const reachEnd=((ws+2-m0)%12+12)%12 + 1;     // měsíců do konce špičky (vč. posledního)
+    if((inPeak || distStart<=Lm+coverM) && reachEnd>windowM){ windowM=reachEnd; ramp=true; rampTo=sea.peak; }
+  }
   const sd=months=>{let s=0;for(let k=0;k<Math.ceil(months);k++){const fr=Math.min(1,months-k);s+=(sales?(sales[(m0+k)%12]||0):0)*fr;}return s;};
   const windowDem=sd(windowM), leadDem=sd(Lm);
   const rop=Math.round(leadDem+P.Z*Math.sqrt(Math.max(0,leadDem)));
@@ -1874,11 +1883,12 @@ function objComputeOrder(x,sales,P,m0){
   let rec=0,status='OK';
   if((x.avail||0)<0){ rec=Math.round(windowDem>0?Math.max(windowDem-position,-(x.avail)):-(x.avail)); status='Kritické — oversold'; }
   else if(D<=0){ status='Bez prodeje'; }
+  else if(ramp){ if(position<windowDem){ rec=Math.max(P.MOQ||1,Math.round(windowDem-position)); status='Náběh sezóny '+rampTo; } else status='Sezóna pokryta'; }
   else if(windowDem<0.5){ status='Mimo sezónu'; }
   else if(position<=rop){ rec=Math.max(P.MOQ||1,Math.round(windowDem-position)); status='Objednat'; }
   rec=Math.max(0,rec);
   const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,sales,m0);
-  return {D,rec,status,value:(x.unitCost>0?x.unitCost*rec:0),windowDem:Math.round(windowDem),coverAfter:coverAfter};
+  return {D,rec,status,ramp,value:(x.unitCost>0?x.unitCost*rec:0),windowDem:Math.round(windowDem),coverAfter:coverAfter};
 }
 async function renderObjednavky(){
   if(!OBJ_DATA){
@@ -1889,7 +1899,7 @@ async function renderObjednavky(){
   }
   const smap=objSalesMap();const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
-  (OBJ_DATA.rows||[]).forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)];x._o=objComputeOrder(x,s,P,m0);x._s=objSeason(s);});
+  (OBJ_DATA.rows||[]).forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)];x._s=objSeason(s);x._o=objComputeOrder(x,s,P,m0,x._s);});
   try{objRenderSeason();}catch(e){}
   if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;}
   try{nkLoadReportCfg();}catch(e){}
@@ -1919,7 +1929,7 @@ function objDraw(){
         '<td '+R+'>'+fmt(x.stock)+'</td><td '+R+(crit?' style="color:#b23;font-weight:700"':'')+'>'+fmt(x.avail)+'</td>'+
         '<td '+R+'>'+fmt(x.unitPrice)+'</td><td '+R+'>'+fmt(x.unitCost)+'</td>'+
         '<td '+R+'>'+fmt(x.onOrder)+'</td><td '+R+'>'+fmt(x.reserved)+'</td><td '+R+'>'+fmt(x.lead)+'</td>'+
-        '<td '+R+'>'+fmt(o.D)+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+'</td><td '+R+'><b>'+(o.rec?fmt(o.rec):'—')+'</b></td><td '+R+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?fmt(o.value)+' Kč':'—')+'</td></tr>';});
+        '<td '+R+'>'+fmt(o.D)+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+'</td><td '+R+'><b>'+(o.rec?fmt(o.rec):'—')+'</b></td><td '+R+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?fmt(o.value)+' Kč':'—')+'</td></tr>';});
   });
   h2+='<tr><td colspan="'+NC+'" class="muted" style="text-align:right">'+list.length+' položek · '+gk.length+' dodavatelů</td></tr></tbody>';
   $('#objTbl').innerHTML=h2;

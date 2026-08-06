@@ -211,9 +211,26 @@ function mount(host) {
     return 48;
   }
   const covTxt = cv => cv === 0 ? '0' : !isFinite(cv) ? '∞' : cv >= 48 ? '4+ r' : cv >= 24 ? (Math.round(cv / 12 * 10) / 10).toLocaleString('cs-CZ') + ' r' : (Math.round(cv * 10) / 10).toLocaleString('cs-CZ') + ' m';
+  const MN_RIM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  function seasonInfo(sales) { // sezónní = nejsilnější souvislé 3měsíční okno ≥55 % ročního prodeje & D≥12
+    if (!sales) return { isSeasonal: false, winStart: -1, peak: '' };
+    const D = sales.reduce((a, b) => a + (b || 0), 0); if (D <= 0) return { isSeasonal: false, winStart: -1, peak: '' };
+    let best = 0, bestS = -1;
+    for (let s = 0; s < 12; s++) { const sum = (sales[s % 12] || 0) + (sales[(s + 1) % 12] || 0) + (sales[(s + 2) % 12] || 0); if (sum > bestS) { bestS = sum; best = s; } }
+    const isSeasonal = (bestS / D) >= 0.55 && D >= 12;
+    return { isSeasonal, winStart: best, peak: MN_RIM[best] + '–' + MN_RIM[(best + 2) % 12] };
+  }
   function computeOrderRow(x, sales, P, m0) {
     const D = sales ? sales.reduce((s, v) => s + (v || 0), 0) : 0;
-    const Lm = (x.lead || 0) / 30, coverM = Math.max(0.5, P.cover || 2), windowM = Lm + coverM;
+    const Lm = (x.lead || 0) / 30, coverM = Math.max(0.5, P.cover || 2);
+    let windowM = Lm + coverM, ramp = false, rampTo = '';
+    // Náběh sezóny: sezónní produkt objednávej s předstihem (lhůta + pokrytí) před špičkou, pokryj do konce špičky.
+    const sea = seasonInfo(sales);
+    if (sea.isSeasonal && sea.winStart >= 0) {
+      const ws = sea.winStart, offset = ((m0 - ws) % 12 + 12) % 12, inPeak = offset <= 2;
+      const distStart = ((ws - m0) % 12 + 12) % 12, reachEnd = ((ws + 2 - m0) % 12 + 12) % 12 + 1;
+      if ((inPeak || distStart <= Lm + coverM) && reachEnd > windowM) { windowM = reachEnd; ramp = true; rampTo = sea.peak; }
+    }
     const sd = months => { let s = 0; for (let k = 0; k < Math.ceil(months); k++) { const fr = Math.min(1, months - k); s += (sales ? (sales[(m0 + k) % 12] || 0) : 0) * fr; } return s; };
     const windowDem = sd(windowM), leadDem = sd(Lm), Z = P.Z || 1.65;
     const rop = Math.round(leadDem + Z * Math.sqrt(Math.max(0, leadDem)));
@@ -221,11 +238,12 @@ function mount(host) {
     let rec = 0, status = 'OK';
     if ((x.avail || 0) < 0) { rec = Math.round(windowDem > 0 ? Math.max(windowDem - position, -(x.avail)) : -(x.avail)); status = 'oversold'; }
     else if (D <= 0) status = 'bez prodeje';
+    else if (ramp) { if (position < windowDem) { rec = Math.max(P.MOQ || 1, Math.round(windowDem - position)); status = 'náběh sezóny ' + rampTo; } else status = 'sezóna pokryta'; }
     else if (windowDem < 0.5) status = 'mimo sezónu';
     else if (position <= rop) { rec = Math.max(P.MOQ || 1, Math.round(windowDem - position)); status = 'objednat'; }
     rec = Math.max(0, rec);
     const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, sales, m0);
-    return { D, rec, status, value: (x.unitCost > 0 ? x.unitCost * rec : 0), coverAfter };
+    return { D, rec, status, ramp, value: (x.unitCost > 0 ? x.unitCost * rec : 0), coverAfter };
   }
   function buildObjednavky(cfg) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
