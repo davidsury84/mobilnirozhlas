@@ -662,6 +662,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <details class="settings" style="margin:6px 0 10px"><summary>🗓 Sezónní pattern — špičky produktů (z historie prodejů)</summary>
         <div id="objSeasonWrap" style="margin-top:8px;font-size:13px"></div>
       </details>
+      <details class="settings" style="margin:6px 0 10px"><summary>📅 Měsíční plán objednávek — kolik položek objednávat každý měsíc</summary>
+        <div id="objPlanWrap" style="margin-top:8px;font-size:13px"></div>
+      </details>
       <div class="toolbar">
         <input type="text" id="objSearch" placeholder="Hledat položku / kód…" style="min-width:220px">
         <select id="objSup"><option value="">Všichni dodavatelé</option></select>
@@ -670,6 +673,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <span style="flex:1"></span>
         <button class="btn ghost" type="button" id="objExport">⬇ Objednací seznam (Excel)</button>
         <button class="btn ghost" type="button" id="objExportAll" title="Celá ERP tabulka (všech 855 položek, i ty co se neobjednávají), rozpad po dodavatelích, s celým identifikátorem SK-reg">⬇ Celá tabulka po dodavatelích</button>
+        <button class="btn ghost" type="button" id="objExportPlan" title="Měsíční order-up-to plán: per položka × 12 měsíců cílová zásoba + kolik objednat, + souhrnný list rytmu">⬇ Měsíční plán (Excel)</button>
       </div>
       <div class="tblwrap"><table id="objTbl"></table></div>
     </div>
@@ -1902,7 +1906,8 @@ async function renderObjednavky(){
   const m0=new Date().getMonth();
   (OBJ_DATA.rows||[]).forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)];x._s=objSeason(s);x._o=objComputeOrder(x,s,P,m0,x._s);});
   try{objRenderSeason();}catch(e){}
-  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;}
+  try{objRenderPlan();}catch(e){}
+  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;}
   try{nkLoadReportCfg();}catch(e){}
   objDraw();
 }
@@ -1965,6 +1970,74 @@ async function objExportAll(){
     ws.getRow(1).font={bold:true};
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='erp-tabulka-dle-dodavatelu.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast('Celá tabulka vyexportována ('+rows.length+' položek, '+new Set(rows.map(x=>x.skupina)).size+' dodavatelů)');
+  }catch(e){alert('Export selhal: '+e.message);}
+}
+// ---- MĚSÍČNÍ PLÁN (order-up-to) ----
+// Simuluje 12 měsíců dopředu: každý měsíc doobjednej na cílovou zásobu = poptávka za (lhůta + cíl. pokrytí).
+// Vrací per měsíc: konc. stav skladu, cílová zásoba S, kolik objednat, hodnotu.
+var OBJ_MN=['led','úno','bře','dub','kvě','čvn','čvc','srp','zář','říj','lis','pro'];
+function objPlan(x,sales,P,m0){
+  const Lf=(x.lead||0)/30, L=Math.max(0,Math.round(Lf)), coverM=Math.max(0.5,P.cover), MOQ=Math.max(1,P.MOQ||1);
+  const sd=(m,months)=>{let s=0;for(let k=0;k<Math.ceil(months);k++){const fr=Math.min(1,months-k);s+=(sales?(sales[(m+k)%12]||0):0)*fr;}return s;};
+  let onHand=Math.max(0,x.avail||0);
+  const arr={}; if((x.onOrder||0)>0){const a=Math.min(11,L);arr[a]=(arr[a]||0)+(x.onOrder||0);} // stávající objednáno dorazí za L měs
+  const rec=[];
+  for(let t=0;t<12;t++){
+    const m=(m0+t)%12;
+    onHand+=arr[t]||0;                                   // příjem
+    onHand=Math.max(0,onHand-(sales?(sales[m]||0):0));   // spotřeba měsíce
+    const S=Math.round(sd(m,Lf+coverM));                 // cílová zásoba (order-up-to = lhůta + pokrytí)
+    let pos=onHand; for(const k in arr){if(+k>t)pos+=arr[k];}
+    let q=Math.max(0,Math.round(S-pos)); if(q>0)q=Math.max(MOQ,q);
+    if(q>0){ if(L===0){onHand+=q;} else {arr[t+L]=(arr[t+L]||0)+q;} }
+    rec.push({m,onHandEnd:Math.round(onHand),S,order:q,value:(x.unitCost>0?x.unitCost*q:0)});
+  }
+  return {L,rec};
+}
+function objPlanParams(){return {cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),MOQ:1};}
+function objRenderPlan(){
+  const wrap=$('#objPlanWrap'); if(!wrap)return;
+  const rows=(OBJ_DATA&&OBJ_DATA.rows)||[]; const smap=objSalesMap(); const P=objPlanParams(); const m0=new Date().getMonth();
+  const agg=Array.from({length:12},()=>({items:0,ks:0,kc:0})); let paired=0;
+  rows.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; if(!s||s.reduce((a,b)=>a+b,0)<=0)return; paired++;
+    const p=objPlan(x,s,P,m0); p.rec.forEach((r,t)=>{if(r.order>0){const mi=(m0+t)%12; agg[mi].items++; agg[mi].ks+=r.order; agg[mi].kc+=r.value;}});});
+  const totIt=agg.reduce((s,a)=>s+a.items,0),totKs=agg.reduce((s,a)=>s+a.ks,0),totKc=agg.reduce((s,a)=>s+a.kc,0);
+  let h='<p class="muted" style="margin:0 0 8px">Objednáváš <b>1× měsíčně</b>; cílová zásoba = poptávka za <b>dodací lhůtu + '+String(P.cover).replace('.',',')+' měs</b> (order-up-to). Sloupce ukazují, kolik položek / kusů / Kč připadá na objednávku v daném měsíci (napárováno <b>'+fmt(paired)+'</b> položek s prodejem). Špička objednávání bývá na jaře — příprava na letní sezónu.</p>';
+  h+='<div class="tblwrap" style="max-height:360px"><table><thead><tr><th>Měsíc</th><th style="text-align:right">Položek k obj.</th><th style="text-align:right">Kusů</th><th style="text-align:right">Hodnota (Kč)</th></tr></thead><tbody>';
+  for(let t=0;t<12;t++){const mi=(m0+t)%12;const a=agg[mi];
+    h+='<tr'+(t===0?' style="background:var(--paper,#eef1ec)"':'')+'><td><b>'+OBJ_MN[mi]+'</b>'+(t===0?' <span class="muted">(teď)</span>':'')+'</td><td style="text-align:right">'+fmt(a.items)+'</td><td style="text-align:right">'+fmt(a.ks)+'</td><td style="text-align:right">'+fmt(Math.round(a.kc))+'</td></tr>';}
+  h+='<tr style="font-weight:700;border-top:2px solid var(--line,#ccc)"><td>Celkem / rok</td><td style="text-align:right">'+fmt(totIt)+'</td><td style="text-align:right">'+fmt(totKs)+'</td><td style="text-align:right">'+fmt(Math.round(totKc))+'</td></tr>';
+  h+='</tbody></table></div>';
+  wrap.innerHTML=h;
+}
+async function objExportPlan(){
+  try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
+    const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).slice(); const smap=objSalesMap(); const P=objPlanParams(); const m0=new Date().getMonth();
+    const mlab=Array.from({length:12},(_,t)=>OBJ_MN[(m0+t)%12]);
+    const paired=rows.filter(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)];return s&&s.reduce((a,b)=>a+b,0)>0;})
+      .sort((a,b)=>String(a.skupina||'').localeCompare(String(b.skupina||''),'cs')||String(a.sk+'-'+a.reg).localeCompare(String(b.sk+'-'+b.reg),'cs'));
+    const wb=new ExcelJS.Workbook();
+    // List 1: kolik OBJEDNAT v jednotlivých měsících
+    const wO=wb.addWorksheet('Objednávky/měsíc');
+    wO.columns=[{header:'Identifikátor',width:16},{header:'Dodavatel',width:24},{header:'Název',width:40},{header:'Lhůta (d)',width:9},{header:'Dispo teď',width:10}].concat(mlab.map(m=>({header:'Obj '+m,width:8})));
+    // List 2: CÍLOVÁ zásoba v jednotlivých měsících
+    const wS=wb.addWorksheet('Cílová zásoba/měsíc');
+    wS.columns=[{header:'Identifikátor',width:16},{header:'Dodavatel',width:24},{header:'Název',width:40},{header:'Lhůta (d)',width:9}].concat(mlab.map(m=>({header:'Cíl '+m,width:8})));
+    const agg=Array.from({length:12},()=>({items:0,ks:0,kc:0}));
+    paired.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; const p=objPlan(x,s,P,m0); const ident=String(x.sk)+'-'+String(x.reg);
+      const rO=wO.addRow([ident,x.skupina,x.nazev,x.lead,x.avail].concat(p.rec.map(r=>r.order||'')));
+      rO.getCell(1).numFmt='@';
+      const rS=wS.addRow([ident,x.skupina,x.nazev,x.lead].concat(p.rec.map(r=>r.S)));
+      rS.getCell(1).numFmt='@';
+      p.rec.forEach((r,t)=>{if(r.order>0){const mi=(m0+t)%12;agg[mi].items++;agg[mi].ks+=r.order;agg[mi].kc+=r.value;}});});
+    wO.getRow(1).font={bold:true}; wS.getRow(1).font={bold:true};
+    // List 3: souhrnný rytmus
+    const wR=wb.addWorksheet('Souhrn rytmu');
+    wR.columns=[{header:'Měsíc',width:10},{header:'Položek k obj.',width:14},{header:'Kusů',width:10},{header:'Hodnota (Kč)',width:14}];
+    for(let t=0;t<12;t++){const mi=(m0+t)%12;const a=agg[mi];wR.addRow([OBJ_MN[mi],a.items,a.ks,Math.round(a.kc)]);}
+    wR.getRow(1).font={bold:true};
+    const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='mesicni-plan-objednavek.xlsx';document.body.appendChild(a);a.click();a.remove();
+    if(typeof toast==='function')toast('Měsíční plán vyexportován ('+paired.length+' položek × 12 měsíců)');
   }catch(e){alert('Export selhal: '+e.message);}
 }
 function renderNakup(){
