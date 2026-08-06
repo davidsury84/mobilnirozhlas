@@ -157,6 +157,13 @@ function mount(host) {
   }
 
   // ---------- objednávkový report (ERP pozice × poptávka z prodejů) ----------
+  function fwdCover(position, sales, m0) { // na kolik měsíců pozice pokryje sezónní poptávku dopředu
+    if (position <= 0) return 0; if (!sales || sales.reduce((s, v) => s + v, 0) <= 0) return Infinity;
+    let rem = position, mo = 0;
+    for (let k = 0; k < 48; k++) { const d = sales[(m0 + k) % 12] || 0; if (d <= 0) { mo += 1; continue; } if (rem >= d) { rem -= d; mo += 1; } else { mo += rem / d; return mo; } }
+    return 48;
+  }
+  const covTxt = cv => cv === 0 ? '0' : !isFinite(cv) ? '∞' : cv >= 48 ? '4+ r' : cv >= 24 ? (Math.round(cv / 12 * 10) / 10).toLocaleString('cs-CZ') + ' r' : (Math.round(cv * 10) / 10).toLocaleString('cs-CZ') + ' m';
   function computeOrderRow(x, sales, P, m0) {
     const D = sales ? sales.reduce((s, v) => s + (v || 0), 0) : 0;
     const Lm = (x.lead || 0) / 30, coverM = Math.max(0.5, P.cover || 2), windowM = Lm + coverM;
@@ -170,7 +177,8 @@ function mount(host) {
     else if (windowDem < 0.5) status = 'mimo sezónu';
     else if (position <= rop) { rec = Math.max(P.MOQ || 1, Math.round(windowDem - position)); status = 'objednat'; }
     rec = Math.max(0, rec);
-    return { D, rec, status, value: (x.unitCost > 0 ? x.unitCost * rec : 0) };
+    const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, sales, m0);
+    return { D, rec, status, value: (x.unitCost > 0 ? x.unitCost * rec : 0), coverAfter };
   }
   function buildObjednavky(cfg) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
@@ -191,11 +199,11 @@ function mount(host) {
         '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
         '<th style="text-align:left;border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">Kód</th>' +
         '<th style="text-align:left;border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">Položka</th>' +
-        R('Sklad') + R('K dispo') + R('Objednáno') + R('Lhůta') + R('Roč. prodej') + R('Objednat') + R('Hodnota') + '</tr></thead><tbody>' +
+        R('Sklad') + R('K dispo') + R('Objednáno') + R('Lhůta') + R('Roč. prodej') + R('Objednat') + R('Krytí po obj.') + R('Hodnota') + '</tr></thead><tbody>' +
         g.items.map(r => '<tr' + (r.x.avail < 0 ? ' style="background:#fbeaea"' : '') + '><td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.sk + '-' + r.x.reg) + '</td>' +
           '<td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.nazev) + '</td>' +
           cellR(fmt(r.x.stock)) + cellR((r.x.avail < 0 ? '<b style="color:#b23">' : '') + fmt(r.x.avail) + (r.x.avail < 0 ? '</b>' : '')) + cellR(fmt(r.x.onOrder)) + cellR(fmt(r.x.lead)) + cellR(fmt(r.o.D)) +
-          cellR('<b>' + fmt(r.o.rec) + '</b>') + cellR(r.o.value ? kc(r.o.value) : '—') + '</tr>').join('') + '</tbody></table>';
+          cellR('<b>' + fmt(r.o.rec) + '</b>') + cellR(covTxt(r.o.coverAfter)) + cellR(r.o.value ? kc(r.o.value) : '—') + '</tr>').join('') + '</tbody></table>';
     });
     return { subject: 'Objednávkový report (ERP) — co objednat · ' + (obj.date || ''), html: wrap('Co objednat (ERP × prodeje)', 'Položky pod bodem objednání, seskupené dle dodavatele', body, obj.date || obj.source || '—'), count: list.length, totVal };
   }
