@@ -37,6 +37,36 @@ function mount(host) {
     return { columns: hdr, rows: out };
   }
 
+  // ---- pohyby (denní rozdíly skladu → odhad výdeje) ----
+  const PREV_F = path.join(host.dataDir || __dirname, 'objednavky-prev.json');   // předchozí momentka (pro rozdíly)
+  const MOVE_F = path.join(host.dataDir || __dirname, 'objednavky-pohyby.json'); // historie pohybů (výdej/den z rozdílů)
+  const loadMoves = () => { try { return JSON.parse(fs.readFileSync(MOVE_F, 'utf8')); } catch (_) { return {}; } };
+  const snapMap = rows => { const m = {}; (rows || []).forEach(r => { m[r.sk + '-' + r.reg] = { stock: r.stock, onOrder: r.onOrder }; }); return m; };
+  // odhad výdeje za interval: příjem (pokles Objednáno) − nárůst skladu = kolik se vydalo
+  const dispatchDiff = (p, n) => { const prijem = Math.max(0, (p.onOrder || 0) - (n.onOrder || 0)); return Math.max(0, prijem - ((n.stock || 0) - (p.stock || 0))); };
+  const daysBetween = (d1, d2) => { const a = Date.parse(d1), b = Date.parse(d2); return (isNaN(a) || isNaN(b)) ? 1 : Math.max(1, Math.round((b - a) / 86400000)); };
+  function applyMovement(prevRows, prevDate, nowRows, nowDate) {
+    const mv = loadMoves(), pm = snapMap(prevRows), dd = daysBetween(prevDate, nowDate);
+    nowRows.forEach(r => { const k = r.sk + '-' + r.reg, p = pm[k]; if (!p) return;
+      const v = dispatchDiff(p, r), e = mv[k] || (mv[k] = { sum: 0, days: 0, hist: [] });
+      e.sum += v; e.days += dd; e.hist.push({ d: nowDate, v: Math.round(v) }); if (e.hist.length > 90) e.hist.shift(); });
+    try { fs.writeFileSync(MOVE_F, JSON.stringify(mv)); } catch (_) {}
+  }
+  const dateOfName = nm => { const m = /(\d{4})[-.]?(\d{2})[-.]?(\d{2})/.exec(nm || ''); return m ? (m[1] + '-' + m[2] + '-' + m[3]) : null; };
+  // bootstrap: projde až 14 nejnovějších denních souborů chronologicky a spočítá rozdíly (rozjezd historie)
+  async function bootstrapMovements(xls, newest, parsedNewest, newestDate) {
+    const recent = xls.slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).slice(-14);
+    let prevRows = null, prevDate = null;
+    for (const f of recent) {
+      let rows, dt;
+      if (f.id === newest.id) { rows = parsedNewest.rows; dt = newestDate; }
+      else { const dl = await drive.downloadFileBase64(f.id, 20 * 1024 * 1024); rows = parseObjXlsx(Buffer.from(dl.base64, 'base64')).rows; dt = dateOfName(f.name); }
+      if (prevRows && dt && prevDate && dt !== prevDate) applyMovement(prevRows, prevDate, rows, dt);
+      prevRows = rows; prevDate = dt;
+    }
+    console.log('[nakup-report] bootstrap pohybů z ' + recent.length + ' souborů');
+  }
+
   // ---- denní stažení nejnovějšího souboru z Drive (SA), rozparsování, uložení na volume ----
   async function syncObjednavky(force) {
     if (!drive || !drive.configured()) return { ok: false, error: 'Service account (GOOGLE_SA_*) není nastavený.' };
@@ -53,8 +83,14 @@ function mount(host) {
     const dl = await drive.downloadFileBase64(newest.id, 20 * 1024 * 1024);
     const parsed = parseObjXlsx(Buffer.from(dl.base64, 'base64'));
     if (!parsed.rows.length) return { ok: false, error: 'Soubor ' + newest.name + ' se nepodařilo rozparsovat.' };
-    const dm = /(\d{4})[-.]?(\d{2})[-.]?(\d{2})/.exec(newest.name || '');
-    const dataDate = dm ? (dm[1] + '-' + dm[2] + '-' + dm[3]) : today;
+    const dataDate = dateOfName(newest.name) || today;
+    // --- POHYBY: rozdíl vůči předchozí momentce; při prázdné historii bootstrap z denních souborů ---
+    try {
+      let prev = null; try { prev = JSON.parse(fs.readFileSync(PREV_F, 'utf8')); } catch (_) {}
+      if (prev && prev.rows && prev.date) { if (prev.date !== dataDate) applyMovement(prev.rows, prev.date, parsed.rows, dataDate); }
+      else if (Object.keys(loadMoves()).length === 0) { await bootstrapMovements(xls, newest, parsed, dataDate); }
+      fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder })) }));
+    } catch (e) { console.warn('[nakup-report] pohyby:', e.message); }
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));
     st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString() };
     try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
@@ -251,7 +287,12 @@ function mount(host) {
     const u = urlLib.parse(req.url, true), p = u.pathname;
     if (!p.startsWith('/api/nakup-report')) return false;
     // ERP objednávková data — čtení pro každého přihlášeného (globální SSO už ověřuje); optimalizace objednávek v appce.
-    if (p === '/api/nakup-report/objednavky' && req.method === 'GET') { json(res, 200, loadObj()); return true; }
+    if (p === '/api/nakup-report/objednavky' && req.method === 'GET') {
+      const o = loadObj(), mv = loadMoves();
+      const rows = (o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
+      json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0 }));
+      return true;
+    }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
 
     if (p === '/api/nakup-report/config' && req.method === 'GET') {
