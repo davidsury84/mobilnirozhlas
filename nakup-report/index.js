@@ -79,7 +79,17 @@ function mount(host) {
     if (!xls.length) return { ok: false, error: 'Ve složce nejsou .xlsx soubory (nasdílena SA?).' };
     xls.sort((a, b) => String(b.createdTime || '').localeCompare(String(a.createdTime || '')) || String(b.name || '').localeCompare(String(a.name || '')));
     const newest = xls[0];
-    if (!force && st.lastFileId === newest.id) { st.lastSyncDate = today; try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {} return { ok: true, skipped: true, file: newest.name, rows: st.lastRows }; }
+    if (!force && st.lastFileId === newest.id) {
+      // I bez nového souboru: pokud ještě nejsou pohyby, dopočítej je z historie složky.
+      if (Object.keys(loadMoves()).length === 0) {
+        try {
+          let parsedNow = null; try { parsedNow = JSON.parse(fs.readFileSync(OBJ_LIVE, 'utf8')); } catch (_) {}
+          if (parsedNow && parsedNow.rows) { await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
+        } catch (e) { console.warn('[nakup-report] pohyby (skip):', e.message); }
+      }
+      st.lastSyncDate = today; try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
+      return { ok: true, skipped: true, file: newest.name, rows: st.lastRows };
+    }
     const dl = await drive.downloadFileBase64(newest.id, 20 * 1024 * 1024);
     const parsed = parseObjXlsx(Buffer.from(dl.base64, 'base64'));
     if (!parsed.rows.length) return { ok: false, error: 'Soubor ' + newest.name + ' se nepodařilo rozparsovat.' };
