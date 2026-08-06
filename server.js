@@ -3254,7 +3254,11 @@ if (require.main === module) {
     maybeSendMonthlyReport();
     setInterval(maybeSendMonthlyReport, 6 * 3600 * 1000);
     // Týdenní reporty nákupu (co zlevnit / co nakoupit) — kontrola při startu a pak po 6 h (pojistka 1×/ISO-týden)
-    if (nakupReportMod) { nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 6 * 3600 * 1000); }
+    if (nakupReportMod) {
+      nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 6 * 3600 * 1000);
+      // Drive sync objednávek kontrolovat každou hodinu (nový soubor tam bývá ~7:00) — vezme ho hned, jak se objeví
+      if (nakupReportMod.sync) setInterval(() => nakupReportMod.sync().catch(() => {}), 3600 * 1000);
+    }
     // Týdenní report přihlášek mobilních lisů (souhrn nových přihlášek z dotazníku) — 1×/ISO-týden.
     if (mobilniLisyMod) { mobilniLisyMod.tick(); setInterval(() => mobilniLisyMod.tick(), 6 * 3600 * 1000); }
     // Lodní kontejnery: import poptávek z Google tabulky (Meta) každých 15 min + týdenní report (pojistka 1×/ISO-týden).

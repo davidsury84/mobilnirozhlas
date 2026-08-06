@@ -42,7 +42,8 @@ function mount(host) {
     if (!drive || !drive.configured()) return { ok: false, error: 'Service account (GOOGLE_SA_*) není nastavený.' };
     let st = {}; try { st = JSON.parse(fs.readFileSync(SYNC_STATE, 'utf8')) || {}; } catch (_) {}
     const today = new Date().toISOString().slice(0, 10);
-    if (!force && st.lastSyncDate === today) return { ok: true, skipped: true, file: st.lastFileName, rows: st.lastRows };
+    // Nezkracujeme podle dne — kontrolujeme složku vždy a stahujeme jen když je NOVĚJŠÍ soubor (dle ID).
+    // (Nový soubor tam bývá ~7:00; server ho vezme při nejbližší kontrole.)
     const files = await drive.listFolder(OBJ_FOLDER);
     const xls = (files || []).filter(f => /\.xlsx$/i.test(f.name || '') || /spreadsheetml/.test(f.mimeType || ''));
     if (!xls.length) return { ok: false, error: 'Ve složce nejsou .xlsx soubory (nasdílena SA?).' };
@@ -292,7 +293,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick };
+  return { handle, tick, sync: () => syncObjednavky(false) };
 }
 
 module.exports = { mount };
