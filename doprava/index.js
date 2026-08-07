@@ -503,6 +503,32 @@ function mount(host) {
       return true;
     }
 
+    // Správa denní rozesílky ceníku (jen správce): číst / uložit nastavení / poslat teď.
+    if (p === '/api/doprava/cenik-nastaveni' && req.method === 'GET') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+      json(res, 200, { ...cenikCfg(), posledni: cenikStav(), postaOk: !!host.deliver }); return true;
+    }
+    if (p === '/api/doprava/cenik-nastaveni' && req.method === 'POST') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+      const cfg = {
+        zapnuto: !!b.zapnuto,
+        prijemci: String(b.prijemci || '').split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)).slice(0, 10),
+        hodina: Math.min(20, Math.max(0, Math.round(Number(b.hodina)) || 6)),
+        marze: Math.min(15, Math.max(0, Number(b.marze) || 5)),
+        kryti: Math.min(100, Math.max(40, Math.round(Number(b.kryti)) || 70)),
+        strop: Math.min(80, Math.max(25, Number(b.strop) || 45)),
+      };
+      try { fs.writeFileSync(CENIK_CFG_F, JSON.stringify(cfg, null, 2)); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
+      json(res, 200, { ok: true, ...cenikCfg(), posledni: cenikStav(), postaOk: !!host.deliver }); return true;
+    }
+    if (p === '/api/doprava/cenik-poslat' && req.method === 'POST') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+      try { await cenikEmail(true); json(res, 200, { ok: true, komu: cenikCfg().prijemci, posledni: cenikStav() }); }
+      catch (e) { json(res, 200, { chyba: e.message }); }
+      return true;
+    }
+
     // Uložení řidiče / typu vozidla k číslu vozu (jen správce).
     if (p === '/api/doprava/vozidlo' && req.method === 'POST') {
       if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Upravovat řidiče a vozidla smí jen správce.' }); return true; }
@@ -521,8 +547,22 @@ function mount(host) {
   }
 
   /* ---------- denní e-mail s pohyblivým ceníkem (klouzavá kalkulace na cílovou marži) ---------- */
-  const CENIK_EMAIL = () => { const e = (process.env.DOPRAVA_CENIK_EMAIL != null ? process.env.DOPRAVA_CENIK_EMAIL : 'patrik.deml@elkoplast.cz').trim(); return (e && e !== 'off') ? e : ''; };
   const CENIK_STATE_F = path.join(host.dataDir || __dirname, 'doprava-cenik-notif.json');
+  // Nastavení rozesílky — edituje správce v modulu; env proměnné slouží jen jako výchozí hodnoty.
+  const CENIK_CFG_F = path.join(host.dataDir || __dirname, 'doprava-cenik.json');
+  function cenikCfg() {
+    let c = {}; try { c = JSON.parse(fs.readFileSync(CENIK_CFG_F, 'utf8')); } catch (_) {}
+    const envMail = (process.env.DOPRAVA_CENIK_EMAIL != null ? process.env.DOPRAVA_CENIK_EMAIL : 'patrik.deml@elkoplast.cz').trim();
+    return {
+      zapnuto: c.zapnuto != null ? !!c.zapnuto : (envMail !== '' && envMail !== 'off'),
+      prijemci: Array.isArray(c.prijemci) && c.prijemci.length ? c.prijemci : ((envMail && envMail !== 'off') ? envMail.split(',').map((x) => x.trim()).filter(Boolean) : []),
+      hodina: (c.hodina != null && isFinite(c.hodina)) ? Math.min(20, Math.max(0, Number(c.hodina))) : 6,
+      marze: (c.marze != null && isFinite(c.marze)) ? Math.min(15, Math.max(0, Number(c.marze))) : 5,
+      kryti: (c.kryti != null && isFinite(c.kryti)) ? Math.min(100, Math.max(40, Number(c.kryti))) : 70,
+      strop: (c.strop != null && isFinite(c.strop)) ? Number(c.strop) : Number(process.env.DOPRAVA_CENIK_STROP || 45),
+    };
+  }
+  function cenikStav() { try { return JSON.parse(fs.readFileSync(CENIK_STATE_F, 'utf8')); } catch (_) { return {}; } }
   // Stejná logika jako záložka „Pohyblivá cena": fixy a variabilní náklady vozu z účetnictví,
   // MTD z rozpracovaného měsíce Daily reportu, cena zbytku měsíce na cílovou marži.
   function cenikDne() {
@@ -539,7 +579,8 @@ function mount(host) {
     const mesice = mesAll.filter((mm) => sum[mm].km > 0.35 * maxKm && sum[mm].trzby > 0);
     const rozp = mesAll.filter((k) => !mesice.includes(k) && (sum[k].km > 0 || sum[k].trzby > 0) && (!mesice.length || k > mesice[mesice.length - 1])).sort().pop() || null;
     const posledni = mesice.length ? Number(mesice[mesice.length - 1].replace('-', '')) : null;
-    const mar = 0.05, kryti = 0.7, strop = Number(process.env.DOPRAVA_CENIK_STROP || 45);
+    const cfg = cenikCfg();
+    const mar = cfg.marze / 100, kryti = cfg.kryti / 100, strop = cfg.strop;
     const FIXV = N.celkemFix, FIXBASE = FIXV != null ? Math.max(0, FIXV - (N.leasingTahac || 0) - (N.leasingNaves || 0)) : null;
     const fixUcto = (e) => { if (!e || !EKN) return null; const s = (p) => { const x = e.polozky.find((q) => q.nazev.indexOf(p) === 0); return x ? (x.celkem || 0) : 0; };
       const f = (s('551000') + s('518410') + ((e.souhrny.rezijni && e.souhrny.rezijni.celkem) || 0) + s('548110') + s('548200') + s('548210') + s('531000')) / EKN; return f > 0 ? f : null; };
@@ -569,14 +610,16 @@ function mount(host) {
     rows.sort((a, b) => b.pTed - a.pTed);
     return { rows, rozp, strop, mar, kryti };
   }
-  async function cenikEmail() {
-    if (!host.deliver || !CENIK_EMAIL()) return;
+  // force = ruční „Odeslat teď" ze správy (ignoruje denní pojistku i hodinu; chyby propadají volajícímu)
+  async function cenikEmail(force) {
+    const cfg = cenikCfg();
+    if (!host.deliver) { if (force) throw new Error('Odesílání pošty není na serveru nakonfigurováno.'); return; }
+    if (!cfg.zapnuto || !cfg.prijemci.length) { if (force) throw new Error('Rozesílka je vypnutá nebo nemá příjemce.'); return; }
     const ted = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Prague' }));
-    if (ted.getHours() < 6) return;                                     // rozesílat až po ránu
+    if (!force && ted.getHours() < cfg.hodina) return;                  // rozesílat až po nastavené hodině
     const dnes = ted.getFullYear() + '-' + String(ted.getMonth() + 1).padStart(2, '0') + '-' + String(ted.getDate()).padStart(2, '0');
-    let st = {}; try { st = JSON.parse(fs.readFileSync(CENIK_STATE_F, 'utf8')); } catch (_) {}
-    if (st.dnes === dnes) return;                                       // dnes už odesláno
-    const c = cenikDne(); if (!c || !c.rows.length) return;
+    if (!force && cenikStav().dnes === dnes) return;                    // dnes už odesláno
+    const c = cenikDne(); if (!c || !c.rows.length) { if (force) throw new Error('Nejsou data pro sestavení ceníku.'); return; }
     const d2 = (v) => v.toFixed(2).replace('.', ',');
     const pad = (s, n) => String(s).padEnd(n);
     const lines = c.rows.map((r) => pad(r.cislo, 5) + pad((r.ridic || '—').slice(0, 12), 13) + pad(r.mtdKm.toLocaleString('cs-CZ') + ' km', 10)
@@ -592,11 +635,10 @@ function mount(host) {
       + (pokryte.length ? 'Fixy pokryté (možno jít na nízkou cenu): ' + pokryte.join(', ') + '\n' : '')
       + (nadS.length ? 'Nad konkurenčním stropem ' + d2(c.strop) + ' Kč/km: ' + nadS.join(', ') + '\n' : '')
       + '\nDetail a posuvníky: ' + (base ? base + '/doprava' : 'intranet -> Doprava') + ' (záložka Pohyblivá cena)';
-    try {
-      await host.deliver({ to: CENIK_EMAIL(), subject: '[Doprava] Pohyblivý ceník ' + dnes + (nadS.length ? ' · ' + nadS.length + ' vozů nad stropem' : ''), text });
-      fs.writeFileSync(CENIK_STATE_F, JSON.stringify({ dnes, at: Date.now() }));
-      console.log('[doprava] denní ceník odeslán na ' + CENIK_EMAIL());
-    } catch (e) { console.error('[doprava] denní ceník se nepodařilo odeslat:', e.message); }
+    const subject = '[Doprava] Pohyblivý ceník ' + dnes + (nadS.length ? ' · ' + nadS.length + ' vozů nad stropem' : '');
+    for (const to of cfg.prijemci) await host.deliver({ to, subject, text });
+    fs.writeFileSync(CENIK_STATE_F, JSON.stringify({ dnes, at: Date.now(), komu: cfg.prijemci, rucne: !!force }));
+    console.log('[doprava] denní ceník odeslán na ' + cfg.prijemci.join(', ') + (force ? ' (ručně)' : ''));
   }
 
   // Tick (co 6 h): předehřátí cache, ať první otevření stránky nečeká na Google.

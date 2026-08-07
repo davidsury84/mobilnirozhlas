@@ -197,6 +197,51 @@ function render(tab){
   window.scrollTo(0,0);
 }
 
+/* ---------- správa denní rozesílky ceníku (jen správce) ---------- */
+async function cenikAdminNacti(){
+  const box=document.getElementById('cenikAdmin'); if(!box) return;
+  let c;
+  try{ const r=await fetch('/api/doprava/cenik-nastaveni',{cache:'no-store'}); c=await r.json(); if(!r.ok) throw new Error(c.chyba||r.status); }
+  catch(e){ box.innerHTML='<h2 style="margin:0 0 8px">Denní e-mail s ceníkem — správa rozesílky</h2>'+alertHtml('danger','Nastavení se nepodařilo načíst: '+esc(e.message)); return; }
+  const posledni=c.posledni&&c.posledni.at? new Date(c.posledni.at).toLocaleString('cs-CZ')+' → '+((c.posledni.komu||[]).join(', ')||'—')+(c.posledni.rucne?' (ručně)':'') : 'zatím nikdy';
+  box.innerHTML='<h2 style="margin:0 0 8px">Denní e-mail s ceníkem — správa rozesílky</h2>'
+    +(c.postaOk?'':alertHtml('warn','Server nemá nakonfigurované odesílání pošty — rozesílka nepoběží.'))
+    +'<div class="sliders" style="margin-bottom:10px">'
+    +'<div class="sl"><label>Rozesílat</label><label style="width:auto;display:inline-flex;align-items:center;gap:6px;color:inherit"><input type="checkbox" id="ceZap"'+(c.zapnuto?' checked':'')+'> zapnuto (denně, 1×)</label></div>'
+    +'<div class="sl"><label>Hodina (po)</label><input type="number" id="ceHod" min="0" max="20" value="'+c.hodina+'" style="width:80px"></div>'
+    +'<div class="sl" style="grid-column:1/-1"><label>Příjemci</label><input id="cePri" value="'+esc((c.prijemci||[]).join(', '))+'" placeholder="e-maily oddělené čárkou" style="flex:1;min-width:0"></div>'
+    +'<div class="sl"><label>Cílová marže</label><input type="number" id="ceMar" min="0" max="15" step="0.5" value="'+c.marze+'" style="width:80px"><span class="muted">%</span></div>'
+    +'<div class="sl"><label>Fixy nese prvních</label><input type="number" id="ceKry" min="40" max="100" step="5" value="'+c.kryti+'" style="width:80px"><span class="muted">% plánu</span></div>'
+    +'<div class="sl"><label>Konkurenční strop</label><input type="number" id="ceStr" min="25" max="80" step="0.5" value="'+c.strop+'" style="width:80px"><span class="muted">Kč/km</span></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    +'<button class="btn" id="ceUloz">Uložit nastavení</button>'
+    +'<button class="btn sec" id="cePosli">Odeslat teď</button>'
+    +'<span class="muted" id="ceStav">Poslední odeslání: '+esc(posledni)+'</span></div>'
+    +'<p class="muted" style="font-size:12px;margin:8px 0 0">Marže, krytí fixů a strop platí i pro e-mail (tabulka a semafor se počítají z těchto hodnot). Posuvníky nahoře na stránce jsou jen náhled a nastavení rozesílky nemění.</p>';
+  const stav=t=>{document.getElementById('ceStav').textContent=t;};
+  document.getElementById('ceUloz').onclick=async()=>{
+    stav('Ukládám…');
+    try{
+      const r=await fetch('/api/doprava/cenik-nastaveni',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        zapnuto:document.getElementById('ceZap').checked, prijemci:document.getElementById('cePri').value,
+        hodina:document.getElementById('ceHod').value, marze:document.getElementById('ceMar').value,
+        kryti:document.getElementById('ceKry').value, strop:document.getElementById('ceStr').value })});
+      const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status);
+      stav('Uloženo ✓ · příjemci: '+(j.prijemci||[]).join(', ')+(j.zapnuto?'':' · ROZESÍLKA VYPNUTA'));
+    }catch(e){ stav('Chyba: '+e.message); }
+  };
+  document.getElementById('cePosli').onclick=async()=>{
+    if(!confirm('Odeslat ceník teď na: '+document.getElementById('cePri').value+'?\n(Nejdřív ulož případné změny nastavení.)')) return;
+    stav('Odesílám…');
+    try{
+      const r=await fetch('/api/doprava/cenik-poslat',{method:'POST'});
+      const j=await r.json(); if(j.chyba) throw new Error(j.chyba);
+      stav('Odesláno ✓ → '+(j.komu||[]).join(', ')+' ('+new Date().toLocaleTimeString('cs-CZ')+')');
+    }catch(e){ stav('Chyba: '+e.message); }
+  };
+}
+
 /* ================= FINANČNÍ PLÁN (Plán tržeb aktuální) ================= */
 function tabPlan(){
   const m=M, P=DATA.plan;
@@ -299,8 +344,9 @@ function tabCena(){
   h+='<div class="chartbox"><h2 style="margin:0 0 8px">Cenová křivka vozu <select id="pVoz" style="margin-left:8px"></select> <span class="muted" id="pVozInfo"></span></h2>'
     +legenda([[B,'Nabízená cena podle odjetých km'],[R,'Konkurenční strop'],[GR,'Variabilní náklady (absolutní dno)'],[G,'Pozice teď']])
     +cv('chCena',300)+'</div>';
-  h+=alertHtml('info','<b>Automatické hlídání:</b> Daily report se plní denně a modul si ho stahuje — „cena teď" je tedy vždy aktuální po otevření záložky. Chceš-li hlídání bez otevírání intranetu, doporučuji denní e-mail dispečerovi (ceník všech vozů + semafor, kdo už může zlevnit) — server to umí rozeslat automaticky, řekni a doplním.');
+  if(ADMIN) h+='<div class="chartbox" id="cenikAdmin"><h2 style="margin:0 0 8px">Denní e-mail s ceníkem — správa rozesílky</h2><p class="muted">Načítám nastavení…</p></div>';
   $('#app').innerHTML=h;
+  if(ADMIN) cenikAdminNacti();
 
   const akt=m.aktivni.filter(v=>!v.pausal);   // paušály mají smluvní cenu, klouzavá kalkulace se jich netýká
   const sel=$('#pVoz');
