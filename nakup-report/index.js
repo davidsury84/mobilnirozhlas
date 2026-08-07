@@ -21,7 +21,20 @@ function mount(host) {
   const OBJ_LIVE = path.join(host.dataDir || __dirname, 'smi-objednavky-data.json'); // denně aktualizováno z Google Drive (volume)
   const SYNC_STATE = path.join(host.dataDir || __dirname, 'objednavky-sync.json');   // stav Drive sync (poslední soubor/den)
   const OBJ_FOLDER = process.env.OBJEDNAVKY_DRIVE_FOLDER || '1n8OCCiXFw86e4EXnkyX8C5i5uu404aO1'; // sdílená složka s SA, denně nový soubor
+  const SUP_F = path.join(host.dataDir || __dirname, 'nakup-dodavatele.json');       // dotazník dodavatelů: termín dodání + náklad na dopravu (writable)
   const loadObj = () => { for (const f of [OBJ_LIVE, OBJ_SEED]) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) {} } return { rows: [], columns: [], date: '' }; };
+  const loadSup = () => { try { return JSON.parse(fs.readFileSync(SUP_F, 'utf8')) || {}; } catch (_) { return {}; } };
+  const saveSup = m => { try { fs.writeFileSync(SUP_F, JSON.stringify(m, null, 2)); } catch (_) {} };
+  // Odvozený seznam dodavatelů z ERP: název, počet položek, medián dodací lhůty, hodnota zásoby — + uložené hodnoty dotazníku.
+  function supplierList() {
+    const o = loadObj(), saved = loadSup(), g = {};
+    (o.rows || []).forEach(r => { const k = r.skupina || '—'; (g[k] = g[k] || { supplier: k, items: 0, leads: [], stockVal: 0 }); g[k].items++; if (r.lead > 0) g[k].leads.push(r.lead); g[k].stockVal += (r.stock || 0) * (r.unitCost || 0); });
+    return Object.values(g).map(x => {
+      const ls = x.leads.slice().sort((a, b) => a - b), med = ls.length ? ls[Math.floor(ls.length / 2)] : 0;
+      const s = saved[x.supplier] || {};
+      return { supplier: x.supplier, items: x.items, erpLead: med, stockVal: Math.round(x.stockVal), lead: (s.lead != null ? s.lead : null), shipCost: (s.shipCost != null ? s.shipCost : null), origin: s.origin || '' };
+    }).sort((a, b) => b.stockVal - a.stockVal);
+  }
 
   // ---- parse ERP xlsx (názvy sloupců robustně) ----
   function parseObjXlsx(buf) {
@@ -318,10 +331,31 @@ function mount(host) {
     if (p === '/api/nakup-report/objednavky' && req.method === 'GET') {
       const o = loadObj(), mv = loadMoves();
       const rows = (o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
-      json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0 }));
+      json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup() }));
       return true;
     }
+    // Dotazník dodavatelů — čtení pro přihlášené (EOQ v appce potřebuje náklad na dopravu + lhůtu)
+    if (p === '/api/nakup-report/suppliers' && req.method === 'GET') {
+      return json(res, 200, { suppliers: supplierList() }), true;
+    }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
+
+    if (p === '/api/nakup-report/suppliers' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; }
+      const cur = loadSup();
+      // b.suppliers = { [name]: { lead, shipCost, origin } } — přepíšeme jen zaslané klíče, prázdné hodnoty = smazat
+      if (b.suppliers && typeof b.suppliers === 'object') {
+        Object.keys(b.suppliers).forEach(k => {
+          const v = b.suppliers[k] || {}, e = {};
+          if (v.lead !== '' && v.lead != null && isFinite(+v.lead)) e.lead = Math.max(0, Math.round(+v.lead));
+          if (v.shipCost !== '' && v.shipCost != null && isFinite(+v.shipCost)) e.shipCost = Math.max(0, Math.round(+v.shipCost));
+          if (v.origin) e.origin = String(v.origin).slice(0, 40);
+          if (Object.keys(e).length) cur[k] = e; else delete cur[k];
+        });
+        saveSup(cur);
+      }
+      return json(res, 200, { ok: true, suppliers: cur }), true;
+    }
 
     if (p === '/api/nakup-report/config' && req.method === 'GET') {
       let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}

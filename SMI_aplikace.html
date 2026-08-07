@@ -665,6 +665,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <details class="settings" style="margin:6px 0 10px"><summary>📅 Měsíční plán objednávek — kolik položek objednávat každý měsíc</summary>
         <div id="objPlanWrap" style="margin-top:8px;font-size:13px"></div>
       </details>
+      <details class="settings" id="objSupPanel" style="margin:6px 0 10px;display:none"><summary>🚚 Dodavatelé — termín dodání &amp; náklad na dopravu (dotazník pro EOQ)</summary>
+        <div id="objSupWrap" style="margin-top:8px;font-size:13px"></div>
+      </details>
       <div class="toolbar">
         <input type="text" id="objSearch" placeholder="Hledat položku / kód…" style="min-width:220px">
         <select id="objSup"><option value="">Všichni dodavatelé</option></select>
@@ -1804,7 +1807,8 @@ function nkLoadReportCfg(){
     if(di)di.innerHTML='ERP data: <b>'+(d.objDate||'?')+'</b> ('+(d.objRows||0)+' pol.)'+(sy.lastAt?(' · poslední Drive sync '+new Date(sy.lastAt).toLocaleString('cs-CZ')+(sy.lastFileName?(' ('+sy.lastFileName+')'):'')):' · zatím nesynchronizováno')+(d.driveConfigured?'':' · <b style="color:#b06f00">⚠ SA nenastaven</b>')+(d.saEmail?('<br>Sdílej složku Disku tomuto účtu (role Prohlížející): <b>'+d.saEmail+'</b>'):'');
     const bo=$('#nkRepSendObj'); if(bo)bo.onclick=()=>nkSendReport('objednavky');
     const sn=$('#nkSyncNow'); if(sn)sn.onclick=nkSyncNow;
-  }).catch(()=>{/* nejsi správce → karta zůstane skrytá */});
+    const sp=$('#objSupPanel'); if(sp){sp.style.display='';} objLoadSuppliers();  // admin → dotazník dodavatelů
+  }).catch(()=>{/* nejsi správce → karta i dotazník zůstanou skryté */});
 }
 function nkSaveReportCfg(){
   const body={markdownTo:$('#nkRepMd').value,enabled:$('#nkRepEnabled').checked,weekday:+$('#nkRepDay').value,objednavkyTo:$('#nkRepObj')?$('#nkRepObj').value:'',objednavkyEnabled:$('#nkRepObjEn')?$('#nkRepObjEn').checked:false,objednavkyDay:$('#nkRepObjDay')?+$('#nkRepObjDay').value:1};
@@ -1832,7 +1836,7 @@ function nkSendReport(type){
     $('#nkRepStatus').textContent=d.ok?('✓ Odesláno '+label+' — '+d.count+' položek, příjemci: '+(d.to||[]).join(', ')):('Chyba odeslání: '+(d.error||'')); 
   }).catch(()=>{$('#nkRepStatus').textContent='Chyba odeslání';});
 }
-let OBJ_DATA=null, OBJ_WIRED=false;
+let OBJ_DATA=null, OBJ_WIRED=false, OBJ_CYCLES={};
 const MN_CZ=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 function objSeason(sales){
   const def={isSeasonal:false,tag:'—',peak:'',peakMonth:-1,share:0};
@@ -1895,6 +1899,29 @@ function objComputeOrder(x,sales,P,m0,sea){
   const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,sales,m0);
   return {D,rec,status,ramp,value:(x.unitCost>0?x.unitCost*rec:0),windowDem:Math.round(windowDem),coverAfter:coverAfter};
 }
+// Společné objednávání dodavatele (joint replenishment): z Číny jede jedna zásilka se sortimentem
+// celého dodavatele → doprava se sdílí. Optimální společný interval T* = √(2·doprava / Σ(poptávka×skladné/ks)).
+// Každá položka pak jede v množství = její roční poptávka × T*. Dražší doprava → delší interval, větší dávky.
+function objHoldRate(){ try{ if(!NK_PARAMS||!NK_PARAMS.effHold) nkCompute(); }catch(e){} return (NK_PARAMS&&NK_PARAMS.effHold)||0.25; }
+function objSupplierCycles(rows,smap,hold){
+  const sup=((OBJ_DATA&&OBJ_DATA.suppliers)||{}), g={};
+  rows.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; const D=s?s.reduce((a,b)=>a+(b||0),0):0; const unit=x.unitCost>0?x.unitCost:(x.unitPrice||0);
+    const k=x.skupina||'—'; (g[k]=g[k]||{sumDh:0,sumD:0}); g[k].sumDh+=D*hold*unit; g[k].sumD+=D;});
+  const out={};
+  for(const k in g){ const s=sup[k]||{}; const S=(s.shipCost!=null?+s.shipCost:null);
+    let Tm=null; if(S>0&&g[k].sumDh>0){ let ty=Math.sqrt(2*S/g[k].sumDh); Tm=Math.min(24,Math.max(0.5,ty*12)); } // roky→měs, cap 0,5–24 měs
+    out[k]={T:Tm,S:S,lead:(s.lead!=null?+s.lead:null),origin:s.origin||'',sumDh:g[k].sumDh}; }
+  return out;
+}
+function objEOQ(x,sales,cyc){
+  const D=sales?sales.reduce((a,b)=>a+(b||0),0):0;
+  const c=(cyc||{})[x.skupina||'—']||{};
+  const lead=(c.lead!=null?c.lead:(x.lead||0));
+  if(!(D>0)||c.T==null) return {eoq:null,interval:null,lead,S:c.S,origin:c.origin||''};
+  const eoq=Math.max(1,Math.round(D*c.T/12));                     // množství této položky na jednu společnou zásilku
+  return {eoq,interval:c.T,lead,S:c.S,origin:c.origin||''};
+}
+function objIntTxt(m){ if(m==null||!isFinite(m))return '—'; if(m>=18)return (Math.round(m/12*10)/10).toString().replace('.',',')+' r'; return (Math.round(m*10)/10).toString().replace('.',',')+' m'; }
 async function renderObjednavky(){
   if(!OBJ_DATA){
     try{const r=await fetch('/api/nakup-report/objednavky',{cache:'no-store'});OBJ_DATA=await r.json();}catch(e){OBJ_DATA={rows:[]};}
@@ -1904,7 +1931,8 @@ async function renderObjednavky(){
   }
   const smap=objSalesMap();const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
-  (OBJ_DATA.rows||[]).forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)];x._s=objSeason(s);x._o=objComputeOrder(x,s,P,m0,x._s);});
+  const hold=objHoldRate(); OBJ_CYCLES=objSupplierCycles(OBJ_DATA.rows||[],smap,hold);
+  (OBJ_DATA.rows||[]).forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)];x._s=objSeason(s);x._o=objComputeOrder(x,s,P,m0,x._s);x._e=objEOQ(x,s,OBJ_CYCLES);});
   try{objRenderSeason();}catch(e){}
   try{objRenderPlan();}catch(e){}
   if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;}
@@ -1924,7 +1952,7 @@ function objDraw(){
   const gk=Object.keys(groups).map(k=>{const items=groups[k].sort((a,b)=>b._o.value-a._o.value||b._o.rec-a._o.rec);return {sup:k,items,val:items.reduce((s,x)=>s+x._o.value,0),ks:items.reduce((s,x)=>s+x._o.rec,0)};}).sort((a,b)=>b.val-a.val);
   const R='style="text-align:right"';
   // VŠECHNY původní ERP sloupce (Název = dodavatel je členění) + přidané Roční prodej / Objednat / Hodnota
-  const hdrs=[['SK',0],['Registrační číslo',0],['Název 1',0],['Doplňkový kód',0],['Mn.po p/v',1],['K dispo. po p/v',1],['Vypočtený průměr',1],['Průměr+SN',1],['Objednáno',1],['Rezervováno',1],['Dodací lhůta',1],['Roční prodej',1],['Spotřeba/den',1],['Sezónnost',0],['Objednat',1],['Krytí po obj.',1],['Hodnota',1]];
+  const hdrs=[['SK',0],['Registrační číslo',0],['Název 1',0],['Doplňkový kód',0],['Mn.po p/v',1],['K dispo. po p/v',1],['Vypočtený průměr',1],['Průměr+SN',1],['Objednáno',1],['Rezervováno',1],['Dodací lhůta',1],['Roční prodej',1],['Spotřeba/den',1],['Sezónnost',0],['Objednat',1],['Ekon. dávka',1],['Obj. interval',1],['Krytí po obj.',1],['Hodnota',1]];
   const NC=hdrs.length;
   let h2='<thead><tr>'+hdrs.map(c=>'<th '+(c[1]?R:'')+'>'+esc(c[0])+'</th>').join('')+'</tr></thead><tbody>';
   gk.forEach(g=>{
@@ -1935,7 +1963,7 @@ function objDraw(){
         '<td '+R+'>'+fmt(x.stock)+'</td><td '+R+(crit?' style="color:#b23;font-weight:700"':'')+'>'+fmt(x.avail)+'</td>'+
         '<td '+R+'>'+fmt(x.unitPrice)+'</td><td '+R+'>'+fmt(x.unitCost)+'</td>'+
         '<td '+R+'>'+fmt(x.onOrder)+'</td><td '+R+'>'+fmt(x.reserved)+'</td><td '+R+'>'+fmt(x.lead)+'</td>'+
-        '<td '+R+'>'+fmt(o.D)+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+'</td><td '+R+'><b>'+(o.rec?fmt(o.rec):'—')+'</b></td><td '+R+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?fmt(o.value)+' Kč':'—')+'</td></tr>';});
+        '<td '+R+'>'+fmt(o.D)+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+'</td><td '+R+'><b>'+(o.rec?fmt(o.rec):'—')+'</b></td><td '+R+' title="'+(x._e&&x._e.eoq?('dodavatel '+esc(x.skupina)+': 1 společná zásilka / '+objIntTxt(x._e.interval)+(x._e.S?(', doprava '+fmt(x._e.S)+' Kč sdílená'):'')+'; toto je množství této položky na zásilku'):'vyplň dotazník dodavatele (náklad na dopravu)')+'">'+(x._e&&x._e.eoq?fmt(x._e.eoq):'—')+'</td><td '+R+'>'+(x._e?objIntTxt(x._e.interval):'—')+'</td><td '+R+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?fmt(o.value)+' Kč':'—')+'</td></tr>';});
   });
   h2+='<tr><td colspan="'+NC+'" class="muted" style="text-align:right">'+list.length+' položek · '+gk.length+' dodavatelů</td></tr></tbody>';
   $('#objTbl').innerHTML=h2;
@@ -1956,14 +1984,15 @@ async function objExport(){
 async function objExportAll(){
   try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
     const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('ERP tabulka');
-    ws.columns=[{header:'Identifikátor (SK-reg)',width:18},{header:'SK',width:8},{header:'Registrační číslo',width:16},{header:'Dodavatel (skupina)',width:24},{header:'Název 1',width:40},{header:'Doplňkový kód',width:16},{header:'Mn.po p/v',width:10},{header:'K dispo. po p/v',width:13},{header:'Vypočtený průměr',width:14},{header:'Průměr+SN',width:12},{header:'Objednáno',width:11},{header:'Rezervováno',width:12},{header:'Dodací lhůta',width:12},{header:'Roční prodej',width:12},{header:'Spotřeba/den',width:12},{header:'Sezónnost (špička)',width:16},{header:'Objednat',width:11},{header:'Krytí po obj. (měs.)',width:16},{header:'Hodnota (Kč)',width:12},{header:'Stav',width:22}];
+    ws.columns=[{header:'Identifikátor (SK-reg)',width:18},{header:'SK',width:8},{header:'Registrační číslo',width:16},{header:'Dodavatel (skupina)',width:24},{header:'Název 1',width:40},{header:'Doplňkový kód',width:16},{header:'Mn.po p/v',width:10},{header:'K dispo. po p/v',width:13},{header:'Vypočtený průměr',width:14},{header:'Průměr+SN',width:12},{header:'Objednáno',width:11},{header:'Rezervováno',width:12},{header:'Dodací lhůta',width:12},{header:'Roční prodej',width:12},{header:'Spotřeba/den',width:12},{header:'Sezónnost (špička)',width:16},{header:'Objednat',width:11},{header:'Ekon. dávka (EOQ)',width:14},{header:'Obj. interval (měs.)',width:15},{header:'Doprava (Kč/obj.)',width:14},{header:'Krytí po obj. (měs.)',width:16},{header:'Hodnota (Kč)',width:12},{header:'Stav',width:22}];
     // VŠECHNY položky, nic nefiltrujeme; řazení dle dodavatele, pak dle identifikátoru
     const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).slice().sort((a,b)=>String(a.skupina||'').localeCompare(String(b.skupina||''),'cs')||String(a.sk+'-'+a.reg).localeCompare(String(b.sk+'-'+b.reg),'cs'));
     let curSup=null;
     rows.forEach(x=>{
       if(x.skupina!==curSup){curSup=x.skupina; const hr=ws.addRow(['▸ '+(curSup||'—')]); hr.font={bold:true}; hr.getCell(1).value='▸ '+(curSup||'—');}
       const o=x._o||{},ident=String(x.sk)+'-'+String(x.reg);
-      const r=ws.addRow([ident,x.sk,x.reg,x.skupina,x.nazev,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),(o.rec||0),(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value||0),(o.status||'')]);
+      const e=x._e||{};
+      const r=ws.addRow([ident,x.sk,x.reg,x.skupina,x.nazev,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),(o.rec||0),(e.eoq||''),(e.interval!=null&&isFinite(e.interval)?Math.round(e.interval*10)/10:''),(e.S!=null?e.S:''),(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value||0),(o.status||'')]);
       r.getCell(1).numFmt='@'; // identifikátor jako text
       r.getCell(3).numFmt='@'; // reg. číslo jako text (neořezávat)
     });
@@ -2039,6 +2068,58 @@ async function objExportPlan(){
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='mesicni-plan-objednavek.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast('Měsíční plán vyexportován ('+paired.length+' položek × 12 měsíců)');
   }catch(e){alert('Export selhal: '+e.message);}
+}
+// ---- DOTAZNÍK DODAVATELŮ (termín dodání + náklad na dopravu) → krmí EOQ ----
+var OBJ_SUP_LOADED=false;
+function objLoadSuppliers(force){
+  if(OBJ_SUP_LOADED&&!force)return; OBJ_SUP_LOADED=true;
+  fetch('/api/nakup-report/suppliers',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject(r.status)).then(d=>objRenderSuppliers(d.suppliers||[])).catch(()=>{});
+}
+function objSupIntervalPreview(supplier,shipCost){
+  // živý náhled doporučeného intervalu: T* = √(2·doprava / Σ(poptávka×skladné/ks)) [měs], cap 0,5–24
+  const c=(OBJ_CYCLES||{})[supplier]; if(!c||!(c.sumDh>0)||!(shipCost>0))return null;
+  return Math.min(24,Math.max(0.5,Math.sqrt(2*shipCost/c.sumDh)*12));
+}
+function objRenderSuppliers(list){
+  const wrap=$('#objSupWrap'); if(!wrap)return;
+  const orig=['','ČR','EU','Čína','jiná'];
+  let h='<p class="muted" style="margin:0 0 8px">U každého dodavatele vyplň <b>termín dodání</b> (dny) a <b>náklad na dopravu</b> (Kč za jednu společnou zásilku/kontejner). Z toho se počítá <b>jak často z toho dodavatele objednávat</b> (společný interval) a <b>ekonomická dávka</b> každé položky. Dražší doprava (Čína) = řidší, větší objednávky. „Doporučený interval" se dopočítá živě. Prázdné = použije se lhůta z ERP, EOQ se nepočítá.</p>';
+  h+='<div style="margin:0 0 8px"><button class="btn" type="button" id="objSupSave">💾 Uložit dotazník</button> <span class="muted" id="objSupStatus" style="font-size:12px"></span></div>';
+  h+='<div class="tblwrap" style="max-height:420px"><table><thead><tr><th>Dodavatel</th><th>Původ</th><th style="text-align:right">Položek</th><th style="text-align:right">Hodnota zásoby</th><th style="text-align:right">ERP lhůta</th><th style="text-align:right">Termín dodání (dny)</th><th style="text-align:right">Doprava (Kč/zásilka)</th><th style="text-align:right" title="Optimální frekvence objednávek z tohoto dodavatele (joint replenishment)">Doporučený interval</th></tr></thead><tbody>';
+  list.forEach(s=>{const k=esc(s.supplier); const prev=objSupIntervalPreview(s.supplier,s.shipCost);
+    h+='<tr data-sup="'+k+'"><td>'+k+'</td>'+
+      '<td><select data-f="origin" style="width:80px">'+orig.map(o=>'<option'+(o===(s.origin||'')?' selected':'')+'>'+o+'</option>').join('')+'</select></td>'+
+      '<td style="text-align:right">'+fmt(s.items)+'</td><td style="text-align:right">'+fmt(s.stockVal)+' Kč</td>'+
+      '<td style="text-align:right" class="muted">'+(s.erpLead?fmt(s.erpLead)+' d':'—')+'</td>'+
+      '<td style="text-align:right"><input type="number" min="0" data-f="lead" value="'+(s.lead!=null?s.lead:'')+'" placeholder="'+(s.erpLead||'')+'" style="width:80px;text-align:right"></td>'+
+      '<td style="text-align:right"><input type="number" min="0" step="1000" data-f="shipCost" value="'+(s.shipCost!=null?s.shipCost:'')+'" placeholder="0" style="width:110px;text-align:right"></td>'+
+      '<td style="text-align:right" data-f="prev"><b>'+objIntTxt(prev)+'</b></td></tr>';
+  });
+  h+='</tbody></table></div>';
+  wrap.innerHTML=h;
+  const sb=$('#objSupSave'); if(sb)sb.onclick=objSaveSuppliers;
+  // živý přepočet doporučeného intervalu při psaní dopravy
+  wrap.querySelectorAll('input[data-f=shipCost]').forEach(inp=>{inp.oninput=function(){
+    const tr=inp.closest('tr[data-sup]'); const sup=tr.getAttribute('data-sup'); const cell=tr.querySelector('[data-f=prev]');
+    const p=objSupIntervalPreview(sup,parseFloat(inp.value)); if(cell)cell.innerHTML='<b>'+objIntTxt(p)+'</b>';
+  };});
+}
+function objSaveSuppliers(){
+  const wrap=$('#objSupWrap'); if(!wrap)return;
+  const payload={};
+  wrap.querySelectorAll('tr[data-sup]').forEach(tr=>{
+    const name=tr.getAttribute('data-sup');
+    const lead=(tr.querySelector('[data-f=lead]')||{}).value, ship=(tr.querySelector('[data-f=shipCost]')||{}).value, origin=(tr.querySelector('[data-f=origin]')||{}).value;
+    payload[name]={lead:lead,shipCost:ship,origin:origin};
+  });
+  const st=$('#objSupStatus'); if(st)st.textContent='Ukládám…';
+  fetch('/api/nakup-report/suppliers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({suppliers:payload})})
+    .then(r=>r.ok?r.json():Promise.reject(r.status)).then(d=>{
+      if(OBJ_DATA)OBJ_DATA.suppliers=d.suppliers||{};   // aktualizuj lokálně → EOQ sloupce se přepočtou
+      if(st)st.textContent='Uloženo ('+Object.keys(d.suppliers||{}).length+' dodavatelů s údaji).';
+      try{renderObjednavky();}catch(e){}
+      if(typeof toast==='function')toast('Dotazník dodavatelů uložen');
+    }).catch(e=>{if(st)st.textContent='Chyba uložení ('+e+')';});
 }
 function renderNakup(){
   try{nkCompute();}catch(e){console.error('nakup',e);return;}
