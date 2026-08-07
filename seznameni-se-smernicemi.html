@@ -1383,7 +1383,6 @@ const MUJ_MODS = [
   { key:"directives", icon:MUJ_IC.file, label:"Směrnice" },
   { key:"ukoly", icon:MUJ_IC.tasks, label:"Úkoly ze směrnic" },
   { key:"library", icon:MUJ_IC.book, label:"Knihovna" },
-  { key:"zapisy", icon:MUJ_IC.file, label:"Zápisy z jednání" },
   { key:"bozp", icon:MUJ_IC.shield, label:"BOZP" },
   { grp:"Kontakty" },
   { key:"telefon", icon:MUJ_IC.phone, label:"Telefonní seznam" },
@@ -2863,7 +2862,7 @@ let TELEFON_DATA=null;
 let ZAP={items:[],oblasti:[],me:null,q:'',oblast:'',mesic:'',open:{}};
 function zapNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim(); }
 async function showZapisy(){
-  MUJ.view="zapisy"; renderSidebar();
+  MUJ.view="library"; renderSidebar();   // sekce Knihovny — v menu zůstává zvýrazněná Knihovna
   const body=document.getElementById("mujBody");
   body.innerHTML='<div class="dash-hero"><h2>Zápisy z jednání</h2><p>Načítám…</p></div>';
   try{
@@ -2892,7 +2891,8 @@ function zapRender(){
   const body=document.getElementById("mujBody");
   const obl=[...new Set((ZAP.oblasti||[]).concat(ZAP.items.map(z=>z.oblast)))].filter(Boolean);
   const mes=zapMesice();
-  body.innerHTML='<div class="dash-hero"><h2>Zápisy z jednání</h2><p>Interní zápisy členěné podle oblasti (marketing, obchod…) a data. Hledání funguje ve všem textu, bez ohledu na diakritiku.</p></div>'
+  body.innerHTML='<div class="crumb"><a onclick="showLibrary(null)">← Knihovna</a><span class="sep">›</span><span class="cur">Zápisy z jednání</span></div>'
+    +'<div class="dash-hero" style="margin-bottom:16px"><h2>Zápisy z jednání</h2><p>Interní zápisy členěné podle oblasti (marketing, obchod…) a data. Hledání funguje ve všem textu, bez ohledu na diakritiku.</p></div>'
     +'<div class="card pad" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
       +'<input id="zapQ" placeholder="🔍 Hledat (název, text, účastníci, tagy…)" value="'+esc(ZAP.q)+'" style="flex:1;min-width:220px;padding:9px 13px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
       +'<select id="zapObl" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff"><option value="">Všechny oblasti</option>'+obl.map(o=>'<option'+(ZAP.oblast===o?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select>'
@@ -3660,6 +3660,10 @@ function showLibrary(folderId){
   if(!folderId){
     h += '<div class="li-item clickable" onclick="showProdukty(null)" style="border-left:4px solid var(--green,#5aa532)"><div class="li-left"><div class="li-ic folder">'+mujIcon(MUJ_IC.box||MUJ_IC.folder)+'</div>'+
       '<div><div class="li-t">Produkty</div><div class="muted" style="font-size:12px;margin-top:2px">Katalog sortimentu Elkoplast — kontejnery, muldy, nádoby, záchytné vany a další</div></div></div>'+
+      '<span class="li-chev">'+mujIcon(MUJ_IC.chev)+'</span></div>';
+    // Sekce Zápisy z interních jednání (členění dle oblasti a data, fulltext).
+    h += '<div class="li-item clickable" onclick="showZapisy()" style="border-left:4px solid #4a6fb5"><div class="li-left"><div class="li-ic folder">'+mujIcon(MUJ_IC.file)+'</div>'+
+      '<div><div class="li-t">Zápisy z jednání</div><div class="muted" style="font-size:12px;margin-top:2px">Interní zápisy členěné podle oblasti (marketing, obchod…) a data · fulltextové hledání</div></div></div>'+
       '<span class="li-chev">'+mujIcon(MUJ_IC.chev)+'</span></div>';
   }
 
