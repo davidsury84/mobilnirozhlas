@@ -2047,10 +2047,10 @@ async function objExportPlan(){
       .sort((a,b)=>String(a.skupina||'').localeCompare(String(b.skupina||''),'cs')||String(a.sk+'-'+a.reg).localeCompare(String(b.sk+'-'+b.reg),'cs'));
     const wb=new ExcelJS.Workbook();
     // List 1: kolik OBJEDNAT v jednotlivých měsících
-    const wO=wb.addWorksheet('Objednávky/měsíc');
+    const wO=wb.addWorksheet('Objednávky za měsíc');
     wO.columns=[{header:'Identifikátor',width:16},{header:'Dodavatel',width:24},{header:'Název',width:40},{header:'Lhůta (d)',width:9},{header:'Dispo teď',width:10}].concat(mlab.map(m=>({header:'Obj '+m,width:8})));
     // List 2: CÍLOVÁ zásoba v jednotlivých měsících
-    const wS=wb.addWorksheet('Cílová zásoba/měsíc');
+    const wS=wb.addWorksheet('Cílová zásoba za měsíc');
     wS.columns=[{header:'Identifikátor',width:16},{header:'Dodavatel',width:24},{header:'Název',width:40},{header:'Lhůta (d)',width:9}].concat(mlab.map(m=>({header:'Cíl '+m,width:8})));
     const agg=Array.from({length:12},()=>({items:0,ks:0,kc:0}));
     paired.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; const p=objPlan(x,s,P,m0); const ident=String(x.sk)+'-'+String(x.reg);
