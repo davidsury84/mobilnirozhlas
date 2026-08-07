@@ -2011,6 +2011,14 @@ try {
   console.error('[reklamace] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Zápisy z interních jednání" — samostatná složka ./zapisy ----
+let zapisyMod = null;
+try {
+  zapisyMod = require('./zapisy').mount({ send, readBody, empSession, isAdmin, logActivity, dataDir: DATA_DIR });
+} catch (e) {
+  console.error('[zapisy] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 // ---- Modul „Požadavky nákupu" (E-shop → nákupčí) — samostatná složka ./pozadavky ----
 let pozadavkyMod = null;
 try {
@@ -2183,6 +2191,8 @@ const server = http.createServer(async (req, res) => {
     if (konstrukceMod && await konstrukceMod.handle(req, res)) return;
     // Modul „Reklamace" si obslouží vlastní cesty (/reklamace*, /api/reklamace*).
     if (reklamaceMod && await reklamaceMod.handle(req, res)) return;
+    // Modul „Zápisy z interních jednání" si obslouží vlastní cesty (/api/zapisy*).
+    if (zapisyMod && await zapisyMod.handle(req, res)) return;
     // Modul „Požadavky nákupu" si obslouží vlastní cesty (/pozadavky*, /api/pozadavky*).
     if (pozadavkyMod && await pozadavkyMod.handle(req, res)) return;
     // Modul „Lodní kontejnery" si obslouží vlastní cesty (/kontejnery*, /api/kontejnery*).

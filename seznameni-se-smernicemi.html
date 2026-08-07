@@ -1383,6 +1383,7 @@ const MUJ_MODS = [
   { key:"directives", icon:MUJ_IC.file, label:"Směrnice" },
   { key:"ukoly", icon:MUJ_IC.tasks, label:"Úkoly ze směrnic" },
   { key:"library", icon:MUJ_IC.book, label:"Knihovna" },
+  { key:"zapisy", icon:MUJ_IC.file, label:"Zápisy z jednání" },
   { key:"bozp", icon:MUJ_IC.shield, label:"BOZP" },
   { grp:"Kontakty" },
   { key:"telefon", icon:MUJ_IC.phone, label:"Telefonní seznam" },
@@ -1594,6 +1595,7 @@ function mjGo(key){
   else if(key==="bozp") showBozp();
   else if(key==="ukoly") showUkoly();
   else if(key==="telefon") showTelefon();
+  else if(key==="zapisy") showZapisy();
   else if(key==="skoleni") showSkoleni();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
@@ -2857,6 +2859,133 @@ function showAdaptace(){
 const BOZP_PRAC = { supikovice:"Supíkovice", zlin:"Zlín", bruntal:"Bruntál", chomutov:"Chomutov" };
 /* ---------- Telefonní seznam (firemní kontakty dle středisek) ---------- */
 let TELEFON_DATA=null;
+/* ---------- Modul Zápisy z interních jednání ---------- */
+let ZAP={items:[],oblasti:[],me:null,q:'',oblast:'',mesic:'',open:{}};
+function zapNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim(); }
+async function showZapisy(){
+  MUJ.view="zapisy"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML='<div class="dash-hero"><h2>Zápisy z jednání</h2><p>Načítám…</p></div>';
+  try{
+    const r=await fetch('/api/zapisy',{cache:'no-store'});
+    if(!r.ok) throw new Error(((await r.json())||{}).error||('HTTP '+r.status));
+    const j=await r.json(); ZAP.items=j.items||[]; ZAP.oblasti=j.oblasti||[]; ZAP.me=j.me||null;
+  }catch(e){ body.innerHTML='<div class="card pad" style="margin:26px">Zápisy se nepodařilo načíst: '+esc(e.message)+'</div>'; return; }
+  zapRender(); window.scrollTo(0,0);
+}
+function zapMesice(){ const s=new Set(); ZAP.items.forEach(z=>{ if(z.datum) s.add(z.datum.slice(0,7)); }); return [...s].sort().reverse(); }
+function zapMesicLabel(m){ const M=['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec']; const p=m.split('-'); return (M[+p[1]-1]||m)+' '+p[0]; }
+function zapOblBarva(o){ const map={'Marketing':['#efeafb','#5b3fa0'],'Obchod':['#e6eefb','#274b8f'],'Výroba':['#fbf0dc','#a86a00'],'Nákup':['#e2f3f5','#0f6674'],'Vedení':['#fbecea','#a03a2c'],'Provoz':['#e7f5e9','#1f5e22'],'IT':['#eef1ec','#444']}; return map[o]||['#eef1ec','#5b635c']; }
+function zapFiltrovane(){
+  const slova=zapNorm(ZAP.q).split(' ').filter(Boolean);   // každé slovo se hledá zvlášť (A ZÁROVEŇ)
+  return ZAP.items.filter(z=>{
+    if(ZAP.oblast && z.oblast!==ZAP.oblast) return false;
+    if(ZAP.mesic && (z.datum||'').slice(0,7)!==ZAP.mesic) return false;
+    if(slova.length){
+      const blob=z.hledani||zapNorm([z.nazev,z.text,z.ucastnici,z.oblast,(z.tagy||[]).join(' ')].join(' '));
+      if(!slova.every(w=>blob.indexOf(w)>=0)) return false;
+    }
+    return true;
+  });
+}
+function zapRender(){
+  const body=document.getElementById("mujBody");
+  const obl=[...new Set((ZAP.oblasti||[]).concat(ZAP.items.map(z=>z.oblast)))].filter(Boolean);
+  const mes=zapMesice();
+  body.innerHTML='<div class="dash-hero"><h2>Zápisy z jednání</h2><p>Interní zápisy členěné podle oblasti (marketing, obchod…) a data. Hledání funguje ve všem textu, bez ohledu na diakritiku.</p></div>'
+    +'<div class="card pad" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
+      +'<input id="zapQ" placeholder="🔍 Hledat (název, text, účastníci, tagy…)" value="'+esc(ZAP.q)+'" style="flex:1;min-width:220px;padding:9px 13px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
+      +'<select id="zapObl" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff"><option value="">Všechny oblasti</option>'+obl.map(o=>'<option'+(ZAP.oblast===o?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select>'
+      +'<select id="zapMes" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff"><option value="">Všechna období</option>'+mes.map(m=>'<option value="'+m+'"'+(ZAP.mesic===m?' selected':'')+'>'+zapMesicLabel(m)+'</option>').join('')+'</select>'
+      +'<button class="btn" onclick="zapForm()">➕ Nový zápis</button></div>'
+    +'<div id="zapList"></div>';
+  const q=document.getElementById('zapQ');
+  q.oninput=function(){ ZAP.q=q.value; zapListRender(); };
+  document.getElementById('zapObl').onchange=function(){ ZAP.oblast=this.value; zapListRender(); };
+  document.getElementById('zapMes').onchange=function(){ ZAP.mesic=this.value; zapListRender(); };
+  zapListRender();
+}
+function zapListRender(){
+  const box=document.getElementById('zapList'); if(!box) return;
+  const list=zapFiltrovane();
+  if(!list.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">'+(ZAP.items.length?'Nic neodpovídá hledání / filtrům.':'Zatím žádné zápisy — přidejte první tlačítkem „➕ Nový zápis".')+'</p></div>'; return; }
+  let h='', posledniMesic='';
+  list.forEach(z=>{
+    const m=(z.datum||'').slice(0,7);
+    if(m!==posledniMesic){ posledniMesic=m; h+='<div class="dash-sec">'+zapMesicLabel(m)+'</div>'; }
+    const c=zapOblBarva(z.oblast);
+    const den=z.datum?z.datum.slice(8,10)+'. '+String(+z.datum.slice(5,7))+'.':'';
+    const otevreny=!!ZAP.open[z.id];
+    const smi=ZAP.me&&(ZAP.me.admin||((z.by&&z.by.email)||'').toLowerCase()===(ZAP.me.email||'').toLowerCase());
+    h+='<div class="li-item" style="cursor:pointer;align-items:flex-start" onclick="zapToggle(\''+z.id+'\')">'
+      +'<div class="li-left" style="align-items:flex-start"><div class="li-ic" style="flex-direction:column;font-size:12px;font-weight:800;line-height:1.1">'+den+'</div><div>'
+      +'<div class="li-t">'+esc(z.nazev)+' <span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:3px 9px;border-radius:999px;background:'+c[0]+';color:'+c[1]+'">'+esc(z.oblast)+'</span></div>'
+      +(z.ucastnici?'<div class="muted" style="font-size:12.5px;margin-top:2px">👥 '+esc(z.ucastnici)+'</div>':'')
+      +(!otevreny&&z.text?'<div class="muted" style="font-size:12.5px;margin-top:3px">'+esc(z.text.slice(0,140))+(z.text.length>140?'…':'')+'</div>':'')
+      +'</div></div>'
+      +'<div style="display:flex;align-items:center;gap:8px;flex:0 0 auto" onclick="event.stopPropagation()">'
+        +(smi?'<button class="btn ghost sm" onclick="zapForm(\''+z.id+'\')">✏️</button><button class="btn ghost sm" title="Smazat" onclick="zapSmazat(\''+z.id+'\')">🗑</button>':'')
+        +'<span class="muted" style="cursor:pointer" onclick="zapToggle(\''+z.id+'\')">'+(otevreny?'▲':'▼')+'</span></div>'
+      +'</div>';
+    if(otevreny){
+      h+='<div class="card pad" style="margin:-6px 0 12px;border-top:none">'
+        +'<div style="white-space:pre-wrap;font-size:14px;line-height:1.65">'+esc(z.text||'(bez textu)')+'</div>'
+        +((z.tagy&&z.tagy.length)?'<div style="margin-top:10px">'+z.tagy.map(t=>'<span class="pill gray" style="margin-right:6px">#'+esc(t)+'</span>').join('')+'</div>':'')
+        +'<div class="muted" style="font-size:11.5px;margin-top:10px">Zapsal(a) '+esc((z.by&&z.by.name)||'—')+' · '+new Date(z.createdAt).toLocaleString('cs-CZ')+(z.updatedBy?' · upraveno '+esc(z.updatedBy.name)+' '+new Date(z.updatedAt).toLocaleString('cs-CZ'):'')+'</div>'
+        +'</div>';
+    }
+  });
+  box.innerHTML=h;
+}
+function zapToggle(id){ ZAP.open[id]=!ZAP.open[id]; zapListRender(); }
+function zapForm(id){
+  const z=id?ZAP.items.find(x=>x.id===id):null;
+  const obl=[...new Set((ZAP.oblasti||[]).concat(ZAP.items.map(x=>x.oblast)))].filter(Boolean);
+  let ov=document.getElementById('zapFormOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='zapFormOv'; document.body.appendChild(ov); }
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,21,18,.5);z-index:1000;display:grid;place-items:center;padding:20px';
+  ov.innerHTML='<div style="max-width:640px;width:100%;max-height:90vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.3);padding:22px 24px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><b style="font-size:17px">'+(z?'Upravit zápis':'Nový zápis z jednání')+'</b><button class="btn ghost sm" onclick="zapFormZavri()">×</button></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+      +'<div><label class="muted" style="font-size:12.5px;font-weight:700">Datum jednání *</label><input id="zfDatum" type="date" value="'+(z?z.datum:new Date().toISOString().slice(0,10))+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font:inherit"></div>'
+      +'<div><label class="muted" style="font-size:12.5px;font-weight:700">Oblast *</label><select id="zfObl" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:9px;font:inherit;background:#fff">'+obl.map(o=>'<option'+((z?z.oblast:'')===o?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select></div>'
+    +'</div>'
+    +'<div style="margin-top:10px"><label class="muted" style="font-size:12.5px;font-weight:700">Název / téma *</label><input id="zfNazev" value="'+esc(z?z.nazev:'')+'" placeholder="např. Marketingová porada — kampaň kontejnery" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font:inherit"></div>'
+    +'<div style="margin-top:10px"><label class="muted" style="font-size:12.5px;font-weight:700">Účastníci</label><input id="zfUcast" value="'+esc(z?z.ucastnici:'')+'" placeholder="celá jména oddělená čárkou" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font:inherit"></div>'
+    +'<div style="margin-top:10px"><label class="muted" style="font-size:12.5px;font-weight:700">Zápis</label><textarea id="zfText" rows="10" placeholder="Průběh jednání, závěry, úkoly…" style="width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:9px;font:inherit;resize:vertical">'+esc(z?z.text:'')+'</textarea></div>'
+    +'<div style="margin-top:10px"><label class="muted" style="font-size:12.5px;font-weight:700">Tagy (oddělené čárkou)</label><input id="zfTagy" value="'+esc(z?(z.tagy||[]).join(', '):'')+'" placeholder="např. kampaň, rozpočet, web" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font:inherit"></div>'
+    +'<div style="margin-top:16px;display:flex;justify-content:flex-end;gap:10px"><button class="btn ghost" onclick="zapFormZavri()">Zrušit</button><button class="btn" id="zfUloz" onclick="zapUloz(\''+(z?z.id:'')+'\')">Uložit zápis</button></div>'
+    +'</div>';
+}
+function zapFormZavri(){ const ov=document.getElementById('zapFormOv'); if(ov) ov.remove(); }
+async function zapUloz(id){
+  const btn=document.getElementById('zfUloz'); if(btn){ btn.disabled=true; btn.textContent='Ukládám…'; }
+  const payload={ id:id||undefined,
+    datum:(document.getElementById('zfDatum')||{}).value||'',
+    oblast:(document.getElementById('zfObl')||{}).value||'',
+    nazev:(document.getElementById('zfNazev')||{}).value||'',
+    ucastnici:(document.getElementById('zfUcast')||{}).value||'',
+    text:(document.getElementById('zfText')||{}).value||'',
+    tagy:(document.getElementById('zfTagy')||{}).value||'' };
+  try{
+    const r=await fetch('/api/zapisy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Uložení selhalo.'); if(btn){btn.disabled=false;btn.textContent='Uložit zápis';} return; }
+    zapFormZavri(); toast(id?'Zápis upraven':'Zápis uložen');
+    await showZapisy();
+  }catch(e){ toast('Uložení selhalo: '+e.message); if(btn){btn.disabled=false;btn.textContent='Uložit zápis';} }
+}
+async function zapSmazat(id){
+  const z=ZAP.items.find(x=>x.id===id); if(!z) return;
+  if(!confirm('Smazat zápis „'+z.nazev+'" ('+z.datum+')?')) return;
+  try{
+    const r=await fetch('/api/zapisy/smazat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+    const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Smazání selhalo.'); return; }
+    toast('Zápis smazán'); await showZapisy();
+  }catch(e){ toast('Smazání selhalo: '+e.message); }
+}
+
 async function showTelefon(){
   MUJ.view="telefon"; renderSidebar();
   const body=document.getElementById("mujBody");
