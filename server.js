@@ -1323,6 +1323,53 @@ function updateUkol(id, patch) {
 function readVac() { const v = readJson(VAC_F, { requests: [] }); if (!Array.isArray(v.requests)) v.requests = []; return v; }
 function writeVac(v) { writeJson(VAC_F, v); }
 
+/* ---------- Jednorázový import zůstatků dovolené (z vac-import.json v kořeni repa) ----------
+   Spustí se při startu. Spáruje podle normalizovaného jména se stávajícími zaměstnanci,
+   doplní konto (vacDays=Celkem, vacUsedInit=Čerpání, vacCarry=převod). Chybějící založí
+   jako „jen evidence" (noApproval, bez e-mailu). Idempotentní přes settings.vacImportVersion. */
+const VAC_IMPORT_FILE = path.join(ROOT, 'vac-import.json');
+function vacNorm(x) { return (x == null ? '' : String(x)).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' '); }
+function runVacImport() {
+  try {
+    if (!fs.existsSync(VAC_IMPORT_FILE)) return;
+    const imp = readJson(VAC_IMPORT_FILE, null);
+    if (!imp || !Array.isArray(imp.records) || !imp.records.length) return;
+    const s = readJson(STATE_F, { employees: [] });
+    s.employees = s.employees || []; s.settings = s.settings || {};
+    if (s.settings.vacImportVersion === imp.version) { console.log('[vac-import] verze ' + imp.version + ' už naimportována – přeskočeno.'); return; }
+    try { fs.writeFileSync(path.join(DATA_DIR, 'state.backup-vacimport-' + imp.version + '.json'), JSON.stringify(s, null, 2)); } catch (_) {}
+    // Párování jen proti PŮVODNÍM zaměstnancům a každého lze „obsadit" jen jednou.
+    const existingByName = {}; s.employees.forEach(e => { const k = vacNorm(e.name); if (!(k in existingByName)) existingByName[k] = e; });
+    const takenNames = new Set(s.employees.map(e => vacNorm(e.name)));
+    const claimed = new Set();
+    let matched = 0, created = 0;
+    imp.records.forEach(r => {
+      const key = vacNorm(r.name);
+      let e = existingByName[key];
+      if (e && !claimed.has(e.id)) { claimed.add(e.id); matched++; }
+      else {
+        // Nový záznam (jen evidence). Při kolizi jména (duplicitní jména v Excelu / už obsazený) přidám os. číslo.
+        let name = r.name; if (takenNames.has(vacNorm(name)) && r.os != null) name = r.name + ' (' + r.os + ')';
+        e = { id: 'v' + crypto.randomBytes(6).toString('hex'), name: name, email: '', cats: [], modules: [], noApproval: true, imported: true };
+        if (r.center) e.stredisko = r.center;
+        s.employees.push(e); takenNames.add(vacNorm(name)); created++;
+      }
+      if (r.vacDays != null) e.vacDays = r.vacDays;
+      if (r.vacUsedInit != null) e.vacUsedInit = r.vacUsedInit;
+      if (r.carry != null) e.vacCarry = r.carry;
+      if (r.os != null) e.osCislo = r.os;
+      e.vacImported = true;
+    });
+    s.settings.vacImportVersion = imp.version;
+    s.settings.vacImportAt = Date.now();
+    writeJson(STATE_F, s);
+    console.log('[vac-import] hotovo (verze ' + imp.version + '): napárováno ' + matched + ', nově vytvořeno ' + created + ', celkem ' + imp.records.length + ' řádků.');
+    // Diagnostika: stávající lidé s e-mailem, které Excel NEnapároval (možná odlišný formát jména) → doplní se ručně.
+    const unmatched = s.employees.filter(e => e.email && !e.imported && !claimed.has(e.id)).map(e => e.name);
+    if (unmatched.length) console.log('[vac-import] BEZ dovolené (nenapárováno, ' + unmatched.length + '): ' + unmatched.join(', '));
+  } catch (err) { console.warn('[vac-import] chyba: ' + err.message); }
+}
+
 // Počet pracovních dnů (po–pá) v rozsahu; celý půlden odečte 0.5. Státní svátky zatím neřešíme.
 function workingDays(from, to, halfDay) {
   const a = new Date(from + 'T00:00:00'), b = new Date(to + 'T00:00:00');
@@ -1356,6 +1403,7 @@ function vacPendingDays(email, year) {
 function approverFor(emp, emps) {
   emps = emps || (getState().employees || []);
   if (!emp) return null;
+  if (emp.noApproval) return null; // jen evidence dovolené (importovaní bez e-maily) – neschvaluje se
   if (emp.managerId) { const m = emps.find(x => x.id === emp.managerId); if (m && m.email) return m; }
   if (emp.stredisko) { const d = emps.find(x => x.vedouci && (x.stredisko || '') === emp.stredisko && x.id !== emp.id); if (d) return d; }
   // Bez přiřazeného vedoucího schvaluje superadmin (SUPERADMIN) – kromě jeho vlastní žádosti.
@@ -2850,7 +2898,7 @@ const server = http.createServer(async (req, res) => {
       const me = emps.find(x => (x.email || '').toLowerCase() === e.email.toLowerCase()) || { email: e.email, name: e.name };
       const ap = approverFor(me, emps);
       const year = new Date().getFullYear();
-      const ent = vacEntitlement(me), used = vacUsed(e.email, year);
+      const ent = vacEntitlement(me), used = Math.round(((Number(me.vacUsedInit) || 0) + vacUsed(e.email, year)) * 10) / 10;
       const mine = readVac().requests.filter(r => (r.empEmail || '').toLowerCase() === e.email.toLowerCase()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       return send(res, 200, { year, entitlement: ent, used, balance: Math.round((ent - used) * 10) / 10, approver: ap ? { name: ap.name, email: ap.email } : null, requests: mine });
     }
@@ -2889,7 +2937,7 @@ const server = http.createServer(async (req, res) => {
       const members = emps
         .filter(x => (x.email || '').toLowerCase() !== eml)
         .filter(x => { const ap = approverFor(x, emps); return ap && (ap.email || '').toLowerCase() === eml; })
-        .map(x => { const ent = vacEntitlement(x), used = vacUsed(x.email, year), pending = vacPendingDays(x.email, year); return { name: x.name, email: x.email, stredisko: x.stredisko || '', entitlement: ent, used, pending, remaining: Math.round((ent - used - pending) * 10) / 10 }; })
+        .map(x => { const ent = vacEntitlement(x), used = Math.round(((Number(x.vacUsedInit) || 0) + vacUsed(x.email, year)) * 10) / 10, pending = vacPendingDays(x.email, year); return { name: x.name, email: x.email, stredisko: x.stredisko || '', entitlement: ent, used, pending, remaining: Math.round((ent - used - pending) * 10) / 10 }; })
         .sort((a, b) => (a.stredisko || '').localeCompare(b.stredisko || '', 'cs') || (a.name || '').localeCompare(b.name || '', 'cs'));
       return send(res, 200, { year, members });
     }
@@ -2928,7 +2976,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/vacation/all' && req.method === 'GET') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const emps = getState().employees || []; const year = new Date().getFullYear();
-      const konto = emps.map(x => { const ent = vacEntitlement(x); const used = vacUsed(x.email, year); return { name: x.name, email: x.email, stredisko: x.stredisko || '', entitlement: ent, used, balance: Math.round((ent - used) * 10) / 10 }; });
+      const konto = emps.map(x => { const ent = vacEntitlement(x); const used = Math.round(((Number(x.vacUsedInit) || 0) + vacUsed(x.email, year)) * 10) / 10; return { name: x.name, email: x.email, stredisko: x.stredisko || '', entitlement: ent, used, balance: Math.round((ent - used) * 10) / 10 }; });
       return send(res, 200, { year, konto, requests: readVac().requests.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)) });
     }
 
@@ -3249,6 +3297,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   const PORT = process.env.PORT || 8080;
+  runVacImport(); // jednorázový import zůstatků dovolené (idempotentní)
   server.listen(PORT, () => {
     console.log('====================================================');
     console.log(' Seznámení se směrnicemi – ONLINE server');

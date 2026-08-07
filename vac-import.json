@@ -1,0 +1,2038 @@
+{
+ "version": "2026-08-07",
+ "note": "Import zůstatků dovolené z Dovolená - zůstatky.xlsx (hodiny→dny ÷8; vacDays=Celkem, vacUsedInit=Čerpání)",
+ "records": [
+  {
+   "name": "Mark Paul Abalde",
+   "os": 2323,
+   "vacDays": 20.88,
+   "vacUsedInit": 3.0,
+   "carry": 0.88,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Rustom Abay",
+   "os": 2303,
+   "vacDays": 25.0,
+   "vacUsedInit": 16.5,
+   "carry": 5.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Arnold Ajero Abellano",
+   "os": 2124,
+   "vacDays": 42.88,
+   "vacUsedInit": 17.0,
+   "carry": 22.88,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Dennis Agrao",
+   "os": 2187,
+   "vacDays": 21.75,
+   "vacUsedInit": 10.0,
+   "carry": 1.75,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "William Alialy",
+   "os": 2245,
+   "vacDays": 21.0,
+   "vacUsedInit": 2.0,
+   "carry": 1.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Noegie Amante",
+   "os": 2212,
+   "vacDays": 20.12,
+   "vacUsedInit": 20.0,
+   "carry": 0.12,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Kirby Ambagan",
+   "os": 2343,
+   "vacDays": 21.75,
+   "vacUsedInit": 5.0,
+   "carry": 1.75,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ken Lester Arellano",
+   "os": 2315,
+   "vacDays": 20.88,
+   "vacUsedInit": 1.0,
+   "carry": 0.88,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Lukáš Archman",
+   "os": 2114,
+   "vacDays": 21.12,
+   "vacUsedInit": 10.0,
+   "carry": 1.12,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Josef Baďurík",
+   "os": 2328,
+   "vacDays": 20.0,
+   "vacUsedInit": 6.0,
+   "carry": 0.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Volodymyr Bahinskyi",
+   "os": 1410,
+   "vacDays": 33.0,
+   "vacUsedInit": 2.0,
+   "carry": 13.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Eric Banate",
+   "os": 2121,
+   "vacDays": 27.88,
+   "vacUsedInit": 4.0,
+   "carry": 7.88,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Zdeněk Barcuch",
+   "os": 2355,
+   "vacDays": 19.25,
+   "vacUsedInit": 6.0,
+   "carry": 0.0,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Kevin Bayate",
+   "os": 2345,
+   "vacDays": 20.0,
+   "vacUsedInit": 2.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jan Beníček",
+   "os": 2356,
+   "vacDays": 19.25,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "E - Shop"
+  },
+  {
+   "name": "Josef Beránek",
+   "os": 626,
+   "vacDays": 38.5,
+   "vacUsedInit": 12.5,
+   "carry": 18.5,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Ezel Bermas",
+   "os": 2145,
+   "vacDays": 27.5,
+   "vacUsedInit": 2.0,
+   "carry": 7.5,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Antonín Bešta",
+   "os": 1846,
+   "vacDays": 22.5,
+   "vacUsedInit": 1.0,
+   "carry": 2.5,
+   "center": "Stř. Sklad PLASTY"
+  },
+  {
+   "name": "Adrian Biňas",
+   "os": 1883,
+   "vacDays": 30.75,
+   "vacUsedInit": 0.0,
+   "carry": 13.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Radim Bobál",
+   "os": 636,
+   "vacDays": 20.88,
+   "vacUsedInit": 7.0,
+   "carry": 0.88,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Milan Buček",
+   "os": 1357,
+   "vacDays": 21.0,
+   "vacUsedInit": 5.0,
+   "carry": 1.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Jaroslav Budina",
+   "os": 1458,
+   "vacDays": 32.0,
+   "vacUsedInit": 4.0,
+   "carry": 12.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Dominik Burdík",
+   "os": 2274,
+   "vacDays": 24.62,
+   "vacUsedInit": 1.0,
+   "carry": 4.62,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Lada Burdíková",
+   "os": 2329,
+   "vacDays": 20.0,
+   "vacUsedInit": 1.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Tomáš Burša",
+   "os": 1733,
+   "vacDays": 34.5,
+   "vacUsedInit": 8.0,
+   "carry": 14.5,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Rey Carreon",
+   "os": 2234,
+   "vacDays": 19.25,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Joel Cartanio",
+   "os": 2257,
+   "vacDays": 20.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Rayan Castillo",
+   "os": 2340,
+   "vacDays": 20.0,
+   "vacUsedInit": 3.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ruben Jr. Coga-Ay",
+   "os": 2062,
+   "vacDays": 20.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Erwin Binolay Coga-Ay",
+   "os": 2063,
+   "vacDays": 42.0,
+   "vacUsedInit": 2.0,
+   "carry": 22.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Claudio Jr. Coldayon",
+   "os": 2321,
+   "vacDays": 21.75,
+   "vacUsedInit": 7.0,
+   "carry": 1.75,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Cristinel Coman",
+   "os": 2246,
+   "vacDays": 20.62,
+   "vacUsedInit": 1.0,
+   "carry": 0.62,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Sorin-Paul Cosma",
+   "os": 2333,
+   "vacDays": 20.0,
+   "vacUsedInit": 4.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Bonn Heroe Cruz",
+   "os": 2342,
+   "vacDays": 21.75,
+   "vacUsedInit": 3.0,
+   "carry": 1.75,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Sheirelyn Cruz",
+   "os": 2391,
+   "vacDays": 9.25,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Chester Cube",
+   "os": 2300,
+   "vacDays": 22.0,
+   "vacUsedInit": 3.0,
+   "carry": 2.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Radek Čecháček",
+   "os": 11,
+   "vacDays": 23.0,
+   "vacUsedInit": 3.0,
+   "carry": 3.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Pavel Čonka",
+   "os": 2375,
+   "vacDays": 13.88,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Reygentor Dampilag",
+   "os": 2054,
+   "vacDays": 20.0,
+   "vacUsedInit": 1.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Stanislav Daneček",
+   "os": 2207,
+   "vacDays": 20.62,
+   "vacUsedInit": 2.0,
+   "carry": 0.62,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Alberto Jr Santillan Dawa",
+   "os": 2086,
+   "vacDays": 20.0,
+   "vacUsedInit": 5.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Benjie Dawa",
+   "os": 1882,
+   "vacDays": 27.0,
+   "vacUsedInit": 4.0,
+   "carry": 7.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Arnold De Guzman",
+   "os": 2254,
+   "vacDays": 12.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jeffrey De La Torre",
+   "os": 2134,
+   "vacDays": 20.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Patrik Deml",
+   "os": 2365,
+   "vacDays": 16.62,
+   "vacUsedInit": 1.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Radek Derfler",
+   "os": 2388,
+   "vacDays": 10.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Aldrin Donieto",
+   "os": 2316,
+   "vacDays": 24.62,
+   "vacUsedInit": 6.0,
+   "carry": 4.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jakub Dostrašil",
+   "os": 2358,
+   "vacDays": 18.88,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Tomáš Dubovan",
+   "os": 2292,
+   "vacDays": 1.88,
+   "vacUsedInit": 0.0,
+   "carry": 0.88,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Tomáš Dubovan",
+   "os": 1817,
+   "vacDays": 4.5,
+   "vacUsedInit": 0.0,
+   "carry": 4.5,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Olga Dudová",
+   "os": 2241,
+   "vacDays": 10.0,
+   "vacUsedInit": 9.5,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Magda Duhajská",
+   "os": 764,
+   "vacDays": 26.0,
+   "vacUsedInit": 10.0,
+   "carry": 6.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Radek Dvořák",
+   "os": 1143,
+   "vacDays": 31.38,
+   "vacUsedInit": 0.0,
+   "carry": 11.38,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Jaroslaw Aleksander Dziadek",
+   "os": 2184,
+   "vacDays": 20.12,
+   "vacUsedInit": 5.5,
+   "carry": 0.12,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Hana Faltýnková",
+   "os": 1810,
+   "vacDays": 33.5,
+   "vacUsedInit": 3.5,
+   "carry": 13.5,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Jaromír Faulhammer",
+   "os": 368,
+   "vacDays": 21.0,
+   "vacUsedInit": 1.0,
+   "carry": 1.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Oldřich Fiala",
+   "os": 1501,
+   "vacDays": 23.0,
+   "vacUsedInit": 2.0,
+   "carry": 3.0,
+   "center": "Stř. Sklad PLASTY"
+  },
+  {
+   "name": "Dušan Fidler",
+   "os": 596,
+   "vacDays": 39.0,
+   "vacUsedInit": 0.0,
+   "carry": 19.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Vitalii Fitsai",
+   "os": 2076,
+   "vacDays": 45.88,
+   "vacUsedInit": 14.0,
+   "carry": 25.88,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Aleš Fleger",
+   "os": 2387,
+   "vacDays": 10.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Richard Fontanilla",
+   "os": 2324,
+   "vacDays": 20.88,
+   "vacUsedInit": 2.0,
+   "carry": 0.88,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Matěj Fořt",
+   "os": 2379,
+   "vacDays": 12.75,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Josef Franek",
+   "os": 336,
+   "vacDays": 32.5,
+   "vacUsedInit": 4.0,
+   "carry": 12.5,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jack Garpa",
+   "os": 2296,
+   "vacDays": 20.75,
+   "vacUsedInit": 7.0,
+   "carry": 0.75,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "René Gilg",
+   "os": 759,
+   "vacDays": 21.0,
+   "vacUsedInit": 6.0,
+   "carry": 1.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Zdeněk Goláň",
+   "os": 475,
+   "vacDays": 21.0,
+   "vacUsedInit": 1.5,
+   "carry": 1.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Romel Grapa",
+   "os": 2220,
+   "vacDays": 20.62,
+   "vacUsedInit": 20.0,
+   "carry": 0.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Dušan Grešák",
+   "os": 1462,
+   "vacDays": 20.88,
+   "vacUsedInit": 2.0,
+   "carry": 0.88,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Tomáš Hampl",
+   "os": 2156,
+   "vacDays": 25.25,
+   "vacUsedInit": 7.25,
+   "carry": 5.25,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Rudolf Hampl",
+   "os": 2390,
+   "vacDays": 10.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Jaroslava Havlanová",
+   "os": 2359,
+   "vacDays": 18.88,
+   "vacUsedInit": 2.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jiří Hejda",
+   "os": 2080,
+   "vacDays": 30.0,
+   "vacUsedInit": 5.0,
+   "carry": 10.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ladislav Hinšt",
+   "os": 1909,
+   "vacDays": 24.12,
+   "vacUsedInit": 0.0,
+   "carry": 6.38,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Karolina Hlaváčová",
+   "os": 1958,
+   "vacDays": 27.5,
+   "vacUsedInit": 2.0,
+   "carry": 7.5,
+   "center": "DIVIZE Bruntál"
+  },
+  {
+   "name": "Michaela Hlisnikovská",
+   "os": 2113,
+   "vacDays": 20.12,
+   "vacUsedInit": 7.0,
+   "carry": 0.12,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Serhii Hnativ",
+   "os": 1283,
+   "vacDays": 20.0,
+   "vacUsedInit": 7.0,
+   "carry": 0.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Milan Hoffmann",
+   "os": 1270,
+   "vacDays": 20.0,
+   "vacUsedInit": 2.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Vitalii Holovin",
+   "os": 1928,
+   "vacDays": 22.0,
+   "vacUsedInit": 1.0,
+   "carry": 2.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Lukáš Holzner",
+   "os": 307,
+   "vacDays": 29.5,
+   "vacUsedInit": 6.5,
+   "carry": 9.5,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jan Horálek",
+   "os": 1735,
+   "vacDays": 28.0,
+   "vacUsedInit": 3.0,
+   "carry": 8.0,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Edi Chlebik",
+   "os": 2348,
+   "vacDays": 20.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Rodrigo Chua",
+   "os": 2322,
+   "vacDays": 24.25,
+   "vacUsedInit": 3.0,
+   "carry": 4.25,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Daniela Chytilová",
+   "os": 2286,
+   "vacDays": 22.88,
+   "vacUsedInit": 6.0,
+   "carry": 2.88,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Petr Janča",
+   "os": 1737,
+   "vacDays": 32.5,
+   "vacUsedInit": 6.5,
+   "carry": 12.5,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Simona Janečková",
+   "os": 871,
+   "vacDays": 17.12,
+   "vacUsedInit": 4.5,
+   "carry": 2.12,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Petr Janíček",
+   "os": 1806,
+   "vacDays": 103.62,
+   "vacUsedInit": 2.0,
+   "carry": 83.62,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Dalimil Janiga",
+   "os": 1147,
+   "vacDays": 29.5,
+   "vacUsedInit": 2.0,
+   "carry": 9.5,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Pavel Janovič",
+   "os": 1950,
+   "vacDays": 23.12,
+   "vacUsedInit": 3.0,
+   "carry": 3.12,
+   "center": "Stř. Sklad PLASTY"
+  },
+  {
+   "name": "Josef Jelínek",
+   "os": 2006,
+   "vacDays": 41.62,
+   "vacUsedInit": 4.0,
+   "carry": 21.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Nervie Jemelisawan",
+   "os": 2285,
+   "vacDays": 20.88,
+   "vacUsedInit": 4.0,
+   "carry": 0.88,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Nelben Jemilesawan",
+   "os": 2373,
+   "vacDays": 14.62,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Ludvík Jeřábek",
+   "os": 2267,
+   "vacDays": 25.62,
+   "vacUsedInit": 22.5,
+   "carry": 5.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Iasmin Jigum",
+   "os": 2332,
+   "vacDays": 20.0,
+   "vacUsedInit": 4.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Pavel Johaník",
+   "os": 2377,
+   "vacDays": 0.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Mykhailo Kalenych",
+   "os": 2271,
+   "vacDays": 20.88,
+   "vacUsedInit": 9.0,
+   "carry": 0.88,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Jan Kaščák",
+   "os": 2265,
+   "vacDays": 22.62,
+   "vacUsedInit": 4.0,
+   "carry": 2.62,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Václav Kibal",
+   "os": 2137,
+   "vacDays": 20.88,
+   "vacUsedInit": 4.5,
+   "carry": 0.88,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "David Kirschner",
+   "os": 2350,
+   "vacDays": 10.0,
+   "vacUsedInit": 10.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Nataliia Kishko",
+   "os": 2081,
+   "vacDays": 38.25,
+   "vacUsedInit": 1.0,
+   "carry": 18.25,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Vitalii Kishko",
+   "os": 2078,
+   "vacDays": 46.88,
+   "vacUsedInit": 14.0,
+   "carry": 26.88,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jan Kišš",
+   "os": 2363,
+   "vacDays": 19.62,
+   "vacUsedInit": 2.62,
+   "carry": 0.0,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Ladislav Klimeš",
+   "os": 941,
+   "vacDays": 19.69,
+   "vacUsedInit": 4.69,
+   "carry": 0.94,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Martin Kolek",
+   "os": 2382,
+   "vacDays": 3.5,
+   "vacUsedInit": 3.0,
+   "carry": 0.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Andrii Korniichuk",
+   "os": 2135,
+   "vacDays": 30.5,
+   "vacUsedInit": 9.0,
+   "carry": 10.5,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Jiří Korytář",
+   "os": 2252,
+   "vacDays": 24.25,
+   "vacUsedInit": 0.0,
+   "carry": 4.25,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Pavel Kostorek",
+   "os": 1799,
+   "vacDays": 27.25,
+   "vacUsedInit": 1.0,
+   "carry": 14.5,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Lukáš Kováč",
+   "os": 767,
+   "vacDays": 20.0,
+   "vacUsedInit": 6.5,
+   "carry": 0.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Ladislav Krajča",
+   "os": 1297,
+   "vacDays": 45.0,
+   "vacUsedInit": 1.0,
+   "carry": 25.0,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Tomáš Krajča",
+   "os": 1811,
+   "vacDays": 164.0,
+   "vacUsedInit": 0.0,
+   "carry": 144.0,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Jakub Krajča",
+   "os": 2366,
+   "vacDays": 1.25,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Bartolomej Krajnik",
+   "os": 1374,
+   "vacDays": 28.0,
+   "vacUsedInit": 4.0,
+   "carry": 8.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ivana Krejčí",
+   "os": 1390,
+   "vacDays": 22.0,
+   "vacUsedInit": 0.0,
+   "carry": 2.0,
+   "center": "DIVIZE Bruntál"
+  },
+  {
+   "name": "Jan Krejčí",
+   "os": 2115,
+   "vacDays": 20.12,
+   "vacUsedInit": 6.5,
+   "carry": 0.12,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Daniel Krybus",
+   "os": 2032,
+   "vacDays": 33.12,
+   "vacUsedInit": 1.0,
+   "carry": 13.12,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Bohuslav Krywda",
+   "os": 699,
+   "vacDays": 30.0,
+   "vacUsedInit": 0.0,
+   "carry": 10.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Radovan Kubáň",
+   "os": 1452,
+   "vacDays": 18.75,
+   "vacUsedInit": 2.0,
+   "carry": 6.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Karel Kubíček",
+   "os": 1451,
+   "vacDays": 33.0,
+   "vacUsedInit": 3.0,
+   "carry": 13.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Maksym Kulinich",
+   "os": 1241,
+   "vacDays": 25.0,
+   "vacUsedInit": 2.0,
+   "carry": 5.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Petr Kutálek",
+   "os": 863,
+   "vacDays": 25.0,
+   "vacUsedInit": 9.0,
+   "carry": 5.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Pavel Kysela",
+   "os": 1698,
+   "vacDays": 28.0,
+   "vacUsedInit": 4.0,
+   "carry": 8.0,
+   "center": "Stř. LASER Supíkovice"
+  },
+  {
+   "name": "Petr Lattner",
+   "os": 1891,
+   "vacDays": 25.0,
+   "vacUsedInit": 5.0,
+   "carry": 5.0,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Olga Lechnerová",
+   "os": 408,
+   "vacDays": 30.0,
+   "vacUsedInit": 7.0,
+   "carry": 10.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Antonín Lejnar",
+   "os": 2259,
+   "vacDays": 21.0,
+   "vacUsedInit": 3.0,
+   "carry": 1.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Václav Lešniowski",
+   "os": 650,
+   "vacDays": 27.0,
+   "vacUsedInit": 5.0,
+   "carry": 7.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Radek Lippmann",
+   "os": 2260,
+   "vacDays": 30.0,
+   "vacUsedInit": 2.0,
+   "carry": 10.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Michaela Lizancová",
+   "os": 1743,
+   "vacDays": 27.38,
+   "vacUsedInit": 4.38,
+   "carry": 9.88,
+   "center": "E - Shop"
+  },
+  {
+   "name": "Jiřina Lónová",
+   "os": 1907,
+   "vacDays": 5.25,
+   "vacUsedInit": 3.38,
+   "carry": 3.88,
+   "center": "Stř. Sklad PLASTY"
+  },
+  {
+   "name": "Fredie Lorico",
+   "os": 2209,
+   "vacDays": 20.0,
+   "vacUsedInit": 20.0,
+   "carry": 0.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jordan Inggo Lumas-E",
+   "os": 2064,
+   "vacDays": 20.0,
+   "vacUsedInit": 2.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Andrii Luzan",
+   "os": 1869,
+   "vacDays": 30.0,
+   "vacUsedInit": 5.0,
+   "carry": 10.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Aaron Neil Macatol",
+   "os": 2344,
+   "vacDays": 8.12,
+   "vacUsedInit": 8.0,
+   "carry": 0.38,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Martin Mádr",
+   "os": 223,
+   "vacDays": 20.5,
+   "vacUsedInit": 1.5,
+   "carry": 0.5,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Tomáš Mádr",
+   "os": 6,
+   "vacDays": 25.0,
+   "vacUsedInit": 4.0,
+   "carry": 5.0,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Tereza Mádrová",
+   "os": 2196,
+   "vacDays": 23.5,
+   "vacUsedInit": 1.0,
+   "carry": 3.5,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jayzon Magpayo",
+   "os": 2215,
+   "vacDays": 20.12,
+   "vacUsedInit": 20.0,
+   "carry": 0.12,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Roy Mahusay",
+   "os": 2302,
+   "vacDays": 22.38,
+   "vacUsedInit": 3.0,
+   "carry": 2.38,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Milan Makó",
+   "os": 551,
+   "vacDays": 25.0,
+   "vacUsedInit": 4.0,
+   "carry": 5.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Marek Malaník",
+   "os": 1455,
+   "vacDays": 30.5,
+   "vacUsedInit": 2.5,
+   "carry": 10.5,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Renata Maňáková",
+   "os": 2331,
+   "vacDays": 20.62,
+   "vacUsedInit": 4.0,
+   "carry": 0.62,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Jason Manilag",
+   "os": 2317,
+   "vacDays": 8.38,
+   "vacUsedInit": 9.0,
+   "carry": 0.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Josef Maňura",
+   "os": 1904,
+   "vacDays": 30.12,
+   "vacUsedInit": 8.0,
+   "carry": 10.12,
+   "center": "Stř. LASER Supíkovice"
+  },
+  {
+   "name": "Eljan Maravillas",
+   "os": 2374,
+   "vacDays": 14.62,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Stanislav Mašek",
+   "os": 2346,
+   "vacDays": 12.75,
+   "vacUsedInit": 12.75,
+   "carry": 0.38,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ladislav Máté",
+   "os": 1040,
+   "vacDays": 28.5,
+   "vacUsedInit": 1.0,
+   "carry": 8.5,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Petr Matějovič",
+   "os": 2167,
+   "vacDays": 23.12,
+   "vacUsedInit": 4.5,
+   "carry": 3.12,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Vasyl Matiiv",
+   "os": 1929,
+   "vacDays": 27.0,
+   "vacUsedInit": 3.0,
+   "carry": 7.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Roman Matoušek",
+   "os": 1450,
+   "vacDays": 22.0,
+   "vacUsedInit": 4.0,
+   "carry": 2.0,
+   "center": "Stř. LASER Supíkovice"
+  },
+  {
+   "name": "Serhii Matushevych",
+   "os": 1930,
+   "vacDays": 28.0,
+   "vacUsedInit": 4.0,
+   "carry": 8.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Matyáš Melčák",
+   "os": 2385,
+   "vacDays": 0.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Jan Merhaut",
+   "os": 2319,
+   "vacDays": 23.62,
+   "vacUsedInit": 3.0,
+   "carry": 3.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Petr Mihalik",
+   "os": 995,
+   "vacDays": 28.5,
+   "vacUsedInit": 8.0,
+   "carry": 8.5,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Lada Michenková",
+   "os": 1429,
+   "vacDays": 24.0,
+   "vacUsedInit": 2.0,
+   "carry": 4.0,
+   "center": "Stř. Sklad PLASTY"
+  },
+  {
+   "name": "Jiří Mlčúch",
+   "os": 1509,
+   "vacDays": 20.0,
+   "vacUsedInit": 5.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Michal Modlak",
+   "os": 1905,
+   "vacDays": 10.0,
+   "vacUsedInit": 10.0,
+   "carry": 10.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jan Mokrejš",
+   "os": 1738,
+   "vacDays": 22.0,
+   "vacUsedInit": 5.5,
+   "carry": 2.0,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Diosdado Naag",
+   "os": 2216,
+   "vacDays": 30.62,
+   "vacUsedInit": 10.0,
+   "carry": 10.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ivan Naumchuk",
+   "os": 1975,
+   "vacDays": 20.0,
+   "vacUsedInit": 4.0,
+   "carry": 0.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "František Nedavaška",
+   "os": 2376,
+   "vacDays": 13.5,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jaroslav Novák",
+   "os": 1215,
+   "vacDays": 26.0,
+   "vacUsedInit": 1.5,
+   "carry": 6.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Nicolas Oláh",
+   "os": 1960,
+   "vacDays": 32.5,
+   "vacUsedInit": 1.0,
+   "carry": 12.5,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Filip Oláh",
+   "os": 2263,
+   "vacDays": 27.38,
+   "vacUsedInit": 1.0,
+   "carry": 7.38,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Stanislav Ondra",
+   "os": 2251,
+   "vacDays": 20.62,
+   "vacUsedInit": 5.5,
+   "carry": 0.62,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Hana Ondrašíková",
+   "os": 2362,
+   "vacDays": 17.75,
+   "vacUsedInit": 3.0,
+   "carry": 0.0,
+   "center": "Marketing"
+  },
+  {
+   "name": "Liviu-Florian Oprescu",
+   "os": 2247,
+   "vacDays": 20.62,
+   "vacUsedInit": 1.0,
+   "carry": 0.62,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Ioana-Bianca-Radiţa Oprescu",
+   "os": 2248,
+   "vacDays": 20.62,
+   "vacUsedInit": 1.0,
+   "carry": 0.62,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Dominik Orság",
+   "os": 2394,
+   "vacDays": 0.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Jana Pánková",
+   "os": 1814,
+   "vacDays": 87.0,
+   "vacUsedInit": 2.0,
+   "carry": 67.0,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Raynald Panotes",
+   "os": 2210,
+   "vacDays": 20.0,
+   "vacUsedInit": 20.0,
+   "carry": 0.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "John Pasiwat",
+   "os": 2299,
+   "vacDays": 22.0,
+   "vacUsedInit": 1.0,
+   "carry": 2.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Petr Pavlíček",
+   "os": 1298,
+   "vacDays": 27.38,
+   "vacUsedInit": 6.0,
+   "carry": 7.38,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Rastislav Pavlovič",
+   "os": 2016,
+   "vacDays": 32.0,
+   "vacUsedInit": 1.0,
+   "carry": 12.0,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Kamila Pechalová",
+   "os": 704,
+   "vacDays": 23.0,
+   "vacUsedInit": 1.0,
+   "carry": 3.0,
+   "center": "Spedice"
+  },
+  {
+   "name": "Kamila Pechalová",
+   "os": 2364,
+   "vacDays": 1.25,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Lucie Pechová",
+   "os": 2226,
+   "vacDays": 38.12,
+   "vacUsedInit": 0.0,
+   "carry": 18.12,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jeony Pepito",
+   "os": 2146,
+   "vacDays": 27.0,
+   "vacUsedInit": 2.0,
+   "carry": 7.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Aleksandar Petković",
+   "os": 2035,
+   "vacDays": 27.0,
+   "vacUsedInit": 5.0,
+   "carry": 7.0,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Lenka Petrželová",
+   "os": 2381,
+   "vacDays": 11.62,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Alejandro Jr. Piano",
+   "os": 2372,
+   "vacDays": 14.62,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Jedrik Piano",
+   "os": 2221,
+   "vacDays": 32.0,
+   "vacUsedInit": 0.0,
+   "carry": 12.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Christopher Jr. Pinpin",
+   "os": 2306,
+   "vacDays": 20.0,
+   "vacUsedInit": 5.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Monika Piškulová",
+   "os": 2313,
+   "vacDays": 21.62,
+   "vacUsedInit": 1.0,
+   "carry": 1.62,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Radovan Pojsl",
+   "os": 654,
+   "vacDays": 22.0,
+   "vacUsedInit": 9.0,
+   "carry": 2.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Vlastislav Polášek",
+   "os": 1999,
+   "vacDays": 24.62,
+   "vacUsedInit": 1.5,
+   "carry": 4.62,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Dominika Pořízková",
+   "os": 2105,
+   "vacDays": 3.12,
+   "vacUsedInit": 0.0,
+   "carry": 2.12,
+   "center": "DIVIZE Bruntál"
+  },
+  {
+   "name": "Lukáš Pospíšil",
+   "os": 4,
+   "vacDays": 31.0,
+   "vacUsedInit": 5.0,
+   "carry": 11.0,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Lukáš Pospíšil",
+   "os": 2242,
+   "vacDays": 3.75,
+   "vacUsedInit": 0.0,
+   "carry": 2.38,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Jiří Prachař",
+   "os": 2327,
+   "vacDays": 20.0,
+   "vacUsedInit": 11.0,
+   "carry": 0.0,
+   "center": "Stř. LASER Supíkovice"
+  },
+  {
+   "name": "Martin Procházka",
+   "os": 2168,
+   "vacDays": 20.0,
+   "vacUsedInit": 1.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jaroslav Prokel",
+   "os": 1524,
+   "vacDays": 29.0,
+   "vacUsedInit": 5.0,
+   "carry": 9.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Bohumil Prokeš",
+   "os": 1314,
+   "vacDays": 18.75,
+   "vacUsedInit": 7.03,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Tomáš Prokeš",
+   "os": 2071,
+   "vacDays": 25.0,
+   "vacUsedInit": 2.0,
+   "carry": 5.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Jonathan Provido",
+   "os": 2258,
+   "vacDays": 20.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Petr Pšeja",
+   "os": 1740,
+   "vacDays": 28.5,
+   "vacUsedInit": 10.0,
+   "carry": 8.5,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Jindřich Ptačník",
+   "os": 2311,
+   "vacDays": 21.62,
+   "vacUsedInit": 4.0,
+   "carry": 1.62,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Petr Rada",
+   "os": 2330,
+   "vacDays": 20.0,
+   "vacUsedInit": 1.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Petr Raida",
+   "os": 1946,
+   "vacDays": 20.0,
+   "vacUsedInit": 6.0,
+   "carry": 0.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Michal Rattay",
+   "os": 2386,
+   "vacDays": 10.88,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Yurii Rehan",
+   "os": 1302,
+   "vacDays": 27.19,
+   "vacUsedInit": 1.88,
+   "carry": 8.44,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Radoslav Rojko",
+   "os": 2244,
+   "vacDays": 36.38,
+   "vacUsedInit": 6.0,
+   "carry": 16.38,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Pavel Romsy",
+   "os": 2383,
+   "vacDays": 5.25,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. Sklad PLASTY"
+  },
+  {
+   "name": "James Ronquillo",
+   "os": 2186,
+   "vacDays": 27.75,
+   "vacUsedInit": 4.0,
+   "carry": 7.75,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "David Rotter",
+   "os": 2198,
+   "vacDays": 23.12,
+   "vacUsedInit": 3.0,
+   "carry": 3.12,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Rhoe Rubenecia",
+   "os": 2314,
+   "vacDays": 20.88,
+   "vacUsedInit": 2.0,
+   "carry": 0.88,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "František Růžička",
+   "os": 2175,
+   "vacDays": 30.25,
+   "vacUsedInit": 9.0,
+   "carry": 10.25,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jana Rychlíková",
+   "os": 1741,
+   "vacDays": 23.0,
+   "vacUsedInit": 16.0,
+   "carry": 3.0,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Aian Saga",
+   "os": 2222,
+   "vacDays": 32.0,
+   "vacUsedInit": 4.0,
+   "carry": 12.0,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Ardy Joshane Salazar",
+   "os": 2305,
+   "vacDays": 26.0,
+   "vacUsedInit": 3.0,
+   "carry": 6.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ricky Sarmiento",
+   "os": 2339,
+   "vacDays": 20.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Mark Glenn Sayno",
+   "os": 2264,
+   "vacDays": 20.38,
+   "vacUsedInit": 10.0,
+   "carry": 0.38,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "Milan Sedláček",
+   "os": 1941,
+   "vacDays": 20.0,
+   "vacUsedInit": 2.0,
+   "carry": 0.0,
+   "center": "Stř. LASER Supíkovice"
+  },
+  {
+   "name": "Lucie Sedláčková",
+   "os": 1815,
+   "vacDays": 29.5,
+   "vacUsedInit": 11.0,
+   "carry": 9.5,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Petro Shashkov",
+   "os": 2253,
+   "vacDays": 20.0,
+   "vacUsedInit": 1.0,
+   "carry": 0.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Maksym Sikalenko",
+   "os": 2151,
+   "vacDays": 20.0,
+   "vacUsedInit": 8.0,
+   "carry": 0.0,
+   "center": "DIVIZE Bruntál"
+  },
+  {
+   "name": "Pavel Skybík",
+   "os": 2369,
+   "vacDays": 15.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jiří Slaný",
+   "os": 142,
+   "vacDays": 21.0,
+   "vacUsedInit": 1.5,
+   "carry": 1.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ján Slezák",
+   "os": 1082,
+   "vacDays": 18.75,
+   "vacUsedInit": 0.94,
+   "carry": 0.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Petr Slončík",
+   "os": 1948,
+   "vacDays": 98.62,
+   "vacUsedInit": 1.0,
+   "carry": 78.62,
+   "center": "Nemovitosti - Ploština"
+  },
+  {
+   "name": "Martin Smetana",
+   "os": 2389,
+   "vacDays": 10.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Vasyl Sokolovskyi",
+   "os": 2337,
+   "vacDays": 20.5,
+   "vacUsedInit": 2.0,
+   "carry": 0.5,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ronnie Solayao",
+   "os": 2318,
+   "vacDays": 9.38,
+   "vacUsedInit": 5.0,
+   "carry": 1.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Antonín Srna",
+   "os": 1974,
+   "vacDays": 54.62,
+   "vacUsedInit": 3.0,
+   "carry": 34.62,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Alina Stovbun",
+   "os": 2052,
+   "vacDays": 28.88,
+   "vacUsedInit": 5.0,
+   "carry": 8.88,
+   "center": "Režim Ukrajina"
+  },
+  {
+   "name": "David Surý",
+   "os": 2371,
+   "vacDays": 15.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Milan Szapowal",
+   "os": 2004,
+   "vacDays": 20.5,
+   "vacUsedInit": 5.5,
+   "carry": 0.5,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Petr Šibal",
+   "os": 954,
+   "vacDays": 92.12,
+   "vacUsedInit": 0.0,
+   "carry": 83.25,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Petr Šimsa",
+   "os": 2308,
+   "vacDays": 21.38,
+   "vacUsedInit": 3.0,
+   "carry": 1.38,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Radek Šiška",
+   "os": 2392,
+   "vacDays": 0.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Darina Škubalová",
+   "os": 1498,
+   "vacDays": 27.5,
+   "vacUsedInit": 2.0,
+   "carry": 7.5,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Darina Škubalová",
+   "os": 1996,
+   "vacDays": 8.38,
+   "vacUsedInit": 0.0,
+   "carry": 7.0,
+   "center": "Stř. LASER Supíkovice"
+  },
+  {
+   "name": "Suzan Šmídová Rabie",
+   "os": 1742,
+   "vacDays": 23.5,
+   "vacUsedInit": 13.5,
+   "carry": 3.5,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Václav Šolar",
+   "os": 2354,
+   "vacDays": 19.62,
+   "vacUsedInit": 8.0,
+   "carry": 0.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jan Šonský",
+   "os": 2289,
+   "vacDays": 23.12,
+   "vacUsedInit": 5.0,
+   "carry": 3.12,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Radek Štejdíř",
+   "os": 1378,
+   "vacDays": 20.0,
+   "vacUsedInit": 1.5,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Naděžda Švarcová",
+   "os": 1901,
+   "vacDays": 34.0,
+   "vacUsedInit": 1.5,
+   "carry": 14.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Zdeněk Táborský",
+   "os": 2164,
+   "vacDays": 21.0,
+   "vacUsedInit": 10.0,
+   "carry": 1.0,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Ranniel Prado Taroy",
+   "os": 2309,
+   "vacDays": 22.62,
+   "vacUsedInit": 3.0,
+   "carry": 2.62,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Yaroslav Tomashevskyi",
+   "os": 2079,
+   "vacDays": 40.25,
+   "vacUsedInit": 17.0,
+   "carry": 20.25,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jaroslav Tomšů",
+   "os": 2033,
+   "vacDays": 36.12,
+   "vacUsedInit": 2.0,
+   "carry": 16.12,
+   "center": "DIVIZE ROTO"
+  },
+  {
+   "name": "Eduard Tunkl",
+   "os": 735,
+   "vacDays": 28.0,
+   "vacUsedInit": 2.0,
+   "carry": 8.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Martin Urban",
+   "os": 1364,
+   "vacDays": 32.0,
+   "vacUsedInit": 3.0,
+   "carry": 12.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Vladan Urošević",
+   "os": 2008,
+   "vacDays": 25.0,
+   "vacUsedInit": 5.0,
+   "carry": 5.0,
+   "center": "Stř. DOPRAVA"
+  },
+  {
+   "name": "Zbyněk Vaclach",
+   "os": 2367,
+   "vacDays": 16.62,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  },
+  {
+   "name": "Alvin Valila",
+   "os": 2347,
+   "vacDays": 21.0,
+   "vacUsedInit": 1.0,
+   "carry": 1.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Lazaros Vasiliadis",
+   "os": 2119,
+   "vacDays": 49.62,
+   "vacUsedInit": 3.0,
+   "carry": 29.62,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Miroslava Vavříková",
+   "os": 1816,
+   "vacDays": 47.0,
+   "vacUsedInit": 7.0,
+   "carry": 27.0,
+   "center": "Centrála Zlín + Správa"
+  },
+  {
+   "name": "Michal Vepřek",
+   "os": 2072,
+   "vacDays": 25.47,
+   "vacUsedInit": 4.5,
+   "carry": 5.47,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Martin Veselý",
+   "os": 2170,
+   "vacDays": 31.0,
+   "vacUsedInit": 3.0,
+   "carry": 11.0,
+   "center": "Obchod centrála"
+  },
+  {
+   "name": "Jolana Viktorinová",
+   "os": 1575,
+   "vacDays": 21.5,
+   "vacUsedInit": 1.5,
+   "carry": 1.5,
+   "center": "Stř. Sklad PLASTY"
+  },
+  {
+   "name": "Alan Villapando",
+   "os": 2334,
+   "vacDays": 20.0,
+   "vacUsedInit": 3.0,
+   "carry": 0.0,
+   "center": "Stř. Supíkovice KONTEJNERY - výroba"
+  },
+  {
+   "name": "Libor Volf",
+   "os": 2353,
+   "vacDays": 0.0,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "PKT"
+  },
+  {
+   "name": "Pavlo Vorobiov",
+   "os": 2094,
+   "vacDays": 42.62,
+   "vacUsedInit": 7.0,
+   "carry": 22.62,
+   "center": "Stř. Chomutov KONTEJNERY - výroba"
+  },
+  {
+   "name": "Jaroslav Zabloudil",
+   "os": 2012,
+   "vacDays": 8.38,
+   "vacUsedInit": 0.0,
+   "carry": 7.0,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Tereza Zabloudilová",
+   "os": 1382,
+   "vacDays": 25.06,
+   "vacUsedInit": 1.0,
+   "carry": 5.06,
+   "center": "Stř. POPELNICE"
+  },
+  {
+   "name": "Miroslav Zátopek",
+   "os": 2357,
+   "vacDays": 18.88,
+   "vacUsedInit": 0.0,
+   "carry": 0.0,
+   "center": "Stř. KONTEJNERY - výroba"
+  }
+ ]
+}
