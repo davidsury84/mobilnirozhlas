@@ -554,7 +554,8 @@ function mount(host) {
     let c = {}; try { c = JSON.parse(fs.readFileSync(CENIK_CFG_F, 'utf8')); } catch (_) {}
     const envMail = (process.env.DOPRAVA_CENIK_EMAIL != null ? process.env.DOPRAVA_CENIK_EMAIL : 'patrik.deml@elkoplast.cz').trim();
     return {
-      zapnuto: c.zapnuto != null ? !!c.zapnuto : (envMail !== '' && envMail !== 'off'),
+      // Výchozí stav je VYPNUTO — rozesílka se spouští výhradně v administraci modulu.
+      zapnuto: c.zapnuto != null ? !!c.zapnuto : false,
       prijemci: Array.isArray(c.prijemci) && c.prijemci.length ? c.prijemci : ((envMail && envMail !== 'off') ? envMail.split(',').map((x) => x.trim()).filter(Boolean) : []),
       hodina: (c.hodina != null && isFinite(c.hodina)) ? Math.min(20, Math.max(0, Number(c.hodina))) : 6,
       marze: (c.marze != null && isFinite(c.marze)) ? Math.min(15, Math.max(0, Number(c.marze))) : 5,
