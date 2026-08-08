@@ -2000,35 +2000,58 @@ function objDraw(){
   h2+='<tr><td colspan="'+NC+'" class="muted" style="text-align:right">'+list.length+' položek · '+gk.length+' dodavatelů</td></tr></tbody>';
   $('#objTbl').innerHTML=h2;
 }
+// Barvy pro Excel (ARGB) — sladěné s barevnou tabulkou v appce.
+const OBJXC={id:'FFEEF1F4',sklad:'FFE6F0E9',ceny:'FFF5EFE4',objrez:'FFECEFF5',prodej:'FFF1ECF6',dopor:'FFE5EFF9',hdr:'FFF2F5F2',over:'FFF7DEDE',order:'FFFBF0D6',chip:'FFFFE9B3',chipOver:'FFF5C6C6',sup:'FFE4EBF0',red:'FFC0392B',green:'FF0A7D33'};
+const objFill=argb=>({type:'pattern',pattern:'solid',fgColor:{argb:argb}});
+// Zapíše barevný řádek skupin (row1) + tučnou hlavičku (row2), zmrazí je. Vrací číslo prvního datového řádku.
+function objXlsxHeader(ws,widths,groups,names){
+  ws.columns=widths.map(w=>({width:w}));
+  let c=1;
+  groups.forEach(g=>{const start=c,end=c+g.n-1; if(end>start)ws.mergeCells(1,start,1,end); const cell=ws.getCell(1,start); cell.value=g.label; cell.alignment={horizontal:'center'}; cell.font={bold:true,size:10,color:{argb:'FF4A544C'}}; cell.fill=objFill(g.color); c=end+1;});
+  names.forEach((nm,i)=>{const cell=ws.getCell(2,i+1); cell.value=nm; cell.font={bold:true}; cell.fill=objFill(OBJXC.hdr);});
+  ws.views=[{state:'frozen',ySplit:2}];
+  return 3;
+}
+const objFillRow=(r,n,argb)=>{for(let i=1;i<=n;i++)r.getCell(i).fill=objFill(argb);};
+function objXlsxHead1(ws,xSplit){ws.getRow(1).eachCell(c=>{c.font={bold:true};c.fill=objFill(OBJXC.hdr);});ws.views=[{state:'frozen',ySplit:1,xSplit:xSplit||0}];}
 async function objExport(){
   try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
     const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Objednávky');
-    ws.columns=[{header:'SK',width:8},{header:'Registrační číslo',width:14},{header:'Název 1',width:38},{header:'Název (dodavatel)',width:22},{header:'Doplňkový kód',width:13},{header:'Mn.po p/v',width:10},{header:'K dispo. po p/v',width:13},{header:'Vypočtený průměr',width:14},{header:'Průměr+SN',width:12},{header:'Objednáno',width:11},{header:'Rezervováno',width:12},{header:'Dodací lhůta',width:12},{header:'Roční prodej',width:12},{header:'Spotřeba/den',width:12},{header:'Sezónnost (špička)',width:16},{header:'Objednat',width:11},{header:'Krytí po obj. (měs.)',width:16},{header:'Hodnota (Kč)',width:12}];
+    const names=['SK','Registrační číslo','Název 1','Název (dodavatel)','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','Spotřeba/den','Sezónnost (špička)','Objednat','Krytí po obj. (měs.)','Hodnota (Kč)'];
+    const widths=[8,14,38,22,13,10,13,14,12,11,12,12,12,12,16,11,16,12];
+    const groups=[{n:5,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:3,label:'Prodej & sezóna',color:OBJXC.prodej},{n:3,label:'Doporučení nákupu',color:OBJXC.dopor}];
+    const N=names.length; objXlsxHeader(ws,widths,groups,names);
     const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>x._o.rec>0||(x.avail||0)<0).sort((a,b)=>String(a.skupina).localeCompare(String(b.skupina),'cs')||b._o.value-a._o.value);
-    rows.forEach(x=>ws.addRow([x.sk,x.reg,x.nazev,x.skupina,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,x._o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),x._o.rec,(isFinite(x._o.coverAfter)?Math.round(x._o.coverAfter*10)/10:''),Math.round(x._o.value)]));
-    ws.getRow(1).font={bold:true};
+    rows.forEach(x=>{const o=x._o,crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
+      const r=ws.addRow([x.sk,x.reg,x.nazev,x.skupina,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),o.rec,(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value)]);
+      if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
+      if(o.rec>0){const oc=r.getCell(16);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
+      const cc=r.getCell(17); if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24)cc.font={bold:true,color:{argb:OBJXC.red}}; else if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8)cc.font={color:{argb:OBJXC.green}};
+      r.getCell(18).font={bold:true}; r.getCell(2).numFmt='@';});
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='objednaci-seznam.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast('Objednací seznam vyexportován ('+rows.length+' položek)');
   }catch(e){alert('Export selhal: '+e.message);}
 }
-// Druhý export = CELÁ ERP tabulka (všechny položky, i ty co se neobjednávají), rozpad po dodavatelích,
-// s garantovaně celým identifikátorem SK-reg jako text (Excel nic neořízne).
+// Druhý export = CELÁ ERP tabulka (všechny položky, i ty co se neobjednávají), rozpad po dodavatelích.
 async function objExportAll(){
   try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
     const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('ERP tabulka');
-    ws.columns=[{header:'Identifikátor (SK-reg)',width:18},{header:'SK',width:8},{header:'Registrační číslo',width:16},{header:'Dodavatel (skupina)',width:24},{header:'Název 1',width:40},{header:'Doplňkový kód',width:16},{header:'Mn.po p/v',width:10},{header:'K dispo. po p/v',width:13},{header:'Vypočtený průměr',width:14},{header:'Průměr+SN',width:12},{header:'Objednáno',width:11},{header:'Rezervováno',width:12},{header:'Dodací lhůta',width:12},{header:'Roční prodej',width:12},{header:'Spotřeba/den',width:12},{header:'Sezónnost (špička)',width:16},{header:'Objednat',width:11},{header:'Ekon. dávka (EOQ)',width:14},{header:'Obj. interval (měs.)',width:15},{header:'Doprava (Kč/obj.)',width:14},{header:'Krytí po obj. (měs.)',width:16},{header:'Hodnota (Kč)',width:12},{header:'Stav',width:22}];
-    // VŠECHNY položky, nic nefiltrujeme; řazení dle dodavatele, pak dle identifikátoru
+    const names=['Identifikátor (SK-reg)','SK','Registrační číslo','Dodavatel (skupina)','Název 1','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','Spotřeba/den','Sezónnost (špička)','Objednat','Ekon. dávka (EOQ)','Obj. interval (měs.)','Doprava (Kč/obj.)','Krytí po obj. (měs.)','Hodnota (Kč)','Stav'];
+    const widths=[18,8,16,24,40,16,10,13,14,12,11,12,12,12,12,16,11,14,15,14,16,12,22];
+    const groups=[{n:6,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:3,label:'Prodej & sezóna',color:OBJXC.prodej},{n:7,label:'Doporučení nákupu',color:OBJXC.dopor}];
+    const N=names.length; objXlsxHeader(ws,widths,groups,names);
     const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).slice().sort((a,b)=>String(a.skupina||'').localeCompare(String(b.skupina||''),'cs')||String(a.sk+'-'+a.reg).localeCompare(String(b.sk+'-'+b.reg),'cs'));
     let curSup=null;
     rows.forEach(x=>{
-      if(x.skupina!==curSup){curSup=x.skupina; const hr=ws.addRow(['▸ '+(curSup||'—')]); hr.font={bold:true}; hr.getCell(1).value='▸ '+(curSup||'—');}
-      const o=x._o||{},ident=String(x.sk)+'-'+String(x.reg);
-      const e=x._e||{};
+      if(x.skupina!==curSup){curSup=x.skupina; const hr=ws.addRow(['▸ '+(curSup||'—')]); hr.getCell(1).font={bold:true}; objFillRow(hr,N,OBJXC.sup);}
+      const o=x._o||{},e=x._e||{},ident=String(x.sk)+'-'+String(x.reg),crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
       const r=ws.addRow([ident,x.sk,x.reg,x.skupina,x.nazev,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),(o.rec||0),(e.eoq||''),(e.interval!=null&&isFinite(e.interval)?Math.round(e.interval*10)/10:''),(e.S!=null?e.S:''),(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value||0),(o.status||'')]);
-      r.getCell(1).numFmt='@'; // identifikátor jako text
-      r.getCell(3).numFmt='@'; // reg. číslo jako text (neořezávat)
+      if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
+      if(o.rec>0){const oc=r.getCell(17);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
+      const cc=r.getCell(21); if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24)cc.font={bold:true,color:{argb:OBJXC.red}}; else if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8)cc.font={color:{argb:OBJXC.green}};
+      r.getCell(22).font={bold:true};
+      r.getCell(1).numFmt='@'; r.getCell(3).numFmt='@';
     });
-    ws.getRow(1).font={bold:true};
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='erp-tabulka-dle-dodavatelu.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast('Celá tabulka vyexportována ('+rows.length+' položek, '+new Set(rows.map(x=>x.skupina)).size+' dodavatelů)');
   }catch(e){alert('Export selhal: '+e.message);}
@@ -2091,12 +2114,13 @@ async function objExportPlan(){
       const rS=wS.addRow([ident,x.skupina,x.nazev,x.lead].concat(p.rec.map(r=>r.S)));
       rS.getCell(1).numFmt='@';
       p.rec.forEach((r,t)=>{if(r.order>0){const mi=(m0+t)%12;agg[mi].items++;agg[mi].ks+=r.order;agg[mi].kc+=r.value;}});});
-    wO.getRow(1).font={bold:true}; wS.getRow(1).font={bold:true};
+    objXlsxHead1(wO,3); objXlsxHead1(wS,3);
+    wO.getCell(1,6).fill=objFill(OBJXC.prodej); wS.getCell(1,5).fill=objFill(OBJXC.prodej); // aktuální měsíc
     // List 3: souhrnný rytmus
     const wR=wb.addWorksheet('Souhrn rytmu');
     wR.columns=[{header:'Měsíc',width:10},{header:'Položek k obj.',width:14},{header:'Kusů',width:10},{header:'Hodnota (Kč)',width:14}];
-    for(let t=0;t<12;t++){const mi=(m0+t)%12;const a=agg[mi];wR.addRow([OBJ_MN[mi],a.items,a.ks,Math.round(a.kc)]);}
-    wR.getRow(1).font={bold:true};
+    for(let t=0;t<12;t++){const mi=(m0+t)%12;const a=agg[mi];const rr=wR.addRow([OBJ_MN[mi],a.items,a.ks,Math.round(a.kc)]);if(t===0)objFillRow(rr,4,OBJXC.prodej);}
+    objXlsxHead1(wR,1);
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='mesicni-plan-objednavek.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast('Měsíční plán vyexportován ('+paired.length+' položek × 12 měsíců)');
   }catch(e){alert('Export selhal: '+e.message);}
