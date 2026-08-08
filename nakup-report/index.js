@@ -80,6 +80,44 @@ function mount(host) {
     console.log('[nakup-report] bootstrap pohybů z ' + recent.length + ' souborů');
   }
 
+  // ---- DENNÍ BILANCE SKLADU (stav + pohyby, kusově i finančně v landed cenách) ----
+  const BAL_F = path.join(host.dataDir || __dirname, 'objednavky-bilance.json'); // denní historie bilance (cap 120 dní)
+  const unitVal = r => (r.unitCost > 0 ? r.unitCost : (r.unitPrice || 0));
+  const loadBilance = () => { try { return JSON.parse(fs.readFileSync(BAL_F, 'utf8')) || []; } catch (_) { return []; } };
+  function pushBilance(B) {
+    const arr = loadBilance().filter(e => e.date !== B.date); arr.push(B);
+    arr.sort((a, b) => String(a.date).localeCompare(String(b.date))); while (arr.length > 120) arr.shift();
+    try { fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} return arr;
+  }
+  function computeBilance(nowRows, nowDate, prevRows) {
+    const Z = () => ({ ks: 0, kc: 0 });
+    const B = { date: nowDate, items: (nowRows || []).length, stock: Z(), dispo: Z(), onOrder: Z(), reserved: Z(),
+      flow: { received: Z(), dispatched: Z(), newReserved: Z(), newOnOrder: Z() }, hasFlow: !!(prevRows && prevRows.length) };
+    const pm = {}; (prevRows || []).forEach(r => { pm[r.sk + '-' + r.reg] = { stock: r.stock || 0, onOrder: r.onOrder || 0, reserved: r.reserved || 0 }; });
+    (nowRows || []).forEach(r => {
+      const v = unitVal(r);
+      B.stock.ks += r.stock || 0; B.stock.kc += (r.stock || 0) * v;
+      B.dispo.ks += r.avail || 0; B.dispo.kc += (r.avail || 0) * v;
+      B.onOrder.ks += r.onOrder || 0; B.onOrder.kc += (r.onOrder || 0) * v;
+      B.reserved.ks += r.reserved || 0; B.reserved.kc += (r.reserved || 0) * v;
+      const p = pm[r.sk + '-' + r.reg];
+      if (p) {
+        const recv = Math.max(0, (p.onOrder || 0) - (r.onOrder || 0));
+        const disp = Math.max(0, recv - ((r.stock || 0) - (p.stock || 0)));
+        const nRes = Math.max(0, (r.reserved || 0) - (p.reserved || 0));
+        const nOrd = Math.max(0, (r.onOrder || 0) - (p.onOrder || 0));
+        B.flow.received.ks += recv; B.flow.received.kc += recv * v;
+        B.flow.dispatched.ks += disp; B.flow.dispatched.kc += disp * v;
+        B.flow.newReserved.ks += nRes; B.flow.newReserved.kc += nRes * v;
+        B.flow.newOnOrder.ks += nOrd; B.flow.newOnOrder.kc += nOrd * v;
+      }
+    });
+    ['stock', 'dispo', 'onOrder', 'reserved'].forEach(k => { B[k].ks = Math.round(B[k].ks); B[k].kc = Math.round(B[k].kc); });
+    Object.keys(B.flow).forEach(k => { B.flow[k].ks = Math.round(B.flow[k].ks); B.flow[k].kc = Math.round(B.flow[k].kc); });
+    return B;
+  }
+  const hasEshop = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); return !!(e && host.employeeModules && host.employeeModules(e.email).indexOf('eshop') >= 0); } catch (_) { return false; } };
+
   // ---- denní stažení nejnovějšího souboru z Drive (SA), rozparsování, uložení na volume ----
   async function syncObjednavky(force) {
     if (!drive || !drive.configured()) return { ok: false, error: 'Service account (GOOGLE_SA_*) není nastavený.' };
@@ -112,7 +150,9 @@ function mount(host) {
       let prev = null; try { prev = JSON.parse(fs.readFileSync(PREV_F, 'utf8')); } catch (_) {}
       if (prev && prev.rows && prev.date) { if (prev.date !== dataDate) applyMovement(prev.rows, prev.date, parsed.rows, dataDate); }
       else if (Object.keys(loadMoves()).length === 0) { await bootstrapMovements(xls, newest, parsed, dataDate); }
-      fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder })) }));
+      // denní bilance skladu (stav + pohyby vs předchozí den)
+      try { pushBilance(computeBilance(parsed.rows, dataDate, prev && prev.rows)); } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
+      fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder, reserved: r.reserved })) }));
     } catch (e) { console.warn('[nakup-report] pohyby:', e.message); }
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));
     st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString() };
@@ -337,6 +377,13 @@ function mount(host) {
     // Dotazník dodavatelů — čtení pro přihlášené (EOQ v appce potřebuje náklad na dopravu + lhůtu)
     if (p === '/api/nakup-report/suppliers' && req.method === 'GET') {
       return json(res, 200, { suppliers: supplierList() }), true;
+    }
+    // Denní bilance skladu — pro přístup k modulu e-shop (i home widget)
+    if (p === '/api/nakup-report/bilance' && req.method === 'GET') {
+      if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
+      const arr = loadBilance(); const latest = arr[arr.length - 1] || null; const prev = arr[arr.length - 2] || null;
+      const trend = arr.slice(-30).map(e => ({ date: e.date, stockKc: e.stock.kc, onOrderKc: e.onOrder.kc, reservedKc: e.reserved.kc, dispoKc: e.dispo.kc }));
+      return json(res, 200, { latest, prev, trend, days: arr.length }), true;
     }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
 
