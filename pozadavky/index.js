@@ -120,6 +120,7 @@ function mount(host) {
       if (p === '/api/pozadavky/nastaveni' && req.method === 'POST') return apiCfgSet(req, res);
       if (p === '/api/pozadavky' && req.method === 'GET') return apiList(req, res);
       if (p === '/api/pozadavky' && req.method === 'POST') return apiCreate(req, res);
+      if (p === '/api/pozadavky/bulk' && req.method === 'POST') return apiBulk(req, res);
       if (p === '/api/pozadavky/stav' && req.method === 'POST') return apiStav(req, res);
     } catch (e) {
       console.error('[pozadavky] chyba obsluhy:', e);
@@ -211,6 +212,47 @@ function mount(host) {
       + '\nPožadavek najdete v intranetu → Požadavky nákupu:\n' + link;
     for (const nb of bs) await notify(nb.email, 'Nový požadavek na nákup #' + item.cislo + ' — ' + (nazev || kod), text);
     json(res, 200, { ok: true, id: item.id, cislo: item.cislo, notified: bs.length });
+    return true;
+  }
+
+  // Hromadné založení požadavků (z Optimalizace nákupu, per dodavatel). Dedup otevřených (novy) dle kódu+zdroj; JEDEN souhrnný e-mail nákupčím.
+  async function apiBulk(req, res) {
+    const me = meOf(req);
+    if (!(me.isRequester || me.isBuyer)) { json(res, 403, { chyba: 'Nemáte oprávnění vytvořit požadavek.' }); return true; }
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const arr = Array.isArray(b.items) ? b.items : [];
+    const zdroj = String(b.zdroj || 'optimalizace-nakupu').trim();
+    const supplier = String(b.supplier || '').trim();
+    if (!arr.length) { json(res, 400, { chyba: 'Žádné položky k předání.' }); return true; }
+    const db = load(); const now = Date.now();
+    const openByKod = {}; db.items.forEach(it => { if (it.stav === 'novy' && it.zdroj === zdroj && it.kod) openByKod[it.kod] = it; });
+    const created = []; let skipped = 0;
+    arr.forEach(x => {
+      const kod = String(x.kod || '').trim(), nazev = String(x.nazev || '').trim(), mn = Math.round(Number(x.mnozstvi) || 0);
+      if ((!kod && !nazev) || !(mn > 0)) return;
+      if (kod && openByKod[kod]) { skipped++; return; }
+      db.seq = (db.seq || 0) + 1;
+      const item = {
+        id: crypto.randomBytes(8).toString('hex'), cislo: db.seq, kod, nazev, mnozstvi: mn, jednotka: 'ks',
+        skladem: (x.skladem == null || x.skladem === '' || isNaN(Number(x.skladem))) ? null : Number(x.skladem),
+        obratka: String(x.obratka || '').trim() || null, duvod: String(x.duvod || '').trim(),
+        dodavatel: supplier || null, zdroj, requester: { email: me.email, name: me.name }, stav: 'novy',
+        createdAt: now, updatedAt: now, historie: [{ stav: 'novy', note: '', by: { email: me.email, name: me.name }, at: now }],
+      };
+      db.items.push(item); created.push(item); if (kod) openByKod[kod] = item;
+    });
+    save(db);
+    logAct('pozadavky', { email: me.email, name: me.name }, 'Hromadný požadavek' + (supplier ? (' · ' + supplier) : '') + ': ' + created.length + ' pol.' + (skipped ? (', ' + skipped + ' přeskočeno (už ve frontě)') : ''));
+    if (created.length) {
+      const bs = nakupci(); const link = baseUrlOf(req) + '/#modul=pozadavky';
+      const lines = created.map(it => '• ' + (it.nazev || '—') + (it.kod ? (' (' + it.kod + ')') : '') + ' — ' + it.mnozstvi + ' ks' + (it.skladem != null ? (' [skladem ' + it.skladem + ']') : '')).join('\n');
+      const text = 'Dobrý den,\n\nE-shop (' + (me.name || me.email) + ') předal ' + created.length + ' položek k objednání'
+        + (supplier ? (' od dodavatele ' + supplier) : '') + ' (z Optimalizace nákupu):\n\n' + lines
+        + (skipped ? ('\n\n(' + skipped + ' položek už bylo ve frontě — nezakládáno znovu.)') : '')
+        + '\n\nPožadavky najdete v intranetu → Požadavky nákupu:\n' + link;
+      for (const nb of bs) await notify(nb.email, 'Objednávka k vyřízení' + (supplier ? (' — ' + supplier) : '') + ' (' + created.length + ' pol.)', text);
+    }
+    json(res, 200, { ok: true, created: created.length, skipped, cisla: created.map(i => i.cislo) });
     return true;
   }
 

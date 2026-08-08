@@ -1993,7 +1993,7 @@ function objDraw(){
   const grpRow='<tr>'+gcols.map(g=>'<th colspan="'+g[0]+'" style="text-align:center;font-size:11px;letter-spacing:.03em;background:'+g[2]+';border-bottom:2px solid #fff;color:#4a544c">'+esc(g[1])+'</th>').join('')+'</tr>';
   let h2='<thead>'+grpRow+'<tr>'+hdrs.map(c=>'<th '+(c[1]?R:'')+'>'+esc(c[0])+'</th>').join('')+'</tr></thead><tbody>';
   gk.forEach(g=>{
-    h2+='<tr class="objsup"><td colspan="'+NC+'">▸ '+esc(g.sup||'—')+' <span style="color:var(--mut);font-weight:400">· '+g.items.length+' pol.'+(g.ks?(' · objednat '+fmt(g.ks)+' ks / '+fmt(g.val)+' Kč'):' · nic k objednání')+'</span>'+(g.ks?' <button type="button" style="margin-left:8px;font:inherit;font-size:12px;font-weight:600;background:#2f6f8f;color:#fff;border:0;border-radius:8px;padding:3px 10px;cursor:pointer" onclick="objExportSupplier(decodeURIComponent(\''+encodeURIComponent(g.sup||'')+'\'))">📋 Objednávka dodavateli</button>':'')+'</td></tr>';
+    h2+='<tr class="objsup"><td colspan="'+NC+'">▸ '+esc(g.sup||'—')+' <span style="color:var(--mut);font-weight:400">· '+g.items.length+' pol.'+(g.ks?(' · objednat '+fmt(g.ks)+' ks / '+fmt(g.val)+' Kč'):' · nic k objednání')+'</span>'+(g.ks?objSupplierBtns(g.sup):'')+'</td></tr>';
     g.items.forEach((x,ri)=>{const o=x._o,crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
       h2+='<tr class="drow'+(crit?' dcrit':(toOrder?' dorder':(ri%2?' dzeb':'')))+'">'+
         '<td>'+esc(x.sk)+'</td><td>'+esc(x.reg)+'</td><td>'+esc(x.nazev)+'</td><td class="muted">'+esc(x.dodKod)+'</td>'+
@@ -2040,7 +2040,30 @@ async function objExport(supFilter){
     if(typeof toast==='function')toast((supFilter?('Objednávka '+supFilter):'Objednací seznam')+' vyexportován ('+rows.length+' položek)');
   }catch(e){alert('Export selhal: '+e.message);}
 }
+function objSupplierBtns(sup){
+  var u=encodeURIComponent(sup||'');
+  var b='margin-left:6px;font:inherit;font-size:12px;font-weight:600;color:#fff;border:0;border-radius:8px;padding:3px 10px;cursor:pointer';
+  return ' <button type="button" style="'+b+';background:#3a7d44" onclick="objSendToNakupci(decodeURIComponent(\''+u+'\'))">➕ Předat nákupčímu</button>'+
+         '<button type="button" style="'+b+';background:#2f6f8f" onclick="objExportSupplier(decodeURIComponent(\''+u+'\'))">📋 Excel</button>';
+}
 function objExportSupplier(sup){ objExport(sup); }
+// Předá objednávku dodavatele nákupčímu → založí požadavky v modulu Požadavky nákupu (stav „nový" = nevyřízené).
+async function objSendToNakupci(sup){
+  const items=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>x.skupina===sup&&x._o&&x._o.rec>0).map(x=>({
+    kod:String(x.sk)+'-'+String(x.reg), nazev:x.nazev, mnozstvi:x._o.rec, skladem:x.stock,
+    obratka:'roční prodej '+fmt(x._o.D)+' ks · krytí po obj. '+objCoverTxt(x._o.coverAfter),
+    duvod:'Doporučeno Optimalizací nákupu'+((x.avail||0)<0?' (oversold — vykrýt rezervace)':'')+(x._o.ramp?' — náběh sezóny':'')
+  }));
+  if(!items.length){ if(typeof toast==='function')toast('U dodavatele '+sup+' není teď nic k objednání.'); return; }
+  const totKs=items.reduce((s,i)=>s+i.mnozstvi,0);
+  if(!confirm('Předat nákupčímu '+items.length+' položek ('+fmt(totKs)+' ks) od dodavatele „'+sup+'"?\n\nZaloží se požadavky v modulu Požadavky nákupu (stav „nový"). Nákupčí je pak označí jako vyřízené/objednané.')) return;
+  try{
+    const r=await fetch('/api/pozadavky/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({supplier:sup,zdroj:'optimalizace-nakupu',items:items})});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok){ if(typeof toast==='function')toast('Předáno nákupčímu: '+d.created+' požadavků'+(d.skipped?(' · '+d.skipped+' už bylo ve frontě'):'')); }
+    else { if(typeof toast==='function')toast('Chyba: '+(d.chyba||('HTTP '+r.status))); else alert('Chyba: '+(d.chyba||r.status)); }
+  }catch(e){ if(typeof toast==='function')toast('Chyba odeslání: '+e.message); }
+}
 // Druhý export = CELÁ ERP tabulka (všechny položky, i ty co se neobjednávají), rozpad po dodavatelích.
 async function objExportAll(){
   try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
