@@ -1957,6 +1957,11 @@ async function renderObjednavky(){
     const sel=$('#objSup');if(sel)sel.innerHTML='<option value="">Všichni dodavatelé ('+(OBJ_DATA.rows||[]).length+')</option>'+sups.map(s=>'<option>'+esc(s)+'</option>').join('');
     const dt=$('#objDate');if(dt)dt.textContent=(OBJ_DATA.date||'?')+' · '+(OBJ_DATA.rows||[]).length+' položek';
   }
+  // STABILITA: počkej na embed prodejů (ROWS), ať se doporučení nepočítá z prázdna a nemizí
+  if(typeof ROWS==='undefined'||!ROWS.length){
+    const tb=$('#objTbl'); if(tb&&!tb.querySelector('tbody tr'))tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Načítám prodejní data…</td></tr></tbody>';
+    for(let i=0;i<80 && (typeof ROWS==='undefined'||!ROWS.length);i++){ await new Promise(r=>setTimeout(r,100)); }
+  }
   const smap=objSalesMap();const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
   const robMap={}; Object.keys(smap).forEach(k=>{robMap[k]=objRobust(smap[k]);});   // robustní poptávka (bez jednorázových extrémů)
@@ -1988,7 +1993,7 @@ function objDraw(){
   const grpRow='<tr>'+gcols.map(g=>'<th colspan="'+g[0]+'" style="text-align:center;font-size:11px;letter-spacing:.03em;background:'+g[2]+';border-bottom:2px solid #fff;color:#4a544c">'+esc(g[1])+'</th>').join('')+'</tr>';
   let h2='<thead>'+grpRow+'<tr>'+hdrs.map(c=>'<th '+(c[1]?R:'')+'>'+esc(c[0])+'</th>').join('')+'</tr></thead><tbody>';
   gk.forEach(g=>{
-    h2+='<tr class="objsup"><td colspan="'+NC+'">▸ '+esc(g.sup||'—')+' <span style="color:var(--mut);font-weight:400">· '+g.items.length+' pol.'+(g.ks?(' · objednat '+fmt(g.ks)+' ks / '+fmt(g.val)+' Kč'):' · nic k objednání')+'</span></td></tr>';
+    h2+='<tr class="objsup"><td colspan="'+NC+'">▸ '+esc(g.sup||'—')+' <span style="color:var(--mut);font-weight:400">· '+g.items.length+' pol.'+(g.ks?(' · objednat '+fmt(g.ks)+' ks / '+fmt(g.val)+' Kč'):' · nic k objednání')+'</span>'+(g.ks?' <button type="button" style="margin-left:8px;font:inherit;font-size:12px;font-weight:600;background:#2f6f8f;color:#fff;border:0;border-radius:8px;padding:3px 10px;cursor:pointer" onclick="objExportSupplier(decodeURIComponent(\''+encodeURIComponent(g.sup||'')+'\'))">📋 Objednávka dodavateli</button>':'')+'</td></tr>';
     g.items.forEach((x,ri)=>{const o=x._o,crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
       h2+='<tr class="drow'+(crit?' dcrit':(toOrder?' dorder':(ri%2?' dzeb':'')))+'">'+
         '<td>'+esc(x.sk)+'</td><td>'+esc(x.reg)+'</td><td>'+esc(x.nazev)+'</td><td class="muted">'+esc(x.dodKod)+'</td>'+
@@ -2014,24 +2019,28 @@ function objXlsxHeader(ws,widths,groups,names){
 }
 const objFillRow=(r,n,argb)=>{for(let i=1;i<=n;i++)r.getCell(i).fill=objFill(argb);};
 function objXlsxHead1(ws,xSplit){ws.getRow(1).eachCell(c=>{c.font={bold:true};c.fill=objFill(OBJXC.hdr);});ws.views=[{state:'frozen',ySplit:1,xSplit:xSplit||0}];}
-async function objExport(){
+function objSafeName(s){return String(s||'').replace(/[^\wěščřžýáíéúůňťďóĚŠČŘŽÝÁÍÉÚŮŇŤĎÓ .-]/g,'').replace(/\s+/g,'-').slice(0,40)||'export';}
+async function objExport(supFilter){
+  if(supFilter && typeof supFilter!=='string')supFilter=null;   // onclick předá event → ignoruj
   try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
     const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Objednávky');
     const names=['SK','Registrační číslo','Název 1','Název (dodavatel)','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','Spotřeba/den','Sezónnost (špička)','Objednat','Krytí po obj. (měs.)','Hodnota (Kč)'];
     const widths=[8,14,38,22,13,10,13,14,12,11,12,12,12,12,16,11,16,12];
     const groups=[{n:5,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:3,label:'Prodej & sezóna',color:OBJXC.prodej},{n:3,label:'Doporučení nákupu',color:OBJXC.dopor}];
     const N=names.length; objXlsxHeader(ws,widths,groups,names);
-    const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>x._o.rec>0||(x.avail||0)<0).sort((a,b)=>String(a.skupina).localeCompare(String(b.skupina),'cs')||b._o.value-a._o.value);
+    const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>(x._o.rec>0||(x.avail||0)<0)&&(!supFilter||x.skupina===supFilter)).sort((a,b)=>String(a.skupina).localeCompare(String(b.skupina),'cs')||b._o.value-a._o.value);
+    if(supFilter&&!rows.length){if(typeof toast==='function')toast('U dodavatele '+supFilter+' není teď nic k objednání.');return;}
     rows.forEach(x=>{const o=x._o,crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
       const r=ws.addRow([x.sk,x.reg,x.nazev,x.skupina,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),o.rec,(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value)]);
       if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
       if(o.rec>0){const oc=r.getCell(16);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
       const cc=r.getCell(17); if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24)cc.font={bold:true,color:{argb:OBJXC.red}}; else if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8)cc.font={color:{argb:OBJXC.green}};
       r.getCell(18).font={bold:true}; r.getCell(2).numFmt='@';});
-    const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='objednaci-seznam.xlsx';document.body.appendChild(a);a.click();a.remove();
-    if(typeof toast==='function')toast('Objednací seznam vyexportován ('+rows.length+' položek)');
+    const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download=supFilter?('objednavka-'+objSafeName(supFilter)+'.xlsx'):'objednaci-seznam.xlsx';document.body.appendChild(a);a.click();a.remove();
+    if(typeof toast==='function')toast((supFilter?('Objednávka '+supFilter):'Objednací seznam')+' vyexportován ('+rows.length+' položek)');
   }catch(e){alert('Export selhal: '+e.message);}
 }
+function objExportSupplier(sup){ objExport(sup); }
 // Druhý export = CELÁ ERP tabulka (všechny položky, i ty co se neobjednávají), rozpad po dodavatelích.
 async function objExportAll(){
   try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
