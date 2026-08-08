@@ -2249,6 +2249,15 @@ const server = http.createServer(async (req, res) => {
     if (mobilniLisyMod && await mobilniLisyMod.handle(req, res)) return;
     if (nakupReportMod && await nakupReportMod.handle(req, res)) return;
 
+    // Centrální přehled rozesílek (správce) — agreguje descriptory z modulů, které je vystavují.
+    if (p === '/api/admin/reports' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod];
+      let out = [];
+      for (const m of mods) { if (m && typeof m.reports === 'function') { try { const rs = m.reports() || []; rs.forEach(r => out.push(r)); } catch (_) {} } }
+      return send(res, 200, { reports: out });
+    }
+
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;
     // režim se rozhodne v prohlížeči podle cesty. Přístup do správy hlídá /api/state (jinak přihlašovací okno).
     if (p === '/' || p === '/index.html' || p === '/admin' || p === '/admin/') {
@@ -3312,9 +3321,9 @@ if (require.main === module) {
     // měsíční vyhodnocení – kontrola při startu a pak periodicky (každých 6 h)
     maybeSendMonthlyReport();
     setInterval(maybeSendMonthlyReport, 6 * 3600 * 1000);
-    // Týdenní reporty nákupu (co zlevnit / co nakoupit) — kontrola při startu a pak po 6 h (pojistka 1×/ISO-týden)
+    // Reporty nákupu — kontrola při startu a pak KAŽDOU HODINU (kvůli ranní bilanci; guardy 1×/den, 1×/týden, 1×/14 dní)
     if (nakupReportMod) {
-      nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 6 * 3600 * 1000);
+      nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 3600 * 1000);
       // Drive sync objednávek kontrolovat každou hodinu (nový soubor tam bývá ~7:00) — vezme ho hned, jak se objeví
       if (nakupReportMod.sync) setInterval(() => nakupReportMod.sync().catch(() => {}), 3600 * 1000);
     }

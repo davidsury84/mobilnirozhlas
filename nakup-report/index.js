@@ -197,6 +197,10 @@ function mount(host) {
       objednavkyTo: Array.isArray(c.objednavkyTo) ? c.objednavkyTo : ['jan.benicek@elkoplast.cz', 'michaela.lizancova@elkoplast.cz', 'david.sury@elkoplast.cz', 'hana.faltynkova@elkoplast.cz'],
       objednavkyEnabled: c.objednavkyEnabled !== undefined ? !!c.objednavkyEnabled : false, // ZATÍM VYPNUTO (uživatel: „zatím nic neposílej")
       objednavkyDay: (c.objednavkyDay >= 0 && c.objednavkyDay <= 6) ? c.objednavkyDay : 1,
+      // ranní bilance skladu (denně) — příjemci editovatelní správcem
+      bilanceTo: Array.isArray(c.bilanceTo) ? c.bilanceTo : DEF_PU.slice(),
+      bilanceEnabled: c.bilanceEnabled !== undefined ? !!c.bilanceEnabled : false, // VÝCHOZÍ VYPNUTO
+      bilanceHour: (c.bilanceHour >= 0 && c.bilanceHour <= 23) ? c.bilanceHour : 8, // odesílá se ráno od této hodiny
       // parametry modelu (výchozí = jako v appce)
       lead: +c.lead || 30, slow: +c.slow || 4, aging: +c.aging || 7, dead: +c.dead || 10,
       covslow: +c.covslow || 12, covaging: +c.covaging || 24, covdead: +c.covdead || 48,
@@ -345,11 +349,38 @@ function mount(host) {
     return { subject: 'Objednávkový report (ERP) — co objednat · ' + (obj.date || ''), html: wrap('Co objednat (ERP × prodeje)', 'Položky pod bodem objednání, seskupené dle dodavatele', body, obj.date || obj.source || '—'), count: list.length, totVal };
   }
 
+  // ---------- ranní bilance skladu (e-mail) ----------
+  function buildBilance(cfg) {
+    const arr = loadBilance(), L = arr[arr.length - 1];
+    if (!L) return { subject: 'Bilance skladu e-shop — zatím bez dat', html: wrap('Bilance skladu e-shop', 'Zatím nejsou data', '<p>Bilance se plní z denních souborů skladu.</p>', '—'), count: 0 };
+    const f = L.flow || {};
+    const card = (label, o, accent) => '<td style="padding:0 6px 0 0;width:25%;vertical-align:top">' +
+      '<div style="border:1px solid #dbe2d8;border-left:4px solid ' + accent + ';border-radius:9px;padding:10px 12px">' +
+      '<div style="font-size:12px;color:#6b736c;text-transform:uppercase;letter-spacing:.03em">' + esc(label) + '</div>' +
+      '<div style="font-size:20px;font-weight:700;color:#243">' + kc(o.kc) + '</div>' +
+      '<div style="font-size:12px;color:#8a938a">' + fmt(o.ks) + ' ks</div></div></td>';
+    let body = '<table style="border-collapse:separate;width:100%;margin:0 0 14px"><tr>' +
+      card('Sklad', L.stock, '#3a7d44') + card('K dispozici', L.dispo, '#2f6f8f') + card('Objednáno u dodav.', L.onOrder, '#b06f00') + card('Rezervováno zákazníky', L.reserved, '#8a4baf') + '</tr></table>';
+    if (L.hasFlow) {
+      const fl = (lbl, o) => '<b>' + lbl + ':</b> ' + fmt(o.ks) + ' ks / ' + kc(o.kc);
+      body += '<div style="background:#f2f6ef;border:1px solid #dbe6d6;border-radius:9px;padding:10px 14px;margin:0 0 14px;font-size:13.5px">' +
+        '📦 <b>Pohyb za den</b> — ' + fl('výdej', f.dispatched) + ' · ' + fl('nové rezervace', f.newReserved) + ' · ' + fl('příjem', f.received) + ' · ' + fl('nově objednáno', f.newOnOrder) + '</div>';
+    }
+    // trend posledních 10 dní (hodnota skladu)
+    const last = arr.slice(-10);
+    body += '<h3 style="margin:14px 0 4px;font-size:14px">Trend (hodnota skladu, posledních ' + last.length + ' dní)</h3>' +
+      '<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>' +
+      ['Den', 'Sklad', 'Dispo', 'Objednáno', 'Rezervováno'].map((h, i) => '<th style="text-align:' + (i ? 'right' : 'left') + ';border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">' + h + '</th>').join('') + '</tr></thead><tbody>' +
+      last.slice().reverse().map(e => '<tr><td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(e.date) + '</td>' +
+        ['stock', 'dispo', 'onOrder', 'reserved'].map(k => '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #eef1ec">' + kc(e[k].kc) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+    return { subject: 'Ranní bilance skladu e-shop · ' + L.date, html: wrap('Bilance skladu e-shop', 'Stav a denní pohyby skladu (v landed cenách)', body, L.date), count: L.items };
+  }
+
   // ---------- odeslání ----------
   async function sendReport(kind, toList, cfg) {
     const to = cleanEmails(toList);
     if (!to.length) return { ok: false, error: 'žádný příjemce' };
-    const rep = kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
+    const rep = kind === 'bilance' ? buildBilance(cfg) : kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
     const from = (host.mailFrom && host.mailFrom.user) || '';
     const name = (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — nákup';
     try {
@@ -372,6 +403,11 @@ function mount(host) {
       if (cfg.objednavkyEnabled && now.getDay() >= cfg.objednavkyDay) {
         const daysSince = st.objAt ? (now - new Date(st.objAt)) / 86400000 : 999;
         if (daysSince >= 13) { const r = await sendReport('objednavky', cfg.objednavkyTo, cfg); st.objAt = now.toISOString(); st.objednavky = r; changed = true; console.log('[nakup-report] objednávkový report: ' + (r.ok ? r.count + ' pol.' : 'CHYBA ' + r.error)); }
+      }
+      // Ranní bilance skladu — denně (od zvolené hodiny), pojistka 1×/den
+      if (cfg.bilanceEnabled && now.getHours() >= (cfg.bilanceHour != null ? cfg.bilanceHour : 8)) {
+        const dstr = now.toISOString().slice(0, 10);
+        if (st.bilanceDay !== dstr) { const rB = await sendReport('bilance', cfg.bilanceTo, cfg); st.bilanceDay = dstr; st.bilance = rB; changed = true; console.log('[nakup-report] ranní bilance: ' + (rB.ok ? 'odesláno' : 'CHYBA ' + rB.error)); }
       }
       // Týdenní zlevnění/nákup — volitelné (defaultně vypnuto)
       if (cfg.enabled && now.getDay() >= cfg.weekday) {
@@ -438,6 +474,9 @@ function mount(host) {
       if (b.objednavkyTo != null) next.objednavkyTo = cleanEmails(b.objednavkyTo);
       if (b.objednavkyEnabled != null) next.objednavkyEnabled = !!b.objednavkyEnabled;
       if (b.objednavkyDay != null && b.objednavkyDay >= 0 && b.objednavkyDay <= 6) next.objednavkyDay = +b.objednavkyDay;
+      if (b.bilanceTo != null) next.bilanceTo = cleanEmails(b.bilanceTo);
+      if (b.bilanceEnabled != null) next.bilanceEnabled = !!b.bilanceEnabled;
+      if (b.bilanceHour != null && b.bilanceHour >= 0 && b.bilanceHour <= 23) next.bilanceHour = +b.bilanceHour;
       saveCfg(next);
       return json(res, 200, { ok: true, config: next }), true;
     }
@@ -446,15 +485,15 @@ function mount(host) {
       catch (e) { return json(res, 500, { ok: false, error: e.message }), true; }
     }
     if (p === '/api/nakup-report/preview' && req.method === 'GET') {
-      const cfg = loadCfg(); const kind = u.query.type === 'objednavky' ? 'objednavky' : 'markdown';
-      const rep = kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
+      const cfg = loadCfg(); const kind = ['objednavky', 'bilance', 'markdown'].indexOf(u.query.type) >= 0 ? u.query.type : 'markdown';
+      const rep = kind === 'bilance' ? buildBilance(cfg) : kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
       return htmlOut(res, 200, rep.html), true;
     }
     if (p === '/api/nakup-report/send' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
       const cfg = loadCfg();
-      const kind = b.type === 'objednavky' ? 'objednavky' : 'markdown';
-      const def = kind === 'objednavky' ? cfg.objednavkyTo : cfg.markdownTo;
+      const kind = ['objednavky', 'bilance', 'markdown'].indexOf(b.type) >= 0 ? b.type : 'markdown';
+      const def = kind === 'bilance' ? cfg.bilanceTo : kind === 'objednavky' ? cfg.objednavkyTo : cfg.markdownTo;
       const to = b.to ? cleanEmails(b.to) : def;
       const r = await sendReport(kind, to, cfg);
       return json(res, r.ok ? 200 : 500, r), true;
@@ -462,7 +501,17 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, sync: () => syncObjednavky(false) };
+  // Descriptor pro centrální přehled rozesílek (správce → „Rozesílky")
+  function reports() {
+    const c = loadCfg(); let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
+    return [
+      { key: 'bilance', module: 'E-shop · Nákup', name: 'Ranní bilance skladu', to: c.bilanceTo || [], enabled: !!c.bilanceEnabled, schedule: 'denně ráno (' + (c.bilanceHour != null ? c.bilanceHour : 8) + ':00)', lastAt: st.bilanceDay || null, preview: '/api/nakup-report/preview?type=bilance', configHint: 'E-shop → Optimalizace nákupu → 📧 Reporty' },
+      { key: 'objednavky', module: 'E-shop · Nákup', name: 'Objednávkový report (co objednat)', to: c.objednavkyTo || [], enabled: !!c.objednavkyEnabled, schedule: '1× za 14 dní', lastAt: st.objAt || null, preview: '/api/nakup-report/preview?type=objednavky', configHint: 'E-shop → Optimalizace nákupu → 📧 Reporty' },
+      { key: 'markdown', module: 'E-shop · Nákup', name: 'Co zlevnit (stárnoucí/mrtvé zásoby)', to: c.markdownTo || [], enabled: !!c.enabled, schedule: 'týdně', lastAt: st.lastAt || null, preview: '/api/nakup-report/preview?type=markdown', configHint: 'E-shop → Optimalizace nákupu → 📧 Reporty' }
+    ];
+  }
+
+  return { handle, tick, sync: () => syncObjednavky(false), reports };
 }
 
 module.exports = { mount };

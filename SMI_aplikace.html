@@ -645,6 +645,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
                 <span class="muted" id="nkDriveInfo" style="font-size:12px"></span>
               </div>
             </div>
+            <div style="border-top:1px solid var(--line,#e4eaf1);margin-top:6px;padding-top:10px">
+              <label style="display:flex;flex-direction:column;gap:3px">📊 <b>„Ranní bilance skladu" (denně ráno)</b> — komu poslat
+                <input type="text" id="nkRepBil" placeholder="email1@elkoplast.cz, email2@elkoplast.cz" style="padding:8px;font:inherit"></label>
+              <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:8px">
+                <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="nkRepBilEn"> Posílat každé ráno</label>
+                <label style="display:flex;align-items:center;gap:6px">od hodiny <input type="number" id="nkRepBilHour" min="0" max="23" value="8" style="width:56px;padding:5px"></label>
+                <button class="btn ghost" type="button" onclick="window.open('/api/nakup-report/preview?type=bilance','_blank')">👁 Náhled bilance</button>
+                <button class="btn ghost" type="button" id="nkRepSendBil">📤 Poslat bilanci teď</button>
+              </div>
+            </div>
             <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
               <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="nkRepEnabled"> Posílat „Co zlevnit" automaticky každý týden</label>
               <label style="display:flex;align-items:center;gap:6px">Den v týdnu <select id="nkRepDay" style="padding:5px"><option value="1">pondělí</option><option value="2">úterý</option><option value="3">středa</option><option value="4">čtvrtek</option><option value="5">pátek</option><option value="6">sobota</option><option value="0">neděle</option></select></label>
@@ -1806,12 +1816,16 @@ function nkLoadReportCfg(){
     const sy=d.sync||{}; const di=$('#nkDriveInfo');
     if(di)di.innerHTML='ERP data: <b>'+(d.objDate||'?')+'</b> ('+(d.objRows||0)+' pol.)'+(sy.lastAt?(' · poslední Drive sync '+new Date(sy.lastAt).toLocaleString('cs-CZ')+(sy.lastFileName?(' ('+sy.lastFileName+')'):'')):' · zatím nesynchronizováno')+(d.driveConfigured?'':' · <b style="color:#b06f00">⚠ SA nenastaven</b>')+(d.saEmail?('<br>Sdílej složku Disku tomuto účtu (role Prohlížející): <b>'+d.saEmail+'</b>'):'');
     const bo=$('#nkRepSendObj'); if(bo)bo.onclick=()=>nkSendReport('objednavky');
+    if($('#nkRepBil'))$('#nkRepBil').value=(c.bilanceTo||[]).join(', ');
+    if($('#nkRepBilEn'))$('#nkRepBilEn').checked=!!c.bilanceEnabled;
+    if($('#nkRepBilHour'))$('#nkRepBilHour').value=String(c.bilanceHour!=null?c.bilanceHour:8);
+    const bb=$('#nkRepSendBil'); if(bb)bb.onclick=()=>nkSendReport('bilance');
     const sn=$('#nkSyncNow'); if(sn)sn.onclick=nkSyncNow;
     const sp=$('#objSupPanel'); if(sp){sp.style.display='';} objLoadSuppliers();  // admin → dotazník dodavatelů
   }).catch(()=>{/* nejsi správce → karta i dotazník zůstanou skryté */});
 }
 function nkSaveReportCfg(){
-  const body={markdownTo:$('#nkRepMd').value,enabled:$('#nkRepEnabled').checked,weekday:+$('#nkRepDay').value,objednavkyTo:$('#nkRepObj')?$('#nkRepObj').value:'',objednavkyEnabled:$('#nkRepObjEn')?$('#nkRepObjEn').checked:false,objednavkyDay:$('#nkRepObjDay')?+$('#nkRepObjDay').value:1};
+  const body={markdownTo:$('#nkRepMd').value,enabled:$('#nkRepEnabled').checked,weekday:+$('#nkRepDay').value,objednavkyTo:$('#nkRepObj')?$('#nkRepObj').value:'',objednavkyEnabled:$('#nkRepObjEn')?$('#nkRepObjEn').checked:false,objednavkyDay:$('#nkRepObjDay')?+$('#nkRepObjDay').value:1,bilanceTo:$('#nkRepBil')?$('#nkRepBil').value:'',bilanceEnabled:$('#nkRepBilEn')?$('#nkRepBilEn').checked:false,bilanceHour:$('#nkRepBilHour')?+$('#nkRepBilHour').value:8};
   $('#nkRepStatus').textContent='Ukládám…';
   fetch('/api/nakup-report/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
     $('#nkRepStatus').textContent=d.ok?('✓ Uloženo'+(d.config&&d.config.enabled?' — automatické posílání zapnuto ('+['neděli','pondělí','úterý','středu','čtvrtek','pátek','sobotu'][d.config.weekday]+')':' — automatické posílání vypnuto')):('Chyba: '+(d.error||'')); 
@@ -1826,8 +1840,8 @@ function nkSyncNow(){
   }).catch(()=>{if(di)di.textContent='Chyba sync';});
 }
 function nkSendReport(type){
-  const label=type==='objednavky'?'„Co objednat (ERP)"':'„Co zlevnit"';
-  const fld=type==='objednavky'?$('#nkRepObj'):$('#nkRepMd');
+  const label=type==='objednavky'?'„Co objednat (ERP)"':type==='bilance'?'„Ranní bilance skladu"':'„Co zlevnit"';
+  const fld=type==='objednavky'?$('#nkRepObj'):type==='bilance'?$('#nkRepBil'):$('#nkRepMd');
   const to=(fld?fld.value:'').trim();
   if(!to){$('#nkRepStatus').textContent='Nejdřív vyplň příjemce.';return;}
   if(!confirm('Odeslat report '+label+' teď na:\n'+to+' ?')) return;

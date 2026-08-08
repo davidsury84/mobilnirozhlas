@@ -780,6 +780,7 @@ img.pv-thumb{background:#fff}
       <button data-view="cenmon">Cenový monitoring</button>
       <button data-view="aktuality">Aktuality</button>
       <button data-view="activity">Aktivita</button>
+      <button data-view="rozesilky">Rozesílky</button>
       <button data-view="settings">Nastavení</button>
     </nav>
   </div>
@@ -994,6 +995,18 @@ img.pv-thumb{background:#fff}
       <button class="btn ghost sm" onclick="renderActivity()">↻ Obnovit</button>
     </div>
     <div id="activityBox"></div>
+  </section>
+
+  <!-- ===== Rozesílky (centrální přehled automatických e-mailů) ===== -->
+  <section id="view-rozesilky" class="view">
+    <div class="view-head spread">
+      <div>
+        <h2>Rozesílky</h2>
+        <p>Centrální přehled automatických e-mailových reportů napříč moduly — komu chodí, jak často, zda jsou zapnuté. Nastavení konkrétního reportu je vždy u jeho modulu.</p>
+      </div>
+      <button class="btn ghost sm" onclick="renderRozesilky()">↻ Obnovit</button>
+    </div>
+    <div id="rozesilkyBox"></div>
   </section>
 
   <!-- ===== Aktuality (přehled čtenosti) ===== -->
@@ -3960,6 +3973,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="grit") renderGritAdmin();
   if(v==="cenmon") renderCenmon();
   if(v==="activity") renderActivity();
+  if(v==="rozesilky") renderRozesilky();
   if(v==="aktuality") renderAktualityAdmin();
   if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); applyBrandLogo(BRAND_LOGO); }
 });
@@ -3983,6 +3997,28 @@ const ACT_META={
   'survey':{i:'📊',l:'Vyplnil(a) průzkum'},
   'abroll':{i:'🎓',l:'Test ABROLL'}
 };
+async function renderRozesilky(){
+  const box=document.getElementById("rozesilkyBox");
+  box.innerHTML='<p class="muted">Načítám…</p>';
+  let reports=[];
+  try{ const r=await fetch("/api/admin/reports",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } if(r.status===403){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Jen pro správce.</p></div>'; return; } reports=(await r.json()).reports||[]; }
+  catch(e){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nepodařilo se načíst rozesílky.</p></div>'; return; }
+  if(!reports.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné registrované rozesílky.</p></div>'; return; }
+  const on=reports.filter(r=>r.enabled).length;
+  let h='<div class="card pad" style="margin-bottom:14px"><b>'+reports.length+'</b> automatických reportů · <b style="color:#0a7d33">'+on+'</b> zapnuto · <b>'+(reports.length-on)+'</b> vypnuto</div>';
+  h+='<div class="card" style="overflow:auto"><table class="matrix" style="width:100%"><thead><tr>'+
+    '<th>Modul</th><th>Report</th><th>Příjemci</th><th>Frekvence</th><th style="text-align:center">Stav</th><th>Naposledy</th><th>Náhled</th></tr></thead><tbody>';
+  reports.forEach(r=>{
+    const to=(r.to||[]); const toStr=to.length?to.join(', '):'<span style="color:#b3261e">bez příjemců</span>';
+    const stav=r.enabled?'<span class="pill green">zapnuto</span>':'<span class="pill" style="background:#eee;color:#666">vypnuto</span>';
+    const last=r.lastAt?new Date(r.lastAt).toLocaleString('cs-CZ'):'—';
+    const prev=r.preview?'<a href="'+esc(r.preview)+'" target="_blank" rel="noopener">👁 náhled</a>':'—';
+    h+='<tr><td>'+esc(r.module||'')+'</td><td><b>'+esc(r.name||'')+'</b>'+(r.configHint?'<br><span class="muted" style="font-size:11.5px">⚙ '+esc(r.configHint)+'</span>':'')+'</td>'+
+      '<td style="font-size:12.5px">'+toStr+'</td><td>'+esc(r.schedule||'')+'</td><td style="text-align:center">'+stav+'</td><td class="muted" style="font-size:12px">'+esc(last)+'</td><td>'+prev+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  box.innerHTML=h;
+}
 async function renderActivity(){
   const box=document.getElementById("activityBox");
   box.innerHTML='<p class="muted">Načítám…</p>';
