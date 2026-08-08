@@ -116,6 +116,9 @@ function mount(host) {
     Object.keys(B.flow).forEach(k => { B.flow[k].ks = Math.round(B.flow[k].ks); B.flow[k].kc = Math.round(B.flow[k].kc); });
     return B;
   }
+  const emptyFlow = () => ({ received: { ks: 0, kc: 0 }, dispatched: { ks: 0, kc: 0 }, newReserved: { ks: 0, kc: 0 }, newOnOrder: { ks: 0, kc: 0 } });
+  function sumFlows(entries) { const s = emptyFlow(); (entries || []).forEach(e => { if (!e.flow) return; ['received', 'dispatched', 'newReserved', 'newOnOrder'].forEach(k => { s[k].ks += (e.flow[k] && e.flow[k].ks) || 0; s[k].kc += (e.flow[k] && e.flow[k].kc) || 0; }); }); return s; }
+  function dayDeltas(L, P) { const d = {}; ['stock', 'dispo', 'onOrder', 'reserved'].forEach(k => { d[k] = { ks: (L[k].ks || 0) - (P ? (P[k].ks || 0) : (L[k].ks || 0)), kc: (L[k].kc || 0) - (P ? (P[k].kc || 0) : (L[k].kc || 0)) }; }); return d; }
   const hasEshop = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); return !!(e && host.employeeModules && host.employeeModules(e.email).indexOf('eshop') >= 0); } catch (_) { return false; } };
   // bootstrap bilance z posledních denních souborů (aby naskočila hned, ne až s dalším souborem)
   async function bootstrapBilance(xls, newest, parsedNewest, newestDate) {
@@ -351,28 +354,46 @@ function mount(host) {
 
   // ---------- ranní bilance skladu (e-mail) ----------
   function buildBilance(cfg) {
-    const arr = loadBilance(), L = arr[arr.length - 1];
+    const arr = loadBilance(), L = arr[arr.length - 1], P = arr[arr.length - 2];
     if (!L) return { subject: 'Bilance skladu e-shop — zatím bez dat', html: wrap('Bilance skladu e-shop', 'Zatím nejsou data', '<p>Bilance se plní z denních souborů skladu.</p>', '—'), count: 0 };
     const f = L.flow || {};
-    const card = (label, o, accent) => '<td style="padding:0 6px 0 0;width:25%;vertical-align:top">' +
+    const signed = kcv => (kcv > 0 ? '+' : '') + kc(kcv);
+    const delColor = kcv => kcv > 0 ? '#2f7d32' : (kcv < 0 ? '#b23' : '#8a938a');
+    const card = (label, o, accent, d) => '<td style="padding:0 6px 0 0;width:25%;vertical-align:top">' +
       '<div style="border:1px solid #dbe2d8;border-left:4px solid ' + accent + ';border-radius:9px;padding:10px 12px">' +
       '<div style="font-size:12px;color:#6b736c;text-transform:uppercase;letter-spacing:.03em">' + esc(label) + '</div>' +
       '<div style="font-size:20px;font-weight:700;color:#243">' + kc(o.kc) + '</div>' +
-      '<div style="font-size:12px;color:#8a938a">' + fmt(o.ks) + ' ks</div></div></td>';
-    let body = '<table style="border-collapse:separate;width:100%;margin:0 0 14px"><tr>' +
-      card('Sklad', L.stock, '#3a7d44') + card('K dispozici', L.dispo, '#2f6f8f') + card('Objednáno u dodav.', L.onOrder, '#b06f00') + card('Rezervováno zákazníky', L.reserved, '#8a4baf') + '</tr></table>';
+      '<div style="font-size:12px;color:#8a938a">' + fmt(o.ks) + ' ks' + (d && P ? ' · <span style="color:' + delColor(d.kc) + '">' + signed(d.kc) + '</span>' : '') + '</div></div></td>';
+    const dd = dayDeltas(L, P);
+    let body = '<table style="border-collapse:separate;width:100%;margin:0 0 8px"><tr>' +
+      card('Sklad', L.stock, '#3a7d44', dd.stock) + card('K dispozici', L.dispo, '#2f6f8f', dd.dispo) + card('Objednáno u dodav.', L.onOrder, '#b06f00', dd.onOrder) + card('Rezervováno zákazníky', L.reserved, '#8a4baf', dd.reserved) + '</tr></table>';
+    if (P) body += '<p style="margin:0 0 14px;font-size:12px;color:#8a938a">Změny (v Kč) jsou proti předchozímu dni ' + esc(P.date) + '.</p>';
+    // Předchozí den (pohyby) — finančně
     if (L.hasFlow) {
-      const fl = (lbl, o) => '<b>' + lbl + ':</b> ' + fmt(o.ks) + ' ks / ' + kc(o.kc);
-      body += '<div style="background:#f2f6ef;border:1px solid #dbe6d6;border-radius:9px;padding:10px 14px;margin:0 0 14px;font-size:13.5px">' +
-        '📦 <b>Pohyb za den</b> — ' + fl('výdej', f.dispatched) + ' · ' + fl('nové rezervace', f.newReserved) + ' · ' + fl('příjem', f.received) + ' · ' + fl('nově objednáno', f.newOnOrder) + '</div>';
+      const fl = (lbl, o) => '<b>' + lbl + ':</b> ' + kc(o.kc) + ' <span style="color:#8a938a">(' + fmt(o.ks) + ' ks)</span>';
+      body += '<div style="background:#f2f6ef;border:1px solid #dbe6d6;border-radius:9px;padding:12px 14px;margin:0 0 14px;font-size:13.5px;line-height:1.7">' +
+        '📦 <b>Předchozí den (' + esc(L.date) + ')</b><br>' +
+        fl('Výdej ze skladu', f.dispatched) + ' &nbsp;·&nbsp; ' + fl('Příjem', f.received) + '<br>' +
+        fl('Nové rezervace zákazníků', f.newReserved) + ' &nbsp;·&nbsp; ' + fl('Nově objednáno u dodavatelů', f.newOnOrder) + '</div>';
+    }
+    // Týden — obrat (posledních 7 dní s pohyby)
+    const wkEntries = arr.filter(e => e.hasFlow).slice(-7);
+    if (wkEntries.length) {
+      const W = sumFlows(wkEntries); const nd = wkEntries.length; const avg = W.dispatched.kc / nd;
+      const wl = (lbl, o) => '<b>' + lbl + ':</b> ' + kc(o.kc) + ' <span style="color:#8a938a">(' + fmt(o.ks) + ' ks)</span>';
+      body += '<div style="background:#eef3fb;border:1px solid #d3e0f2;border-radius:9px;padding:12px 14px;margin:0 0 14px;font-size:13.5px;line-height:1.7">' +
+        '📈 <b>Týden — obrat (posledních ' + nd + ' ' + (nd === 1 ? 'den' : (nd < 5 ? 'dny' : 'dní')) + ')</b><br>' +
+        '<b>Výdej ze skladu (obrat):</b> <b style="font-size:15px">' + kc(W.dispatched.kc) + '</b> <span style="color:#8a938a">(' + fmt(W.dispatched.ks) + ' ks · ø ' + kc(avg) + '/den)</span><br>' +
+        wl('Příjem', W.received) + ' &nbsp;·&nbsp; ' + wl('Nové rezervace', W.newReserved) + ' &nbsp;·&nbsp; ' + wl('Nově objednáno', W.newOnOrder) + '</div>';
     }
     // trend posledních 10 dní (hodnota skladu)
     const last = arr.slice(-10);
     body += '<h3 style="margin:14px 0 4px;font-size:14px">Trend (hodnota skladu, posledních ' + last.length + ' dní)</h3>' +
       '<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>' +
-      ['Den', 'Sklad', 'Dispo', 'Objednáno', 'Rezervováno'].map((h, i) => '<th style="text-align:' + (i ? 'right' : 'left') + ';border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">' + h + '</th>').join('') + '</tr></thead><tbody>' +
+      ['Den', 'Sklad', 'Dispo', 'Objednáno', 'Rezervováno', 'Výdej/den'].map((h, i) => '<th style="text-align:' + (i ? 'right' : 'left') + ';border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">' + h + '</th>').join('') + '</tr></thead><tbody>' +
       last.slice().reverse().map(e => '<tr><td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(e.date) + '</td>' +
-        ['stock', 'dispo', 'onOrder', 'reserved'].map(k => '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #eef1ec">' + kc(e[k].kc) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+        ['stock', 'dispo', 'onOrder', 'reserved'].map(k => '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #eef1ec">' + kc(e[k].kc) + '</td>').join('') +
+        '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #eef1ec;color:#2f6f8f">' + (e.hasFlow ? kc(e.flow.dispatched.kc) : '—') + '</td></tr>').join('') + '</tbody></table>';
     return { subject: 'Ranní bilance skladu e-shop · ' + L.date, html: wrap('Bilance skladu e-shop', 'Stav a denní pohyby skladu (v landed cenách)', body, L.date), count: L.items };
   }
 
@@ -437,8 +458,11 @@ function mount(host) {
     if (p === '/api/nakup-report/bilance' && req.method === 'GET') {
       if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
       const arr = loadBilance(); const latest = arr[arr.length - 1] || null; const prev = arr[arr.length - 2] || null;
-      const trend = arr.slice(-30).map(e => ({ date: e.date, stockKc: e.stock.kc, onOrderKc: e.onOrder.kc, reservedKc: e.reserved.kc, dispoKc: e.dispo.kc }));
-      return json(res, 200, { latest, prev, trend, days: arr.length }), true;
+      const trend = arr.slice(-30).map(e => ({ date: e.date, stockKc: e.stock.kc, onOrderKc: e.onOrder.kc, reservedKc: e.reserved.kc, dispoKc: e.dispo.kc, dispatchedKc: (e.flow && e.flow.dispatched) ? e.flow.dispatched.kc : 0 }));
+      const wkEntries = arr.filter(e => e.hasFlow).slice(-7);
+      const week = latest ? { days: wkEntries.length, flow: sumFlows(wkEntries) } : null;
+      const dayDelta = (latest && prev) ? dayDeltas(latest, prev) : null;
+      return json(res, 200, { latest, prev, trend, week, dayDelta, days: arr.length }), true;
     }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
 

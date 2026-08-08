@@ -3469,19 +3469,21 @@ function showDashboard(){
 // ---------- Bilance skladu e-shop (home widget, jen pro přístup k modulu eshop) ----------
 function bilKc(n){ n=+n||0; const a=Math.abs(n); if(a>=1e6) return (Math.round(n/1e5)/10).toLocaleString('cs-CZ')+' mil.'; if(a>=1e3) return Math.round(n/1e3).toLocaleString('cs-CZ')+' tis.'; return Math.round(n).toLocaleString('cs-CZ'); }
 function bilKs(n){ return Math.round(+n||0).toLocaleString('cs-CZ'); }
+function bilDelta(n){ n=+n||0; if(!n) return ''; const c=n>0?'#0a7d33':'#b3261e'; return ' <span style="color:'+c+'">'+(n>0?'+':'')+bilKc(n)+'</span>'; }
 async function loadBilanceWidget(){
   const el=document.getElementById('bilanceWidget'); if(!el) return; const body=el.querySelector('.webpart-body');
   try{
     const d=await (await fetch('/api/nakup-report/bilance',{cache:'no-store'})).json();
     const L=d&&d.latest; if(!L){ body.innerHTML='<p class="muted" style="margin:0">Zatím bez dat — bilance se plní z ranních reportů skladu.</p>'; return; }
-    const f=L.flow||{};
+    const f=L.flow||{}, dd=d.dayDelta||{}, wk=d.week;
     let h='<div class="metric-grid">'+
-      '<div class="metric"><b>'+bilKc(L.stock.kc)+'</b><span>sklad · '+bilKs(L.stock.ks)+' ks</span></div>'+
-      '<div class="metric"><b>'+bilKc(L.onOrder.kc)+'</b><span>objednáno · '+bilKs(L.onOrder.ks)+' ks</span></div>'+
-      '<div class="metric"><b>'+bilKc(L.reserved.kc)+'</b><span>rezervováno · '+bilKs(L.reserved.ks)+' ks</span></div>'+
-      '<div class="metric"><b>'+bilKc(L.dispo.kc)+'</b><span>dispo · '+bilKs(L.dispo.ks)+' ks</span></div>'+
+      '<div class="metric"><b>'+bilKc(L.stock.kc)+'</b><span>sklad · '+bilKs(L.stock.ks)+' ks'+(dd.stock?bilDelta(dd.stock.kc):'')+'</span></div>'+
+      '<div class="metric"><b>'+bilKc(L.onOrder.kc)+'</b><span>objednáno · '+bilKs(L.onOrder.ks)+' ks'+(dd.onOrder?bilDelta(dd.onOrder.kc):'')+'</span></div>'+
+      '<div class="metric"><b>'+bilKc(L.reserved.kc)+'</b><span>rezervováno · '+bilKs(L.reserved.ks)+' ks'+(dd.reserved?bilDelta(dd.reserved.kc):'')+'</span></div>'+
+      '<div class="metric"><b>'+bilKc(L.dispo.kc)+'</b><span>dispo · '+bilKs(L.dispo.ks)+' ks'+(dd.dispo?bilDelta(dd.dispo.kc):'')+'</span></div>'+
     '</div>';
-    if(L.hasFlow){ h+='<p class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.5">Pohyb za den: výdej <b>'+bilKs(f.dispatched.ks)+' ks</b> / '+bilKc(f.dispatched.kc)+' Kč · nové rezervace '+bilKs(f.newReserved.ks)+' ks · příjem '+bilKs(f.received.ks)+' ks · nově objednáno '+bilKs(f.newOnOrder.ks)+' ks</p>'; }
+    if(L.hasFlow){ h+='<p class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.5"><b>Předchozí den:</b> výdej <b>'+bilKc(f.dispatched.kc)+' Kč</b> ('+bilKs(f.dispatched.ks)+' ks) · nové rezervace '+bilKc(f.newReserved.kc)+' Kč · příjem '+bilKc(f.received.kc)+' Kč · nově objednáno '+bilKc(f.newOnOrder.kc)+' Kč</p>'; }
+    if(wk&&wk.days){ const W=wk.flow; h+='<p style="margin:6px 0 0;font-size:12px;line-height:1.5;color:#2f6f8f"><b>Týden (obrat, '+wk.days+' '+(wk.days===1?'den':(wk.days<5?'dny':'dní'))+'):</b> výdej <b>'+bilKc(W.dispatched.kc)+' Kč</b> ('+bilKs(W.dispatched.ks)+' ks) · příjem '+bilKc(W.received.kc)+' Kč · nové rezervace '+bilKc(W.newReserved.kc)+' Kč</p>'; }
     body.innerHTML=h;
     if(L.date){ const p=el.querySelector('.webpart-head .pill'); if(p) p.textContent=L.date.split('-').reverse().join('.'); }
   }catch(e){ body.innerHTML='<p class="muted" style="margin:0">Bilanci se nepodařilo načíst.</p>'; }
