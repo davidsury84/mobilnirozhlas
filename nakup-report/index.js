@@ -367,14 +367,14 @@ function mount(host) {
     const dd = dayDeltas(L, P);
     let body = '<table style="border-collapse:separate;width:100%;margin:0 0 8px"><tr>' +
       card('Sklad', L.stock, '#3a7d44', dd.stock) + card('K dispozici', L.dispo, '#2f6f8f', dd.dispo) + card('Objednáno u dodav.', L.onOrder, '#b06f00', dd.onOrder) + card('Rezervováno zákazníky', L.reserved, '#8a4baf', dd.reserved) + '</tr></table>';
-    if (P) body += '<p style="margin:0 0 14px;font-size:12px;color:#8a938a">Změny (v Kč) jsou proti předchozímu dni ' + esc(P.date) + '.</p>';
-    // Předchozí den (pohyby) — finančně
+    if (P) body += '<p style="margin:0 0 14px;font-size:12px;color:#8a938a">± u karet = změna hodnoty proti předchozímu dni (' + esc(P.date) + ').</p>';
+    // Předchozí den (pohyby) — finančně, členěno odbyt / zásobování
     if (L.hasFlow) {
       const fl = (lbl, o) => '<b>' + lbl + ':</b> ' + kc(o.kc) + ' <span style="color:#8a938a">(' + fmt(o.ks) + ' ks)</span>';
       body += '<div style="background:#f2f6ef;border:1px solid #dbe6d6;border-radius:9px;padding:12px 14px;margin:0 0 14px;font-size:13.5px;line-height:1.7">' +
         '📦 <b>Předchozí den (' + esc(L.date) + ')</b><br>' +
-        fl('Výdej ze skladu', f.dispatched) + ' &nbsp;·&nbsp; ' + fl('Příjem', f.received) + '<br>' +
-        fl('Nové rezervace zákazníků', f.newReserved) + ' &nbsp;·&nbsp; ' + fl('Nově objednáno u dodavatelů', f.newOnOrder) + '</div>';
+        '<span style="color:#2f7d32">▸ Odbyt:</span> ' + fl('Výdej ze skladu (≈ prodej)', f.dispatched) + ' &nbsp;·&nbsp; ' + fl('Nové rezervace zákazníků', f.newReserved) + '<br>' +
+        '<span style="color:#2f6f8f">▸ Zásobování:</span> ' + fl('Příjem dodávek na sklad', f.received) + ' &nbsp;·&nbsp; ' + fl('Nově objednáno u dodavatelů', f.newOnOrder) + '</div>';
     }
     // Týden — obrat (posledních 7 dní s pohyby)
     const wkEntries = arr.filter(e => e.hasFlow).slice(-7);
@@ -382,9 +382,9 @@ function mount(host) {
       const W = sumFlows(wkEntries); const nd = wkEntries.length; const avg = W.dispatched.kc / nd;
       const wl = (lbl, o) => '<b>' + lbl + ':</b> ' + kc(o.kc) + ' <span style="color:#8a938a">(' + fmt(o.ks) + ' ks)</span>';
       body += '<div style="background:#eef3fb;border:1px solid #d3e0f2;border-radius:9px;padding:12px 14px;margin:0 0 14px;font-size:13.5px;line-height:1.7">' +
-        '📈 <b>Týden — obrat (posledních ' + nd + ' ' + (nd === 1 ? 'den' : (nd < 5 ? 'dny' : 'dní')) + ')</b><br>' +
-        '<b>Výdej ze skladu (obrat):</b> <b style="font-size:15px">' + kc(W.dispatched.kc) + '</b> <span style="color:#8a938a">(' + fmt(W.dispatched.ks) + ' ks · ø ' + kc(avg) + '/den)</span><br>' +
-        wl('Příjem', W.received) + ' &nbsp;·&nbsp; ' + wl('Nové rezervace', W.newReserved) + ' &nbsp;·&nbsp; ' + wl('Nově objednáno', W.newOnOrder) + '</div>';
+        '📈 <b>Týden — obrat (výdej ze skladu, posledních ' + nd + ' ' + (nd === 1 ? 'den' : (nd < 5 ? 'dny' : 'dní')) + ')</b><br>' +
+        '<b>Výdej ze skladu (≈ prodej):</b> <b style="font-size:15px">' + kc(W.dispatched.kc) + '</b> <span style="color:#8a938a">(' + fmt(W.dispatched.ks) + ' ks · ø ' + kc(avg) + '/den)</span><br>' +
+        wl('Naskladněno (příjem dodávek)', W.received) + ' &nbsp;·&nbsp; ' + wl('Nové rezervace zákazníků', W.newReserved) + ' &nbsp;·&nbsp; ' + wl('Nově objednáno u dodav.', W.newOnOrder) + '</div>';
     }
     // trend posledních 10 dní (hodnota skladu)
     const last = arr.slice(-10);
@@ -394,7 +394,9 @@ function mount(host) {
       last.slice().reverse().map(e => '<tr><td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(e.date) + '</td>' +
         ['stock', 'dispo', 'onOrder', 'reserved'].map(k => '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #eef1ec">' + kc(e[k].kc) + '</td>').join('') +
         '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #eef1ec;color:#2f6f8f">' + (e.hasFlow ? kc(e.flow.dispatched.kc) : '—') + '</td></tr>').join('') + '</tbody></table>';
-    return { subject: 'Ranní bilance skladu e-shop · ' + L.date, html: wrap('Bilance skladu e-shop', 'Stav a denní pohyby skladu (v landed cenách)', body, L.date), count: L.items };
+    body += '<div style="margin:14px 0 0;padding:10px 12px;background:#fafbf9;border:1px solid #e6e9e3;border-radius:8px;font-size:11.5px;color:#8a938a;line-height:1.6">' +
+      '<b>Vysvětlivky:</b> <b>Výdej ze skladu</b> = zboží expedované ze skladu (≈ prodej). <b>Příjem</b> = dodávky od dodavatele, které fyzicky dorazily na sklad (z dříve zadaných objednávek — není to nový nákup). <b>Nové rezervace</b> = nové objednávky od zákazníků. <b>Nově objednáno</b> = nové objednávky u dodavatelů. <b>Dispo</b> = sklad − rezervace zákazníků. Vše v nákladových (landed) cenách.</div>';
+    return { subject: 'Ranní bilance skladu e-shop · ' + L.date, html: wrap('Bilance skladu e-shop', 'Stav a denní pohyby skladu (v nákladových cenách)', body, L.date), count: L.items };
   }
 
   // ---------- odeslání ----------

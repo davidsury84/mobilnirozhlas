@@ -3482,8 +3482,11 @@ async function loadBilanceWidget(){
       '<div class="metric"><b>'+bilKc(L.reserved.kc)+'</b><span>rezervováno · '+bilKs(L.reserved.ks)+' ks'+(dd.reserved?bilDelta(dd.reserved.kc):'')+'</span></div>'+
       '<div class="metric"><b>'+bilKc(L.dispo.kc)+'</b><span>dispo · '+bilKs(L.dispo.ks)+' ks'+(dd.dispo?bilDelta(dd.dispo.kc):'')+'</span></div>'+
     '</div>';
-    if(L.hasFlow){ h+='<p class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.5"><b>Předchozí den:</b> výdej <b>'+bilKc(f.dispatched.kc)+' Kč</b> ('+bilKs(f.dispatched.ks)+' ks) · nové rezervace '+bilKc(f.newReserved.kc)+' Kč · příjem '+bilKc(f.received.kc)+' Kč · nově objednáno '+bilKc(f.newOnOrder.kc)+' Kč</p>'; }
-    if(wk&&wk.days){ const W=wk.flow; h+='<p style="margin:6px 0 0;font-size:12px;line-height:1.5;color:#2f6f8f"><b>Týden (obrat, '+wk.days+' '+(wk.days===1?'den':(wk.days<5?'dny':'dní'))+'):</b> výdej <b>'+bilKc(W.dispatched.kc)+' Kč</b> ('+bilKs(W.dispatched.ks)+' ks) · příjem '+bilKc(W.received.kc)+' Kč · nové rezervace '+bilKc(W.newReserved.kc)+' Kč</p>'; }
+    if(L.hasFlow){ h+='<p style="margin:11px 0 2px;font-size:11px;color:#8a938a">± u karet = změna hodnoty proti předchozímu dni.</p>'+
+      '<p class="muted" style="margin:4px 0 0;font-size:12px;line-height:1.6"><b>Předchozí den — odbyt:</b> výdej ze skladu (≈ prodej) <b>'+bilKc(f.dispatched.kc)+' Kč</b> ('+bilKs(f.dispatched.ks)+' ks) · nové rezervace zákazníků '+bilKc(f.newReserved.kc)+' Kč<br>'+
+      '<b>Zásobování:</b> příjem dodávek na sklad '+bilKc(f.received.kc)+' Kč · nově objednáno u dodavatelů '+bilKc(f.newOnOrder.kc)+' Kč</p>'; }
+    if(wk&&wk.days){ const W=wk.flow; h+='<p style="margin:8px 0 0;font-size:12.5px;line-height:1.5;color:#2f6f8f"><b>Týden — obrat (výdej ze skladu, '+wk.days+' '+(wk.days===1?'den':(wk.days<5?'dny':'dní'))+'):</b> <b>'+bilKc(W.dispatched.kc)+' Kč</b> ('+bilKs(W.dispatched.ks)+' ks) · naskladněno '+bilKc(W.received.kc)+' Kč · nové rezervace '+bilKc(W.newReserved.kc)+' Kč</p>'; }
+    h+='<p style="margin:8px 0 0;font-size:11px;color:#a2a9a0;line-height:1.5"><b>Výdej</b> = expedováno ze skladu (≈ prodej). <b>Příjem</b> = dodávky, co dorazily. <b>Rezervace</b> = objednávky zákazníků. <b>Nově objednáno</b> = objednávky u dodavatelů. Vše v nákladových cenách.</p>';
     body.innerHTML=h;
     if(L.date){ const p=el.querySelector('.webpart-head .pill'); if(p) p.textContent=L.date.split('-').reverse().join('.'); }
   }catch(e){ body.innerHTML='<p class="muted" style="margin:0">Bilanci se nepodařilo načíst.</p>'; }
