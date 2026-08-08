@@ -305,8 +305,12 @@ function mount(host) {
     const arr = sales.map(v => v || 0), D = arr.reduce((s, v) => s + v, 0);
     const sorted = arr.slice().sort((a, b) => b - a), top1 = sorted[0], top2 = sorted[1] || 0;
     const sm = arr.slice().sort((a, b) => a - b), med = arr.length % 2 ? sm[(arr.length - 1) / 2] : (sm[arr.length / 2 - 1] + sm[arr.length / 2]) / 2;
-    if (!(top1 >= 15 && top1 >= 4 * Math.max(1, med) && top1 >= 3 * Math.max(1, top2) && top1 >= 0.4 * Math.max(1, D))) return arr;
-    const cap = Math.max(top2, Math.round(med * 2)), r = arr.slice(); r[arr.indexOf(top1)] = cap; return r;
+    let r = arr.slice();
+    if (top1 >= 15 && top1 >= 4 * Math.max(1, med) && top1 >= 3 * Math.max(1, top2) && top1 >= 0.4 * Math.max(1, D)) { r[arr.indexOf(top1)] = Math.max(top2, Math.round(med * 2)); }
+    // Řídce prodávaná položka (<3 měsíce s prodejem a nízký objem) → plochý průměr (sezónnost je jen šum).
+    const Dr = r.reduce((s, v) => s + v, 0), monthsWithSales = r.filter(v => v > 0).length;
+    if (monthsWithSales < 3 && Dr < 24 && Dr > 0) { const avg = Dr / 12; r = r.map(() => avg); }
+    return r;
   }
   function computeOrderRow(x, sales, P, m0) {
     const D = sales ? sales.reduce((s, v) => s + (v || 0), 0) : 0;

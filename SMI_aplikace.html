@@ -1891,14 +1891,19 @@ function objMedian(a){ const s=a.slice().sort((x,y)=>x-y); const n=s.length; ret
 // Detekce jednorázového extrému: JEDEN dominantní měsíc (např. jednorázový nákup 1000 ks),
 // který by nafoukl sezónní poptávku. Vrací robustní řadu (špička omezená) + info o extrému.
 function objRobust(sales){
-  if(!sales||!sales.length) return {robust:sales||[],raw:sales||[],outlier:null};
+  if(!sales||!sales.length) return {robust:sales||[],raw:sales||[],outlier:null,sporadic:false};
   const arr=sales.map(v=>v||0), D=arr.reduce((s,v)=>s+v,0);
   const sorted=arr.slice().sort((a,b)=>b-a), top1=sorted[0], top2=sorted[1]||0, med=objMedian(arr);
   const idx=arr.indexOf(top1);
   const isOut = top1>=15 && top1>=4*Math.max(1,med) && top1>=3*Math.max(1,top2) && top1>=0.4*Math.max(1,D);
-  if(!isOut) return {robust:arr,raw:arr,outlier:null};
-  const cap=Math.max(top2,Math.round(med*2)); const robust=arr.slice(); robust[idx]=cap;
-  return {robust:robust,raw:arr,outlier:{month:idx,value:top1,capped:cap}};
+  let robust=arr.slice(), outlier=null;
+  if(isOut){ const cap=Math.max(top2,Math.round(med*2)); robust[idx]=cap; outlier={month:idx,value:top1,capped:cap}; }
+  // Řídce prodávaná položka (prodej jen v <3 měsících a nízký roční objem): „sezónnost" je jen šum
+  // z pár izolovaných prodejů → použij PLOCHÝ průměr místo špiček (nespoléhat na málo dat).
+  const Dr=robust.reduce((s,v)=>s+v,0), monthsWithSales=robust.filter(v=>v>0).length;
+  let sporadic=false;
+  if(monthsWithSales<3 && Dr<24 && Dr>0){ const avg=Dr/12; robust=robust.map(()=>avg); sporadic=true; }
+  return {robust:robust,raw:arr,outlier:outlier,sporadic:sporadic};
 }
 function objComputeOrder(x,sales,P,m0,sea,dem){
   dem=dem||sales;                          // dem = robustní poptávka (bez jednorázového extrému); sales = skutečná pro roční prodej D
@@ -1966,7 +1971,7 @@ async function renderObjednavky(){
   const m0=new Date().getMonth();
   const robMap={}; Object.keys(smap).forEach(k=>{robMap[k]=objRobust(smap[k]);});   // robustní poptávka (bez jednorázových extrémů)
   const hold=objHoldRate(); OBJ_CYCLES=objSupplierCycles(OBJ_DATA.rows||[],robMap,hold);
-  (OBJ_DATA.rows||[]).forEach(x=>{const rb=robMap[String(x.sk)+'-'+String(x.reg)]||{raw:null,robust:null,outlier:null};x._out=rb.outlier;x._s=objSeason(rb.robust||rb.raw);x._o=objComputeOrder(x,rb.raw,P,m0,x._s,rb.robust||rb.raw);x._e=objEOQ(x,rb.robust||rb.raw,OBJ_CYCLES);});
+  (OBJ_DATA.rows||[]).forEach(x=>{const rb=robMap[String(x.sk)+'-'+String(x.reg)]||{raw:null,robust:null,outlier:null,sporadic:false};x._out=rb.outlier;x._sporadic=rb.sporadic;x._s=objSeason(rb.robust||rb.raw);x._o=objComputeOrder(x,rb.raw,P,m0,x._s,rb.robust||rb.raw);x._e=objEOQ(x,rb.robust||rb.raw,OBJ_CYCLES);});
   try{objRenderSeason();}catch(e){}
   try{objRenderPlan();}catch(e){}
   if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;}
@@ -2000,7 +2005,7 @@ function objDraw(){
         '<td '+R+'>'+fmt(x.stock)+'</td><td '+R+(crit?' style="color:#b23;font-weight:700"':'')+'>'+fmt(x.avail)+'</td>'+
         '<td '+R+'>'+fmt(x.unitPrice)+'</td><td '+R+'>'+fmt(x.unitCost)+'</td>'+
         '<td '+R+'>'+fmt(x.onOrder)+'</td><td '+R+'>'+fmt(x.reserved)+'</td><td '+R+'>'+fmt(x.lead)+'</td>'+
-        '<td '+R+(x._out?' title="⚠ Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks. V doporučení objednávky NENÍ zohledněn (omezen na '+fmt(x._out.capped)+' ks/měs), aby nenafoukl nákup."':'')+'>'+fmt(o.D)+(x._out?' <span style="color:#c0392b;cursor:help">⚠</span>':'')+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+(x._out?' <span style=\"color:#c0392b;font-weight:700;cursor:help\" title=\"Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks — v objednávce omezeno na '+fmt(x._out.capped)+' ks/měs\">⚠ extrém</span>':'')+'</td><td '+R+((x.avail<0&&o.rec>0)?' title=\"Oversold: rezervace přesahují sklad o '+fmt(-x.avail)+' ks. Objednat '+fmt(o.rec)+' = vykrýt '+fmt(-x.avail)+' ks rezervací + zásoba na (lhůta+pokrytí) '+fmt(o.rec+x.avail)+' ks.\"':'')+'>'+(o.rec?('<span class="ochip" style="background:'+(crit?'#fadbd8':'#fff0cc')+';color:'+(crit?'#922':'#7a5200')+'">'+fmt(o.rec)+'</span>'):'<span class="muted">—</span>')+'</td><td '+R+' title="'+(x._e&&x._e.eoq?('dodavatel '+esc(x.skupina)+': 1 společná zásilka / '+objIntTxt(x._e.interval)+(x._e.S?(', doprava '+fmt(x._e.S)+' Kč sdílená'):'')+'; toto je množství této položky na zásilku'):'vyplň dotazník dodavatele (náklad na dopravu)')+'">'+(x._e&&x._e.eoq?fmt(x._e.eoq):'—')+'</td><td '+R+'>'+(x._e?objIntTxt(x._e.interval):'—')+'</td><td '+R+(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24?' style="color:#c0392b;font-weight:700" title="Extrémní krytí po objednávce (>2 roky) — zkontroluj, možný jednorázový výkyv nebo příliš velká dávka"':(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8?' style="color:#0a7d33;font-weight:600"':''))+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?'<b>'+fmt(o.value)+' Kč</b>':'—')+'</td></tr>';});
+        '<td '+R+(x._out?' title="⚠ Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks. V doporučení objednávky NENÍ zohledněn (omezen na '+fmt(x._out.capped)+' ks/měs), aby nenafoukl nákup."':'')+'>'+fmt(o.D)+(x._out?' <span style="color:#c0392b;cursor:help">⚠</span>':'')+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(x._sporadic?' <span class="muted" style="font-size:11px" title="Řídce prodávaná položka (prodej jen v pár měsících) — doporučení jede na plochém průměru, ne na sezónní špičce, aby se nepřeobjednávalo z mála dat.">· málo dat</span>':'')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+(x._out?' <span style=\"color:#c0392b;font-weight:700;cursor:help\" title=\"Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks — v objednávce omezeno na '+fmt(x._out.capped)+' ks/měs\">⚠ extrém</span>':'')+'</td><td '+R+((x.avail<0&&o.rec>0)?' title=\"Oversold: rezervace přesahují sklad o '+fmt(-x.avail)+' ks. Objednat '+fmt(o.rec)+' = vykrýt '+fmt(-x.avail)+' ks rezervací + zásoba na (lhůta+pokrytí) '+fmt(o.rec+x.avail)+' ks.\"':'')+'>'+(o.rec?('<span class="ochip" style="background:'+(crit?'#fadbd8':'#fff0cc')+';color:'+(crit?'#922':'#7a5200')+'">'+fmt(o.rec)+'</span>'):'<span class="muted">—</span>')+'</td><td '+R+' title="'+(x._e&&x._e.eoq?('dodavatel '+esc(x.skupina)+': 1 společná zásilka / '+objIntTxt(x._e.interval)+(x._e.S?(', doprava '+fmt(x._e.S)+' Kč sdílená'):'')+'; toto je množství této položky na zásilku'):'vyplň dotazník dodavatele (náklad na dopravu)')+'">'+(x._e&&x._e.eoq?fmt(x._e.eoq):'—')+'</td><td '+R+'>'+(x._e?objIntTxt(x._e.interval):'—')+'</td><td '+R+(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24?' style="color:#c0392b;font-weight:700" title="Extrémní krytí po objednávce (>2 roky) — zkontroluj, možný jednorázový výkyv nebo příliš velká dávka"':(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8?' style="color:#0a7d33;font-weight:600"':''))+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?'<b>'+fmt(o.value)+' Kč</b>':'—')+'</td></tr>';});
   });
   h2+='<tr><td colspan="'+NC+'" class="muted" style="text-align:right">'+list.length+' položek · '+gk.length+' dodavatelů</td></tr></tbody>';
   $('#objTbl').innerHTML=h2;
