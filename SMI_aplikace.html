@@ -1887,7 +1887,21 @@ function objForwardCover(position,sales,m0){
   return 48;
 }
 function objCoverTxt(cv){ if(cv===0)return '0'; if(!isFinite(cv))return '∞'; if(cv>=48)return '4+ r'; if(cv>=24)return (Math.round(cv/12*10)/10).toString().replace('.',',')+' r'; return (Math.round(cv*10)/10).toString().replace('.',',')+' m'; }
-function objComputeOrder(x,sales,P,m0,sea){
+function objMedian(a){ const s=a.slice().sort((x,y)=>x-y); const n=s.length; return n?(n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2):0; }
+// Detekce jednorázového extrému: JEDEN dominantní měsíc (např. jednorázový nákup 1000 ks),
+// který by nafoukl sezónní poptávku. Vrací robustní řadu (špička omezená) + info o extrému.
+function objRobust(sales){
+  if(!sales||!sales.length) return {robust:sales||[],raw:sales||[],outlier:null};
+  const arr=sales.map(v=>v||0), D=arr.reduce((s,v)=>s+v,0);
+  const sorted=arr.slice().sort((a,b)=>b-a), top1=sorted[0], top2=sorted[1]||0, med=objMedian(arr);
+  const idx=arr.indexOf(top1);
+  const isOut = top1>=15 && top1>=4*Math.max(1,med) && top1>=3*Math.max(1,top2) && top1>=0.4*Math.max(1,D);
+  if(!isOut) return {robust:arr,raw:arr,outlier:null};
+  const cap=Math.max(top2,Math.round(med*2)); const robust=arr.slice(); robust[idx]=cap;
+  return {robust:robust,raw:arr,outlier:{month:idx,value:top1,capped:cap}};
+}
+function objComputeOrder(x,sales,P,m0,sea,dem){
+  dem=dem||sales;                          // dem = robustní poptávka (bez jednorázového extrému); sales = skutečná pro roční prodej D
   const D=sales?sales.reduce((s,v)=>s+v,0):0;
   const Lm=(x.lead||0)/30, coverM=Math.max(0.5,P.cover);
   let windowM=Lm+coverM, ramp=false, rampTo='';
@@ -1899,7 +1913,7 @@ function objComputeOrder(x,sales,P,m0,sea){
     const reachEnd=((ws+2-m0)%12+12)%12 + 1;     // měsíců do konce špičky (vč. posledního)
     if((inPeak || distStart<=Lm+coverM) && reachEnd>windowM){ windowM=reachEnd; ramp=true; rampTo=sea.peak; }
   }
-  const sd=months=>{let s=0;for(let k=0;k<Math.ceil(months);k++){const fr=Math.min(1,months-k);s+=(sales?(sales[(m0+k)%12]||0):0)*fr;}return s;};
+  const sd=months=>{let s=0;for(let k=0;k<Math.ceil(months);k++){const fr=Math.min(1,months-k);s+=(dem?(dem[(m0+k)%12]||0):0)*fr;}return s;};
   const windowDem=sd(windowM), leadDem=sd(Lm);
   const rop=Math.round(leadDem+P.Z*Math.sqrt(Math.max(0,leadDem)));
   const position=(x.avail||0)+(x.onOrder||0);
@@ -1910,16 +1924,16 @@ function objComputeOrder(x,sales,P,m0,sea){
   else if(windowDem<0.5){ status='Mimo sezónu'; }
   else if(position<=rop){ rec=Math.max(P.MOQ||1,Math.round(windowDem-position)); status='Objednat'; }
   rec=Math.max(0,rec);
-  const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,sales,m0);
+  const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,dem,m0);
   return {D,rec,status,ramp,value:(x.unitCost>0?x.unitCost*rec:0),windowDem:Math.round(windowDem),coverAfter:coverAfter};
 }
 // Společné objednávání dodavatele (joint replenishment): z Číny jede jedna zásilka se sortimentem
 // celého dodavatele → doprava se sdílí. Optimální společný interval T* = √(2·doprava / Σ(poptávka×skladné/ks)).
 // Každá položka pak jede v množství = její roční poptávka × T*. Dražší doprava → delší interval, větší dávky.
 function objHoldRate(){ try{ if(!NK_PARAMS||!NK_PARAMS.effHold) nkCompute(); }catch(e){} return (NK_PARAMS&&NK_PARAMS.effHold)||0.25; }
-function objSupplierCycles(rows,smap,hold){
+function objSupplierCycles(rows,robMap,hold){
   const sup=((OBJ_DATA&&OBJ_DATA.suppliers)||{}), g={};
-  rows.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; const D=s?s.reduce((a,b)=>a+(b||0),0):0; const unit=x.unitCost>0?x.unitCost:(x.unitPrice||0);
+  rows.forEach(x=>{const rb=robMap[String(x.sk)+'-'+String(x.reg)]; const s=rb&&(rb.robust||rb.raw); const D=s?s.reduce((a,b)=>a+(b||0),0):0; const unit=x.unitCost>0?x.unitCost:(x.unitPrice||0);
     const k=x.skupina||'—'; (g[k]=g[k]||{sumDh:0,sumD:0}); g[k].sumDh+=D*hold*unit; g[k].sumD+=D;});
   const out={};
   for(const k in g){ const s=sup[k]||{}; const S=(s.shipCost!=null?+s.shipCost:null);
@@ -1945,8 +1959,9 @@ async function renderObjednavky(){
   }
   const smap=objSalesMap();const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
-  const hold=objHoldRate(); OBJ_CYCLES=objSupplierCycles(OBJ_DATA.rows||[],smap,hold);
-  (OBJ_DATA.rows||[]).forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)];x._s=objSeason(s);x._o=objComputeOrder(x,s,P,m0,x._s);x._e=objEOQ(x,s,OBJ_CYCLES);});
+  const robMap={}; Object.keys(smap).forEach(k=>{robMap[k]=objRobust(smap[k]);});   // robustní poptávka (bez jednorázových extrémů)
+  const hold=objHoldRate(); OBJ_CYCLES=objSupplierCycles(OBJ_DATA.rows||[],robMap,hold);
+  (OBJ_DATA.rows||[]).forEach(x=>{const rb=robMap[String(x.sk)+'-'+String(x.reg)]||{raw:null,robust:null,outlier:null};x._out=rb.outlier;x._s=objSeason(rb.robust||rb.raw);x._o=objComputeOrder(x,rb.raw,P,m0,x._s,rb.robust||rb.raw);x._e=objEOQ(x,rb.robust||rb.raw,OBJ_CYCLES);});
   try{objRenderSeason();}catch(e){}
   try{objRenderPlan();}catch(e){}
   if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;}
@@ -1977,7 +1992,7 @@ function objDraw(){
         '<td '+R+'>'+fmt(x.stock)+'</td><td '+R+(crit?' style="color:#b23;font-weight:700"':'')+'>'+fmt(x.avail)+'</td>'+
         '<td '+R+'>'+fmt(x.unitPrice)+'</td><td '+R+'>'+fmt(x.unitCost)+'</td>'+
         '<td '+R+'>'+fmt(x.onOrder)+'</td><td '+R+'>'+fmt(x.reserved)+'</td><td '+R+'>'+fmt(x.lead)+'</td>'+
-        '<td '+R+'>'+fmt(o.D)+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+'</td><td '+R+'><b>'+(o.rec?fmt(o.rec):'—')+'</b></td><td '+R+' title="'+(x._e&&x._e.eoq?('dodavatel '+esc(x.skupina)+': 1 společná zásilka / '+objIntTxt(x._e.interval)+(x._e.S?(', doprava '+fmt(x._e.S)+' Kč sdílená'):'')+'; toto je množství této položky na zásilku'):'vyplň dotazník dodavatele (náklad na dopravu)')+'">'+(x._e&&x._e.eoq?fmt(x._e.eoq):'—')+'</td><td '+R+'>'+(x._e?objIntTxt(x._e.interval):'—')+'</td><td '+R+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?fmt(o.value)+' Kč':'—')+'</td></tr>';});
+        '<td '+R+(x._out?' title="⚠ Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks. V doporučení objednávky NENÍ zohledněn (omezen na '+fmt(x._out.capped)+' ks/měs), aby nenafoukl nákup."':'')+'>'+fmt(o.D)+(x._out?' <span style="color:#c0392b;cursor:help">⚠</span>':'')+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+'</td><td '+R+'><b>'+(o.rec?fmt(o.rec):'—')+'</b></td><td '+R+' title="'+(x._e&&x._e.eoq?('dodavatel '+esc(x.skupina)+': 1 společná zásilka / '+objIntTxt(x._e.interval)+(x._e.S?(', doprava '+fmt(x._e.S)+' Kč sdílená'):'')+'; toto je množství této položky na zásilku'):'vyplň dotazník dodavatele (náklad na dopravu)')+'">'+(x._e&&x._e.eoq?fmt(x._e.eoq):'—')+'</td><td '+R+'>'+(x._e?objIntTxt(x._e.interval):'—')+'</td><td '+R+(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24?' style="color:#c0392b;font-weight:700" title="Extrémní krytí po objednávce (>2 roky) — zkontroluj, možný jednorázový výkyv nebo příliš velká dávka"':'')+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?fmt(o.value)+' Kč':'—')+'</td></tr>';});
   });
   h2+='<tr><td colspan="'+NC+'" class="muted" style="text-align:right">'+list.length+' položek · '+gk.length+' dodavatelů</td></tr></tbody>';
   $('#objTbl').innerHTML=h2;
@@ -2043,7 +2058,7 @@ function objRenderPlan(){
   const rows=(OBJ_DATA&&OBJ_DATA.rows)||[]; const smap=objSalesMap(); const P=objPlanParams(); const m0=new Date().getMonth();
   const agg=Array.from({length:12},()=>({items:0,ks:0,kc:0})); let paired=0;
   rows.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; if(!s||s.reduce((a,b)=>a+b,0)<=0)return; paired++;
-    const p=objPlan(x,s,P,m0); p.rec.forEach((r,t)=>{if(r.order>0){const mi=(m0+t)%12; agg[mi].items++; agg[mi].ks+=r.order; agg[mi].kc+=r.value;}});});
+    const p=objPlan(x,objRobust(s).robust,P,m0); p.rec.forEach((r,t)=>{if(r.order>0){const mi=(m0+t)%12; agg[mi].items++; agg[mi].ks+=r.order; agg[mi].kc+=r.value;}});});
   const totIt=agg.reduce((s,a)=>s+a.items,0),totKs=agg.reduce((s,a)=>s+a.ks,0),totKc=agg.reduce((s,a)=>s+a.kc,0);
   let h='<p class="muted" style="margin:0 0 8px">Objednáváš <b>1× měsíčně</b>; cílová zásoba = poptávka za <b>dodací lhůtu + '+String(P.cover).replace('.',',')+' měs</b> (order-up-to). Sloupce ukazují, kolik položek / kusů / Kč připadá na objednávku v daném měsíci (napárováno <b>'+fmt(paired)+'</b> položek s prodejem). Špička objednávání bývá na jaře — příprava na letní sezónu.</p>';
   h+='<div class="tblwrap" style="max-height:360px"><table><thead><tr><th>Měsíc</th><th style="text-align:right">Položek k obj.</th><th style="text-align:right">Kusů</th><th style="text-align:right">Hodnota (Kč)</th></tr></thead><tbody>';
@@ -2067,7 +2082,7 @@ async function objExportPlan(){
     const wS=wb.addWorksheet('Cílová zásoba za měsíc');
     wS.columns=[{header:'Identifikátor',width:16},{header:'Dodavatel',width:24},{header:'Název',width:40},{header:'Lhůta (d)',width:9}].concat(mlab.map(m=>({header:'Cíl '+m,width:8})));
     const agg=Array.from({length:12},()=>({items:0,ks:0,kc:0}));
-    paired.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; const p=objPlan(x,s,P,m0); const ident=String(x.sk)+'-'+String(x.reg);
+    paired.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; const p=objPlan(x,objRobust(s).robust,P,m0); const ident=String(x.sk)+'-'+String(x.reg);
       const rO=wO.addRow([ident,x.skupina,x.nazev,x.lead,x.avail].concat(p.rec.map(r=>r.order||'')));
       rO.getCell(1).numFmt='@';
       const rS=wS.addRow([ident,x.skupina,x.nazev,x.lead].concat(p.rec.map(r=>r.S)));
