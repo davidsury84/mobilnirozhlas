@@ -1362,7 +1362,7 @@ function orderTrack(z){
   return '<div class="ot-cap">'+fazeLbl+' · Aktuální krok: '+cap+'</div><div class="ot-track">'+parts.join('')+'</div>';
 }
 function stepFlow(z){
-  var stages=[{k:'novy',l:'Rozdělení do závodu',r:'vyr'},{k:'prideleni',l:'Přidělení',r:'sef'},{k:'prace',l:'Zkreslení',r:'kon'},{k:'kontrola',l:'Kontrola',r:'sef'},{k:'obchodnik',l:'Obchodník',r:'obch'},{k:'klient',l:'U klienta',r:'kli'},{k:'schvaleno',l:'Výrobní dok.',r:'kon'},{k:'dokonceno',l:'Ve výrobě',r:'sys'}];
+  var stages=[{k:'prideleni',l:'Přidělení',r:'sef'},{k:'prace',l:'Obchodní výkres',r:'kon'},{k:'kontrola',l:'Kontrola',r:'sef'},{k:'obchodnik',l:'Obchodník',r:'obch'},{k:'klient',l:'U klienta',r:'kli'},{k:'zavod',l:'Výběr závodu',r:'vyr'},{k:'schvaleno',l:'Výrobní dok.',r:'kon'},{k:'dokonceno',l:'Ve výrobě',r:'sys'}];
   var order=stages.map(function(s){return s.k});
   var cur=z.stav, eff=cur;
   if(cur==='revize')eff='prace';
@@ -1377,7 +1377,7 @@ function stepFlow(z){
     else if(i===ci)cls+=' cur r-'+s.r;
     var label=s.l;
     if(i===ci&&cur==='revize')label='Revize v'+z.versionCount;
-    if(s.k==='novy'&&z.strediskoName)label='Závod: '+z.strediskoName;
+    if(s.k==='zavod'&&z.strediskoName)label='Závod: '+z.strediskoName;
     var dtxt=(days[s.k]!=null)?(' <span class="dd">'+days[s.k]+' d</span>'):'';
     h+=(i?'<span class="arw">→</span>':'')+'<span class="'+cls+'"><span class="rd"></span>'+esc(label)+dtxt+'</span>';
   });
