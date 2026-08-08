@@ -84,7 +84,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-var STATE={items:[],role:{},stavy:{},me:{},filter:''};
+var STATE={items:[],role:{},stavy:{},me:{},filter:'',supFilter:''};
 var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2200)}
@@ -110,13 +110,21 @@ function render(){
   var fl=$('#filters');
   if(isBuyer){
     fl.style.display='';
-    var counts={'':STATE.items.length}; Object.keys(STATE.stavy).forEach(function(k){counts[k]=STATE.items.filter(function(x){return x.stav===k}).length});
-    var chips=[['','Vše']].concat(Object.keys(STATE.stavy).map(function(k){return [k,STATE.stavy[k]]}));
-    fl.innerHTML=chips.map(function(c){return '<span class="chip'+(STATE.filter===c[0]?' on':'')+'" onclick="setFilter(\''+c[0]+'\')">'+esc(c[1])+' <b>'+(counts[c[0]]||0)+'</b></span>'}).join('');
+    var counts={'':STATE.items.length, nevyrizene:STATE.items.filter(function(x){return x.stav==='novy'||x.stav==='objednano'}).length};
+    Object.keys(STATE.stavy).forEach(function(k){counts[k]=STATE.items.filter(function(x){return x.stav===k}).length});
+    var chips=[['','Vše'],['nevyrizene','Nevyřízené']].concat(Object.keys(STATE.stavy).map(function(k){return [k,STATE.stavy[k]]}));
+    var chipsH=chips.map(function(c){return '<span class="chip'+(STATE.filter===c[0]?' on':'')+'" onclick="setFilter(\''+c[0]+'\')">'+esc(c[1])+' <b>'+(counts[c[0]]||0)+'</b></span>'}).join('');
+    var sups=[]; var seen={}; STATE.items.forEach(function(x){if(x.dodavatel&&!seen[x.dodavatel]){seen[x.dodavatel]=1;sups.push(x.dodavatel);}}); sups.sort(function(a,b){return a.localeCompare(b,'cs')});
+    var supSel=sups.length?('<select onchange="setSup(this.value)" style="margin-left:6px;font-family:inherit;font-size:13px;padding:6px 9px;border:1px solid var(--line);border-radius:999px;background:#fff"><option value="">Všichni dodavatelé</option>'+sups.map(function(s){return '<option'+(STATE.supFilter===s?' selected':'')+'>'+esc(s)+'</option>'}).join('')+'</select>'):'';
+    fl.innerHTML=chipsH+supSel;
   } else fl.style.display='none';
 
   var items=STATE.items.slice();
-  if(isBuyer&&STATE.filter) items=items.filter(function(x){return x.stav===STATE.filter});
+  if(isBuyer){
+    if(STATE.filter==='nevyrizene') items=items.filter(function(x){return x.stav==='novy'||x.stav==='objednano'});
+    else if(STATE.filter) items=items.filter(function(x){return x.stav===STATE.filter});
+    if(STATE.supFilter) items=items.filter(function(x){return (x.dodavatel||'')===STATE.supFilter});
+  }
   var list=$('#list');
   if(!items.length){ list.innerHTML='<div class="card"><p class="empty" style="margin:0">'+(isBuyer?'Žádné požadavky v této kategorii.':'Zatím jste neodeslali žádný požadavek. Vytvořte ho v SMI aplikaci u produktu, nebo tlačítkem „+ Nový požadavek".')+'</p></div>'; return; }
   list.innerHTML=items.map(function(it){return card(it,isBuyer)}).join('');
@@ -131,8 +139,11 @@ function card(it,isBuyer){
     +'</div><div style="text-align:right"><div class="qty">'+esc(String(it.mnozstvi))+' ks</div>'
     +'<div style="margin-top:6px"><span class="badge b-'+st+'">'+esc(STATE.stavy[st]||st)+'</span></div></div></div>';
   var m=[];
+  if(it.dodavatel) m.push('<span class="obr" style="background:#e7eefb;color:#2b56a0"><b>Dodavatel:</b> '+esc(it.dodavatel)+'</span>');
   if(it.skladem!=null) m.push('<span><b>Skladem:</b> '+esc(String(it.skladem))+' ks</span>');
   if(it.obratka) m.push('<span class="obr">'+esc(it.obratka)+'</span>');
+  if(it.deadline){ var od=isOverdue(it); m.push('<span style="'+(od&&st!=='vyrizeno'&&st!=='zamitnuto'?'color:#c0392b;font-weight:700':'')+'"><b>Termín:</b> '+esc(fmtDay(it.deadline))+(od&&st!=='vyrizeno'&&st!=='zamitnuto'?' ⚠ po termínu':'')+'</span>'); }
+  if(it.assignedTo&&(it.assignedTo.name||it.assignedTo.email)) m.push('<span><b>Přiděleno:</b> '+esc(it.assignedTo.name||it.assignedTo.email)+'</span>');
   m.push('<span><b>Žádá:</b> '+esc((it.requester&&it.requester.name)||(it.requester&&it.requester.email)||'—')+'</span>');
   if(it.zdroj) m.push('<span style="color:#8a938a">zdroj: '+esc(it.zdroj)+'</span>');
   h+='<div class="meta">'+m.join('')+'</div>';
@@ -150,14 +161,30 @@ function card(it,isBuyer){
     h+='<div class="actions">'
       +'<select id="sel_'+it.id+'">'+opts+'</select>'
       +'<input id="note_'+it.id+'" placeholder="poznámka pro E-shop (nepovinné)">'
-      +'<button class="btn sm" onclick="changeStav(\''+it.id+'\')">Uložit stav</button></div>';
+      +'<button class="btn sm" onclick="changeStav(\''+it.id+'\')">Uložit stav</button>'
+      +'<button class="btn ghost sm" style="color:var(--red);border-color:#f0c9c4;margin-left:auto" onclick="delReq(\''+it.id+'\','+it.cislo+')">🗑 Smazat</button></div>';
+  } else if(canDelete(it)){
+    h+='<div class="actions" style="justify-content:flex-end"><button class="btn ghost sm" style="color:var(--red);border-color:#f0c9c4" onclick="delReq(\''+it.id+'\','+it.cislo+')">🗑 Smazat</button></div>';
   }
   h+='</div>';
   return h;
 }
 
 function setFilter(f){ STATE.filter=f; render(); }
+function setSup(s){ STATE.supFilter=s; render(); }
 function toggleForm(){ var c=$('#formCard'); c.style.display=c.style.display==='none'?'':'none'; }
+function fmtDay(d){ try{ var p=String(d).slice(0,10).split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):String(d); }catch(e){ return String(d); } }
+function isOverdue(it){ try{ if(!it.deadline)return false; var today=new Date().toISOString().slice(0,10); return String(it.deadline).slice(0,10)<today; }catch(e){ return false; } }
+function canDelete(it){ var r=STATE.role||{}; if(r.isBuyer||r.isAdmin)return true; var me=(STATE.me&&STATE.me.email||'').toLowerCase(); return !!(it.requester&&(it.requester.email||'').toLowerCase()===me); }
+async function delReq(id,cislo){
+  if(!confirm('Opravdu smazat požadavek #'+cislo+'? Tuto akci nelze vzít zpět.')) return;
+  try{
+    var r=await fetch('/api/pozadavky/smazat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+    var j=await r.json().catch(function(){return{}});
+    if(!r.ok||j.chyba){ toast('Chyba: '+(j.chyba||r.status)); return; }
+    toast('Požadavek #'+cislo+' smazán'); load();
+  }catch(e){ toast('Chyba: '+e.message); }
+}
 
 async function submitReq(){
   var kod=$('#fKod').value.trim(), nazev=$('#fNazev').value.trim(), mn=parseInt($('#fMn').value,10), duvod=$('#fDuvod').value.trim();

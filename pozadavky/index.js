@@ -122,6 +122,7 @@ function mount(host) {
       if (p === '/api/pozadavky' && req.method === 'POST') return apiCreate(req, res);
       if (p === '/api/pozadavky/bulk' && req.method === 'POST') return apiBulk(req, res);
       if (p === '/api/pozadavky/stav' && req.method === 'POST') return apiStav(req, res);
+      if (p === '/api/pozadavky/smazat' && req.method === 'POST') return apiDelete(req, res);
     } catch (e) {
       console.error('[pozadavky] chyba obsluhy:', e);
       json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true;
@@ -134,7 +135,7 @@ function mount(host) {
   // ======================================================================
   function apiMe(req, res) {
     const me = meOf(req);
-    json(res, 200, { email: me.email, name: me.name, isAdmin: me.isAdmin, isBuyer: me.isBuyer, isRequester: me.isRequester, stavy: STAVY, buyers: nakupci().map(b => b.name), buyersCount: nakupci().length });
+    json(res, 200, { email: me.email, name: me.name, isAdmin: me.isAdmin, isBuyer: me.isBuyer, isRequester: me.isRequester, stavy: STAVY, buyers: nakupci().map(b => b.name), buyerList: nakupci(), buyersCount: nakupci().length });
     return true;
   }
 
@@ -223,6 +224,14 @@ function mount(host) {
     const arr = Array.isArray(b.items) ? b.items : [];
     const zdroj = String(b.zdroj || 'optimalizace-nakupu').trim();
     const supplier = String(b.supplier || '').trim();
+    const deadline = String(b.deadline || '').trim() || null; // YYYY-MM-DD
+    // komu přidělit (z výběru nákupčích); ověř proti seznamu, jinak všem
+    let assignedTo = null;
+    if (b.assignTo && (b.assignTo.email || typeof b.assignTo === 'string')) {
+      const em = String(b.assignTo.email || b.assignTo).toLowerCase();
+      const found = nakupci().find(n => n.email === em);
+      if (found) assignedTo = { email: found.email, name: found.name };
+    }
     if (!arr.length) { json(res, 400, { chyba: 'Žádné položky k předání.' }); return true; }
     const db = load(); const now = Date.now();
     const openByKod = {}; db.items.forEach(it => { if (it.stav === 'novy' && it.zdroj === zdroj && it.kod) openByKod[it.kod] = it; });
@@ -236,7 +245,7 @@ function mount(host) {
         id: crypto.randomBytes(8).toString('hex'), cislo: db.seq, kod, nazev, mnozstvi: mn, jednotka: 'ks',
         skladem: (x.skladem == null || x.skladem === '' || isNaN(Number(x.skladem))) ? null : Number(x.skladem),
         obratka: String(x.obratka || '').trim() || null, duvod: String(x.duvod || '').trim(),
-        dodavatel: supplier || null, zdroj, requester: { email: me.email, name: me.name }, stav: 'novy',
+        dodavatel: supplier || null, deadline, assignedTo, zdroj, requester: { email: me.email, name: me.name }, stav: 'novy',
         createdAt: now, updatedAt: now, historie: [{ stav: 'novy', note: '', by: { email: me.email, name: me.name }, at: now }],
       };
       db.items.push(item); created.push(item); if (kod) openByKod[kod] = item;
@@ -244,10 +253,11 @@ function mount(host) {
     save(db);
     logAct('pozadavky', { email: me.email, name: me.name }, 'Hromadný požadavek' + (supplier ? (' · ' + supplier) : '') + ': ' + created.length + ' pol.' + (skipped ? (', ' + skipped + ' přeskočeno (už ve frontě)') : ''));
     if (created.length) {
-      const bs = nakupci(); const link = baseUrlOf(req) + '/#modul=pozadavky';
+      const bs = assignedTo ? [assignedTo] : nakupci(); const link = baseUrlOf(req) + '/#modul=pozadavky';
       const lines = created.map(it => '• ' + (it.nazev || '—') + (it.kod ? (' (' + it.kod + ')') : '') + ' — ' + it.mnozstvi + ' ks' + (it.skladem != null ? (' [skladem ' + it.skladem + ']') : '')).join('\n');
       const text = 'Dobrý den,\n\nE-shop (' + (me.name || me.email) + ') předal ' + created.length + ' položek k objednání'
         + (supplier ? (' od dodavatele ' + supplier) : '') + ' (z Optimalizace nákupu):\n\n' + lines
+        + (deadline ? ('\n\nTermín zpracování: ' + deadline) : '')
         + (skipped ? ('\n\n(' + skipped + ' položek už bylo ve frontě — nezakládáno znovu.)') : '')
         + '\n\nPožadavky najdete v intranetu → Požadavky nákupu:\n' + link;
       for (const nb of bs) await notify(nb.email, 'Objednávka k vyřízení' + (supplier ? (' — ' + supplier) : '') + ' (' + created.length + ' pol.)', text);
@@ -283,6 +293,22 @@ function mount(host) {
       await notify(it.requester.email, 'Požadavek #' + it.cislo + ' — ' + STAVY[stav], text);
     }
     json(res, 200, { ok: true, item: it });
+    return true;
+  }
+
+  async function apiDelete(req, res) {
+    const me = meOf(req);
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) { json(res, 400, { chyba: 'Neplatné tělo požadavku.' }); return true; }
+    const id = String(b.id || '');
+    const db = load();
+    const idx = db.items.findIndex(x => x.id === id);
+    if (idx < 0) { json(res, 404, { chyba: 'Požadavek nenalezen.' }); return true; }
+    const it = db.items[idx];
+    const own = it.requester && (it.requester.email || '').toLowerCase() === me.email;
+    if (!(me.isBuyer || me.isAdmin || own)) { json(res, 403, { chyba: 'Nemáte oprávnění smazat tento požadavek.' }); return true; }
+    db.items.splice(idx, 1); save(db);
+    logAct('pozadavky', { email: me.email, name: me.name }, 'Smazán požadavek #' + it.cislo + ' · ' + (it.nazev || it.kod || ''));
+    json(res, 200, { ok: true, cislo: it.cislo });
     return true;
   }
 

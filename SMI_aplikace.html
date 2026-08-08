@@ -1925,7 +1925,7 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   else if(position<=rop){ const need=Math.round(windowDem-position); if(need>0){ rec=Math.max(P.MOQ||1,need); status='Objednat'; } else status='Zásoba stačí'; }
   rec=Math.max(0,rec);
   const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,dem,m0);
-  return {D,rec,status,ramp,value:(x.unitCost>0?x.unitCost*rec:0),windowDem:Math.round(windowDem),coverAfter:coverAfter};
+  return {D,rec,status,ramp,value:(x.unitCost>0?x.unitCost:(x.unitPrice||0))*rec,windowDem:Math.round(windowDem),coverAfter:coverAfter};
 }
 // Společné objednávání dodavatele (joint replenishment): z Číny jede jedna zásilka se sortimentem
 // celého dodavatele → doprava se sdílí. Optimální společný interval T* = √(2·doprava / Σ(poptávka×skladné/ks)).
@@ -2047,22 +2047,54 @@ function objSupplierBtns(sup){
          '<button type="button" style="'+b+';background:#2f6f8f" onclick="objExportSupplier(decodeURIComponent(\''+u+'\'))">📋 Excel</button>';
 }
 function objExportSupplier(sup){ objExport(sup); }
-// Předá objednávku dodavatele nákupčímu → založí požadavky v modulu Požadavky nákupu (stav „nový" = nevyřízené).
-async function objSendToNakupci(sup){
-  const items=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>x.skupina===sup&&x._o&&x._o.rec>0).map(x=>({
+// Předá objednávku dodavatele nákupčímu → dialog (komu + termín) → založí požadavky v modulu Požadavky nákupu.
+function objOrderItems(sup){
+  return ((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>x.skupina===sup&&x._o&&x._o.rec>0).map(x=>({
     kod:String(x.sk)+'-'+String(x.reg), nazev:x.nazev, mnozstvi:x._o.rec, skladem:x.stock,
     obratka:'roční prodej '+fmt(x._o.D)+' ks · krytí po obj. '+objCoverTxt(x._o.coverAfter),
     duvod:'Doporučeno Optimalizací nákupu'+((x.avail||0)<0?' (oversold — vykrýt rezervace)':'')+(x._o.ramp?' — náběh sezóny':'')
   }));
+}
+async function objSendToNakupci(sup){
+  const items=objOrderItems(sup);
   if(!items.length){ if(typeof toast==='function')toast('U dodavatele '+sup+' není teď nic k objednání.'); return; }
+  let buyers=[]; try{ const me=await (await fetch('/api/pozadavky/me',{cache:'no-store'})).json(); buyers=me.buyerList||[]; }catch(e){}
+  objShowNakupModal(sup,items,buyers);
+}
+function objShowNakupModal(sup,items,buyers){
   const totKs=items.reduce((s,i)=>s+i.mnozstvi,0);
-  if(!confirm('Předat nákupčímu '+items.length+' položek ('+fmt(totKs)+' ks) od dodavatele „'+sup+'"?\n\nZaloží se požadavky v modulu Požadavky nákupu (stav „nový"). Nákupčí je pak označí jako vyřízené/objednané.')) return;
-  try{
-    const r=await fetch('/api/pozadavky/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({supplier:sup,zdroj:'optimalizace-nakupu',items:items})});
-    const d=await r.json().catch(()=>({}));
-    if(r.ok&&d.ok){ if(typeof toast==='function')toast('Předáno nákupčímu: '+d.created+' požadavků'+(d.skipped?(' · '+d.skipped+' už bylo ve frontě'):'')); }
-    else { if(typeof toast==='function')toast('Chyba: '+(d.chyba||('HTTP '+r.status))); else alert('Chyba: '+(d.chyba||r.status)); }
-  }catch(e){ if(typeof toast==='function')toast('Chyba odeslání: '+e.message); }
+  const dflt=new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(20,25,18,.45);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px';
+  const inp='width:100%;padding:9px 10px;font:inherit;border:1px solid #cdd4cc;border-radius:9px;background:#fff';
+  const bopts='<option value="">— všem nákupčím —</option>'+buyers.map(b=>'<option value="'+esc(b.email)+'">'+esc(b.name||b.email)+'</option>').join('');
+  const lst=items.slice(0,8).map(i=>'<li>'+esc(i.nazev)+' — <b>'+fmt(i.mnozstvi)+' ks</b></li>').join('')+(items.length>8?('<li class="muted">… a dalších '+(items.length-8)+'</li>'):'');
+  ov.innerHTML='<div style="background:#fff;border-radius:16px;padding:20px 22px;max-width:480px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.3);max-height:90vh;overflow:auto">'
+    +'<h3 style="margin:0 0 3px;font-size:18px">➕ Předat nákupčímu</h3>'
+    +'<p style="margin:0 0 14px;color:#66716a;font-size:13.5px">Dodavatel <b>'+esc(sup)+'</b> · '+items.length+' položek · '+fmt(totKs)+' ks</p>'
+    +'<label style="display:block;font-size:13px;font-weight:600;color:#4a544c;margin-bottom:4px">Komu zadat</label>'
+    +'<select id="objNkWho" style="'+inp+';margin-bottom:12px">'+bopts+'</select>'
+    +'<label style="display:block;font-size:13px;font-weight:600;color:#4a544c;margin-bottom:4px">Termín zpracování</label>'
+    +'<input id="objNkDate" type="date" value="'+dflt+'" style="'+inp+';margin-bottom:14px">'
+    +'<details style="margin-bottom:16px"><summary style="cursor:pointer;font-size:13px;color:#66716a">Položky ('+items.length+')</summary><ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.6">'+lst+'</ul></details>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
+    +'<button id="objNkCancel" style="font:inherit;font-weight:600;background:#eef1ec;color:#333;border:0;border-radius:9px;padding:9px 16px;cursor:pointer">Zrušit</button>'
+    +'<button id="objNkOk" style="font:inherit;font-weight:700;background:#3a7d44;color:#fff;border:0;border-radius:9px;padding:9px 18px;cursor:pointer">Předat nákupčímu</button></div></div>';
+  document.body.appendChild(ov);
+  const close=()=>{try{ov.remove();}catch(e){}};
+  ov.onclick=e=>{ if(e.target===ov)close(); };
+  ov.querySelector('#objNkCancel').onclick=close;
+  ov.querySelector('#objNkOk').onclick=async()=>{
+    const who=ov.querySelector('#objNkWho').value, dl=ov.querySelector('#objNkDate').value;
+    const whoName=(buyers.find(b=>b.email===who)||{}).name||'';
+    close();
+    try{
+      const r=await fetch('/api/pozadavky/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({supplier:sup,zdroj:'optimalizace-nakupu',items:items,assignTo:who?{email:who,name:whoName}:null,deadline:dl||null})});
+      const d=await r.json().catch(()=>({}));
+      if(r.ok&&d.ok){ if(typeof toast==='function')toast('Předáno '+(whoName?('— '+whoName):'všem nákupčím')+': '+d.created+' požadavků'+(d.skipped?(' · '+d.skipped+' už ve frontě'):'')); }
+      else { if(typeof toast==='function')toast('Chyba: '+(d.chyba||('HTTP '+r.status))); else alert('Chyba: '+(d.chyba||r.status)); }
+    }catch(e){ if(typeof toast==='function')toast('Chyba odeslání: '+e.message); }
+  };
 }
 // Druhý export = CELÁ ERP tabulka (všechny položky, i ty co se neobjednávají), rozpad po dodavatelích.
 async function objExportAll(){

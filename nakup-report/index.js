@@ -332,7 +332,7 @@ function mount(host) {
     else if (position <= rop) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = 'objednat'; } else status = 'zásoba stačí'; }
     rec = Math.max(0, rec);
     const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, dem, m0);
-    return { D, rec, status, ramp, value: (x.unitCost > 0 ? x.unitCost * rec : 0), coverAfter };
+    return { D, rec, status, ramp, value: (x.unitCost > 0 ? x.unitCost : (x.unitPrice || 0)) * rec, coverAfter };
   }
   function buildObjednavky(cfg) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
