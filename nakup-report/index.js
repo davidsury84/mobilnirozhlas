@@ -459,10 +459,10 @@ function mount(host) {
       const cfg = loadCfg(); const now = new Date();
       let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
       let changed = false;
-      // Objednávkový report — 1× za 14 dní (od zvoleného dne)
+      // Objednávkový report — 1× týdně (od zvoleného dne, pojistka 1×/ISO-týden)
       if (cfg.objednavkyEnabled && now.getDay() >= cfg.objednavkyDay) {
-        const daysSince = st.objAt ? (now - new Date(st.objAt)) / 86400000 : 999;
-        if (daysSince >= 13) { const r = await sendReport('objednavky', cfg.objednavkyTo, cfg); st.objAt = now.toISOString(); st.objednavky = r; changed = true; console.log('[nakup-report] objednávkový report: ' + (r.ok ? r.count + ' pol.' : 'CHYBA ' + r.error)); }
+        const wk = isoWeek(now);
+        if (st.objWeek !== wk) { const r = await sendReport('objednavky', cfg.objednavkyTo, cfg); st.objWeek = wk; st.objAt = now.toISOString(); st.objednavky = r; changed = true; console.log('[nakup-report] objednávkový report: ' + (r.ok ? r.count + ' pol.' : 'CHYBA ' + r.error)); }
       }
       // Ranní bilance skladu — denně (od zvolené hodiny), pojistka 1×/den
       if (cfg.bilanceEnabled && now.getHours() >= (cfg.bilanceHour != null ? cfg.bilanceHour : 8)) {

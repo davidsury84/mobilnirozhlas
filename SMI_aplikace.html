@@ -627,15 +627,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <details class="settings" id="nkReportCfg" style="margin:0 0 12px;display:none">
         <summary>📧 Týdenní e-mailové reporty — příjemci a zapnutí (jen správce)</summary>
         <div style="margin-top:10px;font-size:13px">
-          <p class="muted" style="margin:0 0 10px">Automatické e-maily z dat SMI: <b>„Co objednat"</b> (ERP, 1× za 14 dní) a <b>„Co zlevnit"</b> (mrtvé/přeskladněné zásoby, týdně). <span id="nkRepPeriod"></span></p>
+          <p class="muted" style="margin:0 0 10px">Automatické e-maily z dat SMI: <b>„Co objednat"</b> (ERP, týdně) a <b>„Co zlevnit"</b> (mrtvé/přeskladněné zásoby, týdně). <span id="nkRepPeriod"></span></p>
           <div style="display:grid;gap:10px;max-width:740px">
             <label style="display:flex;flex-direction:column;gap:3px">🔻 „Co zlevnit" — komu poslat (více e-mailů oddělte čárkou)
               <input type="text" id="nkRepMd" placeholder="email1@elkoplast.cz, email2@elkoplast.cz" style="padding:8px;font:inherit"></label>
             <div style="border-top:1px solid var(--line,#e4eaf1);margin-top:6px;padding-top:10px">
-              <label style="display:flex;flex-direction:column;gap:3px">🛒 <b>„Co objednat" (ERP, 1× za 14 dní)</b> — komu poslat
+              <label style="display:flex;flex-direction:column;gap:3px">🛒 <b>„Co objednat" (ERP, týdně)</b> — komu poslat
                 <input type="text" id="nkRepObj" placeholder="email1@elkoplast.cz, email2@elkoplast.cz" style="padding:8px;font:inherit"></label>
               <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:8px">
-                <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="nkRepObjEn"> Posílat 1× za 14 dní</label>
+                <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="nkRepObjEn"> Posílat týdně</label>
                 <label style="display:flex;align-items:center;gap:6px">Den <select id="nkRepObjDay" style="padding:5px"><option value="1">pondělí</option><option value="2">úterý</option><option value="3">středa</option><option value="4">čtvrtek</option><option value="5">pátek</option><option value="6">sobota</option><option value="0">neděle</option></select></label>
                 <button class="btn ghost" type="button" onclick="window.open('/api/nakup-report/preview?type=objednavky','_blank')">👁 Náhled objednávky</button>
                 <button class="btn ghost" type="button" id="nkRepSendObj">📤 Poslat objednávky teď</button>
