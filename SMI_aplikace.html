@@ -1920,9 +1920,9 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   let rec=0,status='OK';
   if((x.avail||0)<0){ rec=Math.round(windowDem>0?Math.max(windowDem-position,-(x.avail)):-(x.avail)); status='Kritické — oversold'; }
   else if(D<=0){ status='Bez prodeje'; }
-  else if(ramp){ if(position<windowDem){ rec=Math.max(P.MOQ||1,Math.round(windowDem-position)); status='Náběh sezóny '+rampTo; } else status='Sezóna pokryta'; }
+  else if(ramp){ const need=Math.round(windowDem-position); if(need>0){ rec=Math.max(P.MOQ||1,need); status='Náběh sezóny '+rampTo; } else status='Sezóna pokryta'; }
   else if(windowDem<0.5){ status='Mimo sezónu'; }
-  else if(position<=rop){ rec=Math.max(P.MOQ||1,Math.round(windowDem-position)); status='Objednat'; }
+  else if(position<=rop){ const need=Math.round(windowDem-position); if(need>0){ rec=Math.max(P.MOQ||1,need); status='Objednat'; } else status='Zásoba stačí'; }
   rec=Math.max(0,rec);
   const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,dem,m0);
   return {D,rec,status,ramp,value:(x.unitCost>0?x.unitCost*rec:0),windowDem:Math.round(windowDem),coverAfter:coverAfter};

@@ -327,9 +327,9 @@ function mount(host) {
     let rec = 0, status = 'OK';
     if ((x.avail || 0) < 0) { rec = Math.round(windowDem > 0 ? Math.max(windowDem - position, -(x.avail)) : -(x.avail)); status = 'oversold'; }
     else if (D <= 0) status = 'bez prodeje';
-    else if (ramp) { if (position < windowDem) { rec = Math.max(P.MOQ || 1, Math.round(windowDem - position)); status = 'náběh sezóny ' + rampTo; } else status = 'sezóna pokryta'; }
+    else if (ramp) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = 'náběh sezóny ' + rampTo; } else status = 'sezóna pokryta'; }
     else if (windowDem < 0.5) status = 'mimo sezónu';
-    else if (position <= rop) { rec = Math.max(P.MOQ || 1, Math.round(windowDem - position)); status = 'objednat'; }
+    else if (position <= rop) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = 'objednat'; } else status = 'zásoba stačí'; }
     rec = Math.max(0, rec);
     const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, dem, m0);
     return { D, rec, status, ramp, value: (x.unitCost > 0 ? x.unitCost * rec : 0), coverAfter };
