@@ -258,6 +258,11 @@ function mount(host) {
     '<p style="color:#6b736c;margin:0 0 14px;font-size:13px">' + esc(intro) + ' · Data: ' + esc(period) + '</p>' +
     bodyHtml +
     '<hr style="border:0;border-top:1px solid #e6e9e3;margin:20px 0"><div style="font-size:12px;color:#8a938a">Automatický týdenní report · Intranet ELKOPLAST CZ → E-shop → Optimalizace nákupu. Příjemce a zapnutí spravuje správce v aplikaci.</div></div>';
+  // Vysvětlující box „Co to je / Jak číst / Co s tím" na začátek reportu.
+  function explainBox(rows) {
+    return '<div style="background:#eef4fb;border:1px solid #d3e0f2;border-radius:10px;padding:13px 16px;margin:0 0 16px;font-size:13px;line-height:1.65">' +
+      rows.map(r => '<div style="margin:3px 0"><b style="color:#1f4e79">' + esc(r[0]) + ':</b> ' + r[1] + '</div>').join('') + '</div>';
+  }
   const th = t => '<th style="text-align:' + (/[⌀%KčksČ]|množ|Sklad|Krytí|Sleva|Hodnota|Doporuč|Obrátka|Prodej/.test(t) ? 'right' : 'left') + ';border-bottom:2px solid #d8dee7;padding:6px 8px;font-size:12px;color:#55605a">' + esc(t) + '</th>';
   const td = (v, r) => '<td style="text-align:' + (r ? 'right' : 'left') + ';border-bottom:1px solid #eef1ec;padding:5px 8px">' + v + '</td>';
 
@@ -273,6 +278,12 @@ function mount(host) {
       td(fmt(x.AZ), 1) + td(coverTxt(x.cover) + (x.overBy === 'krytí' ? ' ⚠' : ''), 1) +
       td('<b>' + Math.round(x.disc * 100) + ' %</b>', 1) + td(kc(x.tied), 1) + '</tr>').join('');
     const body =
+      explainBox([
+        ['Co to je', 'Přehled položek, které se <b>dlouho neprodaly</b> nebo jich držíme <b>na roky dopředu</b> — leží v nich zbytečně peníze a zabírají sklad. Cílem je je <b>slevou rozhýbat</b> a uvolnit kapitál.'],
+        ['Jak číst', '<b>Kategorie</b>: <i>Stárnoucí</i> = ' + cfg.aging + '+ měsíců bez prodeje, <i>Mrtvá</i> = ' + cfg.dead + '+ měsíců. <b>Krytí</b> = na jak dlouho zásoba vydrží při současném tempu prodeje (<b>⚠</b> = přeskladněno, drží se roky). <b>Sleva</b> = doporučená akční sleva. <b>Hodnota zásoby</b> = kolik korun v položce leží.'],
+        ['Co s tím', 'Nasadit doporučenou slevu / zařadit do akce, doprodat a hlavně <b>přestat objednávat</b>. Seřazeno podle vázaného kapitálu — <b>nahoře je největší balík peněz</b>.'],
+        ['Odkud data', 'Prodeje z „obrat plasty" (klouzavých 12 měsíců). Report je jen návrh — rozhodnutí o slevě je na tobě.']
+      ]) +
       '<div style="background:#fbeaea;border:1px solid #f0c9c9;border-radius:10px;padding:12px 14px;margin:0 0 14px">' +
       '<b>' + fmt(list.length) + '</b> položek k zlevnění · vázaný kapitál <b>' + kc(totTied) + '</b>. Doporučená sleva: pomalá ' + Math.round(cfg.d1 * 100) + ' %, stárnoucí/mrtvá ' + Math.round(cfg.d2 * 100) + ' %. „⚠" = přeskladněno (drží se roky zásoby).</div>' +
       '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
@@ -349,9 +360,15 @@ function mount(host) {
     const sups = Object.keys(bySup).map(k => ({ sup: k, items: bySup[k].sort((a, b) => b.o.value - a.o.value), val: bySup[k].reduce((s, r) => s + r.o.value, 0) })).sort((a, b) => b.val - a.val);
     const R = t => '<th style="text-align:right;border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">' + esc(t) + '</th>';
     const cellR = v => '<td style="text-align:right;border-bottom:1px solid #eef1ec;padding:4px 7px">' + v + '</td>';
-    let body = '<div style="background:#e7f0fb;border:1px solid #c9dcf0;border-radius:10px;padding:12px 14px;margin:0 0 14px">' +
-      '<b>' + fmt(list.length) + '</b> položek k objednání · celkem <b>' + fmt(totKs) + ' ks</b> (~' + kc(totVal) + ') · <b>' + fmt(oversold) + '</b> oversold (nevykryté objednávky > sklad). ' +
-      'Objednat = sezónní poptávka za (dodací lhůta + pokrytí) − (K dispo + Objednáno). Data: ' + esc(obj.date || obj.source || '') + '.</div>';
+    let body = explainBox([
+      ['Co to je', 'Seznam <b>co objednat u dodavatelů</b>, spočítaný z aktuálního stavu skladu (ERP) a historie prodejů. Seskupeno <b>podle dodavatele</b> a seřazeno podle hodnoty objednávky.'],
+      ['Jak počítáme „Objednat"', 'Cílem je mít na skladě zásobu na <b>dodací lhůtu + ' + (cfg.cover || 2) + ' měsíce</b>. Objednat = tato cílová poptávka − (co je <i>k dispozici</i> + co už je <i>objednáno</i>). Poptávka je <b>sezónní</b> (počítá se dopředu od aktuálního měsíce) a <b>robustní</b> — jednorázové výkyvy (velká jednorázová zakázka) se do ní nezapočítávají.'],
+      ['Zvláštní případy', '<b style="color:#b23">Oversold</b> (červeně) = zákazníci mají rezervováno víc, než je skladem → objednávka je <b>povinná</b> (vykrytí objednávek). <b>Náběh sezóny</b> = předzásobení na nadcházející špičku s předstihem o dodací lhůtu. Řídce prodávané položky jedou na plochém průměru (ne na falešné špičce).'],
+      ['Jak číst sloupce', '<b>K dispo</b> = sklad − rezervace zákazníků. <b>Objednat</b> = doporučený počet ks. <b>Krytí po obj.</b> = na jak dlouho zásoba vydrží po naskladnění (u pomalých/sezónních položek číslo roste, protože se pak dlouho neprodává — není to přeskladnění). <b>Hodnota</b> = objednat × nákupní (landed) cena.'],
+      ['Co s tím', 'Podklad pro objednávky u dodavatelů. V aplikaci lze u každého dodavatele <b>předat objednávku nákupčímu</b> (modul Požadavky nákupu) nebo stáhnout Excel.']
+    ]) +
+      '<div style="background:#e7f0fb;border:1px solid #c9dcf0;border-radius:10px;padding:12px 14px;margin:0 0 14px">' +
+      '<b>' + fmt(list.length) + '</b> položek k objednání · celkem <b>' + fmt(totKs) + ' ks</b> (~' + kc(totVal) + ') · <b>' + fmt(oversold) + '</b> oversold (rezervace > sklad). Data ERP: ' + esc(obj.date || obj.source || '') + '.</div>';
     sups.forEach(g => {
       body += '<h3 style="margin:16px 0 4px;font-size:15px">' + esc(g.sup) + ' <span style="color:#8a938a;font-weight:400;font-size:13px">· ' + g.items.length + ' pol. · ' + kc(g.val) + '</span></h3>' +
         '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
@@ -379,7 +396,13 @@ function mount(host) {
       '<div style="font-size:20px;font-weight:700;color:#243">' + kc(o.kc) + '</div>' +
       '<div style="font-size:12px;color:#8a938a">' + fmt(o.ks) + ' ks' + (d && P ? ' · <span style="color:' + delColor(d.kc) + '">' + signed(d.kc) + '</span>' : '') + '</div></div></td>';
     const dd = dayDeltas(L, P);
-    let body = '<table style="border-collapse:separate;width:100%;margin:0 0 8px"><tr>' +
+    let body = explainBox([
+      ['Co to je', 'Ranní <b>bilance skladu e-shopu</b> — kolik v něm dnes leží peněz a jak se to za den pohnulo. Vše v <b>nákladových (landed) cenách</b>.'],
+      ['Stav (4 karty)', '<b>Sklad</b> = fyzická zásoba. <b>K dispozici</b> = sklad − rezervace zákazníků. <b>Objednáno u dodavatelů</b> = co je na cestě (ještě nedorazilo). <b>Rezervováno zákazníky</b> = co si už zákazníci objednali. „±" u karty = změna hodnoty proti včerejšku.'],
+      ['Pohyby', '<b>Výdej ze skladu</b> ≈ prodej (co odešlo zákazníkům). <b>Příjem</b> = dodávky, které fyzicky dorazily (z dřívějších objednávek — <u>ne</u> nový nákup). <b>Nové rezervace</b> = nové objednávky zákazníků. <b>Nově objednáno</b> = nové objednávky u dodavatelů.'],
+      ['K čemu je to dobré', 'Denní přehled, jestli sklad roste/klesá, kolik se prodalo (obrat) a co dorazilo — na jednom místě, finančně i kusově.']
+    ]) +
+      '<table style="border-collapse:separate;width:100%;margin:0 0 8px"><tr>' +
       card('Sklad', L.stock, '#3a7d44', dd.stock) + card('K dispozici', L.dispo, '#2f6f8f', dd.dispo) + card('Objednáno u dodav.', L.onOrder, '#b06f00', dd.onOrder) + card('Rezervováno zákazníky', L.reserved, '#8a4baf', dd.reserved) + '</tr></table>';
     if (P) body += '<p style="margin:0 0 14px;font-size:12px;color:#8a938a">± u karet = změna hodnoty proti předchozímu dni (' + esc(P.date) + ').</p>';
     // Předchozí den (pohyby) — finančně, členěno odbyt / zásobování
