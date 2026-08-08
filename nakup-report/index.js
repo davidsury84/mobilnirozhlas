@@ -117,6 +117,19 @@ function mount(host) {
     return B;
   }
   const hasEshop = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); return !!(e && host.employeeModules && host.employeeModules(e.email).indexOf('eshop') >= 0); } catch (_) { return false; } };
+  // bootstrap bilance z posledních denních souborů (aby naskočila hned, ne až s dalším souborem)
+  async function bootstrapBilance(xls, newest, parsedNewest, newestDate) {
+    const recent = xls.slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).slice(-14);
+    let prevRows = null;
+    for (const f of recent) {
+      let rows, dt;
+      if (f.id === newest.id) { rows = parsedNewest.rows; dt = newestDate; }
+      else { const dl = await drive.downloadFileBase64(f.id, 20 * 1024 * 1024); rows = parseObjXlsx(Buffer.from(dl.base64, 'base64')).rows; dt = dateOfName(f.name); }
+      if (dt) pushBilance(computeBilance(rows, dt, prevRows));
+      prevRows = rows;
+    }
+    console.log('[nakup-report] bootstrap bilance z ' + recent.length + ' souborů');
+  }
 
   // ---- denní stažení nejnovějšího souboru z Drive (SA), rozparsování, uložení na volume ----
   async function syncObjednavky(force) {
@@ -138,6 +151,12 @@ function mount(host) {
           if (parsedNow && parsedNow.rows) { await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
         } catch (e) { console.warn('[nakup-report] pohyby (skip):', e.message); }
       }
+      if (loadBilance().length === 0) {
+        try {
+          let parsedNow = null; try { parsedNow = JSON.parse(fs.readFileSync(OBJ_LIVE, 'utf8')); } catch (_) {}
+          if (parsedNow && parsedNow.rows) { await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
+        } catch (e) { console.warn('[nakup-report] bilance (skip):', e.message); }
+      }
       st.lastSyncDate = today; try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
       return { ok: true, skipped: true, file: newest.name, rows: st.lastRows };
     }
@@ -150,8 +169,8 @@ function mount(host) {
       let prev = null; try { prev = JSON.parse(fs.readFileSync(PREV_F, 'utf8')); } catch (_) {}
       if (prev && prev.rows && prev.date) { if (prev.date !== dataDate) applyMovement(prev.rows, prev.date, parsed.rows, dataDate); }
       else if (Object.keys(loadMoves()).length === 0) { await bootstrapMovements(xls, newest, parsed, dataDate); }
-      // denní bilance skladu (stav + pohyby vs předchozí den)
-      try { pushBilance(computeBilance(parsed.rows, dataDate, prev && prev.rows)); } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
+      // denní bilance skladu (stav + pohyby vs předchozí den); při prázdné historii bootstrap
+      try { if (loadBilance().length === 0) await bootstrapBilance(xls, newest, parsed, dataDate); else pushBilance(computeBilance(parsed.rows, dataDate, prev && prev.rows)); } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
       fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder, reserved: r.reserved })) }));
     } catch (e) { console.warn('[nakup-report] pohyby:', e.message); }
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));

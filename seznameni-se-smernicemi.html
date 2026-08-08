@@ -1393,7 +1393,7 @@ const MUJ_MODS = [
   { key:"eshop", icon:MUJ_IC.cart, label:"E-shop", gated:true },
   { key:"doprava", icon:MUJ_IC.truck, label:"Doprava", gated:true },
   { key:"loznyplan", icon:MUJ_IC.truck, label:"Ložný plán", gated:true },
-  { key:"konstrukce", icon:MUJ_IC.gear, label:"Konstrukce", gated:true },
+  { key:"konstrukce", icon:MUJ_IC.gear, label:"Zadání do výroby – konstrukce", gated:true },
   { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
   { grp:"Kalkulačky" },
   { key:"kalkulace", icon:MUJ_IC.calc, label:"Kalkulace-lisy", gated:true },
@@ -1407,7 +1407,7 @@ const MUJ_MODS = [
   { key:"poptavky", icon:MUJ_IC.ticket, label:"Poptávky", gated:true },
   { key:"obchod", icon:MUJ_IC.users, label:"Rozdělení obchodníků", gated:true },
   { key:"reklamace", icon:MUJ_IC.shield, label:"Reklamace", gated:true },
-  { key:"zadanikonstrukce", icon:MUJ_IC.file, label:"Zadání do konstrukce", gated:true },
+  { key:"zadanikonstrukce", icon:MUJ_IC.file, label:"Nabídka – konstrukce", gated:true },
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
@@ -2611,7 +2611,7 @@ async function showKonstrukce(){
   MUJ.view="konstrukce"; renderSidebar();
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("konstrukce")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
-  body.innerHTML='<iframe src="/konstrukce" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f6f2" title="Konstrukce — workflow zadání a schválení výkresů"></iframe>';
+  body.innerHTML='<iframe src="/konstrukce" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f6f2" title="Zadání do výroby – konstrukce (objednávky: výběr závodu a výrobní dokumentace)"></iframe>';
   window.scrollTo(0,0);
 }
 async function showReklamace(){
@@ -2632,7 +2632,7 @@ function showZadaniKonstrukce(){
   MUJ.view="zadanikonstrukce"; renderSidebar();
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("obchod")<0 && (MUJ.modules||[]).indexOf("konstrukce")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K zadávání do konstrukce nemáte přístup.</div>'; return; }
-  body.innerHTML='<iframe src="/konstrukce#zadani" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f6f2" title="Zadání zakázky do konstrukce"></iframe>';
+  body.innerHTML='<iframe src="/konstrukce#zadani" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f4f6f2" title="Nabídka – konstrukce (poptávka → obchodní výkres → potvrzení klienta)"></iframe>';
   window.scrollTo(0,0);
 }
 async function showFreelo(){
@@ -3440,6 +3440,9 @@ function showDashboard(){
       '<div class="metric"><b>'+(MUJ.admin?'vše':nMod)+'</b><span>moduly</span></div>'+
       '<div class="metric"><b>'+totalTodo+'</b><span>k vyřízení</span></div>'+
     '</div></div></section>';
+  if(MUJ.admin || (MUJ.modules||[]).indexOf("eshop")>=0){
+    sideH += '<section class="webpart" id="bilanceWidget" style="cursor:pointer" onclick="mjGo(\'eshop\')" title="Otevřít e-shop"><div class="webpart-head"><h3>Sklad e-shop — bilance</h3><span class="pill green">živě</span></div><div class="webpart-body"><p class="muted" style="margin:0">Načítám…</p></div></section>';
+  }
   sideH += '<section class="spotlight" id="prodSpot"><span class="pill green sp-tag">Nové produkty</span><div class="sp-cap"><h4>Výroba ELKOPLAST</h4><p>Fotky produktů z Disku.</p></div></section>';
 
   h += '<div class="hub-grid"><div class="hub-main">'+mainH+'</div><aside class="hub-side">'+sideH+'</aside></div>';
@@ -3448,6 +3451,27 @@ function showDashboard(){
   window.scrollTo(0,0);
   loadAktuality();
   loadProdukty();
+  loadBilanceWidget();
+}
+// ---------- Bilance skladu e-shop (home widget, jen pro přístup k modulu eshop) ----------
+function bilKc(n){ n=+n||0; const a=Math.abs(n); if(a>=1e6) return (Math.round(n/1e5)/10).toLocaleString('cs-CZ')+' mil.'; if(a>=1e3) return Math.round(n/1e3).toLocaleString('cs-CZ')+' tis.'; return Math.round(n).toLocaleString('cs-CZ'); }
+function bilKs(n){ return Math.round(+n||0).toLocaleString('cs-CZ'); }
+async function loadBilanceWidget(){
+  const el=document.getElementById('bilanceWidget'); if(!el) return; const body=el.querySelector('.webpart-body');
+  try{
+    const d=await (await fetch('/api/nakup-report/bilance',{cache:'no-store'})).json();
+    const L=d&&d.latest; if(!L){ body.innerHTML='<p class="muted" style="margin:0">Zatím bez dat — bilance se plní z ranních reportů skladu.</p>'; return; }
+    const f=L.flow||{};
+    let h='<div class="metric-grid">'+
+      '<div class="metric"><b>'+bilKc(L.stock.kc)+'</b><span>sklad · '+bilKs(L.stock.ks)+' ks</span></div>'+
+      '<div class="metric"><b>'+bilKc(L.onOrder.kc)+'</b><span>objednáno · '+bilKs(L.onOrder.ks)+' ks</span></div>'+
+      '<div class="metric"><b>'+bilKc(L.reserved.kc)+'</b><span>rezervováno · '+bilKs(L.reserved.ks)+' ks</span></div>'+
+      '<div class="metric"><b>'+bilKc(L.dispo.kc)+'</b><span>dispo · '+bilKs(L.dispo.ks)+' ks</span></div>'+
+    '</div>';
+    if(L.hasFlow){ h+='<p class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.5">Pohyb za den: výdej <b>'+bilKs(f.dispatched.ks)+' ks</b> / '+bilKc(f.dispatched.kc)+' Kč · nové rezervace '+bilKs(f.newReserved.ks)+' ks · příjem '+bilKs(f.received.ks)+' ks · nově objednáno '+bilKs(f.newOnOrder.ks)+' ks</p>'; }
+    body.innerHTML=h;
+    if(L.date){ const p=el.querySelector('.webpart-head .pill'); if(p) p.textContent=L.date.split('-').reverse().join('.'); }
+  }catch(e){ body.innerHTML='<p class="muted" style="margin:0">Bilanci se nepodařilo načíst.</p>'; }
 }
 
 // ---------- Fotka týdne: fotky nových produktů z Google Disku ----------

@@ -416,13 +416,17 @@ function reloadData(){
     if(!o.ok){document.getElementById('main').innerHTML='<div class="empty">'+esc(o.j.chyba||'Chyba načtení.')+'</div>';return}
     D=o.j; ME=o.j.me;
     document.getElementById('rolech').textContent=roleLabel(ME.role);
-    document.getElementById('newBtn').style.display=canCreate()?'':'none';
+    document.querySelector('h1').textContent=(MODE==='nabidka'?'Nabídka – konstrukce':'Zadání do výroby – konstrukce');
+    var nbtn=document.getElementById('newBtn');
+    nbtn.textContent=(MODE==='nabidka'?'+ Nová nabídka':'+ Nová zakázka');
+    // nové zakázky vznikají vždy jako nabídka; v režimu „zadání do výroby" se nezakládají ručně
+    nbtn.style.display=(canCreate()&&MODE==='nabidka')?'':'none';
     var nb=document.getElementById('nbadge');
     if(D.notifUnread){nb.style.display='';nb.textContent=D.notifUnread}else nb.style.display='none';
     renderSide(); renderMain();
     if(SEL){var z=D.zakazky.find(function(x){return x.id===SEL});if(z)renderDrawer(z);}
-    // vstup z Obchodu: /konstrukce#zadani otevře rovnou nové zadání (jeden tok)
-    if(!ZADANI_OPENED && /(^|[#&])zadani/.test(location.hash) && canCreate()){ZADANI_OPENED=true;openNew();}
+    // vstup z Obchodu: /konstrukce#zadani&new otevře rovnou novou nabídku (jeden tok)
+    if(!ZADANI_OPENED && /(^|[#&])new\b/.test(location.hash) && canCreate() && MODE==='nabidka'){ZADANI_OPENED=true;openNew();}
   });
 }
 var ZADANI_OPENED=false;
@@ -514,7 +518,7 @@ function renderMain(){
   list.forEach(function(z){h+=zkCard(z)});
   m.innerHTML=h;
 }
-var KDE={novy:'u konstrukce',prace:'u konstrukce',kontrola:'u konstrukce',revize:'u konstrukce',podklady:'u obchodníka',obchodnik:'u obchodníka',klient:'u klienta',schvaleno:'u obchodníka',vyroba:'ve výrobě',stredisko:'ve výrobě'};
+var KDE={prideleni:'u šéfa konstrukce',prace:'u konstrukce',kontrola:'u konstrukce',revize:'u konstrukce',podklady:'u obchodníka',obchodnik:'u obchodníka',klient:'u klienta',zavod:'u výkonného ředitele',schvaleno:'u konstrukce',vyroba:'ve výrobě',stredisko:'ve výrobě'};
 function zkTimeline(z){
   var now=Date.now(), DAY=86400000, d=function(ms){return Math.max(0,Math.round(ms/DAY));};
   if(z.deadline && !isTerminal(z.stav) && now>z.deadline){
@@ -549,7 +553,7 @@ function zkCard(z){
   var right=(z.deadline&&!isTerminal(z.stav)&&z.stav!=='schvaleno')?('<span class="muted" style="font-size:12.5px">termín '+fdate(z.deadline)+'</span>'):'';
   return '<div class="card zk" onclick="openDrawer(\''+z.id+'\')">'+
     '<div class="row" style="justify-content:space-between">'+
-      '<div class="row"><span class="dot '+z.semafor+'"></span><div><div class="t">'+esc(z.cislo)+' · '+esc(z.zakaznik)+'</div>'+
+      '<div class="row"><span class="dot '+z.semafor+'"></span><div><div class="t">'+esc(z.cisloZobraz||z.cislo)+' · '+esc(z.zakaznik)+'</div>'+
       '<div class="sub">'+esc(z.typName)+' · v'+(z.versionCount||0)+(z.assignedName?(' · '+esc(z.assignedName)):'')+'</div></div></div>'+
       '<div style="text-align:right"><span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span><div class="sub" style="margin-top:4px">'+esc(z.responsibleName||'—')+' '+right+'</div></div>'+
     '</div>'+zkTimeline(z)+'</div>';
@@ -623,7 +627,7 @@ function renderDash(m){
   if(!shown.length)h+='<div class="empty">Žádné zakázky v tomto filtru.</div>';
   else h+=shown.map(function(x){ var pi=problemInfo(x); var cc=pi?pi.cls:'';
     return '<div class="ot-item'+(cc?' '+cc:'')+'" onclick="openDrawer(\''+x.id+'\')">'+
-      '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span><b>'+esc(x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span></div>'+
+      '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span><b>'+esc(x.cisloZobraz||x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span></div>'+
       (pi?'<div class="ot-prob '+pi.cls+'">'+pi.text+'</div>':'')+
       orderTrack(x)+'</div>';}).join('');
   h+='<div class="kpi">'+
@@ -1280,7 +1284,7 @@ function renderDrawer(z){
   comments+='<div class="field"><textarea id="cmtx" rows="2" placeholder="Přidat interní komentář…"></textarea><div class="actions"><button class="btn ghost sm" onclick="addComment(\''+z.id+'\')">Přidat komentář</button></div></div>';
   var audit='<div class="sec">Auditní log</div><div class="tl">'+((z.audit||[]).slice().reverse().map(function(a){return '<div class="it"><div>'+esc(a.action)+(a.note?(' — '+esc(a.note)):'')+'</div><div class="m">'+esc(a.by)+' · '+fdt(a.at)+'</div></div>'}).join('')||'<span class="muted">—</span>')+'</div>';
 
-  d.innerHTML='<div class="dhead"><div><div class="row"><span class="dot '+z.semafor+'"></span><h2 style="margin:0;font-size:18px">'+esc(z.cislo)+'</h2><span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span></div>'+
+  d.innerHTML='<div class="dhead"><div><div class="row"><span class="dot '+z.semafor+'"></span><h2 style="margin:0;font-size:18px">'+esc(z.cisloZobraz||z.cislo)+'</h2>'+(z.rezim==='objednavka'?'<span class="ot-faze obj">OBJEDNÁVKA</span><span class="muted" style="font-size:12.5px">z nabídky '+esc(z.cislo)+'</span>':'<span class="ot-faze nab">NABÍDKA</span>')+'<span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span></div>'+
       '<div class="muted" style="margin-top:3px">'+esc(z.zakaznik)+' · '+esc(z.typName)+'</div></div><button class="x" onclick="closeDrawer()">×</button></div>'+
     '<div class="dbody">'+
       orderTrack(z)+
@@ -1306,9 +1310,9 @@ function renderDrawer(z){
     '</div>';
 }
 function stepDays(z){
-  var order=['novy','prideleni','prace','kontrola','obchodnik','klient','schvaleno','dokonceno'];
-  var starts={novy:z.createdAt};
-  var map=[['Rozděleno do závodu','prideleni'],['Přidělení','prace'],['Zkreslení hotovo','kontrola'],['Interní kontrola OK','obchodnik'],['Odesláno klientovi','klient'],['Klient schválil','schvaleno']];
+  var order=['prideleni','prace','kontrola','obchodnik','klient','zavod','schvaleno','dokonceno'];
+  var starts={prideleni:z.createdAt};
+  var map=[['Přidělení','prace'],['Zkreslení hotovo','kontrola'],['Interní kontrola OK','obchodnik'],['Odesláno klientovi','klient'],['objednávka','zavod'],['závod','schvaleno']];
   (z.audit||[]).forEach(function(a){
     var ac=a.action||'';
     map.forEach(function(m){if(ac.indexOf(m[0])>=0)starts[m[1]]=a.at});
@@ -1904,7 +1908,7 @@ function openNew(state){
   var m=document.getElementById('modal');
   m.innerHTML='<div class="sheet dqmodal">'+
     '<div class="dqhead">'+
-      '<div class="row" style="justify-content:space-between;align-items:center;gap:12px"><h3 style="margin:0;font-size:17px">'+esc(tr('Nové zadání zakázky do konstrukce'))+'</h3><div class="langbar">'+langs+'</div></div>'+
+      '<div class="row" style="justify-content:space-between;align-items:center;gap:12px"><h3 style="margin:0;font-size:17px">'+esc(tr('Nová nabídka — zadání do konstrukce'))+'</h3><div class="langbar">'+langs+'</div></div>'+
       '<div class="ssobar" style="margin:10px 0 0"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>'+esc(tr('Zadává'))+': <b>'+esc((ME&&(ME.name||ME.email))||'—')+'</b> · '+new Date().toLocaleDateString('cs-CZ')+' <span class="muted">('+esc(tr('automaticky z přihlášení (SSO)'))+')</span></span></div>'+
     '</div>'+
     '<div class="dqbody">'+
