@@ -488,7 +488,16 @@ function mount(host) {
     catch (e) { console.error('[smlouvy] týdenní upomínka chyba:', e.message); }
   }
 
-  return { handle, tick, _models: M, _dashboardData: dashboardData, _tydenniUpominka: tydenniUpominka };
+  // Descriptor pro centrální přehled rozesílek (správce → „Rozesílky").
+  function reports() {
+    let last = null; try { const v = M.meta.get('weekly_reminder_last'); if (v) last = new Date(v).getTime(); } catch (_) {}
+    const to = [notifyTo()].filter(Boolean).concat(notifyCc() ? [notifyCc() + ' (kopie)'] : []);
+    return [
+      { key: 'smlouvy-nezaevidovane', module: 'Smlouvy', name: 'Týdenní upozornění na nezaevidované smlouvy z Disku', to, enabled: !!notifyTo(), schedule: 'týdně (jen když něco čeká)', lastAt: last, preview: null, configHint: 'Smlouvy → panel „Nové z Disku"' },
+      { key: 'smlouvy-terminy', module: 'Smlouvy', name: 'Hlídání termínů smluv (výpovědi, expirace — upozornění garantům)', to: ['garanti smluv dle evidence'], enabled: true, schedule: 'průběžně (kontrola každých 6 h)', lastAt: null, preview: null, configHint: 'termíny u jednotlivých smluv' },
+    ];
+  }
+  return { handle, tick, reports, _models: M, _dashboardData: dashboardData, _tydenniUpominka: tydenniUpominka };
 }
 
 function engineEsc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }

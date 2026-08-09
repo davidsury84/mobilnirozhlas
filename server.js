@@ -548,7 +548,28 @@ function resendSend(mail) {
   });
 }
 // jednotné odeslání: když je nastavený RESEND_API_KEY → Resend, jinak SMTP
-function deliver(mail) { return process.env.RESEND_API_KEY ? resendSend(mail) : smtpSend(CFG, mail); }
+// Centrální EVIDENCE všech odeslaných e-mailů — každý mail z libovolného modulu projde tudy
+// a zapíše se do DATA_DIR/mail-log.json (Rozesílky → Historie odeslaných e-mailů).
+function mailLogAppend(entry) {
+  try {
+    const f = path.join(DATA_DIR, 'mail-log.json');
+    let l = []; try { l = JSON.parse(fs.readFileSync(f, 'utf8')) || []; } catch (_) {}
+    l.push(entry);
+    if (l.length > 800) l = l.slice(-800);
+    fs.writeFileSync(f, JSON.stringify(l));
+  } catch (_) {}
+}
+function mailLogRead(n) {
+  try { const l = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'mail-log.json'), 'utf8')) || []; return l.slice(-(n || 200)).reverse(); } catch (_) { return []; }
+}
+function deliver(mail) {
+  const zaznam = { ts: Date.now(), to: String((mail && mail.to) || ''), subject: String((mail && mail.subject) || '').slice(0, 200), from: String((mail && (mail.fromName || mail.fromAddr)) || '').slice(0, 100) };
+  const p = process.env.RESEND_API_KEY ? resendSend(mail) : smtpSend(CFG, mail);
+  return Promise.resolve(p).then(
+    (r) => { mailLogAppend(Object.assign({ ok: true }, zaznam)); return r; },
+    (e) => { mailLogAppend(Object.assign({ ok: false, chyba: String((e && e.message) || e).slice(0, 200) }, zaznam)); throw e; }
+  );
+}
 
 /* ============================================================
    stav (směrnice/zaměstnanci) + potvrzení
@@ -2254,8 +2275,14 @@ const server = http.createServer(async (req, res) => {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
       const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod];
       let out = [];
+      // Jádro intranetu: měsíční vyhodnocení seznámení se směrnicemi.
+      try {
+        const st = readJson(REPORT_F, {});
+        out.push({ key: 'smernice-mesicni', module: 'Směrnice', name: 'Měsíční vyhodnocení seznámení se směrnicemi', to: [reportRecipient()], enabled: reportEnabled() && emailConfigured(), schedule: 'měsíčně (' + reportDay() + '. den)', lastAt: st.lastSentAt || null, preview: null, configHint: 'env REPORT_EMAIL / REPORT_DAY / REPORT_ENABLED' });
+      } catch (_) {}
       for (const m of mods) { if (m && typeof m.reports === 'function') { try { const rs = m.reports() || []; rs.forEach(r => out.push(r)); } catch (_) {} } }
-      return send(res, 200, { reports: out });
+      // Historie VŠECH odeslaných e-mailů (i jednorázových notifikací) — centrální evidence z deliver().
+      return send(res, 200, { reports: out, maily: mailLogRead(200) });
     }
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;

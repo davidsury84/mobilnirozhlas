@@ -4005,10 +4005,9 @@ const ACT_META={
 async function renderRozesilky(){
   const box=document.getElementById("rozesilkyBox");
   box.innerHTML='<p class="muted">Načítám…</p>';
-  let reports=[];
-  try{ const r=await fetch("/api/admin/reports",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } if(r.status===403){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Jen pro správce.</p></div>'; return; } reports=(await r.json()).reports||[]; }
+  let reports=[], maily=[];
+  try{ const r=await fetch("/api/admin/reports",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } if(r.status===403){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Jen pro správce.</p></div>'; return; } const j=await r.json(); reports=j.reports||[]; maily=j.maily||[]; }
   catch(e){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nepodařilo se načíst rozesílky.</p></div>'; return; }
-  if(!reports.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné registrované rozesílky.</p></div>'; return; }
   const on=reports.filter(r=>r.enabled).length;
   let h='<div class="card pad" style="margin-bottom:14px"><b>'+reports.length+'</b> automatických reportů · <b style="color:#0a7d33">'+on+'</b> zapnuto · <b>'+(reports.length-on)+'</b> vypnuto</div>';
   h+='<div class="card" style="overflow:auto"><table class="matrix" style="width:100%"><thead><tr>'+
@@ -4022,6 +4021,18 @@ async function renderRozesilky(){
       '<td style="font-size:12.5px">'+toStr+'</td><td>'+esc(r.schedule||'')+'</td><td style="text-align:center">'+stav+'</td><td class="muted" style="font-size:12px">'+esc(last)+'</td><td>'+prev+'</td></tr>';
   });
   h+='</tbody></table></div>';
+  // Historie VŠECH odeslaných e-mailů — centrální evidence (reporty i jednorázové notifikace všech modulů).
+  h+='<div class="dash-sec" style="margin-top:22px">Historie odeslaných e-mailů (posledních '+maily.length+')</div>';
+  if(!maily.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné odeslané e-maily. Každý e-mail odeslaný intranetem (reporty, notifikace, pozvánky…) se od teď eviduje zde.</p></div>'; }
+  else{
+    h+='<div class="card" style="overflow:auto;max-height:480px"><table class="matrix" style="width:100%"><thead><tr><th style="min-width:140px">Kdy</th><th>Komu</th><th>Předmět</th><th style="text-align:center">Stav</th></tr></thead><tbody>';
+    maily.forEach(m=>{
+      h+='<tr><td style="white-space:nowrap;font-size:12.5px">'+new Date(m.ts).toLocaleString('cs-CZ')+'</td>'+
+        '<td style="font-size:12.5px">'+esc(m.to||'')+'</td><td style="font-size:12.5px">'+esc(m.subject||'')+(m.from?'<br><span class="muted" style="font-size:11px">od: '+esc(m.from)+'</span>':'')+'</td>'+
+        '<td style="text-align:center">'+(m.ok?'<span class="pill green">✓</span>':'<span class="pill" style="background:#fbecea;color:#b3261e" title="'+esc(m.chyba||'')+'">✕ chyba</span>')+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
   box.innerHTML=h;
 }
 async function renderActivity(){

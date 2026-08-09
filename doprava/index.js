@@ -651,7 +651,12 @@ function mount(host) {
     try { await cenikEmail(); } catch (e) { console.error('[doprava] ceník e-mail chyba:', e.message); }
   }
 
-  return { handle, tick };
+  // Descriptor pro centrální přehled rozesílek (správce → „Rozesílky").
+  function reports() {
+    const c = cenikCfg(); const st = cenikStav();
+    return [{ key: 'doprava-cenik', module: 'Doprava', name: 'Denní e-mail s ceníkem dopravy', to: c.prijemci || [], enabled: !!c.zapnuto, schedule: 'denně v ' + c.hodina + ':00', lastAt: st.at || null, preview: null, configHint: 'Doprava → Denní e-mail s ceníkem — správa rozesílky' }];
+  }
+  return { handle, tick, reports };
 }
 
 module.exports = { mount, parseZakazky, cilZTrasy };

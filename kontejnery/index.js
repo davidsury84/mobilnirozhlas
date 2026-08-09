@@ -785,7 +785,13 @@ function mount(host) {
     } catch (_) {}
   })();
 
-  return { handle, isHandler, syncSheet, tick };
+  // Descriptor pro centrální přehled rozesílek (správce → „Rozesílky").
+  function reports() {
+    const db = load(); const rep = (db.config && db.config.report) || {};
+    const dny = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
+    return [{ key: 'kontejnery-tydenni', module: 'Lodní kontejnery', name: 'Týdenní report poptávek (odeslané nabídky + nevyřízené)', to: (rep.to || []).map(r => r.email || r), enabled: !!rep.enabled, schedule: 'týdně (' + (dny[rep.weekday] || 'pondělí') + ')', lastAt: rep.lastAt ? Date.parse(rep.lastAt) : null, preview: null, configHint: 'config.report v data/kontejnery-poptavky.json' }];
+  }
+  return { handle, isHandler, syncSheet, tick, reports };
 }
 
 module.exports = { mount };

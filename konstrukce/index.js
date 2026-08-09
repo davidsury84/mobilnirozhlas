@@ -2073,7 +2073,12 @@ function mount(host) {
     if (send) { const rec = (d.settings && d.settings.reportRecipients) || []; for (const em of rec) await mail(em, 'Týdenní přehled konstrukce', text); json(res, 200, { ok: true, sent: rec.length, recipients: rec, text }); return true; }
     json(res, 200, { ok: true, text }); return true;
   }
-  return { handle, tick };
+  // Descriptor pro centrální přehled rozesílek (správce → „Rozesílky").
+  function reports() {
+    const d = load(); const cfg = (d.settings && d.settings.notif) || DEFAULT_NOTIF || {};
+    return [{ key: 'konstrukce-eskalace', module: 'Konstrukce', name: 'Eskalace a připomínky zakázek (klient nereaguje, po termínu)', to: ['obchodník / konstruktér / klient dle zakázky'], enabled: true, schedule: 'kontrola každých 6 h (připomínky po ' + (cfg.clientRemind1 || 5) + ' a ' + (cfg.clientRemind2 || 10) + ' prac. dnech)', lastAt: null, preview: null, configHint: 'Konstrukce → SET-UP → notifikace' }];
+  }
+  return { handle, tick, reports };
 }
 
 // Veřejná stránka náhledu (samostatná, bez závislostí na intranetu).
