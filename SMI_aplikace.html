@@ -2014,13 +2014,38 @@ function objDraw(){
 const OBJXC={id:'FFEEF1F4',sklad:'FFE6F0E9',ceny:'FFF5EFE4',objrez:'FFECEFF5',prodej:'FFF1ECF6',dopor:'FFE5EFF9',hdr:'FFF2F5F2',over:'FFF7DEDE',order:'FFFBF0D6',chip:'FFFFE9B3',chipOver:'FFF5C6C6',sup:'FFE4EBF0',red:'FFC0392B',green:'FF0A7D33'};
 const objFill=argb=>({type:'pattern',pattern:'solid',fgColor:{argb:argb}});
 // Zapíše barevný řádek skupin (row1) + tučnou hlavičku (row2), zmrazí je. Vrací číslo prvního datového řádku.
+// Obarvuje VŠECHNY buňky skupiny (ne jen řídicí), aby barva/hlavička byla kompletní v každém prohlížeči.
 function objXlsxHeader(ws,widths,groups,names){
   ws.columns=widths.map(w=>({width:w}));
   let c=1;
-  groups.forEach(g=>{const start=c,end=c+g.n-1; if(end>start)ws.mergeCells(1,start,1,end); const cell=ws.getCell(1,start); cell.value=g.label; cell.alignment={horizontal:'center'}; cell.font={bold:true,size:10,color:{argb:'FF4A544C'}}; cell.fill=objFill(g.color); c=end+1;});
-  names.forEach((nm,i)=>{const cell=ws.getCell(2,i+1); cell.value=nm; cell.font={bold:true}; cell.fill=objFill(OBJXC.hdr);});
+  groups.forEach(g=>{const start=c,end=c+g.n-1;
+    for(let cc=start;cc<=end;cc++){const cell=ws.getCell(1,cc);cell.fill=objFill(g.color);cell.font={bold:true,size:10,color:{argb:'FF37413A'}};cell.border={bottom:{style:'thin',color:{argb:'FFFFFFFF'}}};}
+    if(end>start)ws.mergeCells(1,start,1,end);
+    const m=ws.getCell(1,start);m.value=g.label;m.alignment={horizontal:'center',vertical:'middle'};
+    c=end+1;});
+  names.forEach((nm,i)=>{const cell=ws.getCell(2,i+1);cell.value=nm;cell.font={bold:true};cell.fill=objFill(OBJXC.hdr);cell.alignment={vertical:'middle'};cell.border={bottom:{style:'medium',color:{argb:'FFB8C2B8'}}};});
   ws.views=[{state:'frozen',ySplit:2}];
+  ws.getRow(1).height=18; ws.getRow(2).height=26;
   return 3;
+}
+const XLC='ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // číslo sloupce → písmeno (1→A)
+const objCol=n=>{let s='';while(n>0){const m=(n-1)%26;s=XLC[m]+s;n=(n-m-1)/26;}return s;};
+// Aplikuje formát čísel na datový řádek dle mapy {sloupec:formát}.
+function objApplyFmt(r,fmtMap){for(const k in fmtMap){const c=r.getCell(+k);if(c.value!==''&&c.value!=null)c.numFmt=fmtMap[k];}}
+// Podmíněné formátování klíčových atributů (dynamické v Excelu). cols = čísla sloupců.
+function objAddCondFmt(ws,first,last,cols){
+  if(last<first)return; cols=cols||{dispo:8,order:17,cover:21,value:22};
+  const R=c=>objCol(c)+first+':'+objCol(c)+last;
+  try{
+    // K dispo < 0 → oversold (červené pozadí + tučně)
+    ws.addConditionalFormatting({ref:R(cols.dispo),rules:[{type:'cellIs',operator:'lessThan',formulae:['0'],priority:1,style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFF7C9C4'}},font:{color:{argb:'FFB3261E'},bold:true}}}]});
+    // Objednat > 0 → barevná škála dle velikosti (bílá → jantarová)
+    ws.addConditionalFormatting({ref:R(cols.order),rules:[{type:'colorScale',priority:2,cfvo:[{type:'num',value:0},{type:'max'}],color:[{argb:'FFFFFFFF'},{argb:'FFEFA94A'}]}]});
+    // Krytí po obj. > 24 měs → extrémní (červené tučně)
+    ws.addConditionalFormatting({ref:R(cols.cover),rules:[{type:'cellIs',operator:'greaterThan',formulae:['24'],priority:3,style:{font:{color:{argb:'FFB3261E'},bold:true}}}]});
+    // Hodnota → barevná škála (bílá → zelená)
+    ws.addConditionalFormatting({ref:R(cols.value),rules:[{type:'colorScale',priority:4,cfvo:[{type:'min'},{type:'max'}],color:[{argb:'FFFFFFFF'},{argb:'FF9ED0A8'}]}]});
+  }catch(e){}
 }
 const objFillRow=(r,n,argb)=>{for(let i=1;i<=n;i++)r.getCell(i).fill=objFill(argb);};
 function objXlsxHead1(ws,xSplit){ws.getRow(1).eachCell(c=>{c.font={bold:true};c.fill=objFill(OBJXC.hdr);});ws.views=[{state:'frozen',ySplit:1,xSplit:xSplit||0}];}
@@ -2032,15 +2057,16 @@ async function objExport(supFilter){
     const names=['SK','Registrační číslo','Název 1','Název (dodavatel)','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','Spotřeba/den','Sezónnost (špička)','Objednat','Krytí po obj. (měs.)','Hodnota (Kč)'];
     const widths=[8,14,38,22,13,10,13,14,12,11,12,12,12,12,16,11,16,12];
     const groups=[{n:5,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:3,label:'Prodej & sezóna',color:OBJXC.prodej},{n:3,label:'Doporučení nákupu',color:OBJXC.dopor}];
-    const N=names.length; objXlsxHeader(ws,widths,groups,names);
+    const N=names.length, first=objXlsxHeader(ws,widths,groups,names);
+    const FMT={6:'#,##0',7:'#,##0',8:'#,##0.00',9:'#,##0.00',10:'#,##0',11:'#,##0',12:'#,##0',13:'#,##0',14:'#,##0.00',16:'#,##0',17:'0.0',18:'#,##0 "Kč"'};
     const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>(x._o.rec>0||(x.avail||0)<0)&&(!supFilter||x.skupina===supFilter)).sort((a,b)=>String(a.skupina).localeCompare(String(b.skupina),'cs')||b._o.value-a._o.value);
     if(supFilter&&!rows.length){if(typeof toast==='function')toast('U dodavatele '+supFilter+' není teď nic k objednání.');return;}
     rows.forEach(x=>{const o=x._o,crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
       const r=ws.addRow([x.sk,x.reg,x.nazev,x.skupina,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),o.rec,(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value)]);
       if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
       if(o.rec>0){const oc=r.getCell(16);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
-      const cc=r.getCell(17); if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24)cc.font={bold:true,color:{argb:OBJXC.red}}; else if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8)cc.font={color:{argb:OBJXC.green}};
-      r.getCell(18).font={bold:true}; r.getCell(2).numFmt='@';});
+      r.getCell(18).font={bold:true}; objApplyFmt(r,FMT); r.getCell(2).numFmt='@';});
+    objAddCondFmt(ws,first,ws.rowCount,{dispo:7,order:16,cover:17,value:18});
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download=supFilter?('objednavka-'+objSafeName(supFilter)+'.xlsx'):'objednaci-seznam.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast((supFilter?('Objednávka '+supFilter):'Objednací seznam')+' vyexportován ('+rows.length+' položek)');
   }catch(e){alert('Export selhal: '+e.message);}
@@ -2109,7 +2135,9 @@ async function objExportAll(){
     const names=['Identifikátor (SK-reg)','SK','Registrační číslo','Dodavatel (skupina)','Název 1','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','Spotřeba/den','Sezónnost (špička)','Objednat','Ekon. dávka (EOQ)','Obj. interval (měs.)','Doprava (Kč/obj.)','Krytí po obj. (měs.)','Hodnota (Kč)','Stav'];
     const widths=[18,8,16,24,40,16,10,13,14,12,11,12,12,12,12,16,11,14,15,14,16,12,22];
     const groups=[{n:6,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:3,label:'Prodej & sezóna',color:OBJXC.prodej},{n:7,label:'Doporučení nákupu',color:OBJXC.dopor}];
-    const N=names.length; objXlsxHeader(ws,widths,groups,names);
+    const N=names.length, first=objXlsxHeader(ws,widths,groups,names);
+    // formát čísel per sloupec (skladové/ks celá, ceny 2 des., interval/krytí 1 des., hodnota Kč)
+    const FMT={7:'#,##0',8:'#,##0',9:'#,##0.00',10:'#,##0.00',11:'#,##0',12:'#,##0',13:'#,##0',14:'#,##0',15:'#,##0.00',17:'#,##0',18:'#,##0',19:'0.0',20:'#,##0',21:'0.0',22:'#,##0 "Kč"'};
     const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).slice().sort((a,b)=>String(a.skupina||'').localeCompare(String(b.skupina||''),'cs')||String(a.sk+'-'+a.reg).localeCompare(String(b.sk+'-'+b.reg),'cs'));
     let curSup=null;
     rows.forEach(x=>{
@@ -2118,10 +2146,11 @@ async function objExportAll(){
       const r=ws.addRow([ident,x.sk,x.reg,x.skupina,x.nazev,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),(o.rec||0),(e.eoq||''),(e.interval!=null&&isFinite(e.interval)?Math.round(e.interval*10)/10:''),(e.S!=null?e.S:''),(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value||0),(o.status||'')]);
       if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
       if(o.rec>0){const oc=r.getCell(17);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
-      const cc=r.getCell(21); if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24)cc.font={bold:true,color:{argb:OBJXC.red}}; else if(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8)cc.font={color:{argb:OBJXC.green}};
       r.getCell(22).font={bold:true};
-      r.getCell(1).numFmt='@'; r.getCell(3).numFmt='@';
+      objApplyFmt(r,FMT); r.getCell(1).numFmt='@'; r.getCell(3).numFmt='@';
     });
+    const last=ws.rowCount;
+    objAddCondFmt(ws,first,last);
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='erp-tabulka-dle-dodavatelu.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast('Celá tabulka vyexportována ('+rows.length+' položek, '+new Set(rows.map(x=>x.skupina)).size+' dodavatelů)');
   }catch(e){alert('Export selhal: '+e.message);}
@@ -2180,16 +2209,16 @@ async function objExportPlan(){
     const agg=Array.from({length:12},()=>({items:0,ks:0,kc:0}));
     paired.forEach(x=>{const s=smap[String(x.sk)+'-'+String(x.reg)]; const p=objPlan(x,objRobust(s).robust,P,m0); const ident=String(x.sk)+'-'+String(x.reg);
       const rO=wO.addRow([ident,x.skupina,x.nazev,x.lead,x.avail].concat(p.rec.map(r=>r.order||'')));
-      rO.getCell(1).numFmt='@';
+      rO.getCell(1).numFmt='@'; for(let c=4;c<=17;c++){const cc=rO.getCell(c);if(cc.value!==''&&cc.value!=null)cc.numFmt='#,##0';}
       const rS=wS.addRow([ident,x.skupina,x.nazev,x.lead].concat(p.rec.map(r=>r.S)));
-      rS.getCell(1).numFmt='@';
+      rS.getCell(1).numFmt='@'; for(let c=4;c<=16;c++){const cc=rS.getCell(c);if(cc.value!==''&&cc.value!=null)cc.numFmt='#,##0';}
       p.rec.forEach((r,t)=>{if(r.order>0){const mi=(m0+t)%12;agg[mi].items++;agg[mi].ks+=r.order;agg[mi].kc+=r.value;}});});
     objXlsxHead1(wO,3); objXlsxHead1(wS,3);
     wO.getCell(1,6).fill=objFill(OBJXC.prodej); wS.getCell(1,5).fill=objFill(OBJXC.prodej); // aktuální měsíc
     // List 3: souhrnný rytmus
     const wR=wb.addWorksheet('Souhrn rytmu');
     wR.columns=[{header:'Měsíc',width:10},{header:'Položek k obj.',width:14},{header:'Kusů',width:10},{header:'Hodnota (Kč)',width:14}];
-    for(let t=0;t<12;t++){const mi=(m0+t)%12;const a=agg[mi];const rr=wR.addRow([OBJ_MN[mi],a.items,a.ks,Math.round(a.kc)]);if(t===0)objFillRow(rr,4,OBJXC.prodej);}
+    for(let t=0;t<12;t++){const mi=(m0+t)%12;const a=agg[mi];const rr=wR.addRow([OBJ_MN[mi],a.items,a.ks,Math.round(a.kc)]);rr.getCell(2).numFmt='#,##0';rr.getCell(3).numFmt='#,##0';rr.getCell(4).numFmt='#,##0 "Kč"';if(t===0)objFillRow(rr,4,OBJXC.prodej);}
     objXlsxHead1(wR,1);
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='mesicni-plan-objednavek.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast('Měsíční plán vyexportován ('+paired.length+' položek × 12 měsíců)');
