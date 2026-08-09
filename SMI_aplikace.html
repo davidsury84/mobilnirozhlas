@@ -669,6 +669,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         </div>
       </details>
       <div class="kpis" id="objKpis"></div>
+      <div style="background:#eef4fb;border:1px solid #d3e0f2;border-radius:12px;padding:12px 14px;margin:0 0 12px">
+        <div style="font-weight:700;margin-bottom:6px">🔎 Poradce podle kódu — kolik koupit</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="objAsk" placeholder="Zadej kód (SK-reg, reg. číslo nebo doplňkový kód), např. 313-72562" style="flex:1;min-width:260px;padding:9px 11px;font:inherit;border:1px solid #cdd4cc;border-radius:9px">
+          <button class="btn" type="button" id="objAskBtn">Poradit</button>
+        </div>
+        <div id="objAskResult" style="margin-top:10px"></div>
+      </div>
       <details class="settings" style="margin:6px 0 10px"><summary>🗓 Sezónní pattern — špičky produktů (z historie prodejů)</summary>
         <div id="objSeasonWrap" style="margin-top:8px;font-size:13px"></div>
       </details>
@@ -1955,6 +1963,47 @@ function objEOQ(x,sales,cyc){
   return {eoq,interval:c.T,lead,S:c.S,origin:c.origin||''};
 }
 function objIntTxt(m){ if(m==null||!isFinite(m))return '—'; if(m>=18)return (Math.round(m/12*10)/10).toString().replace('.',',')+' r'; return (Math.round(m*10)/10).toString().replace('.',',')+' m'; }
+// ---- Poradce podle kódu: zadej kód → kolik koupit + proč ----
+function objAskFind(q){
+  q=String(q||'').trim(); if(!q)return null;
+  const rows=(OBJ_DATA&&OBJ_DATA.rows)||[]; const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,'');
+  const qq=norm(q).replace(/[–—]/g,'-');
+  let hit=rows.find(x=>norm(x.sk+'-'+x.reg)===qq); if(hit)return hit;
+  const m=q.match(/(\d+)\D+(\d+)/); if(m){hit=rows.find(x=>String(x.sk)===m[1]&&String(x.reg)===m[2]); if(hit)return hit;}
+  const digits=q.replace(/\D/g,''); hit=rows.find(x=>String(x.reg)===q)||rows.find(x=>String(x.reg)===digits); if(hit)return hit;
+  hit=rows.find(x=>norm(x.dodKod)===qq); if(hit)return hit;
+  hit=rows.find(x=>norm(x.nazev+'|'+x.dodKod+'|'+x.sk+'-'+x.reg).indexOf(qq)>=0); return hit||null;
+}
+function objAskCard(x){
+  const o=x._o||{},s=x._s,e=x._e||{}; const rec=o.rec||0,crit=(x.avail||0)<0,st=o.status||'';
+  const col=rec>0?(crit?'#b3261e':'#b06f00'):'#2f7d32';
+  const big=rec>0?('Koupit '+fmt(rec)+' ks'):(crit?'Řešit — oversold':'Neobjednávat');
+  let why;
+  if(crit) why='Rezervace zákazníků ('+fmt(x.reserved)+' ks) přesahují sklad ('+fmt(x.stock)+' ks). '+(rec>0?('Objednávka pokrývá schodek '+(x.onOrder>0?('(z toho už objednáno '+fmt(x.onOrder)+' ks) '):'')+'a doplní zásobu na dodací lhůtu + 2 měsíce.'):('Schodek už kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba.'));
+  else if(/Náběh/.test(st)) why='Náběh sezóny '+(s?s.peak:'')+' — předzásobení na nadcházející špičku s předstihem o dodací lhůtu.';
+  else if(/Objednat/.test(st)) why='Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) klesla pod bod objednání. Doplnění na cílovou zásobu za dodací lhůtu + 2 měsíce (~'+fmt(o.windowDem)+' ks).';
+  else if(/Mimo sezónu/.test(st)) why='Teď se prakticky neprodává — objednávej až před sezónou, ne s ročním předstihem.';
+  else if(/Bez prodeje/.test(st)) why='Za poslední rok bez prodeje — neobjednávat.';
+  else why='Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) pokrývá poptávku za dodací lhůtu + 2 měsíce. Objednávat teď netřeba.';
+  const chip=(l,v)=>'<div style="background:#fff;border:1px solid #e0e6df;border-radius:8px;padding:6px 9px"><div style="font-size:11px;color:#8a938a">'+l+'</div><div style="font-weight:700">'+v+'</div></div>';
+  return '<div style="background:#fff;border:1px solid #dbe2d8;border-radius:12px;padding:14px 16px">'
+    +'<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">'
+    +'<div><div style="font-size:16px;font-weight:700">'+esc(x.nazev)+'</div><div class="muted" style="font-size:12.5px">'+esc(x.sk+'-'+x.reg)+(x.dodKod?(' · '+esc(x.dodKod)):'')+' · '+esc(x.skupina)+'</div></div>'
+    +'<div style="text-align:right"><div style="font-size:22px;font-weight:800;color:'+col+'">'+big+'</div>'+(rec>0?('<div class="muted" style="font-size:12.5px">hodnota '+fmt(o.value)+' Kč · krytí po obj. '+objCoverTxt(o.coverAfter)+'</div>'):'')+'</div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:7px;margin:12px 0">'
+    +chip('Sklad',fmt(x.stock)+' ks')+chip('K dispo',fmt(x.avail)+' ks')+chip('Objednáno',fmt(x.onOrder)+' ks')+chip('Rezervováno',fmt(x.reserved)+' ks')+chip('Dodací lhůta',fmt(x.lead)+' d')+chip('Roční prodej',fmt(o.D)+' ks')+chip('Sezónnost',(s?esc(s.tag):'—'))+chip('Spotřeba/den',objSpotTxt(x.recentDaily))
+    +'</div>'
+    +'<div style="background:#f5f8f3;border:1px solid #e2e9dc;border-radius:9px;padding:9px 12px;font-size:13.5px;line-height:1.55"><b>Proč:</b> '+why+'</div>'
+    +(e&&e.eoq?('<div class="muted" style="font-size:12px;margin-top:8px">Ekon. dávka (dodavatel '+esc(x.skupina)+'): ~'+fmt(e.eoq)+' ks · interval '+objIntTxt(e.interval)+'.</div>'):'')
+    +'</div>';
+}
+function objAsk(){
+  const q=($('#objAsk')&&$('#objAsk').value)||''; const box=$('#objAskResult'); if(!box)return;
+  if(!q.trim()){box.innerHTML='';return;}
+  const x=objAskFind(q);
+  if(!x){box.innerHTML='<div class="muted" style="padding:6px">Položku „'+esc(q)+'" jsem nenašel. Zkus SK-reg (313-72562), samotné reg. číslo, nebo doplňkový kód.</div>';return;}
+  box.innerHTML=objAskCard(x);
+}
 async function renderObjednavky(){
   if(!OBJ_DATA){
     try{const r=await fetch('/api/nakup-report/objednavky',{cache:'no-store'});OBJ_DATA=await r.json();}catch(e){OBJ_DATA={rows:[]};}
@@ -1974,7 +2023,7 @@ async function renderObjednavky(){
   (OBJ_DATA.rows||[]).forEach(x=>{const rb=robMap[String(x.sk)+'-'+String(x.reg)]||{raw:null,robust:null,outlier:null,sporadic:false};x._out=rb.outlier;x._sporadic=rb.sporadic;x._s=objSeason(rb.robust||rb.raw);x._o=objComputeOrder(x,rb.raw,P,m0,x._s,rb.robust||rb.raw);x._e=objEOQ(x,rb.robust||rb.raw,OBJ_CYCLES);});
   try{objRenderSeason();}catch(e){}
   try{objRenderPlan();}catch(e){}
-  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;}
+  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;const ab=$('#objAskBtn');if(ab)ab.onclick=objAsk;const ai=$('#objAsk');if(ai){ai.onkeydown=ev=>{if(ev.key==='Enter')objAsk();};ai.oninput=()=>{if(!ai.value.trim())$('#objAskResult').innerHTML='';};}}
   try{nkLoadReportCfg();}catch(e){}
   objDraw();
 }
