@@ -616,6 +616,7 @@ function mount(host) {
     const cfg = cenikCfg();
     if (!host.deliver) { if (force) throw new Error('Odesílání pošty není na serveru nakonfigurováno.'); return; }
     if (!cfg.zapnuto || !cfg.prijemci.length) { if (force) throw new Error('Rozesílka je vypnutá nebo nemá příjemce.'); return; }
+    if (!force && host.reportDisabled && host.reportDisabled('doprava-cenik')) return;   // zrušeno v přehledu Rozesílky
     const ted = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Prague' }));
     if (!force && ted.getHours() < cfg.hodina) return;                  // rozesílat až po nastavené hodině
     const dnes = ted.getFullYear() + '-' + String(ted.getMonth() + 1).padStart(2, '0') + '-' + String(ted.getDate()).padStart(2, '0');

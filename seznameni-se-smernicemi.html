@@ -4002,6 +4002,16 @@ const ACT_META={
   'survey':{i:'📊',l:'Vyplnil(a) průzkum'},
   'abroll':{i:'🎓',l:'Test ABROLL'}
 };
+async function rozesilkaToggle(key,vypnout){
+  if(vypnout && !confirm('Zrušit odesílání této rozesílky?\nPřestane se odesílat, dokud ji znovu neobnovíte (nastavení modulu zůstane zachováno).')) return;
+  try{
+    const r=await fetch('/api/admin/reports/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key,vypnout:!!vypnout})});
+    const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Uložení selhalo.'); return; }
+    toast(vypnout?'Odesílání zrušeno':'Odesílání obnoveno');
+    renderRozesilky();
+  }catch(e){ toast('Uložení selhalo: '+e.message); }
+}
 async function renderRozesilky(){
   const box=document.getElementById("rozesilkyBox");
   box.innerHTML='<p class="muted">Načítám…</p>';
@@ -4011,14 +4021,17 @@ async function renderRozesilky(){
   const on=reports.filter(r=>r.enabled).length;
   let h='<div class="card pad" style="margin-bottom:14px"><b>'+reports.length+'</b> automatických reportů · <b style="color:#0a7d33">'+on+'</b> zapnuto · <b>'+(reports.length-on)+'</b> vypnuto</div>';
   h+='<div class="card" style="overflow:auto"><table class="matrix" style="width:100%"><thead><tr>'+
-    '<th>Modul</th><th>Report</th><th>Příjemci</th><th>Frekvence</th><th style="text-align:center">Stav</th><th>Naposledy</th><th>Náhled</th></tr></thead><tbody>';
+    '<th>Modul</th><th>Report</th><th>Příjemci</th><th>Frekvence</th><th style="text-align:center">Stav</th><th>Naposledy</th><th>Náhled</th><th>Akce</th></tr></thead><tbody>';
   reports.forEach(r=>{
     const to=(r.to||[]); const toStr=to.length?to.join(', '):'<span style="color:#b3261e">bez příjemců</span>';
-    const stav=r.enabled?'<span class="pill green">zapnuto</span>':'<span class="pill" style="background:#eee;color:#666">vypnuto</span>';
+    const stav=r.vypnutoCentralne?'<span class="pill" style="background:#fbecea;color:#b3261e">zrušeno</span>':(r.enabled?'<span class="pill green">zapnuto</span>':'<span class="pill" style="background:#eee;color:#666">vypnuto</span>');
     const last=r.lastAt?new Date(r.lastAt).toLocaleString('cs-CZ'):'—';
     const prev=r.preview?'<a href="'+esc(r.preview)+'" target="_blank" rel="noopener">👁 náhled</a>':'—';
-    h+='<tr><td>'+esc(r.module||'')+'</td><td><b>'+esc(r.name||'')+'</b>'+(r.configHint?'<br><span class="muted" style="font-size:11.5px">⚙ '+esc(r.configHint)+'</span>':'')+'</td>'+
-      '<td style="font-size:12.5px">'+toStr+'</td><td>'+esc(r.schedule||'')+'</td><td style="text-align:center">'+stav+'</td><td class="muted" style="font-size:12px">'+esc(last)+'</td><td>'+prev+'</td></tr>';
+    const akce=r.vypnutoCentralne
+      ?'<button class="btn ghost sm" onclick="rozesilkaToggle(\''+esc(r.key)+'\',false)">▶ Obnovit</button>'
+      :'<button class="btn ghost sm" style="color:#b3261e" onclick="rozesilkaToggle(\''+esc(r.key)+'\',true)">⏻ Zrušit odesílání</button>';
+    h+='<tr'+(r.vypnutoCentralne?' style="opacity:.65"':'')+'><td>'+esc(r.module||'')+'</td><td><b>'+esc(r.name||'')+'</b>'+(r.configHint?'<br><span class="muted" style="font-size:11.5px">⚙ '+esc(r.configHint)+'</span>':'')+'</td>'+
+      '<td style="font-size:12.5px">'+toStr+'</td><td>'+esc(r.schedule||'')+'</td><td style="text-align:center">'+stav+'</td><td class="muted" style="font-size:12px">'+esc(last)+'</td><td>'+prev+'</td><td style="white-space:nowrap">'+akce+'</td></tr>';
   });
   h+='</tbody></table></div>';
   // Historie VŠECH odeslaných e-mailů — centrální evidence (reporty i jednorázové notifikace všech modulů).

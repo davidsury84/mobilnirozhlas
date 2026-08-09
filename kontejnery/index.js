@@ -694,6 +694,7 @@ function mount(host) {
     try {
       const db = load(); const rep = db.config.report;
       if (!rep.enabled || !Array.isArray(rep.to) || !rep.to.length) return;
+      if (host.reportDisabled && host.reportDisabled('kontejnery-tydenni')) return;   // zrušeno v přehledu Rozesílky
       const now = new Date(); const wk = isoWeek(now);
       if (now.getDay() < rep.weekday) return;
       if (rep.lastWeek === wk) return;

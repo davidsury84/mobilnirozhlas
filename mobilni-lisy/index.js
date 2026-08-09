@@ -425,6 +425,7 @@ function mount(host) {
       const db = load();
       const rep = db.config.report;
       if (!rep.enabled || !Array.isArray(rep.to) || !rep.to.length) return;
+      if (host.reportDisabled && host.reportDisabled('lisy-tydenni')) return;   // zrušeno v přehledu Rozesílky
       const now = new Date(); const wk = isoWeek(now);
       if (now.getDay() < rep.weekday) return;       // pošli v den >= zvolený weekday
       if (rep.lastWeek === wk) return;              // jednou za ISO-týden

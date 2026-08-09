@@ -562,6 +562,12 @@ function mailLogAppend(entry) {
 function mailLogRead(n) {
   try { const l = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'mail-log.json'), 'utf8')) || []; return l.slice(-(n || 200)).reverse(); } catch (_) { return []; }
 }
+// Centrální vypínač rozesílek: správce může v přehledu „Rozesílky" zrušit odesílání kterékoli
+// registrované rozesílky, bez ohledu na nastavení uvnitř modulu. Klíče = report.key.
+const ROZESILKY_OFF_F = () => path.join(DATA_DIR, 'rozesilky-vypnute.json');
+function rozesilkyOff() { try { return JSON.parse(fs.readFileSync(ROZESILKY_OFF_F(), 'utf8')) || {}; } catch (_) { return {}; } }
+function rozesilkyOffWrite(o) { try { fs.writeFileSync(ROZESILKY_OFF_F(), JSON.stringify(o, null, 2)); } catch (_) {} }
+function reportDisabled(key) { return !!rozesilkyOff()[key]; }
 function deliver(mail) {
   const zaznam = { ts: Date.now(), to: String((mail && mail.to) || ''), subject: String((mail && mail.subject) || '').slice(0, 200), from: String((mail && (mail.fromName || mail.fromAddr)) || '').slice(0, 100) };
   const p = process.env.RESEND_API_KEY ? resendSend(mail) : smtpSend(CFG, mail);
@@ -1909,6 +1915,7 @@ async function sendMonthlyReport(to) {
 async function maybeSendMonthlyReport() {
   try {
     if (!reportEnabled() || !emailConfigured()) return;
+    if (reportDisabled('smernice-mesicni')) return;   // zrušeno správcem v přehledu Rozesílky
     const now = new Date();
     if (now.getDate() < reportDay()) return;
     const st = readJson(REPORT_F, {});
@@ -2022,7 +2029,7 @@ function intranetInviteMail(name, url, tpl) {
 // nesmí shodit zbytek intranetu (směrnice, dovolená, knihovna…).
 let smlouvyMod = null;
 try {
-  smlouvyMod = require('./smlouvy').mount({
+  smlouvyMod = require('./smlouvy').mount({ reportDisabled,
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
     dataDir: DATA_DIR,
     eskalaceEmail: SUPERADMIN,
@@ -2051,7 +2058,7 @@ try {
 // ---- Modul „Doprava" (výkony a náklady vozového parku, data z Google Sheets) ----
 let dopravaMod = null;
 try {
-  dopravaMod = require('./doprava').mount({ send, readBody, deliver, empSession, isAdmin, employeeModules, dataDir: DATA_DIR, publicBaseUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') });
+  dopravaMod = require('./doprava').mount({  reportDisabled,send, readBody, deliver, empSession, isAdmin, employeeModules, dataDir: DATA_DIR, publicBaseUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') });
 } catch (e) {
   console.error('[doprava] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
@@ -2059,7 +2066,7 @@ try {
 // ---- Modul „Konstrukce" (workflow zadání a schválení výkresů) ----
 let konstrukceMod = null;
 try {
-  konstrukceMod = require('./konstrukce').mount({
+  konstrukceMod = require('./konstrukce').mount({ reportDisabled,
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
     isObchodnik: isObchodnikEmail,
     dataDir: DATA_DIR,
@@ -2103,7 +2110,7 @@ try {
 // ---- Modul „Lodní kontejnery" (veřejný web + poptávky) — samostatná složka ./kontejnery ----
 let kontejneryMod = null;
 try {
-  kontejneryMod = require('./kontejnery').mount({
+  kontejneryMod = require('./kontejnery').mount({ reportDisabled,
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
     dataDir: DATA_DIR, ssoSecret: SSO_SHARED_SECRET, sheetsGet, sheetsMeta,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'ELKOPLAST — kontejnery', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
@@ -2115,7 +2122,7 @@ try {
 // ---- Modul „Mobilní lisy" (mobilní-lisy.cz — veřejný web + dotazník → přihlášky) ----
 let mobilniLisyMod = null;
 try {
-  mobilniLisyMod = require('./mobilni-lisy').mount({
+  mobilniLisyMod = require('./mobilni-lisy').mount({ reportDisabled,
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'ELKOPLAST — mobilní lisy', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
@@ -2127,7 +2134,7 @@ try {
 // ---- Modul „Týdenní reporty nákupu" (co zlevnit / co nakoupit — e-maily z dat SMI) ----
 let nakupReportMod = null;
 try {
-  nakupReportMod = require('./nakup-report').mount({
+  nakupReportMod = require('./nakup-report').mount({ reportDisabled,
     send, readBody, deliver, isAdmin, empSession, employeeModules,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet ELKOPLAST — nákup', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
@@ -2281,8 +2288,23 @@ const server = http.createServer(async (req, res) => {
         out.push({ key: 'smernice-mesicni', module: 'Směrnice', name: 'Měsíční vyhodnocení seznámení se směrnicemi', to: [reportRecipient()], enabled: reportEnabled() && emailConfigured(), schedule: 'měsíčně (' + reportDay() + '. den)', lastAt: st.lastSentAt || null, preview: null, configHint: 'env REPORT_EMAIL / REPORT_DAY / REPORT_ENABLED' });
       } catch (_) {}
       for (const m of mods) { if (m && typeof m.reports === 'function') { try { const rs = m.reports() || []; rs.forEach(r => out.push(r)); } catch (_) {} } }
+      // Centrální vypínač: zrušené rozesílky jsou vypnuté bez ohledu na nastavení modulu.
+      const off = rozesilkyOff();
+      out.forEach(r => { r.vypnutoCentralne = !!off[r.key]; if (r.vypnutoCentralne) r.enabled = false; });
       // Historie VŠECH odeslaných e-mailů (i jednorázových notifikací) — centrální evidence z deliver().
       return send(res, 200, { reports: out, maily: mailLogRead(200) });
+    }
+    if (p === '/api/admin/reports/toggle' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const key = String(b.key || '').trim();
+      if (!key) return send(res, 400, { error: 'Chybí klíč rozesílky.' });
+      const off = rozesilkyOff();
+      if (b.vypnout) off[key] = true; else delete off[key];
+      rozesilkyOffWrite(off);
+      const aktor = empSession(req) || { email: '', name: 'správce' };
+      logActivity('rozesilka', { email: aktor.email, name: aktor.name }, (b.vypnout ? 'ZRUŠENO odesílání rozesílky: ' : 'Obnoveno odesílání rozesílky: ') + key);
+      return send(res, 200, { ok: true, vypnute: Object.keys(off) });
     }
 
     // Kořen = zaměstnanecký intranet, /admin = administrace. Obě cesty servírují stejnou SPA;

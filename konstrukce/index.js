@@ -1750,6 +1750,7 @@ function mount(host) {
   //  Eskalace (tick) — termíny, semafory, připomínky klientovi (kap. 5)
   // ======================================================================
   async function tick() {
+    if (host.reportDisabled && host.reportDisabled('konstrukce-eskalace')) return;   // zrušeno v přehledu Rozesílky
     const d = load();
     let changed = false;
     const now = Date.now();

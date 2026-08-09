@@ -189,6 +189,7 @@ function mount(host) {
   // odeslání uplynul aspoň týden (throttle v meta). `force` obejde throttle
   // (tlačítko „Odeslat teď" v UI). Vždy s kopií na notifyCc() (default david.sury).
   async function tydenniUpominka({ force = false } = {}) {
+    if (!force && host.reportDisabled && host.reportDisabled('smlouvy-nezaevidovane')) return { pending: 0, odeslano: false, skipped: 'zrušeno v přehledu Rozesílky' };
     const pending = nezaevidovane();
     if (!pending.length) return { pending: 0, odeslano: false };
     const last = M.meta.get('weekly_reminder_last');
@@ -479,7 +480,9 @@ function mount(host) {
 
   // ---- cron tick ---------------------------------------------------
   async function tick() {
-    try { await engine.tick(M, { deliver: host.deliver, baseUrl: host.publicBaseUrl || '', eskalaceEmail: host.eskalaceEmail }); }
+    // Hlídání termínů smluv lze zrušit v přehledu Rozesílky (maily se pak neposílají, kontrola běží dál).
+    const terminyDeliver = (host.reportDisabled && host.reportDisabled('smlouvy-terminy')) ? (async () => {}) : host.deliver;
+    try { await engine.tick(M, { deliver: terminyDeliver, baseUrl: host.publicBaseUrl || '', eskalaceEmail: host.eskalaceEmail }); }
     catch (e) { console.error('[smlouvy] tick chyba:', e.message); }
     try { await driveSync(); }
     catch (e) { console.error('[smlouvy] drive sync chyba:', e.message); }

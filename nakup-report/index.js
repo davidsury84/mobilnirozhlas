@@ -456,21 +456,22 @@ function mount(host) {
     try { const s = await syncObjednavky(false); if (s && !s.ok && !s.skipped) console.warn('[nakup-report] Drive sync neproběhl:', s.error); } catch (e) { console.error('[nakup-report] Drive sync:', e.message); }
     // 2) E-mailové reporty dle configu
     try {
+      const dis = (k) => host.reportDisabled && host.reportDisabled(k);   // zrušeno v přehledu Rozesílky
       const cfg = loadCfg(); const now = new Date();
       let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
       let changed = false;
       // Objednávkový report — 1× týdně (od zvoleného dne, pojistka 1×/ISO-týden)
-      if (cfg.objednavkyEnabled && now.getDay() >= cfg.objednavkyDay) {
+      if (cfg.objednavkyEnabled && !dis('objednavky') && now.getDay() >= cfg.objednavkyDay) {
         const wk = isoWeek(now);
         if (st.objWeek !== wk) { const r = await sendReport('objednavky', cfg.objednavkyTo, cfg); st.objWeek = wk; st.objAt = now.toISOString(); st.objednavky = r; changed = true; console.log('[nakup-report] objednávkový report: ' + (r.ok ? r.count + ' pol.' : 'CHYBA ' + r.error)); }
       }
       // Ranní bilance skladu — denně (od zvolené hodiny), pojistka 1×/den
-      if (cfg.bilanceEnabled && now.getHours() >= (cfg.bilanceHour != null ? cfg.bilanceHour : 8)) {
+      if (cfg.bilanceEnabled && !dis('bilance') && now.getHours() >= (cfg.bilanceHour != null ? cfg.bilanceHour : 8)) {
         const dstr = now.toISOString().slice(0, 10);
         if (st.bilanceDay !== dstr) { const rB = await sendReport('bilance', cfg.bilanceTo, cfg); st.bilanceDay = dstr; st.bilance = rB; changed = true; console.log('[nakup-report] ranní bilance: ' + (rB.ok ? 'odesláno' : 'CHYBA ' + rB.error)); }
       }
       // Týdenní zlevnění/nákup — volitelné (defaultně vypnuto)
-      if (cfg.enabled && now.getDay() >= cfg.weekday) {
+      if (cfg.enabled && !dis('markdown') && now.getDay() >= cfg.weekday) {
         const wk = isoWeek(now);
         if (st.lastWeek !== wk) { const rM = await sendReport('markdown', cfg.markdownTo, cfg); st.lastWeek = wk; st.lastAt = now.toISOString(); st.markdown = rM; changed = true; }
       }
