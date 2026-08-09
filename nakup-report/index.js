@@ -340,7 +340,7 @@ function mount(host) {
     const rop = Math.round(leadDem + Z * Math.sqrt(Math.max(0, leadDem)));
     const position = (x.avail || 0) + (x.onOrder || 0);
     let rec = 0, status = 'OK';
-    if ((x.avail || 0) < 0) { rec = Math.round(windowDem > 0 ? Math.max(windowDem - position, -(x.avail)) : -(x.avail)); status = 'oversold'; }
+    if ((x.avail || 0) < 0) { rec = Math.round(windowDem > 0 ? Math.max(windowDem - position, -position) : -position); status = 'oversold'; }
     else if (D <= 0) status = 'bez prodeje';
     else if (ramp) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = 'náběh sezóny ' + rampTo; } else status = 'sezóna pokryta'; }
     else if (windowDem < 0.5) status = 'mimo sezónu';

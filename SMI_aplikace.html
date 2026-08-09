@@ -1923,7 +1923,7 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   const rop=Math.round(leadDem+P.Z*Math.sqrt(Math.max(0,leadDem)));
   const position=(x.avail||0)+(x.onOrder||0);
   let rec=0,status='OK';
-  if((x.avail||0)<0){ rec=Math.round(windowDem>0?Math.max(windowDem-position,-(x.avail)):-(x.avail)); status='Kritické — oversold'; }
+  if((x.avail||0)<0){ rec=Math.round(windowDem>0?Math.max(windowDem-position,-position):-position); status='Kritické — oversold'; }
   else if(D<=0){ status='Bez prodeje'; }
   else if(ramp){ const need=Math.round(windowDem-position); if(need>0){ rec=Math.max(P.MOQ||1,need); status='Náběh sezóny '+rampTo; } else status='Sezóna pokryta'; }
   else if(windowDem<0.5){ status='Mimo sezónu'; }
