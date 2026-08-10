@@ -2143,6 +2143,18 @@ try {
   console.error('[nakup-report] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Qooling" (stav závad kvality — Drive sync + pondělní report) ----
+let qoolingMod = null;
+try {
+  qoolingMod = require('./qooling').mount({ reportDisabled,
+    send, readBody, deliver, isAdmin, empSession, employeeModules,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet ELKOPLAST — Qooling', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+  });
+} catch (e) {
+  console.error('[qooling] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -2276,11 +2288,13 @@ const server = http.createServer(async (req, res) => {
     // Modul „Mobilní lisy" si obslouží vlastní cesty (/mobilni-lisy*, /api/mobilni-lisy*).
     if (mobilniLisyMod && await mobilniLisyMod.handle(req, res)) return;
     if (nakupReportMod && await nakupReportMod.handle(req, res)) return;
+    // Modul „Qooling" si obslouží vlastní cesty (/api/qooling*).
+    if (qoolingMod && await qoolingMod.handle(req, res)) return;
 
     // Centrální přehled rozesílek (správce) — agreguje descriptory z modulů, které je vystavují.
     if (p === '/api/admin/reports' && req.method === 'GET') {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
-      const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod];
+      const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod, qoolingMod];
       let out = [];
       // Jádro intranetu: měsíční vyhodnocení seznámení se směrnicemi.
       try {
@@ -3402,6 +3416,11 @@ if (require.main === module) {
     if (konstrukceMod) {
       konstrukceMod.tick();
       setInterval(() => konstrukceMod.tick(), 30 * 60 * 1000);
+    }
+    // Qooling: Drive sync exportů závad + pondělní report (hodinová kontrola, pojistka 1×/ISO-týden).
+    if (qoolingMod) {
+      qoolingMod.tick();
+      setInterval(() => qoolingMod.tick(), 3600 * 1000);
     }
   });
 }

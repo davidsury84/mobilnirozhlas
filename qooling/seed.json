@@ -1,0 +1,32 @@
+{
+  "source": "issues_export 05.08.2026.xls.xlsx (seed)",
+  "syncedAt": "2026-08-10T00:00:00.000Z",
+  "rows": [
+    { "num": "12", "status": "In progress", "date": "2025-10-24", "ks": 5, "ksRaw": "5", "creator": "Naďa Švarcová", "culprit": "Konstrukce", "minutes": 45 },
+    { "num": "13", "status": "Open", "date": "2025-11-11", "ks": 7, "ksRaw": "7", "creator": "Naďa Švarcová", "culprit": "Vada materiálu", "minutes": 30 },
+    { "num": "17", "status": "Open", "date": "2025-11-17", "ks": 12, "ksRaw": "12", "creator": "Naďa Švarcová", "culprit": "Jojo", "minutes": 330 },
+    { "num": "18", "status": "Open", "date": "2025-11-28", "ks": 5, "ksRaw": "5", "creator": "Naďa Švarcová", "culprit": "Guzman", "minutes": 60 },
+    { "num": "19", "status": "Open", "date": "2025-12-12", "ks": 10, "ksRaw": "10", "creator": "Naďa Švarcová", "culprit": "Lorenzo,John", "minutes": 45 },
+    { "num": "20", "status": "Open", "date": "2025-12-18", "ks": 0, "ksRaw": "O", "creator": "Natalia Kishko", "culprit": "Mark Conzales", "minutes": 30 },
+    { "num": "21", "status": "Open", "date": "2026-01-05", "ks": 1, "ksRaw": "1", "creator": "Natalia Kishko", "culprit": "Arvin", "minutes": 15 },
+    { "num": "22", "status": "Open", "date": "2026-01-14", "ks": 8, "ksRaw": "8", "creator": "Naďa Švarcová", "culprit": "Charli", "minutes": 30 },
+    { "num": "23", "status": "Open", "date": "2026-01-21", "ks": 5, "ksRaw": "5", "creator": "Naďa Švarcová", "culprit": "Chester", "minutes": 120 },
+    { "num": "24", "status": "Open", "date": "2026-03-10", "ks": 1, "ksRaw": "1", "creator": "Natalia Kishko", "culprit": "Triskáni", "minutes": 60 },
+    { "num": "25", "status": "Open", "date": "2026-03-11", "ks": 1, "ksRaw": "1", "creator": "Natalia Kishko", "culprit": "Aaron Macatol", "minutes": 40 },
+    { "num": "26", "status": "Open", "date": "2026-03-11", "ks": 1, "ksRaw": "1", "creator": "Natalia Kishko", "culprit": "Grapa", "minutes": 15 },
+    { "num": "27", "status": "Open", "date": "2026-03-11", "ks": 8, "ksRaw": "8", "creator": "Naďa Švarcová", "culprit": "John", "minutes": 155 },
+    { "num": "28", "status": "Open", "date": "2026-03-12", "ks": 1, "ksRaw": "1", "creator": "Natalia Kishko", "culprit": "Déšť", "minutes": 40 },
+    { "num": "29", "status": "Open", "date": "2026-03-12", "ks": 1, "ksRaw": "1", "creator": "Natalia Kishko", "culprit": "Robot + Panotes", "minutes": 20 },
+    { "num": "30", "status": "Open", "date": "2026-03-12", "ks": 1, "ksRaw": "1", "creator": "Natalia Kishko", "culprit": "", "minutes": 20 },
+    { "num": "31", "status": "Open", "date": "2026-03-18", "ks": 9, "ksRaw": "9", "creator": "Natalia Kishko", "culprit": "Lejnar", "minutes": 35 },
+    { "num": "32", "status": "Open", "date": "2026-03-18", "ks": 2, "ksRaw": "2.0", "creator": "Natalia Kishko", "culprit": "Amante", "minutes": 30 },
+    { "num": "33", "status": "Open", "date": "2026-03-26", "ks": 3, "ksRaw": "3.0", "creator": "Natalia Kishko", "culprit": "Amante", "minutes": 20 },
+    { "num": "34", "status": "Open", "date": "2026-04-30", "ks": 5, "ksRaw": "5", "creator": "Naďa Švarcová", "culprit": "Sarmiento", "minutes": 240 },
+    { "num": "35", "status": "Open", "date": "2026-07-17", "ks": 5, "ksRaw": "5.0", "creator": "Lada Králíkova", "culprit": "Rhoe Rubenecia", "minutes": 60 },
+    { "num": "36", "status": "Open", "date": "2026-07-17", "ks": 0, "ksRaw": "0", "creator": "Lada Králíkova", "culprit": "Rhoe Rubenecia", "minutes": 60 },
+    { "num": "37", "status": "Open", "date": "2026-07-17", "ks": 0, "ksRaw": "0", "creator": "Lada Králíkova", "culprit": "Rhoe Rubenecia", "minutes": 60 },
+    { "num": "37", "status": "Open", "date": "2026-07-17", "ks": 5, "ksRaw": "5.0", "creator": "Lada Králíkova", "culprit": "Rhoe Rubenecia", "minutes": 60 },
+    { "num": "38", "status": "Open", "date": "2026-07-20", "ks": 6, "ksRaw": "6.0", "creator": "Natalia Kishko", "culprit": "chyba ve výkresu", "minutes": 15 },
+    { "num": "39", "status": "Open", "date": "2026-07-20", "ks": 7, "ksRaw": "7.0", "creator": "Natalia Kishko", "culprit": "chyba konstruktoru", "minutes": 90 }
+  ]
+}

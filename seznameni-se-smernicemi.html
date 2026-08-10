@@ -1405,6 +1405,7 @@ const MUJ_MODS = [
   { key:"kovo", icon:MUJ_IC.gear, label:"Kovo", gated:true },
   { key:"eshop", icon:MUJ_IC.cart, label:"E-shop", gated:true },
   { key:"doprava", icon:MUJ_IC.truck, label:"Doprava", gated:true },
+  { key:"qooling", icon:MUJ_IC.shield, label:"Qooling — kvalita", gated:true },
   { key:"loznyplan", icon:MUJ_IC.truck, label:"Ložný plán", gated:true },
   { key:"konstrukce", icon:MUJ_IC.gear, label:"Zadání do výroby – konstrukce", gated:true },
   { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
@@ -1615,6 +1616,7 @@ function mjGo(key){
   else if(key==="ukoly") showUkoly();
   else if(key==="telefon") showTelefon();
   else if(key==="zapisy") showZapisy();
+  else if(key==="qooling") showQooling();
   else if(key==="skoleni") showSkoleni();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
@@ -3005,6 +3007,144 @@ async function zapSmazat(id){
     if(!r.ok||j.error){ toast(j.error||'Smazání selhalo.'); return; }
     toast('Zápis smazán'); await showZapisy();
   }catch(e){ toast('Smazání selhalo: '+e.message); }
+}
+
+/* ---------- Modul Qooling — stav závad kvality ---------- */
+let QOO={data:null,q:'',stav:'',vinik:'',mesic:''};
+function qooClosed(st){ return /clos|done|resolv|uzav|hotov/i.test(st||''); }
+function qooBadge(st){
+  if(qooClosed(st)) return '<span style="background:#e7f5e9;color:#1f5e22;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600">✔ '+esc(st)+'</span>';
+  if(/progress/i.test(st)) return '<span style="background:#fbf0dc;color:#a86a00;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600">'+esc(st)+'</span>';
+  return '<span style="background:#fbecea;color:#a03a2c;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600">'+esc(st)+'</span>';
+}
+async function showQooling(){
+  MUJ.view="qooling"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=qooling'); }catch(e){}
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("qooling")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<div class="dash-hero"><h2>Qooling — kvalita</h2><p>Načítám…</p></div>';
+  try{
+    const r=await fetch('/api/qooling',{cache:'no-store'});
+    if(!r.ok) throw new Error(((await r.json())||{}).error||('HTTP '+r.status));
+    QOO.data=await r.json();
+  }catch(e){ body.innerHTML='<div class="card pad" style="margin:26px">Data Qoolingu se nepodařilo načíst: '+esc(e.message)+'</div>'; return; }
+  qooRender(); window.scrollTo(0,0);
+}
+function qooFiltrovane(){
+  const d=QOO.data, q=(QOO.q||'').toLowerCase();
+  return (d.issues||[]).filter(x=>{
+    if(QOO.stav==='open'&&qooClosed(x.status)) return false;
+    if(QOO.stav==='closed'&&!qooClosed(x.status)) return false;
+    if(QOO.vinik&&(x.culprit||'— neuvedeno —')!==QOO.vinik) return false;
+    if(QOO.mesic&&(x.date||'').slice(0,7)!==QOO.mesic) return false;
+    if(q&&([x.num,x.status,x.culprit,x.creator,x.date].join(' ').toLowerCase().indexOf(q)<0)) return false;
+    return true;
+  });
+}
+function qooMesicLabel(m){ const M=['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec']; const p=m.split('-'); return (M[+p[1]-1]||m)+' '+p[0]; }
+function qooRender(){
+  const body=document.getElementById("mujBody"), d=QOO.data;
+  const mes=Object.keys(d.months||{}).sort().reverse();
+  const viniky=(d.culprits||[]).map(c=>c.culprit);
+  const fresh=d.syncedAt?new Date(d.syncedAt):null;
+  const freshTxt=fresh?fresh.toLocaleDateString('cs-CZ')+' '+fresh.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}):'—';
+  body.innerHTML=
+    '<div class="dash-hero" style="margin-bottom:16px"><h2>Qooling — kvalita</h2><p>Stav závad hlášených v Qoolingu — co je otevřené, kdo chyby způsobuje a kolik stojí opravy času. Data se načítají automaticky ze sdílené složky na Disku.</p></div>'
+    +'<div class="kpis">'
+      +'<div class="kpi"><div class="v">'+d.open+'</div><div class="l">Otevřené závady</div></div>'
+      +'<div class="kpi"><div class="v">'+d.inProgress+'</div><div class="l">V řešení</div></div>'
+      +'<div class="kpi"><div class="v">'+d.new30+'</div><div class="l">Nové za 30 dní</div></div>'
+      +'<div class="kpi"><div class="v">'+Number(d.minutesOpen||0).toLocaleString('cs-CZ')+'</div><div class="l">Minut oprav (otevřené)</div></div>'
+    +'</div>'
+    +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Závady po měsících</b><div id="qooChart" style="display:flex;align-items:flex-end;gap:6px;height:110px;margin-top:12px"></div></div>'
+    +'<div class="card pad" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
+      +'<input id="qooQ" placeholder="🔍 Hledat (č., viník, zadal…)" value="'+esc(QOO.q)+'" style="flex:1;min-width:200px;padding:9px 13px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
+      +'<select id="qooStav" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff"><option value="">Všechny stavy</option><option value="open"'+(QOO.stav==='open'?' selected':'')+'>Otevřené</option><option value="closed"'+(QOO.stav==='closed'?' selected':'')+'>Uzavřené</option></select>'
+      +'<select id="qooVinik" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff;max-width:220px"><option value="">Všichni viníci</option>'+viniky.map(v=>'<option'+(QOO.vinik===v?' selected':'')+'>'+esc(v)+'</option>').join('')+'</select>'
+      +'<select id="qooMes" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff"><option value="">Všechna období</option>'+mes.map(m=>'<option value="'+m+'"'+(QOO.mesic===m?' selected':'')+'>'+qooMesicLabel(m)+'</option>').join('')+'</select>'
+    +'</div>'
+    +'<div id="qooList"></div>'
+    +'<div class="card pad" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">'
+      +'<span class="muted" style="font-size:12.5px">Zdroj: '+esc(d.source||'—')+' · načteno '+freshTxt+'</span>'
+      +(d.admin?'<span class="inline-actions" style="gap:8px"><button class="btn sm ghost" onclick="qooSync()">🔄 Obnovit z Drive</button><button class="btn sm ghost" onclick="qooCfg()">📧 Pondělní report</button></span>':'')
+    +'</div>'
+    +(d.admin?'<div id="qooCfgBox"></div>':'');
+  document.getElementById('qooQ').oninput=function(){ QOO.q=this.value; qooListRender(); };
+  document.getElementById('qooStav').onchange=function(){ QOO.stav=this.value; qooListRender(); };
+  document.getElementById('qooVinik').onchange=function(){ QOO.vinik=this.value; qooListRender(); };
+  document.getElementById('qooMes').onchange=function(){ QOO.mesic=this.value; qooListRender(); };
+  qooChartRender(); qooListRender();
+}
+function qooChartRender(){
+  const box=document.getElementById('qooChart'), d=QOO.data;
+  const keys=Object.keys(d.months||{}).sort(); if(!keys.length){ box.innerHTML='<span class="muted">Zatím žádná data.</span>'; return; }
+  const last=keys.slice(-13), max=Math.max.apply(null,last.map(k=>d.months[k]));
+  box.innerHTML=last.map(k=>{
+    const v=d.months[k], h=Math.max(6,Math.round(v/max*84));
+    const on=QOO.mesic===k;
+    return '<div onclick="QOO.mesic=QOO.mesic===\''+k+'\'?\'\':\''+k+'\';qooRender()" title="'+qooMesicLabel(k)+': '+v+'" style="flex:1;min-width:0;cursor:pointer;text-align:center">'
+      +'<div style="font-size:11px;color:var(--ink-soft);margin-bottom:3px">'+v+'</div>'
+      +'<div style="height:'+h+'px;background:'+(on?'var(--yellow)':'var(--green-2)')+';border-radius:5px 5px 0 0;opacity:'+(on?'1':'.85')+'"></div>'
+      +'<div style="font-size:10px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;overflow:hidden">'+k.slice(5)+'/'+k.slice(2,4)+'</div></div>';
+  }).join('');
+}
+function qooListRender(){
+  const box=document.getElementById('qooList'); if(!box) return;
+  const list=qooFiltrovane();
+  if(!list.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Žádné závady neodpovídají filtru.</p></div>'; return; }
+  box.innerHTML='<div class="card" style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:13.5px"><thead><tr>'
+    +['Závada','Datum','Stav','Kdo chybu způsobil','Zadal(a)','Ks','Minut oprava','Stáří'].map((h,i)=>'<th style="text-align:'+(i>=5?'right':'left')+';padding:10px 12px;border-bottom:2px solid var(--line);font-size:12px;color:var(--ink-soft);white-space:nowrap">'+h+'</th>').join('')
+    +'</tr></thead><tbody>'
+    +list.map(x=>'<tr>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line)"><b>#'+esc(x.num)+'</b></td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap">'+esc(x.date?x.date.split('-').reverse().join('. '):'—')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line)">'+qooBadge(x.status)+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line)">'+esc(x.culprit||'—')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line)">'+esc(x.creator||'—')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line);text-align:right">'+(x.ks!=null?x.ks:esc(x.ksRaw||'—'))+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line);text-align:right">'+(x.minutes||0)+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;color:'+((x.ageDays||0)>60&&!qooClosed(x.status)?'#a03a2c':'var(--ink-soft)')+'">'+(x.ageDays!=null?x.ageDays+' d':'—')+'</td></tr>').join('')
+    +'</tbody></table></div>'
+    +'<p class="muted" style="font-size:12px;margin:8px 2px 0">'+list.length+' závad · Ks = počet kusů z pole Title v Qoolingu · Stáří červeně = otevřená závada starší 60 dní.</p>';
+}
+async function qooSync(){
+  toast('Načítám z Drive…');
+  try{
+    const r=await fetch('/api/qooling/sync',{method:'POST'}); const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Sync selhal.'); return; }
+    toast(j.skipped?'Na Disku není novější export.':'Načteno: '+(j.file||'')+' ('+(j.rows||0)+' řádků)');
+    await showQooling();
+  }catch(e){ toast('Sync selhal: '+e.message); }
+}
+async function qooCfg(){
+  const box=document.getElementById('qooCfgBox'); if(!box) return;
+  let cfg=(QOO.data&&QOO.data.config)||{to:[],enabled:true,weekday:1};
+  box.innerHTML='<div class="card pad" style="margin-top:14px"><b style="font-size:14px">📧 Pondělní report — nastavení (správce)</b>'
+    +'<p class="muted" style="font-size:12.5px;margin:6px 0 10px">Každé pondělí se pošle stav závad. Vypnout jde i centrálně v přehledu Rozesílky (klíč qooling-tydenni).</p>'
+    +'<label style="display:block;font-size:13px;margin-bottom:6px">Příjemci (oddělení čárkou):</label>'
+    +'<textarea id="qooTo" rows="2" style="width:100%;padding:9px 13px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'+esc((cfg.to||[]).join(', '))+'</textarea>'
+    +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13.5px"><input type="checkbox" id="qooEn"'+(cfg.enabled?' checked':'')+' style="width:17px;height:17px;accent-color:var(--green-2)"> Odesílat každé pondělí</label>'
+    +'<div class="inline-actions" style="gap:8px;flex-wrap:wrap">'
+      +'<button class="btn sm" onclick="qooCfgSave()">Uložit</button>'
+      +'<a class="btn sm ghost" href="/api/qooling/preview" target="_blank">Náhled e-mailu</a>'
+      +'<button class="btn sm ghost" onclick="qooTestSend()">Odeslat teď (test na příjemce)</button>'
+    +'</div></div>';
+  box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function qooCfgSave(){
+  try{
+    const r=await fetch('/api/qooling/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:document.getElementById('qooTo').value,enabled:document.getElementById('qooEn').checked})});
+    const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení selhalo.'); return; }
+    if(QOO.data) QOO.data.config=j.config; toast('Nastavení reportu uloženo');
+  }catch(e){ toast('Uložení selhalo: '+e.message); }
+}
+async function qooTestSend(){
+  if(!confirm('Odeslat report hned teď všem nastaveným příjemcům?')) return;
+  try{
+    const r=await fetch('/api/qooling/send',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Odeslání selhalo.'); return; }
+    toast('Odesláno: '+(j.to||[]).join(', '));
+  }catch(e){ toast('Odeslání selhalo: '+e.message); }
 }
 
 async function showTelefon(){
@@ -4614,11 +4754,11 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["qooling","Qooling — kvalita (závady)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
-  ["Provoz",["sklady","plasty","kovo","eshop"]],
+  ["Provoz",["sklady","plasty","kovo","eshop","qooling"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
   ["Agendy",["doprava","loznyplan","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","adaptace","freelo","aktuality"]]
 ];
