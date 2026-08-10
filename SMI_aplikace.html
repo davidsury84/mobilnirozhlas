@@ -670,10 +670,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       </details>
       <div class="kpis" id="objKpis"></div>
       <div style="background:#eef4fb;border:1px solid #d3e0f2;border-radius:12px;padding:12px 14px;margin:0 0 12px">
-        <div style="font-weight:700;margin-bottom:6px">🔎 Poradce podle kódu — kolik koupit</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          <div style="font-weight:700">🔎 Poradce podle kódu — kolik koupit</div>
+          <div id="objFresh" class="muted" style="font-size:12px"></div>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <input type="text" id="objAsk" placeholder="Zadej kód (SK-reg, reg. číslo nebo doplňkový kód), např. 313-72562" style="flex:1;min-width:260px;padding:9px 11px;font:inherit;border:1px solid #cdd4cc;border-radius:9px">
           <button class="btn" type="button" id="objAskBtn">Poradit</button>
+          <button class="btn ghost" type="button" id="objRefresh" title="Načíst nejnovější ERP data ze serveru">🔄 Obnovit data</button>
         </div>
         <div id="objAskResult" style="margin-top:10px"></div>
       </div>
@@ -1964,6 +1968,8 @@ function objEOQ(x,sales,cyc){
 }
 function objIntTxt(m){ if(m==null||!isFinite(m))return '—'; if(m>=18)return (Math.round(m/12*10)/10).toString().replace('.',',')+' r'; return (Math.round(m*10)/10).toString().replace('.',',')+' m'; }
 // ---- Poradce podle kódu: zadej kód → kolik koupit + proč ----
+function objSalesPeriodShort(){ try{ const s=(typeof EMBEDDED_PERIOD_INFO!=='undefined'&&EMBEDDED_PERIOD_INFO)||''; const m=s.match(/(\d{4}-\d{2})\s*až\s*(\d{4}-\d{2})/); return m?(m[1]+'–'+m[2]):(s.replace(/^Data za\s*/,'')||'obrat plasty'); }catch(e){ return 'obrat plasty'; } }
+function objFreshInfo(){ return 'Počítáno z: ERP <b>'+esc((OBJ_DATA&&OBJ_DATA.date)||'?')+'</b> (denně z Drive) · prodeje '+esc(objSalesPeriodShort())+' (obrat plasty)'; }
 function objAskFind(q){
   q=String(q||'').trim(); if(!q)return null;
   const rows=(OBJ_DATA&&OBJ_DATA.rows)||[]; const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,'');
@@ -1995,6 +2001,7 @@ function objAskCard(x){
     +'</div>'
     +'<div style="background:#f5f8f3;border:1px solid #e2e9dc;border-radius:9px;padding:9px 12px;font-size:13.5px;line-height:1.55"><b>Proč:</b> '+why+'</div>'
     +(e&&e.eoq?('<div class="muted" style="font-size:12px;margin-top:8px">Ekon. dávka (dodavatel '+esc(x.skupina)+'): ~'+fmt(e.eoq)+' ks · interval '+objIntTxt(e.interval)+'.</div>'):'')
+    +'<div class="muted" style="font-size:11.5px;margin-top:8px;border-top:1px solid #eef1ec;padding-top:6px">'+objFreshInfo()+'</div>'
     +'</div>';
 }
 function objAsk(){
@@ -2016,6 +2023,7 @@ async function renderObjednavky(){
     const tb=$('#objTbl'); if(tb&&!tb.querySelector('tbody tr'))tb.innerHTML='<tbody><tr><td class="muted" style="padding:14px">Načítám prodejní data…</td></tr></tbody>';
     for(let i=0;i<80 && (typeof ROWS==='undefined'||!ROWS.length);i++){ await new Promise(r=>setTimeout(r,100)); }
   }
+  const fr=$('#objFresh'); if(fr)fr.innerHTML=objFreshInfo();
   const smap=objSalesMap();const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
   const robMap={}; Object.keys(smap).forEach(k=>{robMap[k]=objRobust(smap[k]);});   // robustní poptávka (bez jednorázových extrémů)
@@ -2023,7 +2031,7 @@ async function renderObjednavky(){
   (OBJ_DATA.rows||[]).forEach(x=>{const rb=robMap[String(x.sk)+'-'+String(x.reg)]||{raw:null,robust:null,outlier:null,sporadic:false};x._out=rb.outlier;x._sporadic=rb.sporadic;x._s=objSeason(rb.robust||rb.raw);x._o=objComputeOrder(x,rb.raw,P,m0,x._s,rb.robust||rb.raw);x._e=objEOQ(x,rb.robust||rb.raw,OBJ_CYCLES);});
   try{objRenderSeason();}catch(e){}
   try{objRenderPlan();}catch(e){}
-  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;const ab=$('#objAskBtn');if(ab)ab.onclick=objAsk;const ai=$('#objAsk');if(ai){ai.onkeydown=ev=>{if(ev.key==='Enter')objAsk();};ai.oninput=()=>{if(!ai.value.trim())$('#objAskResult').innerHTML='';};}}
+  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;const ab=$('#objAskBtn');if(ab)ab.onclick=objAsk;const ai=$('#objAsk');if(ai){ai.onkeydown=ev=>{if(ev.key==='Enter')objAsk();};ai.oninput=()=>{if(!ai.value.trim())$('#objAskResult').innerHTML='';};}const rf=$('#objRefresh');if(rf)rf.onclick=()=>{const q=($('#objAsk')&&$('#objAsk').value)||'';OBJ_DATA=null;renderObjednavky().then(()=>{if(q.trim())objAsk();});};}
   try{nkLoadReportCfg();}catch(e){}
   objDraw();
 }
