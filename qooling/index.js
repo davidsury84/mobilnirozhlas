@@ -101,6 +101,25 @@ function mount(host) {
     return { ok: true, file: newest.name, rows: rows.length };
   }
 
+  // ---------- středisko zadavatele ----------
+  // Export Qoolingu středisko nemá — dohledáme ho podle jména zadavatele v databázi zaměstnanců.
+  // Jména se liší v drobnostech („Naďa" vs „Naděžda", „Natalia" vs „Nataliia") → porovnáváme
+  // příjmení přesně a křestní jen podle prvních 3 znaků (bez diakritiky).
+  const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  function strediskoMap() {
+    const map = {};
+    let emps = []; try { emps = (host.getState && host.getState().employees) || []; } catch (_) {}
+    return creator => {
+      const key = norm(creator); if (!key) return '— nezařazeno —';
+      if (map[key] !== undefined) return map[key];
+      const parts = key.split(' '), last = parts[parts.length - 1], first3 = (parts[0] || '').slice(0, 3);
+      let hit = emps.filter(e => { const p = norm(e.name).split(' '); return p[p.length - 1] === last; });
+      if (hit.length > 1) { const h2 = hit.filter(e => norm(e.name).slice(0, 3) === first3); if (h2.length) hit = h2; }
+      map[key] = (hit.length === 1 && hit[0].stredisko) ? hit[0].stredisko : '— nezařazeno —';
+      return map[key];
+    };
+  }
+
   // ---------- statistika (společná pro e-mail i API) ----------
   function stats() {
     const d = loadData(), rows = d.rows || [];
@@ -122,7 +141,12 @@ function mount(host) {
     // měsíční histogram (posledních 13 měsíců)
     const months = {};
     issues.forEach(x => { if (x.date) { const m = x.date.slice(0, 7); months[m] = (months[m] || 0) + 1; } });
-    return { issues, open, inProgress, new7, new30, minutesOpen, culprits, months, age, source: d.source || '', syncedAt: d.syncedAt || '' };
+    // minuty oprav podle střediska zadavatele × měsíce (středisko z databáze zaměstnanců)
+    const stred = strediskoMap();
+    issues.forEach(x => { x.stredisko = stred(x.creator); });
+    const minutesMatrix = {};   // { středisko: { 'YYYY-MM': minuty } }
+    issues.forEach(x => { if (!x.date) return; const m = x.date.slice(0, 7); const row = (minutesMatrix[x.stredisko] = minutesMatrix[x.stredisko] || {}); row[m] = (row[m] || 0) + (x.minutes || 0); });
+    return { issues, open, inProgress, new7, new30, minutesOpen, culprits, months, minutesMatrix, age, source: d.source || '', syncedAt: d.syncedAt || '' };
   }
 
   // ---------- config rozesílky ----------
@@ -149,6 +173,24 @@ function mount(host) {
     td(age(x) != null ? fmt(age(x)) + ' d' : '—', 1) + '</tr>').join('');
   const issueHead = '<tr>' + [th('Závada'), th('Datum'), th('Stav'), th('Kdo chybu způsobil'), th('Zadal(a)'), th('Ks'), th('Minut oprava'), th('Stáří')].join('') + '</tr>';
 
+  // Matice „minuty oprav podle střediska × měsíc" (posledních 6 měsíců s daty + Celkem) pro e-mail.
+  function minutesMatrixHtml(S) {
+    const rows = Object.keys(S.minutesMatrix || {}); if (!rows.length) return '';
+    const monthsAll = [...new Set(rows.flatMap(k => Object.keys(S.minutesMatrix[k])))].sort();
+    const months = monthsAll.slice(-6);
+    const total = k => monthsAll.reduce((s, m) => s + (S.minutesMatrix[k][m] || 0), 0);
+    const colTotal = m => rows.reduce((s, k) => s + (S.minutesMatrix[k][m] || 0), 0);
+    const mLabel = m => m.slice(5) + '/' + m.slice(2, 4);
+    const sorted = rows.slice().sort((a, b) => total(b) - total(a));
+    const thR = t => '<th style="text-align:right;border-bottom:2px solid #d8dee7;padding:6px 8px;font-size:12px;color:#55605a">' + esc(t) + '</th>';
+    return '<h3 style="margin:18px 0 6px;font-size:15px">Minuty oprav podle střediska a měsíce</h3>' +
+      '<p style="color:#8a938a;font-size:12px;margin:0 0 6px">Středisko dle zadavatele závady (posledních ' + months.length + ' měsíců s daty; Celkem = celé období).</p>' +
+      '<table style="border-collapse:collapse;width:100%"><thead><tr>' + th('Středisko') + months.map(m => thR(mLabel(m))).join('') + thR('Celkem') + '</tr></thead><tbody>' +
+      sorted.map(k => '<tr>' + td(esc(k)) + months.map(m => td(S.minutesMatrix[k][m] ? fmt(S.minutesMatrix[k][m]) : '<span style="color:#c6ccc4">—</span>', 1)).join('') + td('<b>' + fmt(total(k)) + '</b>', 1) + '</tr>').join('') +
+      '<tr>' + td('<b>Celkem</b>') + months.map(m => td('<b>' + fmt(colTotal(m)) + '</b>', 1)).join('') + td('<b>' + fmt(sorted.reduce((s, k) => s + total(k), 0)) + '</b>', 1) + '</tr>' +
+      '</tbody></table>';
+  }
+
   function buildReport() {
     const S = stats();
     const kpi = (label, val, accent) => '<td style="padding:0 6px 0 0;vertical-align:top"><div style="border:1px solid #dbe2d8;border-left:4px solid ' + accent + ';border-radius:9px;padding:10px 12px">' +
@@ -173,6 +215,7 @@ function mount(host) {
       '<h3 style="margin:18px 0 6px;font-size:15px">Kdo chyby způsobuje (celé období)</h3>' +
       '<table style="border-collapse:collapse;width:100%"><thead><tr>' + [th('Kdo chybu způsobil'), th('Závad'), th('Ks celkem'), th('Minut oprava')].join('') + '</tr></thead><tbody>' +
       S.culprits.slice(0, 12).map(c => '<tr>' + td(esc(c.culprit)) + td('<b>' + fmt(c.count) + '</b>', 1) + td(fmt(c.ks), 1) + td(fmt(c.minutes), 1) + '</tr>').join('') + '</tbody></table>' +
+      minutesMatrixHtml(S) +
       '<p style="margin:16px 0 0;font-size:13px"><a href="' + esc((host.mailFrom && host.mailFrom.publicUrl || '')) + '/#modul=qooling" style="color:#1f4e79">→ Interaktivní přehled v intranetu (modul Qooling)</a></p>';
     const period = S.source || (S.issues[0] && S.issues[0].date) || '';
     const html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c1d1a;line-height:1.55;max-width:860px">' +
@@ -225,7 +268,7 @@ function mount(host) {
       json(res, 200, {
         issues: S.issues.map(x => Object.assign({}, x, { ageDays: S.age(x) })),
         open: S.open.length, inProgress: S.inProgress.length, new7: S.new7.length, new30: S.new30.length,
-        minutesOpen: S.minutesOpen, culprits: S.culprits, months: S.months,
+        minutesOpen: S.minutesOpen, culprits: S.culprits, months: S.months, minutesMatrix: S.minutesMatrix,
         source: S.source, syncedAt: S.syncedAt, admin: !!host.isAdmin(req),
         config: host.isAdmin(req) ? loadCfg() : undefined
       });

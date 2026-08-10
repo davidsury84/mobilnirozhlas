@@ -1472,13 +1472,28 @@ async function initIntranet(){
   MUJ.poptavkyNew = (typeof me.poptavkyNew==="number") ? me.poptavkyNew : 0;
   await refreshMy();
   showDashboard();
-  // Deep-link z e-mailů + návrat na stejné místo po obnovení stránky (#modul=… píše mjGo).
+  // Deep-link z e-mailů + návrat na PŘESNĚ stejnou obrazovku po obnovení stránky.
   const hash0=location.hash;
   const dm=hash0.match(/modul=([a-z0-9]+)/i);
   if(dm){
     let k=dm[1].toLowerCase(); if(k==='kontejnery') k='poptavky';
-    const fm=hash0.match(/slozka=([^&]+)/i);
-    try{ if(k==='library'&&fm) showLibrary(decodeURIComponent(fm[1])); else mjGo(k); }catch(e){}
+    const par={}; ['slozka','kurz','skupina','produkt','id','detail'].forEach(function(n){ const mm=hash0.match(new RegExp(n+'=([^&]+)','i')); if(mm) par[n]=decodeURIComponent(mm[1]); });
+    try{
+      if(k==='library'&&par.slozka) showLibrary(par.slozka);
+      else if(k==='produkty'){ if(par.produkt) showProdukty(par.produkt); else if(par.skupina) showProduktyGroup(par.skupina); else showProdukty(null); }
+      else if(k==='zapisy') showZapisy();
+      else if(k==='skoleni'&&par.kurz){
+        if(par.kurz==='abroll') openAbroll();
+        else if(par.kurz==='prumysl') openPrumysl();
+        else if(par.kurz==='loxxer') openLoxxerSkoleni();
+        else if(par.kurz==='acts') openActsSkoleni();
+        else if(par.kurz==='kovo'||par.kurz==='roto') openProdukty(par.kurz);
+        else mjGo('skoleni');
+      }
+      else if(k==='kontejnerykalk'&&par.id) showKontejneryKalk(par.id);
+      else if(k==='poptavky'&&par.detail){ MUJ._poptDetail=par.detail; mjGo(k); }
+      else mjGo(k);
+    }catch(e){}
   }
   // Živá aktualizace počtu nových poptávek (odznak v menu) — á 90 s.
   if(!MUJ._poptavkyTimer){ MUJ._poptavkyTimer = setInterval(async function(){
@@ -2327,6 +2342,7 @@ function showLoxxerKalk(){
 }
 async function showPoptavky(){
   MUJ.view="poptavky"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=poptavky'); }catch(e){}
   const body=document.getElementById("mujBody");
   if(!moduleVisible({key:"poptavky",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   window.scrollTo(0,0);
@@ -2362,6 +2378,7 @@ async function loadKontejnerPoptavky(){
     MUJ.poptavkyNew=(MUJ.poptavkyNew||0)+nnew; renderSidebar();
     if(!KONT_POPT.items.length){ el.innerHTML='<div class="card pad" style="display:flex;align-items:center;gap:10px"><span class="pill green">✓</span><span class="muted">Žádné poptávky kontejnerů.</span></div>'; return; }
     el.innerHTML=KONT_POPT.items.map(kontCard).join('');
+    if(MUJ._poptDetail){ const _pd=MUJ._poptDetail; MUJ._poptDetail=null; try{ openKontejnerDetail(_pd); }catch(e){} }
   }catch(e){ el.innerHTML='<div class="card pad"><span class="muted">Chyba: '+esc(e.message)+'</span></div>'; }
 }
 let LIS_POPT={items:[],stavy:{},role:{},employees:[]};
@@ -2452,6 +2469,7 @@ function kontCard(it){
 }
 function openKontejnerDetail(id){
   const it=(KONT_POPT.items||[]).find(x=>x.id===id); if(!it) return;
+  try{ history.replaceState(null,'','#modul=poptavky&detail='+encodeURIComponent(id)); }catch(e){}
   KDET=it;
   const body=document.getElementById("mujBody"); if(!body) return;
   const st=it.stav||'nova', isAdmin=!!KONT_POPT.role.isAdmin, stavy=KONT_POPT.stavy||{};
@@ -2598,6 +2616,7 @@ function showLoznyPlan(){
 }
 function showKontejneryKalk(leadId){
   MUJ.view="kontejnerykalk"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=kontejnerykalk'+(leadId?'&id='+encodeURIComponent(leadId):'')); }catch(e){}
   const body=document.getElementById("mujBody");
   if(!moduleVisible({key:"kontejnerykalk",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   const src='/kontejnery-nacenit'+(leadId?('?id='+encodeURIComponent(leadId)):'');
@@ -2802,6 +2821,7 @@ async function skolPozvatOdesli(){
 function openProdukty(typ){
   typ = (typ==='roto') ? 'roto' : 'kovo';
   MUJ.view="skoleni"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=skoleni&kurz='+typ); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
   const q='#typ='+typ+'&kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
@@ -2814,6 +2834,7 @@ function openProdukty(typ){
 }
 function openAbroll(){
   MUJ.view="skoleni"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=skoleni&kurz=abroll'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
   const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
@@ -2825,6 +2846,7 @@ function openAbroll(){
 }
 function openPrumysl(){
   MUJ.view="skoleni"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=skoleni&kurz=prumysl'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
   const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
@@ -2836,6 +2858,7 @@ function openPrumysl(){
 }
 function openLoxxerSkoleni(){
   MUJ.view="skoleni"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=skoleni&kurz=loxxer'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
   const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
@@ -2847,6 +2870,7 @@ function openLoxxerSkoleni(){
 }
 function openActsSkoleni(){
   MUJ.view="skoleni"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=skoleni&kurz=acts'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
   const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
@@ -3057,6 +3081,7 @@ function qooRender(){
       +'<div class="kpi"><div class="v">'+Number(d.minutesOpen||0).toLocaleString('cs-CZ')+'</div><div class="l">Minut oprav (otevřené)</div></div>'
     +'</div>'
     +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Závady po měsících</b><div id="qooChart" style="display:flex;align-items:flex-end;gap:6px;height:110px;margin-top:12px"></div></div>'
+    +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Minuty oprav podle střediska a měsíce</b><p class="muted" style="font-size:12px;margin:4px 0 0">Středisko dle zadavatele závady (z databáze zaměstnanců). Celkem = celé období.</p><div id="qooMatrix" style="overflow-x:auto;margin-top:10px"></div></div>'
     +'<div class="card pad" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
       +'<input id="qooQ" placeholder="🔍 Hledat (č., viník, zadal…)" value="'+esc(QOO.q)+'" style="flex:1;min-width:200px;padding:9px 13px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
       +'<select id="qooStav" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff"><option value="">Všechny stavy</option><option value="open"'+(QOO.stav==='open'?' selected':'')+'>Otevřené</option><option value="closed"'+(QOO.stav==='closed'?' selected':'')+'>Uzavřené</option></select>'
@@ -3073,7 +3098,31 @@ function qooRender(){
   document.getElementById('qooStav').onchange=function(){ QOO.stav=this.value; qooListRender(); };
   document.getElementById('qooVinik').onchange=function(){ QOO.vinik=this.value; qooListRender(); };
   document.getElementById('qooMes').onchange=function(){ QOO.mesic=this.value; qooListRender(); };
-  qooChartRender(); qooListRender();
+  qooChartRender(); qooMatrixRender(); qooListRender();
+}
+function qooMatrixRender(){
+  const box=document.getElementById('qooMatrix'); if(!box) return;
+  const M=(QOO.data&&QOO.data.minutesMatrix)||{}; const stred=Object.keys(M);
+  if(!stred.length){ box.innerHTML='<span class="muted">Zatím žádná data.</span>'; return; }
+  const mesice=[...new Set(stred.flatMap(k=>Object.keys(M[k])))].sort().slice(-13);
+  const radekCelkem=k=>Object.values(M[k]).reduce((s,v)=>s+v,0);
+  const sloupecCelkem=m=>stred.reduce((s,k)=>s+(M[k][m]||0),0);
+  const serazene=stred.slice().sort((a,b)=>radekCelkem(b)-radekCelkem(a));
+  const maxCell=Math.max.apply(null,serazene.flatMap(k=>mesice.map(m=>M[k][m]||0)));
+  const thS='padding:8px 10px;border-bottom:2px solid var(--line);font-size:12px;color:var(--ink-soft);white-space:nowrap';
+  const tdS='padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap';
+  const heat=v=>v?'background:rgba(244,180,0,'+(0.08+0.32*(v/maxCell)).toFixed(2)+')':'';
+  box.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>'
+    +'<th style="text-align:left;'+thS+'">Středisko</th>'
+    +mesice.map(m=>'<th style="text-align:right;'+thS+'">'+m.slice(5)+'/'+m.slice(2,4)+'</th>').join('')
+    +'<th style="text-align:right;'+thS+'">Celkem</th></tr></thead><tbody>'
+    +serazene.map(k=>'<tr><td style="text-align:left;'+tdS+'">'+esc(k)+'</td>'
+      +mesice.map(m=>'<td style="text-align:right;'+tdS+';'+heat(M[k][m]||0)+'">'+(M[k][m]?M[k][m].toLocaleString('cs-CZ'):'<span style="color:var(--line-strong)">—</span>')+'</td>').join('')
+      +'<td style="text-align:right;'+tdS+'"><b>'+radekCelkem(k).toLocaleString('cs-CZ')+'</b></td></tr>').join('')
+    +'<tr><td style="text-align:left;'+tdS+'"><b>Celkem</b></td>'
+      +mesice.map(m=>'<td style="text-align:right;'+tdS+'"><b>'+sloupecCelkem(m).toLocaleString('cs-CZ')+'</b></td>').join('')
+      +'<td style="text-align:right;'+tdS+'"><b>'+serazene.reduce((s,k)=>s+radekCelkem(k),0).toLocaleString('cs-CZ')+'</b></td></tr>'
+    +'</tbody></table>';
 }
 function qooChartRender(){
   const box=document.getElementById('qooChart'), d=QOO.data;
@@ -3093,7 +3142,7 @@ function qooListRender(){
   const list=qooFiltrovane();
   if(!list.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Žádné závady neodpovídají filtru.</p></div>'; return; }
   box.innerHTML='<div class="card" style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:13.5px"><thead><tr>'
-    +['Závada','Datum','Stav','Kdo chybu způsobil','Zadal(a)','Ks','Minut oprava','Stáří'].map((h,i)=>'<th style="text-align:'+(i>=5?'right':'left')+';padding:10px 12px;border-bottom:2px solid var(--line);font-size:12px;color:var(--ink-soft);white-space:nowrap">'+h+'</th>').join('')
+    +['Závada','Datum','Stav','Kdo chybu způsobil','Zadal(a)','Středisko','Ks','Minut oprava','Stáří'].map((h,i)=>'<th style="text-align:'+(i>=6?'right':'left')+';padding:10px 12px;border-bottom:2px solid var(--line);font-size:12px;color:var(--ink-soft);white-space:nowrap">'+h+'</th>').join('')
     +'</tr></thead><tbody>'
     +list.map(x=>'<tr>'
       +'<td style="padding:8px 12px;border-bottom:1px solid var(--line)"><b>#'+esc(x.num)+'</b></td>'
@@ -3101,6 +3150,7 @@ function qooListRender(){
       +'<td style="padding:8px 12px;border-bottom:1px solid var(--line)">'+qooBadge(x.status)+'</td>'
       +'<td style="padding:8px 12px;border-bottom:1px solid var(--line)">'+esc(x.culprit||'—')+'</td>'
       +'<td style="padding:8px 12px;border-bottom:1px solid var(--line)">'+esc(x.creator||'—')+'</td>'
+      +'<td style="padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink-soft)">'+esc(x.stredisko||'—')+'</td>'
       +'<td style="padding:8px 12px;border-bottom:1px solid var(--line);text-align:right">'+(x.ks!=null?x.ks:esc(x.ksRaw||'—'))+'</td>'
       +'<td style="padding:8px 12px;border-bottom:1px solid var(--line);text-align:right">'+(x.minutes||0)+'</td>'
       +'<td style="padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;color:'+((x.ageDays||0)>60&&!qooClosed(x.status)?'#a03a2c':'var(--ink-soft)')+'">'+(x.ageDays!=null?x.ageDays+' d':'—')+'</td></tr>').join('')
@@ -3945,6 +3995,7 @@ function prodCardHtml(p){
 }
 function showProdukty(key){
   MUJ.view="library"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=produkty'+(key?'&produkt='+encodeURIComponent(key):'')); }catch(e){}
   const body=document.getElementById("mujBody");
   if(key){ MUJ.prodGroup=prodGroupOf(key); return renderProduktDetail(key); }
   MUJ.prodGroup=null;
@@ -3967,6 +4018,7 @@ function showProdukty(key){
 }
 function showProduktyGroup(g){
   MUJ.view="library"; MUJ.prodGroup=g; renderSidebar();
+  try{ history.replaceState(null,'','#modul=produkty&skupina='+encodeURIComponent(g)); }catch(e){}
   const body=document.getElementById("mujBody");
   const grp=PROD_GROUPS[g]||PROD_GROUPS.kovo;
   let h='<div class="crumb"><a onclick="showLibrary(null)">'+mujIcon(MUJ_IC.book)+' Knihovna</a><span class="sep">›</span><a onclick="showProdukty(null)">Produkty</a><span class="sep">›</span><span class="cur">'+esc(g.toUpperCase())+'</span></div>';

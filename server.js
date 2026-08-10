@@ -2147,7 +2147,7 @@ try {
 let qoolingMod = null;
 try {
   qoolingMod = require('./qooling').mount({ reportDisabled,
-    send, readBody, deliver, isAdmin, empSession, employeeModules,
+    send, readBody, deliver, isAdmin, empSession, employeeModules, getState,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet ELKOPLAST — Qooling', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
   });
