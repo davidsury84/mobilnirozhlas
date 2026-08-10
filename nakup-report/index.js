@@ -21,6 +21,9 @@ function mount(host) {
   const OBJ_LIVE = path.join(host.dataDir || __dirname, 'smi-objednavky-data.json'); // denně aktualizováno z Google Drive (volume)
   const SYNC_STATE = path.join(host.dataDir || __dirname, 'objednavky-sync.json');   // stav Drive sync (poslední soubor/den)
   const OBJ_FOLDER = process.env.OBJEDNAVKY_DRIVE_FOLDER || '1n8OCCiXFw86e4EXnkyX8C5i5uu404aO1'; // sdílená složka s SA, denně nový soubor
+  const OBRAT_FOLDER = process.env.OBRAT_DRIVE_FOLDER || ''; // složka s „obrat plasty" (prodejní historie); prázdné = vypnuto, klient jede z embedu
+  const OBRAT_RAW = path.join(host.dataDir || __dirname, 'obrat-plasty.xlsx');        // cache nejnovějšího obrat plasty (raw xlsx, writable)
+  const OBRAT_STATE = path.join(host.dataDir || __dirname, 'obrat-plasty-sync.json'); // stav sync (poslední soubor/datum)
   const SUP_F = path.join(host.dataDir || __dirname, 'nakup-dodavatele.json');       // dotazník dodavatelů: termín dodání + náklad na dopravu (writable)
   const loadObj = () => { for (const f of [OBJ_LIVE, OBJ_SEED]) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) {} } return { rows: [], columns: [], date: '' }; };
   const loadSup = () => { try { return JSON.parse(fs.readFileSync(SUP_F, 'utf8')) || {}; } catch (_) { return {}; } };
@@ -182,6 +185,27 @@ function mount(host) {
     console.log('[nakup-report] Drive sync: ' + newest.name + ' → ' + parsed.rows.length + ' položek');
     return { ok: true, file: newest.name, rows: parsed.rows.length };
   }
+
+  // ---- „obrat plasty" (prodejní historie) — denní stažení nejnovějšího souboru ze sdílené složky ----
+  const dateOfObrat = nm => { const m = /(\d{4})[-.]?(\d{2})[-.]?(\d{2})/.exec(nm || ''); if (m) return m[1] + '-' + m[2] + '-' + m[3]; const q = /([1-4])Q\s*(\d{4})/i.exec(nm || ''); return q ? (q[2] + '-Q' + q[1]) : ''; };
+  async function syncObrat(force) {
+    if (!OBRAT_FOLDER) return { ok: false, error: 'OBRAT_DRIVE_FOLDER není nastaven.' };
+    if (!drive || !drive.configured()) return { ok: false, error: 'Service account (GOOGLE_SA_*) není nastavený.' };
+    let st = {}; try { st = JSON.parse(fs.readFileSync(OBRAT_STATE, 'utf8')) || {}; } catch (_) {}
+    const files = await drive.listFolder(OBRAT_FOLDER);
+    const xls = (files || []).filter(f => /\.xlsx$/i.test(f.name || '') || /spreadsheetml/.test(f.mimeType || ''));
+    if (!xls.length) return { ok: false, error: 'Ve složce obrat plasty nejsou .xlsx soubory (nasdílena SA?).' };
+    xls.sort((a, b) => String(b.createdTime || '').localeCompare(String(a.createdTime || '')) || String(b.name || '').localeCompare(String(a.name || '')));
+    const newest = xls[0];
+    if (!force && st.lastFileId === newest.id) return { ok: true, skipped: true, file: newest.name };
+    const dl = await drive.downloadFileBase64(newest.id, 30 * 1024 * 1024);
+    try { fs.writeFileSync(OBRAT_RAW, Buffer.from(dl.base64, 'base64')); } catch (e) { return { ok: false, error: 'Uložení selhalo: ' + e.message }; }
+    st = { lastFileId: newest.id, lastFileName: newest.name, date: dateOfObrat(newest.name), lastAt: new Date().toISOString() };
+    try { fs.writeFileSync(OBRAT_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
+    console.log('[nakup-report] obrat plasty sync: ' + newest.name);
+    return { ok: true, file: newest.name };
+  }
+  function obratMeta() { let st = {}; try { st = JSON.parse(fs.readFileSync(OBRAT_STATE, 'utf8')) || {}; } catch (_) {} return st; }
 
   const DEF_MD = ['michaela.lizancova@elkoplast.cz', 'jan.benicek@elkoplast.cz'];
   const DEF_PU = ['hana.faltynkova@elkoplast.cz', 'david.sury@elkoplast.cz'];
@@ -454,6 +478,7 @@ function mount(host) {
   async function tick() {
     // 1) DENNÍ stažení nejnovějšího souboru z Drive (běží nezávisle na e-mailech)
     try { const s = await syncObjednavky(false); if (s && !s.ok && !s.skipped) console.warn('[nakup-report] Drive sync neproběhl:', s.error); } catch (e) { console.error('[nakup-report] Drive sync:', e.message); }
+    if (OBRAT_FOLDER) { try { const so = await syncObrat(false); if (so && !so.ok && !so.skipped) console.warn('[nakup-report] obrat plasty sync neproběhl:', so.error); } catch (e) { console.error('[nakup-report] obrat sync:', e.message); } }
     // 2) E-mailové reporty dle configu
     try {
       const dis = (k) => host.reportDisabled && host.reportDisabled(k);   // zrušeno v přehledu Rozesílky
@@ -489,6 +514,12 @@ function mount(host) {
       const rows = (o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
       json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup() }));
       return true;
+    }
+    // „obrat plasty" (prodejní historie) — čerstvý raw xlsx pro klienta (SMI app ho parsuje). Přihlášený.
+    if (p === '/api/nakup-report/obrat-plasty' && req.method === 'GET') {
+      try { const b64 = fs.readFileSync(OBRAT_RAW).toString('base64'); const m = obratMeta();
+        return json(res, 200, { ok: true, name: m.lastFileName || '', date: m.date || '', syncedAt: m.lastAt || '', b64 }), true; }
+      catch (_) { return json(res, 200, { ok: false, error: 'Zatím není načten obrat plasty z Drive.' }), true; }
     }
     // Dotazník dodavatelů — čtení pro přihlášené (EOQ v appce potřebuje náklad na dopravu + lhůtu)
     if (p === '/api/nakup-report/suppliers' && req.method === 'GET') {
@@ -575,7 +606,7 @@ function mount(host) {
     ];
   }
 
-  return { handle, tick, sync: () => syncObjednavky(false), reports };
+  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), reports };
 }
 
 module.exports = { mount };

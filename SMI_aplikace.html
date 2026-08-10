@@ -1969,7 +1969,7 @@ function objEOQ(x,sales,cyc){
 function objIntTxt(m){ if(m==null||!isFinite(m))return '—'; if(m>=18)return (Math.round(m/12*10)/10).toString().replace('.',',')+' r'; return (Math.round(m*10)/10).toString().replace('.',',')+' m'; }
 // ---- Poradce podle kódu: zadej kód → kolik koupit + proč ----
 function objSalesPeriodShort(){ try{ const s=(typeof EMBEDDED_PERIOD_INFO!=='undefined'&&EMBEDDED_PERIOD_INFO)||''; const m=s.match(/(\d{4}-\d{2})\s*až\s*(\d{4}-\d{2})/); return m?(m[1]+'–'+m[2]):(s.replace(/^Data za\s*/,'')||'obrat plasty'); }catch(e){ return 'obrat plasty'; } }
-function objFreshInfo(){ return 'Počítáno z: ERP <b>'+esc((OBJ_DATA&&OBJ_DATA.date)||'?')+'</b> (denně z Drive) · prodeje '+esc(objSalesPeriodShort())+' (obrat plasty)'; }
+function objFreshInfo(){ return 'Počítáno z: ERP <b>'+esc((OBJ_DATA&&OBJ_DATA.date)||'?')+'</b> (denně z Drive) · prodeje '+esc(window.__salesSrc||(objSalesPeriodShort()+' (vestavěný snapshot)')); }
 function objAskFind(q){
   q=String(q||'').trim(); if(!q)return null;
   const rows=(OBJ_DATA&&OBJ_DATA.rows)||[]; const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,'');
@@ -3051,11 +3051,16 @@ async function buildSeasonReport(){
 }
 (function(){const b=$('#sezReport');if(b)b.onclick=buildSeasonReport;})();
 
-// ---- autoload embedded default ----
-window.addEventListener('DOMContentLoaded',()=>{
-  if(typeof EMBEDDED_XLSX_B64!=='undefined'&&EMBEDDED_XLSX_B64){
+// ---- autoload: nejdřív zkus ČERSTVÝ „obrat plasty" ze serveru (Drive), jinak vestavěný snapshot ----
+window.addEventListener('DOMContentLoaded',async()=>{
+  let loaded=false;
+  try{
+    const r=await fetch('/api/nakup-report/obrat-plasty',{cache:'no-store'});
+    if(r.ok){ const d=await r.json(); if(d&&d.ok&&d.b64){ SRC_BUFFER=b64ToBuf(d.b64); if(d.name)SRC_NAME=d.name; await loadWorkbook(SRC_BUFFER,false,false); loaded=true; window.__salesSrc='obrat plasty '+(d.date||d.name||'')+' (živě z Drive)'; console.log('[SMI] obrat plasty z Drive: '+(d.name||'')+' ('+(d.date||'?')+')'); } }
+  }catch(e){}
+  if(!loaded && typeof EMBEDDED_XLSX_B64!=='undefined'&&EMBEDDED_XLSX_B64){
     SRC_BUFFER=b64ToBuf(EMBEDDED_XLSX_B64);
-    loadWorkbook(SRC_BUFFER,true,true);
+    await loadWorkbook(SRC_BUFFER,true,true);
   }
 });
 </script>
