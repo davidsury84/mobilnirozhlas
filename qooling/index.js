@@ -161,68 +161,90 @@ function mount(host) {
   }
   const saveCfg = c => { try { fs.writeFileSync(CFG_F, JSON.stringify(c, null, 2)); } catch (e) { console.error('[qooling] zápis config:', e.message); } };
 
-  // ---------- e-mail ----------
-  const th = t => '<th style="text-align:' + (/Ks|Minut|Stáří|Závad$/.test(t) ? 'right' : 'left') + ';border-bottom:2px solid #d8dee7;padding:6px 8px;font-size:12px;color:#55605a">' + esc(t) + '</th>';
-  const td = (v, r) => '<td style="text-align:' + (r ? 'right' : 'left') + ';border-bottom:1px solid #eef1ec;padding:5px 8px">' + v + '</td>';
-  const stBadge = st => isClosed(st) ? '<span style="color:#2f7d32">✔ ' + esc(st) + '</span>'
-    : /progress/i.test(st) ? '<b style="color:#b06f00">' + esc(st) + '</b>' : '<b style="color:#b23">' + esc(st) + '</b>';
-  const issueRows = (list, age) => list.map(x => '<tr>' +
-    td('<b>#' + esc(x.num) + '</b>') + td(esc(x.date || '—')) + td(stBadge(x.status)) +
-    td(esc(x.culprit || '—')) + td(esc(x.creator || '—')) +
-    td(x.ks != null ? fmt(x.ks) : esc(x.ksRaw || '—'), 1) + td(fmt(x.minutes), 1) +
-    td(age(x) != null ? fmt(age(x)) + ' d' : '—', 1) + '</tr>').join('');
-  const issueHead = '<tr>' + [th('Závada'), th('Datum'), th('Stav'), th('Kdo chybu způsobil'), th('Zadal(a)'), th('Ks'), th('Minut oprava'), th('Stáří')].join('') + '</tr>';
+  // ---------- e-mail (zrcadlí stránku modulu: KPI → graf po měsících → matice středisek → tabulka závad) ----------
+  const th = t => '<th style="text-align:' + (/Ks|Minut|Stáří/.test(t) ? 'right' : 'left') + ';border-bottom:2px solid #d8dee7;padding:8px 10px;font-size:12px;color:#55605a;white-space:nowrap">' + esc(t) + '</th>';
+  const td = (v, r) => '<td style="text-align:' + (r ? 'right' : 'left') + ';border-bottom:1px solid #eef1ec;padding:6px 10px">' + v + '</td>';
+  const stBadge = st => isClosed(st) ? '<span style="background:#e7f5e9;color:#1f5e22;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap">✔ ' + esc(st) + '</span>'
+    : /progress/i.test(st) ? '<span style="background:#fbf0dc;color:#a86a00;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap">' + esc(st) + '</span>'
+      : '<span style="background:#fbecea;color:#a03a2c;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap">' + esc(st) + '</span>';
+  const czDate = d => d ? d.split('-').reverse().join('. ') : '—';
 
-  // Matice „minuty oprav podle střediska × měsíc" (posledních 6 měsíců s daty + Celkem) pro e-mail.
+  // KPI karty jako na stránce (bílá karta, zelený proužek vlevo, velké číslo).
+  function kpiRowHtml(S) {
+    const kpi = (val, label) => '<td style="width:25%;padding:0 8px 0 0;vertical-align:top">' +
+      '<div style="background:#fff;border:1px solid #e2e6df;border-left:4px solid #3a7d44;border-radius:10px;padding:14px 16px">' +
+      '<div style="font-size:26px;font-weight:700;color:#1f3d6b;font-family:Consolas,Menlo,monospace">' + val + '</div>' +
+      '<div style="font-size:11px;color:#6b736c;text-transform:uppercase;letter-spacing:.04em;margin-top:2px">' + esc(label) + '</div></div></td>';
+    return '<table style="border-collapse:separate;width:100%;margin:0 0 16px"><tr>' +
+      kpi(fmt(S.open.length), 'Otevřené závady') + kpi(fmt(S.inProgress.length), 'V řešení') +
+      kpi(fmt(S.new30.length), 'Nové za 30 dní') + kpi(fmt(S.minutesOpen), 'Minut oprav (otevřené)') + '</tr></table>';
+  }
+
+  // Sloupcový graf „Závady po měsících" — čisté HTML (divy s výškou), bez skriptů.
+  function monthsChartHtml(S) {
+    const keys = Object.keys(S.months || {}).sort().slice(-13); if (!keys.length) return '';
+    const max = Math.max.apply(null, keys.map(k => S.months[k]));
+    return '<div style="background:#fff;border:1px solid #e2e6df;border-radius:10px;padding:14px 16px;margin:0 0 16px">' +
+      '<b style="font-size:14px">Závady po měsících</b>' +
+      '<table style="border-collapse:collapse;width:100%;margin-top:10px"><tr>' +
+      keys.map(k => { const v = S.months[k], h = Math.max(6, Math.round(v / max * 80));
+        return '<td style="vertical-align:bottom;text-align:center;padding:0 3px">' +
+          '<div style="font-size:11px;color:#8a938a;margin-bottom:3px">' + v + '</div>' +
+          '<div style="height:' + h + 'px;background:#7b96e0;border-radius:4px 4px 0 0;font-size:0;line-height:0">&nbsp;</div></td>'; }).join('') +
+      '</tr><tr>' +
+      keys.map(k => '<td style="text-align:center;font-size:10px;color:#8a938a;padding-top:4px;border-top:2px solid #eef1ec;white-space:nowrap">' + k.slice(5) + '/' + k.slice(2, 4) + '</td>').join('') +
+      '</tr></table></div>';
+  }
+
+  // Matice „minuty oprav podle střediska × měsíc" s heatmapou jako na stránce.
   function minutesMatrixHtml(S) {
     const rows = Object.keys(S.minutesMatrix || {}); if (!rows.length) return '';
     const monthsAll = [...new Set(rows.flatMap(k => Object.keys(S.minutesMatrix[k])))].sort();
-    const months = monthsAll.slice(-6);
+    const months = monthsAll.slice(-13);
     const total = k => monthsAll.reduce((s, m) => s + (S.minutesMatrix[k][m] || 0), 0);
     const colTotal = m => rows.reduce((s, k) => s + (S.minutesMatrix[k][m] || 0), 0);
-    const mLabel = m => m.slice(5) + '/' + m.slice(2, 4);
     const sorted = rows.slice().sort((a, b) => total(b) - total(a));
-    const thR = t => '<th style="text-align:right;border-bottom:2px solid #d8dee7;padding:6px 8px;font-size:12px;color:#55605a">' + esc(t) + '</th>';
-    return '<h3 style="margin:18px 0 6px;font-size:15px">Minuty oprav podle střediska a měsíce</h3>' +
-      '<p style="color:#8a938a;font-size:12px;margin:0 0 6px">Středisko dle zadavatele závady (posledních ' + months.length + ' měsíců s daty; Celkem = celé období).</p>' +
-      '<table style="border-collapse:collapse;width:100%"><thead><tr>' + th('Středisko') + months.map(m => thR(mLabel(m))).join('') + thR('Celkem') + '</tr></thead><tbody>' +
-      sorted.map(k => '<tr>' + td(esc(k)) + months.map(m => td(S.minutesMatrix[k][m] ? fmt(S.minutesMatrix[k][m]) : '<span style="color:#c6ccc4">—</span>', 1)).join('') + td('<b>' + fmt(total(k)) + '</b>', 1) + '</tr>').join('') +
-      '<tr>' + td('<b>Celkem</b>') + months.map(m => td('<b>' + fmt(colTotal(m)) + '</b>', 1)).join('') + td('<b>' + fmt(sorted.reduce((s, k) => s + total(k), 0)) + '</b>', 1) + '</tr>' +
-      '</tbody></table>';
+    const maxCell = Math.max.apply(null, sorted.flatMap(k => months.map(m => S.minutesMatrix[k][m] || 0)));
+    const heat = v => v ? ';background:rgba(244,180,0,' + (0.08 + 0.32 * (v / maxCell)).toFixed(2) + ')' : '';
+    const thR = t => '<th style="text-align:right;border-bottom:2px solid #d8dee7;padding:8px 8px;font-size:12px;color:#55605a;white-space:nowrap">' + esc(t) + '</th>';
+    const cell = (v, extra, b) => '<td style="text-align:right;border-bottom:1px solid #eef1ec;padding:6px 8px;white-space:nowrap' + (extra || '') + '">' + (b ? '<b>' + v + '</b>' : v) + '</td>';
+    return '<div style="background:#fff;border:1px solid #e2e6df;border-radius:10px;padding:14px 16px;margin:0 0 16px">' +
+      '<b style="font-size:14px">Minuty oprav podle střediska a měsíce</b>' +
+      '<div style="font-size:12px;color:#8a938a;margin:4px 0 8px">Středisko dle zadavatele závady (z databáze zaměstnanců). Celkem = celé období.</div>' +
+      '<table style="border-collapse:collapse;width:100%"><thead><tr>' + th('Středisko') + months.map(m => thR(m.slice(5) + '/' + m.slice(2, 4))).join('') + thR('Celkem') + '</tr></thead><tbody>' +
+      sorted.map(k => '<tr>' + td(esc(k)) + months.map(m => { const v = S.minutesMatrix[k][m] || 0; return cell(v ? fmt(v) : '<span style="color:#c6ccc4">—</span>', heat(v)); }).join('') + cell(fmt(total(k)), '', 1) + '</tr>').join('') +
+      '<tr>' + td('<b>Celkem</b>') + months.map(m => cell(fmt(colTotal(m)), '', 1)).join('') + cell(fmt(sorted.reduce((s, k) => s + total(k), 0)), '', 1) + '</tr>' +
+      '</tbody></table></div>';
+  }
+
+  // Tabulka závad jako na stránce (řazeno od nejnovější, se střediskem, stáří >60 dní červeně).
+  function issuesTableHtml(S) {
+    const CAP = 60;
+    const list = S.issues.slice(0, CAP);
+    return '<div style="background:#fff;border:1px solid #e2e6df;border-radius:10px;padding:14px 16px;margin:0 0 16px">' +
+      '<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>' +
+      [th('Závada'), th('Datum'), th('Stav'), th('Kdo chybu způsobil'), th('Zadal(a)'), th('Středisko'), th('Ks'), th('Minut oprava'), th('Stáří')].join('') + '</tr></thead><tbody>' +
+      list.map(x => { const a = S.age(x); const oldOpen = a != null && a > 60 && !isClosed(x.status);
+        return '<tr>' + td('<b>#' + esc(x.num) + '</b>') + td('<span style="white-space:nowrap">' + esc(czDate(x.date)) + '</span>') + td(stBadge(x.status)) +
+        td(esc(x.culprit || '—')) + td(esc(x.creator || '—')) + td('<span style="font-size:12px;color:#6b736c">' + esc(x.stredisko || '—') + '</span>') +
+        td(x.ks != null ? fmt(x.ks) : esc(x.ksRaw || '—'), 1) + td(fmt(x.minutes), 1) +
+        td(a != null ? '<span style="white-space:nowrap;color:' + (oldOpen ? '#a03a2c' : '#8a938a') + '">' + fmt(a) + ' d</span>' : '—', 1) + '</tr>'; }).join('') +
+      '</tbody></table>' +
+      (S.issues.length > CAP ? '<p style="color:#8a938a;font-size:12px;margin:8px 0 0">… zobrazeno ' + CAP + ' nejnovějších z ' + S.issues.length + ' závad — kompletní seznam v intranetu.</p>' : '') +
+      '<p style="color:#8a938a;font-size:12px;margin:8px 0 0">Ks = počet kusů z pole Title v Qoolingu · Stáří červeně = otevřená závada starší 60 dní.</p></div>';
   }
 
   function buildReport() {
     const S = stats();
-    const kpi = (label, val, accent) => '<td style="padding:0 6px 0 0;vertical-align:top"><div style="border:1px solid #dbe2d8;border-left:4px solid ' + accent + ';border-radius:9px;padding:10px 12px">' +
-      '<div style="font-size:12px;color:#6b736c;text-transform:uppercase;letter-spacing:.03em">' + esc(label) + '</div>' +
-      '<div style="font-size:22px;font-weight:700;color:#243">' + val + '</div></div></td>';
-    const oldestOpen = S.open.slice().filter(x => x.date).sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 10);
-    const body =
-      '<div style="background:#eef4fb;border:1px solid #d3e0f2;border-radius:10px;padding:13px 16px;margin:0 0 16px;font-size:13px;line-height:1.65">' +
-      '<div style="margin:3px 0"><b style="color:#1f4e79">Co to je:</b> Týdenní stav <b>závad kvality z Qoolingu</b> — co je otevřené, co přibylo za týden a kdo chyby způsobuje.</div>' +
-      '<div style="margin:3px 0"><b style="color:#1f4e79">Jak číst:</b> <b>Otevřené</b> = závady bez uzavření. <b>Minut oprava</b> = nahlášená doba opravy. <b>Stáří</b> = dny od zadání — staré otevřené závady znamenají, že se neřeší.</div>' +
-      '<div style="margin:3px 0"><b style="color:#1f4e79">Co s tím:</b> Projít nové závady, uzavřít vyřešené (v Qoolingu) a zaměřit se na opakující se viníky níže.</div></div>' +
-      '<table style="border-collapse:separate;width:100%;margin:0 0 14px"><tr>' +
-      kpi('Otevřené závady', fmt(S.open.length), '#b23') +
-      kpi('V řešení', fmt(S.inProgress.length), '#b06f00') +
-      kpi('Nové za 7 dní', fmt(S.new7.length), '#2f6f8f') +
-      kpi('Minut oprav (otevřené)', fmt(S.minutesOpen), '#8a4baf') + '</tr></table>' +
-      (S.new7.length ? '<h3 style="margin:14px 0 6px;font-size:15px">Nové závady za posledních 7 dní</h3>' +
-        '<table style="border-collapse:collapse;width:100%"><thead>' + issueHead + '</thead><tbody>' + issueRows(S.new7, S.age) + '</tbody></table>'
-        : '<p style="color:#2f7d32;margin:8px 0"><b>✔ Za posledních 7 dní nepřibyla žádná nová závada.</b></p>') +
-      (oldestOpen.length ? '<h3 style="margin:18px 0 6px;font-size:15px">Nejstarší otevřené závady (neřeší se?)</h3>' +
-        '<table style="border-collapse:collapse;width:100%"><thead>' + issueHead + '</thead><tbody>' + issueRows(oldestOpen, S.age) + '</tbody></table>' : '') +
-      '<h3 style="margin:18px 0 6px;font-size:15px">Kdo chyby způsobuje (celé období)</h3>' +
-      '<table style="border-collapse:collapse;width:100%"><thead><tr>' + [th('Kdo chybu způsobil'), th('Závad'), th('Ks celkem'), th('Minut oprava')].join('') + '</tr></thead><tbody>' +
-      S.culprits.slice(0, 12).map(c => '<tr>' + td(esc(c.culprit)) + td('<b>' + fmt(c.count) + '</b>', 1) + td(fmt(c.ks), 1) + td(fmt(c.minutes), 1) + '</tr>').join('') + '</tbody></table>' +
-      minutesMatrixHtml(S) +
-      '<p style="margin:16px 0 0;font-size:13px"><a href="' + esc((host.mailFrom && host.mailFrom.publicUrl || '')) + '/#modul=qooling" style="color:#1f4e79">→ Interaktivní přehled v intranetu (modul Qooling)</a></p>';
     const period = S.source || (S.issues[0] && S.issues[0].date) || '';
-    const html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c1d1a;line-height:1.55;max-width:860px">' +
-      '<h2 style="margin:0 0 4px">Qooling — týdenní stav závad kvality</h2>' +
-      '<p style="color:#6b736c;margin:0 0 14px;font-size:13px">Celkem ' + fmt(S.issues.length) + ' evidovaných závad · Zdroj: ' + esc(period) + '</p>' + body +
-      '<hr style="border:0;border-top:1px solid #e6e9e3;margin:20px 0"><div style="font-size:12px;color:#8a938a">Automatický pondělní report · Intranet ELKOPLAST CZ → Qooling. Příjemce a zapnutí spravuje správce v modulu / v přehledu Rozesílky.</div></div>';
-    return { subject: 'Qooling — týdenní stav závad · otevřených ' + S.open.length + ', nových ' + S.new7.length, html, count: S.open.length };
+    const html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c1d1a;line-height:1.55;max-width:960px;background:#f6f7f5;padding:18px">' +
+      '<h2 style="margin:0 0 4px">Qooling — kvalita</h2>' +
+      '<p style="color:#6b736c;margin:0 0 16px;font-size:13px">Stav závad hlášených v Qoolingu — co je otevřené, kdo chyby způsobuje a kolik stojí opravy času. ' +
+      'Celkem ' + fmt(S.issues.length) + ' evidovaných závad · Zdroj: ' + esc(period) + '</p>' +
+      kpiRowHtml(S) + monthsChartHtml(S) + minutesMatrixHtml(S) + issuesTableHtml(S) +
+      '<p style="margin:0;font-size:13px"><a href="' + esc((host.mailFrom && host.mailFrom.publicUrl || '')) + '/#modul=qooling" style="color:#1f4e79">→ Otevřít interaktivní přehled v intranetu (filtry, hledání)</a></p>' +
+      '<hr style="border:0;border-top:1px solid #e6e9e3;margin:18px 0"><div style="font-size:12px;color:#8a938a">Automatický pondělní report · Intranet ELKOPLAST CZ → Qooling. Příjemce a zapnutí spravuje správce v modulu / v přehledu Rozesílky.</div></div>';
+    return { subject: 'Qooling — týdenní stav závad · otevřených ' + S.open.length + ', nových za 30 dní ' + S.new30.length, html, count: S.open.length };
   }
 
   async function sendReport(toList) {
