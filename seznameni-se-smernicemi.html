@@ -1471,9 +1471,14 @@ async function initIntranet(){
   MUJ.poptavkyNew = (typeof me.poptavkyNew==="number") ? me.poptavkyNew : 0;
   await refreshMy();
   showDashboard();
-  // Deep-link z e-mailů: /#modul=skoleni (i kontejnery ap.) otevře rovnou danou sekci.
-  const dm=location.hash.match(/modul=([a-z0-9]+)/i);
-  if(dm){ let k=dm[1].toLowerCase(); if(k==='kontejnery') k='poptavky'; try{ mjGo(k); }catch(e){} }
+  // Deep-link z e-mailů + návrat na stejné místo po obnovení stránky (#modul=… píše mjGo).
+  const hash0=location.hash;
+  const dm=hash0.match(/modul=([a-z0-9]+)/i);
+  if(dm){
+    let k=dm[1].toLowerCase(); if(k==='kontejnery') k='poptavky';
+    const fm=hash0.match(/slozka=([^&]+)/i);
+    try{ if(k==='library'&&fm) showLibrary(decodeURIComponent(fm[1])); else mjGo(k); }catch(e){}
+  }
   // Živá aktualizace počtu nových poptávek (odznak v menu) — á 90 s.
   if(!MUJ._poptavkyTimer){ MUJ._poptavkyTimer = setInterval(async function(){
     try{ const m = await (await fetch("/api/me",{cache:"no-store"})).json();
@@ -1579,6 +1584,8 @@ function mjSearchOpen(i){ const it=MJ_SEARCH_ITEMS[i]; if(it&&it.run) it.run(); 
 function mjSearchClose(){ const b=document.getElementById('mjSearchBox'); if(b) b.classList.remove('show'); MJ_SEARCH_SEL=-1; }
 function mjGo(key){
   mjSearchClose();
+  // Zapamatuj pozici v URL — po obnovení stránky (F5 / aktualizace) se otevře stejný modul.
+  try{ history.replaceState(null,'','#modul='+encodeURIComponent(key)); }catch(e){}
   if(key==="freelo"){ showFreelo(); return; }
   if(key==="directives") showDirectives();
   else if(key==="library") showLibrary(null);
@@ -2876,6 +2883,7 @@ let ZAP={items:[],oblasti:[],me:null,q:'',oblast:'',mesic:'',open:{}};
 function zapNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim(); }
 async function showZapisy(){
   MUJ.view="library"; renderSidebar();   // sekce Knihovny — v menu zůstává zvýrazněná Knihovna
+  try{ history.replaceState(null,'','#modul=zapisy'); }catch(e){}   // po F5 se vrátíme sem
   const body=document.getElementById("mujBody");
   body.innerHTML='<div class="dash-hero"><h2>Zápisy z jednání</h2><p>Načítám…</p></div>';
   try{
@@ -3681,6 +3689,7 @@ function showDirectives(){
 
 function showLibrary(folderId){
   MUJ.view="library"; MUJ.libFolder = folderId||null; renderSidebar();
+  try{ history.replaceState(null,'','#modul=library'+(folderId?'&slozka='+encodeURIComponent(folderId):'')); }catch(e){}   // po F5 stejné místo
   const body = document.getElementById("mujBody");
   const lib = (MUJ.data&&MUJ.data.library)||{folders:[],docs:[]};
   const folders = lib.folders||[], docs = lib.docs||[];
@@ -3965,6 +3974,8 @@ function closePvLightbox(){ const el=document.getElementById("pvLightbox"); if(e
 document.getElementById("tabs").addEventListener("click", e=>{
   if(e.target.tagName!=="BUTTON") return;
   const v=e.target.dataset.view;
+  // Zapamatuj záložku v URL — po obnovení stránky se správce vrátí na stejné místo.
+  try{ history.replaceState(null,'','#view='+encodeURIComponent(v)); }catch(_){}
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("active",b===e.target));
   document.querySelectorAll(".view").forEach(s=>s.classList.toggle("active", s.id==="view-"+v));
   if(v==="stats") renderStats();
@@ -3982,6 +3993,15 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="aktuality") renderAktualityAdmin();
   if(v==="settings"){ loadMailConfig(); renderProfiles(); renderThemeSettings(); applyBrandLogo(BRAND_LOGO); }
 });
+// Po obnovení stránky (F5 / aktualizace) otevři záložku, kde správce byl (#view=…).
+(function(){
+  try{
+    const m=location.hash.match(/view=([a-z0-9]+)/i);
+    if(!m) return;
+    const b=document.querySelector('#tabs button[data-view="'+m[1].toLowerCase()+'"]');
+    if(b) b.click();
+  }catch(_){}
+})();
 
 /* ---------- Pozvánky do intranetu: stav odesláno / přijato ---------- */
 let INVITES={};
