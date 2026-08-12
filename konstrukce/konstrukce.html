@@ -1345,7 +1345,7 @@ function orderTrack(z){
   var zam=(cur==='zamitnuto');
   var ci=zam?-1:order.indexOf(eff);
   var loc=(z.strediskoName?(' · závod '+esc(z.strediskoName)):'')+(z.cvzHelios?(' · ČVZ '+esc(z.cvzHelios)):'');
-  var fazeLbl=(z.faze==='objednavka')?'<span class="ot-faze obj">OBJEDNÁVKA'+(z.cisloObj?(' '+esc(z.cisloObj)):'')+'</span>':'<span class="ot-faze nab">NABÍDKA '+esc(z.cislo)+'</span>';
+  var fazeLbl=(z.rezim==='objednavka')?'<span class="ot-faze obj">OBJEDNÁVKA '+esc(z.cisloObj||z.cislo)+'</span>':'<span class="ot-faze nab">NABÍDKA '+esc(z.cislo)+'</span>';
   var cap= zam?'<span style="color:var(--red);font-weight:700">✕ Zamítnuto / storno</span>'
     : cur==='podklady'?'<span style="color:var(--amber);font-weight:700">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</span>'
     : '<b>'+esc(z.stavLabel)+'</b>'+loc+(z.deadline?(' · termín '+fdate(z.deadline)):'');
