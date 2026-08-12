@@ -247,7 +247,7 @@ const SEED_STAV = {
   prace:     { label: 'Obchodní výkres',            onTurn: 'konstrukter', terminal: false, faze: 'nabidka', phase: 'konstrukce', lhutaKey: 'lhutaZkresleniDays', kind: 'normal' },
   kontrola:  { label: 'Interní kontrola',  onTurn: 'sef',        terminal: false, faze: 'nabidka', phase: 'konstrukce', lhutaKey: 'lhutaKontrolaDays', kind: 'normal' },
   obchodnik: { label: 'U obchodníka',      onTurn: 'obchodnik',  terminal: false, faze: 'nabidka', phase: 'schvaleni',  lhutaKey: 'lhutaObchodnikDays', kind: 'normal' },
-  klient:    { label: 'U klienta — potvrzení nabídky', onTurn: 'obchodnik', terminal: false, faze: 'nabidka', phase: 'schvaleni', lhutaKey: 'lhutaKlientDays', kind: 'klient' },
+  klient:    { label: 'U klienta',        onTurn: 'obchodnik',  terminal: false, faze: 'nabidka', phase: 'schvaleni',  lhutaKey: 'lhutaKlientDays', kind: 'klient' },
   revize:    { label: 'Revize',            onTurn: 'konstrukter', terminal: false, faze: 'nabidka', phase: 'konstrukce', lhutaKey: 'lhutaRevizeDays', lhutaFrom: 'step', kind: 'normal' },
   podklady:  { label: 'Čeká na podklady',  onTurn: 'obchodnik',  terminal: false, faze: 'nabidka', phase: 'konstrukce', hold: true, kind: 'hold' },
   zavod:     { label: 'Výběr závodu',      onTurn: 'vykonny-reditel', terminal: false, faze: 'objednavka', phase: 'vyroba', lhutaKey: 'lhutaPrideleniDays', kind: 'normal' },
@@ -273,7 +273,8 @@ const WF_NODE_XY = {
   revize: [250, 250], podklady: [460, 250], zamitnuto: [880, 250],
 };
 const SEED_WF_EDGES = [
-  { action: 'create',            from: null,        to: 'prideleni', roles: ['obchodnik'],                      kind: 'system', source: 'system', label: 'Nová nabídka (zadání)' },
+  { action: 'create',            from: null,        to: 'prideleni', roles: ['obchodnik'],                      kind: 'system', source: 'system', label: 'Nová nabídka / objednávka se závodem' },
+  { action: 'create',            from: null,        to: 'zavod',     roles: ['obchodnik'],                      kind: 'system', source: 'system', label: 'Nová objednávka (závod vybere ředitel výroby)' },
   { action: 'prideli',           from: 'prideleni', to: 'prace',     roles: ['sef'],                            kind: 'forward', source: 'system', label: 'Přidělit konstruktéra' },
   { action: 'zkresleno',         from: 'prace',     to: 'kontrola',  altTo: 'obchodnik',                        roles: ['konstrukter'], kind: 'forward', source: 'user', label: 'Zkresleno → kontrola' },
   { action: 'zkresleno',         from: 'revize',    to: 'kontrola',  altTo: 'obchodnik',                        roles: ['konstrukter'], kind: 'forward', source: 'user', label: 'Revize zkreslena → kontrola' },
@@ -282,11 +283,14 @@ const SEED_WF_EDGES = [
   { action: 'obchodnik-ok',      from: 'obchodnik', to: 'obchodnik', roles: ['obchodnik'],                      kind: 'self',    source: 'user', label: 'Obchodník potvrdil' },
   { action: 'obchodnik-vrat',    from: 'obchodnik', to: 'prace',     roles: ['obchodnik'],                      kind: 'reject',  source: 'user', label: 'Připomínky obchodníka', needNote: true },
   { action: 'odeslat-klientovi', from: 'obchodnik', to: 'klient',    roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Odeslat klientovi', needPdf: true },
-  { action: 'schvalit',          from: 'klient',    to: 'zavod',     roles: ['klient'],                         kind: 'klient',  source: 'klient', label: 'Klient potvrdil nabídku → objednávka' },
-  { action: 'potvrdit-rucne',    from: 'klient',    to: 'zavod',     roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Obchodník potvrdil (ručně) → objednávka' },
+  { action: 'schvalit',          from: 'klient',    to: 'zavod',     roles: ['klient'],                         kind: 'klient',  source: 'klient', label: 'Klient potvrdil nabídku → předání do objednávek' },
+  { action: 'schvalit',          from: 'klient',    to: 'schvaleno', roles: ['klient'],                         kind: 'klient',  source: 'klient', label: 'Klient schválil výkres (objednávka) → výrobní dok.' },
+  { action: 'potvrdit-rucne',    from: 'klient',    to: 'zavod',     roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Obchodník potvrdil (ručně) → předání do objednávek' },
+  { action: 'potvrdit-rucne',    from: 'klient',    to: 'schvaleno', roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Obchodník potvrdil schválení (objednávka)' },
   { action: 'pripominky',        from: 'klient',    to: 'revize',    roles: ['klient'],                         kind: 'revize',  source: 'klient', label: 'Klient poslal připomínky' },
   { action: 'zamitnout',         from: 'klient',    to: 'zamitnuto', roles: ['klient'],                         kind: 'reject',  source: 'klient', label: 'Klient zamítl' },
-  { action: 'rozdel-zavod',      from: 'zavod',     to: 'schvaleno', roles: ['vykonny-reditel', 'sef'],         kind: 'forward', source: 'user', label: 'Vybrat závod', needPlant: true },
+  { action: 'rozdel-zavod',      from: 'zavod',     to: 'schvaleno', roles: ['vykonny-reditel', 'sef'],         kind: 'forward', source: 'user', label: 'Vybrat závod (z nabídky) → výrobní dok.', needPlant: true },
+  { action: 'rozdel-zavod',      from: 'zavod',     to: 'prideleni', roles: ['vykonny-reditel', 'sef'],         kind: 'forward', source: 'user', label: 'Vybrat závod (přímá objednávka) → přidělení', needPlant: true },
   { action: 'vlozit-vyrobni-dok', from: 'schvaleno', to: 'dokonceno', roles: ['konstrukter'],                   kind: 'forward', source: 'user', label: 'Vložit výrobní dokumentaci', needVyrobni: true },
   { action: 'hold',              from: '*',         to: 'podklady',  roles: ['obchodnik', 'sef'],               kind: 'hold',    source: 'user', label: 'Pozastavit (čeká na podklady)', needNote: true },
   { action: 'unhold',            from: 'podklady',  to: '@prev',     roles: ['obchodnik', 'sef'],               kind: 'forward', source: 'user', label: 'Podklady doplněny' },
@@ -298,9 +302,9 @@ function buildSeedWorkflow() {
     const s = SEED_STAV[id]; const xy = WF_NODE_XY[id] || [40, 40];
     return Object.assign({ id, x: xy[0], y: xy[1] }, JSON.parse(JSON.stringify(s)));
   });
-  return { nodes, edges: JSON.parse(JSON.stringify(SEED_WF_EDGES)), version: 2 };
+  return { nodes, edges: JSON.parse(JSON.stringify(SEED_WF_EDGES)), version: 3 };
 }
-const WF_SEED_VERSION = 2;   // bump = přeseeduje d.workflow (nový tok nabídka→objednávka)
+const WF_SEED_VERSION = 3;   // bump = přeseeduje d.workflow (v3: přímé objednávky — závod na začátku)
 const SEED_WORKFLOW = buildSeedWorkflow();
 
 // Popisky rolí pro schéma / plátno (kdo je „na tahu")
@@ -753,11 +757,14 @@ function mount(host) {
 
   const CURRENT_V = (z) => z.versions[z.versions.length - 1] || null;
 
-  // Překlopení potvrzené NABÍDKY na OBJEDNÁVKU: přiřadí číslo objednávky (VYK),
-  // přepne režim a přejde na výběr závodu. Klient se už znovu neschvaluje.
+  // Předání potvrzené NABÍDKY do aplikace OBJEDNÁVEK: přiřadí číslo objednávky
+  // (VYK), přepne režim a přejde na výběr závodu. Výkres už klient schválil
+  // v nabídkové fázi (zNabidky=true) → po výběru závodu jde rovnou na výrobní
+  // dokumentaci, bez opakovaného schvalování obchodník–klient.
   function toObjednavka(d, z, byLabel) {
     if (z.rezim === 'objednavka') return;
     z.rezim = 'objednavka';
+    z.zNabidky = true;   // vznikla předáním z nabídky (výkres schválen) — přeskočí kreslení
     if (!z.cisloObj) { d.seq = (typeof d.seq === 'number' ? d.seq : 0) + 1; z.cisloObj = 'VYK-' + new Date().getUTCFullYear() + '-' + String(d.seq).padStart(4, '0'); }
     if (z.link) z.link.active = false;
     enterState(d, z, 'zavod');
@@ -925,6 +932,7 @@ function mount(host) {
       id: z.id, cislo: z.cislo, createdAt: z.createdAt,
       rezim: z.rezim || 'nabidka', cisloObj: z.cisloObj || '', faze: nodeF.faze || (['zavod', 'schvaleno', 'dokonceno'].includes(z.stav) ? 'objednavka' : 'nabidka'),
       cisloZobraz: (z.rezim === 'objednavka' && z.cisloObj) ? z.cisloObj : z.cislo,
+      zNabidky: !!z.zNabidky,   // objednávka vzniklá předáním z nabídky (výkres už schválen)
       typKey: z.typKey, typName: t.name, family: familyOf(z.typKey), familyLabel: FAM_LABEL[familyOf(z.typKey)] || '',
       zakaznik: z.zakaznik, kontakt: z.kontakt, kontaktEmail: z.kontaktEmail,
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
@@ -971,6 +979,10 @@ function mount(host) {
   }
 
   // ---- vytvoření zakázky (obchodník) ---------------------------------------
+  // b.rezim: 'nabidka' (výchozí, app Nabídka) | 'objednavka' (přímé zadání
+  // objednávky v app Zadání do výroby — bez nabídkové před-fáze).
+  // b.stredisko (jen objednávka): „zadávám přímo, když vím kdo to bude dělat"
+  // — závod se určí hned a krok výběru závodu ředitelem výroby se přeskočí.
   async function apiCreate(req, res) {
     const me = roleOf(req);
     if (!(me.isAdmin || me.role === 'obchodnik')) { json(res, 403, { chyba: 'Zadávat požadavky smí jen obchodník.' }); return true; }
@@ -979,12 +991,19 @@ function mount(host) {
     if (!zakaznik) { json(res, 400, { chyba: 'Vyplňte zákazníka.' }); return true; }
     const d = load();
     const t = typeOf(d, b.typKey);
-    if (typeof d.seqNab !== 'number') d.seqNab = 0;
-    d.seqNab += 1;
+    const jeObj = (b.rezim === 'objednavka');
     const now = Date.now();
-    const cislo = 'NAB-' + new Date(now).getUTCFullYear() + '-' + String(d.seqNab).padStart(4, '0');
+    let cislo;
+    if (jeObj) {
+      d.seq = (typeof d.seq === 'number' ? d.seq : 0) + 1;
+      cislo = 'VYK-' + new Date(now).getUTCFullYear() + '-' + String(d.seq).padStart(4, '0');
+    } else {
+      if (typeof d.seqNab !== 'number') d.seqNab = 0;
+      d.seqNab += 1;
+      cislo = 'NAB-' + new Date(now).getUTCFullYear() + '-' + String(d.seqNab).padStart(4, '0');
+    }
     const z = {
-      id: 'z' + crypto.randomBytes(7).toString('hex'), cislo, createdAt: now, rezim: 'nabidka',
+      id: 'z' + crypto.randomBytes(7).toString('hex'), cislo, createdAt: now, rezim: jeObj ? 'objednavka' : 'nabidka',
       createdBy: me.email, obchodnikEmail: me.email,
       typKey: t.key, params: b.params && typeof b.params === 'object' ? b.params : {},
       dotaznik: sanitizeDotaznik(t, b.dotaznik), artNo: String(b.artNo || '').slice(0, 60),
@@ -994,8 +1013,16 @@ function mount(host) {
       stav: 'prideleni', versions: [], comments: [], timeEntries: [], activeTimer: null,
       assignedTo: '', link: null, revisionCount: 0, audit: [],
     };
-    enterState(d, z, 'prideleni');
-    audit(z, me.email, 'Založení nabídky', 'typ: ' + t.name);
+    if (jeObj) z.cisloObj = cislo;   // přímá objednávka: jediné číslo VYK (žádné NAB)
+    // Přímá objednávka: závod vybraný rovnou při zadání → přeskočí krok ředitele výroby.
+    let startStav = 'prideleni';
+    if (jeObj) {
+      const s = d.strediska.find(x => x.key === String(b.stredisko || '').trim());
+      if (s) { z.strediskoKey = s.key; z.strediskoName = s.label; startStav = 'prideleni'; }
+      else startStav = 'zavod';
+    }
+    enterState(d, z, startStav);
+    audit(z, me.email, jeObj ? 'Založení objednávky' : 'Založení nabídky', 'typ: ' + t.name + (z.strediskoName ? ' · závod ' + z.strediskoName : ''));
     d.zakazky.push(z);
     // globální číselník adres: nová adresa dodání se automaticky přidá
     const adr = z.dotaznik && typeof z.dotaznik.adresaDodani === 'string' ? z.dotaznik.adresaDodani.trim() : '';
@@ -1008,10 +1035,18 @@ function mount(host) {
       const earliest = addBusinessDays(now, internalDays);
       if (new Date(z.pozadovanyTermin + 'T23:59:59Z').getTime() < earliest) warn = 'Pozor: požadovaný termín je při výchozích lhůtách (interně ~' + internalDays + ' prac. dnů) nereálný ještě před reakcí klienta.';
     }
-    employeesWithRole('sef').forEach(em => { notify(d, em, 'Nová nabídka ' + cislo + ' (' + zakaznik + ') — přidělte konstruktéra.', z.id); });
-    save(d);
-    // e-mail šéfovi konstrukce (první krok nabídky = přidělení konstruktéra)
-    for (const em of employeesWithRole('sef')) mail(em, 'Nová nabídka · přidělení konstruktéra · ' + cislo, 'Obchodník ' + me.name + ' založil novou nabídku.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + '\n\nPřidělte prosím konstruktéra v intranetu → Nabídka – konstrukce.');
+    const co = jeObj ? 'objednávka' : 'nabídka';
+    if (z.stav === 'zavod') {
+      // objednávka bez určeného závodu → na tahu ředitel výroby
+      employeesWithRole('vykonny-reditel').forEach(em => { notify(d, em, 'Nová objednávka ' + cislo + ' (' + zakaznik + ') — vyberte výrobní závod.', z.id); });
+      save(d);
+      for (const em of employeesWithRole('vykonny-reditel')) mail(em, 'Nová objednávka · výběr závodu · ' + cislo, 'Obchodník ' + me.name + ' založil novou objednávku.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + '\n\nVyberte prosím výrobní závod v intranetu → Zadání do výroby – konstrukce.');
+    } else {
+      employeesWithRole('sef').forEach(em => { notify(d, em, 'Nová ' + co + ' ' + cislo + ' (' + zakaznik + ') — přidělte konstruktéra.', z.id); });
+      save(d);
+      // e-mail šéfovi konstrukce (první krok = přidělení konstruktéra)
+      for (const em of employeesWithRole('sef')) mail(em, 'Nová ' + co + ' · přidělení konstruktéra · ' + cislo, 'Obchodník ' + me.name + ' založil novou ' + (jeObj ? 'objednávku' : 'nabídku') + '.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + (z.strediskoName ? '\nZávod: ' + z.strediskoName : '') + '\n\nPřidělte prosím konstruktéra v intranetu → ' + (jeObj ? 'Zadání do výroby – konstrukce' : 'Nabídka – konstrukce') + '.');
+    }
     json(res, 200, { ok: true, id: z.id, cislo, warn });
     return true;
   }
@@ -1200,24 +1235,39 @@ function mount(host) {
         audit(z, me.email, 'Storno', note);
         break;
       }
-      case 'potvrdit-rucne': { // obchodník ručně potvrdí nabídku místo klienta → objednávka
-        if (!isObch) { err = 'Potvrdit nabídku smí obchodník zakázky.'; break; }
-        if (z.stav !== 'klient') { err = 'Nabídka není u klienta k potvrzení.'; break; }
+      case 'potvrdit-rucne': { // obchodník ručně potvrdí místo klienta (e-mail/telefon)
+        if (!isObch) { err = 'Potvrdit smí obchodník zakázky.'; break; }
+        if (z.stav !== 'klient') { err = 'Zakázka není u klienta k potvrzení.'; break; }
         z.clientDecision = { action: 'schvalit', name: 'potvrdil obchodník', at: Date.now(), by: me.email };
-        toObjednavka(d, z, me.email + ' (obchodník)');
+        if (z.rezim === 'objednavka') {
+          // přímá objednávka: klient schválil dokumentaci → výrobní dokumentace
+          if (z.link) z.link.active = false;
+          audit(z, me.email, 'Klient schválil (potvrzeno obchodníkem ručně)', note);
+          enterState(d, z, 'schvaleno');
+          if (z.assignedTo) { notify(d, z.assignedTo, 'Výkres ' + (z.cisloObj || z.cislo) + ' schválen klientem — vypracujte výrobní dokumentaci.', z.id); mail(z.assignedTo, 'Schváleno klientem · ' + (z.cisloObj || z.cislo), 'Výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') je schválen. Vypracujte a vložte výrobní dokumentaci.'); }
+        } else {
+          toObjednavka(d, z, me.email + ' (obchodník)');   // nabídka → předání do objednávek
+        }
         break;
       }
-      case 'rozdel-zavod': { // výkonný ředitel výroby → vybere výrobní závod (fáze objednávky, po potvrzení)
+      case 'rozdel-zavod': { // ředitel výroby vybere výrobní závod (začátek objednávky)
         if (!(isVykonny || isSef)) { err = 'Vybrat závod smí výkonný ředitel výroby.'; break; }
-        if (z.stav !== 'zavod') { err = 'Výběr závodu je až po potvrzení nabídky (objednávka).'; break; }
+        if (z.stav !== 'zavod') { err = 'Zakázka nečeká na výběr závodu.'; break; }
         const skey = String(b.stredisko || '').trim();
         const s = d.strediska.find(x => x.key === skey);
         if (!s) { err = 'Vyberte výrobní závod.'; break; }
         z.strediskoKey = s.key; z.strediskoName = s.label;
-        enterState(d, z, 'schvaleno');
+        // Z nabídky (výkres už schválen) → rovnou výrobní dokumentace.
+        // Přímá objednávka → teprve začíná: šéf konstrukce přidělí konstruktéra.
+        const cil = z.zNabidky ? 'schvaleno' : 'prideleni';
+        enterState(d, z, cil);
         audit(z, me.email, 'Vybrán závod', s.label + (note ? ' — ' + note : ''));
-        if (z.assignedTo) notify(d, z.assignedTo, 'Objednávka ' + (z.cisloObj || z.cislo) + ' — závod ' + s.label + ', vložte výrobní dokumentaci.', z.id);
-        employeesWithRole('sef').forEach(em => notify(d, em, 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') → závod ' + s.label + '.', z.id));
+        if (cil === 'schvaleno') {
+          if (z.assignedTo) notify(d, z.assignedTo, 'Objednávka ' + (z.cisloObj || z.cislo) + ' — závod ' + s.label + ', vložte výrobní dokumentaci.', z.id);
+          employeesWithRole('sef').forEach(em => notify(d, em, 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') → závod ' + s.label + '.', z.id));
+        } else {
+          employeesWithRole('sef').forEach(em => { notify(d, em, 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') — závod ' + s.label + ', přidělte konstruktéra.', z.id); mail(em, 'Objednávka · přidělení konstruktéra · ' + (z.cisloObj || z.cislo), 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') dostala závod ' + s.label + '.\nPřidělte prosím konstruktéra v intranetu → Zadání do výroby – konstrukce.'); });
+        }
         break;
       }
       case 'prideli-zavod': { // přeřazení závodu (šéf / výkonný ředitel) — kdykoli před dokončením
@@ -1649,12 +1699,24 @@ function mount(host) {
     if (action === 'schvalit') {
       if (!name || !b.souhlas) { json(res, 400, { chyba: 'Vyplňte jméno a potvrďte souhlas.' }); return true; }
       z.clientDecision = { action: 'schvalit', name, at: Date.now(), ip, version: cur ? cur.v : null };
-      z.link.accesses.push({ at: Date.now(), ip, action: 'potvrdil nabídku: ' + name });
-      audit(z, name + ' (klient)', 'Klient potvrdil nabídku', 'verze v' + (cur ? cur.v : '?') + ', IP ' + ip);
-      toObjednavka(d, z, name + ' (klient)');   // nabídka → objednávka (výběr závodu), klient se už neschvaluje
-      notify(d, z.obchodnikEmail, 'Klient POTVRDIL nabídku ' + z.cislo + ' → objednávka ' + (z.cisloObj || '') + '.', z.id);
-      save(d);
-      mail(z.obchodnikEmail, 'Klient potvrdil nabídku · ' + z.cislo, 'Klient ' + name + ' potvrdil nabídku ' + z.cislo + ' (' + z.zakaznik + ') dne ' + fmtDateTime(Date.now()) + '.\nVznikla objednávka ' + (z.cisloObj || '') + ' — výkonný ředitel nyní vybere výrobní závod a konstrukce vloží výrobní dokumentaci.');
+      z.link.accesses.push({ at: Date.now(), ip, action: 'schválil: ' + name });
+      if (z.rezim === 'objednavka') {
+        // přímá objednávka: klient schválil dokumentaci → konstruktér vypracuje výrobní dokumentaci
+        audit(z, name + ' (klient)', 'Klient schválil výkres', 'verze v' + (cur ? cur.v : '?') + ', IP ' + ip);
+        z.link.active = false;
+        enterState(d, z, 'schvaleno');
+        notify(d, z.obchodnikEmail, 'Klient SCHVÁLIL výkres objednávky ' + (z.cisloObj || z.cislo) + '.', z.id);
+        if (z.assignedTo) notify(d, z.assignedTo, 'Výkres ' + (z.cisloObj || z.cislo) + ' schválen klientem — vypracujte výrobní dokumentaci.', z.id);
+        save(d);
+        mail(z.obchodnikEmail, 'Klient schválil výkres · ' + (z.cisloObj || z.cislo), 'Klient ' + name + ' schválil výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') dne ' + fmtDateTime(Date.now()) + '.\nKonstrukce nyní vypracuje výrobní dokumentaci.');
+        if (z.assignedTo) mail(z.assignedTo, 'Schváleno klientem · ' + (z.cisloObj || z.cislo), 'Výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') je schválen klientem. Vypracujte a vložte výrobní dokumentaci.');
+      } else {
+        audit(z, name + ' (klient)', 'Klient potvrdil nabídku', 'verze v' + (cur ? cur.v : '?') + ', IP ' + ip);
+        toObjednavka(d, z, name + ' (klient)');   // nabídka → předání do objednávek (výběr závodu)
+        notify(d, z.obchodnikEmail, 'Klient POTVRDIL nabídku ' + z.cislo + ' → objednávka ' + (z.cisloObj || '') + '.', z.id);
+        save(d);
+        mail(z.obchodnikEmail, 'Klient potvrdil nabídku · ' + z.cislo, 'Klient ' + name + ' potvrdil nabídku ' + z.cislo + ' (' + z.zakaznik + ') dne ' + fmtDateTime(Date.now()) + '.\nVznikla objednávka ' + (z.cisloObj || '') + ' — výkonný ředitel nyní vybere výrobní závod a konstrukce vloží výrobní dokumentaci.');
+      }
     } else if (action === 'zamitnout') {
       const duvod = String(b.duvod || '').trim().slice(0, 1500);
       if (!duvod) { json(res, 400, { chyba: 'Uveďte prosím důvod zamítnutí.' }); return true; }
