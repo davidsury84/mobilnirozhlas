@@ -979,8 +979,8 @@ img.pv-thumb{background:#fff}
 
   <section id="view-grit" class="view">
     <div class="view-head">
-      <h2>Průzkumy</h2>
-      <p>Rozešli dotazník zaměstnancům (i po jednotlivých odděleních). Výsledky se ukládají a škálují podle oddělení.</p>
+      <h2>Průzkumy a testy</h2>
+      <p>Přehled všech dotazníků, testů a závěrečných testů školení — počty vyplnění, průměrné výsledky a stavy. Kliknutím na řádek otevřeš administraci konkrétního testu (výsledky podle oddělení, detaily, rozeslání, export).</p>
     </div>
     <div id="gritAdmin"></div>
   </section>
@@ -5716,9 +5716,166 @@ function cenmonXlsx(){
   XLSX.writeFile(wb,'cenovy-monitoring-meva.xlsx');
 }
 
-async function renderGritAdmin(){
+/* ============================================================
+   PŘEHLED PRŮZKUMŮ A TESTŮ — tabulka se statistikami, klik na řádek
+   otevře administraci konkrétního testu (blok s výsledky a rozesláním)
+   ============================================================ */
+let PRUZKUMY_DETAIL=null;   // null = přehledová tabulka, jinak klíč otevřeného testu
+const PRUZKUMY_DEFS=[
+  {kind:'grit',    typ:'pruzkum', sendId:'survey-grit',    nazev:'Test houževnatosti (Grit)',            popis:'10 otázek · vytrvalost a dlouhodobá vášeň pro cíle'},
+  {kind:'jss',     typ:'pruzkum', sendId:'survey-jss',     nazev:'Dotazník pracovní spokojenosti (JSS)', popis:'36 výroků · 9 oblastí pracovní spokojenosti'},
+  {kind:'tw44',    typ:'pruzkum', sendId:'survey-tw44',    nazev:'Test kognitivní zátěže (TW44)',        popis:'vyhledávání v tabulce 10×10 · výkon pod časovým tlakem'},
+  {kind:'vykresy', typ:'pruzkum', sendId:'survey-vykresy', nazev:'Test čtení výkresů',                   popis:'15 otázek · praktické čtení výkresové dokumentace'},
+  {kind:'abroll',        typ:'skoleni', nazev:'Školení ABROLL',        popis:'kódování ABROLL kontejnerů · závěrečný test, max 3 pokusy'},
+  {kind:'prumysl',       typ:'skoleni', nazev:'Školení Průmysl',       popis:'skladování, Li-Ion, ADR · závěrečný test, max 3 pokusy'},
+  {kind:'loxxer',        typ:'skoleni', nazev:'Školení LOXXER',        popis:'protipožární skříně na Li-Ion baterie · závěrečný test, max 3 pokusy'},
+  {kind:'acts',          typ:'skoleni', nazev:'Školení ACTS',          popis:'železniční abroll kontejnery · závěrečný test, max 3 pokusy'},
+  {kind:'produkty-kovo', typ:'skoleni', nazev:'Školení Produkty KOVO', popis:'znalost produktového katalogu KOVO · závěrečný test, max 3 pokusy'},
+  {kind:'produkty-roto', typ:'skoleni', nazev:'Školení Produkty ROTO', popis:'znalost produktového katalogu ROTO · závěrečný test, max 3 pokusy'},
+];
+async function renderGritAdmin(){ PRUZKUMY_DETAIL=null; await renderPruzkumyPrehled(); }
+/* statistika školicího testu (model attempts[], hranice 80 %, max 3 pokusy) */
+function skolStaty(res){
+  const bestOf=r=>(r.attempts||[]).reduce((m,x)=>Math.max(m,x.pct||0),0);
+  const passed=res.filter(r=>(r.attempts||[]).some(x=>x.passed)).length;
+  const failed=res.filter(r=>!(r.attempts||[]).some(x=>x.passed)&&(r.attempts||[]).length>=3).length;
+  const avgBest=res.length?Math.round(res.reduce((s,r)=>s+bestOf(r),0)/res.length):0;
+  const last=res.reduce((m,r)=>{const a=r.attempts||[];return Math.max(m,a.length?(a[a.length-1].ts||0):0);},0);
+  return {n:res.length, passed, failed, run:res.length-passed-failed, avgBest, last};
+}
+async function renderPruzkumyPrehled(){
   const box=document.getElementById("gritAdmin");
-  try{ const r=await fetch("/api/grit-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } GRIT_RESULTS=await r.json(); }
+  box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám přehled testů…</p></div>';
+  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto'];
+  let neprihlasen=false;
+  const data=await Promise.all(eps.map(u=>fetch(u,{cache:'no-store'}).then(r=>{ if(r.status===401){ neprihlasen=true; return []; } return r.json(); }).catch(()=>[])));
+  if(neprihlasen){ showLogin(); return; }
+  GRIT_RESULTS=data[0]||[]; JSS_RESULTS=data[1]||[]; TW44_RESULTS=data[2]||[]; VYKRESY_RESULTS=data[3]||[];
+  ABROLL_RESULTS=data[4]||[]; PRUMYSL_RESULTS=data[5]||[]; LOXXER_SKOLENI_RESULTS=data[6]||[]; ACTS_SKOLENI_RESULTS=data[7]||[];
+  PRODUKTY_SKOLENI_RESULTS.kovo=data[8]||[]; PRODUKTY_SKOLENI_RESULTS.roto=data[9]||[];
+  const fmtD=ts=>ts?new Date(ts).toLocaleDateString('cs-CZ'):'—';
+  const pill=(t,c)=>'<span class="pill '+c+'">'+t+'</span>';
+  /* statistiky jednotlivých testů do sloupců: [vyplnilo, Ø výsledek, stav, poslední] */
+  function statRadku(kind){
+    if(kind==='grit'){ const res=GRIT_RESULTS; if(!res.length) return {n:0};
+      const avg=res.reduce((s,r)=>s+r.hs,0)/res.length, pct=Math.round(res.reduce((s,r)=>s+r.pct,0)/res.length);
+      const pp=GRIT_PASMO_POPIS[gritPasmo(avg)];
+      return {n:res.length, vysledek:'Ø HS '+avg.toFixed(1).replace('.',',')+' · percentil '+pct+' %', stav:pill(pp[0].split(' ')[0],pp[1]), last:Math.max(...res.map(r=>r.ts||0))}; }
+    if(kind==='jss'){ const res=JSS_RESULTS; if(!res.length) return {n:0};
+      const avgT=Math.round(res.reduce((s,r)=>s+r.total,0)/res.length), avgP=Math.round(res.reduce((s,r)=>s+r.pct,0)/res.length);
+      const it=jssPasmoTotal(avgT);
+      return {n:res.length, vysledek:'Ø '+avgT+' / 216 · spokojenost '+avgP+' %', stav:pill(it[0],it[1]), last:Math.max(...res.map(r=>r.ts||0))}; }
+    if(kind==='tw44'){ const res=TW44_RESULTS; if(!res.length) return {n:0};
+      const avgP=Math.round(res.reduce((s,r)=>s+tw44Success(r).pct,0)/res.length);
+      return {n:res.length, vysledek:'Ø úspěšnost hledání '+avgP+' %', stav:'', last:Math.max(...res.map(r=>r.ts||0))}; }
+    if(kind==='vykresy'){ const res=VYKRESY_RESULTS; if(!res.length) return {n:0};
+      const avgP=Math.round(res.reduce((s,r)=>s+(r.procenta||0),0)/res.length);
+      const ok=res.filter(r=>(r.procenta||0)>=70).length, pa=vykresyPasmoCl(avgP);
+      return {n:res.length, vysledek:'Ø úspěšnost '+avgP+' %', stav:pill(pa[0],pa[1])+' <span class="muted" style="font-size:11px">≥ 70 %: '+ok+' z '+res.length+'</span>', last:Math.max(...res.map(r=>r.ts||0))}; }
+    const res=kind==='abroll'?ABROLL_RESULTS:kind==='prumysl'?PRUMYSL_RESULTS:kind==='loxxer'?LOXXER_SKOLENI_RESULTS:kind==='acts'?ACTS_SKOLENI_RESULTS:kind==='produkty-kovo'?PRODUKTY_SKOLENI_RESULTS.kovo:PRODUKTY_SKOLENI_RESULTS.roto;
+    if(!res.length) return {n:0};
+    const st=skolStaty(res);
+    return {n:st.n, vysledek:'Ø nejlepší pokus '+st.avgBest+' %',
+      stav:pill('✓ '+st.passed,'green')+(st.failed?' '+pill('✕ '+st.failed,'red'):'')+(st.run?' '+pill('○ '+st.run,'amber'):''), last:st.last};
+  }
+  const celkem=PRUZKUMY_DEFS.reduce((s,d)=>s+(statRadku(d.kind).n||0),0);
+  const posledni=Math.max(0,...PRUZKUMY_DEFS.map(d=>statRadku(d.kind).last||0));
+  let h='<style>#pruzkumyPrehled tbody tr[data-klik]{cursor:pointer}#pruzkumyPrehled tbody tr[data-klik]:hover{background:var(--green-soft)}</style>';
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Testů v nabídce</div><strong style="font-size:20px">'+PRUZKUMY_DEFS.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Respondentů celkem</div><strong style="font-size:20px">'+celkem+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Poslední vyplnění</div><strong style="font-size:20px">'+fmtD(posledni)+'</strong></div></div>';
+  const sekce=(t,pozn)=>'<tr><td colspan="6" style="background:var(--green-soft);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:700;padding:9px 12px">'+t+(pozn?' <span style="font-weight:400;text-transform:none;letter-spacing:0">· '+pozn+'</span>':'')+'</td></tr>';
+  const radek=d=>{
+    const s=statRadku(d.kind);
+    const akce=(d.sendId?'<button class="btn sm" onclick="event.stopPropagation();openSendModal(\''+d.sendId+'\')">✉ Rozeslat</button> ':'')+
+      '<button class="btn ghost sm" onclick="event.stopPropagation();openPruzkumDetail(\''+d.kind+'\')">Spravovat →</button>';
+    return '<tr data-klik onclick="openPruzkumDetail(\''+d.kind+'\')">'+
+      '<td><strong>'+esc(d.nazev)+'</strong><br><span class="muted" style="font-size:12px">'+esc(d.popis)+'</span></td>'+
+      '<td class="num">'+(s.n||'—')+'</td>'+
+      '<td style="font-size:13px">'+(s.n?s.vysledek:'<span class="muted">zatím bez výsledků</span>')+'</td>'+
+      '<td>'+(s.n?(s.stav||'—'):'—')+'</td>'+
+      '<td class="muted">'+(s.n?fmtD(s.last):'—')+'</td>'+
+      '<td style="text-align:right;white-space:nowrap">'+akce+'</td></tr>';
+  };
+  h+='<div class="matrix-wrap" style="max-height:none"><table class="grid" id="pruzkumyPrehled">'+
+     '<thead><tr><th>Test</th><th class="num">Vyplnilo</th><th>Ø výsledek</th><th>Stav</th><th>Poslední vyplnění</th><th></th></tr></thead><tbody>'+
+     sekce('Dotazníky a testy','osobní odkaz e-mailem — zaměstnancům i uchazečům o práci')+
+     PRUZKUMY_DEFS.filter(d=>d.typ==='pruzkum').map(radek).join('')+
+     sekce('Školení — závěrečné testy','plní se v sekci Školení v intranetu; tady jsou výsledky')+
+     PRUZKUMY_DEFS.filter(d=>d.typ==='skoleni').map(radek).join('')+
+     '</tbody></table></div>'+
+     '<p class="muted" style="font-size:12px;margin-top:10px">Kliknutím na řádek otevřeš administraci testu — kompletní výsledky podle oddělení, detail jednotlivců, cílení rozeslání a export.</p>';
+  box.innerHTML=h;
+}
+/* Detail = původní blok konkrétního testu + tlačítko zpět */
+async function openPruzkumDetail(kind){
+  PRUZKUMY_DETAIL=kind;
+  const box=document.getElementById("gritAdmin");
+  box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám…</p></div>';
+  const def=PRUZKUMY_DEFS.find(d=>d.kind===kind)||{};
+  const back='<div class="spread" style="margin-bottom:14px"><button class="btn ghost sm" onclick="renderGritAdmin()">← Zpět na přehled testů</button>'+
+    '<span class="muted" style="font-size:12px">'+esc(def.typ==='pruzkum'?'Dotazník / test — rozeslání osobním odkazem':'Školení — závěrečný test')+'</span></div>';
+  let inner='';
+  if(kind==='grit') inner=await gritBlockHtml();
+  else if(kind==='jss') inner=await jssBlockHtml();
+  else if(kind==='tw44') inner=await tw44BlockHtml();
+  else if(kind==='vykresy') inner=await vykresyBlockHtml();
+  else if(kind==='abroll') inner=await abrollBlockHtml();
+  else if(kind==='prumysl') inner=await prumyslBlockHtml();
+  else if(kind==='loxxer') inner=await loxxerSkoleniBlockHtml();
+  else if(kind==='acts') inner=await actsSkoleniBlockHtml();
+  else if(kind==='produkty-kovo') inner=await produktySkoleniBlockHtml('kovo');
+  else if(kind==='produkty-roto') inner=await produktySkoleniBlockHtml('roto');
+  box.innerHTML=back+inner;
+  window.scrollTo(0,0);
+}
+/* ---- Školení Produkty (KOVO/ROTO) — výsledky závěrečného testu (dosud v adminu chyběly) ---- */
+let PRODUKTY_SKOLENI_RESULTS={kovo:[],roto:[]};
+async function produktySkoleniBlockHtml(type){
+  try{ const r=await fetch('/api/produkty-results?type='+encodeURIComponent(type),{cache:'no-store'}); if(r.status===401){ showLogin(); return ''; } PRODUKTY_SKOLENI_RESULTS[type]=await r.json(); }catch(e){ PRODUKTY_SKOLENI_RESULTS[type]=[]; }
+  const nazev='Produkty '+(type==='kovo'?'KOVO':'ROTO');
+  let h='<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:8px"><strong>Školení '+nazev+' — závěrečný test</strong>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="exportProduktySkoleni(\''+type+'\')">⬇ Export (CSV)</button></div></div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">Test znalosti produktového katalogu '+nazev+' v sekci Školení. Vyhodnocuje se automaticky, <strong>max. 3 pokusy</strong> na osobu; ukládá se každý pokus.</div>'+
+    '</div>';
+  const res=(PRODUKTY_SKOLENI_RESULTS[type]||[]).slice();
+  if(!res.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné výsledky školení '+nazev+'. Jakmile někdo dokončí test v sekci Školení, objeví se tu.</p></div>'; return h; }
+  const bestOf=r=>(r.attempts||[]).reduce((m,x)=>Math.max(m,x.pct||0),0);
+  const passedOf=r=>(r.attempts||[]).some(x=>x.passed);
+  const lastTs=r=>{ const a=(r.attempts||[]); return a.length?(a[a.length-1].ts||0):0; };
+  const done=res.filter(passedOf).length;
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Účastníků</div><strong style="font-size:20px">'+res.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Splnilo</div><strong style="font-size:20px">'+done+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Nesplnilo</div><strong style="font-size:20px">'+(res.length-done)+'</strong></div></div>';
+  const groups={}; res.forEach(r=>{ const d=r.dept||"—"; (groups[d]=groups[d]||[]).push(r); });
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,"cs")).forEach(d=>{
+    const rows=groups[d].slice().sort((a,b)=>bestOf(b)-bestOf(a));
+    h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3></div>';
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">Pokusů</th><th class="num">Nejlepší</th><th>Stav</th><th>Poslední pokus</th></tr></thead><tbody>';
+    rows.forEach(r=>{ const best=bestOf(r), passed=passedOf(r), used=(r.attempts||[]).length, ts=lastTs(r);
+      h+='<tr><td>'+esc(r.name||r.email)+'</td><td class="muted">'+esc(r.email||"")+'</td>'+
+         '<td class="num">'+used+' / 3</td><td class="num">'+best+' %</td>'+
+         '<td>'+(passed?'<span class="pill green">✓ Splněno</span>':(used>=3?'<span class="pill red">✕ Nesplněno</span>':'<span class="pill amber">○ Probíhá</span>'))+'</td>'+
+         '<td class="muted">'+(ts?new Date(ts).toLocaleDateString("cs-CZ"):"—")+'</td></tr>'; });
+    h+='</tbody></table></div>';
+  });
+  return h;
+}
+function exportProduktySkoleni(type){
+  const res=PRODUKTY_SKOLENI_RESULTS[type]||[]; if(!res.length){ toast("Žádná data k exportu."); return; }
+  const rows=[["Jméno","E-mail","Oddělení","Pokusů","Nejlepší %","Splněno","Poslední pokus"]];
+  res.forEach(r=>{ const a=r.attempts||[]; const best=a.reduce((m,x)=>Math.max(m,x.pct||0),0); const passed=a.some(x=>x.passed); const ts=a.length?(a[a.length-1].ts||0):0;
+    rows.push([r.name||r.email||"", r.email||"", r.dept||"", a.length, best, passed?"ano":"ne", ts?new Date(ts).toLocaleString("cs-CZ"):""]); });
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="produkty-"+type+"-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
+}
+/* ---- Test houževnatosti (Grit) — blok administrace ---- */
+async function gritBlockHtml(){
+  try{ const r=await fetch("/api/grit-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return ""; } GRIT_RESULTS=await r.json(); }
   catch(e){ GRIT_RESULTS=[]; }
   const catChecks = DB.categories.map(c=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0"><input type="checkbox" class="gcat" value="'+c.id+'" '+(GRIT_ASSIGN.cats.includes(c.id)?"checked":"")+' onchange="gritReadCats()"> '+esc(c.name)+'</label>').join("") || '<span class="muted">Nejprve přidej oddělení (kategorie) v záložce Zaměstnanci.</span>';
   let h='<div class="card pad" style="margin-bottom:18px">'+
@@ -5757,14 +5914,7 @@ async function renderGritAdmin(){
       h+='</tbody></table></div>';
     });
   }
-  h+='<div class="divider" style="margin:26px 0"></div>'+ await jssBlockHtml();
-  h+='<div class="divider" style="margin:26px 0"></div>'+ await tw44BlockHtml();
-  h+='<div class="divider" style="margin:26px 0"></div>'+ await vykresyBlockHtml();
-  h+='<div class="divider" style="margin:26px 0"></div>'+ await abrollBlockHtml();
-  h+='<div class="divider" style="margin:26px 0"></div>'+ await prumyslBlockHtml();
-  h+='<div class="divider" style="margin:26px 0"></div>'+ await loxxerSkoleniBlockHtml();
-  h+='<div class="divider" style="margin:26px 0"></div>'+ await actsSkoleniBlockHtml();
-  box.innerHTML=h;
+  return h;
 }
 async function copyGritLinks(){
   const S=sendableOf("survey-grit"); const aud=audienceOf(S);
