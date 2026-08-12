@@ -5217,7 +5217,7 @@ const GRIT_QUESTIONS=[
 function gritAcksMap(){ const m={}; (GRIT_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
 /* Pozvánkové hash odkazy (bez přihlášení) — podpis dělá server, tady jen cache pro aktuální dotazník */
 let INVITE_MAP={};
-function surveyKind(id){ return id==="survey-grit"?"grit":id==="survey-jss"?"jss":id==="survey-tw44"?"tw44":""; }
+function surveyKind(id){ return id==="survey-grit"?"grit":id==="survey-jss"?"jss":id==="survey-tw44"?"tw44":id==="survey-vykresy"?"vykresy":""; }
 async function loadInvites(id, aud){
   const kind=surveyKind(id); if(!kind){ INVITE_MAP={}; return; }
   try{ const r=await fetch("/api/invite-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,list:(aud||[]).map(e=>({email:e.email,name:e.name}))})});
@@ -5250,6 +5250,11 @@ function sendableOf(id){
     return { id:"survey-tw44", isSurvey:true, title:"Test kognitivní zátěže (TW44)",
       assignAll:TW44_ASSIGN.all, assignCats:TW44_ASSIGN.cats, acks:tw44AcksMap(),
       linkFor:(email)=>inviteLinkFor("survey-tw44",email) };
+  }
+  if(id==="survey-vykresy"){
+    return { id:"survey-vykresy", isSurvey:true, title:"Test čtení výkresů",
+      assignAll:VYKRESY_ASSIGN.all, assignCats:VYKRESY_ASSIGN.cats, acks:vykresyAcksMap(),
+      linkFor:(email)=>inviteLinkFor("survey-vykresy",email) };
   }
   const d=DB.directives.find(x=>x.id===id); if(!d) return null;
   return { id:d.id, isSurvey:false, title:d.title, assignAll:d.assignAll, assignCats:d.assignCats,
@@ -5385,9 +5390,9 @@ function gritHero(r){
     '</div>';
 }
 function openVysledekDetail(kind,email){
-  const list = kind==='grit'?GRIT_RESULTS : kind==='jss'?JSS_RESULTS : TW44_RESULTS;
+  const list = kind==='grit'?GRIT_RESULTS : kind==='jss'?JSS_RESULTS : kind==='vykresy'?VYKRESY_RESULTS : TW44_RESULTS;
   const r=(list||[]).find(x=>(x.email||'').toLowerCase()===email.toLowerCase()); if(!r) return;
-  const nazev = kind==='grit'?'Test houževnatosti (Grit)' : kind==='jss'?'Dotazník pracovní spokojenosti (JSS)' : 'Test kognitivní zátěže (TW44)';
+  const nazev = kind==='grit'?'Test houževnatosti (Grit)' : kind==='jss'?'Dotazník pracovní spokojenosti (JSS)' : kind==='vykresy'?'Test čtení výkresů' : 'Test kognitivní zátěže (TW44)';
   const hlava='<div class="muted" style="font-size:13px;margin-bottom:14px">'+esc(r.email)+(r.dept&&r.dept!=='—'?' · '+esc(r.dept):'')+' · vyplněno '+fmtDate(r.ts)+'</div>';
   const big=(label,val)=>'<div><div class="muted" style="font-size:12px">'+label+'</div><strong style="font-size:22px">'+val+'</strong></div>';
   let h='';
@@ -5449,6 +5454,26 @@ function openVysledekDetail(kind,email){
       (r.subs||[]).map(s=>{const p=jssPasmoFacet(s.score);return '<tr><td>'+esc(s.name)+'</td><td class="num">'+s.score+'</td><td><span class="pill '+p[1]+'">'+p[0]+'</span></td></tr>';}).join('')+
       '</tbody></table>'+
       '<p class="muted" style="margin:10px 0 0;font-size:12px">Pásma dle Spectora: oblast ≤ 12 nespokojenost · 13–15 neutrální · ≥ 16 spokojenost. Reverzní položky jsou přepočtené.</p>';
+  } else if(kind==='vykresy'){
+    const pa=vykresyPasmoCl(r.procenta||0);
+    const odp=r.odpovedi||[];
+    h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+
+      big('Výsledek',r.skore+' / '+r.otazekCelkem)+big('Úspěšnost',(r.procenta||0)+' %')+
+      '<div><div class="muted" style="font-size:12px">Hodnocení</div><span class="pill '+pa[1]+'" style="font-size:14px">'+pa[0]+'</span></div>'+
+      big('Čas',vykresyCas(r.casPouzityS)+' / '+vykresyCas(r.limitS))+
+      (r.casVyprsel?'<div><span class="pill red">Čas vypršel</span></div>':'')+
+      (r.pozice?big('Pozice',esc(r.pozice)):'')+'</div>'+
+      '<div class="card pad" style="margin-bottom:14px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.03em">Úspěšnost podle oblastí</strong>'+
+      (r.oblasti||[]).map(o=>{ const pct=o.celkem?Math.round(o.spravne/o.celkem*100):0;
+        return '<div style="margin-top:10px"><div class="spread" style="font-size:13px"><strong>'+esc(o.oblast)+'</strong><span class="muted">'+o.spravne+' / '+o.celkem+'</span></div>'+
+          '<div style="height:8px;background:#eef0ed;border-radius:4px;margin-top:4px"><div style="height:100%;width:'+pct+'%;background:'+(pct>=70?'#12752f':pct>=50?'#c98a00':'#b3261e')+';border-radius:4px"></div></div></div>'; }).join('')+'</div>'+
+      '<div class="card pad" style="margin-bottom:14px;background:var(--green-soft);border-color:#cfe9d8"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.03em">Doporučení</strong>'+
+      '<p style="margin:8px 0 0;font-size:14px;line-height:1.6">'+vykresyDoporuceni(r.procenta||0)+'</p></div>'+
+      (odp.length?'<details class="card pad" open style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:600">Rozbor odpovědí ('+odp.filter(o=>o.spravne).length+' / '+odp.length+' správně)</summary>'+
+        odp.map(o=>'<div style="border-left:3px solid '+(o.spravne?'#12752f':'#b3261e')+';padding:8px 12px;margin-top:10px;background:'+(o.spravne?'#f4faf6':'#fdf4f3')+';border-radius:0 8px 8px 0">'+
+          '<div class="spread" style="font-size:13px"><strong>'+(o.spravne?'✓':'✕')+' Otázka '+o.otazka+'</strong><span class="muted" style="font-size:11px">'+esc(o.oblast)+'</span></div>'+
+          '<div style="font-size:13px;margin-top:3px">Odpověď: <strong>'+(o.odpovedKandidata==null?'bez odpovědi (nestihnuto)':esc(o.odpovedKandidata))+'</strong>'+(o.spravne?'':' &nbsp;·&nbsp; správně: <strong>'+esc(o.spravnaOdpoved)+'</strong>')+'</div></div>').join('')+'</details>':'')+
+      '<p class="muted" style="margin:0;font-size:12px">Orientační výsledek — doporučujeme doplnit krátkým pohovorem nad reálným firemním výkresem. U uchazečů pouštějte test ideálně na firemním PC (správné odpovědi jsou v kódu stránky).</p>';
   } else {
     const su=tw44Success(r), ix=r.indices||{};
     h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:14px">'+big('Varianta',esc(r.variant||'—'))+big('Nalezené cíle',su.found)+big('Úspěšnost',su.pct+' %')+'</div>'+
@@ -5734,6 +5759,7 @@ async function renderGritAdmin(){
   }
   h+='<div class="divider" style="margin:26px 0"></div>'+ await jssBlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await tw44BlockHtml();
+  h+='<div class="divider" style="margin:26px 0"></div>'+ await vykresyBlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await abrollBlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await prumyslBlockHtml();
   h+='<div class="divider" style="margin:26px 0"></div>'+ await loxxerSkoleniBlockHtml();
@@ -5912,6 +5938,83 @@ async function tw44BlockHtml(){
   });
   return h;
 }
+/* ---- Test čtení strojírenských výkresů (praktický, zaměstnanci i uchazeči) ---- */
+let VYKRESY_RESULTS=[];
+let VYKRESY_ASSIGN={all:true,cats:[]};
+const VYKRESY_OBLASTI=["Pohledy a řezy","Kótování","Tolerance a závity","Svary","Popisové pole","Sestava a kusovník"];
+function vykresyAcksMap(){ const m={}; (VYKRESY_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
+function vykresyAssignAll(on){ VYKRESY_ASSIGN.all=on; const w=document.getElementById("vykCatWrap"); if(w) w.style.opacity=on?.4:1; }
+function vykresyReadCats(){ VYKRESY_ASSIGN.cats=[...document.querySelectorAll(".vykcat:checked")].map(c=>c.value); }
+/* pásmo dle procent — stejné hranice jako v testu (90/70/50) */
+function vykresyPasmoCl(p){ return p>=90?['Výborná úroveň','green']:p>=70?['Dobrá úroveň','green']:p>=50?['Základní orientace','amber']:['Nedostatečná úroveň','red']; }
+function vykresyDoporuceni(p){
+  return p>=90?'Čte výkresy spolehlivě — bez omezení pro samostatnou práci podle výkresové dokumentace.'
+    :p>=70?'Drobné mezery, běžnou výrobní dokumentaci zvládne. Doporučujeme krátké zaškolení na firemní standardy kreslení.'
+    :p>=50?'Ve výkresech se orientuje jen částečně. Jednodušší úkoly zvládne pod dohledem; před samostatnou prací doporučujeme školení čtení výkresů.'
+    :'Čtení výkresů zatím neovládá. Pro práci podle výkresové dokumentace je nutné důkladné zaškolení.';
+}
+function vykresyCas(s){ s=Math.max(0,Math.round(s||0)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
+async function copyVykresyLinks(){
+  const S=sendableOf("survey-vykresy"); const aud=audienceOf(S);
+  if(!aud.length){ alert("Žádní příjemci — zaškrtni Všem nebo vyber oddělení."); return; }
+  await loadInvites("survey-vykresy", aud);
+  copyText("Jméno\tE-mail\tOdkaz\n"+aud.map(e=>e.name+"\t"+e.email+"\t"+S.linkFor(e.email)).join("\n")); toast("Odkazy zkopírovány ("+aud.length+")");
+}
+function exportVykresy(){
+  if(typeof XLSX==="undefined"){ alert("Knihovna XLSX není načtená."); return; }
+  const head=["Oddělení","Jméno","E-mail","Pozice","Správně","Otázek","Úspěšnost %","Hodnocení"].concat(VYKRESY_OBLASTI,["Čas","Čas vypršel","Datum"]);
+  const aoa=[head];
+  (VYKRESY_RESULTS||[]).slice().sort((a,b)=>(a.dept||"").localeCompare(b.dept||"","cs")||(b.procenta||0)-(a.procenta||0)).forEach(r=>{
+    const obl={}; (r.oblasti||[]).forEach(o=>obl[o.oblast]=o.spravne+"/"+o.celkem);
+    aoa.push([r.dept||"—",r.name,r.email,r.pozice||"",r.skore,r.otazekCelkem,r.procenta,r.hodnoceni||vykresyPasmoCl(r.procenta||0)[0]]
+      .concat(VYKRESY_OBLASTI.map(n=>obl[n]||""),[vykresyCas(r.casPouzityS),r.casVyprsel?"ano":"ne",new Date(r.ts).toLocaleDateString("cs-CZ")]));
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa), wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Čtení výkresů"); XLSX.writeFile(wb,"vykresy-vysledky.xlsx");
+}
+async function vykresyBlockHtml(){
+  try{ const r=await fetch("/api/vykresy-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return ""; } VYKRESY_RESULTS=await r.json(); }catch(e){ VYKRESY_RESULTS=[]; }
+  const catChecks=DB.categories.map(c=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0"><input type="checkbox" class="vykcat" value="'+c.id+'" '+(VYKRESY_ASSIGN.cats.includes(c.id)?"checked":"")+' onchange="vykresyReadCats()"> '+esc(c.name)+'</label>').join("")||'<span class="muted">Nejprve přidej oddělení (kategorie).</span>';
+  let h='<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:8px"><strong>Test čtení výkresů</strong>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="copyVykresyLinks()">Zkopírovat odkazy</button>'+
+      '<button class="btn sm" onclick="openSendModal(\'survey-vykresy\')">Rozeslat</button></div></div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">15 otázek · 6 oblastí · limit 10 minut · neanonymní · osobní odkaz e-mailem — pro zaměstnance i uchazeče o práci.</div>'+
+    '<div style="background:var(--green-soft);border:1px solid #cfe9d8;border-radius:10px;padding:14px 16px;margin-bottom:12px;font-size:14px;line-height:1.55">'+
+      '<strong>O čem to je:</strong> Praktický test <strong>čtení strojírenských výkresů</strong> — žádná teorie ani definice. Respondent čte skutečné výkresy z kontejnerové výroby: pohledy a řezy, kóty a rozteče, tolerance a závity, svarové značky, popisové pole (razítko) a sestavu s kusovníkem. Odpovídá výběrem možnosti, zápisem hodnoty z výkresu, nebo kliknutím přímo do výkresu.'+
+      '<div class="muted" style="margin-top:6px;font-size:13px">Hodnocení: ≥ 90 % výborná úroveň · 70–89 % dobrá · 50–69 % základní orientace · &lt; 50 % nedostatečná. Po vypršení limitu se test sám vyhodnotí (nezodpovězené = chybné), vracet se nelze. Vhodné pro svářeče, zámečníky, obsluhu strojů, mistry i nábor do výroby.</div>'+
+    '</div>'+
+    '<label class="field" style="margin-bottom:4px"><span>Komu rozeslat — oddělení</span>'+
+      '<label style="display:inline-flex;gap:6px;align-items:center;margin:0 0 8px"><input type="checkbox" id="vykAll" '+(VYKRESY_ASSIGN.all?"checked":"")+' onchange="vykresyAssignAll(this.checked)"> Všem zaměstnancům</label></label>'+
+    '<div id="vykCatWrap" style="opacity:'+(VYKRESY_ASSIGN.all?.4:1)+'">'+catChecks+'</div></div>';
+  const res=VYKRESY_RESULTS||[];
+  if(!res.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné výsledky testu čtení výkresů. Rozešli test zaměstnancům či uchazečům (tlačítko Rozeslat — uchazeči se přidávají přímo v dialogu) a vyplněné výsledky se tu objeví.</p></div>'; return h; }
+  const avgPct=Math.round(res.reduce((s,r)=>s+(r.procenta||0),0)/res.length);
+  const okN=res.filter(r=>(r.procenta||0)>=70).length;
+  h+='<div class="spread" style="margin:4px 0 12px"><h3 style="margin:0">Čtení výkresů — výsledky podle oddělení</h3><button class="btn sm" onclick="exportVykresy()">⬇ Export (XLSX)</button></div>';
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Respondentů</div><strong style="font-size:20px">'+res.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Ø úspěšnost</div><strong style="font-size:20px">'+avgPct+' %</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Dobrá úroveň a lepší (≥ 70 %)</div><strong style="font-size:20px">'+okN+' z '+res.length+'</strong></div></div>';
+  const groups={}; res.forEach(r=>{ const d=r.dept||"—"; (groups[d]=groups[d]||[]).push(r); });
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,"cs")).forEach(d=>{
+    const rows=groups[d].slice().sort((a,b)=>(b.procenta||0)-(a.procenta||0));
+    const gP=Math.round(rows.reduce((s,r)=>s+(r.procenta||0),0)/rows.length);
+    h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+(d==="—"?"Uchazeči / bez oddělení":esc(d))+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3>'+
+       '<span class="pill green">Ø '+gP+' %</span></div>';
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>Pozice</th><th class="num">Správně</th><th class="num">Úspěšnost</th><th>Hodnocení</th><th class="num">Čas</th><th>Datum</th><th></th></tr></thead><tbody>';
+    rows.forEach(r=>{ const pa=vykresyPasmoCl(r.procenta||0);
+      h+='<tr><td>'+esc(r.name)+'<br><span class="muted mono" style="font-size:11px">'+esc(r.email)+'</span></td>'+
+         '<td>'+esc(r.pozice||"—")+'</td><td class="num">'+r.skore+' / '+r.otazekCelkem+'</td><td class="num">'+(r.procenta||0)+' %</td>'+
+         '<td><span class="pill '+pa[1]+'">'+pa[0]+'</span></td>'+
+         '<td class="num">'+vykresyCas(r.casPouzityS)+(r.casVyprsel?' <span title="Čas vypršel">⏱</span>':'')+'</td>'+
+         '<td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td>'+
+         '<td style="text-align:right"><button class="btn ghost sm" onclick="openVysledekDetail(\'vykresy\',\''+esc(r.email)+'\')">Detail</button></td></tr>'; });
+    h+='</tbody></table></div>';
+  });
+  return h;
+}
+
 /* ---- Školení ABROLL – závěrečný test (výsledky, max 3 pokusy) ---- */
 let ABROLL_RESULTS=[];
 async function abrollBlockHtml(){
@@ -7011,9 +7114,9 @@ function openSendModal(id){
 }
 function refreshSend(id){ const S=sendableOf(id); if(S&&S.isSurvey){ reloadSurveyResults(id); } else { pullAcks(id); } }
 async function reloadSurveyResults(id){
-  const ep = id==="survey-jss" ? "/api/jss-results" : id==="survey-tw44" ? "/api/tw44-results" : "/api/grit-results";
+  const ep = id==="survey-jss" ? "/api/jss-results" : id==="survey-tw44" ? "/api/tw44-results" : id==="survey-vykresy" ? "/api/vykresy-results" : "/api/grit-results";
   try{ const r=await fetch(ep,{cache:"no-store"}); const data=await r.json();
-    if(id==="survey-jss") JSS_RESULTS=data; else if(id==="survey-tw44") TW44_RESULTS=data; else GRIT_RESULTS=data;
+    if(id==="survey-jss") JSS_RESULTS=data; else if(id==="survey-tw44") TW44_RESULTS=data; else if(id==="survey-vykresy") VYKRESY_RESULTS=data; else GRIT_RESULTS=data;
   }catch(e){}
   renderSendList(id); toast("Výsledky načteny");
 }

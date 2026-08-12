@@ -159,6 +159,7 @@ const GOOGLE_SA_PRIVATE_KEY = (process.env.GOOGLE_SA_PRIVATE_KEY || '').replace(
 const GRIT_FILE = path.join(ROOT, 'grit.html');              // test houževnatosti (Grit)
 const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracovní spokojenosti (JSS)
 const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
+const VYKRESY_FILE = path.join(ROOT, 'vykresy.html');        // test čtení strojírenských výkresů (praktický, 15 otázek)
 const ABROLL_FILE = path.join(ROOT, 'abroll-skoleni.html');  // interaktivní školení ABROLL + závěrečný test
 const PRODUKTY_FILE = path.join(ROOT, 'produkty-skoleni.html'); // interaktivní školení Produkty (znalosti obchodníků) + závěrečný test
 const PRUMYSL_FILE = path.join(ROOT, 'prumysl-skoleni.html'); // interaktivní školení Průmysl (obchodník: skladování, Li-Ion, ADR) + závěrečný test
@@ -174,6 +175,7 @@ const REPORT_F = path.join(DATA_DIR, 'report-state.json');   // stav měsíční
 const GRIT_F   = path.join(DATA_DIR, 'grit-results.json');   // výsledky testu houževnatosti (neanonymní)
 const JSS_F    = path.join(DATA_DIR, 'jss-results.json');    // výsledky dotazníku pracovní spokojenosti
 const TW44_F   = path.join(DATA_DIR, 'tw44-results.json');   // výsledky testu kognitivní zátěže (neanonymní)
+const VYKRESY_F = path.join(DATA_DIR, 'vykresy-results.json'); // výsledky testu čtení výkresů (zaměstnanci i uchazeči)
 const ABROLL_F = path.join(DATA_DIR, 'abroll-results.json'); // výsledky testu ABROLL (max 3 pokusy na osobu)
 const PRODUKTY_F = path.join(DATA_DIR, 'produkty-results.json'); // výsledky testu znalosti produktů (max 3 pokusy na osobu)
 const PRUMYSL_F = path.join(DATA_DIR, 'prumysl-results.json'); // výsledky testu Průmysl (obchodník) — max 3 pokusy na osobu
@@ -693,6 +695,7 @@ function mySurveys(email) {
     { id: 'grit', title: 'Test houževnatosti (Grit)', desc: '10 otázek · vytrvalost a dlouhodobá vášeň pro cíle', mins: 3, file: GRIT_F },
     { id: 'jss',  title: 'Dotazník pracovní spokojenosti (JSS)', desc: '36 otázek · 9 oblastí pracovní spokojenosti', mins: 8, file: JSS_F },
     { id: 'tw44', title: 'Test kognitivní zátěže (TW44)', desc: 'krátké subtesty pozornosti a paměti', mins: 6, file: TW44_F },
+    { id: 'vykresy', title: 'Test čtení výkresů', desc: '15 otázek · praktické čtení strojírenské výkresové dokumentace', mins: 10, file: VYKRESY_F },
   ];
   return DEFS.map(d => {
     const rec = readJson(d.file, []).find(r => (r.email || '').toLowerCase() === email);
@@ -765,8 +768,55 @@ function recordTw44(a) {
   logActivity('survey', { email, name }, 'Test kognitivní zátěže (TW44)');
   return rec;
 }
+// Uloží (upsert podle e-mailu) výsledek testu čtení strojírenských výkresů (zaměstnanec i uchazeč).
+function recordVykresy(a) {
+  const email = (a.email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || a.kandidat || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const celkem = Math.max(1, Math.round(Number(a.otazekCelkem) || 15));
+  const skore = Math.max(0, Math.min(celkem, Math.round(Number(a.skore) || 0)));
+  const procenta = Math.max(0, Math.min(100, Math.round((a.procenta != null && isFinite(a.procenta)) ? Number(a.procenta) : skore / celkem * 100)));
+  const rec = { email, name, dept,
+    pozice: String(a.pozice || '').slice(0, 80),
+    skore, otazekCelkem: celkem, procenta,
+    hodnoceni: String(a.hodnoceni || VYKRESY_HODNOCENI[vykresyPasmo(procenta)]).slice(0, 60),
+    casVyprsel: !!a.casVyprsel,
+    casPouzityS: Math.max(0, Math.round(Number(a.casPouzityS) || 0)),
+    limitS: Math.max(0, Math.round(Number(a.limitS) || 0)),
+    oblasti: (Array.isArray(a.oblasti) ? a.oblasti : []).slice(0, 12).map(o => ({
+      oblast: String((o || {}).oblast || '').slice(0, 60),
+      spravne: Math.max(0, Math.round(Number((o || {}).spravne) || 0)),
+      celkem: Math.max(0, Math.round(Number((o || {}).celkem) || 0)) })),
+    odpovedi: (Array.isArray(a.odpovedi) ? a.odpovedi : []).slice(0, 40).map(o => ({
+      otazka: Math.round(Number((o || {}).otazka) || 0),
+      oblast: String((o || {}).oblast || '').slice(0, 60),
+      spravne: !!(o || {}).spravne,
+      odpovedKandidata: (o || {}).odpovedKandidata == null ? null : String((o || {}).odpovedKandidata).slice(0, 200),
+      spravnaOdpoved: String((o || {}).spravnaOdpoved || '').slice(0, 200) })),
+    ts: Date.now() };
+  const results = readJson(VYKRESY_F, []);
+  const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0 && results[i].ts && Date.now() < nextFillAt(results[i].ts)) return { blocked: true, nextAt: nextFillAt(results[i].ts) };
+  if (i >= 0) results[i] = rec; else results.push(rec);
+  writeJson(VYKRESY_F, results);
+  logActivity('survey', { email, name }, 'Test čtení výkresů');
+  return rec;
+}
 /* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
-const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)' };
+const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)', vykresy: 'Test čtení výkresů' };
+/* Test čtení výkresů — pásma dle procent (stejná hranice jako v testu samotném) */
+function vykresyPasmo(p) { return p >= 90 ? 'vyborna' : p >= 70 ? 'dobra' : p >= 50 ? 'zakladni' : 'nedostatecna'; }
+const VYKRESY_HODNOCENI = { vyborna: 'Výborná úroveň', dobra: 'Dobrá úroveň', zakladni: 'Základní orientace', nedostatecna: 'Nedostatečná úroveň' };
+const VYKRESY_DOPORUCENI = {
+  vyborna: 'Kandidát čte výkresy spolehlivě — bez omezení pro samostatnou práci podle výkresové dokumentace.',
+  dobra: 'Drobné mezery, běžnou výrobní dokumentaci zvládne. Doporučujeme krátké zaškolení na firemní standardy kreslení.',
+  zakladni: 'Ve výkresech se orientuje jen částečně. Jednodušší úkoly zvládne pod dohledem; před samostatnou prací doporučujeme školení čtení výkresů.',
+  nedostatecna: 'Čtení výkresů zatím neovládá. Pro práci podle výkresové dokumentace je nutné důkladné zaškolení.',
+};
+function vykresyFmtCas(sec) { sec = Math.max(0, Math.round(sec || 0)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
 // Pracovní pásma dle skóre 1–5 (publikované normy neexistují — percentil je jen orientační).
 function gritPasmo(v) { return v < 3 ? 'nizke' : (v < 4 ? 'stredni' : 'vysoke'); }
 const GRIT_TXT = {
@@ -850,6 +900,20 @@ function surveyVysledekRadky(kind, rec) {
     (rec.subs || []).forEach(s => r.push([s.name + ' (4–24)', s.score + ' — ' + jssPasmoFacet(s.score)]));
     return r;
   }
+  if (kind === 'vykresy') {
+    const r = [
+      ['Výsledek', rec.skore + ' / ' + rec.otazekCelkem + ' správně (' + rec.procenta + ' %)'],
+      ['Hodnocení', rec.hodnoceni || VYKRESY_HODNOCENI[vykresyPasmo(rec.procenta)]],
+    ];
+    if (rec.pozice) r.push(['Pozice', rec.pozice]);
+    r.push(['Čas', vykresyFmtCas(rec.casPouzityS) + ' / limit ' + vykresyFmtCas(rec.limitS) + (rec.casVyprsel ? ' — čas vypršel (nezodpovězené = chybné)' : '')]);
+    (rec.oblasti || []).forEach(o => r.push(['Oblast — ' + o.oblast, o.spravne + ' / ' + o.celkem]));
+    const chyby = (rec.odpovedi || []).filter(o => !o.spravne);
+    if (chyby.length) r.push(['Chybné otázky', chyby.map(o => 'č. ' + o.otazka + ' (' + o.oblast + ')').join(' · ')]);
+    r.push(['Doporučení', VYKRESY_DOPORUCENI[vykresyPasmo(rec.procenta)]],
+      ['Upozornění', 'Orientační výsledek — doporučujeme doplnit krátkým pohovorem nad reálným firemním výkresem.']);
+    return r;
+  }
   const su = tw44UspesnostSrv(rec); const ix = rec.indices || {};
   const r = [['Varianta', rec.variant || '—'], ['Nalezené cíle', String(su.found)], ['Úspěšnost hledání', su.pct + ' %']];
   tw44Interpretace(ix).forEach(t => r.push(['Index', t]));
@@ -898,7 +962,7 @@ function surveyReportHtml(kind, rec, poznamka) {
     '<p style="margin-top:16px;font-size:12px;color:#77796f">Interní podklad HR — ELKOPLAST CZ. Doplňková informace ze sebehodnocení, nikoli samostatné selekční kritérium. Plný interaktivní detail: intranet.elkoplast.cz → Průzkumy.</p></div></div>';
 }
 function surveyRec(kind, email) {
-  const f = kind === 'jss' ? JSS_F : kind === 'tw44' ? TW44_F : GRIT_F;
+  const f = kind === 'jss' ? JSS_F : kind === 'tw44' ? TW44_F : kind === 'vykresy' ? VYKRESY_F : GRIT_F;
   return readJson(f, []).find(r => (r.email || '').toLowerCase() === String(email || '').toLowerCase());
 }
 
@@ -2164,7 +2228,7 @@ const server = http.createServer(async (req, res) => {
 
   // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
   const invite = inviteVerify(u.query.i || '');
-  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/api/grit', '/api/jss', '/api/tw44'];
+  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/vykresy', '/vykresy.html', '/api/grit', '/api/jss', '/api/tw44', '/api/vykresy'];
   const inviteOk = !!(invite && INVITE_ROUTES.indexOf(p) >= 0);
   // Veřejné cesty modulu Smlouvy (mimo SSO závoru): potvrzení termínu tokenem + Resend webhook.
   const smlouvyPublic = p.startsWith('/smlouvy/potvrdit') || p === '/api/smlouvy/webhook/resend';
@@ -2265,7 +2329,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // chráněné cesty (správa)
-  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results'];
+  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results'];
   if (PROTECTED.indexOf(p) >= 0 && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
@@ -2338,6 +2402,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/jss' || p === '/jss.html') {
       if (!fs.existsSync(JSS_FILE)) return send(res, 404, '<h1>Chybí jss.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(JSS_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    if (p === '/vykresy' || p === '/vykresy.html') {
+      if (!fs.existsSync(VYKRESY_FILE)) return send(res, 404, '<h1>Chybí vykresy.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(VYKRESY_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/koncept' || p === '/koncept.html') {
       if (!fs.existsSync(KONCEPT_FILE)) return send(res, 404, '<h1>Chybí intranet-koncept.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
@@ -2470,6 +2538,9 @@ const server = http.createServer(async (req, res) => {
     // ---- test kognitivní zátěže (TW44) ----
     if (p === '/api/tw44' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordTw44(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('tw44', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/tw44-results' && req.method === 'GET') return send(res, 200, readJson(TW44_F, []));
+
+    if (p === '/api/vykresy' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordVykresy(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('vykresy', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, skore: rec.skore, procenta: rec.procenta }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/vykresy-results' && req.method === 'GET') return send(res, 200, readJson(VYKRESY_F, []));
     // ABROLL test: GET = stav pokusů dané osoby, POST = odeslání pokusu (max 3)
     if (p === '/api/abroll' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, abrollStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
@@ -2494,7 +2565,7 @@ const server = http.createServer(async (req, res) => {
       if (!emailConfigured()) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
       const b = JSON.parse(await readBody(req));
       const kind = (b.kind || '').toLowerCase();
-      if (['grit', 'jss', 'tw44'].indexOf(kind) < 0) return send(res, 400, { error: 'Neznámý typ testu.' });
+      if (['grit', 'jss', 'tw44', 'vykresy'].indexOf(kind) < 0) return send(res, 400, { error: 'Neznámý typ testu.' });
       const to = String(b.to || '').trim();
       if (to.indexOf('@') < 0) return send(res, 400, { error: 'Neplatný e-mail příjemce.' });
       const rec = surveyRec(kind, b.email);

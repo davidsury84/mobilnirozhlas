@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test čtení strojírenských výkresů</title>
+<style>
+  :root{
+    --page:#f6f6f3; --surface:#fcfcfb; --paper:#ffffff;
+    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --hair:#e1e0d9; --line:#c3c2b7; --border:rgba(11,11,11,.10);
+    --accent:#2a78d6; --accent-dk:#256abf; --accent-wash:rgba(42,120,214,.08);
+    --good:#0ca30c; --good-tx:#006300; --bad:#d03b3b;
+    --r:14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html{color-scheme:light}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--page); color:var(--ink);
+    -webkit-font-smoothing:antialiased; line-height:1.45;
+  }
+  /* ---------- header ---------- */
+  header.app{
+    background:var(--surface); border-bottom:1.5px solid var(--ink);
+    position:sticky; top:0; z-index:50;
+  }
+  .app-in{
+    max-width:900px; margin:0 auto; padding:12px 20px;
+    display:flex; align-items:center; gap:16px;
+  }
+  .brand{display:flex; flex-direction:column; gap:1px; min-width:150px}
+  .brand b{font-size:13px; letter-spacing:.04em}
+  .brand span{font-size:9.5px; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); font-weight:600}
+  .head-mid{flex:1; text-align:center}
+  .qcount{font-size:13px; font-weight:700; letter-spacing:.02em}
+  .qcat{font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--accent); font-weight:700; margin-top:1px}
+  .timer{
+    font-size:21px; font-weight:800; font-variant-numeric:tabular-nums;
+    min-width:96px; text-align:right; letter-spacing:.02em;
+  }
+  .timer small{display:block; font-size:9px; font-weight:600; letter-spacing:.14em; color:var(--muted); text-transform:uppercase}
+  .timer.low{color:var(--bad); animation:pulse 1s steps(2,end) infinite}
+  @keyframes pulse{50%{opacity:.55}}
+  .pbar{height:4px; background:var(--hair)}
+  .pbar i{display:block; height:100%; background:var(--accent); width:0%; transition:width .35s ease}
+
+  main{max-width:900px; margin:0 auto; padding:26px 20px 70px}
+  .screen{display:none}
+  .screen.active{display:block; animation:fade .25s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+  .card{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r); padding:26px 28px;
+    box-shadow:0 1px 2px rgba(11,11,11,.04);
+  }
+  .card + .card{margin-top:18px}
+
+  /* ---------- stamp (title-block styled grid) ---------- */
+  .stamp{
+    display:grid; border:1.5px solid var(--ink); border-radius:6px; overflow:hidden;
+    background:var(--paper);
+  }
+  .stamp .cell{padding:9px 14px 10px; border-right:1px solid var(--hair); border-bottom:1px solid var(--hair)}
+  .stamp .cell:last-child{border-right:none}
+  .flab{font-size:9px; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); font-weight:700; display:block; margin-bottom:2px}
+  .fval{font-size:14.5px; font-weight:700; letter-spacing:.01em}
+  .fval.acc{color:var(--accent)}
+
+  /* ---------- intro ---------- */
+  .hero{margin-bottom:20px}
+  .hero .eyebrow{font-size:10.5px; text-transform:uppercase; letter-spacing:.22em; color:var(--muted); font-weight:700; margin-bottom:8px}
+  .hero h1{font-size:29px; line-height:1.15; letter-spacing:-.01em; font-weight:800}
+  .hero p{color:var(--ink2); margin-top:8px; font-size:15px; max-width:640px}
+  .meta-stamp{grid-template-columns:repeat(4,1fr); margin:20px 0 24px}
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px}
+  .field label{font-size:9.5px; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); font-weight:700; display:block; margin-bottom:5px}
+  .field input,.field select{
+    width:100%; padding:11px 12px; font-size:15px; font-family:inherit;
+    border:1.5px solid var(--hair); border-radius:9px; background:var(--paper); color:var(--ink);
+  }
+  .field input:focus,.field select:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  .field input.err{border-color:var(--bad); animation:shake .3s}
+  @keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  .howto{display:flex; gap:10px; flex-wrap:wrap; margin-top:20px}
+  .chip{
+    display:flex; align-items:center; gap:9px; padding:9px 14px;
+    border:1px solid var(--hair); border-radius:999px; background:var(--paper);
+    font-size:12.5px; color:var(--ink2); font-weight:600;
+  }
+  .chip b{
+    font-size:10px; background:var(--ink); color:#fff; border-radius:5px;
+    padding:3px 6px; letter-spacing:.06em; font-weight:800;
+  }
+  .rules{margin-top:16px; color:var(--ink2); font-size:13.5px; padding-left:0; list-style:none}
+  .rules li{padding:3px 0 3px 22px; position:relative}
+  .rules li::before{content:""; position:absolute; left:4px; top:11px; width:8px; height:2px; background:var(--accent)}
+  .startrow{display:flex; align-items:center; gap:16px; margin-top:24px; flex-wrap:wrap}
+  .hrnote{font-size:11.5px; color:var(--muted); max-width:420px}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.01em;
+    padding:12px 26px; border-radius:10px; border:1.5px solid transparent;
+    cursor:pointer; transition:background .15s,transform .05s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn:focus-visible{outline:2.5px solid var(--accent); outline-offset:2px}
+  .btn.primary{background:var(--accent); color:#fff}
+  .btn.primary:hover{background:var(--accent-dk)}
+  .btn.primary:disabled{background:var(--hair); color:var(--muted); cursor:not-allowed}
+  .btn.ghost{background:var(--paper); border-color:var(--line); color:var(--ink)}
+  .btn.ghost:hover{border-color:var(--ink)}
+  .btn.sm{font-size:13px; padding:9px 16px}
+
+  /* ---------- quiz ---------- */
+  .qtext{font-size:17.5px; font-weight:700; line-height:1.4; max-width:760px}
+  .qtext .em{color:var(--accent)}
+  .sheet{
+    background:var(--paper); border:1px solid #d9d8d1; border-radius:8px;
+    margin:18px 0 6px; padding:8px; overflow:hidden;
+  }
+  .sheet svg{display:block; width:100%; height:auto; max-width:780px; margin:0 auto}
+  .hint{
+    display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink2);
+    background:var(--accent-wash); border:1px dashed var(--accent);
+    border-radius:8px; padding:8px 12px; margin-top:12px; font-weight:600;
+  }
+  .answers{margin-top:16px; display:grid; gap:10px}
+  .answers.imggrid{grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:12px}
+  .opt{
+    display:flex; align-items:center; gap:13px; text-align:left;
+    padding:13px 16px; border:1.5px solid var(--hair); border-radius:11px;
+    background:var(--paper); cursor:pointer; font-family:inherit; font-size:15px; color:var(--ink);
+    transition:border-color .12s, background .12s;
+  }
+  .opt:hover{border-color:var(--accent)}
+  .opt .let{
+    flex:0 0 auto; width:27px; height:27px; border-radius:50%;
+    border:1.5px solid var(--line); display:grid; place-items:center;
+    font-size:12.5px; font-weight:800; color:var(--ink2); background:var(--surface);
+  }
+  .opt.sel{border-color:var(--accent); background:var(--accent-wash)}
+  .opt.sel .let{background:var(--accent); border-color:var(--accent); color:#fff}
+  .optimg{flex-direction:column; align-items:stretch; gap:8px; padding:10px}
+  .optimg .imgbox{border:1px solid var(--hair); border-radius:7px; background:var(--paper); overflow:hidden}
+  .optimg .imgbox svg{display:block; width:100%; height:auto}
+  .optimg .let{align-self:center}
+  .numwrap{display:flex; align-items:center; gap:10px; max-width:260px}
+  .numwrap input{
+    width:150px; padding:12px 14px; font-size:19px; font-weight:700; font-family:inherit;
+    font-variant-numeric:tabular-nums; text-align:right;
+    border:1.5px solid var(--hair); border-radius:10px; background:var(--paper); color:var(--ink);
+  }
+  .numwrap input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  .numwrap .unit{font-size:15px; font-weight:700; color:var(--ink2)}
+  .qfoot{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    margin-top:22px; padding-top:18px; border-top:1px solid var(--hair);
+  }
+  .selstate{font-size:13px; color:var(--muted); font-weight:600}
+  .selstate.on{color:var(--good-tx)}
+
+  /* ---------- SVG drawing styles ---------- */
+  .ol   {stroke:#0b0b0b; stroke-width:2.2; fill:none; stroke-linejoin:round; stroke-linecap:round}
+  .olf  {stroke:#0b0b0b; stroke-width:2.2; fill:#fff; stroke-linejoin:round}
+  .thin {stroke:#52514e; stroke-width:1; fill:none}
+  .hid  {stroke:#3d4a57; stroke-width:1.5; fill:none; stroke-dasharray:7 4}
+  .axis {stroke:#8a94a0; stroke-width:.9; fill:none; stroke-dasharray:15 4 3 4}
+  .dtxt {font:12.5px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+  .stxt {font:10px Arial,Helvetica,sans-serif; fill:#52514e}
+  .cap  {font:700 10px system-ui,sans-serif; fill:#52514e; letter-spacing:.08em}
+  [data-zone]{fill:rgba(0,0,0,0); stroke:none; pointer-events:none}
+  .zone{cursor:pointer; pointer-events:all}
+  .zone:hover{fill:rgba(42,120,214,.10)}
+  .zone.zsel{fill:rgba(42,120,214,.16); stroke:#2a78d6; stroke-width:2.2; stroke-dasharray:6 3}
+  .tbl-l{font:700 8.5px system-ui,sans-serif; fill:#898781; letter-spacing:.09em}
+  .tbl-v{font:700 13.5px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+  .tbl-b{font:700 16px Arial,Helvetica,sans-serif; fill:#0b0b0b; letter-spacing:.02em}
+  .btxt{font:700 13px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+  .bomh{font:700 9px system-ui,sans-serif; fill:#52514e; letter-spacing:.06em}
+  .bomv{font:11.5px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+  .bomv-s{font:9.5px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+
+  /* ---------- results ---------- */
+  .res-stamp{grid-template-columns:1.4fr 1fr 1fr 1fr 1fr; margin-bottom:20px}
+  .res-main{display:flex; gap:34px; align-items:center; flex-wrap:wrap}
+  .ringbox{position:relative; width:168px; height:168px; flex:0 0 auto}
+  .ringbox svg{transform:rotate(-90deg)}
+  .ring-tr{stroke:var(--hair)}
+  .ring-fg{stroke:var(--accent); transition:stroke-dashoffset 1s ease}
+  .ring-c{position:absolute; inset:0; display:grid; place-items:center; text-align:center}
+  .ring-c b{font-size:37px; font-weight:800; letter-spacing:-.02em; display:block; line-height:1}
+  .ring-c span{font-size:12px; color:var(--muted); font-weight:700; margin-top:3px; display:block}
+  .verdict h2{font-size:22px; font-weight:800; letter-spacing:-.01em}
+  .verdict .badge{
+    display:inline-block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.12em;
+    border:1.5px solid var(--bad); color:var(--bad); padding:3px 9px; border-radius:6px; margin-bottom:8px;
+  }
+  .verdict p{color:var(--ink2); font-size:14.5px; margin-top:7px; max-width:480px}
+  .verdict .note{font-size:11.5px; color:var(--muted); margin-top:9px}
+  .cats{margin-top:26px; display:grid; gap:13px}
+  .catrow .cr-head{display:flex; justify-content:space-between; font-size:13px; font-weight:700; margin-bottom:5px}
+  .catrow .cr-head span{color:var(--ink2); font-weight:600; font-variant-numeric:tabular-nums}
+  .cr-track{height:9px; background:var(--hair); border-radius:5px; overflow:hidden}
+  .cr-fill{height:100%; background:var(--accent); border-radius:5px; transition:width .8s ease}
+  .resbtns{display:flex; gap:11px; margin-top:26px; flex-wrap:wrap}
+  .sendstate{margin-top:14px; font-size:12.5px; font-weight:700}
+
+  .review{margin-top:8px}
+  .rev-item{
+    border:1px solid var(--hair); border-left-width:4px; border-radius:10px;
+    padding:14px 18px; margin-top:11px; background:var(--paper);
+  }
+  .rev-item.ok{border-left-color:var(--good)}
+  .rev-item.bad{border-left-color:var(--bad)}
+  .rev-top{display:flex; gap:10px; align-items:baseline}
+  .rev-mark{font-size:14px; font-weight:800; flex:0 0 auto}
+  .rev-item.ok .rev-mark{color:var(--good-tx)}
+  .rev-item.bad .rev-mark{color:var(--bad)}
+  .rev-q{font-size:14px; font-weight:700}
+  .rev-cat{font-size:9.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700; margin-left:auto; flex:0 0 auto}
+  .rev-ans{font-size:13px; margin-top:7px; color:var(--ink2)}
+  .rev-ans b{color:var(--ink)}
+  .rev-ex{font-size:13px; margin-top:6px; color:var(--ink2); background:var(--page); border-radius:7px; padding:8px 12px}
+
+  footer.app{max-width:900px; margin:0 auto; padding:0 20px 34px; color:var(--muted); font-size:11px; letter-spacing:.02em}
+
+  @media (max-width:680px){
+    .form-grid{grid-template-columns:1fr}
+    .meta-stamp{grid-template-columns:1fr 1fr}
+    .res-stamp{grid-template-columns:1fr 1fr}
+    .app-in{padding:10px 14px}
+    .brand{min-width:0}
+    .brand span{display:none}
+    .card{padding:20px 16px}
+  }
+  @media print{
+    body{background:#fff}
+    header.app,.pbar,footer.app,.resbtns,.no-print{display:none !important}
+    #scr-intro,#scr-quiz{display:none !important}
+    #scr-result{display:block !important}
+    .card{border:none; box-shadow:none; padding:6px 0}
+    .review{display:block !important}
+    .rev-item{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="app-in">
+    <div class="brand">
+      <b>Čtení strojírenských výkresů</b>
+      <span>Praktický vstupní test · kontejnerová výroba</span>
+    </div>
+    <div class="head-mid" id="headMid" style="visibility:hidden">
+      <div class="qcount" id="hQnum">Otázka 1/10</div>
+      <div class="qcat" id="hQcat">—</div>
+    </div>
+    <div class="timer" id="timerBox" style="visibility:hidden">
+      <small>Zbývá</small><span id="timer">10:00</span>
+    </div>
+  </div>
+  <div class="pbar"><i id="pfill"></i></div>
+</header>
+
+<main>
+  <!-- ============ INTRO ============ -->
+  <section class="screen active" id="scr-intro">
+    <div class="hero">
+      <div class="eyebrow">Vstupní test · praktické čtení výkresové dokumentace</div>
+      <h1>Umíte číst strojírenské výkresy?</h1>
+      <p>Žádná teorie ani definice. Dostanete skutečné výkresy — od jednoduché desky po sestavu vrat kontejneru — a budete z nich číst rozměry, tolerance, svary, materiál i pozice dílů, přesně jako ve výrobě.</p>
+    </div>
+    <div class="card">
+      <div class="stamp meta-stamp">
+        <div class="cell"><span class="flab">Otázek</span><span class="fval" id="mQ">10</span></div>
+        <div class="cell"><span class="flab">Časový limit</span><span class="fval" id="mLim">10 min</span></div>
+        <div class="cell"><span class="flab">Oblasti</span><span class="fval">6</span></div>
+        <div class="cell"><span class="flab">Forma</span><span class="fval acc">praktická</span></div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="inName">Jméno a příjmení *</label>
+          <input id="inName" type="text" autocomplete="off" placeholder="např. Jan Novák">
+        </div>
+        <div class="field">
+          <label for="inPos">Pozice (nepovinné)</label>
+          <input id="inPos" type="text" autocomplete="off" placeholder="např. svářeč / zámečník">
+        </div>
+      </div>
+
+      <div class="howto">
+        <div class="chip"><b>A·B·C</b> výběr jedné možnosti</div>
+        <div class="chip"><b>123</b> zápis čísla z výkresu</div>
+        <div class="chip"><b>KLIK</b> kliknutí přímo do výkresu</div>
+      </div>
+
+      <ul class="rules">
+        <li>Odpovědi se potvrzují tlačítkem, <b>vracet se nelze</b> — jako u zkoušky.</li>
+        <li>Výsledek a rozbor chyb se zobrazí až na konci testu.</li>
+        <li>Po vypršení limitu se test sám vyhodnotí (nezodpovězené = chybné).</li>
+        <li>Stránku během testu nezavírejte a neobnovujte.</li>
+      </ul>
+
+      <div class="startrow">
+        <button class="btn primary" id="btnStart">Spustit test&nbsp;→</button>
+        <div class="hrnote" id="hrNote">Pro náboráře: výsledky se nikam neukládají — na konci lze protokol vytisknout nebo zkopírovat souhrn.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section class="screen" id="scr-quiz">
+    <div class="card">
+      <div class="qtext" id="qText"></div>
+      <div id="qMedia"></div>
+      <div id="qAnswers"></div>
+      <div class="qfoot">
+        <div class="selstate" id="selState">Vyberte odpověď…</div>
+        <button class="btn primary" id="btnConfirm" disabled>Potvrdit odpověď&nbsp;→</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section class="screen" id="scr-result">
+    <div class="card">
+      <div class="stamp res-stamp">
+        <div class="cell"><span class="flab">Kandidát</span><span class="fval" id="rName">—</span></div>
+        <div class="cell"><span class="flab">Pozice</span><span class="fval" id="rPos">—</span></div>
+        <div class="cell"><span class="flab">Datum</span><span class="fval" id="rDate">—</span></div>
+        <div class="cell"><span class="flab">Čas / limit</span><span class="fval" id="rTime">—</span></div>
+        <div class="cell"><span class="flab">Výsledek</span><span class="fval acc" id="rScore">—</span></div>
+      </div>
+
+      <div class="res-main">
+        <div class="ringbox">
+          <svg width="168" height="168" viewBox="0 0 168 168" aria-hidden="true">
+            <circle class="ring-tr" cx="84" cy="84" r="70" fill="none" stroke-width="13"/>
+            <circle class="ring-fg" id="ringFg" cx="84" cy="84" r="70" fill="none" stroke-width="13"
+                    stroke-linecap="round" stroke-dasharray="439.8" stroke-dashoffset="439.8"/>
+          </svg>
+          <div class="ring-c"><div><b id="rPct">0&nbsp;%</b><span id="rFrac">0 / 10 správně</span></div></div>
+        </div>
+        <div class="verdict">
+          <div class="badge" id="rTimeout" style="display:none">Čas vypršel</div>
+          <h2 id="rVerdict">—</h2>
+          <p id="rRecom">—</p>
+          <div class="note">Orientační výsledek — doporučujeme doplnit krátkým pohovorem nad reálným firemním výkresem.</div>
+        </div>
+      </div>
+
+      <div class="cats" id="rCats"></div>
+
+      <div class="resbtns no-print">
+        <button class="btn primary" id="btnPrint">Vytisknout protokol</button>
+        <button class="btn ghost" id="btnCopy">Kopírovat souhrn</button>
+        <button class="btn ghost" id="btnReview">Zobrazit rozbor odpovědí</button>
+      </div>
+      <div class="sendstate" id="sendState" style="display:none"></div>
+    </div>
+
+    <div class="card review" id="reviewBox" style="display:none">
+      <div class="flab" style="margin-bottom:4px">Rozbor odpovědí</div>
+      <div id="revList"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="app">Interaktivní praktický test čtení výkresové dokumentace (ISO-E, 1. kvadrant) · vytvořeno pro interní použití při náboru</footer>
+
+<script>
+"use strict";
+/* =====================================================================
+   KONFIGURACE PRO NASAZENÍ NA INTRANET — upravujte pouze tento blok
+   ---------------------------------------------------------------------
+   limitMinutes ....... pevný časový limit testu v minutách
+   webhookUrl ......... volitelné: URL intranetového endpointu; po dokončení
+                        testu se na něj odešle POST s JSON výsledkem
+                        (viz README_integrace.md); "" = neodesílat nic
+   postMessageOrigin .. je-li test vložený v <iframe>, výsledek se po
+                        dokončení pošle nadřazené stránce přes
+                        window.parent.postMessage; doporučeno nastavit
+                        konkrétní origin, např. "https://intranet.firma.cz"
+   Předvyplnění kandidáta z intranetu: ?jmeno=Jan+Novák&pozice=svářeč
+   ===================================================================== */
+const CONFIG = {
+  limitMinutes: 10,
+  webhookUrl: "",
+  postMessageOrigin: "*"
+};
+/* Intranet ELKOPLAST: osobní pozvánkový odkaz (?i=podepsaný hash — stejný mechanismus
+   jako Grit/JSS/TW44). Je-li token přítomen, výsledek se po dokončení uloží na server
+   (/api/vykresy) a jméno se předvyplní z pozvánky (funguje pro zaměstnance i uchazeče). */
+const INVITE_TOKEN = (location.search.match(/[?&]i=([^&]+)/i) || [])[1] || "";
+function inviteName(tok){
+  try{
+    const data = tok.split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(data + "=".repeat((4 - data.length % 4) % 4));
+    const o = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+    return (o && o.n) || "";
+  }catch(e){ return ""; }
+}
+if(INVITE_TOKEN) CONFIG.webhookUrl = "/api/vykresy?i=" + encodeURIComponent(INVITE_TOKEN);
+
+/* ================= DATA ================= */
+const DRAWINGS = {
+/* ---- v: tři pohledy (ISO-E) + 3D pohled — PODSTAVEC ---- */
+v: `<svg viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tři pohledy na součást">
+  <rect x="6" y="6" width="648" height="418" class="thin" stroke-width="1.2"/>
+  <!-- nárys -->
+  <path class="olf" d="M70 60 H158 V104 H246 V148 H70 Z"/>
+  <line class="hid" x1="96.4" y1="60" x2="96.4" y2="148"/>
+  <line class="hid" x1="131.6" y1="60" x2="131.6" y2="148"/>
+  <line class="axis" x1="114" y1="54" x2="114" y2="154"/>
+  <!-- pohled zleva (vpravo od nárysu) -->
+  <rect class="olf" x="326" y="60" width="110" height="88"/>
+  <line class="hid" x1="326" y1="104" x2="436" y2="104"/>
+  <line class="hid" x1="363.4" y1="60" x2="363.4" y2="148"/>
+  <line class="hid" x1="398.6" y1="60" x2="398.6" y2="148"/>
+  <line class="axis" x1="381" y1="54" x2="381" y2="154"/>
+  <!-- půdorys (pod nárysem) -->
+  <rect class="olf" x="70" y="210" width="176" height="110"/>
+  <line class="ol" x1="158" y1="210" x2="158" y2="320"/>
+  <circle class="ol" cx="114" cy="265" r="17.6"/>
+  <line class="axis" x1="88" y1="265" x2="140" y2="265"/>
+  <line class="axis" x1="114" y1="239" x2="114" y2="291"/>
+  <!-- 3D pohled (pomocný) -->
+  <g transform="translate(430,212) scale(0.92)">
+    <polygon points="123.9,165 188.9,127.5 188.9,97.5 123.9,135" fill="#bfcad5" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <polygon points="20,105 123.9,165 123.9,135 72,105 72,75 20,45" fill="#d9e1e8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <polygon points="72,75 72,105 136.9,67.5 136.9,37.5" fill="#bfcad5" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <polygon points="72,105 123.9,135 188.9,97.5 136.9,67.5" fill="#f2f5f8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <polygon points="20,45 72,75 136.9,37.5 85,7.5" fill="#f2f5f8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <ellipse cx="78.5" cy="41.25" rx="14.7" ry="8.49" fill="#9fadbb" stroke="#0b0b0b" stroke-width="1.6"/>
+    <text x="104" y="188" text-anchor="middle" class="stxt">Prostorový pohled (jen pro názornost)</text>
+  </g>
+  <!-- mini popisové pole -->
+  <rect x="470" y="398" width="182" height="24" class="thin"/>
+  <text x="561" y="414" text-anchor="middle" class="cap">PODSTAVEC · M 1:1</text>
+  <!-- zóny -->
+  <rect data-zone="naris" x="56" y="44" width="204" height="118" rx="6"/>
+  <rect data-zone="bokorys" x="312" y="44" width="138" height="118" rx="6"/>
+  <rect data-zone="pudorys" x="56" y="194" width="204" height="140" rx="6"/>
+</svg>`,
+
+/* ---- x: 3D + nárys + půdorys, chybějící pohled zleva — pro otázku s výběrem ---- */
+x: `<svg viewBox="0 0 640 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Doplnění chybějícího pohledu">
+  <rect x="6" y="6" width="628" height="388" class="thin" stroke-width="1.2"/>
+  <g transform="translate(30,55) scale(1.08)">
+    <polygon points="123.9,165 188.9,127.5 188.9,97.5 123.9,135" fill="#bfcad5" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <polygon points="20,105 123.9,165 123.9,135 72,105 72,75 20,45" fill="#d9e1e8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <polygon points="72,75 72,105 136.9,67.5 136.9,37.5" fill="#bfcad5" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <polygon points="72,105 123.9,135 188.9,97.5 136.9,67.5" fill="#f2f5f8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <polygon points="20,45 72,75 136.9,37.5 85,7.5" fill="#f2f5f8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+    <ellipse cx="78.5" cy="41.25" rx="14.7" ry="8.49" fill="#9fadbb" stroke="#0b0b0b" stroke-width="1.6"/>
+    <text x="104" y="188" text-anchor="middle" class="stxt">3D pohled</text>
+  </g>
+  <!-- nárys -->
+  <path class="olf" d="M300 50 H388 V94 H476 V138 H300 Z"/>
+  <line class="hid" x1="326.4" y1="50" x2="326.4" y2="138"/>
+  <line class="hid" x1="361.6" y1="50" x2="361.6" y2="138"/>
+  <line class="axis" x1="344" y1="44" x2="344" y2="144"/>
+  <text x="388" y="160" text-anchor="middle" class="cap">NÁRYS</text>
+  <!-- půdorys -->
+  <rect class="olf" x="300" y="190" width="176" height="110"/>
+  <line class="ol" x1="388" y1="190" x2="388" y2="300"/>
+  <circle class="ol" cx="344" cy="245" r="17.6"/>
+  <line class="axis" x1="318" y1="245" x2="370" y2="245"/>
+  <line class="axis" x1="344" y1="219" x2="344" y2="271"/>
+  <text x="388" y="320" text-anchor="middle" class="cap">PŮDORYS</text>
+  <!-- chybějící pohled -->
+  <rect x="516" y="50" width="110" height="88" fill="#f4f7fa" stroke="#8a94a0" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="571" y="103" text-anchor="middle" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#8a94a0">?</text>
+  <text x="571" y="160" text-anchor="middle" class="cap">POHLED ZLEVA = ?</text>
+  <rect x="452" y="364" width="174" height="24" class="thin"/>
+  <text x="539" y="380" text-anchor="middle" class="cap">PODSTAVEC · M 1:1</text>
+</svg>`,
+/* ---- p: kótovaná deska — PŘÍLOŽKA ZÁVĚSU ---- */
+p: `<svg viewBox="0 0 620 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kótovaný výkres desky">
+  <defs>
+    <marker id="p_a" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse">
+      <path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#52514e"/>
+    </marker>
+  </defs>
+  <rect x="6" y="6" width="608" height="348" class="thin" stroke-width="1.2"/>
+  <rect class="olf" x="130" y="80" width="300" height="150" rx="15"/>
+  <g>
+    <circle class="ol" cx="160" cy="110" r="6.75"/><line class="axis" x1="147" y1="110" x2="173" y2="110"/><line class="axis" x1="160" y1="97" x2="160" y2="123"/>
+    <circle class="ol" cx="400" cy="110" r="6.75"/><line class="axis" x1="387" y1="110" x2="413" y2="110"/><line class="axis" x1="400" y1="97" x2="400" y2="123"/>
+    <circle class="ol" cx="160" cy="200" r="6.75"/><line class="axis" x1="147" y1="200" x2="173" y2="200"/><line class="axis" x1="160" y1="187" x2="160" y2="213"/>
+    <circle class="ol" cx="400" cy="200" r="6.75"/><line class="axis" x1="387" y1="200" x2="413" y2="200"/><line class="axis" x1="400" y1="187" x2="400" y2="213"/>
+  </g>
+  <!-- horní řetězec kót 20 / 160 -->
+  <line class="thin" x1="130" y1="76" x2="130" y2="44"/>
+  <line class="thin" x1="160" y1="98" x2="160" y2="44"/>
+  <line class="thin" x1="400" y1="98" x2="400" y2="44"/>
+  <line class="thin" x1="130" y1="50" x2="160" y2="50" marker-start="url(#p_a)" marker-end="url(#p_a)"/>
+  <text class="dtxt" x="145" y="42" text-anchor="middle">20</text>
+  <line class="thin" x1="160" y1="50" x2="400" y2="50" marker-start="url(#p_a)" marker-end="url(#p_a)"/>
+  <text class="dtxt" x="280" y="42" text-anchor="middle">160</text>
+  <!-- celková délka 200 -->
+  <line class="thin" x1="130" y1="234" x2="130" y2="308"/>
+  <line class="thin" x1="430" y1="234" x2="430" y2="308"/>
+  <line class="thin" x1="130" y1="300" x2="430" y2="300" marker-start="url(#p_a)" marker-end="url(#p_a)"/>
+  <text class="dtxt" x="280" y="292" text-anchor="middle">200</text>
+  <!-- celková šířka 100 -->
+  <line class="thin" x1="434" y1="80" x2="478" y2="80"/>
+  <line class="thin" x1="434" y1="230" x2="478" y2="230"/>
+  <line class="thin" x1="470" y1="80" x2="470" y2="230" marker-start="url(#p_a)" marker-end="url(#p_a)"/>
+  <text class="dtxt" x="462" y="155" text-anchor="middle" transform="rotate(-90 462 155)">100</text>
+  <!-- levý řetězec 20 / 60 -->
+  <line class="thin" x1="126" y1="230" x2="82" y2="230"/>
+  <line class="thin" x1="152" y1="200" x2="82" y2="200"/>
+  <line class="thin" x1="152" y1="110" x2="82" y2="110"/>
+  <line class="thin" x1="90" y1="230" x2="90" y2="200" marker-start="url(#p_a)" marker-end="url(#p_a)"/>
+  <text class="dtxt" x="81" y="215" text-anchor="middle" transform="rotate(-90 81 215)">20</text>
+  <line class="thin" x1="90" y1="200" x2="90" y2="110" marker-start="url(#p_a)" marker-end="url(#p_a)"/>
+  <text class="dtxt" x="81" y="155" text-anchor="middle" transform="rotate(-90 81 155)">60</text>
+  <!-- odkazy -->
+  <path class="thin" d="M452 64 H442 L404.5 105" marker-end="url(#p_a)"/>
+  <text class="dtxt" x="456" y="68" text-anchor="start">4× Ø9</text>
+  <path class="thin" d="M62 50 H76 L134.4 84.4" marker-end="url(#p_a)"/>
+  <text class="dtxt" x="58" y="54" text-anchor="end">R10</text>
+  <!-- mini popisové pole -->
+  <rect x="438" y="322" width="176" height="24" class="thin"/>
+  <text x="526" y="338" text-anchor="middle" class="cap">PŘÍLOŽKA ZÁVĚSU · P5</text>
+  <!-- zóny -->
+  <rect data-zone="z20top" x="124" y="28" width="48" height="32" rx="5"/>
+  <rect data-zone="z160" x="200" y="28" width="160" height="32" rx="5"/>
+  <rect data-zone="z200" x="200" y="282" width="160" height="32" rx="5"/>
+  <rect data-zone="z100" x="444" y="110" width="44" height="90" rx="5"/>
+  <rect data-zone="z60" x="58" y="110" width="44" height="86" rx="5"/>
+  <rect data-zone="z20left" x="58" y="198" width="44" height="50" rx="5"/>
+  <rect data-zone="zd9" x="436" y="48" width="124" height="30" rx="5"/>
+  <rect data-zone="zR10" x="26" y="38" width="90" height="26" rx="5"/>
+</svg>`,
+
+/* ---- t: popisové pole (rohové razítko) — BOČNICE KONTEJNERU ---- */
+t: `<svg viewBox="0 0 640 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Popisové pole výkresu">
+  <rect x="6" y="6" width="628" height="218" class="thin" stroke-width="1.2"/>
+  <rect x="30" y="20" width="580" height="170" fill="#fff" stroke="#0b0b0b" stroke-width="2.2"/>
+  <line x1="300" y1="20" x2="300" y2="190" stroke="#0b0b0b" stroke-width="1.4"/>
+  <line class="thin" x1="30" y1="55" x2="300" y2="55"/>
+  <line class="thin" x1="30" y1="90" x2="300" y2="90"/>
+  <line class="thin" x1="30" y1="125" x2="300" y2="125"/>
+  <line class="thin" x1="165" y1="20" x2="165" y2="55"/>
+  <line class="thin" x1="300" y1="55" x2="610" y2="55"/>
+  <line class="thin" x1="300" y1="90" x2="610" y2="90"/>
+  <line class="thin" x1="300" y1="140" x2="610" y2="140"/>
+  <line class="thin" x1="455" y1="20" x2="455" y2="90"/>
+  <line class="thin" x1="470" y1="140" x2="470" y2="190"/>
+  <line class="thin" x1="540" y1="140" x2="540" y2="190"/>
+  <text class="tbl-l" x="39" y="34">KRESLIL</text><text class="tbl-v" x="39" y="49">J. Novák</text>
+  <text class="tbl-l" x="174" y="34">DATUM</text><text class="tbl-v" x="174" y="49">12.03.2026</text>
+  <text class="tbl-l" x="39" y="69">TOLEROVÁNÍ</text><text class="tbl-v" x="39" y="84">ISO 2768-mK</text>
+  <text class="tbl-l" x="39" y="104">POVRCHOVÁ ÚPRAVA</text><text class="tbl-v" x="39" y="119">Žárový zinek</text>
+  <text class="tbl-l" x="39" y="139">POZNÁMKA</text>
+  <text class="tbl-v" x="39" y="156" style="font-weight:400">Neokótované rádiusy R3</text>
+  <text class="tbl-v" x="39" y="174" style="font-weight:400">Ostré hrany srazit 0,5 × 45°</text>
+  <text class="tbl-l" x="309" y="34">MATERIÁL</text><text class="tbl-v" x="309" y="49">S355J2</text>
+  <text class="tbl-l" x="464" y="34">POLOTOVAR</text><text class="tbl-v" x="464" y="49">P5 – 1500×3000</text>
+  <text class="tbl-l" x="309" y="69">HMOTNOST</text><text class="tbl-v" x="309" y="84">124,5 kg</text>
+  <text class="tbl-l" x="464" y="69">MĚŘÍTKO</text><text class="tbl-v" x="464" y="84">1:20</text>
+  <text class="tbl-l" x="309" y="104">NÁZEV</text><text class="tbl-b" x="309" y="127">BOČNICE KONTEJNERU ABR-9</text>
+  <text class="tbl-l" x="309" y="154">ČÍSLO VÝKRESU</text><text class="tbl-v" x="309" y="173">KV-2026-0451</text>
+  <text class="tbl-l" x="479" y="154">REVIZE</text><text class="tbl-v" x="479" y="173">B</text>
+  <text class="tbl-l" x="549" y="154">LIST</text><text class="tbl-v" x="549" y="173">1 / 1</text>
+  <text class="stxt" x="30" y="210">Výřez výkresu: popisové pole (rohové razítko) v pravém dolním rohu listu</text>
+  <rect data-zone="zKreslil" x="30" y="20" width="135" height="35"/>
+  <rect data-zone="zDatum" x="165" y="20" width="135" height="35"/>
+  <rect data-zone="zTol" x="30" y="55" width="270" height="35"/>
+  <rect data-zone="zPovrch" x="30" y="90" width="270" height="35"/>
+  <rect data-zone="zPozn" x="30" y="125" width="270" height="65"/>
+  <rect data-zone="zMat" x="300" y="20" width="155" height="35"/>
+  <rect data-zone="zPolotovar" x="455" y="20" width="155" height="35"/>
+  <rect data-zone="zHmot" x="300" y="55" width="155" height="35"/>
+  <rect data-zone="zMeritko" x="455" y="55" width="155" height="35"/>
+  <rect data-zone="zNazev" x="300" y="90" width="310" height="50"/>
+  <rect data-zone="zCislo" x="300" y="140" width="170" height="50"/>
+  <rect data-zone="zRev" x="470" y="140" width="70" height="50"/>
+  <rect data-zone="zList" x="540" y="140" width="70" height="50"/>
+</svg>`,
+/* ---- a: sestava vrat kontejneru s kusovníkem ---- */
+a: `<svg viewBox="0 0 660 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sestava vrat kontejneru s kusovníkem">
+  <rect x="6" y="6" width="648" height="428" class="thin" stroke-width="1.2"/>
+  <!-- vrata -->
+  <rect class="olf" x="50" y="40" width="240" height="340"/>
+  <rect x="66" y="56" width="208" height="308" fill="#f0f3f6" stroke="#52514e" stroke-width="1.1"/>
+  <!-- panty (3×) -->
+  <rect class="olf" stroke-width="2" x="28" y="84" width="22" height="30"/><circle cx="39" cy="99" r="3" fill="#fff" stroke="#0b0b0b" stroke-width="1.2"/>
+  <rect class="olf" stroke-width="2" x="28" y="195" width="22" height="30"/><circle cx="39" cy="210" r="3" fill="#fff" stroke="#0b0b0b" stroke-width="1.2"/>
+  <rect class="olf" stroke-width="2" x="28" y="306" width="22" height="30"/><circle cx="39" cy="321" r="3" fill="#fff" stroke="#0b0b0b" stroke-width="1.2"/>
+  <!-- tyč uzávěru + vedení + madlo -->
+  <rect class="olf" x="297" y="24" width="10" height="372" rx="4"/>
+  <rect class="olf" x="288" y="120" width="28" height="24"/>
+  <rect class="olf" x="288" y="278" width="28" height="24"/>
+  <rect class="olf" x="307" y="198" width="36" height="11" rx="5"/>
+  <!-- pozice -->
+  <circle cx="150" cy="41" r="2" fill="#52514e"/><line class="thin" x1="150" y1="41" x2="150" y2="26"/>
+  <circle cx="150" cy="14" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="150" y="18.5" text-anchor="middle">1</text>
+  <circle cx="200" cy="120" r="2" fill="#52514e"/><line class="thin" x1="200" y1="120" x2="235.8" y2="25.2"/>
+  <circle cx="240" cy="14" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="240" y="18.5" text-anchor="middle">2</text>
+  <circle cx="39" cy="206" r="2" fill="#52514e"/><line class="thin" x1="39" y1="206" x2="22" y2="180.4"/>
+  <circle cx="16" cy="170" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="16" y="174.5" text-anchor="middle">3</text>
+  <circle cx="302" cy="60" r="2" fill="#52514e"/><line class="thin" x1="302" y1="60" x2="327.8" y2="44.3"/>
+  <circle cx="338" cy="38" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="338" y="42.5" text-anchor="middle">4</text>
+  <circle cx="310" cy="132" r="2" fill="#52514e"/><line class="thin" x1="310" y1="132" x2="341.6" y2="114"/>
+  <circle cx="352" cy="108" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="352" y="112.5" text-anchor="middle">5</text>
+  <circle cx="330" cy="203" r="2" fill="#52514e"/><line class="thin" x1="330" y1="203" x2="355.4" y2="227.6"/>
+  <circle cx="364" cy="236" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="364" y="240.5" text-anchor="middle">6</text>
+  <!-- kusovník -->
+  <text class="cap" x="380" y="52">KUSOVNÍK</text>
+  <rect x="380" y="60" width="262" height="180" fill="#fff" stroke="#0b0b0b" stroke-width="1.6"/>
+  <rect x="380" y="60" width="262" height="24" fill="#eef1f4" stroke="none"/>
+  <line class="thin" x1="380" y1="84" x2="642" y2="84"/>
+  <line class="thin" x1="380" y1="110" x2="642" y2="110"/>
+  <line class="thin" x1="380" y1="136" x2="642" y2="136"/>
+  <line class="thin" x1="380" y1="162" x2="642" y2="162"/>
+  <line class="thin" x1="380" y1="188" x2="642" y2="188"/>
+  <line class="thin" x1="380" y1="214" x2="642" y2="214"/>
+  <line class="thin" x1="412" y1="60" x2="412" y2="240"/>
+  <line class="thin" x1="536" y1="60" x2="536" y2="240"/>
+  <line class="thin" x1="566" y1="60" x2="566" y2="240"/>
+  <text class="bomh" x="396" y="76" text-anchor="middle">POZ</text>
+  <text class="bomh" x="420" y="76">NÁZEV</text>
+  <text class="bomh" x="551" y="76" text-anchor="middle">KS</text>
+  <text class="bomh" x="572" y="76">POLOTOVAR</text>
+  <text class="bomv" x="396" y="101" text-anchor="middle">1</text><text class="bomv" x="420" y="101">Rám vrat</text><text class="bomv" x="551" y="101" text-anchor="middle">1</text><text class="bomv-s" x="572" y="101">JÄKL 60×40×3</text>
+  <text class="bomv" x="396" y="127" text-anchor="middle">2</text><text class="bomv" x="420" y="127">Výplň vrat</text><text class="bomv" x="551" y="127" text-anchor="middle">1</text><text class="bomv-s" x="572" y="127">P3-1450×2050</text>
+  <text class="bomv" x="396" y="153" text-anchor="middle">3</text><text class="bomv" x="420" y="153">Pant vrat</text><text class="bomv" x="551" y="153" text-anchor="middle">3</text><text class="bomv-s" x="572" y="153">HB 60-16</text>
+  <text class="bomv" x="396" y="179" text-anchor="middle">4</text><text class="bomv" x="420" y="179">Tyč uzávěru</text><text class="bomv" x="551" y="179" text-anchor="middle">1</text><text class="bomv-s" x="572" y="179">TR Ø33,7×3</text>
+  <text class="bomv" x="396" y="205" text-anchor="middle">5</text><text class="bomv" x="420" y="205">Vedení tyče</text><text class="bomv" x="551" y="205" text-anchor="middle">2</text><text class="bomv-s" x="572" y="205">P5-60×80</text>
+  <text class="bomv" x="396" y="231" text-anchor="middle">6</text><text class="bomv" x="420" y="231">Madlo</text><text class="bomv" x="551" y="231" text-anchor="middle">1</text><text class="bomv-s" x="572" y="231">KR Ø12</text>
+  <text class="cap" x="50" y="406">VRATA KONTEJNERU — SESTAVA</text>
+  <text class="stxt" x="50" y="421">Pohled zepředu · M 1:15</text>
+  <!-- zóny -->
+  <rect data-zone="poz2" x="72" y="62" width="196" height="296"/>
+  <rect data-zone="poz1" x="46" y="36" width="248" height="24"/>
+  <rect data-zone="poz1" x="46" y="360" width="248" height="24"/>
+  <rect data-zone="poz1" x="46" y="36" width="26" height="348"/>
+  <rect data-zone="poz1" x="268" y="36" width="26" height="348"/>
+  <rect data-zone="poz3" x="24" y="80" width="30" height="38"/>
+  <rect data-zone="poz3" x="24" y="191" width="30" height="38"/>
+  <rect data-zone="poz3" x="24" y="302" width="30" height="38"/>
+  <rect data-zone="poz4" x="291" y="20" width="22" height="380"/>
+  <rect data-zone="poz5" x="284" y="114" width="36" height="36"/>
+  <rect data-zone="poz5" x="284" y="272" width="36" height="36"/>
+  <rect data-zone="poz6" x="303" y="192" width="44" height="24"/>
+  <circle data-zone="poz1" cx="150" cy="14" r="14"/>
+  <circle data-zone="poz2" cx="240" cy="14" r="14"/>
+  <circle data-zone="poz3" cx="16" cy="170" r="14"/>
+  <circle data-zone="poz4" cx="338" cy="38" r="14"/>
+  <circle data-zone="poz5" cx="352" cy="108" r="14"/>
+  <circle data-zone="poz6" cx="364" cy="236" r="14"/>
+</svg>`,
+
+/* ---- r: pouzdro čepu s vyznačeným řezem A-A ---- */
+r: `<svg viewBox="0 0 640 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pouzdro s vyznačeným řezem A-A">
+  <defs>
+    <marker id="r_a" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse">
+      <path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#0b0b0b"/>
+    </marker>
+  </defs>
+  <rect x="6" y="6" width="628" height="318" class="thin" stroke-width="1.2"/>
+  <circle class="ol" cx="170" cy="160" r="44"/>
+  <circle class="ol" cx="170" cy="160" r="27.5"/>
+  <line class="axis" x1="170" y1="104" x2="170" y2="216"/>
+  <line class="axis" x1="100" y1="160" x2="240" y2="160"/>
+  <line x1="100" y1="160" x2="116" y2="160" stroke="#0b0b0b" stroke-width="3.2"/>
+  <line x1="224" y1="160" x2="240" y2="160" stroke="#0b0b0b" stroke-width="3.2"/>
+  <line class="thin" x1="108" y1="160" x2="108" y2="136" marker-end="url(#r_a)" stroke-width="1.3"/>
+  <line class="thin" x1="232" y1="160" x2="232" y2="136" marker-end="url(#r_a)" stroke-width="1.3"/>
+  <text x="108" y="126" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#0b0b0b">A</text>
+  <text x="232" y="126" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#0b0b0b">A</text>
+  <path class="thin" d="M262 78 H250 L201.1 128.9" marker-end="url(#r_a)"/>
+  <text class="dtxt" x="266" y="82" text-anchor="start">Ø40</text>
+  <path class="thin" d="M96 236 H108 L150.6 179.4" marker-end="url(#r_a)"/>
+  <text class="dtxt" x="92" y="240" text-anchor="end">Ø25</text>
+  <rect x="400" y="80" width="150" height="140" fill="#f4f7fa" stroke="#8a94a0" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="475" y="158" text-anchor="middle" font-family="system-ui,sans-serif" font-size="34" font-weight="700" fill="#8a94a0">?</text>
+  <text x="475" y="248" text-anchor="middle" class="cap">ŘEZ A-A = ?</text>
+  <rect x="448" y="286" width="176" height="24" class="thin"/>
+  <text x="536" y="302" text-anchor="middle" class="cap">POUZDRO ČEPU · M 2:1</text>
+</svg>`,
+
+/* ---- u: úchyt tyče s tolerancí a závitovou dírou ---- */
+u: `<svg viewBox="0 0 620 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Úchyt s tolerovanou šířkou a závitovou dírou">
+  <defs>
+    <marker id="u_a" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse">
+      <path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#52514e"/>
+    </marker>
+  </defs>
+  <rect x="6" y="6" width="608" height="328" class="thin" stroke-width="1.2"/>
+  <rect class="olf" x="150" y="70" width="240" height="160"/>
+  <circle class="ol" cx="270" cy="150" r="30"/>
+  <line class="axis" x1="232" y1="150" x2="308" y2="150"/>
+  <line class="axis" x1="270" y1="112" x2="270" y2="188"/>
+  <circle class="ol" cx="180" cy="100" r="11"/><line class="axis" x1="164" y1="100" x2="196" y2="100"/><line class="axis" x1="180" y1="84" x2="180" y2="116"/>
+  <circle class="ol" cx="180" cy="220" r="11"/><line class="axis" x1="164" y1="220" x2="196" y2="220"/><line class="axis" x1="180" y1="204" x2="180" y2="236"/>
+  <circle class="ol" cx="360" cy="220" r="11"/><line class="axis" x1="344" y1="220" x2="376" y2="220"/><line class="axis" x1="360" y1="204" x2="360" y2="236"/>
+  <circle class="ol" cx="360" cy="100" r="14"/>
+  <path class="thin" d="M376 100 A16 16 0 1 0 360 84"/>
+  <line class="axis" x1="340" y1="100" x2="380" y2="100"/><line class="axis" x1="360" y1="80" x2="360" y2="120"/>
+  <path class="thin" d="M108 56 H120 L172.2 92.2" marker-end="url(#u_a)"/>
+  <text class="dtxt" x="104" y="60" text-anchor="end">3× Ø11</text>
+  <path class="thin" d="M218 44 H230 L259.4 121.9" marker-end="url(#u_a)"/>
+  <text class="dtxt" x="215" y="48" text-anchor="end">Ø30 H7</text>
+  <line class="thin" x1="150" y1="234" x2="150" y2="296"/>
+  <line class="thin" x1="390" y1="234" x2="390" y2="296"/>
+  <line class="thin" x1="150" y1="288" x2="390" y2="288" marker-start="url(#u_a)" marker-end="url(#u_a)"/>
+  <text class="dtxt" x="270" y="280" text-anchor="middle">120 ±0,2</text>
+  <line class="thin" x1="394" y1="70" x2="442" y2="70"/>
+  <line class="thin" x1="394" y1="230" x2="442" y2="230"/>
+  <line class="thin" x1="434" y1="70" x2="434" y2="230" marker-start="url(#u_a)" marker-end="url(#u_a)"/>
+  <text class="dtxt" x="426" y="150" text-anchor="middle" transform="rotate(-90 426 150)">80</text>
+  <rect x="426" y="304" width="176" height="24" class="thin"/>
+  <text x="514" y="320" text-anchor="middle" class="cap">ÚCHYT TYČE · M 2:1</text>
+  <circle data-zone="h_tl" cx="180" cy="100" r="22"/>
+  <circle data-zone="h_tr" cx="360" cy="100" r="24"/>
+  <circle data-zone="h_bl" cx="180" cy="220" r="22"/>
+  <circle data-zone="h_br" cx="360" cy="220" r="22"/>
+  <circle data-zone="h_c" cx="270" cy="150" r="36"/>
+</svg>`,
+
+/* ---- w: výztuha na bočnici — svarová značka ---- */
+w: `<svg viewBox="0 0 620 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Detail svaru výztuhy">
+  <defs>
+    <marker id="w_a" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse">
+      <path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#52514e"/>
+    </marker>
+  </defs>
+  <rect x="6" y="6" width="608" height="288" class="thin" stroke-width="1.2"/>
+  <rect class="olf" x="120" y="210" width="320" height="16"/>
+  <rect class="olf" x="264" y="110" width="16" height="100"/>
+  <line class="thin" x1="222" y1="162" x2="264" y2="210" marker-end="url(#w_a)"/>
+  <line class="thin" x1="122" y1="162" x2="222" y2="162"/>
+  <circle class="thin" cx="222" cy="162" r="5" fill="none"/>
+  <polygon points="168,148 168,162 186,162" fill="none" stroke="#52514e" stroke-width="1.2"/>
+  <text class="dtxt" x="162" y="158" text-anchor="end">a4</text>
+  <line class="thin" x1="272" y1="108" x2="295" y2="84"/>
+  <text class="stxt" x="298" y="80" text-anchor="start">výztuha (žebro)</text>
+  <line class="thin" x1="400" y1="212" x2="430" y2="244"/>
+  <text class="stxt" x="433" y="250" text-anchor="start">bočnice kontejneru</text>
+  <rect x="408" y="264" width="194" height="24" class="thin"/>
+  <text x="505" y="280" text-anchor="middle" class="cap">VÝZTUHA BOČNICE · DETAIL</text>
+</svg>`
+};
+const OPTSVG = {
+xa: `<svg viewBox="0 0 176 148" xmlns="http://www.w3.org/2000/svg">
+  <path class="olf" d="M33 30 H88 V74 H143 V118 H33 Z"/>
+</svg>`,
+xb: `<svg viewBox="0 0 176 148" xmlns="http://www.w3.org/2000/svg">
+  <rect class="olf" x="33" y="30" width="110" height="88"/>
+  <line class="ol" x1="33" y1="74" x2="143" y2="74"/>
+  <line class="ol" x1="70.4" y1="30" x2="70.4" y2="118"/>
+  <line class="ol" x1="105.6" y1="30" x2="105.6" y2="118"/>
+  <line class="axis" x1="88" y1="25" x2="88" y2="123"/>
+</svg>`,
+xc: `<svg viewBox="0 0 176 148" xmlns="http://www.w3.org/2000/svg">
+  <rect class="olf" x="33" y="30" width="110" height="88"/>
+  <line class="hid" x1="33" y1="74" x2="143" y2="74"/>
+  <line class="hid" x1="70.4" y1="30" x2="70.4" y2="118"/>
+  <line class="hid" x1="105.6" y1="30" x2="105.6" y2="118"/>
+  <line class="axis" x1="88" y1="25" x2="88" y2="123"/>
+</svg>`,
+xd: `<svg viewBox="0 0 176 148" xmlns="http://www.w3.org/2000/svg">
+  <rect class="olf" x="33" y="30" width="110" height="88"/>
+  <line class="axis" x1="88" y1="25" x2="88" y2="123"/>
+</svg>`,
+sa: `<svg viewBox="0 0 176 148" xmlns="http://www.w3.org/2000/svg">
+  <defs><pattern id="sa_h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#52514e" stroke-width="0.9"/></pattern></defs>
+  <rect class="olf" x="40" y="32" width="96" height="84"/>
+  <rect x="40" y="32" width="18" height="84" fill="url(#sa_h)" stroke="none"/>
+  <rect x="118" y="32" width="18" height="84" fill="url(#sa_h)" stroke="none"/>
+  <line class="ol" x1="58" y1="32" x2="58" y2="116"/>
+  <line class="ol" x1="118" y1="32" x2="118" y2="116"/>
+  <line class="axis" x1="88" y1="26" x2="88" y2="122"/>
+</svg>`,
+sb: `<svg viewBox="0 0 176 148" xmlns="http://www.w3.org/2000/svg">
+  <defs><pattern id="sb_h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#52514e" stroke-width="0.9"/></pattern></defs>
+  <rect class="olf" x="40" y="32" width="96" height="84"/>
+  <rect x="40" y="32" width="96" height="84" fill="url(#sb_h)" stroke="none"/>
+  <line class="axis" x1="88" y1="26" x2="88" y2="122"/>
+</svg>`,
+sc: `<svg viewBox="0 0 176 148" xmlns="http://www.w3.org/2000/svg">
+  <defs><pattern id="sc_h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#52514e" stroke-width="0.9"/></pattern></defs>
+  <rect class="olf" x="40" y="32" width="96" height="84"/>
+  <rect x="40" y="32" width="18" height="84" fill="url(#sc_h)" stroke="none"/>
+  <rect x="118" y="32" width="18" height="84" fill="url(#sc_h)" stroke="none"/>
+  <line class="hid" x1="58" y1="32" x2="58" y2="116"/>
+  <line class="hid" x1="118" y1="32" x2="118" y2="116"/>
+  <line class="axis" x1="88" y1="26" x2="88" y2="122"/>
+</svg>`,
+sd: `<svg viewBox="0 0 176 148" xmlns="http://www.w3.org/2000/svg">
+  <rect class="olf" x="40" y="32" width="96" height="84"/>
+  <line class="ol" x1="58" y1="32" x2="58" y2="116"/>
+  <line class="ol" x1="118" y1="32" x2="118" y2="116"/>
+  <line class="axis" x1="88" y1="26" x2="88" y2="122"/>
+</svg>`
+};
+const CATS = ["Pohledy a řezy","Kótování","Tolerance a závity","Svary","Popisové pole","Sestava a kusovník"];
+const QUESTIONS = [
+{
+  cat:0, type:"hotspot", drawing:"v",
+  text:'Na listu jsou tři pravoúhlé pohledy na součást (vlevo nahoře je <span class="em">nárys</span>) a pomocný 3D pohled. Klikněte na <span class="em">PŮDORYS</span> — pohled shora.',
+  correctZones:["pudorys"],
+  zoneNames:{naris:"nárys (vlevo nahoře)", bokorys:"pohled zleva (vpravo)", pudorys:"půdorys (dole) ✓"},
+  correctText:"pohled dole — pod nárysem",
+  explain:"V evropském promítání (ISO metoda 1), které se u nás používá, se půdorys kreslí POD nárys. Poznáte ho i podle díry: shora je vidět jako kružnice, zatímco v ostatních pohledech je jen čárkovaná (skrytá)."
+},
+{
+  cat:0, type:"mcimg", drawing:"x",
+  text:'Na výkrese chybí <span class="em">pohled zleva</span> (kreslí se vpravo od nárysu — na místě s otazníkem). Podle 3D pohledu, nárysu a půdorysu vyberte, jak má správně vypadat.',
+  options:["xa","xb","xc","xd"], correct:2,
+  correctText:"C — obrys s čárkovanými skrytými hranami",
+  explain:"Hrana osazení i díra jsou při pohledu zleva schované uvnitř materiálu, proto se kreslí čárkovaně jako skryté hrany (možnost C). A je jen tvar nárysu, B má skryté hrany chybně plnou čarou a D je úplně vynechává."
+},
+{
+  cat:0, type:"mcimg", drawing:"r",
+  text:'Pouzdro čepu je rozříznuto rovinou <span class="em">A-A</span> (viz značení v pohledu shora). Vyberte, jak má správně vypadat <span class="em">řez A-A</span>.',
+  options:["sb","sc","sd","sa"], correct:3,
+  correctText:"D — šrafované jsou jen stěny, díra zůstává prázdná",
+  explain:"V řezu se šrafuje pouze materiál, který rovina řezu skutečně protíná — tedy obě stěny pouzdra. Díra zůstává prázdná a její hrany jsou v řezu vidět plnou čarou (D). A šrafuje chybně i díru, B má hrany díry čárkovaně, C šrafování úplně vynechává."
+},
+{
+  cat:1, type:"num", drawing:"p", unit:"mm", answer:200,
+  text:'Jaká je <span class="em">celková délka</span> desky? Odečtěte z výkresu a zapište v mm.',
+  correctText:"200 mm",
+  explain:"Celkovou délku udává kóta 200 na spodní straně výkresu. Odpovídá i součtu dílčích kót: 20 + 160 + 20 = 200 mm."
+},
+{
+  cat:1, type:"mc", drawing:"p",
+  text:'Kolik <span class="em">děr</span> je v desce a jaký mají <span class="em">průměr</span>?',
+  options:["4 díry o průměru 9 mm","1 díra o průměru 9 mm","4 díry o průměru 4,5 mm","9 děr o průměru 4 mm"],
+  correct:0,
+  correctText:"A — 4 díry o průměru 9 mm",
+  explain:"Zápis „4× Ø9“ znamená: 4 stejné díry, každá o průměru 9 mm. Kótuje se jen jedna a značka Ø vždy udává průměr (ne poloměr — ten značí R)."
+},
+{
+  cat:1, type:"hotspot", drawing:"p",
+  text:'Klikněte na kótu, která udává <span class="em">svislou rozteč děr</span> (vzdálenost středů děr na výšku).',
+  correctZones:["z60"],
+  zoneNames:{z20top:"kóta 20 (odsazení díry od levého okraje)", z160:"kóta 160 (vodorovná rozteč)", z200:"kóta 200 (celková délka)", z100:"kóta 100 (celková šířka)", z60:"kóta 60 (svislá rozteč) ✓", z20left:"kóta 20 (odsazení díry od spodního okraje)", zd9:"4× Ø9 (průměr děr)", zR10:"R10 (rádius rohu)"},
+  correctText:"kóta 60 na levé straně",
+  explain:"Svislá vzdálenost středů děr je 60 mm — kóta vlevo. Kóta 100 je celková šířka desky, 160 vodorovná rozteč a kóty 20 jsou odsazení děr od okrajů."
+},
+{
+  cat:2, type:"mc", drawing:"u",
+  text:'Šířka úchytu je kótována <span class="em">120 ±0,2</span> mm. Kontrolor naměřil <span class="em">120,25 mm</span>. Vyhovuje rozměr předpisu na výkrese?',
+  options:["Ne — největší dovolený rozměr je 120,2 mm","Ano — tolerance je ±0,25 mm","Ano — naměřená hodnota se zaokrouhlí na 120,2 mm","Nelze rozhodnout bez znalosti měřítka výkresu"],
+  correct:0,
+  correctText:"A — nevyhovuje, horní mez je 120,2 mm",
+  explain:"Zápis 120 ±0,2 povoluje rozměry od 119,8 do 120,2 mm. Naměřených 120,25 mm je o 0,05 mm nad horní mezí — kus nevyhovuje. Naměřené hodnoty se kvůli toleranci nikdy nezaokrouhlují a měřítko výkresu s tolerancí nesouvisí."
+},
+{
+  cat:2, type:"hotspot", drawing:"u",
+  text:'Jedna z rohových děr úchytu je <span class="em">závitová (M16)</span>. Poznáte ji podle způsobu kreslení — klikněte na ni.',
+  correctZones:["h_tr"],
+  zoneNames:{h_tl:"díra Ø11 vlevo nahoře (hladká)", h_tr:"závitová díra M16 vpravo nahoře ✓", h_bl:"díra Ø11 vlevo dole (hladká)", h_br:"díra Ø11 vpravo dole (hladká)", h_c:"středová díra Ø30 H7 (přesná hladká díra)"},
+  correctText:"díra vpravo nahoře — s tenkou ¾ kružnicí závitu",
+  explain:"Vnitřní závit se kreslí tenkou neúplnou (¾) kružnicí okolo plné kružnice díry — to má jen díra vpravo nahoře. Hladké díry Ø11 mají jedinou plnou kružnici; středová Ø30 H7 je přesná hladká díra (velké písmeno H = tolerance díry)."
+},
+{
+  cat:3, type:"mc", drawing:"w",
+  text:'Výztuha je k bočnici přivařena podle svarové značky na výkrese. Jaký <span class="em">druh a velikost svaru</span> značka předepisuje?',
+  options:["Tupý V-svar s hloubkou 4 mm","Koutový svar o výšce a = 4 mm","Bodový svar, celkem 4 body","Koutový svar dlouhý 4 mm"],
+  correct:1,
+  correctText:"B — koutový svar, a = 4 mm",
+  explain:"Trojúhelník ve svarové značce = koutový svar. Údaj „a4“ před ním udává jmenovitou (účinnou) výšku svaru 4 mm — ne jeho délku ani počet. Tupý V-svar by měl značku V, bodový svar kroužek na čáře."
+},
+{
+  cat:3, type:"mc", drawing:"w",
+  text:'Co znamená <span class="em">kroužek</span> v místě zalomení odkazové čáry svarové značky?',
+  options:["Svar se provede po celém obvodu styku","Svar se provede až při montáži na stavbě","Svar se provede z obou stran","Jde o bodový svar"],
+  correct:0,
+  correctText:"A — svar po celém obvodu",
+  explain:"Kroužek na zalomení odkazové čáry předepisuje svar po celém obvodu styku dílů. Svar prováděný při montáži se značí praporkem (vlaječkou); svar z obou stran se pozná podle symbolů nad i pod referenční čarou."
+},
+{
+  cat:4, type:"mc", drawing:"t",
+  text:'Podívejte se do popisového pole (razítka) výkresu. Z jakého <span class="em">materiálu</span> se bočnice vyrábí?',
+  options:["S235JR","S355J2","P5 – 1500×3000","Žárový zinek"],
+  correct:1,
+  correctText:"B — S355J2",
+  explain:"Materiál je uveden v poli MATERIÁL: konstrukční ocel S355J2. Pozor na záměny — „P5 – 1500×3000“ je polotovar (plech tl. 5 mm) a „žárový zinek“ je povrchová úprava, ne materiál."
+},
+{
+  cat:4, type:"num", drawing:"t", unit:"mm", answer:300,
+  text:'Výkres má měřítko <span class="em">1:20</span>. Na vytištěném výkrese jste pravítkem naměřili 15 mm. Kolik milimetrů měří tento rozměr <span class="em">ve skutečnosti</span>?',
+  correctText:"300 mm",
+  explain:"Měřítko 1:20 znamená, že skutečnost je 20× větší než obraz na papíře: 15 × 20 = 300 mm. (V praxi ale vždy platí vepsané kóty — měření pravítkem po výkrese je jen orientační.)"
+},
+{
+  cat:4, type:"hotspot", drawing:"t",
+  text:'Klikněte na políčko razítka, ve kterém je uvedena <span class="em">hmotnost</span> dílu.',
+  correctZones:["zHmot"],
+  zoneNames:{zKreslil:"pole KRESLIL", zDatum:"pole DATUM", zTol:"pole TOLEROVÁNÍ", zPovrch:"pole POVRCHOVÁ ÚPRAVA", zPozn:"pole POZNÁMKA", zMat:"pole MATERIÁL", zPolotovar:"pole POLOTOVAR", zHmot:"pole HMOTNOST ✓", zMeritko:"pole MĚŘÍTKO", zNazev:"pole NÁZEV", zCislo:"pole ČÍSLO VÝKRESU", zRev:"pole REVIZE", zList:"pole LIST"},
+  correctText:"pole HMOTNOST (124,5 kg)",
+  explain:"Hmotnost dílu — 124,5 kg — je v poli HMOTNOST. Ve výrobě je důležitá např. pro volbu vázacích prostředků a bezpečnou manipulaci jeřábem."
+},
+{
+  cat:5, type:"num", drawing:"a", unit:"ks", answer:3,
+  text:'Podle výkresu sestavy a kusovníku: kolik kusů <span class="em">pantů (pozice 3)</span> je potřeba na jedna vrata?',
+  correctText:"3 ks",
+  explain:"V kusovníku má pozice 3 (Pant vrat) ve sloupci KS hodnotu 3 — a souhlasí to s výkresem, kde jsou na levé straně vrat tři panty."
+},
+{
+  cat:5, type:"hotspot", drawing:"a",
+  text:'Klikněte přímo ve výkrese na součást <span class="em">POZICE 4 — tyč uzávěru</span> (na samotný díl, nebo na kroužek s číslem 4).',
+  correctZones:["poz4"],
+  zoneNames:{poz1:"pozice 1 — rám vrat", poz2:"pozice 2 — výplň vrat (plech)", poz3:"pozice 3 — pant", poz4:"pozice 4 — tyč uzávěru ✓", poz5:"pozice 5 — vedení tyče", poz6:"pozice 6 — madlo"},
+  correctText:"dlouhá svislá tyč na pravé straně vrat (pozice ④)",
+  explain:"Pozice 4 je dlouhá svislá tyč uzávěru na pravé straně vrat — odkazuje na ni kroužek ④. Pozice 5 jsou jen její vedení (držáky) a pozice 6 je madlo."
+}
+];
+
+/* ================= STATE ================= */
+const N = () => QUESTIONS.length;
+const $ = id => document.getElementById(id);
+const LETTERS = ["A","B","C","D"];
+const state = {name:"", pos:"", limit:600, i:0, sel:null, answers:[], t0:0, timerId:null, timedOut:false, usedSec:0};
+
+/* ================= HELPERS ================= */
+function parseNum(s){
+  s = String(s||"").trim().toLowerCase().replace(/mm|ks|×|x/g,"").replace(/\s/g,"").replace(",",".");
+  if(s==="") return null;
+  const v = Number(s);
+  return Number.isFinite(v) ? v : null;
+}
+function fmtT(sec){
+  sec = Math.max(0, Math.round(sec));
+  return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+}
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  $(id).classList.add("active");
+  window.scrollTo({top:0});
+}
+
+/* ================= FLOW ================= */
+function startTest(){
+  const name = $("inName").value.trim();
+  if(!name){ const el=$("inName"); el.classList.add("err"); el.focus();
+    setTimeout(()=>el.classList.remove("err"),600); return; }
+  state.name = name;
+  state.pos = $("inPos").value.trim();
+  state.limit = CONFIG.limitMinutes*60;
+  state.i = 0; state.sel = null; state.timedOut = false;
+  state.answers = Array(N()).fill(null);
+  state.t0 = Date.now();
+  $("headMid").style.visibility = "visible";
+  $("timerBox").style.visibility = "visible";
+  state.timerId = setInterval(tick, 400);
+  tick();
+  show("scr-quiz");
+  renderQ();
+}
+function tick(){
+  const gone = (Date.now()-state.t0)/1000;
+  const left = state.limit - gone;
+  $("timer").textContent = fmtT(left);
+  $("timer").parentElement.classList.toggle("low", left<=60);
+  if(left<=0){ state.timedOut = true; finishTest(); }
+}
+function renderQ(){
+  const q = QUESTIONS[state.i];
+  state.sel = null;
+  $("hQnum").textContent = "Otázka "+(state.i+1)+" / "+N();
+  $("hQcat").textContent = CATS[q.cat];
+  $("pfill").style.width = (state.i/N()*100)+"%";
+  $("qText").innerHTML = q.text;
+  $("qMedia").innerHTML = (q.drawing ? '<div class="sheet">'+DRAWINGS[q.drawing]+"</div>" : "") +
+    (q.type==="hotspot" ? '<div class="hint">Klikněte přímo do výkresu na správné místo — vybraná oblast se zvýrazní, pak odpověď potvrďte.</div>' : "");
+  const A = $("qAnswers");
+  if(q.type==="mc"){
+    A.className = "answers";
+    A.innerHTML = q.options.map((o,k)=>
+      '<button type="button" class="opt" data-k="'+k+'"><span class="let">'+LETTERS[k]+'</span><span>'+o+"</span></button>").join("");
+    A.querySelectorAll(".opt").forEach(b=>b.addEventListener("click",()=>pickOpt(b)));
+  } else if(q.type==="mcimg"){
+    A.className = "answers imggrid";
+    A.innerHTML = q.options.map((o,k)=>
+      '<button type="button" class="opt optimg" data-k="'+k+'"><div class="imgbox">'+OPTSVG[o]+'</div><span class="let">'+LETTERS[k]+"</span></button>").join("");
+    A.querySelectorAll(".opt").forEach(b=>b.addEventListener("click",()=>pickOpt(b)));
+  } else if(q.type==="num"){
+    A.className = "answers";
+    A.innerHTML = '<div class="numwrap"><input id="numin" inputmode="decimal" autocomplete="off" spellcheck="false"><span class="unit">'+(q.unit||"")+"</span></div>";
+    const inp = $("numin");
+    inp.addEventListener("input", ()=>{ state.sel = inp.value; syncFoot(); });
+    inp.addEventListener("keydown", e=>{ if(e.key==="Enter" && !$("btnConfirm").disabled) confirmAnswer(); });
+    setTimeout(()=>inp.focus(), 60);
+  } else if(q.type==="hotspot"){
+    A.className = "answers"; A.innerHTML = "";
+    $("qMedia").querySelectorAll("[data-zone]").forEach(z=>{
+      z.classList.add("zone");
+      z.addEventListener("click", ev=>{ ev.stopPropagation(); pickZone(z); });
+    });
+  }
+  syncFoot();
+}
+function pickOpt(btn){
+  btn.parentElement.querySelectorAll(".opt").forEach(o=>o.classList.remove("sel"));
+  btn.classList.add("sel");
+  state.sel = parseInt(btn.dataset.k,10);
+  syncFoot();
+}
+function pickZone(z){
+  const id = z.dataset.zone;
+  $("qMedia").querySelectorAll("[data-zone]").forEach(el=>el.classList.remove("zsel"));
+  $("qMedia").querySelectorAll('[data-zone="'+id+'"]').forEach(el=>el.classList.add("zsel"));
+  state.sel = id;
+  syncFoot();
+}
+function syncFoot(){
+  const q = QUESTIONS[state.i];
+  let ready = false, label = "Vyberte odpověď…";
+  if(q.type==="num"){
+    ready = parseNum(state.sel)!==null;
+    label = ready ? "Zapsáno: "+String(state.sel).trim()+" "+(q.unit||"") : "Zapište hodnotu z výkresu…";
+  } else if(q.type==="hotspot"){
+    ready = state.sel!==null;
+    label = ready ? "Oblast vybrána ✓ (kliknutím lze změnit)" : "Klikněte do výkresu…";
+  } else {
+    ready = state.sel!==null;
+    label = ready ? "Vybráno: "+LETTERS[state.sel] : "Vyberte jednu z možností…";
+  }
+  $("selState").textContent = label;
+  $("selState").classList.toggle("on", ready);
+  $("btnConfirm").disabled = !ready;
+}
+function confirmAnswer(){
+  const q = QUESTIONS[state.i];
+  let ok=false, ansText="";
+  if(q.type==="num"){
+    const v = parseNum(state.sel);
+    ok = v!==null && Math.abs(v-q.answer)<0.01;
+    ansText = String(state.sel).trim()+" "+(q.unit||"");
+  } else if(q.type==="hotspot"){
+    ok = q.correctZones.includes(state.sel);
+    ansText = (q.zoneNames && q.zoneNames[state.sel]) || String(state.sel);
+  } else {
+    ok = state.sel===q.correct;
+    ansText = LETTERS[state.sel] + (q.type==="mc" ? " — "+q.options[state.sel] : "");
+  }
+  state.answers[state.i] = {ok, ansText};
+  state.i++;
+  if(state.i>=N()) finishTest(); else renderQ();
+}
+
+/* ================= RESULTS ================= */
+function finishTest(){
+  if(state.timerId){ clearInterval(state.timerId); state.timerId=null; }
+  state.usedSec = Math.min(state.limit, (Date.now()-state.t0)/1000);
+  $("headMid").style.visibility="hidden";
+  $("timerBox").style.visibility="hidden";
+  $("pfill").style.width="100%";
+
+  const score = state.answers.filter(a=>a && a.ok).length;
+  const pct = Math.round(score/N()*100);
+  $("rName").textContent = state.name;
+  $("rPos").textContent = state.pos || "—";
+  const d = new Date();
+  $("rDate").textContent = d.toLocaleDateString("cs-CZ")+" "+d.toLocaleTimeString("cs-CZ",{hour:"2-digit",minute:"2-digit"});
+  $("rTime").textContent = fmtT(state.usedSec)+" / "+fmtT(state.limit);
+  $("rScore").textContent = score+" / "+N();
+  $("rPct").innerHTML = pct+"&nbsp;%";
+  $("rFrac").textContent = score+" / "+N()+" správně";
+  $("rTimeout").style.display = state.timedOut ? "inline-block" : "none";
+
+  const C = 2*Math.PI*70;
+  const fg = $("ringFg");
+  fg.style.strokeDasharray = C;
+  fg.style.strokeDashoffset = C;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ fg.style.strokeDashoffset = C*(1-pct/100); }));
+
+  let verdict, recom;
+  if(pct>=90){ verdict="Výborná úroveň"; recom="Kandidát čte výkresy spolehlivě — bez omezení pro samostatnou práci podle výkresové dokumentace."; }
+  else if(pct>=70){ verdict="Dobrá úroveň"; recom="Drobné mezery, běžnou výrobní dokumentaci zvládne. Doporučujeme krátké zaškolení na firemní standardy kreslení."; }
+  else if(pct>=50){ verdict="Základní orientace"; recom="Ve výkresech se orientuje jen částečně. Jednodušší úkoly zvládne pod dohledem; před samostatnou prací doporučujeme školení čtení výkresů."; }
+  else { verdict="Nedostatečná úroveň"; recom="Čtení výkresů zatím neovládá. Pro práci podle výkresové dokumentace je nutné důkladné zaškolení."; }
+  $("rVerdict").textContent = verdict;
+  $("rRecom").textContent = recom;
+
+  const per = CATS.map((c,ci)=>{
+    const idx = QUESTIONS.map((q,k)=>q.cat===ci?k:-1).filter(k=>k>=0);
+    const got = idx.filter(k=>state.answers[k] && state.answers[k].ok).length;
+    return {c, got, tot: idx.length};
+  });
+  $("rCats").innerHTML = per.map(p=>
+    '<div class="catrow"><div class="cr-head"><b>'+p.c+"</b><span>"+p.got+" / "+p.tot+"</span></div>"+
+    '<div class="cr-track"><div class="cr-fill" style="width:0%"></div></div></div>').join("");
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    document.querySelectorAll(".cr-fill").forEach((el,k)=>{ el.style.width = (per[k].tot? per[k].got/per[k].tot*100 : 0)+"%"; });
+  }));
+
+  $("revList").innerHTML = QUESTIONS.map((q,k)=>{
+    const a = state.answers[k];
+    const ok = a && a.ok;
+    const yours = a ? a.ansText : "bez odpovědi (nestihnuto)";
+    return '<div class="rev-item '+(ok?"ok":"bad")+'">'+
+      '<div class="rev-top"><span class="rev-mark">'+(ok?"✓":"✕")+'</span>'+
+      '<span class="rev-q">'+(k+1)+". "+q.text.replace(/<[^>]+>/g,"")+"</span>"+
+      '<span class="rev-cat">'+CATS[q.cat]+"</span></div>"+
+      '<div class="rev-ans">Odpověď kandidáta: <b>'+yours+"</b>"+(ok?"":" &nbsp;·&nbsp; Správně: <b>"+q.correctText+"</b>")+"</div>"+
+      '<div class="rev-ex">'+q.explain+"</div></div>";
+  }).join("");
+
+  $("reviewBox").style.display = "none";
+  $("btnReview").textContent = "Zobrazit rozbor odpovědí";
+  window.__summary = buildSummary(score, pct, per);
+
+  const payload = {
+    test: "test-cteni-vykresu",
+    verze: 3,
+    kandidat: state.name,
+    pozice: state.pos || "",
+    datum: new Date().toISOString(),
+    skore: score,
+    otazekCelkem: N(),
+    procenta: pct,
+    hodnoceni: verdict,
+    casVyprsel: state.timedOut,
+    casPouzityS: Math.round(state.usedSec),
+    limitS: state.limit,
+    oblasti: per.map(p=>({oblast:p.c, spravne:p.got, celkem:p.tot})),
+    odpovedi: QUESTIONS.map((q,k)=>{
+      const a = state.answers[k];
+      return {otazka:k+1, oblast:CATS[q.cat], spravne: !!(a && a.ok),
+              odpovedKandidata: a ? a.ansText : null, spravnaOdpoved: q.correctText};
+    })
+  };
+  window.__payload = payload;
+  deliverResult(payload);
+  show("scr-result");
+}
+function deliverResult(payload){
+  /* výsledek pro nadřazenou stránku (vložení v <iframe> na intranetu) */
+  try{
+    if(window.parent && window.parent !== window){
+      window.parent.postMessage({type:"vykresy-test-vysledek", data:payload}, CONFIG.postMessageOrigin);
+    }
+  }catch(e){}
+  /* volitelné odeslání na intranetový endpoint */
+  if(CONFIG.webhookUrl){
+    const st = $("sendState");
+    st.style.display = "block"; st.style.color = "#52514e";
+    st.textContent = "Odesílám výsledek do systému…";
+    fetch(CONFIG.webhookUrl, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    }).then(async r=>{
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const j = await r.json().catch(()=>({ok:true}));
+      if(j && j.blocked){
+        const kdy = j.nextAt ? new Date(j.nextAt).toLocaleDateString("cs-CZ") : "";
+        st.style.color = "#8a6d12";
+        st.textContent = "Výsledek se neuložil — test lze odeslat jen jednou za měsíc" + (kdy ? " (další termín " + kdy + ")" : "") + ". Protokol si můžete vytisknout níže.";
+        return;
+      }
+      st.style.color = "#006300"; st.textContent = "✓ Výsledek byl odeslán do systému.";
+    }).catch(()=>{
+      st.style.color = "#d03b3b"; st.textContent = "✕ Výsledek se nepodařilo odeslat — vytiskněte protokol nebo zkopírujte souhrn.";
+    });
+  }
+}
+function buildSummary(score, pct, per){
+  const d = new Date();
+  return "Test čtení strojírenských výkresů\n"+
+    "Kandidát: "+state.name+(state.pos? " ("+state.pos+")":"")+"\n"+
+    "Datum: "+d.toLocaleDateString("cs-CZ")+" "+d.toLocaleTimeString("cs-CZ",{hour:"2-digit",minute:"2-digit"})+"\n"+
+    "Výsledek: "+score+"/"+N()+" ("+pct+" %) — "+$("rVerdict").textContent+(state.timedOut? " · čas vypršel":"")+"\n"+
+    "Čas: "+fmtT(state.usedSec)+" / limit "+fmtT(state.limit)+"\n"+
+    per.map(p=>p.c+": "+p.got+"/"+p.tot).join(" | ");
+}
+
+/* ================= WIRING ================= */
+$("btnStart").addEventListener("click", startTest);
+$("btnConfirm").addEventListener("click", ()=>{
+  $("btnConfirm").disabled = true;
+  confirmAnswer();
+});
+$("btnPrint").addEventListener("click", ()=>{
+  $("reviewBox").style.display="block";
+  window.print();
+});
+$("btnReview").addEventListener("click", ()=>{
+  const b = $("reviewBox");
+  const open = b.style.display!=="none";
+  b.style.display = open ? "none" : "block";
+  $("btnReview").textContent = open ? "Zobrazit rozbor odpovědí" : "Skrýt rozbor odpovědí";
+  if(!open) b.scrollIntoView({behavior:"smooth", block:"start"});
+});
+$("btnCopy").addEventListener("click", async ()=>{
+  const t = window.__summary || "";
+  try{ await navigator.clipboard.writeText(t); }
+  catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  $("btnCopy").textContent = "Zkopírováno ✓";
+  setTimeout(()=>$("btnCopy").textContent="Kopírovat souhrn", 1800);
+});
+$("mQ").textContent = String(N());
+$("mLim").textContent = CONFIG.limitMinutes+" min";
+if(CONFIG.webhookUrl){ $("hrNote").textContent = "Pro náboráře: výsledek se po dokončení automaticky odešle do systému; protokol lze navíc vytisknout nebo zkopírovat."; }
+/* předvyplnění identity kandidáta z URL (intranet): ?jmeno=…&pozice=… */
+(function(){
+  try{
+    const p = new URLSearchParams(location.search);
+    const jm = p.get("jmeno") || p.get("name");
+    const po = p.get("pozice") || p.get("pos");
+    if(jm){ $("inName").value = jm; $("inName").readOnly = true; }
+    if(po){ $("inPos").value = po; $("inPos").readOnly = true; }
+    /* osobní pozvánkový odkaz intranetu: jméno z podepsaného tokenu */
+    if(!jm && INVITE_TOKEN){
+      const n = inviteName(INVITE_TOKEN);
+      if(n){ $("inName").value = n; $("inName").readOnly = true; }
+    }
+    /* fallback z iframu intranetu (#kdo=e-mail) */
+    if(!$("inName").value){
+      const kdo = ((location.hash || "").match(/kdo=([^&]+)/i) || [])[1];
+      if(kdo) $("inName").value = decodeURIComponent(kdo);
+    }
+  }catch(e){}
+})();
+
+/* test hook */
+window.__APP = {state, QUESTIONS, DRAWINGS};
+</script>
+</body>
+</html>
