@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Průvodce svařováním a interaktivní výuka</title>
-  <meta name="description" content="Webový průvodce hodnocením svarů, fotogalerie vad, QC checklist a interaktivní výukový program.">
+  <meta name="description" content="Webový průvodce hodnocením svarů, fotogalerie vad a interaktivní výukový program.">
   <style>
 
 :root {
@@ -233,7 +233,6 @@ button { cursor: pointer; }
       <div class="hero-actions">
         <a class="btn orange" href="#fotopruvodce">Otevřít fotoprůvodce</a>
         <a class="btn ghost" href="#vyuka">Spustit výuku</a>
-        <a class="btn ghost" href="#checklist">QC checklist</a>
       </div>
     </div>
   </header>
@@ -246,7 +245,6 @@ button { cursor: pointer; }
         <a href="#katalog">Katalog vad</a>
         <a href="#postup">Postup svařování</a>
         <a href="#desatero">Desatero</a>
-        <a href="#checklist">QC checklist</a>
         <a href="#vyuka">Výuka a test</a>
       </nav>
       <div class="card progress-box">
@@ -280,7 +278,7 @@ button { cursor: pointer; }
             <li>Projděte fotoprůvodce a katalog vad.</li>
             <li>U každé vady si zapamatujte: jak vypadá, proč vadí, jak jí předejít a jak ji opravit.</li>
             <li>Vyplňte výukové případy a test.</li>
-            <li>Pro reálný díl použijte QC checklist před lakovnou a exportujte protokol.</li>
+            <li>Zásady mezioperační kontroly před lakovnou najdete v Postupu svařování a Desateru.</li>
           </ol>
           <p class="muted">Poznámka: program nenahrazuje WPS, kvalifikaci svářeče, výkres ani rozhodnutí odpovědné kontroly.</p>
         </div>
@@ -334,27 +332,6 @@ button { cursor: pointer; }
           </div>
         </div>
         <div class="rules" id="rulesMount"></div>
-      </section>
-
-      <section id="checklist" class="section">
-        <div class="section-header">
-          <div>
-            <h2>QC checklist před lakováním</h2>
-            <p>Interaktivní formulář pro uvolnění dílu. Stav se ukládá lokálně v prohlížeči.</p>
-          </div>
-          <span class="badge light"><span id="checkPct">0 %</span> splněno</span>
-        </div>
-        <div class="card">
-          <p class="print-note">QC protokol svarů před lakovnou</p>
-          <div class="form-grid" id="qcForm"></div>
-          <div class="checklist" id="checklistMount"></div>
-          <div id="releaseStatus" class="release bad">Uvolnění: NE.</div>
-          <div class="sticky-actions">
-            <button class="btn primary" id="exportReport" type="button">Stáhnout protokol JSON</button>
-            <button class="btn" id="printReport" type="button">Tisk / PDF</button>
-            <button class="btn danger" id="resetChecklist" type="button">Vynulovat checklist</button>
-          </div>
-        </div>
       </section>
 
       <section id="vyuka" class="section">
@@ -950,7 +927,7 @@ const DATA = {
         "Měrkou ověřit výšku a a namátkově délky.",
         "Vadu vybrousit do čistého kovu, ne převařovat přes vadu."
       ],
-      "task": "Vyplňte QC checklist alespoň nanečisto a sledujte stav uvolnění."
+      "task": "U fotek 13–15 si vyzkoušejte, zda byste díl při samokontrole pustili dál — porovnejte s QC rozhodnutím u fotky."
     },
     {
       "id": "L5",
@@ -1265,7 +1242,6 @@ function init() {
   renderDefects();
   renderProcedure();
   renderRules();
-  renderChecklist();
   renderLessons();
   renderQuiz();
   renderCaseTraining();
@@ -1300,10 +1276,10 @@ function bindGlobal() {
   byId('imageModal').addEventListener('click', e => { if (e.target.id === 'imageModal') closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
   byId('resetAll').addEventListener('click', () => {
-    if (!confirm('Opravdu vynulovat uložený pokrok, testy a checklist?')) return;
+    if (!confirm('Opravdu vynulovat uložený pokrok a testy?')) return;
     state = { lessons: {}, checks: {}, form: {}, quiz: null, cases: {}, lastVisit: new Date().toISOString() };
     saveState();
-    renderChecklist(); renderLessons(); renderQuiz(); renderCaseTraining(); updateProgress();
+    renderLessons(); renderQuiz(); renderCaseTraining(); updateProgress();
   });
 }
 
@@ -1379,59 +1355,7 @@ function renderRules() {
   byId('rulesMount').innerHTML = DATA.tenRules.map(rule => `<div class="rule">${esc(rule)}</div>`).join('');
 }
 
-function renderChecklist() {
-  const form = state.form || {};
-  byId('qcForm').innerHTML = `
-    <div class="field"><label for="jobNo">Zakázka / výrobek</label><input id="jobNo" value="${esc(form.jobNo || '')}" placeholder="např. ABR-DSD 36 m³"></div>
-    <div class="field"><label for="serialNo">Výrobní číslo</label><input id="serialNo" value="${esc(form.serialNo || '')}" placeholder="např. 250207"></div>
-    <div class="field"><label for="welder">Svářeč</label><input id="welder" value="${esc(form.welder || '')}" placeholder="jméno / osobní číslo"></div>
-    <div class="field"><label for="inspector">Kontrolor</label><input id="inspector" value="${esc(form.inspector || '')}" placeholder="jméno / osobní číslo"></div>
-    <div class="field" style="grid-column:1/-1"><label for="notes">Poznámky / neshody</label><textarea id="notes" rows="3" placeholder="Popište opravy, neuznané svary, čísla fotek...">${esc(form.notes || '')}</textarea></div>
-  `;
-  byId('checklistMount').innerHTML = DATA.checklist.map((item, i) => `
-    <div class="check-row">
-      <input type="checkbox" id="chk_${i}" ${state.checks[i] ? 'checked' : ''} onchange="toggleCheck(${i}, this.checked)">
-      <label for="chk_${i}">${esc(item)}</label>
-    </div>
-  `).join('');
-  ['jobNo','serialNo','welder','inspector','notes'].forEach(id => {
-    const el = byId(id);
-    el.addEventListener('input', () => { state.form = state.form || {}; state.form[id] = el.value; saveState(); });
-  });
-  byId('exportReport').onclick = exportReport;
-  byId('printReport').onclick = () => window.print();
-  byId('resetChecklist').onclick = () => { state.checks = {}; saveState(); renderChecklist(); };
-  updateRelease();
-}
-function toggleCheck(i, value) { state.checks[i] = value; saveState(); updateRelease(); }
-function updateRelease() {
-  const done = DATA.checklist.filter((_,i) => state.checks[i]).length;
-  const rel = byId('releaseStatus');
-  rel.className = 'release ' + (done === DATA.checklist.length ? 'ok' : 'bad');
-  rel.textContent = done === DATA.checklist.length
-    ? `Uvolnění: ANO. Splněno ${done}/${DATA.checklist.length} bodů.`
-    : `Uvolnění: NE. Splněno ${done}/${DATA.checklist.length} bodů. Díl nesmí do lakovny.`;
-  byId('checkPct').textContent = `${pct(done, DATA.checklist.length)} %`;
-}
-function exportReport() {
-  ['jobNo','serialNo','welder','inspector','notes'].forEach(id => { state.form[id] = byId(id).value; });
-  const report = {
-    type: 'QC checklist svaru před lakovnou',
-    generatedAt: new Date().toISOString(),
-    form: state.form,
-    checklist: DATA.checklist.map((item,i) => ({ item, ok: !!state.checks[i] })),
-    release: DATA.checklist.every((_,i) => !!state.checks[i]) ? 'uvolnit' : 'neuvolnit',
-    quiz: state.quiz,
-    lessons: state.lessons
-  };
-  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `qc_svary_${(state.form.serialNo || 'dil').replace(/[^a-z0-9_-]+/gi,'_')}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+/* Sekce QC checklist byla na žádost vedení odstraněna (checklist se vede mimo tuto aplikaci). */
 
 function renderLessons() {
   byId('lessons').innerHTML = `
@@ -1492,7 +1416,7 @@ function renderQuiz() {
     result.className = `result ${percent >= 80 ? 'pass' : 'fail'}`;
     result.innerHTML = percent >= 80
       ? `<strong>Splněno.</strong> Výsledek ${score}/${DATA.quiz.length} (${percent} %).`
-      : `<strong>Zopakovat.</strong> Výsledek ${score}/${DATA.quiz.length} (${percent} %). Pro interní splnění použijte hranici 80 %.`;
+      : `<strong>Nesplněno.</strong> Výsledek ${score}/${DATA.quiz.length} (${percent} %). Hranice splnění je 80 %.`;
     odeslatVysledekIntranetu(score, DATA.quiz.length, percent);
   });
   svarSetAttInfo();
@@ -1607,13 +1531,13 @@ function svarSetAttInfo(){
   var el = byId('attInfo'); if (!el) return;
   if (!AX.email) { el.textContent = 'Test si můžeš vyzkoušet; výsledek se ukládá jen při spuštění z intranetu (sekce Školení).'; return; }
   el.textContent = AX.locked
-    ? ('Vyčerpal(a) jsi všechny 3 pokusy' + (AX.best ? (' · nejlepší výsledek ' + AX.best + ' %') : '') + '.')
-    : (AX.attemptsUsed > 0 ? ('Využito pokusů: ' + AX.attemptsUsed + ' / 3' + (AX.best ? (' · nejlepší ' + AX.best + ' %') : '')) : 'Máš 3 pokusy na splnění testu (hranice 80 %).');
+    ? ('Test už byl dokončen — opakování není možné' + (AX.best ? (' · výsledek ' + AX.best + ' %') : '') + '.')
+    : 'Test je jednorázový — máš jediný pokus (hranice splnění 80 %). Výsledek se ihned ukládá vedení.';
 }
 function lockQuizUI(){
   var f = byId('quizForm'); if (!f) return;
   f.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
-  var s = f.querySelector('button[type="submit"]'); if (s) s.textContent = 'Pokusy vyčerpány (3/3)';
+  var s = f.querySelector('button[type="submit"]'); if (s) s.textContent = 'Test už byl dokončen';
 }
 (function initSvarStatus(){
   if (!AX.email) return;
@@ -1621,7 +1545,7 @@ function lockQuizUI(){
     .then(function(r){ return r.json(); })
     .then(function(j){
       AX.attemptsUsed = (j && j.attemptsUsed) || 0; AX.best = (j && j.best) || 0;
-      if (AX.attemptsUsed >= 3) AX.locked = true;
+      if (AX.attemptsUsed >= 1) AX.locked = true;
       svarSetAttInfo(); if (AX.locked) lockQuizUI();
     }).catch(function(){});
 })();
@@ -1633,9 +1557,9 @@ function odeslatVysledekIntranetu(correct, total, percent){
     .then(function(j){
       var extra = byId('quizAttemptNote');
       if (!extra) { extra = document.createElement('div'); extra.id = 'quizAttemptNote'; extra.style.marginTop = '10px'; var qr = byId('quizResult'); if (qr && qr.parentNode) qr.parentNode.insertBefore(extra, qr.nextSibling); }
-      if (j && j.blocked) { AX.locked = true; AX.attemptsUsed = 3; lockQuizUI(); extra.innerHTML = '<p style="color:#b42318;font-weight:700;margin:6px 0 0">Vyčerpal(a) jsi všechny 3 pokusy — tento výsledek se už neuložil.</p>'; }
-      else if (j && j.ok) { AX.attemptsUsed = j.attempt; if (j.attemptsLeft <= 0) { AX.locked = true; lockQuizUI(); }
-        extra.innerHTML = '<p style="margin:6px 0 0"><strong>Pokus ' + j.attempt + ' ze 3.</strong> ' + (j.attemptsLeft > 0 ? ('Zbývají ' + j.attemptsLeft + ' pokusy.') : 'Toto byl poslední pokus.') + ' Výsledek byl odeslán vedení.</p>'; }
+      if (j && j.blocked) { AX.locked = true; AX.attemptsUsed = Math.max(1, AX.attemptsUsed); lockQuizUI(); extra.innerHTML = '<p style="color:#b42318;font-weight:700;margin:6px 0 0">Test už byl jednou odeslán — tento výsledek se neuložil.</p>'; }
+      else if (j && j.ok) { AX.attemptsUsed = j.attempt; AX.locked = true; lockQuizUI();
+        extra.innerHTML = '<p style="margin:6px 0 0"><strong>Výsledek byl odeslán vedení.</strong> Test je jednorázový — další pokus není možný.</p>'; }
       svarSetAttInfo();
     }).catch(function(){});
 }

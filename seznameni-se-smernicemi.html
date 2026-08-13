@@ -4272,6 +4272,38 @@ async function rozesilkaToggle(key,vypnout){
     renderRozesilky();
   }catch(e){ toast('Uložení selhalo: '+e.message); }
 }
+function rozStatus(msg,err){const el=document.getElementById('rozStatus');if(el){el.textContent=msg;el.style.color=err?'#b3261e':'#0a7d33';}}
+function rozVal(i,name){const el=document.querySelector('[data-roz="'+name+'"][data-i="'+i+'"]');if(!el)return null;return el.type==='checkbox'?el.checked:el.value;}
+async function rozesilkaSave(i){
+  const r=(window.__ROZ||[])[i]; if(!r)return;
+  const body={key:r.key};
+  const en=rozVal(i,'en'); if(en!==null)body.enabled=!!en;
+  const to=rozVal(i,'to'); if(to!==null)body.to=to;
+  const day=rozVal(i,'day'); if(day!==null)body.day=+day;
+  const hour=rozVal(i,'hour'); if(hour!==null)body.hour=+hour;
+  if(body.enabled && !(String(body.to||'').trim())){ rozStatus('U „'+r.name+'" nejsou vyplnění příjemci — nejdřív je doplň.',true); return; }
+  rozStatus('Ukládám…');
+  try{
+    const res=await fetch('/api/admin/reports/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await res.json().catch(()=>({}));
+    if(!res.ok||j.error){ rozStatus('Chyba: '+(j.error||res.status),true); return; }
+    rozStatus('✓ Uloženo — „'+(j.report&&j.report.name||r.name)+'" je '+((j.report&&j.report.enabled)?'ZAPNUTÁ':'vypnutá')+'.');
+    renderRozesilky();
+  }catch(e){ rozStatus('Chyba: '+e.message,true); }
+}
+async function rozesilkaSend(i){
+  const r=(window.__ROZ||[])[i]; if(!r||!r.send)return;
+  const to=(r.to||[]).join(', ');
+  if(!to){ rozStatus('Nejdřív vyplň příjemce a ulož.',true); return; }
+  if(!confirm('Odeslat report „'+r.name+'" teď na:\n'+to+' ?')) return;
+  rozStatus('Odesílám…');
+  try{
+    const res=await fetch(r.send.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r.send.body||{})});
+    const j=await res.json().catch(()=>({}));
+    if(!res.ok||j.error||j.ok===false){ rozStatus('Nepodařilo se odeslat: '+(j.error||res.status),true); return; }
+    rozStatus('✓ Odesláno na '+to+'.'); renderRozesilky();
+  }catch(e){ rozStatus('Chyba: '+e.message,true); }
+}
 async function renderRozesilky(){
   const box=document.getElementById("rozesilkyBox");
   box.innerHTML='<p class="muted">Načítám…</p>';
@@ -4279,21 +4311,37 @@ async function renderRozesilky(){
   try{ const r=await fetch("/api/admin/reports",{cache:"no-store"}); if(r.status===401){ showLogin(); return; } if(r.status===403){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Jen pro správce.</p></div>'; return; } const j=await r.json(); reports=j.reports||[]; maily=j.maily||[]; }
   catch(e){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nepodařilo se načíst rozesílky.</p></div>'; return; }
   const on=reports.filter(r=>r.enabled).length;
-  let h='<div class="card pad" style="margin-bottom:14px"><b>'+reports.length+'</b> automatických reportů · <b style="color:#0a7d33">'+on+'</b> zapnuto · <b>'+(reports.length-on)+'</b> vypnuto</div>';
+  window.__ROZ=reports;
+  const DNY=['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota'];
+  let h='<div class="card pad" style="margin-bottom:14px"><b>'+reports.length+'</b> automatických reportů · <b style="color:#0a7d33">'+on+'</b> zapnuto · <b>'+(reports.length-on)+'</b> vypnuto'+
+    '<div class="muted" style="font-size:12.5px;margin-top:6px">Vše se dá nastavit přímo tady: zapnout/vypnout přepínačem, upravit příjemce, den nebo hodinu odeslání — pak dej <b>Uložit</b>.</div></div>';
   h+='<div class="card" style="overflow:auto"><table class="matrix" style="width:100%"><thead><tr>'+
-    '<th>Modul</th><th>Report</th><th>Příjemci</th><th>Frekvence</th><th style="text-align:center">Stav</th><th>Naposledy</th><th>Náhled</th><th>Akce</th></tr></thead><tbody>';
-  reports.forEach(r=>{
-    const to=(r.to||[]); const toStr=to.length?to.join(', '):'<span style="color:#b3261e">bez příjemců</span>';
-    const stav=r.vypnutoCentralne?'<span class="pill" style="background:#fbecea;color:#b3261e">zrušeno</span>':(r.enabled?'<span class="pill green">zapnuto</span>':'<span class="pill" style="background:#eee;color:#666">vypnuto</span>');
+    '<th style="text-align:center">Zapnuto</th><th>Report</th><th style="min-width:230px">Příjemci</th><th>Kdy</th><th>Naposledy</th><th>Akce</th></tr></thead><tbody>';
+  reports.forEach((r,i)=>{
+    const ro=!!r.readOnly, to=(r.to||[]).join(', ');
+    const sw='<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">'+
+      '<input type="checkbox" data-roz="en" data-i="'+i+'"'+(r.enabled?' checked':'')+' style="width:18px;height:18px;cursor:pointer">'+
+      '<span class="muted" style="font-size:11px">'+(r.enabled?'zap':'vyp')+'</span></label>';
+    let kdy='';
+    if(ro) kdy='<span class="muted">'+esc(r.schedule||'')+'</span>';
+    else if(r.day!=null) kdy='<select data-roz="day" data-i="'+i+'" style="font-family:inherit;font-size:13px;padding:5px 7px;border:1px solid var(--line);border-radius:7px">'+
+      DNY.map((d,k)=>'<option value="'+k+'"'+(k===r.day?' selected':'')+'>'+d+'</option>').join('')+'</select> <span class="muted" style="font-size:11.5px">týdně</span>';
+    else if(r.hour!=null) kdy='<span class="muted" style="font-size:11.5px">denně od</span> <input type="number" min="0" max="23" data-roz="hour" data-i="'+i+'" value="'+r.hour+'" style="width:58px;font-family:inherit;font-size:13px;padding:5px 7px;border:1px solid var(--line);border-radius:7px"> <span class="muted" style="font-size:11.5px">h</span>';
+    else kdy='<span class="muted">'+esc(r.schedule||'')+'</span>';
+    const prijemci=ro?('<span class="muted" style="font-size:12.5px">'+esc(to||'—')+'</span>')
+      :'<input type="text" data-roz="to" data-i="'+i+'" value="'+esc(to)+'" placeholder="email1@elkoplast.cz, email2@…" style="width:100%;font-family:inherit;font-size:12.5px;padding:6px 8px;border:1px solid '+(to?'var(--line)':'#e6a6a0')+';border-radius:7px">';
     const last=r.lastAt?new Date(r.lastAt).toLocaleString('cs-CZ'):'—';
-    const prev=r.preview?'<a href="'+esc(r.preview)+'" target="_blank" rel="noopener">👁 náhled</a>':'—';
-    const akce=r.vypnutoCentralne
-      ?'<button class="btn ghost sm" onclick="rozesilkaToggle(\''+esc(r.key)+'\',false)">▶ Obnovit</button>'
-      :'<button class="btn ghost sm" style="color:#b3261e" onclick="rozesilkaToggle(\''+esc(r.key)+'\',true)">⏻ Zrušit odesílání</button>';
-    h+='<tr'+(r.vypnutoCentralne?' style="opacity:.65"':'')+'><td>'+esc(r.module||'')+'</td><td><b>'+esc(r.name||'')+'</b>'+(r.configHint?'<br><span class="muted" style="font-size:11.5px">⚙ '+esc(r.configHint)+'</span>':'')+'</td>'+
-      '<td style="font-size:12.5px">'+toStr+'</td><td>'+esc(r.schedule||'')+'</td><td style="text-align:center">'+stav+'</td><td class="muted" style="font-size:12px">'+esc(last)+'</td><td>'+prev+'</td><td style="white-space:nowrap">'+akce+'</td></tr>';
+    let akce='';
+    if(!ro) akce+='<button class="btn sm" onclick="rozesilkaSave('+i+')">💾 Uložit</button> ';
+    if(r.preview) akce+='<a class="btn ghost sm" href="'+esc(r.preview)+'" target="_blank" rel="noopener">👁</a> ';
+    if(r.send) akce+='<button class="btn ghost sm" onclick="rozesilkaSend('+i+')">📤 Poslat teď</button>';
+    h+='<tr'+(r.enabled?'':' style="opacity:.72"')+'><td style="text-align:center">'+sw+'</td>'+
+      '<td><b>'+esc(r.name||'')+'</b><br><span class="muted" style="font-size:11.5px">'+esc(r.module||'')+(r.configHint?(' · ⚙ '+esc(r.configHint)):'')+'</span></td>'+
+      '<td>'+prijemci+'</td><td style="white-space:nowrap">'+kdy+'</td>'+
+      '<td class="muted" style="font-size:12px;white-space:nowrap">'+esc(last)+'</td>'+
+      '<td style="white-space:nowrap">'+akce+'</td></tr>';
   });
-  h+='</tbody></table></div>';
+  h+='</tbody></table><div class="muted" id="rozStatus" style="padding:8px 12px;font-size:12.5px;min-height:18px"></div></div>';
   // Historie VŠECH odeslaných e-mailů — centrální evidence (reporty i jednorázové notifikace všech modulů).
   h+='<div class="dash-sec" style="margin-top:22px">Historie odeslaných e-mailů (posledních '+maily.length+')</div>';
   if(!maily.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné odeslané e-maily. Každý e-mail odeslaný intranetem (reporty, notifikace, pozvánky…) se od teď eviduje zde.</p></div>'; }

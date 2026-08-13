@@ -666,16 +666,41 @@ function mount(host) {
   }
 
   // Descriptor pro centrální přehled rozesílek (správce → „Rozesílky")
+  const DNY = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
+  // Mapa report → klíče v configu (pro centrální editaci v „Rozesílky")
+  const REP_MAP = {
+    bilance:    { to: 'bilanceTo',    en: 'bilanceEnabled',    hour: 'bilanceHour' },
+    objednavky: { to: 'objednavkyTo', en: 'objednavkyEnabled', day: 'objednavkyDay' },
+    markdown:   { to: 'markdownTo',   en: 'enabled',           day: 'weekday' }
+  };
   function reports() {
     const c = loadCfg(); let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
+    const base = { module: 'E-shop · Nákup', configHint: 'lze upravit i v E-shop → Optimalizace nákupu → 📧 Reporty' };
     return [
-      { key: 'bilance', module: 'E-shop · Nákup', name: 'Ranní bilance skladu', to: c.bilanceTo || [], enabled: !!c.bilanceEnabled, schedule: 'denně ráno (' + (c.bilanceHour != null ? c.bilanceHour : 8) + ':00)', lastAt: st.bilanceDay || null, preview: '/api/nakup-report/preview?type=bilance', configHint: 'E-shop → Optimalizace nákupu → 📧 Reporty' },
-      { key: 'objednavky', module: 'E-shop · Nákup', name: 'Objednávkový report (co objednat)', to: c.objednavkyTo || [], enabled: !!c.objednavkyEnabled, schedule: '1× za 14 dní', lastAt: st.objAt || null, preview: '/api/nakup-report/preview?type=objednavky', configHint: 'E-shop → Optimalizace nákupu → 📧 Reporty' },
-      { key: 'markdown', module: 'E-shop · Nákup', name: 'Co zlevnit (stárnoucí/mrtvé zásoby)', to: c.markdownTo || [], enabled: !!c.enabled, schedule: 'týdně', lastAt: st.lastAt || null, preview: '/api/nakup-report/preview?type=markdown', configHint: 'E-shop → Optimalizace nákupu → 📧 Reporty' }
+      Object.assign({}, base, { key: 'bilance', name: 'Ranní bilance skladu', to: c.bilanceTo || [], enabled: !!c.bilanceEnabled,
+        hour: (c.bilanceHour != null ? c.bilanceHour : 8), schedule: 'denně ráno (' + (c.bilanceHour != null ? c.bilanceHour : 8) + ':00)',
+        lastAt: st.bilanceDay || null, preview: '/api/nakup-report/preview?type=bilance', send: { url: '/api/nakup-report/send', body: { type: 'bilance' } } }),
+      Object.assign({}, base, { key: 'objednavky', name: 'Objednávkový report (co objednat)', to: c.objednavkyTo || [], enabled: !!c.objednavkyEnabled,
+        day: (c.objednavkyDay != null ? c.objednavkyDay : 1), schedule: 'týdně (' + DNY[c.objednavkyDay != null ? c.objednavkyDay : 1] + ')',
+        lastAt: st.objAt || null, preview: '/api/nakup-report/preview?type=objednavky', send: { url: '/api/nakup-report/send', body: { type: 'objednavky' } } }),
+      Object.assign({}, base, { key: 'markdown', name: 'Co zlevnit (stárnoucí/mrtvé zásoby)', to: c.markdownTo || [], enabled: !!c.enabled,
+        day: (c.weekday != null ? c.weekday : 1), schedule: 'týdně (' + DNY[c.weekday != null ? c.weekday : 1] + ')',
+        lastAt: st.lastAt || null, preview: '/api/nakup-report/preview?type=markdown', send: { url: '/api/nakup-report/send', body: { type: 'markdown' } } })
     ];
   }
+  // Centrální editace z „Rozesílky" (správce): zapnout/vypnout, příjemci, den, hodina.
+  function setReport(key, patch) {
+    const m = REP_MAP[key]; if (!m) return null;
+    const c = loadCfg();
+    if (patch.to != null) c[m.to] = cleanEmails(patch.to);
+    if (patch.enabled != null) c[m.en] = !!patch.enabled;
+    if (patch.day != null && m.day && +patch.day >= 0 && +patch.day <= 6) c[m.day] = +patch.day;
+    if (patch.hour != null && m.hour && +patch.hour >= 0 && +patch.hour <= 23) c[m.hour] = +patch.hour;
+    saveCfg(c);
+    return reports().find(r => r.key === key) || null;
+  }
 
-  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), reports };
+  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), reports, setReport };
 }
 
 module.exports = { mount };

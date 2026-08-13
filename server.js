@@ -1156,8 +1156,8 @@ function recordVykresySkoleni(a) {
   logActivity('vykresy-skoleni', { email, name }, 'Test Čtení výkresů · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, VYKRESY_SKOLENI_MAX - rec.attempts.length), passed };
 }
-// Školení Průvodce svařováním (ISO 5817) – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
-const SVAROVANI_SKOLENI_MAX = 3;
+// Školení Průvodce svařováním (ISO 5817) – závěrečný test. Jeden záznam na e-mail; test je JEDNORÁZOVÝ (1 pokus, bez opakování).
+const SVAROVANI_SKOLENI_MAX = 1;
 function svarovaniSkoleniStatus(email) {
   email = (email || '').toLowerCase();
   const rec = readJson(SVAROVANI_SKOLENI_F, []).find(r => (r.email || '').toLowerCase() === email);
@@ -2427,7 +2427,7 @@ const server = http.createServer(async (req, res) => {
       // Jádro intranetu: měsíční vyhodnocení seznámení se směrnicemi.
       try {
         const st = readJson(REPORT_F, {});
-        out.push({ key: 'smernice-mesicni', module: 'Směrnice', name: 'Měsíční vyhodnocení seznámení se směrnicemi', to: [reportRecipient()], enabled: reportEnabled() && emailConfigured(), schedule: 'měsíčně (' + reportDay() + '. den)', lastAt: st.lastSentAt || null, preview: null, configHint: 'env REPORT_EMAIL / REPORT_DAY / REPORT_ENABLED' });
+        out.push({ key: 'smernice-mesicni', module: 'Směrnice', name: 'Měsíční vyhodnocení seznámení se směrnicemi', to: [reportRecipient()], enabled: reportEnabled() && emailConfigured(), schedule: 'měsíčně (' + reportDay() + '. den)', lastAt: st.lastSentAt || null, preview: null, readOnly: true, configHint: 'nastavuje se v proměnných prostředí (REPORT_EMAIL / REPORT_DAY / REPORT_ENABLED); tady lze jen zrušit odesílání' });
       } catch (_) {}
       for (const m of mods) { if (m && typeof m.reports === 'function') { try { const rs = m.reports() || []; rs.forEach(r => out.push(r)); } catch (_) {} } }
       // Centrální vypínač: zrušené rozesílky jsou vypnuté bez ohledu na nastavení modulu.
@@ -2435,6 +2435,28 @@ const server = http.createServer(async (req, res) => {
       out.forEach(r => { r.vypnutoCentralne = !!off[r.key]; if (r.vypnutoCentralne) r.enabled = false; });
       // Historie VŠECH odeslaných e-mailů (i jednorázových notifikací) — centrální evidence z deliver().
       return send(res, 200, { reports: out, maily: mailLogRead(200) });
+    }
+    // Plná editace rozesílky přímo v přehledu: zapnout/vypnout, příjemci, den, hodina.
+    if (p === '/api/admin/reports/edit' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const key = String(b.key || '').trim();
+      if (!key) return send(res, 400, { error: 'Chybí klíč rozesílky.' });
+      const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod, qoolingMod];
+      for (const m of mods) {
+        if (!m || typeof m.setReport !== 'function') continue;
+        let r = null; try { r = m.setReport(key, b); } catch (e) { return send(res, 500, { error: e.message }); }
+        if (!r) continue;
+        // Zapnutí v přehledu zruší i centrální vypnutí, ať to nedělá zmatek.
+        const off = rozesilkyOff();
+        if (b.enabled === true && off[key]) { delete off[key]; rozesilkyOffWrite(off); }
+        else if (b.enabled === false) { off[key] = true; rozesilkyOffWrite(off); }
+        r.vypnutoCentralne = !!rozesilkyOff()[key];
+        const aktor = empSession(req) || { email: '', name: 'správce' };
+        logActivity('rozesilka', { email: aktor.email, name: aktor.name }, 'Upravena rozesílka „' + r.name + '": ' + (r.enabled ? 'zapnuta' : 'vypnuta') + ' · ' + (r.to || []).join(', '));
+        return send(res, 200, { ok: true, report: r });
+      }
+      return send(res, 404, { error: 'Rozesílku „' + key + '" nelze upravit odsud (nastavuje se jinde).' });
     }
     if (p === '/api/admin/reports/toggle' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
@@ -2797,7 +2819,9 @@ const server = http.createServer(async (req, res) => {
       const text = 'Dobrý den,\n\nzveme vás k absolvování školení v intranetu ELKOPLAST:\n\n  ' + nazev + '\n\n'
         + (poznamka ? 'Poznámka od správce: ' + poznamka + '\n\n' : '')
         + 'Školení otevřete v intranetu v sekci Školení:\n' + link + '\n\n'
-        + 'Na konci školení je závěrečný test — hranice splnění 80 %, max. 3 pokusy.\n\nDěkujeme.\nIntranet ELKOPLAST';
+        + (String(b.skoleni) === 'svarovani'
+          ? 'Na konci školení je jednorázový závěrečný test — hranice splnění 80 %, jediný pokus.\n\nDěkujeme.\nIntranet ELKOPLAST'
+          : 'Na konci školení je závěrečný test — hranice splnění 80 %, max. 3 pokusy.\n\nDěkujeme.\nIntranet ELKOPLAST');
       const chyby = []; let sent = 0;
       for (const to of emails) {
         try { await deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST', subject: 'Pozvánka ke školení: ' + nazev, text, html: toHtml(text, '') }); sent++; }
