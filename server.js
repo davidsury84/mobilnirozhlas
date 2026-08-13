@@ -217,6 +217,21 @@ function writeJson(f, obj) { fs.writeFileSync(f, JSON.stringify(obj, null, 2), '
   } catch (err) { console.error('[seed] tomas kontejnery:', err.message); }
 })();
 
+// Jednorázová oprava (2026-08-11): někdo přes „Odesílané e-maily" přepsal šablonu pozvánky do intranetu.
+// Vracíme na původní výchozí text („Dobrý den {jmeno5}, byli jste pozváni…"). Šablona zůstává dál editovatelná.
+(function () {
+  try {
+    const s = readJson(STATE_F, null);
+    if (!s || s._inviteTplReset20260811) return;
+    s._inviteTplReset20260811 = true;
+    if (s.settings && s.settings.mailTpl && s.settings.mailTpl.invite) {
+      console.log('[migrace] šablona pozvánky byla přepsaná (subject: ' + JSON.stringify((s.settings.mailTpl.invite.subject || '').slice(0, 60)) + ') → vráceno na výchozí.');
+      delete s.settings.mailTpl.invite;
+    }
+    writeJson(STATE_F, s);
+  } catch (err) { console.error('[migrace] invite tpl reset:', err.message); }
+})();
+
 /* ---------- jednoduchý log aktivity + stav pozvánek ---------- */
 // Zapíše událost do logu (posledních 500). Typy: login, admin-login, invite-sent, invite-accepted, survey.
 function logActivity(type, who, detail) {
