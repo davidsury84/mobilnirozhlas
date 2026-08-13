@@ -3779,6 +3779,7 @@ function aktNew(){
     '<label class="field"><span>Titulek</span><input id="aktT" type="text" maxlength="140" placeholder="Např. Nový postup pro objednávky"></label>'+
     '<label class="field"><span>Text</span><textarea id="aktB" rows="4" placeholder="Obsah novinky…"></textarea></label>'+
     '<label class="field"><span>Obrázek (volitelně)</span><input id="aktImg" type="file" accept="image/*"></label>'+
+    '<label style="display:flex;align-items:center;gap:8px;margin:4px 0 2px;font-size:13.5px;cursor:pointer"><input id="aktBezMailu" type="checkbox"> Neposílat e-mail zaměstnancům (jen na nástěnku)</label>'+
     '<div class="akt-prev" id="aktPrev"></div>'+
     '<div class="akt-msg" id="aktMsg"></div>'+
     '<div class="akt-modal-foot"><button class="btn ghost" type="button" onclick="this.closest(\'.akt-modal-ov\').remove()">Zrušit</button>'+
@@ -3797,7 +3798,8 @@ async function aktSubmit(btn){
   const msg=ov.querySelector("#aktMsg");
   if(!title){ msg.textContent="Vyplňte titulek."; return; }
   btn.disabled=true; msg.textContent="Publikuji…";
-  try{ const r=await fetch("/api/aktuality",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body:bodyTxt,image:img})});
+  const bezEmailu=!!(ov.querySelector("#aktBezMailu")&&ov.querySelector("#aktBezMailu").checked);
+  try{ const r=await fetch("/api/aktuality",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,body:bodyTxt,image:img,bezEmailu})});
     const j=await r.json().catch(()=>({}));
     if(r.ok&&j.ok){ ov.remove(); if(typeof toast==="function") toast("Aktualita publikována"); loadAktuality(); }
     else { msg.textContent=j.error||"Nepodařilo se uložit."; btn.disabled=false; }

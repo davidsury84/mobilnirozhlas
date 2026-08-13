@@ -2945,7 +2945,8 @@ const server = http.createServer(async (req, res) => {
       st.posts.push(post); writeJson(AKTUALITY_F, st);
       logActivity('aktuality', { email: e.email, name: e.name }, 'Přidal aktualitu: ' + title);
       // OZNÁMENÍ: nová aktualita se e-mailem rozešle všem zaměstnancům (kromě autora), na pozadí.
-      if (emailConfigured()) {
+      // Autor může e-mail vypnout checkboxem „Neposílat e-mail" (bezEmailu) — pak jde novinka jen na nástěnku.
+      if (emailConfigured() && !b.bezEmailu) {
         const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
         const link = proto + '://' + (req.headers['x-forwarded-host'] || req.headers.host || 'intranet.elkoplast.cz') + '/#modul=dash';
         const uryvek = (post.body || '').slice(0, 300) + ((post.body || '').length > 300 ? '…' : '');
