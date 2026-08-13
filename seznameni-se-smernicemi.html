@@ -4762,7 +4762,8 @@ async function renderLibAdmin(folderId){
     h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.file)+'</div>'+
       '<div><div class="li-t">'+esc(d.title)+' <span class="muted" style="font-size:12px;font-weight:400">verze '+v+(d.kind?' · '+esc(d.kind):'')+'</span></div>'+
       '<div style="margin-top:5px">'+badges+'</div></div></div>'+
-      '<div class="inline-actions"><button class="btn ghost sm" onclick="openLibDocModal(\''+d.id+'\')">Upravit</button>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="libEditObsah(\''+d.id+'\')">✏️ Obsah</button>'+
+      '<button class="btn ghost sm" onclick="openLibDocModal(\''+d.id+'\')">Upravit</button>'+
       '<button class="btn danger sm" onclick="deleteLibDoc(\''+d.id+'\')">Smazat</button></div></div>';
   });
   box.innerHTML=h;
@@ -4793,6 +4794,18 @@ function libFolderOptions(selected){
   const walk=(pid,depth)=>{ libChildF(pid).sort((a,b)=>a.name.localeCompare(b.name,"cs")).forEach(f=>{ opts+='<option value="'+f.id+'"'+(f.id===selected?' selected':'')+'>'+'&nbsp;'.repeat(depth*3)+esc(f.name)+'</option>'; walk(f.id,depth+1); }); };
   walk(null,0); return opts;
 }
+/* Editace obsahu stávajícího dokumentu: načte aktuální verzi do editoru v modalu.
+   Uložení pak vytvoří novou verzi (stejná cesta jako nahrání souboru). */
+function libNactiObsah(id){
+  const d=LIBDB&&LIBDB.docs.find(x=>x.id===id); if(!d) return;
+  const ver=(d.versions||[]).find(v=>v.v===curVer(d))||{};
+  const prev=document.getElementById('docPreview'); if(!prev) return;
+  prev.innerHTML=ver.html||'';
+  pendingHtml=prev.innerHTML; libNewVer=true;
+  const wrap=document.getElementById('docPreviewWrap'); if(wrap) wrap.style.display='';
+  prev.focus();
+}
+async function libEditObsah(id){ await openLibDocModal(id); libNactiObsah(id); }
 async function openLibDocModal(id){
   await ensureLib(); if(!LIBDB) return;
   const d = id? LIBDB.docs.find(x=>x.id===id) : null;
@@ -4804,7 +4817,8 @@ async function openLibDocModal(id){
     '<label class="field"><span>Název dokumentu</span><input type="text" id="lTitle" value="'+(d?esc(d.title):'')+'" placeholder="např. Pracovní řád"></label>'+
     '<div class="row"><label class="field" style="flex:1;min-width:200px"><span>Typ / popisek</span><input type="text" id="lKind" value="'+(d?esc(d.kind||''):'')+'" placeholder="např. pracovní řád, SOP"></label>'+
     '<label class="field" style="flex:1;min-width:200px"><span>Složka</span><select id="lFolder">'+libFolderOptions(folderSel)+'</select></label></div>'+
-    (d? ('<div class="hint">Aktuální verze: <strong>v'+curVer(d)+'</strong>. Nahrání nového souboru vytvoří <strong>verzi '+(curVer(d)+1)+'</strong> (vyžádá si nové potvrzení). Bez nahrání se uloží jen údaje.</div>') : '')+
+    (d? ('<div class="hint" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Aktuální verze: <strong>v'+curVer(d)+'</strong>. Úprava obsahu či nahrání souboru vytvoří <strong>verzi '+(curVer(d)+1)+'</strong> (vyžádá si nové potvrzení). Bez toho se uloží jen údaje.</span>'+
+      '<button type="button" class="btn sm" onclick="libNactiObsah(\''+d.id+'\')">✏️ Upravit stávající obsah</button></div>') : '')+
     '<label class="field"><span>'+(d?'Nahrát novou verzi (.docx / .html / .txt)':'Dokument (.docx / .html / .txt)')+'</span><input type="file" id="docFile" accept=".docx,.html,.htm,.txt" onchange="parseDoc(this);libNewVer=true"></label>'+
     '<div id="docPreviewWrap" style="display:none"><div class="spread" style="margin-bottom:6px"><span style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase">Náhled · klikni a uprav</span>'+
       '<div class="inline-actions" style="gap:4px">'+
