@@ -4809,7 +4809,7 @@ async function renderLibAdmin(folderId){
     const badges=(d.requireAck!==false?'<span class="pill amber">vyžaduje potvrzení</span>':'<span class="pill gray">jen ke čtení</span>')+' '+
       (d.assignAll?'<span class="tag">Všichni</span>':((d.assignCats||[]).map(c=>'<span class="tag">'+esc(catName(c))+'</span>').join("")||'<span class="tag">— nepřiřazeno —</span>'))
       +(d.assignTags||[]).map(t=>'<span class="tag" style="background:var(--yellow-soft);color:var(--amber)">🏷 '+esc(t)+'</span>').join("");
-    h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.file)+'</div>'+
+    h+='<div class="li-item"><div class="li-left" style="cursor:pointer" title="Kliknutím upravíte obsah dokumentu" onclick="libEditObsah(\''+d.id+'\')"><div class="li-ic">'+mujIcon(MUJ_IC.file)+'</div>'+
       '<div><div class="li-t">'+esc(d.title)+' <span class="muted" style="font-size:12px;font-weight:400">verze '+v+(d.kind?' · '+esc(d.kind):'')+'</span></div>'+
       '<div style="margin-top:5px">'+badges+'</div></div></div>'+
       '<div class="inline-actions"><button class="btn ghost sm" onclick="libEditObsah(\''+d.id+'\')">✏️ Obsah</button>'+
