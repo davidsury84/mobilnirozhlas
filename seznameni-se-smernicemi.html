@@ -1488,6 +1488,7 @@ async function initIntranet(){
         else if(par.kurz==='loxxer') openLoxxerSkoleni();
         else if(par.kurz==='acts') openActsSkoleni();
         else if(par.kurz==='vykresy') openVykresySkoleni();
+        else if(par.kurz==='svarovani') openSvarovaniSkoleni();
         else if(par.kurz==='kovo'||par.kurz==='roto') openProdukty(par.kurz);
         else mjGo('skoleni');
       }
@@ -2723,14 +2724,15 @@ async function showSkoleni(){
     const label = st.passed ? 'Otevřít znovu' : (u>=3 ? 'Prohlédnout' : (u>0 ? 'Pokračovat' : 'Spustit'));
     return { badge, label };
   }
-  let kst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, rst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, pst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, lst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, ast={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, vst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false};
+  let kst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, rst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, pst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, lst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, ast={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, vst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false}, sst={attemptsUsed:0,attemptsLeft:3,best:0,passed:false};
   try{ kst=await (await fetch('/api/produkty?type=kovo&email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ rst=await (await fetch('/api/produkty?type=roto&email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ pst=await (await fetch('/api/prumysl?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ lst=await (await fetch('/api/loxxer-skoleni?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ ast=await (await fetch('/api/acts-skoleni?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
   try{ vst=await (await fetch('/api/vykresy-skoleni?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
-  const kb=skolBadgeBtn(kst), rb=skolBadgeBtn(rst), pb=skolBadgeBtn(pst), lb=skolBadgeBtn(lst), ab=skolBadgeBtn(ast), vb=skolBadgeBtn(vst);
+  try{ sst=await (await fetch('/api/svarovani-skoleni?email='+encodeURIComponent(MUJ.email),{cache:'no-store'})).json(); }catch(e){}
+  const kb=skolBadgeBtn(kst), rb=skolBadgeBtn(rst), pb=skolBadgeBtn(pst), lb=skolBadgeBtn(lst), ab=skolBadgeBtn(ast), vb=skolBadgeBtn(vst), sb=skolBadgeBtn(sst);
   // Správce může kohokoli pozvat k absolvování (e-mailová pozvánka) — u všech školení.
   const inv=(key,nazev)=>MUJ.admin?'<button class="btn ghost sm" title="Pozvat zaměstnance k absolvování" onclick="skolPozvat(\''+key+'\',\''+nazev.replace(/'/g,"\\'")+'\')">✉ Pozvat</button>':'';
   let h='<div class="dash-hero"><h2>Školení</h2><p>Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).'+(MUJ.admin?' Jako správce můžete tlačítkem „✉ Pozvat" poslat komukoli e-mailovou pozvánku k absolvování.':'')+'</p></div>';
@@ -2770,7 +2772,24 @@ async function showSkoleni(){
      '<div class="muted" style="font-size:12px;margin-top:2px">5 výukových celků · 18 lekcí podle ČSN a ISO: od čar, pohledů a řezů přes kóty, tolerance a GPS až po svary, plechy, materiály a kusovník; závěrečný test ve vlastní záložce</div></div></div>'+
      '<div style="display:flex;align-items:center;gap:10px">'+vb.badge+inv('vykresy-skoleni','Čtení technických výkresů (ČSN/ISO)')+
      '<button class="btn sm" onclick="openVykresySkoleni()">'+vb.label+'</button></div></div>';
+  h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
+     '<div class="li-t">Průvodce svařováním — hodnocení svarů (ISO 5817)</div>'+
+     '<div class="muted" style="font-size:12px;margin-top:2px">Fotogalerie skutečných vad s QC rozhodnutími, katalog vad dle ISO 5817, výukové lekce, procvičování na fotkách a QC checklist + závěrečný test</div></div></div>'+
+     '<div style="display:flex;align-items:center;gap:10px">'+sb.badge+inv('svarovani','Průvodce svařováním — hodnocení svarů (ISO 5817)')+
+     '<button class="btn sm" onclick="openSvarovaniSkoleni()">'+sb.label+'</button></div></div>';
   body.innerHTML=h; window.scrollTo(0,0);
+}
+function openSvarovaniSkoleni(){
+  MUJ.view="skoleni"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=skoleni&kurz=svarovani'); }catch(e){}
+  const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
+  const body=document.getElementById("mujBody");
+  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
+      '<button class="btn ghost sm" onclick="showSkoleni()">← Zpět na školení</button>'+
+      '<span class="muted" style="font-size:13px">Školení <b>Průvodce svařováním</b> — v záložce Test je závěrečný test. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
+    '<iframe src="/svarovani-skoleni-app'+q+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#fff" title="Školení Průvodce svařováním"></iframe>';
+  window.scrollTo(0,0);
 }
 function openVykresySkoleni(){
   MUJ.view="skoleni"; renderSidebar();
@@ -5760,6 +5779,7 @@ const PRUZKUMY_DEFS=[
   {kind:'produkty-kovo', typ:'skoleni', nazev:'Školení Produkty KOVO', popis:'znalost produktového katalogu KOVO · závěrečný test, max 3 pokusy'},
   {kind:'produkty-roto', typ:'skoleni', nazev:'Školení Produkty ROTO', popis:'znalost produktového katalogu ROTO · závěrečný test, max 3 pokusy'},
   {kind:'vykresy-skoleni', typ:'skoleni', nazev:'Školení Čtení technických výkresů', popis:'ČSN/ISO: čáry, pohledy, řezy, kóty, tolerance, svary, kusovník · závěrečný test, max 3 pokusy'},
+  {kind:'svarovani-skoleni', typ:'skoleni', nazev:'Školení Průvodce svařováním', popis:'hodnocení svarů dle ISO 5817 · fotogalerie vad a QC rozhodnutí · závěrečný test, max 3 pokusy'},
 ];
 async function renderGritAdmin(){ PRUZKUMY_DETAIL=null; await renderPruzkumyPrehled(); }
 /* statistika školicího testu (model attempts[], hranice 80 %, max 3 pokusy) */
@@ -5774,13 +5794,13 @@ function skolStaty(res){
 async function renderPruzkumyPrehled(){
   const box=document.getElementById("gritAdmin");
   box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám přehled testů…</p></div>';
-  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto','/api/vykresy-skoleni-results'];
+  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto','/api/vykresy-skoleni-results','/api/svarovani-skoleni-results'];
   let neprihlasen=false;
   const data=await Promise.all(eps.map(u=>fetch(u,{cache:'no-store'}).then(r=>{ if(r.status===401){ neprihlasen=true; return []; } return r.json(); }).catch(()=>[])));
   if(neprihlasen){ showLogin(); return; }
   GRIT_RESULTS=data[0]||[]; JSS_RESULTS=data[1]||[]; TW44_RESULTS=data[2]||[]; VYKRESY_RESULTS=data[3]||[];
   ABROLL_RESULTS=data[4]||[]; PRUMYSL_RESULTS=data[5]||[]; LOXXER_SKOLENI_RESULTS=data[6]||[]; ACTS_SKOLENI_RESULTS=data[7]||[];
-  PRODUKTY_SKOLENI_RESULTS.kovo=data[8]||[]; PRODUKTY_SKOLENI_RESULTS.roto=data[9]||[]; VYKRESY_SKOLENI_RESULTS=data[10]||[];
+  PRODUKTY_SKOLENI_RESULTS.kovo=data[8]||[]; PRODUKTY_SKOLENI_RESULTS.roto=data[9]||[]; VYKRESY_SKOLENI_RESULTS=data[10]||[]; SVAROVANI_SKOLENI_RESULTS=data[11]||[];
   const fmtD=ts=>ts?new Date(ts).toLocaleDateString('cs-CZ'):'—';
   const pill=(t,c)=>'<span class="pill '+c+'">'+t+'</span>';
   /* statistiky jednotlivých testů do sloupců: [vyplnilo, Ø výsledek, stav, poslední] */
@@ -5800,7 +5820,7 @@ async function renderPruzkumyPrehled(){
       const avgP=Math.round(res.reduce((s,r)=>s+(r.procenta||0),0)/res.length);
       const ok=res.filter(r=>(r.procenta||0)>=70).length, pa=vykresyPasmoCl(avgP);
       return {n:res.length, vysledek:'Ø úspěšnost '+avgP+' %', stav:pill(pa[0],pa[1])+' <span class="muted" style="font-size:11px">≥ 70 %: '+ok+' z '+res.length+'</span>', last:Math.max(...res.map(r=>r.ts||0))}; }
-    const res=kind==='abroll'?ABROLL_RESULTS:kind==='prumysl'?PRUMYSL_RESULTS:kind==='loxxer'?LOXXER_SKOLENI_RESULTS:kind==='acts'?ACTS_SKOLENI_RESULTS:kind==='produkty-kovo'?PRODUKTY_SKOLENI_RESULTS.kovo:kind==='vykresy-skoleni'?VYKRESY_SKOLENI_RESULTS:PRODUKTY_SKOLENI_RESULTS.roto;
+    const res=kind==='abroll'?ABROLL_RESULTS:kind==='prumysl'?PRUMYSL_RESULTS:kind==='loxxer'?LOXXER_SKOLENI_RESULTS:kind==='acts'?ACTS_SKOLENI_RESULTS:kind==='produkty-kovo'?PRODUKTY_SKOLENI_RESULTS.kovo:kind==='vykresy-skoleni'?VYKRESY_SKOLENI_RESULTS:kind==='svarovani-skoleni'?SVAROVANI_SKOLENI_RESULTS:PRODUKTY_SKOLENI_RESULTS.roto;
     if(!res.length) return {n:0};
     const st=skolStaty(res);
     return {n:st.n, vysledek:'Ø nejlepší pokus '+st.avgBest+' %',
@@ -5856,6 +5876,7 @@ async function openPruzkumDetail(kind){
   else if(kind==='produkty-kovo') inner=await produktySkoleniBlockHtml('kovo');
   else if(kind==='produkty-roto') inner=await produktySkoleniBlockHtml('roto');
   else if(kind==='vykresy-skoleni') inner=await vykresySkoleniBlockHtml();
+  else if(kind==='svarovani-skoleni') inner=await svarovaniSkoleniBlockHtml();
   box.innerHTML=back+inner;
   window.scrollTo(0,0);
 }
@@ -5943,6 +5964,48 @@ function exportVykresySkoleni(){
   const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
   const a=document.createElement("a"); a.href=url; a.download="vykresy-skoleni-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
+}
+/* ---- Školení Průvodce svařováním — výsledky závěrečného testu ---- */
+let SVAROVANI_SKOLENI_RESULTS=[];
+async function svarovaniSkoleniBlockHtml(){
+  try{ const r=await fetch('/api/svarovani-skoleni-results',{cache:'no-store'}); if(r.status===401){ showLogin(); return ''; } SVAROVANI_SKOLENI_RESULTS=await r.json(); }catch(e){ SVAROVANI_SKOLENI_RESULTS=[]; }
+  let h='<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:8px"><strong>Školení Průvodce svařováním — závěrečný test</strong>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="exportSvarovaniSkoleni()">⬇ Export (CSV)</button></div></div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">Interaktivní průvodce hodnocením svarů (ISO 5817, kontrola dle ISO 17637): fotogalerie skutečných vad s QC rozhodnutími, katalog vad, výukové lekce a procvičování na fotkách — v sekci Školení. Test se vyhodnocuje automaticky, hranice splnění 80 %, <strong>max. 3 pokusy</strong> na osobu; ukládá se každý pokus.</div>'+
+    '</div>';
+  const res=(SVAROVANI_SKOLENI_RESULTS||[]).slice();
+  if(!res.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné výsledky školení Průvodce svařováním. Jakmile někdo dokončí test v sekci Školení, objeví se tu.</p></div>'; return h; }
+  const bestOf=r=>(r.attempts||[]).reduce((m,x)=>Math.max(m,x.pct||0),0);
+  const passedOf=r=>(r.attempts||[]).some(x=>x.passed);
+  const lastTs=r=>{ const a=(r.attempts||[]); return a.length?(a[a.length-1].ts||0):0; };
+  const done=res.filter(passedOf).length;
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Účastníků</div><strong style="font-size:20px">'+res.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Splnilo (≥80 %)</div><strong style="font-size:20px">'+done+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Nesplnilo</div><strong style="font-size:20px">'+(res.length-done)+'</strong></div></div>';
+  const groups={}; res.forEach(r=>{ const d=r.dept||"—"; (groups[d]=groups[d]||[]).push(r); });
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,"cs")).forEach(d=>{
+    const rows=groups[d].slice().sort((a,b)=>bestOf(b)-bestOf(a));
+    h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+esc(d)+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3></div>';
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>E-mail</th><th class="num">Pokusů</th><th class="num">Nejlepší</th><th>Stav</th><th>Poslední pokus</th></tr></thead><tbody>';
+    rows.forEach(r=>{ const best=bestOf(r), passed=passedOf(r), used=(r.attempts||[]).length, ts=lastTs(r);
+      h+='<tr><td>'+esc(r.name||r.email)+'</td><td class="muted">'+esc(r.email||"")+'</td>'+
+         '<td class="num">'+used+' / 3</td><td class="num">'+best+' %</td>'+
+         '<td>'+(passed?'<span class="pill green">✓ Splněno</span>':(used>=3?'<span class="pill red">✕ Nesplněno</span>':'<span class="pill amber">○ Probíhá</span>'))+'</td>'+
+         '<td class="muted">'+(ts?new Date(ts).toLocaleDateString("cs-CZ"):"—")+'</td></tr>'; });
+    h+='</tbody></table></div>';
+  });
+  return h;
+}
+function exportSvarovaniSkoleni(){
+  const res=SVAROVANI_SKOLENI_RESULTS||[]; if(!res.length){ toast("Žádná data k exportu."); return; }
+  const rows=[["Jméno","E-mail","Oddělení","Pokusů","Nejlepší %","Splněno","Poslední pokus"]];
+  res.forEach(r=>{ const a=r.attempts||[]; const best=a.reduce((m,x)=>Math.max(m,x.pct||0),0); const passed=a.some(x=>x.passed); const ts=a.length?(a[a.length-1].ts||0):0;
+    rows.push([r.name||r.email||"", r.email||"", r.dept||"", a.length, best, passed?"ano":"ne", ts?new Date(ts).toLocaleString("cs-CZ"):""]); });
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="svarovani-skoleni-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
 }
 /* ---- Test houževnatosti (Grit) — blok administrace ---- */
 async function gritBlockHtml(){
