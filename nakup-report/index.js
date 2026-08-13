@@ -85,6 +85,19 @@ function mount(host) {
 
   // ---- DENNÍ BILANCE SKLADU (stav + pohyby, kusově i finančně v landed cenách) ----
   const BAL_F = path.join(host.dataDir || __dirname, 'objednavky-bilance.json'); // denní historie bilance (cap 120 dní)
+  // ---- HISTORIE SNÍMKŮ SMI (mrtvé zásoby v čase) — sdílená na serveru, dřív jen localStorage prohlížeče ----
+  const HIST_F = path.join(host.dataDir || __dirname, 'smi-historie.json');
+  const loadHist = () => { try { const a = JSON.parse(fs.readFileSync(HIST_F, 'utf8')); return Array.isArray(a) ? a : []; } catch (_) { return []; } };
+  const histKey = s => (s && s.periodKey) ? String(s.periodKey) : ('d:' + (s && s.date));
+  function saveHist(arr) {
+    arr = (arr || []).slice().sort((a, b) => ((a.periodKey || 0) - (b.periodKey || 0)) || ((a.ts || 0) - (b.ts || 0)));
+    if (arr.length > 60) arr = arr.slice(-60);
+    try { fs.writeFileSync(HIST_F, JSON.stringify(arr)); } catch (e) { console.error('[nakup-report] historie zápis:', e.message); }
+    return arr;
+  }
+  function mergeHist(snap) { // re-upload stejného období = přepis, ne duplicita
+    const arr = loadHist().filter(s => histKey(s) !== histKey(snap)); arr.push(snap); return saveHist(arr);
+  }
   const unitVal = r => (r.unitCost > 0 ? r.unitCost : (r.unitPrice || 0));
   const loadBilance = () => { try { return JSON.parse(fs.readFileSync(BAL_F, 'utf8')) || []; } catch (_) { return []; } };
   function pushBilance(B) {
@@ -547,6 +560,23 @@ function mount(host) {
       const week = latest ? { days: wkEntries.length, flow: sumFlows(wkEntries) } : null;
       const dayDelta = (latest && prev) ? dayDeltas(latest, prev) : null;
       return json(res, 200, { latest, prev, trend, week, dayDelta, days: arr.length }), true;
+    }
+    // Historie snímků SMI (mrtvé zásoby v čase) — sdílená, přístup jako e-shop
+    if (p === '/api/nakup-report/historie' && req.method === 'GET') {
+      if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
+      return json(res, 200, { ok: true, items: loadHist() }), true;
+    }
+    if (p === '/api/nakup-report/historie' && req.method === 'POST') {
+      if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; }
+      let arr;
+      if (b.clear) arr = saveHist([]);
+      else if (Array.isArray(b.items)) arr = saveHist(b.items);          // hromadně (migrace z prohlížeče)
+      else if (b.snapshot && typeof b.snapshot === 'object') arr = mergeHist(b.snapshot);
+      else { json(res, 400, { error: 'Chybí snapshot / items / clear.' }); return true; }
+      const who = (host.empSession && host.empSession(req)) || {};
+      console.log('[nakup-report] historie: ' + (b.clear ? 'vymazána' : 'uložen snímek') + ' (' + arr.length + ' celkem) · ' + (who.email || 'admin'));
+      return json(res, 200, { ok: true, items: arr }), true;
     }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
 

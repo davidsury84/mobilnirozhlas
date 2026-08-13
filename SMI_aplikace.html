@@ -1604,8 +1604,26 @@ async function buildExcel(){
 if(window.ChartDataLabels){Chart.register(window.ChartDataLabels);Chart.defaults.plugins.datalabels={display:false};}
 const HKEY='smi_history_v4'; let _memHist=null;   // v4: historie klíčovaná obdobím z dat (ne datem uploadu)
 try{localStorage.removeItem('smi_history_v2');localStorage.removeItem('smi_history_v3');}catch(e){}
-function getHistory(){try{return JSON.parse(localStorage.getItem(HKEY)||'[]');}catch(e){return _memHist||[];}}
-function setHistory(a){try{localStorage.setItem(HKEY,JSON.stringify(a));}catch(e){_memHist=a;}}
+/* Historie je SDÍLENÁ NA SERVERU (data/smi-historie.json). localStorage slouží jen jako
+   offline cache a zdroj jednorázové migrace, když server ještě nic nemá. */
+let HIST_CACHE=null, HIST_SRV=false;
+function getHistory(){ if(HIST_CACHE)return HIST_CACHE; try{return JSON.parse(localStorage.getItem(HKEY)||'[]');}catch(e){return _memHist||[];} }
+function setHistory(a){ HIST_CACHE=a; try{localStorage.setItem(HKEY,JSON.stringify(a));}catch(e){_memHist=a;} }
+async function histSrv(body){ const r=await fetch('/api/nakup-report/historie',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!r.ok)throw new Error('HTTP '+r.status); const d=await r.json(); if(!d||!d.ok)throw new Error(d&&d.error||'chyba'); return d.items||[]; }
+async function histInit(){
+  try{
+    const r=await fetch('/api/nakup-report/historie',{cache:'no-store'});
+    if(!r.ok)return false;                       // nepřihlášen / bez přístupu → zůstane localStorage
+    const d=await r.json(); if(!d||!d.ok)return false;
+    HIST_SRV=true;
+    let srv=d.items||[];
+    let loc=[]; try{loc=JSON.parse(localStorage.getItem(HKEY)||'[]');}catch(e){}
+    if(!srv.length&&loc.length){ try{ srv=await histSrv({items:loc}); if(typeof toast==='function')toast('Historie přenesena z prohlížeče na server ('+srv.length+' snímků)'); }catch(e){} }
+    HIST_CACHE=srv; try{localStorage.setItem(HKEY,JSON.stringify(srv));}catch(e){}
+    try{renderHistory();}catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
 function buildSnapshot(label){
   const dead=ROWS.filter(r=>r.cat==='Mrtvá zásoba');const items={};
   for(const r of ROWS){if(r.ident==null||r.ident==='')continue;
@@ -1623,7 +1641,9 @@ function saveSnapshot(label){let h=getHistory();const snap=buildSnapshot(label);
   const kOf=s=>(s.periodKey||0)||('d:'+s.date);
   h=h.filter(s=>kOf(s)!==kOf(snap));h.push(snap);
   h.sort((a,b)=>((a.periodKey||0)-(b.periodKey||0))||(a.ts-b.ts));
-  if(h.length>60)h=h.slice(-60);setHistory(h);return snap;}
+  if(h.length>60)h=h.slice(-60);setHistory(h);
+  if(HIST_SRV)histSrv({snapshot:snap}).then(items=>{setHistory(items);try{renderHistory();}catch(e){}}).catch(e=>{if(typeof toast==='function')toast('Snímek se neuložil na server: '+e.message);});
+  return snap;}
 let histCharts=[];
 function renderHistory(){
   const h=getHistory();const hc=$('#histCount');if(hc)hc.textContent=h.length+' snímků';
@@ -1643,7 +1663,8 @@ function renderHistory(){
     {label:'Hodnota mrtvých (Kč)',data:h.map(s=>s.deadValue),borderColor:'#e056fd',backgroundColor:'#e056fd',tension:.25},
     {label:'Roční ICC mrtvých (Kč)',data:h.map(s=>s.deadICC),borderColor:'#ff6b6b',backgroundColor:'#ff6b6b',tension:.25}]},options:lineOpt('',showLbl)}));
 }
-function clearHistory(){if(!confirm('Vymazat celou historii snímků?'))return;setHistory([]);renderHistory();}
+function clearHistory(){if(!confirm('Vymazat celou historii snímků?'+(HIST_SRV?' Maže se i na serveru — pro všechny uživatele.':'')))return;setHistory([]);renderHistory();
+  if(HIST_SRV)histSrv({clear:1}).catch(e=>{if(typeof toast==='function')toast('Nepodařilo se vymazat na serveru: '+e.message);});}
 function refreshItemPicker(){const dl=$('#itemList');if(!dl)return;dl.innerHTML=ROWS.filter(r=>r.ident).slice(0,3000).map(r=>`<option value="${esc(r.ident)}">${esc(r.name)}</option>`).join('');}
 let itemChart=null;
 function renderItem(){
@@ -3101,6 +3122,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     SRC_BUFFER=b64ToBuf(EMBEDDED_XLSX_B64);
     await loadWorkbook(SRC_BUFFER,true,true);
   }
+  try{ await histInit(); }catch(e){}   // historie ze serveru (sdílená) + případná migrace z prohlížeče
 });
 </script>
 </body>
