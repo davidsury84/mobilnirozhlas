@@ -2918,7 +2918,9 @@ const server = http.createServer(async (req, res) => {
       const isNakupci = !!(pozadavkyMod && pozadavkyMod.isConfiguredBuyer && pozadavkyMod.isConfiguredBuyer(e.email));
       const isKontejnery = !!(kontejneryMod && kontejneryMod.isHandler && kontejneryMod.isHandler(e.email));
       const isLisy = !!(mobilniLisyMod && mobilniLisyMod.isHandler && mobilniLisyMod.isHandler(e.email));
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, heroImage: (readJson(SITE_F, {}).heroImage) || null });
+      // Nepřečtené aktuality — pro oznámení „je tam něco nového" na přehledu.
+      const aktualityNew = (readJson(AKTUALITY_F, { posts: [] }).posts || []).filter(x => !(x.reads && x.reads[eml])).length;
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, aktualityNew: aktualityNew, heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 
     // ---- Aktuality (novinky na intranetu) ----
@@ -2942,6 +2944,20 @@ const server = http.createServer(async (req, res) => {
       const post = { id: crypto.randomBytes(6).toString('hex'), title, body: (b.body || '').trim(), image, author: e.name || e.email, authorEmail: e.email, ts: Date.now(), likes: {} };
       st.posts.push(post); writeJson(AKTUALITY_F, st);
       logActivity('aktuality', { email: e.email, name: e.name }, 'Přidal aktualitu: ' + title);
+      // OZNÁMENÍ: nová aktualita se e-mailem rozešle všem zaměstnancům (kromě autora), na pozadí.
+      if (emailConfigured()) {
+        const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+        const link = proto + '://' + (req.headers['x-forwarded-host'] || req.headers.host || 'intranet.elkoplast.cz') + '/#modul=dash';
+        const uryvek = (post.body || '').slice(0, 300) + ((post.body || '').length > 300 ? '…' : '');
+        const text = 'Dobrý den,\n\nna intranetu je nová aktualita od ' + (e.name || e.email) + ':\n\n„' + title + '"\n' + (uryvek ? '\n' + uryvek + '\n' : '')
+          + '\nOtevřít intranet: ' + link + '\n\nIntranet ELKOPLAST';
+        const prijemci = (getState().employees || []).map(x => (x.email || '').toLowerCase()).filter(em => em && em !== e.email.toLowerCase());
+        (async () => {
+          let poslano = 0;
+          for (const to of prijemci) { try { await deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST', subject: '🆕 Nová aktualita: ' + title, text, html: toHtml(text, '') }); poslano++; } catch (_) {} }
+          logActivity('aktuality', { email: e.email, name: e.name }, 'Aktualita „' + title + '" oznámena e-mailem ' + poslano + '/' + prijemci.length + ' zaměstnancům');
+        })();
+      }
       return send(res, 200, { ok: true, id: post.id });
     }
     if (p === '/api/aktuality/delete' && req.method === 'POST') {

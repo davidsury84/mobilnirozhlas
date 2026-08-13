@@ -3599,8 +3599,11 @@ function showDashboard(){
     pend.push({ icon:MUJ_IC.book, t:d.title||"Dokument", sub:"Knihovna · verze "+d.v, act:'<button class="btn sm" onclick="openLibDoc(\''+d.id+'\','+d.v+')">Přečíst a potvrdit</button>' });
   });
   if(pop>0){ pend.push({ icon:MUJ_IC.ticket, t:pop+' '+plural(pop,"nová poptávka","nové poptávky","nových poptávek"), sub:"Kalkulátor lisů · fronta k vyřízení", act:'<button class="btn sm" onclick="mjGo(\'poptavky\')">Zobrazit</button>' }); }
+  // Oznámení o nepřečtených aktualitách — „je tam něco nového".
+  const aktN=(MUJ.data&&MUJ.data.aktualityNew)||0;
+  if(aktN>0){ pend.push({ icon:MUJ_IC.book, t:'🆕 '+aktN+' '+plural(aktN,"nová aktualita","nové aktuality","nových aktualit"), sub:"Nástěnka — novinky ve firmě", act:'<button class="btn sm" onclick="aktScroll()">Zobrazit</button>' }); }
   // ----- Levý sloupec hubu: Aktuality + K vyřízení + Rychlý přístup + Provozy -----
-  let mainH = '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>Aktuality</h3>'+
+  let mainH = '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>Aktuality'+(aktN>0?' <span style="background:#e0a400;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;vertical-align:2px">'+aktN+' NOVÉ</span>':'')+'</h3>'+
     (canPostAkt?'<button class="btn sm" type="button" onclick="aktNew()">+ Přidat</button>':'')+
     '</div><div class="webpart-body" id="aktBody"><div class="muted">Načítám aktuality…</div></div></section>';
   mainH += '<div class="dash-sec">K vyřízení</div>';
@@ -3723,7 +3726,7 @@ function aktCard(p){
   const when=new Date(p.ts).toLocaleDateString("cs-CZ",{day:"numeric",month:"long",year:"numeric"});
   return '<article class="akt-card'+(p.read?" is-read":"")+'" data-id="'+p.id+'">'+
     (p.image?'<div class="akt-media" onclick="aktOpen(\''+p.id+'\')"><img src="'+esc(p.image)+'" alt="" loading="lazy"></div>':'')+
-    '<div class="akt-txt"><h4 onclick="aktOpen(\''+p.id+'\')">'+esc(p.title)+(p.read?' <span class="akt-read">✓ Přečteno</span>':'')+'</h4>'+
+    '<div class="akt-txt"><h4 onclick="aktOpen(\''+p.id+'\')">'+esc(p.title)+(p.read?' <span class="akt-read">✓ Přečteno</span>':' <span style="background:#e0a400;color:#fff;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;vertical-align:2px">NOVÉ</span>')+'</h4>'+
     (p.body?'<p>'+esc(p.body).replace(/\n/g,"<br>")+'</p>':'')+
     '<div class="akt-foot"><span class="muted">'+esc(p.author||"")+' · '+when+'</span><span class="akt-actions">'+
       '<button class="like-btn'+(p.liked?" on":"")+'" type="button" onclick="aktLike(\''+p.id+'\',this)" aria-pressed="'+(p.liked?"true":"false")+'">'+
@@ -3732,6 +3735,8 @@ function aktCard(p){
       ((p.mine||MUJ.admin)?'<button class="like-btn del" type="button" title="Smazat" onclick="aktDelete(\''+p.id+'\')"><svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>':'')+
     '</span></div></div></article>';
 }
+// Sroluje na nástěnku s aktualitami (z upozornění „K vyřízení" na přehledu).
+function aktScroll(){ const el=document.getElementById('aktWrap')||document.getElementById('aktBody'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 // Otevře aktualitu v detailu a označí ji za přečtenou (klik zaměstnance).
 async function aktOpen(id){
   const p=(window._aktPosts||[]).find(x=>x.id===id); if(!p) return;
@@ -3747,7 +3752,8 @@ async function aktOpen(id){
   document.body.appendChild(ov);
   if(!p.read){
     try{ await fetch("/api/aktuality/read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
-      p.read=true; const card=document.querySelector('.akt-card[data-id="'+id+'"]');
+      p.read=true; if(MUJ.data&&MUJ.data.aktualityNew>0) MUJ.data.aktualityNew--;
+      const card=document.querySelector('.akt-card[data-id="'+id+'"]');
       if(card){ card.classList.add("is-read"); const h=card.querySelector("h4"); if(h&&!h.querySelector(".akt-read")) h.insertAdjacentHTML("beforeend",' <span class="akt-read">✓ Přečteno</span>'); }
     }catch(e){}
   }
