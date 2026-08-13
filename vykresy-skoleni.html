@@ -1,0 +1,1327 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Čtení technických výkresů — školení podle ČSN a ISO</title>
+<style>
+:root{
+  --green:#5aa532; --green2:#8cc63f; --green-d:#2f7430;
+  --dark:#1b1f23; --muted:#65707a; --line:#e3e7ea; --soft:#f5f8f3; --soft2:#eef6e8;
+  --warn:#fff7e0; --danger:#fff0f0; --ok:#e9f8e6; --norm:#2b6cb0;
+  --shadow:0 10px 30px rgba(20,40,20,.08); --radius:18px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--dark);background:#fff;line-height:1.5}
+button{cursor:pointer;font:inherit}
+.topbar{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,.04)}
+.topbar-inner{display:flex;align-items:center;gap:16px;padding:12px 22px;max-width:1180px;margin:0 auto}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.4px;color:var(--green);font-size:1.15rem;white-space:nowrap}
+.logo-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--green2));display:grid;place-items:center;color:#fff;font-weight:900}
+.top-title{flex:1;min-width:0}
+.top-title h1{margin:0;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-title p{margin:1px 0 0;color:var(--muted);font-size:.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.progress-wrap{width:210px;display:flex;align-items:center;gap:10px}
+.progress-label{font-size:.78rem;color:var(--muted);min-width:58px;text-align:right}
+.progress{height:9px;background:#e8eee4;border-radius:50px;overflow:hidden;flex:1}
+.progress span{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--green2));width:0%;transition:.35s}
+/* ---------- záložky ---------- */
+.tabbar{position:sticky;top:59px;z-index:40;background:#fff;border-bottom:1px solid var(--line)}
+.tabbar-inner{display:flex;gap:6px;padding:8px 22px;max-width:1180px;margin:0 auto;overflow-x:auto}
+.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 15px;font-weight:700;font-size:.88rem;color:#41513e;white-space:nowrap;display:inline-flex;gap:7px;align-items:center}
+.tab .tn{width:20px;height:20px;border-radius:50%;background:var(--soft2);color:var(--green-d);display:grid;place-items:center;font-size:.72rem;font-weight:900}
+.tab:hover{border-color:var(--green)}
+.tab.active{background:var(--green);border-color:var(--green);color:#fff}
+.tab.active .tn{background:rgba(255,255,255,.25);color:#fff}
+.tab.test-tab{border-color:#bcd4ec;color:#245a94;background:#eef4fb}
+.tab.test-tab.active{background:var(--norm);border-color:var(--norm);color:#fff}
+.tabpane{display:none}
+.tabpane.active{display:block;animation:fadein .25s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.nextrow{margin:36px 0 0;display:flex;justify-content:flex-end}
+.wrap{max-width:1180px;margin:0 auto;padding:26px 22px 80px}
+.hero{background:linear-gradient(135deg,#eef4fb,#fff);border:1px solid var(--line);border-radius:26px;padding:26px 28px;box-shadow:var(--shadow);position:relative;overflow:hidden;margin-bottom:26px}
+.hero:after{content:"";position:absolute;right:-80px;bottom:-80px;width:260px;height:260px;border-radius:50%;background:rgba(43,108,176,.10)}
+.hero h2{font-size:1.9rem;margin:0 0 10px;line-height:1.14}
+.hero p{max-width:840px;color:#465249;margin:0 0 16px}
+.hero .claim{font-weight:800;color:var(--norm);font-size:1.02rem}
+.badge-row{display:flex;gap:10px;flex-wrap:wrap}
+.badge{background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 12px;color:#41513e;font-size:.85rem;display:inline-flex;gap:6px;align-items:center}
+.badge strong{color:var(--green)}
+.sec{margin:34px 0 0}
+.sec-h{display:flex;align-items:center;gap:12px;margin:0 0 4px}
+.sec-h .num{min-width:30px;height:30px;padding:0 8px;border-radius:9px;background:var(--soft2);color:var(--green-d);display:grid;place-items:center;font-weight:900;flex:none}
+.sec-h h3{margin:0;font-size:1.3rem}
+.sec-lead{color:var(--muted);margin:2px 0 16px 42px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 22px}
+.grid{display:grid;gap:16px}
+.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:980px){.grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:820px){.grid.two,.grid.three,.grid.four{grid-template-columns:1fr}.progress-wrap{display:none}.tabbar{top:59px}}
+.callout{border-left:5px solid var(--green);background:#f8fff4;border-radius:14px;padding:14px 16px;margin:14px 0}
+.callout.warn{border-left-color:#d99b24;background:var(--warn)}
+.callout.norm{border-left-color:var(--norm);background:#eef4fb}
+.callout b{color:var(--green-d)}
+.callout.norm b{color:var(--norm)}
+.callout.warn b{color:#9a6a0d}
+.pill{display:inline-block;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;margin:2px;font-size:.82rem}
+.pill.green{border-color:#cfe8bf;background:#f3faee;color:#326c22;font-weight:800}
+.pill.norm{border-color:#bcd4ec;background:#eef4fb;color:#245a94;font-weight:800}
+.step{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px dashed #e7ebe6}
+.step:last-child{border-bottom:0}
+.step .n{width:28px;height:28px;border-radius:50%;background:var(--norm);color:#fff;font-weight:900;display:grid;place-items:center;flex:none;font-size:.9rem}
+.step h4{margin:0 0 2px;font-size:1rem}
+.step p{margin:0;color:var(--muted);font-size:.9rem}
+table{border-collapse:collapse;width:100%;font-size:.92rem;margin-top:6px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid #edf0ed;vertical-align:top}
+th{background:#f0f8eb;color:#25451e}
+td.tick{color:var(--green-d);font-weight:800}
+.code-chip{display:inline-block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;background:#f2f6fa;border:1px solid #d8e2ec;border-radius:8px;padding:2px 8px;margin:1px;color:#24547f;font-weight:700}
+.scenario{border:1px solid var(--line);border-radius:16px;background:#fff;padding:4px 16px;box-shadow:var(--shadow);margin:10px 0}
+.scenario summary{font-weight:800;cursor:pointer;padding:10px 0}
+.scenario .answer{margin:0 0 14px;padding:12px;border-radius:12px;background:#f4fbf0;border:1px solid #dcefd2;font-size:.92rem}
+.quiz-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:18px;box-shadow:var(--shadow);margin-bottom:14px}
+.quiz-q{font-weight:800;margin:0 0 4px}
+.quiz-cat{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.quiz-opts{display:grid;gap:8px}
+.quiz-opts button{border:1px solid #d6ded3;background:#fff;text-align:left;border-radius:12px;padding:11px 13px}
+.quiz-opts button:hover{border-color:var(--green)}
+.quiz-opts button.correct{background:#e8f8e3;border-color:#6eb957;font-weight:800}
+.quiz-opts button.wrong{background:#ffecec;border-color:#e08383}
+.quiz-opts button:disabled{cursor:default}
+.feedback{margin-top:10px;padding:10px 12px;border-radius:12px;background:#f6f8fa;color:#35443b;font-size:.9rem;display:none}
+.btn{border:0;background:var(--green);color:#fff;border-radius:999px;padding:12px 20px;font-weight:900}
+.btn:disabled{background:#b9cbb0}
+.btn.ghost{background:#fff;border:1px solid var(--line);color:var(--green-d)}
+.btn.blue{background:var(--norm)}
+.result{display:none;margin-top:16px;border:1px solid var(--line);border-radius:18px;padding:20px 22px;background:#fbfff8;box-shadow:var(--shadow)}
+.score-big{font-size:2.4rem;font-weight:900;color:var(--green);line-height:1}
+.att-info{margin-top:10px;font-weight:800;color:var(--green-d)}
+.muted{color:var(--muted)}
+.schema{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px;overflow-x:auto}
+.schema svg{display:block;min-width:620px;width:100%;height:auto;max-width:820px;margin:0 auto}
+.schema svg.narrow{min-width:320px;max-width:560px}
+.schema .cap-under{text-align:center;color:var(--muted);font-size:.85rem;margin:8px 0 0}
+/* ---------- styly technických výkresů (shodné s testem čtení výkresů) ---------- */
+.ol   {stroke:#0b0b0b; stroke-width:2.2; fill:none; stroke-linejoin:round; stroke-linecap:round}
+.olf  {stroke:#0b0b0b; stroke-width:2.2; fill:#fff; stroke-linejoin:round}
+.thin {stroke:#52514e; stroke-width:1; fill:none}
+.hid  {stroke:#3d4a57; stroke-width:1.5; fill:none; stroke-dasharray:7 4}
+.axis {stroke:#8a94a0; stroke-width:.9; fill:none; stroke-dasharray:15 4 3 4}
+.cut  {stroke:#0b0b0b; stroke-width:1; fill:none; stroke-dasharray:15 4 3 4}
+.dtxt {font:12.5px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+.stxt {font:10px Arial,Helvetica,sans-serif; fill:#52514e}
+.cap  {font:700 10px system-ui,sans-serif; fill:#52514e; letter-spacing:.08em}
+.lbl  {font:700 12px Inter,system-ui,sans-serif; fill:#245a94}
+.tbl-l{font:700 8.5px system-ui,sans-serif; fill:#898781; letter-spacing:.09em}
+.tbl-v{font:700 13.5px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+.tbl-b{font:700 16px Arial,Helvetica,sans-serif; fill:#0b0b0b; letter-spacing:.02em}
+.bomh{font:700 9px system-ui,sans-serif; fill:#52514e; letter-spacing:.06em}
+.bomv{font:11.5px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+.bomv-s{font:9.5px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+.btxt{font:700 13px Arial,Helvetica,sans-serif; fill:#0b0b0b}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-inner">
+  <div class="logo"><div class="logo-mark">E</div> ELKOPLAST</div>
+  <div class="top-title"><h1>Čtení technických výkresů</h1><p>Výkresová dokumentace podle ČSN a ISO — 5 výukových celků, závěrečný test ve vlastní záložce (80 % = splněno)</p></div>
+  <div class="progress-wrap"><div class="progress"><span id="pbar"></span></div><div class="progress-label" id="plabel">0 %</div></div>
+</div></div>
+<div class="tabbar"><div class="tabbar-inner">
+  <button class="tab active" data-tab="t1" onclick="showTab('t1')"><span class="tn">1</span>Základy dokumentace</button>
+  <button class="tab" data-tab="t2" onclick="showTab('t2')"><span class="tn">2</span>Pohledy a řezy</button>
+  <button class="tab" data-tab="t3" onclick="showTab('t3')"><span class="tn">3</span>Kóty, tolerance a povrch</button>
+  <button class="tab" data-tab="t4" onclick="showTab('t4')"><span class="tn">4</span>Svary, plechy a materiály</button>
+  <button class="tab" data-tab="t5" onclick="showTab('t5')"><span class="tn">5</span>Sestavy a praxe</button>
+  <button class="tab test-tab" data-tab="ttest" onclick="showTab('ttest')"><span class="tn">✓</span>Závěrečný test</button>
+</div></div>
+
+<div class="wrap">
+
+<!-- ======================================================= ZÁLOŽKA 1 -->
+<div class="tabpane active" id="t1">
+  <div class="hero">
+    <h2>Výkres je jazyk výroby — nauč se ho číst</h2>
+    <p>Technický výkres je <b>závazný předpis</b>, jak má díl vypadat: tvar, rozměry, tolerance, materiál, svary i povrchová úprava. Všechno na něm má přesně daný význam podle norem <b>ČSN a ISO</b> — díky tomu si konstruktér rozumí se svářečem v dílně i s dodavatelem v zahraničí. Školení je rozdělené do <b>pěti výukových celků</b> (záložky nahoře): od základů dokumentace přes pohledy, řezy, kóty a tolerance až po svary, materiály a čtení sestav. Až projdeš všech pět celků, čeká tě <b>závěrečný test v samostatné záložce</b>. Příklady jsou z naší kontejnerové výroby.</p>
+    <p class="claim">„Vyrábí se podle kót a poznámek — nikdy podle toho, jak výkres vypadá od oka."</p>
+    <div class="badge-row">
+      <span class="badge"><strong>5</strong>&nbsp;výukových celků</span>
+      <span class="badge"><strong>18</strong>&nbsp;lekcí</span>
+      <span class="badge"><strong>ISO-E</strong>&nbsp;evropské promítání</span>
+      <span class="badge"><strong>ČSN EN ISO</strong>&nbsp;normy kreslení</span>
+      <span class="badge"><strong>80 %</strong>&nbsp;hranice testu</span>
+      <span class="badge"><strong>3</strong>&nbsp;pokusy na test</span>
+    </div>
+  </div>
+
+  <!-- 1. Druhy dokumentace -->
+  <div class="sec" id="s1">
+    <div class="sec-h"><div class="num">1</div><h3>Co všechno je „výkresová dokumentace"</h3></div>
+    <p class="sec-lead">Než otevřeš první výkres, musíš vědět, jaký druh dokumentu držíš v ruce — každý slouží jinému kroku výroby.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 8px">Druhy dokumentů, které u nás potkáš</h4>
+        <table>
+          <tr><th>Dokument</th><th>Co obsahuje a k čemu je</th></tr>
+          <tr><td><b>Výrobní výkres dílu</b></td><td>jedna položka (příložka, čep, výpalek): kompletní tvar, kóty, tolerance, materiál. Podle něj se díl vyrábí a kontroluje.</td></tr>
+          <tr><td><b>Výkres svarku (svařence)</b></td><td>svařená skupina dílů: pozice dílů, svarové značky, rozměry po svaření. Případné obrábění po svaření bývá na samostatném výkrese obrobku.</td></tr>
+          <tr><td><b>Výkres sestavy</b></td><td>celý výrobek: pozice, kusovník, hlavní (připojovací) rozměry. Neslouží k výrobě jednotlivých dílů, ale k montáži a kompletaci.</td></tr>
+          <tr><td><b>Kusovník</b></td><td>seznam položek sestavy: pozice, název, počet kusů, polotovar/výkres, materiál. Bývá na výkrese sestavy nebo jako samostatný list.</td></tr>
+          <tr><td><b>Rozvin (výpalek)</b></td><td>plechový díl v rozloženém tvaru před ohnutím — podklad pro pálení/laser (víc v celku 4).</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px">Jak spolu dokumenty souvisí</h4>
+        <div class="step"><div class="n">1</div><div><h4>Sestava kontejneru</h4><p>např. VRATA KONTEJNERU — SESTAVA: pozice ①–⑥ + kusovník.</p></div></div>
+        <div class="step"><div class="n">2</div><div><h4>Podsestavy a svarky</h4><p>kusovník odkazuje na výkres svarku (rám vrat) s vlastními svarovými značkami.</p></div></div>
+        <div class="step"><div class="n">3</div><div><h4>Výrobní výkresy dílů</h4><p>každý vyráběný díl svarku má svůj výkres (nebo rozvin výpalku); nakupované položky mají jen řádek v kusovníku.</p></div></div>
+        <p class="muted" style="margin:10px 0 0;font-size:.88rem">Čteš tedy vždy „shora dolů": sestava → svarek → díl. Číslo výkresu z kusovníku je klíč, kterým se dostaneš o úroveň níž.</p>
+      </div>
+    </div>
+    <div class="callout"><b>Proč to řešit:</b> stejný rozměr může na výkrese svarku platit „po svaření" a na výkrese obrobku „po obrobení". Když nevíš, jaký dokument čteš, kontroluješ špatné hodnoty na špatném kusu.</div>
+  </div>
+
+  <!-- 2. Formáty a měřítka -->
+  <div class="sec" id="s2">
+    <div class="sec-h"><div class="num">2</div><h3>List výkresu: formáty a měřítka</h3></div>
+    <p class="sec-lead">Než začneš číst obsah, zorientuj se na listu — formát, rámeček a hlavně měřítko.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Formáty listů <span class="pill norm">ČSN EN ISO 5457</span></h4>
+        <p style="margin:0 0 8px">Výkresy se kreslí na normalizované formáty řady A. Každý vyšší formát má dvojnásobnou plochu:</p>
+        <table>
+          <tr><th>Formát</th><th>Rozměr (mm)</th><th>Typické použití</th></tr>
+          <tr><td><b>A4</b></td><td>210 × 297</td><td>malé díly, kusovníky, průvodky</td></tr>
+          <tr><td><b>A3</b></td><td>297 × 420</td><td>běžné díly (příložky, výztuhy)</td></tr>
+          <tr><td><b>A2</b></td><td>420 × 594</td><td>větší svařence</td></tr>
+          <tr><td><b>A1</b></td><td>594 × 841</td><td>bočnice, vrata, podsestavy</td></tr>
+          <tr><td><b>A0</b></td><td>841 × 1189</td><td>celé sestavy kontejnerů</td></tr>
+        </table>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">List má rámeček kreslicí plochy a souřadnicovou síť na okraji (A–H / 1–8) pro odkazy „kde na listu". Velké výkresy se skládají na A4 tak, aby <b>popisové pole zůstalo navrchu</b>.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Měřítka <span class="pill norm">ČSN EN ISO 5455</span></h4>
+        <p style="margin:0 0 8px">Měřítko je poměr obrazu ke skutečnosti — <b>první číslo je obraz, druhé skutečnost</b>:</p>
+        <p style="margin:0 0 6px"><span class="pill">1:1</span> skutečná velikost · <span class="pill">1:2, 1:5, 1:10, 1:20, 1:50</span> zmenšení (velké svařence) · <span class="pill">2:1, 5:1, 10:1</span> zvětšení (malé detaily)</p>
+        <p style="margin:0 0 8px">Příklad: při měřítku <b>1:20</b> je skutečnost 20× větší než obraz. Naměříš-li na papíře 15 mm, ve skutečnosti je to <b>300 mm</b>.</p>
+        <p style="margin:0 0 8px">Hlavní měřítko je v razítku; <b>detaily mívají vlastní měřítko</b> napsané u svého nadpisu (např. „DETAIL B · M 2:1").</p>
+        <div class="callout warn" style="margin:10px 0 0"><b>Zlaté pravidlo:</b> po výkrese se <b>neměří pravítkem</b>. Tisk i kopie zkreslují a detaily mají jiné měřítko. Platí vepsané kóty — vždy a bez výjimky.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Popisové pole -->
+  <div class="sec" id="s3">
+    <div class="sec-h"><div class="num">3</div><h3>Popisové pole (razítko) a revize</h3></div>
+    <p class="sec-lead">Pravý dolní roh listu je první místo, kam se díváš. Je tam všechno, co o dokumentu potřebuješ vědět.</p>
+    <div class="schema">
+      <svg viewBox="0 0 640 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Popisové pole výkresu">
+        <rect x="6" y="6" width="628" height="218" class="thin" stroke-width="1.2"/>
+        <rect x="30" y="20" width="580" height="170" fill="#fff" stroke="#0b0b0b" stroke-width="2.2"/>
+        <line x1="300" y1="20" x2="300" y2="190" stroke="#0b0b0b" stroke-width="1.4"/>
+        <line class="thin" x1="30" y1="55" x2="300" y2="55"/>
+        <line class="thin" x1="30" y1="90" x2="300" y2="90"/>
+        <line class="thin" x1="30" y1="125" x2="300" y2="125"/>
+        <line class="thin" x1="165" y1="20" x2="165" y2="55"/>
+        <line class="thin" x1="300" y1="55" x2="610" y2="55"/>
+        <line class="thin" x1="300" y1="90" x2="610" y2="90"/>
+        <line class="thin" x1="300" y1="140" x2="610" y2="140"/>
+        <line class="thin" x1="455" y1="20" x2="455" y2="90"/>
+        <line class="thin" x1="470" y1="140" x2="470" y2="190"/>
+        <line class="thin" x1="540" y1="140" x2="540" y2="190"/>
+        <text class="tbl-l" x="39" y="34">KRESLIL</text><text class="tbl-v" x="39" y="49">J. Novák</text>
+        <text class="tbl-l" x="174" y="34">DATUM</text><text class="tbl-v" x="174" y="49">12.03.2026</text>
+        <text class="tbl-l" x="39" y="69">TOLEROVÁNÍ</text><text class="tbl-v" x="39" y="84">ISO 2768-mK</text>
+        <text class="tbl-l" x="39" y="104">POVRCHOVÁ ÚPRAVA</text><text class="tbl-v" x="39" y="119">Žárový zinek</text>
+        <text class="tbl-l" x="39" y="139">POZNÁMKA</text>
+        <text class="tbl-v" x="39" y="156" style="font-weight:400">Neokótované rádiusy R3</text>
+        <text class="tbl-v" x="39" y="174" style="font-weight:400">Ostré hrany srazit 0,5 × 45°</text>
+        <text class="tbl-l" x="309" y="34">MATERIÁL</text><text class="tbl-v" x="309" y="49">S355J2</text>
+        <text class="tbl-l" x="464" y="34">POLOTOVAR</text><text class="tbl-v" x="464" y="49">P5 – 1500×3000</text>
+        <text class="tbl-l" x="309" y="69">HMOTNOST</text><text class="tbl-v" x="309" y="84">124,5 kg</text>
+        <text class="tbl-l" x="464" y="69">MĚŘÍTKO</text><text class="tbl-v" x="464" y="84">1:20</text>
+        <text class="tbl-l" x="309" y="104">NÁZEV</text><text class="tbl-b" x="309" y="127">BOČNICE KONTEJNERU ABR-9</text>
+        <text class="tbl-l" x="309" y="154">ČÍSLO VÝKRESU</text><text class="tbl-v" x="309" y="173">KV-2026-0451</text>
+        <text class="tbl-l" x="479" y="154">REVIZE</text><text class="tbl-v" x="479" y="173">B</text>
+        <text class="tbl-l" x="549" y="154">LIST</text><text class="tbl-v" x="549" y="173">1 / 1</text>
+        <text class="stxt" x="30" y="210">Ukázka: popisové pole (rohové razítko) v pravém dolním rohu listu — obsah polí dle ČSN EN ISO 7200</text>
+      </svg>
+    </div>
+    <div class="grid three" style="margin-top:16px">
+      <div class="card"><h4 style="margin:0 0 6px;color:var(--green-d)">Identifikace</h4><p class="muted" style="margin:0"><b>Název</b>, <b>číslo výkresu</b> (jednoznačný klíč pro objednávky i archiv), <b>revize</b> a <b>počet listů</b>. Podle čísla výkresu se díl dohledává v systému i v kusovníku sestavy.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px;color:var(--green-d)">Výroba</h4><p class="muted" style="margin:0"><b>Materiál</b> (S355J2), <b>polotovar</b> (P5 – plech tl. 5 mm, formát 1500×3000), <b>hmotnost</b> (volba jeřábu a vázacích prostředků), <b>měřítko</b> a <b>povrchová úprava</b>.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px;color:var(--green-d)">Pravidla pro celý list</h4><p class="muted" style="margin:0"><b>Tolerování</b> (ISO 2768-mK — viz celek 3) a <b>poznámky</b>: „neokótované rádiusy R3", „ostré hrany srazit". Poznámky jsou stejně závazné jako kóty!</p></div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Tabulka změn (revizí)</h4>
+        <p style="margin:0 0 6px">Nad razítkem bývá tabulka změn: <b>index (A, B, C…), popis změny, datum, kdo změnil</b>. Změněná místa v obraze se značí indexem v kroužku nebo trojúhelníčku.</p>
+        <table>
+          <tr><th>Rev.</th><th>Popis změny</th><th>Datum</th></tr>
+          <tr><td><b>A</b></td><td>první vydání</td><td>12.03.2026</td></tr>
+          <tr><td><b>B</b></td><td>rozteč děr 160 → 170; přidán svar a4 u žebra</td><td>02.06.2026</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px;color:#b5361f">Revize je zákon</h4>
+        <p style="margin:0">Před výrobou i kontrolou vždy ověř, že držíš <b>aktuální revizi</b> — proti systému, průvodce zakázky nebo dotazem u mistra. Vyrobit kus „přesně podle výkresu", ale podle staré revize, je jedna z nejdražších chyb v dílně: kus je zmetek, i když sedí každá kóta.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Čáry -->
+  <div class="sec" id="s4">
+    <div class="sec-h"><div class="num">4</div><h3>Druhy čar a jejich význam</h3></div>
+    <p class="sec-lead">Každý typ čáry nese informaci — tloušťka a vzor nejsou estetika.</p>
+    <div class="schema">
+      <svg viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Druhy čar na výkrese">
+        <line x1="40" y1="40" x2="330" y2="40" class="ol"/>
+        <text class="lbl" x="350" y="44">tlustá plná</text>
+        <text class="stxt" x="465" y="44">viditelné hrany a obrysy</text>
+        <line x1="40" y1="80" x2="330" y2="80" class="thin"/>
+        <text class="lbl" x="350" y="84">tenká plná</text>
+        <text class="stxt" x="465" y="84">kótovací a vynášecí čáry, šrafování</text>
+        <line x1="40" y1="120" x2="330" y2="120" class="hid"/>
+        <text class="lbl" x="350" y="124">čárkovaná</text>
+        <text class="stxt" x="465" y="124">skryté (neviditelné) hrany</text>
+        <line x1="40" y1="160" x2="330" y2="160" class="axis"/>
+        <text class="lbl" x="350" y="164">tenká čerchovaná</text>
+        <text class="stxt" x="480" y="164">osy souměrnosti, osy děr</text>
+        <g>
+          <line x1="40" y1="200" x2="330" y2="200" class="cut"/>
+          <line x1="40" y1="200" x2="58" y2="200" stroke="#0b0b0b" stroke-width="3.4"/>
+          <line x1="312" y1="200" x2="330" y2="200" stroke="#0b0b0b" stroke-width="3.4"/>
+        </g>
+        <text class="lbl" x="350" y="204">čerchovaná, tlusté konce</text>
+        <text class="stxt" x="520" y="204">stopa roviny řezu (A-A)</text>
+        <path d="M40 240 H330" stroke="#52514e" stroke-width="1" fill="none" stroke-dasharray="15 4 3 4 3 4"/>
+        <text class="lbl" x="350" y="244">dvojitě čerchovaná</text>
+        <text class="stxt" x="500" y="244">krajní polohy pohyblivých částí, obrysy sousedních dílů</text>
+      </svg>
+      <p class="cap-under">Základní typy čar podle ČSN EN ISO 128-2 (dříve řada ISO 128-20/-24)</p>
+    </div>
+    <div class="grid three" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Dvě tloušťky, poměr 2:1</h4>
+        <p style="margin:0">Tlustá čára pro viditelné obrysy, tenká pro všechno pomocné (kóty, šrafy, osy). Tvar součásti díky tomu „vystoupí" na první pohled.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Priorita překrývajících se čar</h4>
+        <p style="margin:0"><b>Viditelná hrana</b> &gt; <b>skrytá hrana</b> &gt; <b>osa</b>. Osa se nikdy nekreslí přes viditelnou hranu — hrana vyhrává. Osy vždy <b>přesahují obrys</b> o pár milimetrů.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Tenká plná „od ruky"</h4>
+        <p style="margin:0">Vlnitá či klikatá tenká čára ohraničuje <b>místní řez</b> nebo <b>přerušení obrazu</b> dlouhé součásti (viz celek 2).</p>
+      </div>
+    </div>
+    <div class="callout"><b>Praktický tip do dílny:</b> čárkovaná čára říká „tady něco je, ale z tohoto směru to nevidíš" — typicky díra nebo osazení uvnitř materiálu. Když skrytou hranu přehlédneš, vyrobíš plný kus tam, kde měla být kapsa.</div>
+    <div class="nextrow"><button class="btn" onclick="showTab('t2')">Pokračovat: Pohledy a řezy →</button></div>
+  </div>
+</div>
+
+<!-- ======================================================= ZÁLOŽKA 2 -->
+<div class="tabpane" id="t2">
+  <!-- 5. Promítání -->
+  <div class="sec" id="s5">
+    <div class="sec-h"><div class="num">5</div><h3>Promítání a rozmístění pohledů</h3></div>
+    <p class="sec-lead">Trojrozměrné těleso se na papír „rozkládá" do pravoúhlých pohledů. V Evropě podle metody prvního kvadrantu.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Evropské promítání ISO-E <span class="pill norm">ČSN EN ISO 5456-2</span></h4>
+        <p style="margin:0 0 8px">Metoda <b>1. kvadrantu (metoda E)</b> — předmět leží <b>mezi pozorovatelem a průmětnou</b>. Z toho plyne rozmístění pohledů okolo nárysu:</p>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>nárys</b> (pohled zepředu) — hlavní pohled, nejvíc informací,</li>
+          <li><b>půdorys</b> (pohled shora) — kreslí se <b>POD nárys</b>,</li>
+          <li><b>pohled zleva</b> — kreslí se <b>VPRAVO</b> od nárysu,</li>
+          <li>pohled zprava — vlevo, pohled zdola — nahoře.</li>
+        </ul>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Zní to obráceně, ale logika promítání „skrz předmět" to tak vyžaduje. Americká metoda <b>ISO-A (3. kvadrant)</b> má pohledy zrcadlově — pozor na výkresy ze zámoří.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px">Značka metody promítání</h4>
+        <svg viewBox="0 0 320 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Značka evropského promítání" style="display:block;max-width:320px;margin:0 auto">
+          <path class="olf" d="M40 35 L100 25 V95 L40 85 Z"/>
+          <line class="axis" x1="30" y1="60" x2="110" y2="60"/>
+          <g transform="translate(150,0)">
+            <circle class="ol" cx="55" cy="60" r="30"/>
+            <circle class="ol" cx="55" cy="60" r="14"/>
+            <line class="axis" x1="15" y1="60" x2="95" y2="60"/>
+          </g>
+          <text class="stxt" x="160" y="112" text-anchor="middle">značka ISO-E v popisovém poli: komolý kužel + jeho pohled zleva</text>
+        </svg>
+        <p class="muted" style="margin:10px 0 0;font-size:.88rem">Metoda promítání bývá vyznačená značkou v popisovém poli. Když značka chybí, u nás se předpokládá ISO-E.</p>
+      </div>
+    </div>
+    <div class="schema" style="margin-top:16px">
+      <svg viewBox="0 0 660 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tři pohledy na součást">
+        <rect x="6" y="6" width="648" height="418" class="thin" stroke-width="1.2"/>
+        <path class="olf" d="M70 60 H158 V104 H246 V148 H70 Z"/>
+        <line class="hid" x1="96.4" y1="60" x2="96.4" y2="148"/>
+        <line class="hid" x1="131.6" y1="60" x2="131.6" y2="148"/>
+        <line class="axis" x1="114" y1="54" x2="114" y2="154"/>
+        <text class="cap" x="158" y="172" text-anchor="middle">NÁRYS</text>
+        <rect class="olf" x="326" y="60" width="110" height="88"/>
+        <line class="hid" x1="326" y1="104" x2="436" y2="104"/>
+        <line class="hid" x1="363.4" y1="60" x2="363.4" y2="148"/>
+        <line class="hid" x1="398.6" y1="60" x2="398.6" y2="148"/>
+        <line class="axis" x1="381" y1="54" x2="381" y2="154"/>
+        <text class="cap" x="381" y="172" text-anchor="middle">POHLED ZLEVA (vpravo od nárysu)</text>
+        <rect class="olf" x="70" y="210" width="176" height="110"/>
+        <line class="ol" x1="158" y1="210" x2="158" y2="320"/>
+        <circle class="ol" cx="114" cy="265" r="17.6"/>
+        <line class="axis" x1="88" y1="265" x2="140" y2="265"/>
+        <line class="axis" x1="114" y1="239" x2="114" y2="291"/>
+        <text class="cap" x="158" y="344" text-anchor="middle">PŮDORYS (pod nárysem)</text>
+        <g transform="translate(430,212) scale(0.92)">
+          <polygon points="123.9,165 188.9,127.5 188.9,97.5 123.9,135" fill="#bfcad5" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+          <polygon points="20,105 123.9,165 123.9,135 72,105 72,75 20,45" fill="#d9e1e8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+          <polygon points="72,75 72,105 136.9,67.5 136.9,37.5" fill="#bfcad5" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+          <polygon points="72,105 123.9,135 188.9,97.5 136.9,67.5" fill="#f2f5f8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+          <polygon points="20,45 72,75 136.9,37.5 85,7.5" fill="#f2f5f8" stroke="#0b0b0b" stroke-width="1.6" stroke-linejoin="round"/>
+          <ellipse cx="78.5" cy="41.25" rx="14.7" ry="8.49" fill="#9fadbb" stroke="#0b0b0b" stroke-width="1.6"/>
+          <text x="104" y="188" text-anchor="middle" class="stxt">prostorový pohled (jen pro názornost)</text>
+        </g>
+      </svg>
+      <p class="cap-under">Součást PODSTAVEC ve třech pohledech: díra je v půdorysu vidět jako kružnice, v ostatních pohledech jen čárkovaně jako skrytá hrana</p>
+    </div>
+    <div class="callout"><b>Jak se zorientovat:</b> najdi nárys (největší pohled s nejvíce informacemi) a od něj čti ostatní. Kolik pohledů výkres má? Přesně tolik, kolik je potřeba — jednoduchá deska si vystačí s jedním pohledem a tloušťkou v poznámce (t5), složitý svařenec potřebuje tři i víc.</div>
+  </div>
+
+  <!-- 6. Zvláštní pohledy -->
+  <div class="sec" id="s6">
+    <div class="sec-h"><div class="num">6</div><h3>Zvláštní pohledy: detaily, přerušení, symetrie</h3></div>
+    <p class="sec-lead">Ne všechno se vejde do tří pravoúhlých pohledů — norma má nástroje, jak výkres zjednodušit a přitom nic neztratit.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 8px">Detail ve zvětšeném měřítku</h4>
+        <svg viewBox="0 0 560 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Detail B" style="display:block;width:100%;max-width:520px;margin:0 auto">
+          <rect class="olf" x="20" y="60" width="240" height="70"/>
+          <path class="ol" d="M260 60 L260 95 L240 130"/>
+          <circle class="thin" cx="252" cy="70" r="22"/>
+          <line class="thin" x1="268" y1="54" x2="300" y2="36"/>
+          <text class="dtxt" x="306" y="34">B</text>
+          <g transform="translate(360,20)">
+            <path class="ol" d="M20 40 L110 40 L110 75 L88 118"/>
+            <line class="thin" x1="20" y1="40" x2="20" y2="130"/>
+            <text class="dtxt" x="10" y="20">DETAIL B</text>
+            <text class="stxt" x="10" y="34">M 2:1</text>
+            <path class="thin" d="M104 52 L146 42" marker-end="none"/>
+            <text class="dtxt" x="126" y="36">2×45°</text>
+          </g>
+          <text class="stxt" x="140" y="170" text-anchor="middle">místo detailu se v pohledu zakroužkuje tenkou čarou a označí písmenem</text>
+        </svg>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Detail má vlastní nadpis a <b>vlastní měřítko</b> — proto se po výkrese nikdy neměří pravítkem.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px">Přerušení dlouhé součásti</h4>
+        <svg viewBox="0 0 560 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Přerušení obrazu" style="display:block;width:100%;max-width:520px;margin:0 auto">
+          <defs><marker id="brk" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse"><path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#52514e"/></marker></defs>
+          <path class="ol" d="M30 40 H220"/><path class="ol" d="M30 80 H220"/>
+          <path class="thin" d="M220 34 q6 12 -3 26 q-6 12 3 26"/>
+          <path class="ol" d="M330 40 H520"/><path class="ol" d="M330 80 H520"/>
+          <path class="thin" d="M330 34 q6 12 -3 26 q-6 12 3 26"/>
+          <line class="axis" x1="20" y1="60" x2="530" y2="60"/>
+          <line class="thin" x1="30" y1="96" x2="30" y2="112"/>
+          <line class="thin" x1="520" y1="96" x2="520" y2="112"/>
+          <line class="thin" x1="30" y1="106" x2="520" y2="106" marker-start="url(#brk)" marker-end="url(#brk)"/>
+          <text class="dtxt" x="275" y="100" text-anchor="middle">6 000</text>
+        </svg>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Dlouhý profil (JÄKL, trubka) se uprostřed „vystřihne" a kreslí zkráceně — <b>kóta ale platí pro celou délku</b> (tady 6 000 mm). Hranice přerušení tenkou vlnitou čarou.</p>
+      </div>
+    </div>
+    <div class="grid three" style="margin-top:16px">
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Místní pohled</h4><p class="muted" style="margin:0;font-size:.88rem">Když je potřeba jen kousek dalšího pohledu (např. tvar jednoho výřezu), kreslí se pouze tento výsek se šipkou a písmenem místo celého pohledu.</p></div>
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Symetrické díly</h4><p class="muted" style="margin:0;font-size:.88rem">Souměrný díl lze kreslit jen do poloviny (po osu) — osa se označí dvěma krátkými rovnoběžnými čárkami na koncích. Rozměry platí pro celek.</p></div>
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Pohled šipkou</h4><p class="muted" style="margin:0;font-size:.88rem">Pohled z libovolného směru: šipka s písmenem v hlavním obraze + samostatný obraz „POHLED A" (klidně pootočený — pak se doplní značka otočení).</p></div>
+    </div>
+  </div>
+
+  <!-- 7. Řezy -->
+  <div class="sec" id="s7">
+    <div class="sec-h"><div class="num">7</div><h3>Řezy a průřezy</h3></div>
+    <p class="sec-lead">Vnitřek součásti se místo hromady čárkovaných čar ukáže řezem — myšleným rozříznutím.</p>
+    <div class="schema">
+      <svg viewBox="0 0 660 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pohled a řez A-A pouzdra">
+        <defs>
+          <marker id="ra" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse">
+            <path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#0b0b0b"/>
+          </marker>
+          <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="6" stroke="#52514e" stroke-width="0.9"/>
+          </pattern>
+        </defs>
+        <rect x="6" y="6" width="648" height="318" class="thin" stroke-width="1.2"/>
+        <circle class="ol" cx="170" cy="160" r="44"/>
+        <circle class="ol" cx="170" cy="160" r="27.5"/>
+        <line class="axis" x1="170" y1="104" x2="170" y2="216"/>
+        <line class="axis" x1="100" y1="160" x2="240" y2="160"/>
+        <line x1="100" y1="160" x2="116" y2="160" stroke="#0b0b0b" stroke-width="3.2"/>
+        <line x1="224" y1="160" x2="240" y2="160" stroke="#0b0b0b" stroke-width="3.2"/>
+        <line class="thin" x1="108" y1="160" x2="108" y2="136" marker-end="url(#ra)" stroke-width="1.3"/>
+        <line class="thin" x1="232" y1="160" x2="232" y2="136" marker-end="url(#ra)" stroke-width="1.3"/>
+        <text x="108" y="126" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#0b0b0b">A</text>
+        <text x="232" y="126" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" fill="#0b0b0b">A</text>
+        <text class="cap" x="170" y="242" text-anchor="middle">POHLED SHORA SE STOPOU ŘEZU</text>
+        <g transform="translate(420,80)">
+          <rect class="olf" x="0" y="0" width="150" height="160"/>
+          <rect x="0" y="0" width="28" height="160" fill="url(#hatch)" stroke="none"/>
+          <rect x="122" y="0" width="28" height="160" fill="url(#hatch)" stroke="none"/>
+          <line class="ol" x1="28" y1="0" x2="28" y2="160"/>
+          <line class="ol" x1="122" y1="0" x2="122" y2="160"/>
+          <line class="axis" x1="75" y1="-10" x2="75" y2="170"/>
+          <text class="cap" x="75" y="186" text-anchor="middle">ŘEZ A-A</text>
+        </g>
+        <text class="stxt" x="330" y="308" text-anchor="middle">Šipky u stopy řezu ukazují SMĚR POHLEDU; šrafuje se jen protnutý materiál (stěny), díra zůstává prázdná</text>
+      </svg>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Pravidla šrafování <span class="pill norm">ČSN EN ISO 128-50</span></h4>
+        <ul style="margin:0;padding-left:18px">
+          <li>Šrafuje se <b>jen materiál, který rovina řezu skutečně protíná</b> — tenkou plnou čarou pod 45°.</li>
+          <li><b>Stejná součást = stejný sklon i rozteč šraf</b> na všech řezech; sousední díly v sestavě mají šrafy různě, aby se rozlišily.</li>
+          <li>Hrany za rovinou řezu, které jsou vidět, se kreslí plnou čarou.</li>
+          <li>Velmi tenké průřezy (plechy v sestavě) se místo šrafování <b>začerní</b>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Co se podélně neřeže</h4>
+        <p style="margin:0 0 6px">Plné rotační a normalizované prvky se v podélném řezu <b>nešrafují</b> — kreslí se v pohledu, i když jimi rovina řezu prochází:</p>
+        <p style="margin:0"><span class="pill">hřídele a čepy</span> <span class="pill">šrouby a matice</span> <span class="pill">podložky, kolíky, nýty</span> <span class="pill">žebra a výztuhy</span> <span class="pill">ramena kol</span></p>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Důvod: rozříznuté by ztratily názornost a šrafy by lhaly o plném průřezu.</p>
+      </div>
+    </div>
+    <div class="grid four" style="margin-top:16px">
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Úplný řez</h4><p class="muted" style="margin:0;font-size:.86rem">Rovina projde celou součástí — nejběžnější případ (řez A-A výše).</p></div>
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Poloviční řez</h4><p class="muted" style="margin:0;font-size:.86rem">U souměrných dílů: polovina pohled, polovina řez — dvě informace v jednom obraze.</p></div>
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Místní (částečný) řez</h4><p class="muted" style="margin:0;font-size:.86rem">„Odtrhne" se jen kousek materiálu (ohraničený tenkou od ruky) — třeba nad jednou dírou.</p></div>
+      <div class="card"><h4 style="margin:0 0 4px;font-size:.98rem">Lomený řez</h4><p class="muted" style="margin:0;font-size:.86rem">Rovina se láme, aby prošla více prvky (díry na roztečné kružnici); v obraze se narovná do jedné roviny.</p></div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Průřez — profil „otočený" do obrazu</h4>
+        <p style="margin:0"><b>Průřez</b> ukazuje jen samotný protnutý obrys, nic za ním. Typicky profil žebra, tyče nebo lemu: kreslí se otočený přímo v obraze (tenkou čarou) nebo vysunutý vedle. U našich výztuh U-profilů je to nejrychlejší způsob, jak ukázat tvar bez dalšího pohledu.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Rozdíl řez × průřez</h4>
+        <p style="margin:0"><b>Řez</b> = protnutý materiál <b>+ vše viditelné za rovinou</b>. <b>Průřez</b> = jen protnutý materiál. Poznáš to i podle obsahu obrazu: v řezu pouzdra vidíš i hranu díry za rovinou, v průřezu jen dvě šrafované stěny. <span class="pill norm">řada ČSN EN ISO 128 (dříve -40/-44)</span></p>
+      </div>
+    </div>
+    <div class="nextrow"><button class="btn" onclick="showTab('t3')">Pokračovat: Kóty, tolerance a povrch →</button></div>
+  </div>
+</div>
+
+<!-- ======================================================= ZÁLOŽKA 3 -->
+<div class="tabpane" id="t3">
+  <!-- 8. Kótování -->
+  <div class="sec" id="s8">
+    <div class="sec-h"><div class="num">8</div><h3>Kótování</h3></div>
+    <p class="sec-lead">Kóty jsou jediný závazný zdroj rozměrů. Nauč se jejich anatomii a značky.</p>
+    <div class="schema">
+      <svg viewBox="0 0 620 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kótovaný výkres desky">
+        <defs>
+          <marker id="pa" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse">
+            <path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#52514e"/>
+          </marker>
+        </defs>
+        <rect x="6" y="6" width="608" height="348" class="thin" stroke-width="1.2"/>
+        <rect class="olf" x="130" y="80" width="300" height="150" rx="15"/>
+        <g>
+          <circle class="ol" cx="160" cy="110" r="6.75"/><line class="axis" x1="147" y1="110" x2="173" y2="110"/><line class="axis" x1="160" y1="97" x2="160" y2="123"/>
+          <circle class="ol" cx="400" cy="110" r="6.75"/><line class="axis" x1="387" y1="110" x2="413" y2="110"/><line class="axis" x1="400" y1="97" x2="400" y2="123"/>
+          <circle class="ol" cx="160" cy="200" r="6.75"/><line class="axis" x1="147" y1="200" x2="173" y2="200"/><line class="axis" x1="160" y1="187" x2="160" y2="213"/>
+          <circle class="ol" cx="400" cy="200" r="6.75"/><line class="axis" x1="387" y1="200" x2="413" y2="200"/><line class="axis" x1="400" y1="187" x2="400" y2="213"/>
+        </g>
+        <line class="thin" x1="130" y1="76" x2="130" y2="44"/>
+        <line class="thin" x1="160" y1="98" x2="160" y2="44"/>
+        <line class="thin" x1="400" y1="98" x2="400" y2="44"/>
+        <line class="thin" x1="130" y1="50" x2="160" y2="50" marker-start="url(#pa)" marker-end="url(#pa)"/>
+        <text class="dtxt" x="145" y="42" text-anchor="middle">20</text>
+        <line class="thin" x1="160" y1="50" x2="400" y2="50" marker-start="url(#pa)" marker-end="url(#pa)"/>
+        <text class="dtxt" x="280" y="42" text-anchor="middle">160</text>
+        <line class="thin" x1="130" y1="234" x2="130" y2="308"/>
+        <line class="thin" x1="430" y1="234" x2="430" y2="308"/>
+        <line class="thin" x1="130" y1="300" x2="430" y2="300" marker-start="url(#pa)" marker-end="url(#pa)"/>
+        <text class="dtxt" x="280" y="292" text-anchor="middle">200</text>
+        <line class="thin" x1="434" y1="80" x2="478" y2="80"/>
+        <line class="thin" x1="434" y1="230" x2="478" y2="230"/>
+        <line class="thin" x1="470" y1="80" x2="470" y2="230" marker-start="url(#pa)" marker-end="url(#pa)"/>
+        <text class="dtxt" x="462" y="155" text-anchor="middle" transform="rotate(-90 462 155)">100</text>
+        <line class="thin" x1="126" y1="230" x2="82" y2="230"/>
+        <line class="thin" x1="152" y1="200" x2="82" y2="200"/>
+        <line class="thin" x1="152" y1="110" x2="82" y2="110"/>
+        <line class="thin" x1="90" y1="230" x2="90" y2="200" marker-start="url(#pa)" marker-end="url(#pa)"/>
+        <text class="dtxt" x="81" y="215" text-anchor="middle" transform="rotate(-90 81 215)">20</text>
+        <line class="thin" x1="90" y1="200" x2="90" y2="110" marker-start="url(#pa)" marker-end="url(#pa)"/>
+        <text class="dtxt" x="81" y="155" text-anchor="middle" transform="rotate(-90 81 155)">60</text>
+        <path class="thin" d="M452 64 H442 L404.5 105" marker-end="url(#pa)"/>
+        <text class="dtxt" x="456" y="68" text-anchor="start">4× Ø9</text>
+        <path class="thin" d="M62 50 H76 L134.4 84.4" marker-end="url(#pa)"/>
+        <text class="dtxt" x="58" y="54" text-anchor="end">R10</text>
+        <rect x="438" y="322" width="176" height="24" class="thin"/>
+        <text x="526" y="338" text-anchor="middle" class="cap">PŘÍLOŽKA ZÁVĚSU · P5</text>
+      </svg>
+      <p class="cap-under">Deska 200 × 100: celkové rozměry, rozteče děr 160 a 60, odsazení 20, zápis 4× Ø9 a rádius R10</p>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Anatomie a zásady <span class="pill norm">ČSN EN ISO 129-1</span></h4>
+        <ul style="margin:0;padding-left:18px">
+          <li>Kóta = <b>kótovací čára se šipkami</b> + <b>vynášecí čáry</b> + <b>hodnota</b>. Vše tenkou čarou.</li>
+          <li>Rozměry ve strojírenství v <b>milimetrech — jednotka se nepíše</b>. Úhly ve stupních (45°).</li>
+          <li>Každý rozměr se kótuje <b>jen jednou</b>, na pohledu, kde je prvek nejzřetelnější.</li>
+          <li>Kóty se čtou zdola a zprava; hodnota se nesmí protínat s čarami.</li>
+          <li>Pomocná (informativní) kóta v závorce, např. (200) — nekontroluje se, jen informuje.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Značky před hodnotou</h4>
+        <table>
+          <tr><th>Zápis</th><th>Význam</th></tr>
+          <tr><td><b>Ø20</b></td><td>průměr 20 mm</td></tr>
+          <tr><td><b>R10</b></td><td>poloměr (rádius) 10 mm</td></tr>
+          <tr><td><b>4× Ø9</b></td><td>4 stejné díry o průměru 9 mm (kótuje se jen jedna)</td></tr>
+          <tr><td><b>□30</b></td><td>čtvercový průřez 30 × 30</td></tr>
+          <tr><td><b>SR50</b></td><td>poloměr kulové plochy</td></tr>
+          <tr><td><b>2×45°</b> (C2)</td><td>sražení hrany 2 mm pod 45°</td></tr>
+          <tr><td><b>t5</b></td><td>tloušťka plechu 5 mm (deska kreslená jedním pohledem)</td></tr>
+          <tr><td><b>M16</b></td><td>metrický závit, jmenovitý průměr 16 mm</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="callout warn"><b>Řetězec vs. základna:</b> kóty řazené za sebou (řetězcové) sčítají výrobní úchylky článek po článku. Funkčně důležité rozměry se proto kótují <b>od společné základny</b>. Když kóty „nesedí" součtem, rozhoduje vždy předepsaná kóta, ne dopočet — a nejasnost hlásíš konstrukci.</div>
+  </div>
+
+  <!-- 9. Díry a zahloubení -->
+  <div class="sec" id="s9">
+    <div class="sec-h"><div class="num">9</div><h3>Kótování děr a zahloubení</h3></div>
+    <p class="sec-lead">Díra není jen průměr — výkres říká i hloubku, zahloubení a rozmístění.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 8px">Průchozí, slepá, zahloubená</h4>
+        <svg viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Druhy děr v řezu" style="display:block;width:100%;max-width:540px;margin:0 auto">
+          <defs><pattern id="h2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#52514e" stroke-width="0.9"/></pattern></defs>
+          <g transform="translate(20,30)">
+            <rect x="0" y="0" width="140" height="100" fill="url(#h2)" stroke="#0b0b0b" stroke-width="2"/>
+            <rect x="55" y="0" width="30" height="100" fill="#fff" stroke="#0b0b0b" stroke-width="2"/>
+            <line class="axis" x1="70" y1="-10" x2="70" y2="110"/>
+            <text class="stxt" x="70" y="128" text-anchor="middle">průchozí díra Ø14</text>
+          </g>
+          <g transform="translate(210,30)">
+            <rect x="0" y="0" width="140" height="100" fill="url(#h2)" stroke="#0b0b0b" stroke-width="2"/>
+            <path d="M55 0 H85 V62 L70 74 L55 62 Z" fill="#fff" stroke="#0b0b0b" stroke-width="2"/>
+            <line class="axis" x1="70" y1="-10" x2="70" y2="88"/>
+            <text class="stxt" x="70" y="128" text-anchor="middle">slepá díra — hloubka ⌵ se kótuje</text>
+          </g>
+          <g transform="translate(400,30)">
+            <rect x="0" y="0" width="140" height="100" fill="url(#h2)" stroke="#0b0b0b" stroke-width="2"/>
+            <rect x="55" y="0" width="30" height="100" fill="#fff" stroke="#0b0b0b" stroke-width="2"/>
+            <rect x="43" y="0" width="54" height="26" fill="#fff" stroke="#0b0b0b" stroke-width="2"/>
+            <line class="axis" x1="70" y1="-10" x2="70" y2="110"/>
+            <text class="stxt" x="70" y="128" text-anchor="middle">válcové zahloubení pro hlavu šroubu</text>
+          </g>
+        </svg>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px">Zápisy u děr</h4>
+        <table>
+          <tr><th>Zápis</th><th>Význam</th></tr>
+          <tr><td><b>Ø14</b></td><td>průchozí díra (nic dalšího se nekótuje)</td></tr>
+          <tr><td><b>Ø14, hloubka 20</b> (⌵ 20)</td><td>slepá díra hluboká 20 mm; vrták nechá kuželové dno</td></tr>
+          <tr><td><b>Ø14 / zahl. Ø24×5</b></td><td>válcové zahloubení Ø24 do hloubky 5 (zapuštění hlavy šroubu)</td></tr>
+          <tr><td><b>Ø14 / kuž. 90°</b></td><td>kuželové zahloubení pro zápustnou hlavu</td></tr>
+          <tr><td><b>M12, závit 18 / díra 22</b></td><td>slepá závitová díra: hloubka závitu 18, díry 22 (díra je vždy hlubší)</td></tr>
+        </table>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Novější výkresy používají grafické značky zahloubení; starší to píší slovně. Význam je stejný — hlava šroubu se musí schovat.</p>
+      </div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Roztečná kružnice</h4>
+        <p style="margin:0">Díry po obvodu příruby se kótují <b>roztečnou kružnicí</b> (tenká čerchovaná) a zápisem, např. <b>8× Ø14 na roztečné kružnici Ø220</b>, rovnoměrně (à 45°). Nekótuje se každá díra zvlášť.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Tabulka děr (souřadnicové kótování)</h4>
+        <p style="margin:0">U výpalků s mnoha otvory (CNC pálení, laser) bývá místo hromady kót <b>tabulka děr</b>: každá díra má označení (A1, A2…), souřadnice X/Y od základny a průměr. Čteš tedy tabulku, ne obraz — a základnu (roh, ze kterého se měří) najdeš vyznačenou v pohledu.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. Tolerance -->
+  <div class="sec" id="s10">
+    <div class="sec-h"><div class="num">10</div><h3>Tolerance rozměrů</h3></div>
+    <p class="sec-lead">Nic nejde vyrobit „přesně". Tolerance říkají, jaká nepřesnost je ještě v pořádku.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Mezní úchylky <span class="pill norm">ČSN EN ISO 129-1</span></h4>
+        <p style="margin:0 0 8px">Zápis <b>120 ±0,2</b> povoluje rozměry <b>119,8 až 120,2 mm</b>. Zápis <b>40 <span style="font-size:.8em;vertical-align:super">+0,1</span><span style="font-size:.8em;vertical-align:sub">0</span></b> povoluje 40,0 až 40,1 mm (úchylky nemusí být souměrné).</p>
+        <div class="callout warn" style="margin:0"><b>Kontrola měřením:</b> naměřených 120,25 mm proti kótě 120 ±0,2 <b>nevyhovuje</b> — je 0,05 mm nad horní mezí. Naměřené hodnoty se kvůli toleranci <b>nikdy nezaokrouhlují</b>.</div>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Toleranční značky a uložení <span class="pill norm">ČSN EN ISO 286-1</span></h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>VELKÁ písmena = díra</b> (Ø30 H7), <b>malá = hřídel</b> (Ø30 g6). Číslo = stupeň přesnosti (menší číslo — přesnější).</li>
+          <li>Dvojice díra/hřídel tvoří <b>uložení</b>: s vůlí (H7/g6 — čep se otáčí), přechodné (H7/k6), s přesahem (H7/p6 — nalisováno).</li>
+          <li>Mezní hodnoty se hledají v tabulkách — v dílně je nepočítáš zpaměti, ale musíš vědět, že <b>H7 je předpis přesnosti, ne „nějaké písmeno"</b>.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h4 style="margin:0 0 6px">Všeobecné tolerance — co platí pro nekótované úchylky <span class="pill norm">ČSN ISO 2768-1, -2</span></h4>
+      <p style="margin:0 0 8px">V razítku bývá zápis <b>ISO 2768-mK</b>: všechny rozměry <b>bez přímo zapsané tolerance</b> se řídí všeobecnými tolerancemi — <b>m</b> = střední třída přesnosti délkových a úhlových rozměrů, <b>K</b> = třída geometrických tolerancí. Příklad tříd délkových rozměrů (třída m):</p>
+      <div style="overflow-x:auto">
+      <table>
+        <tr><th>Jmenovitý rozměr (mm)</th><td>0,5–3</td><td>3–6</td><td>6–30</td><td>30–120</td><td>120–400</td><td>400–1000</td><td>1000–2000</td><td>2000–4000</td></tr>
+        <tr><th>Mezní úchylka (třída m)</th><td>±0,1</td><td>±0,1</td><td>±0,2</td><td>±0,3</td><td>±0,5</td><td>±0,8</td><td>±1,2</td><td>±2</td></tr>
+      </table>
+      </div>
+      <p class="muted" style="margin:8px 0 0;font-size:.88rem">Netolerovaná kóta 200 mm tedy smí mít úchylku ±0,5 mm; bočnice 2 400 mm dokonce ±2 mm. Mlčení výkresu neznamená libovůli, ale ISO 2768.</p>
+    </div>
+  </div>
+
+  <!-- 11. GPS -->
+  <div class="sec" id="s11">
+    <div class="sec-h"><div class="num">11</div><h3>Geometrické tolerance (GPS)</h3></div>
+    <p class="sec-lead">Rozměrová tolerance nestačí — deska může mít správnou tloušťku, a přesto být zkroucená. Na tvar a polohu jsou geometrické tolerance.</p>
+    <div class="schema">
+      <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rámeček geometrické tolerance">
+        <defs><marker id="ga" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse"><path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#52514e"/></marker></defs>
+        <rect x="6" y="6" width="708" height="238" class="thin" stroke-width="1.2"/>
+        <rect class="olf" x="60" y="150" width="300" height="50"/>
+        <rect class="olf" x="150" y="60" width="26" height="90"/>
+        <g>
+          <rect x="230" y="70" width="40" height="30" fill="#fff" stroke="#0b0b0b" stroke-width="1.6"/>
+          <rect x="270" y="70" width="52" height="30" fill="#fff" stroke="#0b0b0b" stroke-width="1.6"/>
+          <rect x="322" y="70" width="34" height="30" fill="#fff" stroke="#0b0b0b" stroke-width="1.6"/>
+          <path d="M242 92 L258 92 M250 92 L250 76" stroke="#0b0b0b" stroke-width="2.2" fill="none"/>
+          <text class="dtxt" x="296" y="90" text-anchor="middle">0,2</text>
+          <text class="dtxt" x="339" y="90" text-anchor="middle">A</text>
+          <line class="thin" x1="230" y1="85" x2="180" y2="85" marker-end="url(#ga)"/>
+        </g>
+        <g>
+          <rect x="196" y="206" width="28" height="24" fill="#fff" stroke="#0b0b0b" stroke-width="1.6"/>
+          <text class="dtxt" x="210" y="223" text-anchor="middle">A</text>
+          <path d="M210 206 L210 200 L204 194 L216 194 Z" fill="#0b0b0b"/>
+        </g>
+        <text class="stxt" x="210" y="243" text-anchor="middle">základna A = spodní plocha desky</text>
+        <text class="lbl" x="420" y="78">rámeček: značka | hodnota | základna</text>
+        <text class="stxt" x="420" y="96">tady: KOLMOST žebra 0,2 mm vůči základně A</text>
+        <text class="stxt" x="420" y="112">= skutečná plocha žebra se musí vejít mezi dvě</text>
+        <text class="stxt" x="420" y="126">rovnoběžné roviny 0,2 mm od sebe, kolmé k A</text>
+        <text class="cap" x="420" y="160">NEJČASTĚJŠÍ ZNAČKY</text>
+        <text class="stxt" x="420" y="180">— přímost · ▱ rovinnost · ○ kruhovitost</text>
+        <text class="stxt" x="420" y="196">⟂ kolmost · ∥ rovnoběžnost · ∠ sklon</text>
+        <text class="stxt" x="420" y="212">⌖ poloha · ◎ souosost · ↗ házení (obvodové)</text>
+      </svg>
+      <p class="cap-under">Geometrické tolerance dle ČSN EN ISO 1101; základny dle ČSN EN ISO 5459</p>
+    </div>
+    <div class="grid three" style="margin-top:16px">
+      <div class="card"><h4 style="margin:0 0 6px">Tvar</h4><p class="muted" style="margin:0"><b>Rovinnost</b> (deska se nesmí kroutit víc než …), <b>přímost</b>, <b>kruhovitost</b>. Bez vztahu k jiným prvkům — hlídají samotný tvar plochy.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Směr a poloha</h4><p class="muted" style="margin:0"><b>Kolmost</b> a <b>rovnoběžnost</b> vůči základně, <b>poloha</b> díry vůči základnám (přesnější než ± na roztečích), <b>souosost</b> čepů.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Házení</h4><p class="muted" style="margin:0">U rotačních dílů (čepy, kladky): jak moc smí plocha „házet" při otáčení kolem osy. Měří se úchylkoměrem.</p></div>
+    </div>
+    <div class="callout"><b>K čemu to je u kontejnerů:</b> rovinnost dosedací plochy rámu (aby kontejner neseděl na třech rozích), kolmost bočnice k podlaze, poloha závěsů vůči ose — to jsou přesně věci, které rozměrová kóta sama nepohlídá. Když je v rámečku základna (A, B…), najdi si ji nejdřív na výkrese — bez ní tolerance nedává smysl.</div>
+  </div>
+
+  <!-- 12. Drsnost -->
+  <div class="sec" id="s12">
+    <div class="sec-h"><div class="num">12</div><h3>Drsnost povrchu a povrchová úprava</h3></div>
+    <p class="sec-lead">Značka nad plochou říká, jak hladký povrch musí být — a jestli se smí, musí, nebo nesmí obrábět.</p>
+    <div class="schema">
+      <svg viewBox="0 0 700 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Značky drsnosti povrchu">
+        <g transform="translate(60,30)">
+          <path class="thin" d="M0 70 L20 100 L55 30" stroke-width="1.6"/>
+          <text class="stxt" x="28" y="125" text-anchor="middle">základní značka</text>
+          <text class="stxt" x="28" y="138" text-anchor="middle">(způsob výroby libovolný)</text>
+        </g>
+        <g transform="translate(260,30)">
+          <path class="thin" d="M0 70 L20 100 L55 30 H110" stroke-width="1.6"/>
+          <text class="dtxt" x="80" y="22" text-anchor="middle">Ra 3,2</text>
+          <text class="stxt" x="55" y="125" text-anchor="middle">s hodnotou Ra (µm)</text>
+          <text class="stxt" x="55" y="138" text-anchor="middle">požadovaná drsnost povrchu</text>
+        </g>
+        <g transform="translate(480,30)">
+          <path class="thin" d="M0 70 L20 100 L55 30" stroke-width="1.6"/>
+          <circle class="thin" cx="25" cy="72" r="11" stroke-width="1.6"/>
+          <text class="stxt" x="28" y="125" text-anchor="middle">s kroužkem</text>
+          <text class="stxt" x="28" y="138" text-anchor="middle">obrábění (odběr materiálu) nepřípustné</text>
+        </g>
+      </svg>
+      <p class="cap-under">Značení drsnosti podle ČSN EN ISO 21920-1 (nahrazuje dřívější ISO 1302); Ra = průměrná aritmetická úchylka profilu v µm</p>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Orientační hodnoty Ra v praxi</h4>
+        <table>
+          <tr><th>Ra (µm)</th><th>Odpovídá</th></tr>
+          <tr><td><b>25 / 12,5</b></td><td>pálení, hrubé řezání, neopracovaný válcovaný povrch</td></tr>
+          <tr><td><b>6,3</b></td><td>běžné obrábění — neexponované plochy</td></tr>
+          <tr><td><b>3,2</b></td><td>čisté obrobení, běžné dosedací plochy</td></tr>
+          <tr><td><b>1,6</b></td><td>jemné obrábění, vodicí plochy</td></tr>
+          <tr><td><b>0,8 a méně</b></td><td>broušení, těsnicí a kluzné plochy</td></tr>
+        </table>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem"><b>Menší číslo = hladší povrch</b> (a dražší výroba). Souhrnná značka v rohu výkresu platí pro všechny plochy bez vlastní značky. Vedle Ra se občas potkáš s Rz (výška profilu) — orientačně Rz ≈ 4–5× Ra.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Povrchová úprava celého dílu</h4>
+        <p style="margin:0 0 8px">Úprava proti korozi je předepsaná v <b>popisovém poli</b> nebo poznámce: u kontejnerů typicky <b>žárové zinkování</b> (EN ISO 1461), jinde nátěrové systémy (základ + vrchní email), KTL či prášková barva.</p>
+        <p class="muted" style="margin:0;font-size:.88rem">Pozor: „Žárový zinek" v razítku je povrchová úprava — <b>ne materiál</b>. Materiál je vedle (S355J2). Zinkování přidá vrstvu ~50–150 µm — u přesných děr a závitů se s ní musí počítat (kalibrace závitů po zinku).</p>
+      </div>
+    </div>
+    <div class="nextrow"><button class="btn" onclick="showTab('t4')">Pokračovat: Svary, plechy a materiály →</button></div>
+  </div>
+</div>
+
+<!-- ======================================================= ZÁLOŽKA 4 -->
+<div class="tabpane" id="t4">
+  <!-- 13. Svary -->
+  <div class="sec" id="s13">
+    <div class="sec-h"><div class="num">13</div><h3>Svarové značky — denní chléb kontejnerové výroby</h3></div>
+    <p class="sec-lead">Jedna malá značka nese druh svaru, rozměr, stranu i rozsah. Přečíst ji správně je pro nás klíčová dovednost.</p>
+    <div class="schema">
+      <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Anatomie svarové značky">
+        <defs>
+          <marker id="wa" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse">
+            <path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#52514e"/>
+          </marker>
+        </defs>
+        <rect x="6" y="6" width="708" height="288" class="thin" stroke-width="1.2"/>
+        <rect class="olf" x="60" y="210" width="320" height="16"/>
+        <rect class="olf" x="204" y="110" width="16" height="100"/>
+        <line class="thin" x1="162" y1="162" x2="204" y2="210" marker-end="url(#wa)"/>
+        <line class="thin" x1="62" y1="162" x2="162" y2="162"/>
+        <circle class="thin" cx="162" cy="162" r="5" fill="none"/>
+        <polygon points="108,148 108,162 126,162" fill="none" stroke="#52514e" stroke-width="1.2"/>
+        <text class="dtxt" x="102" y="158" text-anchor="end">a4</text>
+        <line class="thin" x1="212" y1="108" x2="235" y2="84"/>
+        <text class="stxt" x="238" y="80" text-anchor="start">výztuha (žebro)</text>
+        <line class="thin" x1="340" y1="212" x2="370" y2="244"/>
+        <text class="stxt" x="373" y="250" text-anchor="start">bočnice kontejneru</text>
+        <g transform="translate(420,60)">
+          <line class="thin" x1="0" y1="60" x2="90" y2="110" marker-start="url(#wa)"/>
+          <line class="thin" x1="90" y1="110" x2="270" y2="110"/>
+          <line x1="90" y1="118" x2="270" y2="118" stroke="#52514e" stroke-width="1" stroke-dasharray="5 4"/>
+          <polygon points="150,96 150,110 168,110" fill="none" stroke="#0b0b0b" stroke-width="1.4"/>
+          <text class="dtxt" x="144" y="107" text-anchor="end">a4</text>
+          <circle class="thin" cx="90" cy="110" r="5.5"/>
+          <path class="thin" d="M258 110 L258 96 L276 103 Z" fill="#fff"/>
+          <text class="stxt" x="10" y="48">šipka → místo svaru</text>
+          <text class="stxt" x="175" y="88">značka NAD čarou = strana šipky</text>
+          <text class="stxt" x="175" y="136">čárkovaná čára = protější strana</text>
+          <text class="stxt" x="60" y="136">kroužek = po obvodu</text>
+          <text class="stxt" x="262" y="88">praporek = montážní svar</text>
+        </g>
+        <text class="cap" x="220" y="262" text-anchor="middle">DETAIL: KOUTOVÝ SVAR a4 PO OBVODU</text>
+        <text class="cap" x="560" y="262" text-anchor="middle">ANATOMIE ZNAČKY DLE ISO 2553</text>
+      </svg>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Základní značky svarů <span class="pill norm">ČSN EN ISO 2553</span></h4>
+        <table>
+          <tr><th>Značka</th><th>Svar</th><th>Poznámka</th></tr>
+          <tr><td><b>▷</b> trojúhelník</td><td><b>koutový</b> — náš nejčastější</td><td>rozměr a (výška) nebo z (odvěsna)</td></tr>
+          <tr><td><b>ǀ</b></td><td>tupý I-svar</td><td>tenké plechy natupo, bez úkosu</td></tr>
+          <tr><td><b>V</b></td><td>tupý V-svar</td><td>úkosované hrany, plný průvar</td></tr>
+          <tr><td><b>⌐ (½V)</b></td><td>poloviční V</td><td>úkos jen na jednom dílu</td></tr>
+          <tr><td><b>Y / U</b></td><td>Y-svar, U-svar</td><td>silné materiály, méně návarového kovu</td></tr>
+          <tr><td><b>◯ na čáře</b></td><td>bodový</td><td>odporové/dírové bodování plechů</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Rozměry a rozsah svaru</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>a4</b> = účinná výška koutového svaru 4 mm; <b>z5</b> = odvěsna 5 mm. Převod: <b>a ≈ 0,7 × z</b> (a4 ≈ z5,6).</li>
+          <li><b>a4 ▷ 3×100 (200)</b> = přerušovaný svar: 3 úseky po 100 mm, mezery 200 mm.</li>
+          <li>Značky nad <b>i pod</b> referenční čarou = svar z obou stran (oboustranný koutový).</li>
+          <li>Číslo za značkou bez závorky = délka svaru; bez údaje = svar po celé délce styku.</li>
+        </ul>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Postup svařování (WPS), přídavný materiál a kontrola svarů (vizuální VT, případně UT/PT) bývají v poznámce nebo technologickém předpisu — značka na výkrese říká „co", technologie „jak".</p>
+      </div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Doplňkové značky, které rozhodují</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>Kroužek</b> v zalomení odkazové čáry = svar <b>po celém obvodu</b> styku.</li>
+          <li><b>Praporek</b> = <b>montážní svar</b> — provádí se až při montáži, ne v dílně.</li>
+          <li>Značka <b>nad plnou čarou</b> = svar na <b>straně šipky</b>; u čárkované čáry = na <b>protější straně</b>.</li>
+          <li>Symboly povrchu svaru: rovný (–), vypuklý (⌒), vydutý (⌣) — případné broušení po svaření.</li>
+        </ul>
+      </div>
+      <div class="card" style="background:var(--warn);border-color:#ecd9a8">
+        <h4 style="margin:0 0 6px;color:#9a6a0d">Nejčastější chyba u svarů</h4>
+        <p style="margin:0">Záměna strany. Značka pod čárkovanou čarou znamená svar z DRUHÉ strany, než kam míří šipka. U koutového svaru výztuhy je to rozdíl mezi svarem uvnitř a vně — a vně může kolidovat s dalším dílem. Když si nejsi jistý, ptej se mistra nebo konstrukce, nevař „odhadem".</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 14. Plechy a ohyby -->
+  <div class="sec" id="s14">
+    <div class="sec-h"><div class="num">14</div><h3>Plechové díly: výpalky, ohyby a rozviny</h3></div>
+    <p class="sec-lead">Většina našich dílů začíná jako plech — vypálí se, ohne a svaří. Výkresy plechových dílů mají svá specifika.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 8px">Ohýbaný díl a jeho rozvin</h4>
+        <svg viewBox="0 0 560 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ohyb a rozvin" style="display:block;width:100%;max-width:540px;margin:0 auto">
+          <defs><marker id="ba" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="8" refX="10" refY="4" orient="auto-start-reverse"><path d="M0.5,0.8 L10,4 L0.5,7.2 Z" fill="#52514e"/></marker></defs>
+          <g transform="translate(40,30)">
+            <path class="ol" d="M0 110 H120 Q136 110 136 94 V10"/>
+            <path class="ol" d="M0 96 H118 Q122 96 122 92 V10"/>
+            <line class="ol" x1="0" y1="96" x2="0" y2="110"/>
+            <line class="ol" x1="122" y1="10" x2="136" y2="10"/>
+            <path class="thin" d="M100 78 L118 88" marker-end="url(#ba)"/>
+            <text class="dtxt" x="60" y="80">R6 vnitřní</text>
+            <text class="stxt" x="60" y="140" text-anchor="middle">ohnutý díl (t5, ohyb 90°)</text>
+          </g>
+          <g transform="translate(300,30)">
+            <rect class="olf" x="0" y="70" width="200" height="40"/>
+            <line class="axis" x1="118" y1="60" x2="118" y2="120"/>
+            <text class="stxt" x="118" y="54" text-anchor="middle">čára ohybu (tenká čerchovaná)</text>
+            <line class="thin" x1="0" y1="126" x2="0" y2="140"/>
+            <line class="thin" x1="200" y1="126" x2="200" y2="140"/>
+            <line class="thin" x1="0" y1="134" x2="200" y2="134" marker-start="url(#ba)" marker-end="url(#ba)"/>
+            <text class="dtxt" x="100" y="128" text-anchor="middle">rozvinutá délka</text>
+            <text class="stxt" x="100" y="160" text-anchor="middle">rozvin (výpalek) — podklad pro laser/pálení</text>
+          </g>
+        </svg>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Rozvinutá délka je <b>menší než součet vnějších stran</b> — materiál se v ohybu natahuje (počítá to konstrukce/CAD, tzv. K-faktor). Proto se rozvin nikdy „nedopočítává" v dílně z ohnutého tvaru.</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 8px">Co hlídat na výkresech plechových dílů</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>Tloušťka</b> bývá jen v razítku/poznámce (t5, P5) — obraz je jeden pohled.</li>
+          <li><b>Vnitřní poloměr ohybu</b> (R6…): závisí na tloušťce a materiálu; menší R než dovolený = praskliny.</li>
+          <li><b>Čáry ohybu</b> v rozvinu (tenké čerchované) + případně směr ohybu NAHORU/DOLŮ.</li>
+          <li>Rozměry ohýbaného dílu jsou <b>po ohnutí</b> — rozvin je jen výrobní mezikrok.</li>
+          <li>Tolerance ohýbaných rozměrů jsou volnější (ISO 2768 má pro ně zvláštní řádky) — plech není obrobek.</li>
+          <li>Hrany po pálení/laseru: případný požadavek na <b>odjehlení</b> či broušení najdeš v poznámce.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><b>Praxe z výroby:</b> když kontroluješ výpalek proti výkresu, měř rozvin proti rozvinu a hotový díl proti ohnutému tvaru. Míchat obojí dohromady je častý zdroj „neshod", které žádnou neshodou nejsou.</div>
+  </div>
+
+  <!-- 15. Materiály -->
+  <div class="sec" id="s15">
+    <div class="sec-h"><div class="num">15</div><h3>Materiály a polotovary</h3></div>
+    <p class="sec-lead">Řádek MATERIÁL v razítku a sloupec POLOTOVAR v kusovníku musíš umět přečíst bez tabulek.</p>
+    <div class="grid two">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Oceli podle EN <span class="pill norm">ČSN EN 10025-2</span></h4>
+        <table>
+          <tr><th>Značka</th><th>Co říká</th></tr>
+          <tr><td><b>S235JR</b></td><td>běžná konstrukční ocel; S = konstrukční, 235 = mez kluzu (MPa), JR = houževnatost při +20 °C</td></tr>
+          <tr><td><b>S355J2</b></td><td>pevnější ocel našich kontejnerů; J2 = ověřená houževnatost při −20 °C (venkovní provoz v zimě)</td></tr>
+          <tr><td><b>1.4301</b></td><td>nerez (AISI 304) — potravinářství, agresivní prostředí</td></tr>
+          <tr><td><b>Hardox…</b></td><td>otěruvzdorné plechy na šrot, suť a abraziva (obchodní název)</td></tr>
+        </table>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Záměna S235 za S355 není „skoro totéž" — pevnostní výpočet přestane platit. Vyšší číslo = pevnější materiál, ne „lepší pro všechno".</p>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Staré ČSN značky — v dílnách pořád žijí</h4>
+        <table>
+          <tr><th>Stará ČSN</th><th>Dnešní ekvivalent (orientačně)</th></tr>
+          <tr><td><b>11 373</b></td><td>≈ S235JR („jedenáct tři sta")</td></tr>
+          <tr><td><b>11 523</b></td><td>≈ S355 („jedenáct pět set")</td></tr>
+          <tr><td><b>17 240</b></td><td>≈ 1.4301 (nerez)</td></tr>
+        </table>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Na starších výkresech a v hovoru v dílně tyhle značky uslyšíš — musíš vědět, že „jedenáct pět set" a S355 je tentýž materiál. Při pochybnosti rozhoduje aktuální výkres, ne zvyk.</p>
+      </div>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Zkratky polotovarů</h4>
+        <table>
+          <tr><th>Zápis</th><th>Polotovar</th></tr>
+          <tr><td><b>P5 – 1500×3000</b></td><td>plech tl. 5 mm, tabule 1500×3000</td></tr>
+          <tr><td><b>JÄKL 60×40×3</b></td><td>uzavřený obdélníkový profil 60×40, stěna 3</td></tr>
+          <tr><td><b>TR Ø33,7×3</b></td><td>trubka vnější Ø 33,7, stěna 3</td></tr>
+          <tr><td><b>KR Ø12</b></td><td>kruhová tyč Ø 12</td></tr>
+          <tr><td><b>UPN 180 / U 120</b></td><td>válcovaný U-profil</td></tr>
+          <tr><td><b>L 50×50×5</b></td><td>rovnoramenný úhelník</td></tr>
+          <tr><td><b>PLO 60×8</b></td><td>plochá tyč (pásovina) 60×8</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Povrchové úpravy v dokumentaci</h4>
+        <ul style="margin:0;padding-left:18px">
+          <li><b>Žárový zinek</b> (EN ISO 1461) — standard kontejnerů; díly musí mít odvětrávací a výtokové otvory pro zinkovou lázeň (bývají na výkrese!).</li>
+          <li><b>Nátěrové systémy</b> — základ + vrchní email, odstín RAL v poznámce.</li>
+          <li><b>KTL / prášková barva</b> — menší díly, série.</li>
+        </ul>
+        <p class="muted" style="margin:8px 0 0;font-size:.88rem">Otvor na výkrese, který „nedává smysl", může být technologický otvor pro zinkování — než ho prohlásíš za chybu, zeptej se.</p>
+      </div>
+    </div>
+    <div class="nextrow"><button class="btn" onclick="showTab('t5')">Pokračovat: Sestavy a praxe →</button></div>
+  </div>
+</div>
+
+<!-- ======================================================= ZÁLOŽKA 5 -->
+<div class="tabpane" id="t5">
+  <!-- 16. Sestavy -->
+  <div class="sec" id="s16">
+    <div class="sec-h"><div class="num">16</div><h3>Sestava, pozice a kusovník</h3></div>
+    <p class="sec-lead">Výkres sestavy říká, z čeho se výrobek skládá a jak k sobě díly patří. Kusovník je jeho nákupní i výrobní seznam.</p>
+    <div class="schema">
+      <svg viewBox="0 0 660 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sestava vrat kontejneru s kusovníkem">
+        <rect x="6" y="6" width="648" height="428" class="thin" stroke-width="1.2"/>
+        <rect class="olf" x="50" y="40" width="240" height="340"/>
+        <rect x="66" y="56" width="208" height="308" fill="#f0f3f6" stroke="#52514e" stroke-width="1.1"/>
+        <rect class="olf" stroke-width="2" x="28" y="84" width="22" height="30"/><circle cx="39" cy="99" r="3" fill="#fff" stroke="#0b0b0b" stroke-width="1.2"/>
+        <rect class="olf" stroke-width="2" x="28" y="195" width="22" height="30"/><circle cx="39" cy="210" r="3" fill="#fff" stroke="#0b0b0b" stroke-width="1.2"/>
+        <rect class="olf" stroke-width="2" x="28" y="306" width="22" height="30"/><circle cx="39" cy="321" r="3" fill="#fff" stroke="#0b0b0b" stroke-width="1.2"/>
+        <rect class="olf" x="297" y="24" width="10" height="372" rx="4"/>
+        <rect class="olf" x="288" y="120" width="28" height="24"/>
+        <rect class="olf" x="288" y="278" width="28" height="24"/>
+        <rect class="olf" x="307" y="198" width="36" height="11" rx="5"/>
+        <circle cx="150" cy="41" r="2" fill="#52514e"/><line class="thin" x1="150" y1="41" x2="150" y2="26"/>
+        <circle cx="150" cy="14" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="150" y="18.5" text-anchor="middle">1</text>
+        <circle cx="200" cy="120" r="2" fill="#52514e"/><line class="thin" x1="200" y1="120" x2="235.8" y2="25.2"/>
+        <circle cx="240" cy="14" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="240" y="18.5" text-anchor="middle">2</text>
+        <circle cx="39" cy="206" r="2" fill="#52514e"/><line class="thin" x1="39" y1="206" x2="22" y2="180.4"/>
+        <circle cx="16" cy="170" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="16" y="174.5" text-anchor="middle">3</text>
+        <circle cx="302" cy="60" r="2" fill="#52514e"/><line class="thin" x1="302" y1="60" x2="327.8" y2="44.3"/>
+        <circle cx="338" cy="38" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="338" y="42.5" text-anchor="middle">4</text>
+        <circle cx="310" cy="132" r="2" fill="#52514e"/><line class="thin" x1="310" y1="132" x2="341.6" y2="114"/>
+        <circle cx="352" cy="108" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="352" y="112.5" text-anchor="middle">5</text>
+        <circle cx="330" cy="203" r="2" fill="#52514e"/><line class="thin" x1="330" y1="203" x2="355.4" y2="227.6"/>
+        <circle cx="364" cy="236" r="12" fill="#fff" stroke="#0b0b0b" stroke-width="1.3"/><text class="btxt" x="364" y="240.5" text-anchor="middle">6</text>
+        <text class="cap" x="380" y="52">KUSOVNÍK</text>
+        <rect x="380" y="60" width="262" height="180" fill="#fff" stroke="#0b0b0b" stroke-width="1.6"/>
+        <rect x="380" y="60" width="262" height="24" fill="#eef1f4" stroke="none"/>
+        <line class="thin" x1="380" y1="84" x2="642" y2="84"/>
+        <line class="thin" x1="380" y1="110" x2="642" y2="110"/>
+        <line class="thin" x1="380" y1="136" x2="642" y2="136"/>
+        <line class="thin" x1="380" y1="162" x2="642" y2="162"/>
+        <line class="thin" x1="380" y1="188" x2="642" y2="188"/>
+        <line class="thin" x1="380" y1="214" x2="642" y2="214"/>
+        <line class="thin" x1="412" y1="60" x2="412" y2="240"/>
+        <line class="thin" x1="536" y1="60" x2="536" y2="240"/>
+        <line class="thin" x1="566" y1="60" x2="566" y2="240"/>
+        <text class="bomh" x="396" y="76" text-anchor="middle">POZ</text>
+        <text class="bomh" x="420" y="76">NÁZEV</text>
+        <text class="bomh" x="551" y="76" text-anchor="middle">KS</text>
+        <text class="bomh" x="572" y="76">POLOTOVAR</text>
+        <text class="bomv" x="396" y="101" text-anchor="middle">1</text><text class="bomv" x="420" y="101">Rám vrat</text><text class="bomv" x="551" y="101" text-anchor="middle">1</text><text class="bomv-s" x="572" y="101">JÄKL 60×40×3</text>
+        <text class="bomv" x="396" y="127" text-anchor="middle">2</text><text class="bomv" x="420" y="127">Výplň vrat</text><text class="bomv" x="551" y="127" text-anchor="middle">1</text><text class="bomv-s" x="572" y="127">P3-1450×2050</text>
+        <text class="bomv" x="396" y="153" text-anchor="middle">3</text><text class="bomv" x="420" y="153">Pant vrat</text><text class="bomv" x="551" y="153" text-anchor="middle">3</text><text class="bomv-s" x="572" y="153">HB 60-16</text>
+        <text class="bomv" x="396" y="179" text-anchor="middle">4</text><text class="bomv" x="420" y="179">Tyč uzávěru</text><text class="bomv" x="551" y="179" text-anchor="middle">1</text><text class="bomv-s" x="572" y="179">TR Ø33,7×3</text>
+        <text class="bomv" x="396" y="205" text-anchor="middle">5</text><text class="bomv" x="420" y="205">Vedení tyče</text><text class="bomv" x="551" y="205" text-anchor="middle">2</text><text class="bomv-s" x="572" y="205">P5-60×80</text>
+        <text class="bomv" x="396" y="231" text-anchor="middle">6</text><text class="bomv" x="420" y="231">Madlo</text><text class="bomv" x="551" y="231" text-anchor="middle">1</text><text class="bomv-s" x="572" y="231">KR Ø12</text>
+        <text class="cap" x="50" y="406">VRATA KONTEJNERU — SESTAVA</text>
+        <text class="stxt" x="50" y="421">Pohled zepředu · M 1:15 · pozice dle ISO 6433</text>
+      </svg>
+      <p class="cap-under">Pozice v kroužcích odkazují do kusovníku: pozice 3 (pant) je potřeba 3×, tyč uzávěru (poz. 4) je trubka TR Ø33,7×3</p>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <div class="card">
+        <h4 style="margin:0 0 6px">Pravidla pozic <span class="pill norm">ISO 6433 · kusovník ČSN EN ISO 7573</span></h4>
+        <ul style="margin:0;padding-left:18px">
+          <li>Pozice v kroužku, odkazová čára končí tečkou na dílu (nebo šipkou na obrysu).</li>
+          <li>Stejný díl = stejné číslo pozice v celé sestavě; počet kusů říká kusovník.</li>
+          <li>Na výkrese sestavy jsou jen <b>hlavní a připojovací rozměry</b> — výrobní rozměry hledej na výkresech dílů.</li>
+          <li>Spojovací materiál (šrouby M12×40, podložky, matice) je také v kusovníku — v řezu se nešrafuje.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin:0 0 6px">Jak čteš sestavu</h4>
+        <p style="margin:0">① najdi díl v obraze → ② kroužek s číslem pozice → ③ řádek v kusovníku (název, počet kusů, polotovar/číslo výkresu) → ④ u vyráběných dílů pokračuj na jejich výrobní výkres podle čísla. U svařenců mezikrok: sestava → svarek → díly svarku.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 17. Postup + chyby -->
+  <div class="sec" id="s17">
+    <div class="sec-h"><div class="num">17</div><h3>Postup čtení výkresu + nejčastější chyby</h3></div>
+    <p class="sec-lead">Vždy stejný rituál. Kdo čte výkres nahodile, něco přehlédne.</p>
+    <div class="card">
+      <div class="step"><div class="n">1</div><div><h4>Popisové pole</h4><p>Název, číslo výkresu, <b>revize</b>, materiál, polotovar, hmotnost, povrchová úprava, tolerování (ISO 2768-…). Ověř, že je to správný dokument ve správné revizi.</p></div></div>
+      <div class="step"><div class="n">2</div><div><h4>Měřítko a listy</h4><p>Měřítko hlavních pohledů, počet listů, měřítka detailů (bývají jiná!).</p></div></div>
+      <div class="step"><div class="n">3</div><div><h4>Poznámky</h4><p>Texty nad razítkem: sražení hran, neokótované rádiusy, požadavky na svary a kontrolu. Jsou závazné jako kóty.</p></div></div>
+      <div class="step"><div class="n">4</div><div><h4>Orientace v pohledech</h4><p>Najdi nárys, přiřaď si půdorys a boční pohledy (ISO-E!), dohledej řezy A-A, B-B a detaily. Představ si tvar ve 3D.</p></div></div>
+      <div class="step"><div class="n">5</div><div><h4>Hlavní rozměry a funkční kóty</h4><p>Celkové rozměry, rozteče, průměry. U kót s tolerancí zbystři — jsou funkční a budou se měřit.</p></div></div>
+      <div class="step"><div class="n">6</div><div><h4>Svary a spoje</h4><p>Projdi svarové značky: druh, rozměr (a…), strana, obvod/přerušovaně, montážní svary. U šroubových spojů závity a zahloubení.</p></div></div>
+      <div class="step"><div class="n">7</div><div><h4>Kusovník (u sestav)</h4><p>Zkontroluj pozice proti obrazu, počty kusů a polotovary. Teprve pak plánuj dělení materiálu a výrobu.</p></div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h4 style="margin:0 0 8px">Nejčastější chyby při čtení — a jak se jim vyhnout</h4>
+      <div style="overflow-x:auto">
+      <table>
+        <tr><th>Chyba</th><th>Následek</th><th>Obrana</th></tr>
+        <tr><td>Měření pravítkem po výkrese</td><td>rozměr mimo toleranci</td><td>vyrábět jen podle kót (lekce 2)</td></tr>
+        <tr><td>Stará revize výkresu</td><td>vyrobený zmetek „přesně podle výkresu"</td><td>ověřit revizi v razítku proti systému (lekce 3)</td></tr>
+        <tr><td>Záměna R a Ø</td><td>dvojnásobný / poloviční rozměr</td><td>R = poloměr, Ø = průměr (lekce 8)</td></tr>
+        <tr><td>Přehlédnutá skrytá hrana</td><td>chybí kapsa, drážka či díra</td><td>čárkovaná čára = prvek uvnitř (lekce 4)</td></tr>
+        <tr><td>Svar na špatné straně</td><td>kolize, nefunkční spoj, oprava broušením</td><td>plná vs. čárkovaná referenční čára (lekce 13)</td></tr>
+        <tr><td>Ignorovaná poznámka u razítka</td><td>nesražené hrany, chybějící rádiusy</td><td>poznámky číst jako první (krok 3)</td></tr>
+        <tr><td>Kóty „dopočítané" ze součtu</td><td>hromadění úchylek</td><td>platí předepsaná kóta; nejasnost hlásit konstrukci (lekce 8)</td></tr>
+        <tr><td>Měření rozvinu proti ohnutému tvaru</td><td>falešná „neshoda" výpalku</td><td>rozvin proti rozvinu, díl proti dílu (lekce 14)</td></tr>
+      </table>
+      </div>
+    </div>
+    <div class="callout"><b>Když něco nesedí</b> (chybějící kóta, rozpor pohledů, nesmyslná tolerance) — <b>nezkoušej hádat</b>. Zastav se a ptej se mistra nebo konstrukce. Deset minut dotazu je levnějších než den opravy svařence.</div>
+  </div>
+
+  <!-- 18. Měření + situace + taháček -->
+  <div class="sec" id="s18">
+    <div class="sec-h"><div class="num">18</div><h3>Měření v dílně, modelové situace a taháček</h3></div>
+    <p class="sec-lead">Výkres čteš proto, abys podle něj vyrobil a změřil. Nástroj musí odpovídat toleranci.</p>
+    <div class="grid three">
+      <div class="card"><h4 style="margin:0 0 6px">Svinovací metr</h4><p class="muted" style="margin:0">Na stavební délky a všeobecné tolerance (±0,5 mm a volnější): celkové rozměry svařenců, rozteče závěsů. Na kóty s desetinami nestačí.</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Posuvné měřítko (šuplera)</h4><p class="muted" style="margin:0">Přesnost 0,05 / digitální 0,01–0,02 mm: průměry děr a čepů, tloušťky, zahloubení, běžné tolerované kóty (±0,1 až ±0,5).</p></div>
+      <div class="card"><h4 style="margin:0 0 6px">Mikrometr a spol.</h4><p class="muted" style="margin:0">Setiny a přesněji (uložení H7/g6): mikrometr, kalibry, úchylkoměr na házení. Svarové měrky na kontrolu a-míry koutových svarů.</p></div>
+    </div>
+    <div class="callout warn"><b>Pravidlo:</b> měřidlo má být řádově přesnější než tolerance, kterou kontroluje. Kóту ±0,05 šuplerou s přesností 0,05 neuhlídáš — a naopak metr na ±2 mm u bočnice úplně stačí. První vyrobený kus vždy projde kontrolou celý; další kusy dle kontrolního plánu.</div>
+
+    <h4 style="margin:22px 0 8px">Modelové situace z dílny</h4>
+    <details class="scenario"><summary>Na výkrese příložky chybí kóta rozteče dvou děr — dá se dopočítat ze součtu ostatních kót. Co uděláš?</summary>
+      <div class="answer"><b>Správně:</b> nedopočítávat a nevyrábět „od oka". Chybějící kóta = vada výkresu; nahlas ji mistrovi/konstrukci a počkej na doplnění (oprava revize nebo písemné upřesnění). Dopočtená hodnota nemá toleranci a hromadí úchylky řetězce — při kontrole nebude podle čeho rozhodnout.</div>
+    </details>
+    <details class="scenario"><summary>Kontroluješ kótu 120 ±0,2 a naměříš 120,25 mm. Kolega říká „to se vejde, zaokrouhli". Co ty na to?</summary>
+      <div class="answer"><b>Správně:</b> nevejde. Horní mez je 120,2 mm; naměřené hodnoty se kvůli toleranci nezaokrouhlují. Kus jde na opravu nebo k rozhodnutí kontrole/technologovi (odchylkové řízení) — ale nikdy „mávnutím ruky" dál.</div>
+    </details>
+    <details class="scenario"><summary>Svarová značka a4 je pod čárkovanou referenční čarou a šipka míří na vnější stranu bočnice. Kde budeš vařit?</summary>
+      <div class="answer"><b>Správně:</b> na protější straně, než kam míří šipka — tedy <b>zevnitř</b>. Značka u čárkované čáry = protější strana. Kdyby byla nad plnou čarou, vaří se na straně šipky (vně).</div>
+    </details>
+    <details class="scenario"><summary>Přišel výkres od zahraničního zákazníka z USA. Pohledy „nesedí" — půdorys je nad nárysem. Co se děje?</summary>
+      <div class="answer"><b>Správně:</b> je to americké promítání ISO-A (3. kvadrant) — pohledy jsou rozmístěné zrcadlově oproti našemu ISO-E. Ověř značku metody promítání v razítku a čti pohledy podle ní; případně požádej konstrukci o překreslení. Rozměry v palcích přepočítej (1" = 25,4 mm) a pozor na tolerance v tisícinách palce.</div>
+    </details>
+    <details class="scenario"><summary>Na výpalku bočnice je otvor Ø20, který v sestavě nemá žádnou funkci. Vypálit, nebo nahlásit chybu?</summary>
+      <div class="answer"><b>Správně:</b> vypálit podle výkresu — a když si nejsi jistý, zeptat se. „Nefunkční" otvor bývá technologický: odvětrání a výtok zinku při žárovém zinkování, manipulační otvor, odlehčení. Otvory na výkrese nejsou návrh k diskusi, ale předpis.</div>
+    </details>
+
+    <h4 style="margin:22px 0 8px">Taháček — nejčastější zápisy na jednom místě</h4>
+    <div class="card">
+      <div style="overflow-x:auto">
+      <table>
+        <tr><th>Zápis</th><th>Význam</th><th>Zápis</th><th>Význam</th></tr>
+        <tr><td><b>Ø20</b></td><td>průměr</td><td><b>R10</b></td><td>poloměr</td></tr>
+        <tr><td><b>4× Ø9</b></td><td>4 stejné díry</td><td><b>□30</b></td><td>čtvercový průřez</td></tr>
+        <tr><td><b>2×45° / C2</b></td><td>sražení hrany</td><td><b>t5 / P5</b></td><td>tloušťka plechu 5</td></tr>
+        <tr><td><b>M16 (×1,5 / LH)</b></td><td>metrický závit (jemný / levý)</td><td><b>G ½</b></td><td>trubkový závit</td></tr>
+        <tr><td><b>120 ±0,2</b></td><td>mezní úchylky</td><td><b>H7 / g6</b></td><td>tolerance díry / hřídele</td></tr>
+        <tr><td><b>ISO 2768-mK</b></td><td>všeobecné tolerance</td><td><b>Ra 3,2</b></td><td>drsnost povrchu (µm)</td></tr>
+        <tr><td><b>a4 ▷</b></td><td>koutový svar, výška 4</td><td><b>z5</b></td><td>odvěsna svaru (a ≈ 0,7×z)</td></tr>
+        <tr><td><b>kroužek na značce</b></td><td>svar po obvodu</td><td><b>praporek</b></td><td>montážní svar</td></tr>
+        <tr><td><b>A-A</b></td><td>řez rovinou A</td><td><b>DETAIL B · M 2:1</b></td><td>detail ve zvětšení</td></tr>
+        <tr><td><b>JÄKL / TR / KR / PLO</b></td><td>profil / trubka / tyč / pásovina</td><td><b>S355J2 (11 523)</b></td><td>ocel dle EN (stará ČSN)</td></tr>
+      </table>
+      </div>
+    </div>
+    <div class="callout norm"><b>Hotovo?</b> Prošel jsi všech 18 lekcí. Teď si ověř znalosti — <b>závěrečný test je v poslední záložce nahoře</b>. Máš 3 pokusy, hranice splnění 80 %.</div>
+    <div class="nextrow"><button class="btn blue" onclick="showTab('ttest')">Přejít na závěrečný test →</button></div>
+  </div>
+</div>
+
+<!-- ======================================================= ZÁLOŽKA TEST -->
+<div class="tabpane" id="ttest">
+  <div class="sec" id="stest" style="margin-top:0">
+    <div class="sec-h"><div class="num">✓</div><h3>Závěrečný test</h3></div>
+    <p class="sec-lead" id="testLead">Pro splnění potřebuješ alespoň 80 %. Výsledek se ukládá vedení, máš max 3 pokusy.</p>
+    <div class="callout" style="margin:0 0 14px">Otázky pokrývají všech pět výukových celků — pokud si nejsi jistý, vrať se záložkami nahoře k příslušné lekci. Pořadí odpovědí se při každém otevření míchá.</div>
+    <div id="attInfo" class="att-info" style="margin:0 0 14px"></div>
+    <div id="quiz"></div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:4px">
+      <button class="btn" id="finishBtn" onclick="finishQuiz()">Vyhodnotit test</button>
+      <button class="btn ghost" onclick="showTab('t1')">↑ Zpět na výuku</button>
+    </div>
+    <div class="result" id="result"></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+/* ---- Záložky ---- */
+function showTab(id){
+  document.querySelectorAll('.tabpane').forEach(function(p){ p.classList.toggle('active', p.id===id); });
+  document.querySelectorAll('.tabbar .tab').forEach(function(b){ b.classList.toggle('active', b.dataset.tab===id); });
+  window.scrollTo({top:0});
+}
+
+/* ---- Test ---- */
+var QUESTIONS = [
+  { cat:'Dokumentace', q:'Čteš výkres sestavy a potřebuješ vyrobit jeden její díl. Kde najdeš jeho výrobní rozměry?',
+    opts:['Na výrobním výkrese dílu — číslo najdu v kusovníku sestavy','Přímo na výkrese sestavy, tam je všechno','V objednávce zákazníka','Rozměry si odměřím z obrazu sestavy'], a:0,
+    why:'Sestava nese jen hlavní a připojovací rozměry + pozice a kusovník. Výrobní rozměry dílu jsou na jeho vlastním výkrese — dohledáš ho podle čísla z kusovníku.' },
+  { cat:'Měřítko', q:'Výkres má měřítko 1:20. Co to znamená?',
+    opts:['Obraz je 20× menší než skutečnost — skutečné rozměry jsou 20× větší','Obraz je 20× větší než skutečnost','Výkres má 20 listů','Tolerance všech rozměrů je 20 mm'], a:0,
+    why:'První číslo je obraz, druhé skutečnost: 1:20 = zmenšení. 15 mm na papíře odpovídá 300 mm ve skutečnosti. Zvětšení se zapisuje obráceně (2:1, 5:1).' },
+  { cat:'Měřítko', q:'Na vytištěném výkrese jsi pravítkem naměřil(a) rozměr, který neodpovídá kótě. Co platí?',
+    opts:['Vždy kóta — po výkrese se pravítkem neměří, tisk zkresluje','Měření pravítkem, je čerstvé','Průměr obou hodnot','Ta hodnota, která je menší (bezpečnější)'], a:0,
+    why:'Vyrábí se výhradně podle vepsaných kót. Tisk a kopie zkreslují a detaily mají jiné měřítko — měření po výkrese je jen orientační.' },
+  { cat:'Popisové pole', q:'Kde na výkrese najdeš materiál, hmotnost, měřítko a číslo výkresu?',
+    opts:['V popisovém poli (razítku) v pravém dolním rohu','V levém horním rohu listu','V kusovníku','Na samostatném listu obálky'], a:0,
+    why:'Popisové pole dle ČSN EN ISO 7200 v pravém dolním rohu nese identifikaci dokumentu i výrobní údaje. Je to první místo, kam se při čtení díváš.' },
+  { cat:'Popisové pole', q:'V razítku je REVIZE „B". Co z toho plyne?',
+    opts:['Výkres byl změněn — vyrábět se smí jen podle aktuální revize, kterou ověřím','Písmeno B značí druhý list výkresu','Jde o kvalitu materiálu','Nic, revize je jen pro archiv'], a:0,
+    why:'Písmeno revize roste s každou změnou dokumentu (tabulka změn popisuje co a kdy). Výroba podle staré revize je drahý zmetek, i když sedí každá kóta.' },
+  { cat:'Čáry', q:'Co na výkrese znamená čárkovaná čára?',
+    opts:['Skrytou (neviditelnou) hranu — např. díru uvnitř materiálu','Osu souměrnosti','Viditelný obrys','Kótovací čáru'], a:0,
+    why:'Čárkovaně se kreslí hrany, které z daného směru pohledu nejsou vidět — díry, kapsy a osazení uvnitř materiálu. Osy jsou tenké čerchované, obrysy tlusté plné.' },
+  { cat:'Čáry', q:'Jakou čarou se kreslí osy děr a osy souměrnosti?',
+    opts:['Tenkou čerchovanou (s přesahem přes obrys)','Tlustou plnou','Čárkovanou','Tenkou plnou vlnovkou'], a:0,
+    why:'Osy = tenká čerchovaná čára, vždy s malým přesahem přes obrys. Tlustá plná patří viditelným hranám, čárkovaná skrytým, tenká plná kótám a šrafům.' },
+  { cat:'Promítání', q:'Kde se v evropském promítání ISO-E (metoda 1. kvadrantu) kreslí půdorys?',
+    opts:['Pod nárysem','Nad nárysem','Vlevo od nárysu','Kdekoli je místo'], a:0,
+    why:'V ISO-E se promítá „skrz předmět": pohled shora (půdorys) se kreslí POD nárys a pohled zleva VPRAVO od nárysu. Americká metoda ISO-A to má zrcadlově.' },
+  { cat:'Promítání', q:'Přišel výkres z USA (metoda ISO-A). Jak jsou rozmístěné pohledy oproti našemu zvyku?',
+    opts:['Zrcadlově — půdorys nad nárysem, pohled zleva vlevo','Stejně jako u nás','Otočené o 90°','Každý pohled na zvláštním listu'], a:0,
+    why:'Americké promítání 3. kvadrantu má pohledy zrcadlově vůči ISO-E. Metodu poznáš podle značky promítání (komolý kužel) v popisovém poli.' },
+  { cat:'Pohledy', q:'U obrazu je nadpis „DETAIL B · M 2:1". Co to znamená?',
+    opts:['Zvětšený detail místa B — kreslený ve vlastním měřítku 2:1','Druhý list výkresu','Rozměr B je 2× tolerovaný','Pohled zprava'], a:0,
+    why:'Místo detailu se v pohledu zakroužkuje tenkou čarou a označí písmenem; detail se kreslí zvlášť ve zvětšeném měřítku, které je uvedené u jeho nadpisu.' },
+  { cat:'Pohledy', q:'Dlouhý profil je na výkrese kreslený s „vystřiženým" prostředkem (přerušení obrazu). Jaká délka platí?',
+    opts:['Kóta — platí pro celou skutečnou délku, obraz je jen zkrácený','Délka odměřená z obrazu','Dvojnásobek obrazu','Délku určuje dílna'], a:0,
+    why:'Přerušení obrazu (tenké vlnité čáry) jen šetří místo na listu. Kóta uvádí skutečnou celkovou délku — např. 6 000 mm, i když obraz měří pár centimetrů.' },
+  { cat:'Řezy', q:'Co se v řezu šrafuje?',
+    opts:['Jen materiál, který rovina řezu skutečně protíná','Celý obrys součásti včetně děr','Jen díry','Nic — šrafy jsou dekorace'], a:0,
+    why:'Šrafuje se pouze protnutý materiál (tenká čára pod 45°). Díry a dutiny zůstávají prázdné a jejich hrany jsou v řezu vidět plnou čarou.' },
+  { cat:'Řezy', q:'Rovina podélného řezu prochází žebrem, hřídelí a šroubem. Jak se tyto prvky kreslí?',
+    opts:['Nešrafují se — kreslí se v pohledu, i když jimi řez prochází','Šrafují se hustěji než okolí','Šrafují se opačným sklonem','Vynechají se z obrazu'], a:0,
+    why:'Plné rotační a normalizované prvky (hřídele, čepy, šrouby, matice, kolíky) a žebra se podélně nešrafují — rozříznuté by ztratily názornost a obraz by lhal o plném průřezu.' },
+  { cat:'Řezy', q:'Jaký je rozdíl mezi řezem a průřezem?',
+    opts:['Řez ukazuje i viditelné hrany za rovinou; průřez jen samotný protnutý obrys','Jsou to synonyma','Průřez se používá jen u sestav','Řez se nešrafuje, průřez ano'], a:0,
+    why:'Řez = protnutý materiál + vše viditelné za rovinou. Průřez = pouze protnutý obrys (typicky profil žebra či tyče otočený do obrazu).' },
+  { cat:'Kótování', q:'Co znamená zápis 4× Ø9?',
+    opts:['Čtyři stejné díry o průměru 9 mm','Jedna díra o průměru 4,9 mm','Čtyři díry o poloměru 9 mm','Díra hluboká 4 mm a široká 9 mm'], a:0,
+    why:'Značka Ø = průměr; násobnost říká počet stejných prvků — okótuje se jen jeden. Poloměr by značilo R (R9 = poloměr 9 mm).' },
+  { cat:'Kótování', q:'V jakých jednotkách jsou délkové kóty na strojírenském výkrese?',
+    opts:['V milimetrech — jednotka se u čísla neuvádí','V centimetrech s uvedením „cm"','V metrech','V palcích, pokud není uvedeno jinak'], a:0,
+    why:'Strojírenské výkresy kótují v milimetrech a jednotka se nepíše (ČSN EN ISO 129-1). Úhly se uvádějí ve stupních.' },
+  { cat:'Díry', q:'U díry je zápis „Ø14, válcové zahloubení Ø24×5". K čemu zahloubení slouží?',
+    opts:['Aby se hlava šroubu schovala pod povrch — zahloubení Ø24 do hloubky 5 mm','Ke zvětšení průtoku','Je to výrobní chyba','K odvodnění dílu'], a:0,
+    why:'Válcové zahloubení vytváří osazení pro válcovou hlavu šroubu; kuželové (např. 90°) pro zápustnou hlavu. Kótuje se průměr a hloubka zahloubení.' },
+  { cat:'Díry', q:'U slepé závitové díry M12 je „závit 18, díra 22". Proč jsou dvě hloubky?',
+    opts:['Díra se vrtá hlouběji než řezaný závit — vrták i závitník potřebují výběh','Je to překlep na výkrese','Závit je z obou stran','Hloubka díry se neměří'], a:0,
+    why:'Plný závit nejde nařezat až na dno slepé díry. Proto se kótuje hloubka závitu (18) i hloubka díry (22) — díra je vždy hlubší; na dně zůstává kužel po vrtáku.' },
+  { cat:'Tolerance', q:'Kóta 120 ±0,2. Kontrolor naměřil 120,25 mm. Vyhovuje?',
+    opts:['Ne — povolené pásmo je 119,8 až 120,2 mm','Ano — zaokrouhlí se na 120,2','Ano — tolerance je ±0,25','Nelze rozhodnout bez měřítka výkresu'], a:0,
+    why:'±0,2 dává meze 119,8–120,2 mm; 120,25 je nad horní mezí. Naměřené hodnoty se kvůli toleranci nikdy nezaokrouhlují a měřítko s tím nesouvisí.' },
+  { cat:'Tolerance', q:'Co znamená zápis ISO 2768-mK v popisovém poli?',
+    opts:['Všeobecné tolerance pro rozměry bez zapsané tolerance (m = střední třída délkových, K = geometrických)','Materiál musí být middle-K ocel','Maximální kroutící moment','Výkres smí číst jen mistr a kontrolor'], a:0,
+    why:'ISO 2768 určuje všeobecné tolerance: netolerovaná kóta 200 mm smí mít ve třídě m úchylku ±0,5 mm. Mlčení výkresu tedy neznamená libovůli.' },
+  { cat:'Tolerance', q:'Zápis Ø30 H7 — co říká velké písmeno H?',
+    opts:['Jde o toleranci DÍRY (velká písmena = díry, malá = hřídele)','Jde o toleranci hřídele','Díra je kalená','Hloubka díry je 7 mm'], a:0,
+    why:'V soustavě ISO 286 značí velká písmena tolerance děr (H7), malá písmena hřídelí (g6). Číslo je stupeň přesnosti; dvojice tvoří uložení (H7/g6 = s vůlí).' },
+  { cat:'GPS', q:'V rámečku u plochy žebra je: [značka kolmosti | 0,2 | A]. Co to předepisuje?',
+    opts:['Kolmost plochy vůči základně A s tolerancí 0,2 mm','Rozměr žebra 0,2 mm','Drsnost plochy 0,2 µm','Sražení hrany 0,2×45°'], a:0,
+    why:'Rámeček geometrické tolerance (ISO 1101) čteš: značka — hodnota — základna. Skutečná plocha se musí vejít mezi dvě rovnoběžné roviny 0,2 mm od sebe, kolmé k základně A.' },
+  { cat:'GPS', q:'Proč nestačí rozměrová tolerance tloušťky a je předepsaná i rovinnost desky?',
+    opts:['Deska může mít správnou tloušťku všude, a přesto být zkroucená — tvar hlídá jen geometrická tolerance','Rovinnost je totéž co tloušťka','Rovinnost se týká jen barvy povrchu','Je to zdvojení pro jistotu'], a:0,
+    why:'Rozměrová kóta hlídá vzdálenost dvou ploch, ne tvar. Zkroucená deska projde měřením tloušťky, ale nesedne na rám — proto existují geometrické tolerance tvaru (rovinnost, přímost…).' },
+  { cat:'Drsnost', q:'Na dvou plochách jsou značky Ra 1,6 a Ra 12,5. Která plocha musí být hladší?',
+    opts:['Plocha s Ra 1,6 — menší hodnota znamená hladší (a dražší) povrch','Plocha s Ra 12,5','Obě stejně','Nelze poznat, Ra s drsností nesouvisí'], a:0,
+    why:'Ra je střední aritmetická úchylka profilu v µm — čím menší číslo, tím hladší povrch. Ra 12,5 odpovídá pálení či hrubému obrábění, Ra 1,6 jemnému obrábění.' },
+  { cat:'Svary', q:'Svarová značka: trojúhelník s údajem a4. Co předepisuje?',
+    opts:['Koutový svar s účinnou výškou 4 mm','Tupý V-svar hloubky 4 mm','Bodový svar, 4 body','Koutový svar dlouhý 4 mm'], a:0,
+    why:'Trojúhelník = koutový svar, náš nejčastější. Rozměr a = účinná výška svaru; z by značilo odvěsnu (a ≈ 0,7×z). Délka svaru se píše za značku.' },
+  { cat:'Svary', q:'Co znamená kroužek v zalomení odkazové čáry svarové značky?',
+    opts:['Svar po celém obvodu styku','Svar provést při montáži','Bodový svar','Svar bez kontroly'], a:0,
+    why:'Kroužek = obvodový svar. Montážní svar značí praporek (vlaječka). Strany svaru rozlišuje plná vs. čárkovaná referenční čára.' },
+  { cat:'Svary', q:'Značka svaru je umístěná u ČÁRKOVANÉ referenční čáry. Kde se svar provede?',
+    opts:['Na protější straně, než kam míří šipka','Přesně tam, kam míří šipka','Na obou stranách','Kdekoli, strana je volitelná'], a:0,
+    why:'Plná referenční čára = strana šipky, čárkovaná = protější strana. Záměna strany je nejčastější chyba — u výztuh rozhoduje o svaru uvnitř vs. vně.' },
+  { cat:'Svary', q:'Zápis „a4 ▷ 3×100 (200)" u svaru znamená…',
+    opts:['Přerušovaný koutový svar: 3 úseky po 100 mm s mezerami 200 mm','Tři svary vysoké 100 mm','Svar dlouhý 200 mm','Tři vrstvy svaru'], a:0,
+    why:'Přerušovaný svar šetří čas i deformace: počet úseků × délka úseku, v závorce rozteč (mezera). Výška koutového svaru zůstává a4.' },
+  { cat:'Plechy', q:'Proč je rozvinutá délka ohýbaného plechu menší než součet vnějších stran dílu?',
+    opts:['Materiál se v ohybu natahuje — rozvin počítá konstrukce (K-faktor), v dílně se nedopočítává','Protože se plech při ohybu zkracuje řezáním','Je to rezerva na svar','Není — rozvin je vždy součet stran'], a:0,
+    why:'V ohybu se vnější vlákna natahují a vnitřní stlačují; skutečná rozvinutá délka závisí na tloušťce, poloměru a K-faktoru. Proto platí rozvin z výkresu/CAD, ne dopočet ze stran.' },
+  { cat:'Materiály', q:'Mistr řekne „vezmi jedenáct pět set". Jakou ocel podle dnešního značení myslí?',
+    opts:['Přibližně S355 (stará ČSN 11 523)','S235JR','Nerez 1.4301','Hardox'], a:0,
+    why:'Stará ČSN 11 523 odpovídá zhruba dnešní S355 (naše kontejnery: S355J2 — J2 = houževnatost při −20 °C). „Jedenáct tři sta" (11 373) je ≈ S235JR. Při pochybnosti rozhoduje výkres.' },
+  { cat:'Kusovník', q:'V kusovníku je u položky polotovar „P5 – 1500×3000". Co to je?',
+    opts:['Plech tloušťky 5 mm, tabule 1500 × 3000 mm','Profil 5× ohnutý','Pět kusů tyče 1500 mm','Plastová deska řady P5'], a:0,
+    why:'P = plech, číslo za ním tloušťka v mm, dále formát tabule. Obdobně TR Ø33,7×3 je trubka, JÄKL uzavřený profil, KR kruhová tyč, PLO pásovina.' },
+  { cat:'Praxe', q:'Správný první krok při čtení nového výkresu je…',
+    opts:['Přečíst popisové pole: název, číslo, revizi, materiál, tolerování a poznámky','Začít měřit největší pohled','Spočítat díry','Podívat se na razítko až nakonec'], a:0,
+    why:'Vždy stejný rituál: nejdřív razítko a poznámky (co to je, jaká revize, z čeho, jaké obecné tolerance), pak měřítko, pohledy, kóty, svary a kusovník.' },
+  { cat:'Praxe', q:'Na výkrese chybí kóta, dá se ale dopočítat ze součtu ostatních. Co uděláš?',
+    opts:['Nahlásím konstrukci/mistrovi — dopočtená hodnota nemá toleranci a nevyrábí se podle ní','Dopočítám a vyrábím','Odhadnu podle oka','Použiju měřítko a pravítko'], a:0,
+    why:'Chybějící kóta je vada výkresu. Dopočet hromadí úchylky řetězce a nemá předepsanou toleranci — správný postup je nechat výkres doplnit (nová revize či písemné upřesnění).' }
+];
+
+/* Zamíchání odpovědí — správná odpověď nesmí být vždy první; index a se přepočítá */
+QUESTIONS.forEach(function(q){ var correct=q.opts[q.a]; for(var i=q.opts.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=q.opts[i]; q.opts[i]=q.opts[j]; q.opts[j]=t; } q.a=q.opts.indexOf(correct); });
+
+var answers = {};
+(function setTestLead(){
+  var el=document.getElementById('testLead'); if(!el) return;
+  var need=Math.ceil(QUESTIONS.length*0.8);
+  el.textContent=QUESTIONS.length+' otázek napříč všemi celky. Pro splnění potřebuješ alespoň 80 % ('+need+' správně). Výsledek se ukládá vedení, máš max 3 pokusy.';
+})();
+(function renderQuiz(){
+  var host=document.getElementById('quiz');
+  host.innerHTML = QUESTIONS.map(function(q,i){
+    var opts = q.opts.map(function(o,oi){ return '<button data-q="'+i+'" data-o="'+oi+'" onclick="pick('+i+','+oi+')">'+esc(o)+'</button>'; }).join('');
+    return '<div class="quiz-card" data-card="'+i+'"><div class="quiz-cat">'+esc(q.cat)+' · otázka '+(i+1)+'/'+QUESTIONS.length+'</div>'+
+      '<div class="quiz-q">'+esc(q.q)+'</div><div class="quiz-opts">'+opts+'</div>'+
+      '<div class="feedback" data-fb="'+i+'"></div></div>';
+  }).join('');
+})();
+function pick(qi,oi){
+  if(AX.locked) return;
+  answers[qi]=oi; updateProgress();
+  var card=document.querySelector('.quiz-card[data-card="'+qi+'"]');
+  card.querySelectorAll('button').forEach(function(b){ b.classList.remove('correct','wrong'); var o=Number(b.dataset.o);
+    if(o===QUESTIONS[qi].a) b.classList.add('correct'); else if(o===oi) b.classList.add('wrong'); });
+  var fb=card.querySelector('.feedback'); fb.style.display='block';
+  fb.innerHTML=(oi===QUESTIONS[qi].a?'<b style="color:#2f7430">Správně.</b> ':'<b style="color:#932b2b">Nesprávně.</b> ')+esc(QUESTIONS[qi].why);
+}
+function updateProgress(){
+  var done=Object.keys(answers).length, pct=Math.round(done/QUESTIONS.length*100);
+  document.getElementById('pbar').style.width=pct+'%';
+  document.getElementById('plabel').textContent=pct+' %';
+}
+
+/* ---- Napojení na intranet: identita + limit 3 pokusů + odeslání výsledku ---- */
+var AX = { email:'', name:'', attemptsUsed:0, locked:false };
+(function(){ try{ var h=location.hash||''; var me=(h.match(/kdo=([^&]+)/i)||[])[1]; var nm=(h.match(/jmeno=([^&]+)/i)||[])[1]; if(me) AX.email=decodeURIComponent(me); if(nm) AX.name=decodeURIComponent(nm); }catch(e){} })();
+function lockUI(){ var b=document.getElementById('finishBtn'); if(b){ b.disabled=true; b.textContent='Pokusy vyčerpány (3/3)'; } }
+function setAttInfo(t){ var el=document.getElementById('attInfo'); if(el) el.textContent=t; }
+(async function initStatus(){
+  if(!AX.email){ setAttInfo('Test si můžeš vyzkoušet; výsledek se ukládá jen po přihlášení v intranetu.'); return; }
+  try{ var j=await (await fetch('/api/vykresy-skoleni?email='+encodeURIComponent(AX.email),{cache:'no-store'})).json();
+    AX.attemptsUsed=(j&&j.attemptsUsed)||0;
+    if(AX.attemptsUsed>=3){ AX.locked=true; lockUI(); setAttInfo('Vyčerpal(a) jsi všechny 3 pokusy'+(j.best?(' · nejlepší výsledek '+j.best+' %'):'')+'.'); }
+    else setAttInfo(AX.attemptsUsed>0 ? ('Využito pokusů: '+AX.attemptsUsed+' / 3'+(j.best?(' · nejlepší '+j.best+' %'):'')) : 'Máš 3 pokusy na splnění testu (hranice 80 %).');
+  }catch(e){ setAttInfo('Máš 3 pokusy na splnění testu (hranice 80 %).'); }
+})();
+async function finishQuiz(){
+  if(AX.locked){ lockUI(); return; }
+  var total=QUESTIONS.length, correct=0;
+  QUESTIONS.forEach(function(q,i){ if(answers[i]===q.a) correct++; });
+  var pct=Math.round(correct/total*100), passed=pct>=80;
+  QUESTIONS.forEach(function(q,i){
+    var card=document.querySelector('.quiz-card[data-card="'+i+'"]');
+    card.querySelectorAll('button').forEach(function(b){ var o=Number(b.dataset.o);
+      b.classList.remove('correct','wrong'); if(o===q.a) b.classList.add('correct'); else if(answers[i]===o) b.classList.add('wrong'); });
+    var fb=card.querySelector('.feedback'); fb.style.display='block';
+    fb.innerHTML=(answers[i]===q.a?'<b style="color:#2f7430">Správně.</b> ':'<b style="color:#932b2b">Nesprávně.</b> ')+esc(q.why);
+  });
+  var note='';
+  if(AX.email){
+    try{ var j=await (await fetch('/api/vykresy-skoleni',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:AX.email,name:AX.name,correct:correct,total:total,pct:pct,passed:passed})})).json();
+      if(j&&j.blocked){ AX.locked=true; AX.attemptsUsed=3; lockUI(); note='<p style="color:#932b2b;font-weight:800;margin:8px 0 0">Vyčerpal(a) jsi všechny 3 pokusy — tento výsledek se už neuložil.</p>'; }
+      else if(j&&j.ok){ AX.attemptsUsed=j.attempt; if(j.attemptsLeft<=0){ AX.locked=true; lockUI(); }
+        note='<p style="margin:8px 0 0"><strong>Pokus '+j.attempt+' ze 3.</strong> '+(j.attemptsLeft>0?('Zbývají '+j.attemptsLeft+' pokusy.'):'Toto byl poslední pokus.')+' Výsledek byl odeslán vedení.</p>'; }
+      setAttInfo(AX.locked?'Pokusy vyčerpány (3/3).':('Využito pokusů: '+AX.attemptsUsed+' / 3'));
+    }catch(e){}
+  }
+  var r=document.getElementById('result'); r.style.display='block';
+  r.innerHTML='<h3 style="margin:0 0 6px">Výsledek testu</h3><div class="score-big">'+pct+' %</div>'+
+    '<p style="margin:6px 0 0">'+correct+'/'+total+' správně. '+(passed?'<b style="color:#2f7430">Splněno ✓</b>':'Nesplněno — vrať se záložkami k lekcím u špatně zodpovězených otázek a zkus další pokus.')+'</p>'+note;
+  document.getElementById('pbar').style.width='100%'; document.getElementById('plabel').textContent=pct+' %';
+  r.scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>

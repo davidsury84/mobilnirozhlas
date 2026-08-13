@@ -88,7 +88,10 @@ function mount(host) {
   const unitVal = r => (r.unitCost > 0 ? r.unitCost : (r.unitPrice || 0));
   const loadBilance = () => { try { return JSON.parse(fs.readFileSync(BAL_F, 'utf8')) || []; } catch (_) { return []; } };
   function pushBilance(B) {
-    const arr = loadBilance().filter(e => e.date !== B.date); arr.push(B);
+    const all = loadBilance(), old = all.find(e => e.date === B.date);
+    // Pojistka: nikdy nepřepiš už spočítané denní pohyby prázdnými (opakovaný sync téhož dne).
+    if (old && old.hasFlow && !B.hasFlow) { B = Object.assign({}, B, { flow: old.flow, hasFlow: true }); }
+    const arr = all.filter(e => e.date !== B.date); arr.push(B);
     arr.sort((a, b) => String(a.date).localeCompare(String(b.date))); while (arr.length > 120) arr.shift();
     try { fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} return arr;
   }
@@ -123,15 +126,15 @@ function mount(host) {
   function sumFlows(entries) { const s = emptyFlow(); (entries || []).forEach(e => { if (!e.flow) return; ['received', 'dispatched', 'newReserved', 'newOnOrder'].forEach(k => { s[k].ks += (e.flow[k] && e.flow[k].ks) || 0; s[k].kc += (e.flow[k] && e.flow[k].kc) || 0; }); }); return s; }
   function dayDeltas(L, P) { const d = {}; ['stock', 'dispo', 'onOrder', 'reserved'].forEach(k => { d[k] = { ks: (L[k].ks || 0) - (P ? (P[k].ks || 0) : (L[k].ks || 0)), kc: (L[k].kc || 0) - (P ? (P[k].kc || 0) : (L[k].kc || 0)) }; }); return d; }
   const hasEshop = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); return !!(e && host.employeeModules && host.employeeModules(e.email).indexOf('eshop') >= 0); } catch (_) { return false; } };
-  // bootstrap bilance z posledních denních souborů (aby naskočila hned, ne až s dalším souborem)
-  async function bootstrapBilance(xls, newest, parsedNewest, newestDate) {
+  // bootstrap / přepočet bilance z posledních denních souborů (naskočí hned; forceAll = přepiš i existující dny)
+  async function bootstrapBilance(xls, newest, parsedNewest, newestDate, forceAll) {
     const recent = xls.slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).slice(-14);
     let prevRows = null;
     for (const f of recent) {
       let rows, dt;
       if (f.id === newest.id) { rows = parsedNewest.rows; dt = newestDate; }
       else { const dl = await drive.downloadFileBase64(f.id, 20 * 1024 * 1024); rows = parseObjXlsx(Buffer.from(dl.base64, 'base64')).rows; dt = dateOfName(f.name); }
-      if (dt) pushBilance(computeBilance(rows, dt, prevRows));
+      if (dt) { const B = computeBilance(rows, dt, prevRows); if (forceAll) { const arr = loadBilance().filter(e => e.date !== dt); arr.push(B); arr.sort((a, b) => String(a.date).localeCompare(String(b.date))); try { fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} } else pushBilance(B); }
       prevRows = rows;
     }
     console.log('[nakup-report] bootstrap bilance z ' + recent.length + ' souborů');
@@ -157,10 +160,15 @@ function mount(host) {
           if (parsedNow && parsedNow.rows) { await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
         } catch (e) { console.warn('[nakup-report] pohyby (skip):', e.message); }
       }
-      if (loadBilance().length === 0) {
+      if (loadBilance().length === 0 || !st.bilanceFixV2) {
         try {
           let parsedNow = null; try { parsedNow = JSON.parse(fs.readFileSync(OBJ_LIVE, 'utf8')); } catch (_) {}
-          if (parsedNow && parsedNow.rows) { await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
+          if (parsedNow && parsedNow.rows) {
+            const force = loadBilance().length > 0;
+            await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today, force);
+            st.bilanceFixV2 = 1;
+            console.log('[nakup-report] bilance: ' + (force ? 'jednorázový přepočet historie' : 'bootstrap') + ' z denních souborů');
+          }
         } catch (e) { console.warn('[nakup-report] bilance (skip):', e.message); }
       }
       st.lastSyncDate = today; try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
@@ -175,12 +183,17 @@ function mount(host) {
       let prev = null; try { prev = JSON.parse(fs.readFileSync(PREV_F, 'utf8')); } catch (_) {}
       if (prev && prev.rows && prev.date) { if (prev.date !== dataDate) applyMovement(prev.rows, prev.date, parsed.rows, dataDate); }
       else if (Object.keys(loadMoves()).length === 0) { await bootstrapMovements(xls, newest, parsed, dataDate); }
-      // denní bilance skladu (stav + pohyby vs předchozí den); při prázdné historii bootstrap
-      try { if (loadBilance().length === 0) await bootstrapBilance(xls, newest, parsed, dataDate); else pushBilance(computeBilance(parsed.rows, dataDate, prev && prev.rows)); } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
+      // denní bilance skladu (stav + pohyby vs PŘEDCHOZÍ DEN — nikdy ne proti témuž dni, jinak vyjdou nulové pohyby)
+      try {
+        const prevForFlow = (prev && prev.rows && prev.date && prev.date !== dataDate) ? prev.rows : null;
+        if (loadBilance().length === 0) await bootstrapBilance(xls, newest, parsed, dataDate);
+        else if (!st.bilanceFixV2) { await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV2 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů'); }
+        else pushBilance(computeBilance(parsed.rows, dataDate, prevForFlow));
+      } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
       fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder, reserved: r.reserved })) }));
     } catch (e) { console.warn('[nakup-report] pohyby:', e.message); }
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));
-    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString() };
+    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV2: st.bilanceFixV2 || 0 };
     try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
     console.log('[nakup-report] Drive sync: ' + newest.name + ' → ' + parsed.rows.length + ' položek');
     return { ok: true, file: newest.name, rows: parsed.rows.length };
