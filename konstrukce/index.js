@@ -840,6 +840,277 @@ function mount(host) {
   // ======================================================================
   //  HTTP handler
   // ======================================================================
+  // ==========================================================================
+  //  ARCHIV VÝKRESŮ — index sdíleného Disku výroby Bruntál (service account)
+  //  Celý strom (ročníky → závody → zakázky) se projde přes Drive API a uloží
+  //  jako kompaktní index; konstruktér pak hledá výkresy podle kódu ABR
+  //  z dotazníku nebo fulltextem, s odkazy přímo do Drive. Obnova 1× denně.
+  // ==========================================================================
+  const VYK_F = path.join(host.dataDir || __dirname, 'konstrukce-vykresy.json');
+  const VYK_ROOT = host.vykresyRoot || '';
+  const VYK_MAX_SLOZEK = parseInt(process.env.VYKRESY_MAX_FOLDERS || '', 10) || 40000;
+  const VYK_MAX_SOUBORU = 300000;
+  // index: slozky [name, parentIdx, id] (kořen = idx 0, parent −1); soubory [folderIdx, name, id, ext]
+  let VYK = { builtAt: 0, root: '', slozky: [], soubory: [] };
+  try { const v = JSON.parse(fs.readFileSync(VYK_F, 'utf8')); if (v && Array.isArray(v.slozky)) VYK = v; } catch (_) {}
+  let vykRun = null;      // probíhající crawl: {startedAt, slozky, soubory, chyba}
+  let VYK_S = null;       // odvozené vyhledávací struktury (lazy)
+
+  function vykNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[×]/g, 'x'); }
+  function vykExt(name, mime) {
+    const m = String(name || '').match(/\.([a-z0-9]{1,7})$/i);
+    if (m) return m[1].toLowerCase();
+    if (/pdf/.test(mime)) return 'pdf';
+    return '';
+  }
+
+  // ---- crawl (BFS, stránkování, 4 souběžné požadavky, limity) --------------
+  async function vykCrawl() {
+    if (!host.drive || !host.drive.available() || !VYK_ROOT || vykRun) return;
+    const run = vykRun = { startedAt: Date.now(), slozky: 0, soubory: 0, chyba: '' };
+    let token = '', tokenAt = 0;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    async function driveGet(apiPath) {
+      for (let a = 0; ; a++) {
+        if (!token || Date.now() - tokenAt > 40 * 60 * 1000) { token = await host.drive.token(); tokenAt = Date.now(); }
+        try {
+          return await new Promise((resolve, reject) => {
+            const r = https.request({ method: 'GET', hostname: 'www.googleapis.com', path: apiPath, headers: { Authorization: 'Bearer ' + token } }, resp => {
+              let d = ''; resp.on('data', c => d += c); resp.on('end', () => {
+                if (resp.statusCode >= 200 && resp.statusCode < 300) { try { resolve(JSON.parse(d)); } catch (e) { reject(e); } return; }
+                const e = new Error('Drive ' + resp.statusCode + ': ' + d.slice(0, 160)); e.status = resp.statusCode; reject(e);
+              });
+            });
+            r.on('error', reject); r.setTimeout(30000, () => { try { r.destroy(new Error('Drive: časový limit.')); } catch (_) {} }); r.end();
+          });
+        } catch (e) {
+          if (a >= 3) throw e;
+          if (e.status === 401) { token = ''; continue; }
+          if (e.status === 403 || e.status === 429 || (e.status >= 500 && e.status < 600) || !e.status) { await sleep(1500 * (a + 1)); continue; }
+          throw e;
+        }
+      }
+    }
+    const slozky = [['', -1, VYK_ROOT]];
+    const soubory = [];
+    const fronta = [{ idx: 0, depth: 0 }];
+    async function projdiSlozku(job) {
+      const id = slozky[job.idx][2];
+      let pageToken = '';
+      do {
+        const q = encodeURIComponent(`'${id}' in parents and trashed=false`);
+        const j = await driveGet(`/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''}`);
+        for (const f of (j.files || [])) {
+          if (f.mimeType === 'application/vnd.google-apps.folder') {
+            if (slozky.length >= VYK_MAX_SLOZEK || job.depth >= 12) continue;
+            slozky.push([f.name || '', job.idx, f.id]);
+            fronta.push({ idx: slozky.length - 1, depth: job.depth + 1 });
+          } else {
+            if (f.mimeType === 'application/vnd.google-apps.shortcut') continue;
+            const ext = vykExt(f.name, f.mimeType || '');
+            if (ext === 'lnk') continue;
+            if (soubory.length < VYK_MAX_SOUBORU) soubory.push([job.idx, f.name || '', f.id, ext]);
+          }
+        }
+        pageToken = j.nextPageToken || '';
+      } while (pageToken);
+      run.slozky = slozky.length; run.soubory = soubory.length;
+    }
+    try {
+      // 4 pracovníci nad společnou frontou (fronta během práce roste)
+      let qi = 0, active = 0, err = null;
+      await new Promise((resolve) => {
+        const next = () => {
+          if (err) { if (!active) resolve(); return; }
+          while (active < 4 && qi < fronta.length) {
+            const job = fronta[qi++]; active++;
+            projdiSlozku(job).then(() => { active--; next(); }).catch(e => { err = e; active--; next(); });
+          }
+          if (!active && qi >= fronta.length) resolve();
+        };
+        next();
+      });
+      if (err) throw err;
+      VYK = { builtAt: Date.now(), root: VYK_ROOT, slozky, soubory };
+      VYK_S = null;
+      try { fs.writeFileSync(VYK_F, JSON.stringify(VYK)); } catch (e) { console.error('[konstrukce] zápis indexu výkresů:', e.message); }
+      console.log('[konstrukce] archiv výkresů: ' + slozky.length + ' složek, ' + soubory.length + ' souborů za ' + Math.round((Date.now() - run.startedAt) / 1000) + ' s');
+    } catch (e) {
+      console.error('[konstrukce] crawl archivu výkresů selhal:', e.message);
+      run.chyba = e.message;
+      // starý index zůstává v platnosti
+    } finally {
+      vykRun = (run.chyba ? { startedAt: 0, slozky: 0, soubory: 0, chyba: run.chyba, skoncil: Date.now() } : null);
+      if (vykRun) setTimeout(() => { if (vykRun && vykRun.chyba) vykRun = null; }, 10 * 60 * 1000); // chybu ukazuj max 10 minut
+    }
+  }
+  function vykAutoRefresh() {
+    if (!host.drive || !host.drive.available() || !VYK_ROOT) return;
+    if (vykRun && !vykRun.chyba) return;
+    if (Date.now() - (VYK.builtAt || 0) > 24 * 60 * 60 * 1000) { vykRun = null; vykCrawl(); }
+  }
+
+  // ---- odvozené struktury pro hledání (cesty, roky, haystack) --------------
+  const VYK_ZAVODY = ['BRUNTÁL', 'SUPIKOVICE', 'SUPÍKOVICE', 'POLSKO', 'CHOMUTOV', 'BEDNY'];
+  function vykIndex() {
+    if (VYK_S && VYK_S.builtAt === VYK.builtAt) return VYK_S;
+    const n = VYK.slozky.length;
+    const cesty = new Array(n), roky = new Array(n), zavody = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const [name, par] = VYK.slozky[i];
+      cesty[i] = (par >= 0 && cesty[par] ? cesty[par] + ' / ' : '') + (name || '');
+      const rm = (name || '').match(/\b(20[0-3]\d)\b/);
+      const zm = rm ? null : (name || '').match(/^([12]\d)-[A-Z]-\d/);   // „24-B-498" → 2024
+      roky[i] = rm ? parseInt(rm[1], 10) : (zm ? 2000 + parseInt(zm[1], 10) : (par >= 0 ? roky[par] : 0));
+      const zn = vykNorm(name);
+      zavody[i] = VYK_ZAVODY.find(z => vykNorm(z) === zn) ? name.toUpperCase() : (par >= 0 ? zavody[par] : '');
+    }
+    // soubory seskupené dle složky + haystack (cesta + názvy souborů, normalizováno)
+    const skupiny = new Map();
+    for (let si = 0; si < VYK.soubory.length; si++) {
+      const fi = VYK.soubory[si][0];
+      let g = skupiny.get(fi); if (!g) { g = []; skupiny.set(fi, g); }
+      g.push(si);
+    }
+    const hay = new Map();
+    for (const [fi, list] of skupiny) {
+      let h = vykNorm(cesty[fi]);
+      for (const si of list) h += ' ' + vykNorm(VYK.soubory[si][1]);
+      hay.set(fi, h);
+    }
+    VYK_S = { builtAt: VYK.builtAt, cesty, roky, zavody, skupiny, hay };
+    return VYK_S;
+  }
+
+  // ---- rozklad kódu ABR na porovnatelné části ------------------------------
+  function vykParseKod(kod) {
+    const t = String(kod || '').trim().replace(/^ABR-/i, '').split('-').filter(Boolean);
+    const out = { typ: '', dims: null, plechy: '', segs: [] };
+    let i = 0;
+    if (t[i] && /^[a-z]{2,4}$/i.test(t[i])) out.typ = t[i++].toLowerCase();
+    for (; i < t.length; i++) {
+      const dm = t[i].match(/^(\d{3,4})x(\d{3,4})x(\d{3,4})$/i);
+      if (dm) { out.dims = [+dm[1], +dm[2], +dm[3]]; if (/^\d{2}$/.test(t[i + 1] || '')) out.plechy = t[++i]; continue; }
+      out.segs.push(t[i]);
+    }
+    return out;
+  }
+  const vykReEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function vykHasTok(hay, tok) {
+    if (!tok) return false;
+    return new RegExp('(^|[^a-z0-9])' + vykReEsc(tok) + '($|[^a-z0-9])').test(hay);
+  }
+
+  // ---- vyhledávání: skóre složek dle kódu a/nebo fulltextu -----------------
+  function vykSearch(kod, q, limit) {
+    const S = vykIndex();
+    const pk = kod ? vykParseKod(kod) : null;
+    const toks = vykNorm(q || '').split(/\s+/).filter(Boolean);
+    const segVar = seg => { const s = vykNorm(seg); return [s, s.replace(/_/g, '/'), s.replace(/_/g, '-')]; };
+    const out = [];
+    for (const [fi, list] of S.skupiny) {
+      const h = S.hay.get(fi) || '';
+      let score = 0;
+      if (toks.length) {
+        let hit = 0;
+        for (const tk of toks) if (h.includes(tk)) hit++;
+        if (!pk && hit < toks.length) continue;      // čistý fulltext: musí sedět všechna slova
+        score += hit * 10;
+      }
+      let dimScore = 0;
+      if (pk) {
+        if (pk.dims) {
+          const [L, W, H] = pk.dims;
+          let re = /(\d{3,4})x(\d{3,4})x(\d{3,4})/g, m;
+          while ((m = re.exec(h))) {
+            const l = +m[1], w = +m[2], v = +m[3];
+            let s = 0;
+            if (l === L && w === W && v === H) s = 45;
+            else if (l === L && w === W && Math.abs(v - H) <= 400) s = 20 + Math.round((400 - Math.abs(v - H)) / 40);
+            else {
+              if (Math.abs(l - L) <= 60) s += 7;
+              if (Math.abs(w - W) <= 60) s += 6;
+              if (Math.abs(v - H) <= 60) s += 6;
+              if (s < 13) s = 0;                      // shoda jen jednoho rozměru nic neznamená
+            }
+            if (s > dimScore) dimScore = s;
+            if (s === 45 && pk.plechy && h.includes(m[0] + '-' + pk.plechy)) { dimScore = 53; break; }
+          }
+          score += dimScore;
+        }
+        if (pk.typ && (h.includes('abr-' + pk.typ) || vykHasTok(h, pk.typ))) score += 25;
+        for (const seg of pk.segs) {
+          const vars = segVar(seg);
+          if (vars.some(v => vykHasTok(h, v))) score += 7; else score -= 1;
+        }
+        if (pk.dims && dimScore === 0 && score < 40) continue;  // bez rozměrové shody jen při silné shodě jinde
+        if (score < 25) continue;
+      }
+      if (!pk && !toks.length) continue;
+      score += Math.min(6, Math.max(0, ((S.roky[fi] || 2012) - 2012) * 0.5));
+      if (vykNorm(S.zavody[fi] || '') === 'bruntal') score += 3;
+      out.push([score, fi]);
+    }
+    out.sort((a, b) => b[0] - a[0] || (S.roky[b[1]] || 0) - (S.roky[a[1]] || 0));
+    const extRank = e => (e === 'pdf' ? 0 : (e === 'xlsx' || e === 'xls') ? 1 : (e === 'dwg' || e === 'dxf') ? 2 : 3);
+    const KOD_RE = /ABR[-_ ]?[A-Z]{2,4}-\d{3,4}x\d{3,4}x\d{3,4}[A-Za-z0-9_\-]*/;
+    return out.slice(0, limit || 20).map(([score, fi]) => {
+      const list = (S.skupiny.get(fi) || []).slice();
+      list.sort((a, b) => extRank(VYK.soubory[a][3]) - extRank(VYK.soubory[b][3]) || String(VYK.soubory[a][1]).localeCompare(String(VYK.soubory[b][1]), 'cs'));
+      const cistKod = k => String(k || '').replace(/[-_ ]?KUSOVN[A-Za-z0-9]*$/i, '').replace(/[-_ ]?V[YÝ]KRES[A-Za-z0-9]*$/i, '').replace(/[-_ ]?ver\d*$/i, '').replace(/[-_]+$/, '');
+      let kodNalez = '';
+      for (const si of list) { const m = String(VYK.soubory[si][1]).match(KOD_RE); if (m) { const k = cistKod(m[0]); if (k.length > kodNalez.length) kodNalez = k; } }
+      if (!kodNalez) { const m = String(S.cesty[fi]).match(KOD_RE); if (m) kodNalez = cistKod(m[0]); }
+      return {
+        id: VYK.slozky[fi][2],
+        nazev: VYK.slozky[fi][0],
+        cesta: S.cesty[fi],
+        rok: S.roky[fi] || null,
+        zavod: S.zavody[fi] || '',
+        link: 'https://drive.google.com/drive/folders/' + VYK.slozky[fi][2],
+        score: Math.round(score),
+        kod: kodNalez,
+        soubory: list.slice(0, 14).map(si => ({
+          n: VYK.soubory[si][1], typ: VYK.soubory[si][3] || '',
+          link: 'https://drive.google.com/file/d/' + VYK.soubory[si][2] + '/view',
+        })),
+        dalsich: Math.max(0, list.length - 14),
+      };
+    });
+  }
+
+  function vykStatus() {
+    return {
+      dostupny: !!(host.drive && host.drive.available() && VYK_ROOT),
+      builtAt: VYK.builtAt || 0,
+      slozek: VYK.slozky.length ? VYK.slozky.length - 1 : 0,
+      souboru: VYK.soubory.length,
+      bezi: !!(vykRun && !vykRun.chyba),
+      prubeh: (vykRun && !vykRun.chyba) ? { slozky: vykRun.slozky, soubory: vykRun.soubory } : null,
+      chyba: (vykRun && vykRun.chyba) || '',
+    };
+  }
+  function apiVykresy(req, res, query) {
+    const kod = String((query || {}).kod || '').trim().slice(0, 300);
+    const q = String((query || {}).q || '').trim().slice(0, 200);
+    // první dotaz bez indexu → spustí crawl na pozadí
+    if (!VYK.builtAt && !vykRun) vykCrawl();
+    let vysledky = [];
+    if (VYK.builtAt && (kod || q)) {
+      try { vysledky = vykSearch(kod, q, 20); } catch (e) { console.error('[konstrukce] hledání výkresů:', e.message); }
+    }
+    json(res, 200, { ok: true, status: vykStatus(), vysledky });
+    return true;
+  }
+  function apiVykresyReindex(req, res) {
+    const me = roleOf(req);
+    if (!(me.isAdmin || ['sef', 'konstrukter', 'reditel', 'vykonny-reditel'].includes(me.role))) { json(res, 403, { chyba: 'Reindexaci může spustit jen konstrukce nebo správce.' }); return true; }
+    if (vykRun && !vykRun.chyba) { json(res, 200, { ok: true, status: vykStatus() }); return true; }
+    vykRun = null; vykCrawl();
+    json(res, 200, { ok: true, status: vykStatus() });
+    return true;
+  }
+
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true);
     const p = u.pathname;
@@ -880,6 +1151,8 @@ function mount(host) {
         res.end(fs.readFileSync(fp)); return true;
       }
       if (p === '/api/konstrukce/me' && req.method === 'GET') return apiMe(req, res);
+      if (p === '/api/konstrukce/vykresy' && req.method === 'GET') return apiVykresy(req, res, u.query);
+      if (p === '/api/konstrukce/vykresy/reindex' && req.method === 'POST') return apiVykresyReindex(req, res);
       if (p === '/api/konstrukce/data' && req.method === 'GET') return apiData(req, res);
       if (p === '/api/konstrukce/zakazka' && req.method === 'POST') return apiCreate(req, res);
       if (p === '/api/konstrukce/prideli' && req.method === 'POST') return apiAssign(req, res);
@@ -1888,6 +2161,7 @@ function mount(host) {
   //  Eskalace (tick) — termíny, semafory, připomínky klientovi (kap. 5)
   // ======================================================================
   async function tick() {
+    try { vykAutoRefresh(); } catch (_) {}   // denní obnova indexu archivu výkresů (nezávisle na rozesílkách)
     if (host.reportDisabled && host.reportDisabled('konstrukce-eskalace')) return;   // zrušeno v přehledu Rozesílky
     const d = load();
     let changed = false;

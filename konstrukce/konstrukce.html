@@ -382,6 +382,25 @@ select.dq2-opt{width:100%;max-width:560px}
 .dfilt:hover{background:#f0f3ee}
 .dfilt.act{background:var(--g);color:#fff;border-color:var(--g)}
 .dfilt b{font-weight:800}
+/* ---- archiv výkresů (Disk Bruntál) ---- */
+.archlist{display:flex;flex-direction:column;gap:10px}
+.archrow{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 13px}
+.archh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.archh a{color:inherit;text-decoration:none}
+.archh a:hover b{text-decoration:underline}
+.archm{color:#7c8a80;font-size:12px;white-space:nowrap}
+.archk code{font-weight:800;font-size:11.5px;overflow-wrap:anywhere}
+.archp{font-size:11.5px;overflow-wrap:anywhere;margin-top:2px}
+.archfs{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.archf{font-size:11.5px;border:1px solid var(--line);border-radius:7px;padding:3px 7px;text-decoration:none;color:#33413b;background:#fff;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.archf:hover{border-color:var(--g);color:var(--g)}
+.archf.t-pdf{border-color:#e5b5b0;background:#fdf6f5}
+.archf.t-dxf,.archf.t-dwg{border-color:#b9c8e2;background:#f4f7fc}
+.archf.t-xlsx,.archf.t-xls{border-color:#b5d4b8;background:#f3faf3}
+.dq-extra{display:flex;gap:14px;margin-top:14px;align-items:flex-start;flex-wrap:wrap}
+.dq-svgbox{flex:0 0 350px;max-width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px}
+.dq-svgbox svg{display:block;width:100%;height:auto}
+#dqArchWrap{flex:1;min-width:260px}
 </style>
 </head>
 <body>
@@ -487,6 +506,7 @@ function renderSide(){
   h+=chip('open','Otevřené',c.open);
   h+=chip('all','Vše',c.all);
   h+='<button class="chip'+(FILTER==='workflow'?' act':'')+'" onclick="setFilter(\'workflow\')"><span>Postup (schéma)</span></button>';
+  h+='<div class="grp">Výkresy</div><button class="chip'+(FILTER==='archiv'?' act':'')+'" onclick="setFilter(\'archiv\')"><span>🗂 Archiv výkresů</span></button>';
   if(MODE!=='nabidka'&&(ME.isAdmin||ME.role==='sef')){h+='<div class="grp">Konstrukce</div>';h+='<button class="chip'+(FILTER==='kapacity'?' act':'')+'" onclick="setFilter(\'kapacity\')"><span>Kapacity</span></button>';}
   if(MODE!=='nabidka'&&(ME.isAdmin||ME.role==='reditel')){h+='<button class="chip'+(FILTER==='kpi'?' act':'')+'" onclick="setFilter(\'kpi\')"><span>KPI ředitele</span></button>';}
   if(MODE!=='nabidka'&&(ME.isAdmin||ME.role==='konstrukter'||ME.role==='sef'||ME.role==='reditel')){h+='<div class="grp">Evidence</div>';h+='<button class="chip'+(FILTER==='evidence'?' act':'')+'" onclick="setFilter(\'evidence\')"><span>Evidence práce</span></button>';}
@@ -517,6 +537,7 @@ function filtered(){
 function renderMain(){
   var m=document.getElementById('main');
   if(FILTER==='dash')return renderDash(m);
+  if(FILTER==='archiv')return renderArchiv(m);
   if(FILTER==='kapacity')return renderKapacity(m);
   if(FILTER==='kpi')return renderKpi(m);
   if(FILTER==='workflow')return renderWorkflow(m);
@@ -1277,6 +1298,262 @@ function toggleNotif(){
 /* ---- detail (drawer) ---- */
 function openDrawer(id){SEL=id;var z=D.zakazky.find(function(x){return x.id===id});if(!z)return;renderDrawer(z);document.getElementById('ov').classList.add('open');document.getElementById('drawer').classList.add('open')}
 function closeDrawer(){SEL=null;document.getElementById('ov').classList.remove('open');document.getElementById('drawer').classList.remove('open')}
+/* ==================== ARCHIV VÝKRESŮ (Disk Bruntál) + VIZUALIZACE ==================== */
+/* Server indexuje sdílený Disk výroby; klient hledá dle kódu ABR nebo fulltextu.
+   svgAbr() kreslí schematický bokorys + zadní čelo kontejneru z dotazníku. */
+function abrTok(v){
+  if(v==null)return '';
+  var s=(typeof v==='string')?v:((v.volba==='pozadavek')?'':String(v.hodnota||''));
+  var kd=s.trim().split(/[\s—–]+/)[0]||'';
+  return (kd==='NE'||kd==='—')?'':kd;
+}
+function abrSpecFromDot(z){
+  if(ABR_RADY_JS.indexOf(z.typKey)<0)return null;
+  var dot=z.dotaznik||{};
+  return {typ:String(z.typKey||'').toUpperCase(),
+    roz:(typeof dot.rozmery==='string'?dot.rozmery:''),
+    plechy:(String(abrTok(dot.provedeni)).match(/\d\s*\/\s*\d/)||[])[0]||'',
+    natah:abrTok(dot.natahovani),vrata:abrTok(dot.vrata),klapka:abrTok(dot.klapka),
+    vlajka:abrTok(dot.vlajka),zebrik:abrTok(dot.zebrik),rolny:abrTok(dot.rolny),
+    strecha:abrTok(dot.strecha),sklopna:abrTok(dot.sklopnaBocnice)};
+}
+function abrSpecFromForm(){
+  var t=curType(); if(ABR_RADY_JS.indexOf(t.key)<0)return null;
+  function fk(k){var f=dqField(k);if(!f||f.std===undefined)return '';var vol=selVolba(k);if(vol==='pozadavek')return '';
+    var hod=(vol==='standard')?f.std:(selOptVal(k)||'');var kd=String(hod).trim().split(/[\s—–]+/)[0]||'';return (kd==='NE'||kd==='—')?'':kd;}
+  return {typ:String(t.key||'').toUpperCase(),
+    roz:((document.getElementById('dq_rozmery')||{}).value||''),
+    plechy:(String(fk('provedeni')).match(/\d\s*\/\s*\d/)||[])[0]||'',
+    natah:fk('natahovani'),vrata:fk('vrata'),klapka:fk('klapka'),vlajka:fk('vlajka'),
+    zebrik:fk('zebrik'),rolny:fk('rolny'),strecha:fk('strecha'),sklopna:fk('sklopnaBocnice')};
+}
+/* Schematický výkres: bokorys (hák vlevo, vrata vpravo) + zadní čelo. Jen orientační proporce. */
+function svgAbr(spec){
+  if(!spec)return '';
+  var roz=String(spec.roz||'').replace(/\s+/g,'').replace(/[×X]/g,'x');
+  var m=roz.match(/^(\d{3,4})x(\d{3,4})x(\d{3,4})/);
+  if(!m)return '';
+  var L=+m[1],W=+m[2],H=+m[3];
+  if(L<2500||L>9000||W<1200||W>3200||H<500||H>3200)return '';
+  var C='#33413b',A='#0f7a3d',RIB='#c3d1c8',DIM='#7c8a80';
+  var sc=Math.min(328/L,148/H);
+  var x0=42,gy=212,sk=7,fl=4;
+  var Lpx=L*sc,Hpx=H*sc,x1=x0+Lpx,bb=gy-sk,bt=bb-Hpx;
+  var s='';
+  function ln(a,b,c,d,col,wd,dash){s+='<line x1="'+a.toFixed(1)+'" y1="'+b.toFixed(1)+'" x2="'+c.toFixed(1)+'" y2="'+d.toFixed(1)+'" stroke="'+(col||C)+'" stroke-width="'+(wd||1.3)+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+' stroke-linecap="round"/>'}
+  function tx(x,y,t,size,col,anchor,bold){s+='<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" font-size="'+(size||10)+'" fill="'+(col||DIM)+'"'+(anchor?' text-anchor="'+anchor+'"':'')+(bold?' font-weight="700"':'')+' font-family="system-ui,sans-serif">'+esc(t)+'</text>'}
+  // země
+  ln(14,gy+1,546,gy+1,'#dce4de',1.5);
+  // lyžina + korba (bokorys)
+  s+='<rect x="'+(x0+8).toFixed(1)+'" y="'+bb.toFixed(1)+'" width="'+(Lpx-16).toFixed(1)+'" height="'+sk+'" fill="#e7eee9" stroke="'+C+'" stroke-width="1.1"/>';
+  s+='<rect x="'+x0.toFixed(1)+'" y="'+bt.toFixed(1)+'" width="'+Lpx.toFixed(1)+'" height="'+Hpx.toFixed(1)+'" fill="#f7fbf8" stroke="'+C+'" stroke-width="1.7"/>';
+  ln(x0+1,bb-fl,x1-1,bb-fl,C,0.8);                                  // podlaha
+  var nR=Math.max(2,Math.round(L/1000));                            // výztuhy bočnice
+  for(var i=1;i<=nR;i++){var rx=x0+Lpx*i/(nR+1);ln(rx,bt+3,rx,bb-2,RIB,1);}
+  // natahování — hák na čele (výška dle kódu, standard 1570)
+  var hookH=parseInt((String(spec.natah).match(/(\d{3,4})/)||[])[1]||'1570',10);
+  if(!(hookH>=700&&hookH<=2200))hookH=1570;
+  var hy=gy-hookH*sc;
+  ln(x0+2,hy+2,x0+2,bb-1,C,1.5);                                    // sloupek háku
+  ln(x0+2,hy+12,x0+30,bb-4,C,1.1);                                  // vzpěra
+  ln(x0,hy,x0-10,hy,C,1.6);                                         // rameno
+  s+='<path d="M '+(x0-10).toFixed(1)+' '+(hy-7).toFixed(1)+' A 7.5 7.5 0 1 0 '+(x0-10).toFixed(1)+' '+(hy+8).toFixed(1)+'" fill="none" stroke="'+C+'" stroke-width="1.9"/>';
+  if(spec.natah)tx(6,hy-12,spec.natah,8.5,A,null,true);
+  // žebřík (od výšky 1500, Z0 = bez)
+  if(spec.zebrik&&spec.zebrik!=='Z0'&&H>=1500){
+    var xz1=x1-42,xz2=x1-30;
+    ln(xz1,bt+7,xz1,bb-1,C,1.1);ln(xz2,bt+7,xz2,bb-1,C,1.1);
+    for(var y=bt+12;y<bb-3;y+=9)ln(xz1,y,xz2,y,C,1);
+  }
+  // sklopná bočnice — pant v horní části
+  if(spec.sklopna){
+    var yy=bt+Hpx*0.42;
+    ln(x0+6,yy,x1-6,yy,A,1.1,'5 4');
+    [0.25,0.5,0.75].forEach(function(p){s+='<circle cx="'+(x0+Lpx*p).toFixed(1)+'" cy="'+yy.toFixed(1)+'" r="2.1" fill="#fff" stroke="'+A+'" stroke-width="1.1"/>'});
+  }
+  // rolny vzadu
+  if(spec.rolny)s+='<circle cx="'+(x1-15).toFixed(1)+'" cy="'+(gy-5).toFixed(1)+'" r="5.5" fill="#fff" stroke="'+C+'" stroke-width="1.4"/>';
+  // zadní hrana: vrata / klapka / vlajka
+  if(spec.vrata){
+    ln(x1+3.5,bt+1,x1+3.5,bb-1,A,2);
+    s+='<circle cx="'+(x1+3.5).toFixed(1)+'" cy="'+(bt+10).toFixed(1)+'" r="1.8" fill="'+A+'"/><circle cx="'+(x1+3.5).toFixed(1)+'" cy="'+(bb-12).toFixed(1)+'" r="1.8" fill="'+A+'"/>';
+    ln(x1+3.5,(bt+bb)/2,x1+9,(bt+bb)/2,A,1.6);
+  }
+  if(spec.klapka){
+    ln(x1,bt+1,x1+22,bt+Hpx*0.4,A,1.4,'6 4');
+    s+='<circle cx="'+x1.toFixed(1)+'" cy="'+(bt+1.5).toFixed(1)+'" r="2.2" fill="'+A+'"/>';
+  }
+  if(spec.vlajka){
+    ln(x1-9,bt,x1-9,bt-17,C,1.3);
+    s+='<polygon points="'+(x1-9).toFixed(1)+','+(bt-17).toFixed(1)+' '+(x1+5).toFixed(1)+','+(bt-13).toFixed(1)+' '+(x1-9).toFixed(1)+','+(bt-9).toFixed(1)+'" fill="'+A+'" opacity="0.85"/>';
+  }
+  // střecha dle prefixu kódu
+  var st=String(spec.strecha||''),mid=(x0+x1)/2;
+  if(/^(SM|SH|AS|SP)/.test(st)){
+    var stp=Lpx/4;
+    for(var a2=0;a2<4;a2++)s+='<path d="M '+(x0+stp*a2).toFixed(1)+' '+bt.toFixed(1)+' A '+(stp/2).toFixed(1)+' 13 0 0 1 '+(x0+stp*(a2+1)).toFixed(1)+' '+bt.toFixed(1)+'" fill="none" stroke="'+C+'" stroke-width="1.2"/>';
+  }else if(/^SFX/.test(st)){
+    s+='<polyline points="'+x0.toFixed(1)+','+bt.toFixed(1)+' '+mid.toFixed(1)+','+(bt-17).toFixed(1)+' '+x1.toFixed(1)+','+bt.toFixed(1)+'" fill="none" stroke="'+C+'" stroke-width="1.4"/>';
+  }else if(/^(PR|PD|PP)/.test(st)){
+    s+='<path d="M '+x0.toFixed(1)+' '+bt.toFixed(1)+' Q '+mid.toFixed(1)+' '+(bt-15).toFixed(1)+' '+x1.toFixed(1)+' '+bt.toFixed(1)+'" fill="none" stroke="'+C+'" stroke-width="1.2" stroke-dasharray="6 4"/>';
+  }else if(/^(RS|DV|SD)/.test(st)){
+    ln(x0+2,bt-5,x1-2,bt-5,C,1.4);
+  }
+  if(st)tx(mid,bt-21,st,8.5,A,'middle',true);
+  // kóty bokorysu
+  ln(x0,gy+16,x1,gy+16,DIM,1);ln(x0,gy+12,x0,gy+20,DIM,1);ln(x1,gy+12,x1,gy+20,DIM,1);
+  tx((x0+x1)/2,gy+29,String(L),10,DIM,'middle',true);
+  ln(x1+30,bt,x1+30,bb,DIM,1);ln(x1+26,bt,x1+34,bt,DIM,1);ln(x1+26,bb,x1+34,bb,DIM,1);
+  s+='<text transform="rotate(-90 '+(x1+42).toFixed(1)+' '+((bt+bb)/2).toFixed(1)+')" x="'+(x1+42).toFixed(1)+'" y="'+((bt+bb)/2).toFixed(1)+'" font-size="10" font-weight="700" fill="'+DIM+'" text-anchor="middle" font-family="system-ui,sans-serif">'+H+'</text>';
+  // zadní čelo (pohled zezadu)
+  var cx=492,scR=Math.min(104/W,148/H),WR=W*scR,HR=H*scR,xr=cx-WR/2,btR=bb-HR;
+  s+='<rect x="'+xr.toFixed(1)+'" y="'+btR.toFixed(1)+'" width="'+WR.toFixed(1)+'" height="'+HR.toFixed(1)+'" fill="#f7fbf8" stroke="'+C+'" stroke-width="1.5"/>';
+  var lz=Math.min(530,(W-260)/2)*scR;
+  s+='<rect x="'+(cx-lz-4).toFixed(1)+'" y="'+bb.toFixed(1)+'" width="8" height="'+sk+'" fill="#e7eee9" stroke="'+C+'" stroke-width="1"/>';
+  s+='<rect x="'+(cx+lz-4).toFixed(1)+'" y="'+bb.toFixed(1)+'" width="8" height="'+sk+'" fill="#e7eee9" stroke="'+C+'" stroke-width="1"/>';
+  if(spec.rolny){s+='<circle cx="'+(cx-lz).toFixed(1)+'" cy="'+(gy-3.5).toFixed(1)+'" r="3.8" fill="#fff" stroke="'+C+'" stroke-width="1.1"/><circle cx="'+(cx+lz).toFixed(1)+'" cy="'+(gy-3.5).toFixed(1)+'" r="3.8" fill="#fff" stroke="'+C+'" stroke-width="1.1"/>'}
+  if(spec.vrata){
+    ln(cx,btR+3,cx,bb-3,C,1.1);
+    ln(cx-7,(btR+bb)/2,cx-3,(btR+bb)/2,A,1.6);ln(cx+3,(btR+bb)/2,cx+7,(btR+bb)/2,A,1.6);
+  }
+  if(spec.klapka){
+    var ky=btR+HR*(spec.vrata?0.45:0.42);
+    ln(xr+3,ky,xr+WR-3,ky,A,1.2,'5 4');
+    s+='<circle cx="'+(xr+4).toFixed(1)+'" cy="'+(btR+4).toFixed(1)+'" r="1.8" fill="'+A+'"/><circle cx="'+(xr+WR-4).toFixed(1)+'" cy="'+(btR+4).toFixed(1)+'" r="1.8" fill="'+A+'"/>';
+  }
+  ln(xr,gy+16,xr+WR,gy+16,DIM,1);ln(xr,gy+12,xr,gy+20,DIM,1);ln(xr+WR,gy+12,xr+WR,gy+20,DIM,1);
+  tx(cx,gy+29,String(W),10,DIM,'middle',true);
+  // popisky
+  tx(12,20,'ABR-'+(spec.typ||''),13,C,null,true);
+  tx(12,36,L+' × '+W+' × '+H+' mm'+(spec.plechy?' · plechy '+spec.plechy:''),10.5,'#55645c');
+  var leg=[spec.vrata,spec.klapka,spec.vlajka,spec.zebrik&&H>=1500?spec.zebrik:'',spec.sklopna,spec.rolny].filter(Boolean).join(' · ');
+  if(leg)tx(548,20,leg,8.5,A,'end');
+  tx((x0+x1)/2,250,'bokorys',8.5,DIM,'middle');
+  tx(cx,250,'zadní čelo',8.5,DIM,'middle');
+  return '<svg viewBox="0 0 560 258" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Schéma kontejneru">'+s+'</svg>';
+}
+/* ---- dotazy na archiv ---- */
+function archFetch(qq,cb){
+  var ps=[];
+  if(qq.kod)ps.push('kod='+encodeURIComponent(qq.kod));
+  if(qq.q)ps.push('q='+encodeURIComponent(qq.q));
+  api('/vykresy?'+ps.join('&')).then(function(o){
+    cb(o.ok?o.j:{status:{},vysledky:[],chyba:(o.j||{}).chyba||'Chyba spojení.'});
+  }).catch(function(){cb({status:{},vysledky:[],chyba:'Chyba spojení.'})});
+}
+function archRow(r,compact){
+  var fl=(r.soubory||[]).slice(0,compact?4:14).map(function(f){
+    var n=String(f.n||'');
+    return '<a class="archf t-'+esc(f.typ||'')+'" href="'+esc(f.link)+'" target="_blank" rel="noopener" title="'+esc(n)+'">'+esc(n.length>48?n.slice(0,46)+'…':n)+'</a>';
+  }).join('');
+  return '<div class="archrow">'+
+    '<div class="archh"><a href="'+esc(r.link)+'" target="_blank" rel="noopener"><b>'+esc(r.nazev||'—')+'</b> ↗</a>'+
+      '<span class="archm">'+(r.rok?r.rok+' · ':'')+(r.zavod?esc(r.zavod)+' · ':'')+'shoda '+r.score+'</span></div>'+
+    (r.kod?'<div class="archk"><code>'+esc(r.kod)+'</code></div>':'')+
+    (compact?'':'<div class="archp muted">'+esc(r.cesta||'')+'</div>')+
+    '<div class="archfs">'+fl+(r.dalsich?'<span class="muted" style="font-size:11px">+'+r.dalsich+' dalších ve složce</span>':'')+'</div>'+
+  '</div>';
+}
+function archResHtml(o,compact){
+  var st=o.status||{};
+  if(o.chyba)return '<p class="muted">'+esc(o.chyba)+'</p>';
+  if(!st.dostupny)return '<p class="muted">Archiv není dostupný (service account nemá přístup ke složce výkresů).</p>';
+  if(!st.builtAt)return '<p class="muted">'+(st.bezi?'⏳ Index archivu se právě sestavuje ('+(((st.prubeh||{}).soubory)||0).toLocaleString('cs-CZ')+' souborů zatím) — zkuste to za pár minut.':'Index archivu zatím nebyl sestaven.'+(st.chyba?' Chyba: '+esc(st.chyba):''))+'</p>';
+  var v=o.vysledky||[];
+  if(compact)v=v.slice(0,4);
+  if(!v.length)return '<p class="muted">V archivu se nenašlo nic podobného.</p>';
+  return '<div class="archlist">'+v.map(function(r){return archRow(r,compact)}).join('')+'</div>';
+}
+/* ---- detail zakázky: podobné výkresy ---- */
+function archQueryFor(z){
+  if(z.kodAbr)return {kod:z.kodAbr};
+  var dot=z.dotaznik||{};
+  var roz=String(typeof dot.rozmery==='string'?dot.rozmery:'').replace(/\s+/g,'').replace(/[×X]/g,'x');
+  var q=[];
+  var rm=roz.match(/\d{3,4}x\d{3,4}(x\d{3,4})?/);
+  if(rm)q.push(rm[0]);
+  if(!q.length&&typeof dot.objem==='string')q.push(dot.objem.split(/[\s(]/)[0]);
+  return q.length?{q:q.join(' ')}:null;
+}
+function archDrawer(z){
+  var el=document.getElementById('drwArch');
+  if(!el)return;
+  var qq=archQueryFor(z);
+  if(!qq){el.innerHTML='';return}
+  el.innerHTML='<div class="sec">Podobné výkresy v archivu (Bruntál)</div><p class="muted">Hledám…</p>';
+  archFetch(qq,function(o){
+    var el2=document.getElementById('drwArch');
+    if(!el2)return;
+    el2.innerHTML='<div class="sec">Podobné výkresy v archivu (Bruntál)</div>'+archResHtml(o,false);
+  });
+}
+/* ---- živý náhled v dotazníku (SVG + podobné výkresy) ---- */
+var DQ_ARCH_T=null,DQ_ARCH_LAST='';
+function dqExtraUpdate(kod){
+  var box=document.getElementById('dqExtra');
+  if(!box)return;
+  var spec=abrSpecFromForm();
+  var sv=spec?svgAbr(spec):'';
+  var sb=document.getElementById('dqSvg');
+  if(sb){sb.innerHTML=sv;sb.style.display=sv?'':'none'}
+  var hasRoz=/\d{3,4}x\d{3,4}x\d{3,4}/.test(String(kod||''));
+  box.style.display=(sv||hasRoz)?'':'none';
+  var a=document.getElementById('dqArch');
+  if(!hasRoz){if(a)a.innerHTML='<span class="muted">'+esc(tr('Vyplňte rozměry — najdu podobné již vyrobené kontejnery.'))+'</span>';DQ_ARCH_LAST='';return}
+  if(kod===DQ_ARCH_LAST)return;
+  clearTimeout(DQ_ARCH_T);
+  DQ_ARCH_T=setTimeout(function(){
+    DQ_ARCH_LAST=kod;
+    var a2=document.getElementById('dqArch');
+    if(a2)a2.innerHTML='<span class="muted">'+esc(tr('Hledám…'))+'</span>';
+    archFetch({kod:kod},function(o){
+      var a3=document.getElementById('dqArch');
+      if(a3)a3.innerHTML=archResHtml(o,true);
+    });
+  },700);
+}
+/* ---- záložka Archiv výkresů ---- */
+var ARCH_ST_T=null;
+function renderArchiv(m){
+  m.innerHTML='<div class="card" style="padding:16px 18px">'+
+    '<h2 style="margin:0 0 4px;font-size:17px">Archiv výkresů — výroba Bruntál</h2>'+
+    '<p class="muted" style="margin:0 0 10px;font-size:13px">Prohledává sdílený Disk výroby (ročníky, zakázky, kusovníky, opakované zakázky). Vložte kód ABR z dotazníku, číslo zakázky (např. 24-B-498), rozměry nebo libovolná slova z názvu.</p>'+
+    '<div class="row" style="gap:8px"><input id="archQ" style="flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:9px;font:inherit" placeholder="např. ABR-DSD-6500x2300x1500-53 · 24-B-498 · 6500x2300 klapka" onkeydown="if(event.key===\'Enter\')archGo()"><button class="btn" onclick="archGo()">Hledat</button></div>'+
+    '<div id="archSt" class="muted" style="font-size:12px;margin-top:7px"></div></div>'+
+    '<div id="archRes" style="margin-top:12px"></div>';
+  archStatus();
+  var q=document.getElementById('archQ');
+  if(q)q.focus();
+}
+function archStatus(){
+  api('/vykresy?').then(function(o){
+    var el=document.getElementById('archSt');
+    if(!o.ok||!el)return;
+    var st=o.j.status||{},t='';
+    if(!st.dostupny)t='Archiv není dostupný — service account nemá přístup ke složce.';
+    else if(st.bezi)t='⏳ Index se sestavuje… zatím '+(((st.prubeh||{}).soubory)||0).toLocaleString('cs-CZ')+' souborů v '+(((st.prubeh||{}).slozky)||0).toLocaleString('cs-CZ')+' složkách.';
+    else if(st.builtAt)t='Index: '+st.souboru.toLocaleString('cs-CZ')+' souborů v '+st.slozek.toLocaleString('cs-CZ')+' složkách · aktualizace '+fdt(st.builtAt)+' (obnovuje se denně).';
+    else t='Index zatím nebyl sestaven.'+(st.chyba?' Chyba: '+esc(st.chyba):'');
+    if(ME&&(ME.isAdmin||['sef','konstrukter','reditel','vykonny-reditel'].indexOf(ME.role)>=0)&&!st.bezi)t+=' <button class="btn ghost sm" onclick="archReindex()">⟳ Přeindexovat</button>';
+    el.innerHTML=t;
+    clearTimeout(ARCH_ST_T);
+    if(st.bezi&&document.getElementById('archSt'))ARCH_ST_T=setTimeout(archStatus,4000);
+  });
+}
+function archReindex(){api('/vykresy/reindex','POST',{}).then(function(){archStatus()})}
+function archGo(){
+  var el=document.getElementById('archQ'),q=el?el.value.trim():'';
+  var res=document.getElementById('archRes');
+  if(!q||!res)return;
+  var qq=/^ABR[-_ ]/i.test(q)?{kod:q}:{q:q};
+  res.innerHTML='<p class="muted">Hledám…</p>';
+  archFetch(qq,function(o){
+    var r2=document.getElementById('archRes');
+    if(r2)r2.innerHTML=archResHtml(o,false);
+    archStatus();
+  });
+}
+
 function renderDrawer(z){
   var d=document.getElementById('drawer');
   var params='';var pk=Object.keys(z.params||{});
@@ -1317,10 +1594,11 @@ function renderDrawer(z){
       '</div>'+
       actionsFor(z)+
       pdfPanel(z)+
-      dotaznikView(z)+params+vers+
+      dotaznikView(z)+'<div id="drwArch"></div>'+params+vers+
       linkBox(z)+
       comments+audit+
     '</div>';
+  archDrawer(z);
 }
 function stepDays(z){
   var order=['prideleni','prace','kontrola','obchodnik','klient','zavod','schvaleno','dokonceno'];
@@ -1434,6 +1712,8 @@ function dotaznikView(z){
   if(!t||!t.dotaznik)return '';
   var h='<div class="sec">Zadání (dotazník provedení)</div>';
   if(z.kodAbr)h+='<div class="card" style="background:#f2f7ee;padding:10px 12px"><b>Kód dle katalogu ABR:</b> <code style="font-weight:800">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')">⧉ Kopírovat</button><div class="muted" style="font-size:11.5px;margin-top:3px">Vypisují se jen odchylky od standardu ELKOPLAST; NE se vynechává; žebřík se uvádí od výšky 1500 mm.</div></div>';
+  var _sv=svgAbr(abrSpecFromDot(z));
+  if(_sv)h+='<div class="card" style="background:#fff;padding:8px 10px;margin-top:8px;overflow-x:auto">'+_sv+'<div class="muted" style="font-size:11px;margin-top:2px">Schematická vizualizace z dotazníku — orientační proporce, ne výkres.</div></div>';
   t.dotaznik.forEach(function(sec){
     var rows='';
     (sec.fields||[]).forEach(function(f){
@@ -1954,6 +2234,10 @@ function openNew(state){
         '<div style="position:relative"><input id="artInput" autocomplete="off" value="'+esc(DQ_ART||'')+'" placeholder="'+esc(tr('hledat dle kódu, rozměru, objemu…'))+'" oninput="artLookup(this)" onfocus="artLookup(this)" onblur="setTimeout(artClose,180)"><div class="art-dd" style="display:none"></div></div>'+
         '<div id="artInfo" class="art-info"></div></div>'+
       '<div id="paramBox"></div>'+
+      '<div class="dq-extra" id="dqExtra" style="display:none">'+
+        '<div class="dq-svgbox" id="dqSvg"></div>'+
+        '<div id="dqArchWrap"><div class="dqsec2">'+esc(tr('Podobné výkresy v archivu (Bruntál)'))+'</div><div id="dqArch"></div></div>'+
+      '</div>'+
       '<div class="err" id="nErr"></div>'+
     '</div>'+
     '<div class="dqfoot"><div class="dqkod" id="dqKod" style="display:none"></div><span class="cnt" id="dqcount"></span><button class="btn ghost" onclick="closeModal()">'+esc(tr('Zrušit'))+'</button><button class="btn" onclick="createZak()">'+esc(tr(MODE==='nabidka'?'Založit nabídku':'Založit objednávku'))+'</button></div>'+
@@ -2033,7 +2317,7 @@ function dqKodPreview(){
   var el=document.getElementById('dqKod'); if(!el)return;
   var t=curType();
   var koded=(t.dotaznik||[]).some(function(s){return (s.fields||[]).some(function(f){return f.kod})});
-  if(!koded||ABR_RADY_JS.indexOf(t.key)<0){el.style.display='none';return}
+  if(!koded||ABR_RADY_JS.indexOf(t.key)<0){el.style.display='none';var ex=document.getElementById('dqExtra');if(ex)ex.style.display='none';return}
   var parts=['ABR-'+String(t.key||'').toUpperCase()];
   var roz=((document.getElementById('dq_rozmery')||{}).value||'').replace(/\s+/g,'').replace(/[×X]/g,'x');
   var pf=dqField('provedeni'),pvol=selVolba('provedeni');
@@ -2056,6 +2340,7 @@ function dqKodPreview(){
   })});
   el.style.display='';
   el.innerHTML='<b>'+esc(tr('Kód'))+':</b> <span class="k">'+esc(parts.join('-'))+'</span>';
+  dqExtraUpdate(parts.join('-'));
 }
 function segSelect(inp,v){var row=inp.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});var b=row.querySelector('.seg[data-v='+v+']');if(b)b.classList.add('sel');dqKodPreview();}
 function renderDotaznik(){

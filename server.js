@@ -2254,6 +2254,9 @@ try {
     isObchodnik: isObchodnikEmail,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – konstrukce', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+    // Archiv výkresů: čtení sdíleného Disku výroby Bruntál přes service account
+    drive: { available: driveAvailable, token: driveGetToken },
+    vykresyRoot: process.env.VYKRESY_DRIVE_ROOT || '1Fk92-QvkDyhdBWl2lnj2zdaw5wShviJV',
   });
 } catch (e) {
   console.error('[konstrukce] modul se nenačetl, intranet pokračuje bez něj:', e.message);
