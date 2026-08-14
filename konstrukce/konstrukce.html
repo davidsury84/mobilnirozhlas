@@ -1505,12 +1505,12 @@ function dqExtraUpdate(kod){
   DQ_ARCH_T=setTimeout(function(){
     DQ_ARCH_LAST=kod;
     var a2=document.getElementById('dqArch');
-    if(a2)a2.innerHTML='<span class="muted">'+esc(tr('Hledám…'))+'</span>';
+    if(a2&&!a2.firstChild)a2.innerHTML='<span class="muted">'+esc(tr('Hledám…'))+'</span>';
     archFetch({kod:kod},function(o){
       var a3=document.getElementById('dqArch');
       if(a3)a3.innerHTML=archResHtml(o,true);
     });
-  },700);
+  },400);
 }
 /* ---- záložka Archiv výkresů ---- */
 var ARCH_ST_T=null;
@@ -1518,7 +1518,7 @@ function renderArchiv(m){
   m.innerHTML='<div class="card" style="padding:16px 18px">'+
     '<h2 style="margin:0 0 4px;font-size:17px">Archiv výkresů — výroba Bruntál</h2>'+
     '<p class="muted" style="margin:0 0 10px;font-size:13px">Prohledává sdílený Disk výroby (ročníky, zakázky, kusovníky, opakované zakázky). Vložte kód ABR z dotazníku, číslo zakázky (např. 24-B-498), rozměry nebo libovolná slova z názvu.</p>'+
-    '<div class="row" style="gap:8px"><input id="archQ" style="flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:9px;font:inherit" placeholder="např. ABR-DSD-6500x2300x1500-53 · 24-B-498 · 6500x2300 klapka" onkeydown="if(event.key===\'Enter\')archGo()"><button class="btn" onclick="archGo()">Hledat</button></div>'+
+    '<div class="row" style="gap:8px"><input id="archQ" style="flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:9px;font:inherit" placeholder="např. ABR-DSD-6500x2300x1500-53 · 24-B-498 · 6500x2300 klapka" oninput="archType()" onkeydown="if(event.key===\'Enter\')archGo()"><button class="btn" onclick="archGo()">Hledat</button></div>'+
     '<div id="archSt" class="muted" style="font-size:12px;margin-top:7px"></div></div>'+
     '<div id="archRes" style="margin-top:12px"></div>';
   archStatus();
@@ -1541,6 +1541,14 @@ function archStatus(){
   });
 }
 function archReindex(){api('/vykresy/reindex','POST',{}).then(function(){archStatus()})}
+/* hledání při psaní — server hledá v RAM, snese dotaz na každý úhoz */
+var ARCH_GO_T=null;
+function archType(){
+  clearTimeout(ARCH_GO_T);
+  var el=document.getElementById('archQ'),q=el?el.value.trim():'';
+  if(q.length<3)return;
+  ARCH_GO_T=setTimeout(archGo,350);
+}
 function archGo(){
   var el=document.getElementById('archQ'),q=el?el.value.trim():'';
   var res=document.getElementById('archRes');
