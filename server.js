@@ -1728,14 +1728,54 @@ const TELEFON_SKUPINY = [
 const TELEFON_ODKAZY = [
   { label: 'Obchodníci (kontakty na webu)', url: 'https://www.elkoplast.cz/kontakty' },
 ];
+/* Telefonní seznam se od 2026-08-14 generuje ŽIVĚ z databáze zaměstnanců (jedno centrum úprav):
+   pozice + telefon jsou pole zaměstnance (edituje se v Organizaci), střediska dle číselníku.
+   Kontakty mimo zaměstnance (sdílené schránky ap.) žijí v settings.telefonExtra (také Organizace). */
 function buildTelefon() {
-  const groups = TELEFON_SKUPINY.map((g) => ({
-    stredisko: g.stredisko,
-    lide: g.lide.map((r) => ({ role: r[0] || '', name: r[1] || '', email: (r[2] || '').trim(), phone: (r[3] || '').trim() })),
-  }));
+  const s = getState();
+  const emps = (s.employees || []).filter(e => e && (String(e.telefon || '').trim() || String(e.pozice || '').trim()));
+  const extra = (s.settings && Array.isArray(s.settings.telefonExtra)) ? s.settings.telefonExtra : [];
+  const byStr = {};
+  const add = (stredisko, rec) => { const k = String(stredisko || '').trim() || 'Ostatní'; (byStr[k] = byStr[k] || []).push(rec); };
+  emps.forEach(e => add(e.stredisko, { role: String(e.pozice || '').trim(), name: e.name || e.email || '', email: (e.email || '').trim(), phone: String(e.telefon || '').trim() }));
+  extra.forEach(x => { if (x && (x.name || x.phone || x.email)) add(x.stredisko, { role: String(x.role || '').trim(), name: x.name || '', email: (x.email || '').trim(), phone: String(x.phone || '').trim() }); });
+  const groups = Object.keys(byStr)
+    .sort((a, b) => (a === 'Ostatní') - (b === 'Ostatní') || a.localeCompare(b, 'cs'))
+    .map(k => ({ stredisko: k, lide: byStr[k].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs')) }));
   const total = groups.reduce((n, g) => n + g.lide.length, 0);
   return { groups, odkazy: TELEFON_ODKAZY, total };
 }
+
+// Jednorázová migrace (2026-08-14): sloučení telefonního seznamu se zaměstnanci.
+// Snapshot TELEFON_SKUPINY se propíše do polí zaměstnanců (telefon, pozice; středisko jen když chybí)
+// párováním podle e-mailu. Nespárované kontakty (sdílené schránky ap.) → settings.telefonExtra.
+(function () {
+  try {
+    const s = readJson(STATE_F, null);
+    if (!s || !Array.isArray(s.employees) || s._telefonMerge20260814) return;
+    s._telefonMerge20260814 = true;
+    s.settings = s.settings || {};
+    const extra = [];
+    let sparovano = 0;
+    TELEFON_SKUPINY.forEach(g => (g.lide || []).forEach(r => {
+      const role = r[0] || '', name = r[1] || '', email = (r[2] || '').trim().toLowerCase(), phone = (r[3] || '').trim();
+      const e = email ? s.employees.find(x => (x.email || '').toLowerCase() === email) : null;
+      if (e) {
+        if (!String(e.telefon || '').trim()) e.telefon = phone;
+        if (!String(e.pozice || '').trim()) e.pozice = role;
+        if (!String(e.stredisko || '').trim()) e.stredisko = g.stredisko;
+        sparovano++;
+      } else {
+        extra.push({ stredisko: g.stredisko, role, name, email, phone });
+      }
+    }));
+    if (!Array.isArray(s.settings.telefonExtra)) s.settings.telefonExtra = [];
+    s.settings.telefonExtra = s.settings.telefonExtra.concat(extra);
+    writeJson(STATE_F, s);
+    console.log('[migrace] telefonní seznam sloučen se zaměstnanci: ' + sparovano + ' spárováno, ' + extra.length + ' mimo zaměstnance (telefonExtra).');
+  } catch (err) { console.error('[migrace] telefon merge:', err.message); }
+})();
+
 
 /* ---------- Obchod: rozdělení obchodníků / zastupitelnost produktových manažerů ----------
    Editovatelná tabulka 1:1 se zdrojovým Google Sheetem „Zastupitelnost_PM_Elkoplast_cisty"

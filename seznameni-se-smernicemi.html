@@ -5113,8 +5113,9 @@ function renderOrg(){
 
   if(!DB.employees.length){ box.innerHTML=cis+'<div class="card pad"><p class="muted" style="margin:0">Nejprve přidej zaměstnance v záložce Zaměstnanci.</p></div>'; document.getElementById("orgTree").innerHTML=''; return; }
 
-  let h=cis+'<div class="matrix-wrap"><table class="matrix"><thead><tr>'+
-    '<th class="who">Zaměstnanec</th><th style="text-align:center">Vedoucí</th><th>Pod kým je (nadřízený)</th>'+
+  let h=cis+'<div class="hint" style="margin-bottom:10px">📞 <b>Telefonní seznam se generuje odsud:</b> zaměstnanec se v něm objeví, jakmile má vyplněnou <b>pozici nebo telefon</b>. Vše se edituje jen tady — žádný druhý seznam.</div>'
+    +'<div class="matrix-wrap"><table class="matrix"><thead><tr>'+
+    '<th class="who">Zaměstnanec</th><th>Pozice (co dělá)</th><th>Telefon</th><th style="text-align:center">Vedoucí</th><th>Pod kým je (nadřízený)</th>'+
     '<th>Středisko</th><th style="text-align:center">Nárok<br>(dní/rok)</th><th>Schvaluje</th></tr></thead><tbody>';
   const vedouci=DB.employees.filter(x=>x.vedouci);
   DB.employees.forEach(e=>{
@@ -5124,6 +5125,8 @@ function renderOrg(){
     const strOpts='<option value="">—</option>'+sList.map(s=>'<option'+(e.stredisko===s?' selected':'')+'>'+esc(s)+'</option>').join('');
     const ap=orgApprover(e);
     h+='<tr><td class="who">'+esc(e.name||e.email)+'<div class="muted" style="font-size:12px">'+esc(e.email||'')+'</div></td>'+
+      '<td><input type="text" value="'+esc(e.pozice||'')+'" placeholder="např. Vedoucí dopravy" style="max-width:180px" onchange="setPozice(\''+e.id+'\',this.value)"></td>'+
+      '<td><input type="text" value="'+esc(e.telefon||'')+'" placeholder="777 123 456" style="max-width:120px" onchange="setTelefon(\''+e.id+'\',this.value)"></td>'+
       '<td style="text-align:center"><input type="checkbox" style="width:18px;height:18px;accent-color:var(--green-2)" '+(e.vedouci?'checked':'')+' onchange="toggleVedouci(\''+e.id+'\',this.checked)"></td>'+
       '<td><select style="max-width:190px" onchange="setManager(\''+e.id+'\',this.value)">'+mgrOpts+'</select></td>'+
       '<td><select style="max-width:160px" onchange="setStredisko(\''+e.id+'\',this.value)">'+strOpts+'</select></td>'+
@@ -5131,6 +5134,21 @@ function renderOrg(){
       '<td class="muted" style="font-size:13px">'+(ap?esc(ap.name||ap.email):'<span style="color:var(--yellow)">admin</span>')+'</td></tr>';
   });
   h+='</tbody></table></div>';
+  // Kontakty do telefonního seznamu MIMO zaměstnance (sdílené schránky, výroba, externí čísla).
+  const tx=telExtra();
+  h+='<div class="card pad" style="margin-top:18px"><strong>📞 Další kontakty v telefonním seznamu</strong>'
+    +'<p class="muted" style="margin:4px 0 12px;font-size:13px">Sdílené schránky a čísla, která nepatří konkrétnímu zaměstnanci (např. roto@, konstrukce@). Zaměstnanci se do seznamu dostávají automaticky přes sloupce Pozice/Telefon výše.</p>'
+    +'<div class="matrix-wrap"><table class="matrix"><thead><tr><th>Středisko / skupina</th><th>Pozice / popis</th><th>Jméno</th><th>E-mail</th><th>Telefon</th><th></th></tr></thead><tbody>'
+    +(tx.length?tx.map((x,i)=>'<tr>'
+      +'<td><input type="text" value="'+esc(x.stredisko||'')+'" style="max-width:180px" onchange="telExtraSet('+i+',\'stredisko\',this.value)"></td>'
+      +'<td><input type="text" value="'+esc(x.role||'')+'" style="max-width:180px" onchange="telExtraSet('+i+',\'role\',this.value)"></td>'
+      +'<td><input type="text" value="'+esc(x.name||'')+'" style="max-width:160px" onchange="telExtraSet('+i+',\'name\',this.value)"></td>'
+      +'<td><input type="text" value="'+esc(x.email||'')+'" style="max-width:200px" onchange="telExtraSet('+i+',\'email\',this.value)"></td>'
+      +'<td><input type="text" value="'+esc(x.phone||'')+'" style="max-width:120px" onchange="telExtraSet('+i+',\'phone\',this.value)"></td>'
+      +'<td><button class="btn danger sm" onclick="telExtraDel('+i+')">✕</button></td></tr>').join('')
+      :'<tr><td colspan="6" class="muted" style="font-size:13px">Zatím žádné — kontakty mimo zaměstnance přibudou automaticky migrací, nebo je přidejte tlačítkem.</td></tr>')
+    +'</tbody></table></div>'
+    +'<button class="btn sm" style="margin-top:10px" onclick="telExtraAdd()">➕ Přidat kontakt</button></div>';
   box.innerHTML=h;
   renderOrgCanvas();
   renderOrgTree();
@@ -5289,6 +5307,14 @@ function toggleVedouci(empId,on){
 }
 function setManager(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.managerId=val||null; save(); renderOrg(); }
 function setStredisko(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.stredisko=(val||'').trim(); save(); renderOrg(); }
+/* Pozice + telefon zaměstnance — jediné místo úprav; telefonní seznam se z toho generuje. */
+function setPozice(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.pozice=(val||'').trim(); save(); }
+function setTelefon(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; e.telefon=(val||'').trim(); save(); }
+/* Kontakty mimo zaměstnance (sdílené schránky ap.) — settings.telefonExtra */
+function telExtra(){ if(!DB.settings) DB.settings={}; if(!Array.isArray(DB.settings.telefonExtra)) DB.settings.telefonExtra=[]; return DB.settings.telefonExtra; }
+function telExtraSet(i,pole,val){ const x=telExtra()[i]; if(!x) return; x[pole]=(val||'').trim(); save(); }
+function telExtraAdd(){ telExtra().push({stredisko:'',role:'',name:'',email:'',phone:''}); save(); renderOrg(); }
+function telExtraDel(i){ if(!confirm('Odebrat tento kontakt z telefonního seznamu?')) return; telExtra().splice(i,1); save(); renderOrg(); }
 function setVacDays(empId,val){ const e=DB.employees.find(x=>x.id===empId); if(!e) return; const n=parseFloat(val); e.vacDays=isFinite(n)&&n>=0?n:20; save(); }
 function addStredisko(){
   const inp=document.getElementById("newStredisko"); const name=(inp&&inp.value||'').trim(); if(!name) return;
