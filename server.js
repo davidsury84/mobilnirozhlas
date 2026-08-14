@@ -2361,6 +2361,7 @@ const server = http.createServer(async (req, res) => {
   const prekladPublic = p === '/preklad' || p === '/preklad.html' || (p === '/api/preklad-lead' && req.method === 'POST');
   // Server-to-server cesty modulu Lodní kontejnery (Bearer = SSO tajemství) z aplikace lodni-kontejnery.
   const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext') || (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') || (p === '/api/kontejnery/list-ext' && req.method === 'GET') || (p === '/api/kontejnery/update-ext' && req.method === 'POST') || (p === '/api/kontejnery/potvrdit-ext' && req.method === 'POST');
+  const libraryIngestPublic = (p === '/api/library/ingest-ext' && req.method === 'POST');   // Bearer SSO_SHARED_SECRET (vkládání dokumentů přes chat)
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
 
@@ -2427,7 +2428,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !libraryIngestPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -3294,6 +3295,42 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- knihovna: správa (admin) ----
+    // Vkládání dokumentů do Knihovny přes chat (Bearer SSO_SHARED_SECRET) — dokument se založí
+    // jako běžný verzovaný dokument, stejně jako by ho správce nahrál ručně. Stejný název ve
+    // stejné složce = nová verze místo duplicity.
+    if (p === '/api/library/ingest-ext' && req.method === 'POST') {
+      const auth = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      let bearerOk = false;
+      try { bearerOk = !!SSO_SHARED_SECRET && crypto.timingSafeEqual(Buffer.from(auth), Buffer.from(String(SSO_SHARED_SECRET))); } catch (_) {}
+      if (!bearerOk) return send(res, 401, { error: 'Neplatné tajemství.' });
+      let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const title = String(b.title || '').trim().slice(0, 200);
+      const html = String(b.html || '').trim();
+      if (!title || !html) return send(res, 400, { error: 'Chybí title nebo html.' });
+      const lib = readLibrary();
+      let folderId = null;
+      const folderName = String(b.folder || '').trim();
+      if (folderName) {
+        let f = lib.folders.find(x => (x.parentId || null) === null && (x.name || '').toLowerCase() === folderName.toLowerCase());
+        if (!f) { f = { id: 'f' + crypto.randomBytes(5).toString('hex'), name: folderName, parentId: null }; lib.folders.push(f); }
+        folderId = f.id;
+      }
+      const note = String(b.note || '').trim().slice(0, 200) || 'vloženo přes chat';
+      let doc = lib.docs.find(d => (d.folderId || null) === folderId && (d.title || '').toLowerCase() === title.toLowerCase());
+      let akce;
+      if (doc) {
+        const nv = (doc.cur || (doc.versions && doc.versions.length ? doc.versions[doc.versions.length - 1].v : 1)) + 1;
+        doc.versions = doc.versions || [];
+        doc.versions.push({ v: nv, html, note, ts: Date.now() });
+        doc.cur = nv; akce = 'nova-verze';
+      } else {
+        doc = { id: 'd' + crypto.randomBytes(5).toString('hex'), title, kind: String(b.kind || '').trim().slice(0, 80), folderId, requireAck: !!b.requireAck, assignAll: b.assignAll !== false, assignCats: [], assignTags: [], cur: 1, versions: [{ v: 1, html, note, ts: Date.now() }] };
+        lib.docs.push(doc); akce = 'novy';
+      }
+      writeJson(LIB_F, lib);
+      logActivity('library', { email: '', name: 'Claude (chat)' }, (akce === 'novy' ? 'Do Knihovny vložen dokument: ' : 'Nová verze dokumentu v Knihovně: ') + title + (folderName ? ' (složka ' + folderName + ')' : '') + ' — v' + doc.cur);
+      return send(res, 200, { ok: true, id: doc.id, verze: doc.cur, akce });
+    }
     if (p === '/api/library' && req.method === 'GET') return send(res, 200, readLibrary());
     if (p === '/api/library' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(LIB_F, { docs: Array.isArray(b.docs) ? b.docs : [], folders: Array.isArray(b.folders) ? b.folders : [] }); return send(res, 200, { ok: true }); }
     // ---- knihovna: čtení a potvrzení zaměstnancem (session) ----

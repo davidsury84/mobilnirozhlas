@@ -4796,7 +4796,12 @@ async function renderLibAdmin(folderId){
   h+='</div>';
   const subs=libChildF(fid).sort((a,b)=>a.name.localeCompare(b.name,"cs"));
   const here=LIBDB.docs.filter(d=>(d.folderId||null)===(fid||null));
-  if(!subs.length && !here.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Složka je prázdná. Přidej složku nebo dokument tlačítky nahoře.</p></div>'; box.innerHTML=h; return; }
+  // Na kořeni: vestavěné sekce, které zaměstnanci vidí v Knihovně, ale NEJSOU to nahrané dokumenty.
+  if(!fid){
+    h+='<div class="hint" style="margin-bottom:10px">Zaměstnanci vidí v Knihovně navíc dvě <b>vestavěné sekce</b> (nejsou to nahrané dokumenty): '
+      +'<b>Produkty</b> — katalog sortimentu zabudovaný v aplikaci · <b>Zápisy z jednání</b> — spravují se přímo v sekci Zápisy (autor/správce edituje u každého zápisu).</div>';
+  }
+  if(!subs.length && !here.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné nahrané dokumenty. Přidej složku nebo dokument tlačítky nahoře — pak půjdou i editovat (klik na název dokumentu otevře editor obsahu).</p></div>'; box.innerHTML=h; return; }
   subs.forEach(f=>{
     const n=libSubtreeCount(f.id);
     h+='<div class="li-item"><div class="li-left" style="cursor:pointer" onclick="renderLibAdmin(\''+f.id+'\')"><div class="li-ic folder">'+mujIcon(MUJ_IC.folder)+'</div>'+
