@@ -177,6 +177,15 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .dq2-req{margin-top:4px}
 .dq2-optwrap{grid-column:2;display:flex;align-items:center;gap:7px;margin-top:4px}
 .dq2-opt{width:120px;padding:7px 10px;font-size:13.5px;border:1px solid var(--line);border-radius:8px}
+select.dq2-opt{width:100%;max-width:560px}
+.nat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;grid-column:2;margin-top:2px}
+.nat-tile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:7px 6px;text-align:center}
+.nat-tile img{width:100%;height:84px;object-fit:contain;background:#fff;border-radius:6px}
+.nat-tile .nk{font-size:11.5px;font-weight:800;letter-spacing:.2px}
+.nat-tile .np{font-size:10px;color:var(--mut);line-height:1.15;font-weight:500}
+.seg.nat-tile.sel .np{color:#eaf3e6}
+.dqkod{margin-right:auto;font-size:12.5px;background:#f2f7ee;border:1px solid var(--line);border-radius:8px;padding:6px 10px;max-width:56%;overflow-wrap:anywhere;line-height:1.35}
+.dqkod .k{font-weight:800;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .dq2-unit{font-size:12.5px;color:var(--mut);font-weight:600}
 @media(max-width:640px){.dqhg{grid-template-columns:1fr}.dq2{grid-template-columns:1fr;gap:3px}.dq2 input.txt,.dq2-req,.dq2-optwrap{grid-column:1}}
 .dq-hint{font-size:11.5px;color:var(--mut);margin-top:2px}
@@ -1299,6 +1308,7 @@ function renderDrawer(z){
         '<b>Kontakt klienta</b><span>'+esc(z.kontakt||'—')+(z.kontaktEmail?(' · '+esc(z.kontaktEmail)):'')+'</span>'+
         '<b>Poptávka</b><span>'+esc(z.cisloPoptavky||'—')+'</span>'+
         '<b>Č. výrobní zakázky (Helios)</b><span><input id="cvzInp" value="'+esc(z.cvzHelios||'')+'" placeholder="např. 26C-001" style="width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:7px;font:inherit"> <button class="btn ghost sm" onclick="saveCvz(\''+z.id+'\')">Uložit</button></span>'+
+        (z.kodAbr?('<b>Kód ABR (katalog)</b><span style="overflow-wrap:anywhere"><code style="font-weight:800;font-size:12px">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')" title="Kopírovat kód">⧉</button></span>'):'')+
         (z.artNo?('<b>ART NO.</b><span><b>'+esc(z.artNo)+'</b></span>'):'')+
         '<b>Odpracováno</b><span>'+hhmm(z.totalSec)+'</span>'+
         (z.revisionCount?('<b>Revizí</b><span>'+z.revisionCount+'</span>'):'')+
@@ -1423,6 +1433,7 @@ function dotaznikView(z){
   var t=(D.types||[]).find(function(x){return x.key===z.typKey});
   if(!t||!t.dotaznik)return '';
   var h='<div class="sec">Zadání (dotazník provedení)</div>';
+  if(z.kodAbr)h+='<div class="card" style="background:#f2f7ee;padding:10px 12px"><b>Kód dle katalogu ABR:</b> <code style="font-weight:800">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')">⧉ Kopírovat</button><div class="muted" style="font-size:11.5px;margin-top:3px">Vypisují se jen odchylky od standardu ELKOPLAST; NE se vynechává; žebřík se uvádí od výšky 1500 mm.</div></div>';
   t.dotaznik.forEach(function(sec){
     var rows='';
     (sec.fields||[]).forEach(function(f){
@@ -1613,6 +1624,7 @@ function sendClient(id){
   });
 }
 function copyLink(url){var full=location.origin+url;navigator.clipboard&&navigator.clipboard.writeText(full);prompt('Odkaz pro klienta (Ctrl+C):',full)}
+function copyTxt(t){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t);}else{prompt('Zkopírujte (Ctrl+C):',t)}}
 function askStorno(id){var d=prompt('Důvod storna:');if(!d)return;api('/stav','POST',{id:id,action:'storno',note:d}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function askHold(id){var d=prompt('Na jaké podklady se čeká? (důvod)');if(!d)return;api('/stav','POST',{id:id,action:'hold',note:d}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function askTermin(id){var t=prompt('Nový termín (RRRR-MM-DD):');if(!t)return;var d=prompt('Zdůvodnění změny termínu:');if(!d)return;api('/termin','POST',{id:id,deadline:t,duvod:d}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
@@ -1944,7 +1956,7 @@ function openNew(state){
       '<div id="paramBox"></div>'+
       '<div class="err" id="nErr"></div>'+
     '</div>'+
-    '<div class="dqfoot"><span class="cnt" id="dqcount"></span><button class="btn ghost" onclick="closeModal()">'+esc(tr('Zrušit'))+'</button><button class="btn" onclick="createZak()">'+esc(tr(MODE==='nabidka'?'Založit nabídku':'Založit objednávku'))+'</button></div>'+
+    '<div class="dqfoot"><div class="dqkod" id="dqKod" style="display:none"></div><span class="cnt" id="dqcount"></span><button class="btn ghost" onclick="closeModal()">'+esc(tr('Zrušit'))+'</button><button class="btn" onclick="createZak()">'+esc(tr(MODE==='nabidka'?'Založit nabídku':'Založit objednávku'))+'</button></div>'+
   '</div>';
   m.classList.add('open');renderDotaznik();
 }
@@ -1975,7 +1987,13 @@ function selVolba(k){var s=document.querySelector('.dq2[data-k="'+k+'"] .seg.sel
 function seg(k,v,tag,label,cur){return '<button type="button" class="seg'+(cur===v?' sel':'')+'" data-v="'+v+'" onclick="segClick(this)"><span class="st">'+tag+'</span>'+esc(label||'—')+'</button>';}
 // jedna z více samostatných opcí (data-optval = zdrojová CZ hodnota, label = přeložený text)
 function segOpt(k,val,label,sel){return '<button type="button" class="seg'+(sel?' sel':'')+'" data-v="opce" data-optval="'+esc(val)+'" onclick="segClick(this)"><span class="st">opce</span>'+esc(label||'—')+'</button>';}
-function selOptVal(k){var s=document.querySelector('.dq2[data-k="'+k+'"] .seg.sel[data-v="opce"]');return s?(s.getAttribute('data-optval')||''):'';}
+function selOptVal(k){
+  var row=document.querySelector('.dq2[data-k="'+k+'"]'); if(!row)return '';
+  var s=row.querySelector('.seg.sel[data-v="opce"]');
+  if(s&&s.getAttribute('data-optval'))return s.getAttribute('data-optval')||'';
+  var sel=row.querySelector('select.dq2-opt');   // dlouhé číselníky = rozbalovací select
+  return sel?(sel.value||''):'';
+}
 // rozdělí opce na samostatné volby: přeloží celý řetězec, pak dělí dle „ / " (kousky zůstanou zarovnané); při nejednoznačnosti = jedna volba.
 function splitOpts(opceRaw){
   if(!opceRaw)return [];
@@ -1986,8 +2004,60 @@ function splitOpts(opceRaw){
 function segClick(el){var row=el.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});el.classList.add('sel');var v=el.getAttribute('data-v');
   var req=row.querySelector('.dq2-req');if(req)req.style.display=(v==='pozadavek'?'':'none');
   var ow=row.querySelector('.dq2-optwrap');if(ow)ow.style.display=(v==='opce'?'':'none');
-  if(v==='pozadavek'&&req)req.focus(); else if(v==='opce'&&ow){var oi=ow.querySelector('.dq2-opt');if(oi)oi.focus();}}
-function segSelect(inp,v){var row=inp.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});var b=row.querySelector('.seg[data-v='+v+']');if(b)b.classList.add('sel');}
+  if(v==='pozadavek'&&req)req.focus(); else if(v==='opce'&&ow){var oi=ow.querySelector('.dq2-opt');if(oi)oi.focus();}
+  dqKodPreview();}
+/* ---- Natahování: obrázkové dlaždice (ilustrace z katalogu ABROLL) ---- */
+function natGrid(f,opts,vol,curOpt,rq){
+  var tile=function(dv,val,lab,selq){
+    var kd=String(val).trim().split(/[\s—–]+/)[0]||'';
+    var img=(D.natahImg||{})[kd];
+    var pop=String(lab).replace(/^[^—]*—\s*/,'');if(pop.length>52)pop=pop.slice(0,50)+'…';
+    return '<button type="button" class="seg nat-tile'+(selq?' sel':'')+'" data-v="'+dv+'"'+(dv==='opce'?' data-optval="'+esc(val)+'"':'')+' onclick="segClick(this)" title="'+esc(lab)+'">'+
+      (img?'<img loading="lazy" src="/api/konstrukce/natah-img?f='+esc(img)+'" alt="">':'')+
+      '<span class="nk">'+esc(kd)+(dv==='standard'?' · STD':'')+'</span><span class="np">'+esc(pop)+'</span></button>';
+  };
+  return '<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div>'+
+    '<div class="dq2-seg" style="flex-direction:column;align-items:stretch">'+
+      '<div class="nat-grid">'+
+        tile('standard',f.std,f.std,vol==='standard')+
+        opts.map(function(o){return tile('opce',o.val,o.lab,vol==='opce'&&curOpt===o.val)}).join('')+
+      '</div>'+
+      '<div>'+seg(f.k,'pozadavek','✎',tr('vlastní'),vol)+'</div>'+
+    '</div>'+
+    '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
+}
+/* ---- Živý náhled celkového kódu ABR (varianta B — standardy se nevypisují) ---- */
+var ABR_RADY_JS=['dsd','afs','hbs','sth','hbi','lwc'];
+function dqField(k){var t=curType(),r=null;(t.dotaznik||[]).forEach(function(s){(s.fields||[]).forEach(function(f){if(f.k===k)r=f})});return r}
+function dqKodPreview(){
+  var el=document.getElementById('dqKod'); if(!el)return;
+  var t=curType();
+  var koded=(t.dotaznik||[]).some(function(s){return (s.fields||[]).some(function(f){return f.kod})});
+  if(!koded||ABR_RADY_JS.indexOf(t.key)<0){el.style.display='none';return}
+  var parts=['ABR-'+String(t.key||'').toUpperCase()];
+  var roz=((document.getElementById('dq_rozmery')||{}).value||'').replace(/\s+/g,'').replace(/[×X]/g,'x');
+  var pf=dqField('provedeni'),pvol=selVolba('provedeni');
+  var pleS=pvol==='standard'?(pf?pf.std:''):(pvol==='opce'?selOptVal('provedeni'):((document.getElementById('dqr_provedeni')||{}).value||''));
+  var ple=(String(pleS).match(/(\d)\s*\/\s*(\d)/)||[]);
+  if(roz)parts.push(roz+(ple[1]?('-'+ple[1]+ple[2]):''));
+  var vyska=parseInt(roz.split('x')[2]||'',10)||0;
+  var afnor=(t.key==='afs');
+  (t.dotaznik||[]).forEach(function(sec){(sec.fields||[]).forEach(function(f){
+    if(!f.kod)return;
+    var vol=selVolba(f.k); if(vol==='pozadavek')return;
+    var hod=(vol==='standard')?f.std:(selOptVal(f.k)||'');
+    var kd=String(hod).trim().split(/[\s—–]+/)[0]||'';
+    if(!kd||kd==='NE'||kd==='—')return;
+    var stdKd=String(f.std).trim().split(/[\s—–]+/)[0]||'';
+    if(f.k==='natahovani'){if(!afnor&&kd==='NA1570/50')return;parts.push(kd.replace(/\//g,'_'));return;}
+    if(f.k==='zebrik'){if(vyska>=1500)parts.push(kd.replace(/\//g,'_'));return;}
+    if(kd===stdKd)return;
+    parts.push(kd.replace(/\//g,'_'));
+  })});
+  el.style.display='';
+  el.innerHTML='<b>'+esc(tr('Kód'))+':</b> <span class="k">'+esc(parts.join('-'))+'</span>';
+}
+function segSelect(inp,v){var row=inp.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});var b=row.querySelector('.seg[data-v='+v+']');if(b)b.classList.add('sel');dqKodPreview();}
 function renderDotaznik(){
   var t=curType(),pf=DQ_PREFILL||{},np=0;
   var h='';
@@ -2001,6 +2071,19 @@ function renderDotaznik(){
           var vol=(a&&a.volba)||'standard', rq=(a&&a.volba==='pozadavek')?(a.hodnota||''):'', oc=(a&&a.detail!=null)?a.detail:'';
           var curOpt=(a&&a.volba==='opce')?(a.hodnota||''):'';
           var opts=splitOpts(f.opce), single=opts.length<=1;
+          if(f.k==='natahovani'&&f.kod){
+            h+=natGrid(f,opts,vol,curOpt,rq);
+          } else if(opts.length>6){
+            // dlouhý číselník (klapky, střechy, rolny…) → rozbalovací výběr z katalogu
+            var osel='<div class="dq2-optwrap" style="'+(vol==='opce'?'':'display:none')+'"><select class="dq2-opt" onchange="segSelect(this,\'opce\')">'+
+              opts.map(function(o){return '<option value="'+esc(o.val)+'"'+(curOpt===o.val?' selected':'')+'>'+esc(o.lab)+'</option>'}).join('')+'</select></div>';
+            h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg">'+
+              seg(f.k,'standard','std',tr(f.std),vol)+
+              seg(f.k,'opce','▾',tr('vybrat z katalogu')+' ('+opts.length+')',vol)+
+              seg(f.k,'pozadavek','✎',tr('vlastní'),vol)+
+              '</div>'+osel+
+              '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
+          } else {
           var optSegs=opts.map(function(o){var sel=vol==='opce'&&(single||curOpt===o.val);return segOpt(f.k,o.val,o.lab,sel);}).join('');
           var optInp=(f.opceVstup&&single)?('<div class="dq2-optwrap" id="dqow_'+f.k+'" style="'+(vol==='opce'?'':'display:none')+'"><input class="dq2-opt" id="dqo_'+f.k+'" '+(f.opceVstup.num?'type="number" min="0" inputmode="numeric"':'')+' value="'+esc(oc)+'" placeholder="'+esc(tr(f.opceVstup.placeholder||''))+'" oninput="segSelect(this,\'opce\')">'+(f.opceVstup.unit?'<span class="dq2-unit">'+esc(f.opceVstup.unit)+'</span>':'')+'</div>'):'';
           h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg">'+
@@ -2009,6 +2092,7 @@ function renderDotaznik(){
             seg(f.k,'pozadavek','✎',tr('vlastní'),vol)+
             '</div>'+optInp+
             '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
+          }
         } else if(f.type==='adresa'){
           h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg" style="flex-direction:column;align-items:stretch;gap:2px;position:relative">'+
             '<input id="dq_'+f.k+'" class="txt" autocomplete="off" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('začněte psát adresu…'))+'" oninput="adrLookup(this)" onfocus="adrLookup(this)" onblur="setTimeout(adrClose,180)">'+
@@ -2032,6 +2116,9 @@ function renderDotaznik(){
   }
   document.getElementById('paramBox').innerHTML=h;
   (t.dotaznik||[]).forEach(function(sec){(sec.fields||[]).forEach(function(f){if(f.ral)ralMark(f.k)})});
+  var pb=document.getElementById('paramBox');
+  if(pb&&!pb._kodHook){pb._kodHook=1;pb.addEventListener('input',function(){dqKodPreview()});}
+  dqKodPreview();
 }
 function createZak(){
   var t=curType();

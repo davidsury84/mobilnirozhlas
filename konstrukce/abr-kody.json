@@ -1,0 +1,1969 @@
+{
+ "version": "16.09.2025",
+ "sekce": [
+  "typ",
+  "natahovani",
+  "lyzina",
+  "oka",
+  "sklopnaBocnice",
+  "napojeni",
+  "lem",
+  "profilVyztuh",
+  "roztecVyztuh",
+  "reklama",
+  "mezivyztuhy",
+  "vyztuhyLyzina",
+  "hacky",
+  "vrata",
+  "klapka",
+  "vlajka",
+  "zavirani",
+  "zamekPaky",
+  "centralVrat",
+  "centralVlajky",
+  "centralKlapky",
+  "zebrik",
+  "cepRolen",
+  "rolny",
+  "panty",
+  "strecha"
+ ],
+ "data": {
+  "typ": {
+   "label": "KONTEJNER TYP",
+   "opts": [
+    {
+     "kod": "ABR-DSD",
+     "popis": "kontejnery v normě DIN 30722-1",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD2",
+     "popis": "kontejnery v normě DIN 30722-2",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ACTS",
+     "popis": "Železniční kontejner/ACTS containers",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-AFO",
+     "popis": "kontejnery pro f.Hamo/Scandinavian type",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-AFS",
+     "popis": "kontejnery v normě AF-NOR",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-AFS-CASIER",
+     "popis": "značení kont pro konkrétního zákazníka (CASIER)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-AFS-POP",
+     "popis": "Abroll AFS s víky",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ALST",
+     "popis": "značení kont pro konkrétního zákazníka (ALUSTAHL) v normě DIN 30722-2",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ALST-STH",
+     "popis": "značení kont(stohovák) pro konkrétního zákazníka (ALUSTAHL) v normě DIN 30722-2",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ALST180",
+     "popis": "značení kont pro konkrétního zákazníka (ALUSTAHL) v normě DIN 30722-1",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ARC",
+     "popis": "Kontejner na sklo",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-BS",
+     "popis": "provedení s podélnými prolisy (např. Veolia France)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-AUGUSTIN-DE",
+     "popis": "značení kont pro konkrétního zákazníka (AUGUSTIN DE)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-AVE",
+     "popis": "značení kont pro konkrétního zákazníka (AVE CZ)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-ELLERMANN",
+     "popis": "značení kont pro konkrétního zákazníka (ELLERMANN)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-PREZERO",
+     "popis": "DE - značení kont pro konkrétního zákazníka (PREZERO DE)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-REMONDIS-DE",
+     "popis": "značení kont pro konkrétního zákazníka (REMONDIS)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-SBS",
+     "popis": "kontejner se sklopnými bočnicemi upevněnými pomocí KINNEGRIP",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-SIT",
+     "popis": "kontejner z síťované bočnice a vrata",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-TSR",
+     "popis": "značení kont pro konkrétního zákazníka (TSR)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-DSD-VEOLIA-DE",
+     "popis": "značení kont pro konkrétního zákazníka (VEOLIA DE)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ECL",
+     "popis": "kulaté bezvýztuhové provedení (staré provedení - do 2025)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ECL1",
+     "popis": "kulaté bezvýztuhové provedení (aktuálně provedení)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ECL1-PREZERO",
+     "popis": "DE - značení kont pro konkrétního zákazníka (PREZERO DE)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-ECON3-ELLERMANN",
+     "popis": "značení kont pro konkrétního zákazníka (ELLERMANN, kulaté provedení)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-HBI",
+     "popis": "hardoxové kontejnery velké vypouklé/ABR containers from Hardox BIG and strong",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-HBI-REMONDIS-DE",
+     "popis": "značení kont pro konkrétního zákazníka (REMONDIS)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-HBI-TSR",
+     "popis": "značení kont pro konkrétního zákazníka (TSR)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-HBS",
+     "popis": "halbšalenmuldy hardox/ABR containers from Hardox half pipe shape",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-HDC",
+     "popis": "hardoxové korby (typ ala GTS)/ABR containers from Hardox U shape",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-LENAERTS",
+     "popis": "značení kont pro konkrétního zákazníka (LENAERTS)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-LWC",
+     "popis": "lehké provedení HARDOX/STRENX 700",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-NL",
+     "popis": "Kontejnery pro holandský trh",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-NL-RENEWI",
+     "popis": "značení kont pro konkrétního zákazníka (RENEWI)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-PAP",
+     "popis": "Abrol s otvory na papír",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-PDK",
+     "popis": "Plato standard drevena podlaha s klanicemi",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-POP",
+     "popis": "Abroll DSD s víky (tzv. Hausmull Container) (změna z ABR-HM dle 28.5.2018)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-PS",
+     "popis": "Plato standard ocel podlaha",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-PSK",
+     "popis": "Plato standard ocel podlaha s klanicemi",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-PSN",
+     "popis": "Plato se zadním nájezdem",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-PSNK",
+     "popis": "Plato se zadním nájezdem a klanicemi",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-PT",
+     "popis": "Plato těžké provedení s prohlubní",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-RAM",
+     "popis": "Rám ABR/ABR frames",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-SCHROLL",
+     "popis": "značení kont pro konkrétního zákazníka (SIRMAT)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-STH",
+     "popis": "stohováky dle DIN/stackable containers ABR acc DIN",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-SUEZ-DE",
+     "popis": "značení kont pro konkrétního zákazníka",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-TH",
+     "popis": "Thermocontainer",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-VEOLIA-BE",
+     "popis": "značení kont pro konkrétního zákazníka (VEOLIA BE)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-VHD",
+     "popis": "značení kont pro konkrétního zákazníka (Vanheede)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-WD",
+     "popis": "bezvýztuhové kontejnery v normě DIN",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ABR-WF",
+     "popis": "bezvýztuhové kontejnery v normě AFNOR",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "natahovani": {
+   "label": "NATAHOVÁNÍ",
+   "opts": [
+    {
+     "kod": "NA1425/50",
+     "popis": "AF-NOR STANDARD. typ A výška 1425 mm, průměr háku 50 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NA1450/50",
+     "popis": "AF-NOR STANDARD. typ A výška 1450 mm, průměr háku 50 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NA1570/50",
+     "popis": "DIN30722 STANDARD. typ A výška 1570 mm, průměr háku 50 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NA1570/60",
+     "popis": "DIN30722 STANDARD. typ A výška 1570 mm, průměr háku 60 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NAT1570/50",
+     "popis": "DIN30722 STANDARD. typ A výška 1570 mm, průměr háku 50 mm, tunelové",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NAT1570/60",
+     "popis": "DIN30722 STANDARD. typ A výška 1570 mm, průměr háku 60 mm, tunelové",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NH1570/50",
+     "popis": "DIN30722 STANDARD. typ H výška 1570 mm, průměr háku 50 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NH1570/60",
+     "popis": "DIN30722 STANDARD. typ H výška 1570 mm, průměr háku 60 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NHF1425/50",
+     "popis": "AF-NOR STANDARD. typ H výška 1425 mm,  průměr háku 50 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NHF1425/60",
+     "popis": "AF-NOR STANDARD. typ H výška 1425 mm,  průměr háku 60 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NHF1450/50",
+     "popis": "AF-NOR STANDARD. typ H výška 1450 mm,  průměr háku 50 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NHF1450/60",
+     "popis": "AF-NOR STANDARD. typ H výška 1450 mm,  průměr háku 60 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NHNL1450/50",
+     "popis": "AF-NOR STANDARD. typ H pro NL trh 1450, hák 50 mm, 200 od čela",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NHT1570/50",
+     "popis": "DIN30722 STANDARD. typ H dle Din 1570, hák 50 mm, tunelové",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NHT1570/60",
+     "popis": "DIN30722 STANDARD. typ H dle Din 1570, hák 60 mm, tunelové",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NL",
+     "popis": "natahování lanové",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NR",
+     "popis": "pevné-natahování řetězové pevně navařené na čele",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NRS",
+     "popis": "sklopné-natahování řetězové sklopné",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NS1570/50",
+     "popis": "DIN30722 STANDARD. sklopné 1570/průměr 50",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NS1570/60",
+     "popis": "DIN30722 STANDARD. sklopné 1570/průměr 60",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NT1425/50",
+     "popis": "AF-NOR STANDARD. tvar T 1425",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NT1450/50",
+     "popis": "AF-NOR STANDARD. tvar T 1450",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NTA1425/50",
+     "popis": "AF-NOR STANDARD. tvar TA vytažený 1425 (např. Schroll)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NV1570/60",
+     "popis": "DIN30722 STANDARD. vyměnitelné 1570, průměr háku 60 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "lyzina": {
+   "label": "Zajištění v lyžině / typ lyžiny",
+   "opts": [
+    {
+     "kod": "LZA",
+     "popis": "lyžina IPN zajištění aktivní (bez C-dorázu)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "LZP",
+     "popis": "lyžina IPN zajištění pasivní (s dorázem dle normy)",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "LTP",
+     "popis": "lyžina T-Profil svařený",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "oka": {
+   "label": "Uvazovací oka",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "NE - uvazovací oka nejsou",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "UOP",
+     "popis": "uvazovací oka v podlaze",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "UOS",
+     "popis": "uvazovací oko v šikmině",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "UOB",
+     "popis": "uvazovací oka v bočnice",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "sklopnaBocnice": {
+   "label": "Sklopná bočnice",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Sklopná bočnice NENÍ",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "SBO",
+     "popis": "sklopná část bočnice oboustranná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SBL",
+     "popis": "sklopná část bočnice LEVÁ ve směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SBP",
+     "popis": "sklopná část bočnice PRAVÁ ve směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "napojeni": {
+   "label": "Napojení bočnic / Typ podlahy",
+   "opts": [
+    {
+     "kod": "R150",
+     "popis": "napojení kulaté R150 vytažená podlaha (profil U 100x50)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R200",
+     "popis": "napojení kulaté R200 vytažená podlaha (profil U 120x60)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "K90",
+     "popis": "kolmé napojení (šířky 2300 a 2420 mm)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VP250",
+     "popis": "vytažená podlaha do výšky ca 250 mm nad podlahu (45x45 st.) - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VP000",
+     "popis": "NEvytažená podlaha (ohýbané bočnice 45x45 st.)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "K90R",
+     "popis": "kolmé napojení (šířky 2300 a 2420 mm), PODLAHOVÝ  ROŠT",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VP250R",
+     "popis": "vytažená podlaha do výšky ca 250 mm nad podlahu (45x45 st.), PODLAHOVÝ  ROŠT",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "lem": {
+   "label": "Vrchní lem bočnice",
+   "opts": [
+    {
+     "kod": "JE100",
+     "popis": "JEKL 100x80x4 S355 (PRO KONTEJNERY VNITŘ. ŠÍŘKA MAX 2380mm)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "JE120",
+     "popis": "JEKL 120x60x6 S355",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "OPLWC",
+     "popis": "OHNUTÝ PROFIL LEMU BOČNICE pro LWC kontejner",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "OPQ6",
+     "popis": "OHNUTÝ PROFIL Z PLECHU QSTE690 6mm pro HBI kontejner",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "TR114",
+     "popis": "TRUBKA 114x6 S355",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "TR89",
+     "popis": "TRUBKA 89x6 S355 - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "TT114",
+     "popis": "\"TRUBKA V TRUBCE\" PRO RÁM NA SÍŤ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "JE100K",
+     "popis": "JEKL 100x80x4 S355 - PLECH UMÍSTĚNY \"NA KOLMO\" K JEKLU",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "JE120K",
+     "popis": "JEKL 120x60x6 S355 - PLECH UMÍSTĚNY \"NA KOLMO\" K JEKLU",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "profilVyztuh": {
+   "label": "Profil výztuh bočnice / podlaha",
+   "opts": [
+    {
+     "kod": "VU80",
+     "popis": "profil U80x60",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VU100",
+     "popis": "profil U100x60 - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VU120",
+     "popis": "profil U120x60",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VU100",
+     "popis": "x50 - profil U100x50",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "NE",
+     "popis": "Výztuhy NEJSOU (ABR-ECL, LWC atd.)",
+     "std": false,
+     "ne": true,
+     "depr": false
+    }
+   ]
+  },
+  "roztecVyztuh": {
+   "label": "Rozteč výztuh PODLAHY/BOČNICE",
+   "opts": [
+    {
+     "kod": "SV750",
+     "popis": "rozteč svislých výztuh 750 mm - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SV500",
+     "popis": "rozteč svislých výztuh 500 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "reklama": {
+   "label": "Reklama na bočnice",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Reklama na bočnice - NE",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "REO",
+     "popis": "Reklama na bočnice - olemovaná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "REP",
+     "popis": "Reklama na bočnice - plech",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "mezivyztuhy": {
+   "label": "Vyztužení podlahy - mezívýztuhy v podlaze",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Mezívýztuhy v podlaze - NE",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "ZPN80",
+     "popis": "mezívýztuhy v podlaze U 80x60x3",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ZPN100",
+     "popis": "mezívýztuhy v podlaze U 100x60x3",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "vyztuhyLyzina": {
+   "label": "Vyztužení podlahy - výztuhy mezí lyžinou a podlahou PL5mm",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Výztuhy mezí lyžinou a podlahou - NE",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "MZVL",
+     "popis": "výztuhy mezí lyžinou a podlahou tl.5mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "hacky": {
+   "label": "Háčky na plachtu x výška",
+   "opts": [
+    {
+     "kod": "HPS500",
+     "popis": "háčky na plachtu ze spodu - od podlahy 500 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "HPV500",
+     "popis": "háčky na plachtu zvrchu 500 mm - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "HPV300",
+     "popis": "háčky na plachtu zvrchu 300 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "HP0",
+     "popis": "háčky na plachtu nejsou",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "vrata": {
+   "label": "VRATA",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "VRATA NEJSOU",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "VRJEKL",
+     "popis": "vrata jeklový lem, prolis plechy - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VRVU",
+     "popis": "vrata vyztužené U profilem",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VRJT",
+     "popis": "vrata jeklové těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VRVUT",
+     "popis": "vrata vyztužené U profilem těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "klapka": {
+   "label": "KLAPKA",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "KLAPKA NENÍ",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "KH",
+     "popis": "klapka hydraulická",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KHFS",
+     "popis": "hydraulická francouzská klapka + vrata S hák zavírání",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KHFVNL",
+     "popis": "hydraulická francouzská klapka + vrata holandské zavírání",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KHT",
+     "popis": "klapka hyraulická těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KL2M",
+     "popis": "klapka s možností otevření ve svislé a vodorovné rovině (2 MOVE)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLFS",
+     "popis": "francouzská klapka + vrata S hák zavírání",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLFVNL",
+     "popis": "francouzská klapka + vrata holandské zavírání",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLHDC",
+     "popis": "klapka zvýšena pro kont ABR-HDC",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLP",
+     "popis": "klapka přejezdová",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLPP",
+     "popis": "klapka přejezdová odpružená",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLS",
+     "popis": "klapka standardní/rovná (pendel)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLS1",
+     "popis": "klapka standardní/rovná (pendel)  (nový typ)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLST",
+     "popis": "klapka standardní těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLST1",
+     "popis": "klapka standardní těsněná (nový typ)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLT",
+     "popis": "klapka rovná (pendel) z lemem nahoře TR89",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLT1",
+     "popis": "klapka rovná (pendel) z lemem nahoře TR89  (nový typ)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLTT",
+     "popis": "klapka rovná (pendel) těsněná z lemem nahoře TR89",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLTT1",
+     "popis": "klapka rovná (pendel) těsněná z lemem nahoře TR89  (nový typ)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLZ",
+     "popis": "klapka zvýšená",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KLZT",
+     "popis": "klapka zvýšená těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "KSL",
+     "popis": "klapka Sörling",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "vlajka": {
+   "label": "VLAJKA",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "VLAJKA NENÍ",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "VLPT",
+     "popis": "vlajka pravá těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VLLT",
+     "popis": "vlajka levá těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VLPTE",
+     "popis": "vlajka pravá těsněná externí --- !!! NEPOUŽÍVAT !!!",
+     "std": false,
+     "ne": false,
+     "depr": true
+    },
+    {
+     "kod": "VLLTE",
+     "popis": "vlajka levá těsněná externí",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "zavirani": {
+   "label": "Zavírání vrat",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Zavírání není (VRATA NEJSOU)",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "VNL",
+     "popis": "holandské zavírání",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VSH",
+     "popis": "S hák- STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VDO",
+     "popis": "ala Domat",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VHD",
+     "popis": "kryté ala Casier, Vanheede",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VHM1",
+     "popis": "ala Hamo mono",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VHM2",
+     "popis": "ala Hamo dvojité",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "VDC",
+     "popis": "dvojté zavírání (double closing)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ENL",
+     "popis": "holandské zavírání odnímatelné (ELLERMANN)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "zamekPaky": {
+   "label": "Zámek páky vrat",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Zámek není (VRATA NEJSOU)",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "PA",
+     "popis": "zámek zavírání ala ALST-STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PN",
+     "popis": "zámek páky bezpečnostní NL",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PR8",
+     "popis": "zámek páky Rewald",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PS",
+     "popis": "zámek páky starý standard",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PR9",
+     "popis": "zámek páky Rewald pro PREZERO",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "centralVrat": {
+   "label": "Centrální jištění vrat",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Jištění není (VRATA NEJSOU)",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "C0",
+     "popis": "provedení bez centrálu",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CA",
+     "popis": "centrál automat s pružinou",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CB",
+     "popis": "centrál umístěný pod podlahou(za trámcem) --- !!! NEPOUŽÍVAT !!!",
+     "std": false,
+     "ne": false,
+     "depr": true
+    },
+    {
+     "kod": "CE",
+     "popis": "centrál umístěný vně trámce- STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CET",
+     "popis": "centrál umístěný vně trámce-pro těsnění",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CG",
+     "popis": "centrál gravitační automat",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CP",
+     "popis": "centrál posuvný ala Domat umístněný v trámci",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CPT",
+     "popis": "centrál umístěný pod trámcem",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CS",
+     "popis": "centrál např. pro VEOLIA BE, TVH",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "centralVlajky": {
+   "label": "Centrální jištění vlajky",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Jištění není (VLAJKA NENÍ)",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "CV",
+     "popis": "provedení vlajky univerzální (ala lisovací kont) pro těsnou verzi",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "centralKlapky": {
+   "label": "Centrální jištění klapky",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Jištění není (KLAPKA NENÍ)",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "CD",
+     "popis": "provedení těsněné klapky",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "C0",
+     "popis": "provedení bez centrálu",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CK",
+     "popis": "centrál pro přejezdová klapka",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "zebrik": {
+   "label": "Žebříky H>1500mm",
+   "opts": [
+    {
+     "kod": "ZD",
+     "popis": "žebřík s perfor nášlapy montovaný - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "Z0",
+     "popis": "bez žebříku",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SKL",
+     "popis": "skládací žebřík",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ZA",
+     "popis": "ALST žebřík samostatný nášlap",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ZA400",
+     "popis": "ALST žebřík samostatný nášlap, délka 400 mm (pro AFS)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ZC",
+     "popis": "žebřík s nášlapy s protiskluz plechem montovaný (pro Č.R.)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ZF",
+     "popis": "žebřík z pásoviny 40/8",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ZR",
+     "popis": "žebřík roxor z boční strany",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ZU",
+     "popis": "žebřík zapuštěný s perfor nášlapy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ZW",
+     "popis": "žebřík samostatný nášlap s protiskluz plechem NEPOUŽÍVAT",
+     "std": false,
+     "ne": false,
+     "depr": true
+    },
+    {
+     "kod": "ZWP",
+     "popis": "žebřík samostatný nášlap s protiskluz plechem PRAVÝ pro SUEZ-BE",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "cepRolen": {
+   "label": "Čep rolen",
+   "opts": [
+    {
+     "kod": "CR300/40",
+     "popis": "čep pro rolnu délky 300 mm, průměr 40 mm - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CR300/50",
+     "popis": "čep pro rolnu délky 300 mm, průměr 50 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CR200/40",
+     "popis": "čep pro rolnu délky 200 mm, průměr 40 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CR200/50",
+     "popis": "čep pro rolnu délky 200 mm, průměr 50 mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CR180/40",
+     "popis": "čep rolen pro CITY",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "CRS300/45",
+     "popis": "čep pro rolnu délky 300 mm, průměr 45 mm šroubovací",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "rolny": {
+   "label": "ROLNY",
+   "opts": [
+    {
+     "kod": "R159/300",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 300mm - STANDARD ELKO",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/200",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 200mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/200P",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 200mm POLYAMID",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/200PS",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 200mm POLYAMID ŠROUBOVACÍ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/200S",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 200mm ŠROUBOVACÍ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/250",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 250mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/250P",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 250mm POLYAMID",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/250PS",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 250mm POLYAMID ŠROUBOVACÍ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/250S",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 250mm ŠROUBOVACÍ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/300P",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 300mm POLYAMID",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/300PD",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 300mm POLYAMID DĚLENÉ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/300PS",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 300mm POLYAMID ŠROUBOVACÍ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/300PSOP",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 300mm POLYAMID S OCELOVÝM PLÁŠTĚM",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R159/300S",
+     "popis": "ROLNA PRŮMER 159mm DÉLKA 300mm ŠROUBOVACÍ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R203/200",
+     "popis": "ROLNA PRŮMER 203mm DÉLKA 200mm pro kontejnery ABR-AFS",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "R220/200",
+     "popis": "ROLNA PRŮMER 220mm DÉLKA 200mm pro kontejnery ABR-AFS",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "RS159/300PD",
+     "popis": "ROLNA ŠROUBOVACÍ PRŮMER 159mm DÉLKA 300mm POLYAMID DĚLENÉ",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "panty": {
+   "label": "Typy pantů vrat",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "PANTY VRAT NEJSOU",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "POD23",
+     "popis": "PANT ODLITEK PRO KONTEJNER 2300mm",
+     "std": true,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "POD24",
+     "popis": "PANT ODLITEK PRO KONTEJNER 2420mm",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PP23",
+     "popis": "PANT PLOCHÝ. STARÝ TYP",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PU24",
+     "popis": "PANT Z U-PROFILU. STARÝ TYP",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  },
+  "strecha": {
+   "label": "Střechy / Plachty",
+   "opts": [
+    {
+     "kod": "NE",
+     "popis": "Střecha/Plachta NENÍ",
+     "std": false,
+     "ne": true,
+     "depr": false
+    },
+    {
+     "kod": "ASML",
+     "popis": "střecha A-typ s mechanickým heverem/panty VLEVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "ASMP",
+     "popis": "střecha A-typ s mechanickým heverem/panty VPRAVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "DVSH",
+     "popis": "střecha, která se otevírá na dvě strany ovládaná hydraulilicky",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "DVSM",
+     "popis": "střecha, která se otevírá na dvě strany s mechanickým heverem",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PDL",
+     "popis": "plachta/síť dvoudílná umístěná v lemu",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PDP",
+     "popis": "plachta/síť dvoudílná přehazovací",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PP1",
+     "popis": "plachta posuvná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PR0",
+     "popis": "plachta rolovací  + gumové lano",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PRBL",
+     "popis": "plachta rolovací s bajonety na LEVÉ straně ve směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PRBP",
+     "popis": "plachta rolovací s bajonety na PRAVÉ straně ve směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PROB",
+     "popis": "plachta rolovací rolovaná na obě strany",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PRTL",
+     "popis": "plachta rolovací s turnikety na LEVÉ straně ve směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "PRTP",
+     "popis": "plachta rolovací s turnikety na PRAVÉ straně ve směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "RS0",
+     "popis": "rám na síť ovládaná ručně",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "RS1",
+     "popis": "rám na síť ovládaná ručně pomocí páky",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SDH0",
+     "popis": "střecha 2 dílná/ovládaná hydraulilicky (ozubené kolo)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SDH1",
+     "popis": "střecha 2 dílná/ovládaná hydraulilicky (pákový systém)",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SEHL",
+     "popis": "střecha s elektro- hydraulickým ovládáním/panty VLEVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SEHP",
+     "popis": "střecha s elektro- hydraulickým ovládáním/panty VPRAVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SFX",
+     "popis": "střecha fixní/pevně zavařená",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SHAL",
+     "popis": "střecha ALST s hydraulickým ovládáním /panty VLEVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SHAP",
+     "popis": "střecha ALST s hydraulickým ovládáním /panty VPRAVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SHL",
+     "popis": "střecha s hydraulickým ovládáním/panty VLEVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SHLT",
+     "popis": "střecha s hydraulickým ovládáním/panty VLEVO po směru jízdy těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SHP",
+     "popis": "střecha s hydraulickým ovládáním/panty VPRAVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SHPT",
+     "popis": "střecha s hydraulickým ovládáním/panty VPRAVO po směru jízdy těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SMAL",
+     "popis": "střecha ALST s mechanickým heverem/panty VLEVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SMAP",
+     "popis": "střecha ALST s mechanickým heverem/panty VPRAVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SML",
+     "popis": "střecha s mechanickým heverem/panty VLEVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SMLT",
+     "popis": "střecha s mechanickým heverem/panty VLEVO po směru jízdy těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SMP",
+     "popis": "střecha s mechanickým heverem/panty VPRAVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SMPT",
+     "popis": "střecha s mechanickým heverem/panty VPRAVO po směru jízdy těsněná",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SPL",
+     "popis": "střecha posuvná/ovládání VLEVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    },
+    {
+     "kod": "SPP",
+     "popis": "střecha posuvná/ovládání VPRAVO po směru jízdy",
+     "std": false,
+     "ne": false,
+     "depr": false
+    }
+   ]
+  }
+ }
+}

@@ -25,45 +25,109 @@ const HTML_FILE = path.join(__dirname, 'konstrukce.html');
 let KATALOG_ABR = [];
 try { KATALOG_ABR = (JSON.parse(fs.readFileSync(path.join(__dirname, 'katalog-abr.json'), 'utf8')).polozky) || []; } catch (_) {}
 
-// ---- Dotazník provedení kontejneru ABROLL (ABR-DSD) ------------------------
-// Zdroj: sdílený Google Sheet „Dotazník provedení kontejneru Abroll".
-// Pole typu 'volba' mají standard/opci; obchodník volí standard, opci, nebo
-// zapíše vlastní „požadavek zákazníka". Jeden informační tok Obchod → Konstrukce.
+// ---- Oficiální číselník kódů ABR („SEZNAM ABR KÓD", 16.09.2025) -------------
+// Zdroj: tabulka DOTAZNÍK ABROLL ELKOPLAST → list SEZNÁM ABR KÓD + KATALOG
+// ABROLL PDF. Každá sekce = jedna komponenta; opts: {kod, popis, std, ne, depr}.
+// std = standard ELKOPLAST (ve výsledném kódu se nevypisuje — „varianta B"),
+// ne = komponenta není (z kódu se vynechává), depr = NEPOUŽÍVAT (skryto).
+let ABR_KODY = { sekce: [], data: {} };
+try { ABR_KODY = JSON.parse(fs.readFileSync(path.join(__dirname, 'abr-kody.json'), 'utf8')); } catch (_) {}
+// Ilustrační obrázky typů natahování (CAD rendery z alba) — kod → soubor.
+let NATAH_IMG = {};
+try { NATAH_IMG = JSON.parse(fs.readFileSync(path.join(__dirname, 'natah-img', 'map.json'), 'utf8')); } catch (_) {}
+
+// Pole dotazníku vyrobené z jedné sekce číselníku: standard = STD položka
+// (u komponent „může nebýt" položka NE), opce = ostatní platné kódy.
+function abrPole(sek, label, over) {
+  over = over || {};
+  const s = (ABR_KODY.data || {})[sek] || { opts: [] };
+  const opts = (s.opts || []).filter(o => !o.depr);
+  let stdO = null;
+  if (over.stdKod) stdO = opts.find(o => o.kod === over.stdKod) || null;
+  if (!stdO) stdO = opts.find(o => o.std) || opts.find(o => o.ne) || null;
+  const std = stdO ? (stdO.ne ? ('NE — ' + stdO.popis) : (stdO.kod + ' — ' + stdO.popis)) : '—';
+  const rest = opts.filter(o => o !== stdO).map(o => (o.ne ? 'NE' : o.kod) + ' — ' + o.popis);
+  return { k: sek, label, std, opce: rest.join(' / '), kod: true };
+}
+
+// ---- Dotazník provedení kontejneru ABROLL — kódovaný dle katalogu -----------
+// Každá volba nese oficiální kód; z odpovědí se skládá celkový kód kontejneru
+// (genKodAbr). Pořadí polí v sekci „Provedení" = pořadí segmentů v názvu.
 const DOTAZNIK_ABROLL = [
   { title: 'Základní údaje', fields: [
-    { k: 'rozmery', label: 'Vnitřní rozměry (délka × šířka × výška)', type: 'text' },
+    { k: 'rozmery', label: 'Vnitřní rozměry v mm (délka × šířka × výška)', type: 'text' },
+    { k: 'provedeni', label: 'Provedení — tloušťky plechů dno/bočnice', std: '5/3', opce: '4/3 / 3/3' },
     { k: 'pocet', label: 'Počet ks', type: 'number' },
     { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
   ] },
-  { title: 'Provedení', fields: [
-    { k: 'provedeni', label: 'Provedení', std: '5/3', opce: '4/3 nebo jiné' },
-    { k: 'natahovani', label: 'Natahování', std: 'NA 1570/50 — typ A (DIN, hák 50)', opce: 'NH 1570/50·60 (typ H) / NS 1570 (sklopné) / NV 1570/60 (vyměnitelné) / NAT·NHT (tunelové) / AFNOR: NA 1425/50 · NA 1450/50 · NT · NTA / NHNL (NL) / NL (lanové) / NR·NRS (řetězové)' },
-    { k: 'prumerHaku', label: 'Průměr háku h 1570 (mm) — součást kódu natahování', std: '50 (…/50)', opce: '60 (…/60)' },
-    { k: 'napojeniPodlaha', label: 'Napojení podlaha × bočnice', std: 'VP250 — vytažená podlaha ~250 mm (45×45°)', opce: 'VP000 (nevytažená) / K90 (kolmé 2300·2420) / R150 · R200 (kulaté) / +R = s podlahovým roštem (VP250R·VP000R·K90R)' },
-    { k: 'vrchniLem', label: 'Vrchní lem', std: 'JE100 — jekl 100×80×4 S355', opce: 'TR114 — trubka 114×6 S355 / TR89 — trubka 89×6 S355' },
-    { k: 'roztecVyztuhBocnice', label: 'Rozteč výztuh bočnice', std: '750 mm (průběžně)', opce: 'SV500 — rozteč 500 mm' },
-    { k: 'profilVyztuhBocnice', label: 'Profil výztuh bočnice', std: 'VU100 — U100×60 (standard ELKOPLAST)', opce: 'VU80 (U80×60) / VU120 (U120×60) / VU100x50·VU80x50·VU120x50 (special výška)' },
-    { k: 'roztecVyztuhPodlahy', label: 'Rozteč výztuh podlahy', std: '750 mm', opce: '500 mm' },
-    { k: 'profilVyztuhPodlahy', label: 'Profil výztuh podlahy', std: 'VU100 — U100×60', opce: 'ZPN100 — zhuštěná podlaha U100×60×4' },
-    { k: 'mezivyztuhaIPN', label: 'Mezivýztuha IPN × podlaha', std: 'ne', opce: 'MZVL — mezivýztuhy lyžina×podlaha / ZPN100 — zhuštěná podlaha' },
-    { k: 'jisteniC', label: 'Jištění C v lyžině (C-doraz)', std: 'D1 — C-doraz ano', opce: 'D0 — C-doraz ne' },
-    { k: 'zadniTramec', label: 'Zadní trámec', std: 'UPN 180', opce: 'UPN 200 + sloupky (kolmé napojení / šířka 2420)' },
-    { k: 'rolny', label: 'Rolny 2 ks délka 300 mm', std: 'ROL159-300 — tr159, délka 300 (STD)', opce: 'ROL159-250·200 / …P (polyamid) / …S (šroubovací) / ROL203-200·ROL220-200 (AFS)' },
-    { k: 'cepRolen', label: 'Čep rolen mazaný / průměr', std: 'CR300/40 (40 mm)', opce: 'CR300/50 / CR200/40 / CR200/50' },
-    { k: 'provedeniVrat', label: 'Provedení vrat', std: '2křídlá — VRJEKL (jeklový lem)', opce: '1křídlá / VRVU (vyztužená U) / VRJT (těsněná) · klapky: KLS·KLST, KLZ (zvýšená), KLP (přejezdová), KLF (fr.), KH·KHT (hydraulická)' },
-    { k: 'zaviraniVrat', label: 'Zavírání vrat', std: 'VSH — S hák', opce: 'VNL (holandské) / VDO (ala Domat) / VHD (kryté heavy duty) / VHM1·VHM2 (ala Hamo) / VDC (dvojité)' },
-    { k: 'strecha', label: 'Střecha (směr ovládání je v kódu: …P vpravo / …L vlevo)', std: 'ne', opce: 'SMP·SML (mechanická vpravo·vlevo) / SHP·SHL (hydraulická) / SPP·SPL (posuvná) / SFX (fixní) / SDH (2dílná hydr.) · plachty: PRT (rolovací), PDP·PDL (dvoudílná)' },
-    { k: 'hackyNaPlachtu', label: 'Háčky na plachtu', std: 'HPV500 — háčky zvrchu ~500 mm', opce: 'HPS500 (zespodu) / HP0 (bez háčků)' },
-    { k: 'zebrik', label: 'Žebřík (výška kont. min 1500 mm)', std: 'ZC — protiskluz nášlapy (ČR), vlevo', opce: 'ZD (perfor nášlapy) / ZF (pásovina 40/8) / ZU (zapuštěný) / ZR (roxor boční) / Z0 (bez žebříku)' },
-    { k: 'centralniJisteni', label: 'Centrální jištění vrat', std: 'CE — centrál vně trámce', opce: 'CA (automat s pružinou) / CS (Veolia BE·TVH) / CG (gravitační) / C0 (bez) · vlajka CV · klapka CD·CK' },
+  { title: 'Provedení dle katalogu ABR', fields: [
+    abrPole('natahovani', 'Natahování', { stdKod: 'NA1570/50' }),
+    abrPole('lyzina', 'Zajištění v lyžině / typ lyžiny'),
+    abrPole('napojeni', 'Napojení bočnic / typ podlahy'),
+    abrPole('lem', 'Vrchní lem bočnice'),
+    abrPole('profilVyztuh', 'Profil výztuh bočnice / podlahy'),
+    abrPole('roztecVyztuh', 'Rozteč výztuh podlahy/bočnice'),
+    abrPole('mezivyztuhy', 'Mezivýztuhy v podlaze'),
+    abrPole('vyztuhyLyzina', 'Výztuhy mezi lyžinou a podlahou (PL 5 mm)'),
+    abrPole('oka', 'Uvazovací oka'),
+    abrPole('sklopnaBocnice', 'Sklopná bočnice'),
+    abrPole('reklama', 'Reklama na bočnice'),
+    abrPole('hacky', 'Háčky na plachtu'),
+    abrPole('vrata', 'Vrata'),
+    abrPole('klapka', 'Klapka'),
+    abrPole('vlajka', 'Vlajka'),
+    abrPole('zavirani', 'Zavírání vrat'),
+    abrPole('zamekPaky', 'Zámek páky vrat'),
+    abrPole('centralVrat', 'Centrální jištění vrat'),
+    abrPole('centralKlapky', 'Centrální jištění klapky'),
+    abrPole('centralVlajky', 'Centrální jištění vlajky'),
+    abrPole('zebrik', 'Žebřík (u výšky nad 1500 mm)'),
+    abrPole('cepRolen', 'Čep rolen'),
+    abrPole('rolny', 'Rolny'),
+    abrPole('panty', 'Typ pantů vrat'),
+    abrPole('strecha', 'Střecha / plachta'),
   ] },
-  { title: 'Doplňky', fields: [
-    { k: 'dvojiteZavirani', label: 'Dvojité zavírání', std: 'ne', opce: 'ano' },
-    { k: 'zhustkeNosniky', label: 'Zhuštěné nosníky podlahy', std: 'ne', opce: 'ano 60×60×4' },
+  { title: 'Doplňky (mimo kód)', fields: [
+    { k: 'zadniTramec', label: 'Zadní trámec', std: 'UPN 180', opce: 'UPN 200 + sloupky (kolmé napojení / šířka 2420)' },
     { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano', opceVstup: { placeholder: 'počet výztuh', unit: 'ks', num: true } },
     { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
   ] },
 ];
+
+// ---- Generátor celkového kódu kontejneru ABR (varianta B) -------------------
+// Struktura dle KATALOG ABROLL str. 2: TYP - ROZMĚRY-PLECHY - NATAHOVÁNÍ -
+// [odchylky podlah/bočnic] - VRATA/KLAPKA/VLAJKA - zavírání/zámek/centrál -
+// ŽEBŘÍK - ČEP/ROLNY - PANTY - STŘECHA. Pravidla: standard ELKOPLAST se
+// nevypisuje (plně standardní DIN kontejner = jen ABR-XXX-rozměry-plechy),
+// NE se vynechává, „/" v kódu se v názvu píše jako „_" (NH1570/60 → NH1570_60),
+// žebřík se u výšky > 1500 mm vypisuje vždy (i standardní ZD).
+const ABR_GEN_ORDER = ['natahovani', 'lyzina', 'napojeni', 'lem', 'profilVyztuh', 'roztecVyztuh', 'mezivyztuhy', 'vyztuhyLyzina', 'oka', 'sklopnaBocnice', 'reklama', 'hacky', 'vrata', 'klapka', 'vlajka', 'zavirani', 'zamekPaky', 'centralVrat', 'centralKlapky', 'centralVlajky', 'zebrik', 'cepRolen', 'rolny', 'panty', 'strecha'];
+const ABR_STD_NATAH = 'NA1570/50';     // standard pro DIN řady; AFNOR řady (afs) vypisují vždy
+function abrStdKod(sek) { const o = ((ABR_KODY.data || {})[sek] || {}).opts || []; const s = o.find(x => x.std); return s ? s.kod : ''; }
+function genKodAbr(z) {
+  if (familyOf(z.typKey) !== 'abroll') return '';
+  const dq = z.dotaznik || {};
+  const hodn = v => (v == null) ? '' : (typeof v === 'string' ? v : String(v.hodnota || ''));
+  const tok = v => { const s = hodn(v).trim(); const m = s.split(/[\s—–]+/)[0] || ''; return m; };
+  const parts = ['ABR-' + String(z.typKey || '').toUpperCase()];
+  const roz = hodn(dq.rozmery).replace(/\s+/g, '').replace(/[×X]/g, 'x');
+  const ple = (hodn(dq.provedeni).match(/(\d)\s*\/\s*(\d)/) || []);
+  if (roz) parts.push(roz + (ple[1] ? ('-' + ple[1] + ple[2]) : ''));
+  const vyska = parseInt((roz.split('x')[2] || ''), 10) || 0;
+  const afnor = (z.typKey === 'afs' || z.typKey === 'wf');
+  for (const k of ABR_GEN_ORDER) {
+    const v = dq[k];
+    if (!v || typeof v !== 'object') continue;
+    if (v.volba === 'pozadavek') continue;          // volný požadavek → jen text v dotazníku
+    const kd = tok(v);
+    if (!kd || kd === 'NE' || kd === '—') continue;
+    if (k === 'natahovani') { if (!afnor && kd === ABR_STD_NATAH) continue; parts.push(kd.replace(/\//g, '_')); continue; }
+    if (k === 'zebrik') { if (vyska >= 1500) parts.push(kd.replace(/\//g, '_')); continue; }   // vzor katalogu vypisuje ZD už při 1500
+    if (kd === abrStdKod(k)) continue;               // varianta B: standard se nevypisuje
+    parts.push(kd.replace(/\//g, '_'));
+  }
+  return parts.join('-');
+}
 
 // ---- Dotazník CITY — uzavřené městské abroll kontejnery (hákový nosič) ------
 // Vychází z produktové knihovny (řada CITY: CSD/DSD/POP/WDG/WDC/RAM/WFR).
@@ -806,6 +870,15 @@ function mount(host) {
 
     try {
       if (p === '/api/konstrukce/katalog' && req.method === 'GET') { json(res, 200, { polozky: KATALOG_ABR }); return true; }
+      if (p === '/api/konstrukce/natah-img' && req.method === 'GET') {
+        // ilustrace natahování — jen soubory fNN.jpg z natah-img/ (žádné cesty)
+        const f = String((u.query || {}).f || '');
+        if (!/^f\d{2}\.jpg$/.test(f)) { json(res, 404, { chyba: 'Neznámý obrázek.' }); return true; }
+        const fp = path.join(__dirname, 'natah-img', f);
+        if (!fs.existsSync(fp)) { json(res, 404, { chyba: 'Neznámý obrázek.' }); return true; }
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
+        res.end(fs.readFileSync(fp)); return true;
+      }
       if (p === '/api/konstrukce/me' && req.method === 'GET') return apiMe(req, res);
       if (p === '/api/konstrukce/data' && req.method === 'GET') return apiData(req, res);
       if (p === '/api/konstrukce/zakazka' && req.method === 'POST') return apiCreate(req, res);
@@ -882,6 +955,7 @@ function mount(host) {
       families: FAM_ORDER.map(k => ({ key: k, label: FAM_LABEL[k] })),
       strediska: (d.strediska || []).map(s => ({ key: s.key, label: s.label, reditelEmail: s.reditelEmail || '', reditelName: s.reditelEmail ? empName(s.reditelEmail) : '' })),
       adresy: (d.adresy || []).slice().sort((a, b) => a.localeCompare(b, 'cs')),
+      natahImg: NATAH_IMG,                             // kod natahování → soubor ilustrace (natah-img/)
       roles: (me.isAdmin) ? roleAssignments(d) : undefined,
       employees: (me.isAdmin) ? adminEmployees() : undefined,
       workflow: d.workflow,                            // pravidlo toku (graf) — pro schéma i plátno
@@ -937,6 +1011,7 @@ function mount(host) {
       zakaznik: z.zakaznik, kontakt: z.kontakt, kontaktEmail: z.kontaktEmail,
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
       cvzHelios: z.cvzHelios || '',   // číslo výrobní zakázky z Heliosu (26C-001 apod.), ručně
+      kodAbr: z.kodAbr || '',         // celkový kód kontejneru dle katalogu ABR (varianta B)
 
       params: z.params || {}, dotaznik: z.dotaznik || null, artNo: z.artNo || '',
       stav: z.stav, stavLabel: STAV[z.stav].label, onTurn: STAV[z.stav].onTurn,
@@ -1014,6 +1089,7 @@ function mount(host) {
       assignedTo: '', link: null, revisionCount: 0, audit: [],
     };
     if (jeObj) z.cisloObj = cislo;   // přímá objednávka: jediné číslo VYK (žádné NAB)
+    z.kodAbr = genKodAbr(z);         // celkový kód kontejneru dle katalogu ABR (jen ABROLL řady)
     // Přímá objednávka: závod vybraný rovnou při zadání → přeskočí krok ředitele výroby.
     let startStav = 'prideleni';
     if (jeObj) {
