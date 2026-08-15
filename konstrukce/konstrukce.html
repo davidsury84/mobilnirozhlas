@@ -2332,7 +2332,8 @@ function splitOpts(opceRaw){
 }
 function segClick(el){var row=el.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});el.classList.add('sel');var v=el.getAttribute('data-v');
   var req=row.querySelector('.dq2-req');if(req)req.style.display=(v==='pozadavek'?'':'none');
-  var ow=row.querySelector('.dq2-optwrap');if(ow)ow.style.display=(v==='opce'?'':'none');
+  // rozbalovací katalog jen pro trigger bez konkrétní hodnoty (řadové opce mají data-optval)
+  var ow=row.querySelector('.dq2-optwrap');if(ow)ow.style.display=(v==='opce'&&!el.getAttribute('data-optval')?'':'none');
   if(v==='pozadavek'&&req)req.focus(); else if(v==='opce'&&ow){var oi=ow.querySelector('.dq2-opt');if(oi)oi.focus();}
   dqKodPreview();}
 /* ---- Natahování: obrázkové dlaždice (ilustrace z katalogu ABROLL) ---- */
@@ -2345,13 +2346,19 @@ function natGrid(f,opts,vol,curOpt,rq){
       (img?'<img loading="lazy" src="/api/konstrukce/natah-img?f='+esc(img)+'" alt="">':'')+
       '<span class="nk">'+esc(kd)+(dv==='standard'?' · STD':'')+'</span><span class="np">'+esc(pop)+'</span></button>';
   };
+  var katOpts=splitOpts(f.kat||'');
+  var vTile=opts.some(function(o){return o.val===curOpt});
+  var katSel=(vol==='opce'&&!vTile&&!!curOpt);
+  var katBtn=katOpts.length?('<button type="button" class="seg'+(katSel?' sel':'')+'" data-v="opce" data-kat="1" onclick="segClick(this)"><span class="st">▾</span>'+esc(tr('další z katalogu'))+' ('+katOpts.length+')</button>'):'';
+  var katWrap=katOpts.length?('<div class="dq2-optwrap" style="'+(katSel?'':'display:none')+'"><select class="dq2-opt" onchange="segSelect(this,\'opce\')"><option value=""'+(katSel?'':' selected')+' disabled>'+esc(tr('vyberte z katalogu…'))+'</option>'+
+    katOpts.map(function(o){return '<option value="'+esc(o.val)+'"'+(curOpt===o.val?' selected':'')+'>'+esc(o.lab)+'</option>'}).join('')+'</select></div>'):'';
   return '<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div>'+
     '<div class="dq2-seg" style="flex-direction:column;align-items:stretch">'+
       '<div class="nat-grid">'+
         tile('standard',f.std,f.std,vol==='standard')+
         opts.map(function(o){return tile('opce',o.val,o.lab,vol==='opce'&&curOpt===o.val)}).join('')+
       '</div>'+
-      '<div>'+seg(f.k,'pozadavek','✎',tr('vlastní'),vol)+'</div>'+
+      '<div class="row" style="gap:6px">'+katBtn+seg(f.k,'pozadavek','✎',tr('vlastní'),vol)+'</div>'+katWrap+
     '</div>'+
     '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
 }
@@ -2378,7 +2385,7 @@ function dqKodPreview(){
     var kd=String(hod).trim().split(/[\s—–]+/)[0]||'';
     if(!kd||kd==='NE'||kd==='—')return;
     var stdKd=String(f.std).trim().split(/[\s—–]+/)[0]||'';
-    if(f.k==='natahovani'){if(!afnor&&kd==='NA1570/50')return;parts.push(kd.replace(/\//g,'_'));return;}
+    if(f.k==='natahovani'){if(!afnor&&kd===stdKd)return;parts.push(kd.replace(/\//g,'_'));return;}
     if(f.k==='zebrik'){if(vyska>=1500)parts.push(kd.replace(/\//g,'_'));return;}
     if(kd===stdKd)return;
     parts.push(kd.replace(/\//g,'_'));
@@ -2387,7 +2394,12 @@ function dqKodPreview(){
   el.innerHTML='<b>'+esc(tr('Kód'))+':</b> <span class="k">'+esc(parts.join('-'))+'</span>';
   dqExtraUpdate(parts.join('-'));
 }
-function segSelect(inp,v){var row=inp.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});var b=row.querySelector('.seg[data-v='+v+']');if(b)b.classList.add('sel');dqKodPreview();}
+function segSelect(inp,v){var row=inp.closest('.dq2');row.querySelectorAll('.seg').forEach(function(s){s.classList.remove('sel')});
+  // změna z katalogového selectu → označit trigger „další z katalogu", ne první řadovou opci
+  var b=null;
+  if(v==='opce'&&inp.classList&&inp.classList.contains('dq2-opt'))b=row.querySelector('.seg[data-kat]');
+  if(!b)b=row.querySelector('.seg[data-v='+v+']');
+  if(b)b.classList.add('sel');dqKodPreview();}
 function renderDotaznik(){
   var t=curType(),pf=DQ_PREFILL||{},np=0;
   var h='';
@@ -2403,6 +2415,21 @@ function renderDotaznik(){
           var opts=splitOpts(f.opce), single=opts.length<=1;
           if(f.k==='natahovani'&&f.kod){
             h+=natGrid(f,opts,vol,curOpt,rq);
+          } else if(f.kat!==undefined){
+            // pole řízené LISTEM řady: segmenty = std + opce řady, zbytek číselníku pod „další z katalogu"
+            var katOpts=splitOpts(f.kat||'');
+            var vSegu=opts.some(function(o){return o.val===curOpt});
+            var katSel=(vol==='opce'&&!vSegu&&!!curOpt);
+            var optSegs=opts.map(function(o){return segOpt(f.k,o.val,o.lab,vol==='opce'&&curOpt===o.val)}).join('');
+            var katBtn=katOpts.length?('<button type="button" class="seg'+(katSel?' sel':'')+'" data-v="opce" data-kat="1" onclick="segClick(this)"><span class="st">▾</span>'+esc(tr('další z katalogu'))+' ('+katOpts.length+')</button>'):'';
+            var katWrap=katOpts.length?('<div class="dq2-optwrap" style="'+(katSel?'':'display:none')+'"><select class="dq2-opt" onchange="segSelect(this,\'opce\')"><option value=""'+(katSel?'':' selected')+' disabled>'+esc(tr('vyberte z katalogu…'))+'</option>'+
+              katOpts.map(function(o){return '<option value="'+esc(o.val)+'"'+(curOpt===o.val?' selected':'')+'>'+esc(o.lab)+'</option>'}).join('')+'</select></div>'):'';
+            h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg">'+
+              seg(f.k,'standard','std',tr(f.std),vol)+
+              optSegs+katBtn+
+              seg(f.k,'pozadavek','✎',tr('vlastní'),vol)+
+              '</div>'+katWrap+
+              '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
           } else if(opts.length>6){
             // dlouhý číselník (klapky, střechy, rolny…) → rozbalovací výběr z katalogu
             var osel='<div class="dq2-optwrap" style="'+(vol==='opce'?'':'display:none')+'"><select class="dq2-opt" onchange="segSelect(this,\'opce\')">'+
@@ -2435,7 +2462,7 @@ function renderDotaznik(){
             ralTB(f.k)+
             '<input id="dq_'+f.k+'" class="txt" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('RAL a další poznámky…'))+'" oninput="ralMark(\''+f.k+'\')"></div></div>';
         } else {
-          h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg"><input id="dq_'+f.k+'" class="txt" '+(f.type==='number'?'type="number" inputmode="decimal"':'')+' value="'+esc(typeof a==='string'?a:'')+'" placeholder="…"></div></div>';
+          h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg"'+(f.hint?' style="flex-direction:column;align-items:stretch;gap:2px"':'')+'><input id="dq_'+f.k+'" class="txt" '+(f.type==='number'?'type="number" inputmode="decimal"':'')+' value="'+esc(typeof a==='string'?a:'')+'" placeholder="…">'+(f.hint?'<div class="dq-hint">'+esc(tr(f.hint))+'</div>':'')+'</div></div>';
         }
       });
     });

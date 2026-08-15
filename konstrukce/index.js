@@ -35,64 +35,100 @@ try { ABR_KODY = JSON.parse(fs.readFileSync(path.join(__dirname, 'abr-kody.json'
 // Ilustrační obrázky typů natahování (CAD rendery z alba) — kod → soubor.
 let NATAH_IMG = {};
 try { NATAH_IMG = JSON.parse(fs.readFileSync(path.join(__dirname, 'natah-img', 'map.json'), 'utf8')); } catch (_) {}
+// Per-řadové standardy a opce dle LISTŮ oficiální tabulky „Typová řada ABR
+// kontejnerů" (abr-rady.json) — každá řada (ABR-DSD, ABR-AFS…) má vlastní list
+// s jinými std/opce. Řady bez listu jedou na globálním číselníku.
+let ABR_RADY_CFG = {};
+try {
+  const raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'abr-rady.json'), 'utf8'));
+  for (const k in raw) { if (k.startsWith('_')) continue; ABR_RADY_CFG[k] = raw[k].$ref ? raw[raw[k].$ref] : raw[k]; }
+} catch (_) {}
 
 // Pole dotazníku vyrobené z jedné sekce číselníku: standard = STD položka
 // (u komponent „může nebýt" položka NE), opce = ostatní platné kódy.
+// Per-řadové překrytí (over._rada z abr-rady.json): std i opce dle LISTU řady;
+// zbytek číselníku zůstává dosažitelný přes „další z katalogu" (f.kat).
+// std může být i token mimo číselník (hodnota z listu) — do kódu se std stejně nevypisuje.
 function abrPole(sek, label, over) {
   over = over || {};
   const s = (ABR_KODY.data || {})[sek] || { opts: [] };
   const opts = (s.opts || []).filter(o => !o.depr);
-  let stdO = null;
-  if (over.stdKod) stdO = opts.find(o => o.kod === over.stdKod) || null;
-  if (!stdO) stdO = opts.find(o => o.std) || opts.find(o => o.ne) || null;
-  const std = stdO ? (stdO.ne ? ('NE — ' + stdO.popis) : (stdO.kod + ' — ' + stdO.popis)) : '—';
-  const rest = opts.filter(o => o !== stdO).map(o => (o.ne ? 'NE' : o.kod) + ' — ' + o.popis);
-  return { k: sek, label, std, opce: rest.join(' / '), kod: true };
+  let stdO = null, stdText = '';
+  if (over.stdKod) stdO = opts.find(o => o.kod === over.stdKod || (over.stdKod === 'NE' && o.ne)) || null;
+  if (!stdO && over.std !== undefined) {
+    stdText = (String(over.std).toUpperCase() === 'NE')
+      ? ('NE — ' + (over.stdPopis || 'komponenta není (dle listu řady)'))
+      : (over.std + ' — ' + (over.stdPopis || 'standard dle listu řady'));
+  }
+  if (!stdO && !stdText) stdO = opts.find(o => o.std) || opts.find(o => o.ne) || null;
+  const std = stdText || (stdO ? (stdO.ne ? ('NE — ' + stdO.popis) : (stdO.kod + ' — ' + (over.stdPopis || stdO.popis))) : '—');
+  const rest = opts.filter(o => o !== stdO);
+  const lab = o => (o.ne ? 'NE' : o.kod) + ' — ' + o.popis;
+  if (over._rada) {
+    const opceO = (over.opceKody || []).map(kk => rest.find(o => o.kod === kk || (kk === 'NE' && o.ne))).filter(Boolean);
+    const kat = rest.filter(o => !opceO.includes(o));
+    const f = { k: sek, label, std, opce: opceO.map(lab).join(' / '), kod: true };
+    if (kat.length) f.kat = kat.map(lab).join(' / ');
+    return f;
+  }
+  return { k: sek, label, std, opce: rest.map(lab).join(' / '), kod: true };
 }
 
 // ---- Dotazník provedení kontejneru ABROLL — kódovaný dle katalogu -----------
 // Každá volba nese oficiální kód; z odpovědí se skládá celkový kód kontejneru
 // (genKodAbr). Pořadí polí v sekci „Provedení" = pořadí segmentů v názvu.
-const DOTAZNIK_ABROLL = [
-  { title: 'Základní údaje', fields: [
-    { k: 'rozmery', label: 'Vnitřní rozměry v mm (délka × šířka × výška)', type: 'text' },
-    { k: 'provedeni', label: 'Provedení — tloušťky plechů dno/bočnice', std: '5/3', opce: '4/3 / 3/3' },
-    { k: 'pocet', label: 'Počet ks', type: 'number' },
-    { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
-  ] },
-  { title: 'Provedení dle katalogu ABR', fields: [
-    abrPole('natahovani', 'Natahování', { stdKod: 'NA1570/50' }),
-    abrPole('lyzina', 'Zajištění v lyžině / typ lyžiny'),
-    abrPole('napojeni', 'Napojení bočnic / typ podlahy'),
-    abrPole('lem', 'Vrchní lem bočnice'),
-    abrPole('profilVyztuh', 'Profil výztuh bočnice / podlahy'),
-    abrPole('roztecVyztuh', 'Rozteč výztuh podlahy/bočnice'),
-    abrPole('mezivyztuhy', 'Mezivýztuhy v podlaze'),
-    abrPole('vyztuhyLyzina', 'Výztuhy mezi lyžinou a podlahou (PL 5 mm)'),
-    abrPole('oka', 'Uvazovací oka'),
-    abrPole('sklopnaBocnice', 'Sklopná bočnice'),
-    abrPole('reklama', 'Reklama na bočnice'),
-    abrPole('hacky', 'Háčky na plachtu'),
-    abrPole('vrata', 'Vrata'),
-    abrPole('klapka', 'Klapka'),
-    abrPole('vlajka', 'Vlajka'),
-    abrPole('zavirani', 'Zavírání vrat'),
-    abrPole('zamekPaky', 'Zámek páky vrat'),
-    abrPole('centralVrat', 'Centrální jištění vrat'),
-    abrPole('centralKlapky', 'Centrální jištění klapky'),
-    abrPole('centralVlajky', 'Centrální jištění vlajky'),
-    abrPole('zebrik', 'Žebřík (u výšky nad 1500 mm)'),
-    abrPole('cepRolen', 'Čep rolen'),
-    abrPole('rolny', 'Rolny'),
-    abrPole('panty', 'Typ pantů vrat'),
-    abrPole('strecha', 'Střecha / plachta'),
-  ] },
-  { title: 'Doplňky (mimo kód)', fields: [
-    { k: 'zadniTramec', label: 'Zadní trámec', std: 'UPN 180', opce: 'UPN 200 + sloupky (kolmé napojení / šířka 2420)' },
-    { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano', opceVstup: { placeholder: 'počet výztuh', unit: 'ks', num: true } },
-    { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
-  ] },
-];
+// Dotazník se skládá PER ŘADA: std/opce dle listu řady (abr-rady.json),
+// zbytek číselníku pod „další z katalogu"; řady bez listu = celý číselník.
+function dotaznikAbroll(rada) {
+  const cfg = ABR_RADY_CFG[rada] || {};
+  const ov = (k, def) => {
+    if (cfg[k]) return Object.assign({ _rada: true }, def || {}, cfg[k]);
+    return def || {};
+  };
+  const prov = cfg.provedeni || {};
+  const rozmery = { k: 'rozmery', label: 'Vnitřní rozměry v mm (délka × šířka × výška)', type: 'text' };
+  if (cfg.rozmeryHint) rozmery.hint = cfg.rozmeryHint;
+  return [
+    { title: 'Základní údaje', fields: [
+      rozmery,
+      { k: 'provedeni', label: 'Provedení — tloušťky plechů dno/bočnice', std: prov.std || '5/3', opce: (Array.isArray(prov.opce) ? prov.opce : ['4/3', '3/3']).join(' / ') },
+      { k: 'pocet', label: 'Počet ks', type: 'number' },
+      { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
+    ] },
+    { title: 'Provedení dle listu řady ABR-' + String(rada).toUpperCase(), fields: [
+      abrPole('natahovani', 'Natahování', ov('natahovani', { stdKod: 'NA1570/50' })),
+      abrPole('lyzina', 'Zajištění v lyžině / typ lyžiny', ov('lyzina')),
+      abrPole('napojeni', 'Napojení bočnic / typ podlahy', ov('napojeni')),
+      abrPole('lem', 'Vrchní lem bočnice', ov('lem')),
+      abrPole('profilVyztuh', 'Profil výztuh bočnice / podlahy', ov('profilVyztuh')),
+      abrPole('roztecVyztuh', 'Rozteč výztuh podlahy/bočnice', ov('roztecVyztuh')),
+      abrPole('mezivyztuhy', 'Mezivýztuhy v podlaze', ov('mezivyztuhy')),
+      abrPole('vyztuhyLyzina', 'Výztuhy mezi lyžinou a podlahou (PL 5 mm)', ov('vyztuhyLyzina')),
+      abrPole('oka', 'Uvazovací oka', ov('oka')),
+      abrPole('sklopnaBocnice', 'Sklopná bočnice', ov('sklopnaBocnice')),
+      abrPole('reklama', 'Reklama na bočnice', ov('reklama')),
+      abrPole('hacky', 'Háčky na plachtu', ov('hacky')),
+      abrPole('vrata', 'Vrata', ov('vrata')),
+      abrPole('klapka', 'Klapka', ov('klapka')),
+      abrPole('vlajka', 'Vlajka', ov('vlajka')),
+      abrPole('zavirani', 'Zavírání vrat', ov('zavirani')),
+      abrPole('zamekPaky', 'Zámek páky vrat', ov('zamekPaky')),
+      abrPole('centralVrat', 'Centrální jištění vrat', ov('centralVrat')),
+      abrPole('centralKlapky', 'Centrální jištění klapky', ov('centralKlapky')),
+      abrPole('centralVlajky', 'Centrální jištění vlajky', ov('centralVlajky')),
+      abrPole('zebrik', 'Žebřík (u výšky nad 1500 mm)', ov('zebrik')),
+      abrPole('cepRolen', 'Čep rolen', ov('cepRolen')),
+      abrPole('rolny', 'Rolny', ov('rolny')),
+      abrPole('panty', 'Typ pantů vrat', ov('panty')),
+      abrPole('strecha', 'Střecha / plachta', ov('strecha')),
+    ] },
+    { title: 'Doplňky (mimo kód)', fields: [
+      { k: 'zadniTramec', label: 'Zadní trámec', std: 'UPN 180', opce: 'UPN 200 + sloupky (kolmé napojení / šířka 2420)' },
+      { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano', opceVstup: { placeholder: 'počet výztuh', unit: 'ks', num: true } },
+      { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
+    ] },
+  ];
+}
 
 // ---- Generátor celkového kódu kontejneru ABR (varianta B) -------------------
 // Struktura dle KATALOG ABROLL str. 2: TYP - ROZMĚRY-PLECHY - NATAHOVÁNÍ -
@@ -102,8 +138,16 @@ const DOTAZNIK_ABROLL = [
 // NE se vynechává, „/" v kódu se v názvu píše jako „_" (NH1570/60 → NH1570_60),
 // žebřík se u výšky > 1500 mm vypisuje vždy (i standardní ZD).
 const ABR_GEN_ORDER = ['natahovani', 'lyzina', 'napojeni', 'lem', 'profilVyztuh', 'roztecVyztuh', 'mezivyztuhy', 'vyztuhyLyzina', 'oka', 'sklopnaBocnice', 'reklama', 'hacky', 'vrata', 'klapka', 'vlajka', 'zavirani', 'zamekPaky', 'centralVrat', 'centralKlapky', 'centralVlajky', 'zebrik', 'cepRolen', 'rolny', 'panty', 'strecha'];
-const ABR_STD_NATAH = 'NA1570/50';     // standard pro DIN řady; AFNOR řady (afs) vypisují vždy
+const ABR_STD_NATAH = 'NA1570/50';     // záložní standard pro řady bez listu; AFNOR řady (afs/wf) vypisují vždy
 function abrStdKod(sek) { const o = ((ABR_KODY.data || {})[sek] || {}).opts || []; const s = o.find(x => x.std); return s ? s.kod : ''; }
+// Standard PER ŘADA: token std z pole dotazníku řady (listy ABR-XXX); fallback globální číselník.
+function radaStdTok(typKey, k) {
+  const t = SEED_TYPES.find(x => x.key === typKey);
+  if (!t || !Array.isArray(t.dotaznik)) return '';
+  let f = null;
+  t.dotaznik.forEach(sec => (sec.fields || []).forEach(x => { if (x.k === k) f = x; }));
+  return f ? (String(f.std || '').trim().split(/[\s—–]+/)[0] || '') : '';
+}
 function genKodAbr(z) {
   if (familyOf(z.typKey) !== 'abroll') return '';
   const dq = z.dotaznik || {};
@@ -121,9 +165,9 @@ function genKodAbr(z) {
     if (v.volba === 'pozadavek') continue;          // volný požadavek → jen text v dotazníku
     const kd = tok(v);
     if (!kd || kd === 'NE' || kd === '—') continue;
-    if (k === 'natahovani') { if (!afnor && kd === ABR_STD_NATAH) continue; parts.push(kd.replace(/\//g, '_')); continue; }
+    if (k === 'natahovani') { const stdNat = radaStdTok(z.typKey, 'natahovani') || ABR_STD_NATAH; if (!afnor && kd === stdNat) continue; parts.push(kd.replace(/\//g, '_')); continue; }
     if (k === 'zebrik') { if (vyska >= 1500) parts.push(kd.replace(/\//g, '_')); continue; }   // vzor katalogu vypisuje ZD už při 1500
-    if (kd === abrStdKod(k)) continue;               // varianta B: standard se nevypisuje
+    if (kd === (radaStdTok(z.typKey, k) || abrStdKod(k))) continue;   // varianta B: standard ŘADY se nevypisuje
     parts.push(kd.replace(/\//g, '_'));
   }
   return parts.join('-');
@@ -429,7 +473,7 @@ const TYP_DEFAULTS = {
   internalCheck: true, linkValidDays: 30, params: [],
 };
 const SEED_TYPES = [
-  ...RADY_ABR.map(([key, name]) => ({ key, name, ...TYP_DEFAULTS, dotaznik: DOTAZNIK_ABROLL })),
+  ...RADY_ABR.map(([key, name]) => ({ key, name, ...TYP_DEFAULTS, dotaznik: dotaznikAbroll(key) })),
   { key: 'city', name: 'CITY — uzavřený městský kontejner (hákový)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_CITY },
   { key: 'mulda', name: 'MULDA — skip / Absetzmulde (řetězová ramena)', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_MULDA },
   { key: 'sld', name: 'SLD — kontejner na separovaný sběr', ...TYP_DEFAULTS, dotaznik: DOTAZNIK_SLD },
