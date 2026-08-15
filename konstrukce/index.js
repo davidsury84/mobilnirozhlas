@@ -391,14 +391,36 @@ const SEED_STREDISKA = [
 // ---- Výchozí číselník typů výrobku (seed) — řady ABROLL kontejnerů ---------
 // 6 řad z ceníku ABR-XXX; všechny sdílí dotazník provedení (ABR-DSD) a výchozí lhůty.
 // Názvy řad dle oficiální „Typová řada ABR kontejnerů" (kódy ABR-XXX).
+// Kompletní typové řady ABR dle oficiální tabulky „Typová řada ABR kontejnerů"
+// (pořadí = pořadí v tabulce; ABR-SUEZ DE je jen příklad zákaznického značení, neuvádí se).
 const RADY_ABR = [
   ['dsd', 'DSD — kontejnery v normě DIN (DIN 30722)'],
   ['afs', 'AFS — kontejnery v normě AFNOR'],
+  ['nl', 'NL — kontejnery pro holandský trh (Dutch type)'],
+  ['wd', 'WD — bezvýztuhové kontejnery v normě DIN'],
+  ['wf', 'WF — bezvýztuhové kontejnery v normě AFNOR'],
   ['ecl', 'ECL — kulaté bezvýztuhové provedení (pipe shape)'],
-  ['hbs', 'HBS — Hardox „halbšálen" (půlkulaté provedení)'],
+  ['bs', 'BS — provedení s podélnými prolisy (Veolia France)'],
+  ['lwc', 'LWC — lehké provedení Hardox / Strenx 700'],
   ['sth', 'STH — stohovací kontejnery dle DIN'],
   ['hbi', 'HBI — Hardox velké vypouklé (BIG & strong)'],
-  ['lwc', 'LWC — lehké provedení Hardox / Strenx 700'],
+  ['hbs', 'HBS — Hardox „halbšálen" (půlkulaté provedení)'],
+  ['hdc', 'HDC — Hardox korby tvaru U (typ à la GTS)'],
+  ['acts', 'ACTS — železniční abroll kontejner'],
+  ['pop', 'POP — abroll s víky (Hausmüll)'],
+  ['pap', 'PAP — abroll s otvory na papír'],
+  ['pal', 'PAL — plato s alu bočnicemi'],
+  ['pt', 'PT — plato těžké provedení s prohlubní'],
+  ['ps', 'PS — plato standard, ocelová podlaha'],
+  ['psk', 'PSK — plato, ocelová podlaha, s klanicemi'],
+  ['psn', 'PSN — plato se zadním nájezdem'],
+  ['psnk', 'PSNK — plato se zadním nájezdem a klanicemi'],
+  ['pdk', 'PDK — plato, dřevěná podlaha, s klanicemi'],
+  ['afo', 'AFO — kontejnery pro f. Hamo (skandinávský typ)'],
+  ['th', 'TH — thermokontejner'],
+  ['arc', 'ARC — kontejner na sklo'],
+  ['ram', 'RAM — rám ABR (frames)'],
+  ['alst', 'ALST — provedení Alustahl (vybraní zákazníci)'],
 ];
 const TYP_DEFAULTS = {
   standard: true, normohodiny: 8, revizeNh: 2,
@@ -417,7 +439,8 @@ const SEED_TYPES = [
 ];
 
 // ---- Rodiny výrobků (skupiny) — pro přidělování konstruktérů dle skupiny -----
-const TYP_FAM = { dsd: 'abroll', afs: 'abroll', hbs: 'abroll', sth: 'abroll', hbi: 'abroll', lwc: 'abroll', city: 'city', mulda: 'mulda', sld: 'sber', su: 'sber', vany: 'sklad', boxy: 'sklad' };
+const TYP_FAM = { city: 'city', mulda: 'mulda', sld: 'sber', su: 'sber', vany: 'sklad', boxy: 'sklad' };
+RADY_ABR.forEach(([k]) => { TYP_FAM[k] = 'abroll'; });
 const FAM_LABEL = { abroll: 'ABROLL — hákové kontejnery', city: 'CITY — uzavřené městské', mulda: 'MULDA — skipy', sber: 'Separovaný sběr (SLD, SU)', sklad: 'Skladování (boxy, vany)' };
 const FAM_ORDER = ['abroll', 'city', 'mulda', 'sber', 'sklad'];
 function familyOf(typKey) { return TYP_FAM[typKey] || 'abroll'; }
@@ -543,6 +566,9 @@ function mount(host) {
     if (!d.types.some(t => t.key === 'dsd')) d.types = JSON.parse(JSON.stringify(SEED_TYPES));
     // doplň chybějící seed typy (CITY/MULDA přidané později) beze změny existujících
     SEED_TYPES.forEach(s => { if (!d.types.some(t => t.key === s.key)) d.types.push(JSON.parse(JSON.stringify(s))); });
+    // pořadí typů drž dle seedu (= oficiální pořadí řad ABR z tabulky); typy mimo seed až na konec
+    const seedIdx = k => { const i = SEED_TYPES.findIndex(s => s.key === k); return i < 0 ? 999 : i; };
+    d.types.sort((a, b) => seedIdx(a.key) - seedIdx(b.key));
     // dotazník seed typů držíme v synchronu s kódem — každý typ svůj (ABROLL řady, CITY, MULDA)
     d.types.forEach(t => { const s = SEED_TYPES.find(x => x.key === t.key); if (s && s.dotaznik) t.dotaznik = JSON.parse(JSON.stringify(s.dotaznik)); });
     // Jednorázová oprava chybných názvů ABROLL řad (DIN/AFNOR/Hardox dle oficiální typové řady) — respektuje pozdější ruční přejmenování.

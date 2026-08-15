@@ -2199,7 +2199,9 @@ function collectDot(){
   return dot;
 }
 /* Vlastní výběr typu výrobku s plným podbarvením rodin (nativní select barvy řádků na macOS neumí). */
-var TYP_FAM={dsd:'abroll',afs:'abroll',hbs:'abroll',sth:'abroll',hbi:'abroll',lwc:'abroll',city:'city',mulda:'mulda',sld:'sber',su:'sber',vany:'sklad',boxy:'sklad'};
+var ABR_RADY_JS=['dsd','afs','nl','wd','wf','ecl','bs','lwc','sth','hbi','hbs','hdc','acts','pop','pap','pal','pt','ps','psk','psn','psnk','pdk','afo','th','arc','ram','alst'];
+var TYP_FAM={city:'city',mulda:'mulda',sld:'sber',su:'sber',vany:'sklad',boxy:'sklad'};
+ABR_RADY_JS.forEach(function(k){TYP_FAM[k]='abroll'});
 var FAM={
   abroll:{label:'ABROLL — hákové kontejnery',bg:'#e3f2fd',fg:'#0d3c78',dot:'#1565c0'},
   city:  {label:'CITY — uzavřené městské (hákové)',bg:'#fdecea',fg:'#b3261e',dot:'#c62828'},
@@ -2354,7 +2356,7 @@ function natGrid(f,opts,vol,curOpt,rq){
     '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
 }
 /* ---- Živý náhled celkového kódu ABR (varianta B — standardy se nevypisují) ---- */
-var ABR_RADY_JS=['dsd','afs','ecl','hbs','sth','hbi','lwc'];
+/* ABR_RADY_JS deklarováno výše u TYP_FAM (jeden zdroj pravdy pro řady ABR) */
 function dqField(k){var t=curType(),r=null;(t.dotaznik||[]).forEach(function(s){(s.fields||[]).forEach(function(f){if(f.k===k)r=f})});return r}
 function dqKodPreview(){
   var el=document.getElementById('dqKod'); if(!el)return;
