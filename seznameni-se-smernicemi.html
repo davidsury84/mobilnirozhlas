@@ -89,6 +89,8 @@ nav.tabs button{
   padding:8px 14px;border-radius:9px;font-weight:600;font-size:13.5px;transition:.16s;letter-spacing:-.01em;
 }
 nav.tabs button:hover{background:var(--bg-2);color:var(--ink)}
+#intraLang{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:10px;padding:7px 8px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;outline:none}
+#intraLang:hover{border-color:var(--green)}
 nav.tabs button.active{background:var(--green-soft);color:var(--green-d);box-shadow:none;font-weight:700}
 
 main{max-width:1180px;margin:0 auto;padding:28px 22px 80px}
@@ -1159,7 +1161,7 @@ img.pv-thumb{background:#fff}
         <div class="logo">✓</div>
         <div><h1>intranet</h1><small id="mujWho">Intranet pro zaměstnance</small></div>
       </div>
-      <nav class="tabs"><button id="mujAdmin" style="display:none" onclick="location.href='/admin'">Správa</button><button id="mujLogout" style="display:none" onclick="location.href='/auth/logout'">Odhlásit</button></nav>
+      <nav class="tabs"><select id="intraLang" class="no-print" title="Jazyk / Language" aria-label="Jazyk / Language" onchange="mjLangSet(this.value)"><option value="cz">CZ</option><option value="en">EN</option><option value="de">DE</option><option value="pl">PL</option><option value="ua">UA</option><option value="ro">RO</option></select><button id="mujAdmin" style="display:none" onclick="location.href='/admin'">Správa</button><button id="mujLogout" style="display:none" onclick="location.href='/auth/logout'">Odhlásit</button></nav>
     </div>
   </header>
   <div class="mj-shell">
@@ -1435,6 +1437,120 @@ const MUJ_MODS = [
   { key:"pozadavky", icon:MUJ_IC.ticket, label:"Požadavky", soon:true }
 ];
 
+/* ===== Jazyk hlavního menu (pro zahraniční pracovníky) — CZ/EN/DE/PL/UA/RO.
+   Klíč = český text, hodnota = [en, de, pl, ua, ro]. Obsah modulů zůstává česky. */
+const MJ_LANGS = ['cz','en','de','pl','ua','ro'];
+const MJ_L10N = {
+  'Můj přehled': ['My dashboard','Meine Übersicht','Mój przegląd','Мій огляд','Rezumatul meu'],
+  'Dokumenty': ['Documents','Dokumente','Dokumenty','Документи','Documente'],
+  'Směrnice': ['Directives','Richtlinien','Zarządzenia','Директиви','Directive'],
+  'Úkoly ze směrnic': ['Tasks from directives','Aufgaben aus Richtlinien','Zadania z zarządzeń','Завдання з директив','Sarcini din directive'],
+  'Knihovna': ['Library','Bibliothek','Biblioteka','Бібліотека','Bibliotecă'],
+  'BOZP': ['Safety (OSH)','Arbeitsschutz','BHP','Охорона праці','SSM'],
+  'Kontakty': ['Contacts','Kontakte','Kontakty','Контакти','Contacte'],
+  'Telefonní seznam': ['Phone directory','Telefonverzeichnis','Książka telefoniczna','Телефонний довідник','Agendă telefonică'],
+  'Provozy': ['Operations','Betriebe','Zakłady','Виробництва','Operațiuni'],
+  'Sklady': ['Warehouses','Lager','Magazyny','Склади','Depozite'],
+  'Plasty': ['Plastics','Kunststoffe','Tworzywa','Пластик','Plastice'],
+  'Kovo': ['Metal','Metall','Metal','Метал','Metal'],
+  'E-shop': ['E-shop','E-Shop','E-sklep','Інтернет-магазин','E-shop'],
+  'Doprava': ['Transport','Transport','Transport','Транспорт','Transport'],
+  'Qooling — kvalita': ['Qooling — quality','Qooling — Qualität','Qooling — jakość','Qooling — якість','Qooling — calitate'],
+  'Ložný plán': ['Loading plan','Ladeplan','Plan załadunku','План завантаження','Plan de încărcare'],
+  'Zadání do výroby – konstrukce': ['Production orders — engineering','Fertigungsaufträge — Konstruktion','Zlecenia do produkcji — konstrukcja','Замовлення у виробництво — конструкція','Comenzi în producție — proiectare'],
+  'Freelo': ['Freelo','Freelo','Freelo','Freelo','Freelo'],
+  'Kalkulačky': ['Calculators','Rechner','Kalkulatory','Калькулятори','Calculatoare'],
+  'Kalkulace-lisy': ['Baler calculator','Kalkulation Pressen','Kalkulacja — prasy','Калькуляція — преси','Calculație prese'],
+  'LOXXER — kalkulace': ['LOXXER — calculator','LOXXER — Kalkulation','LOXXER — kalkulacja','LOXXER — калькуляція','LOXXER — calculație'],
+  'Kalkulačka svoz ESA': ['ESA collection calculator','Rechner ESA-Abholung','Kalkulator odbioru ESA','Калькулятор вивозу ESA','Calculator colectare ESA'],
+  'Design třídicí linky': ['Sorting line design','Sortieranlagen-Design','Projekt linii sortowniczej','Дизайн сортувальної лінії','Design linie de sortare'],
+  'Kalkulačka překladiště': ['Transfer station calculator','Umschlagplatz-Rechner','Kalkulator stacji przeładunkowej','Калькулятор перевалки','Calculator stație de transfer'],
+  'Lodní kontejnery': ['Shipping containers','Seecontainer','Kontenery morskie','Морські контейнери','Containere maritime'],
+  'Obchod': ['Sales','Vertrieb','Sprzedaż','Продажі','Vânzări'],
+  'Požadavky nákupu': ['Purchasing requests','Einkaufsanfragen','Wnioski zakupowe','Заявки на закупівлю','Cereri de achiziție'],
+  'Poptávky': ['Enquiries','Anfragen','Zapytania','Запити','Solicitări'],
+  'Rozdělení obchodníků': ['Sales rep allocation','Vertriebsaufteilung','Podział handlowców','Розподіл менеджерів','Repartizarea agenților'],
+  'Reklamace': ['Complaints','Reklamationen','Reklamacje','Рекламації','Reclamații'],
+  'Nabídka – konstrukce': ['Quotation — engineering','Angebot — Konstruktion','Oferta — konstrukcja','Пропозиція — конструкція','Ofertă — proiectare'],
+  'Smlouvy': ['Contracts','Verträge','Umowy','Договори','Contracte'],
+  'Hlídač sortimentu': ['Product range watchdog','Sortimentswächter','Monitor asortymentu','Моніторинг асортименту','Monitor sortiment'],
+  'Rozvoj a nástup': ['Development & onboarding','Entwicklung & Einstieg','Rozwój i wdrożenie','Розвиток і адаптація','Dezvoltare și integrare'],
+  'Adaptace': ['Onboarding','Einarbeitung','Adaptacja','Адаптація','Integrare'],
+  'Školení': ['Training','Schulungen','Szkolenia','Навчання','Instruiri'],
+  'Průzkumy': ['Surveys','Umfragen','Ankiety','Опитування','Sondaje'],
+  'Volno a žádosti': ['Time off & requests','Urlaub & Anträge','Wolne i wnioski','Відпустки та заявки','Concedii și cereri'],
+  'Dovolená': ['Vacation','Urlaub','Urlop','Відпустка','Concediu'],
+  'Home office': ['Home office','Homeoffice','Praca zdalna','Віддалена робота','Muncă la distanță'],
+  'Požadavky': ['Requests','Anträge','Wnioski','Заявки','Cereri'],
+  'brzy': ['soon','bald','wkrótce','скоро','în curând'],
+  'Správa': ['Admin','Verwaltung','Administracja','Адміністрування','Administrare'],
+  'Odhlásit': ['Log out','Abmelden','Wyloguj','Вийти','Deconectare'],
+  // — hlavní stránka (hub) —
+  'Úkoly': ['Tasks','Aufgaben','Zadania','Завдання','Sarcini'],
+  'Telefony': ['Phones','Telefone','Telefony','Телефони','Telefoane'],
+  'Dobrý den': ['Hello','Guten Tag','Dzień dobry','Доброго дня','Bună ziua'],
+  '__heroTodo': ['You have <strong>%n</strong> item(s) waiting. You can handle everything right from here.','Es warten <strong>%n</strong> Aufgabe(n) auf Sie. Alles lässt sich direkt von hier erledigen.','Czeka na Ciebie <strong>%n</strong> pozycji. Wszystko załatwisz bezpośrednio stąd.','На вас чекає <strong>%n</strong> завдань. Усе можна зробити прямо звідси.','Vă așteaptă <strong>%n</strong> elemente. Totul se poate rezolva direct de aici.'],
+  '__heroDone': ['Great job — nothing pending, all done. ✓','Super Arbeit — nichts offen, alles erledigt. ✓','Świetna robota — nic nie czeka, wszystko gotowe. ✓','Чудова робота — нічого не очікує, все готово. ✓','Bravo — nimic în așteptare, totul e gata. ✓'],
+  '__searchPh': ['What do you need to find today? (directives, documents, sections…)','Was möchten Sie heute finden? (Richtlinien, Dokumente, Bereiche…)','Czego dziś szukasz? (zarządzenia, dokumenty, sekcje…)','Що потрібно знайти сьогодні? (директиви, документи, розділи…)','Ce doriți să găsiți azi? (directive, documente, secțiuni…)'],
+  '__waiting': ['waiting','offen','oczekuje','очікує','în așteptare'],
+  '__mods': ['modules available','Module verfügbar','dostępne moduły','доступні модулі','module disponibile'],
+  'k vyřízení': ['to handle','zu erledigen','do załatwienia','до опрацювання','de rezolvat'],
+  'plný přístup': ['full access','Vollzugriff','pełny dostęp','повний доступ','acces complet'],
+  'Správce · plný přístup': ['Admin · full access','Administrator · Vollzugriff','Administrator · pełny dostęp','Адміністратор · повний доступ','Administrator · acces complet'],
+  'dovolená ke schválení': ['vacation approvals','Urlaub zur Genehmigung','urlopy do zatwierdzenia','відпустки на погодження','concedii de aprobat'],
+  'vše': ['all','alle','wszystko','усе','tot'],
+  'Aktuality': ['News','Aktuelles','Aktualności','Новини','Noutăți'],
+  'NOVÉ': ['NEW','NEU','NOWE','НОВЕ','NOU'],
+  'K vyřízení': ['To handle','Zu erledigen','Do załatwienia','До опрацювання','De rezolvat'],
+  'Rychlý přístup': ['Quick access','Schnellzugriff','Szybki dostęp','Швидкий доступ','Acces rapid'],
+  '✓ Hotovo': ['✓ Done','✓ Erledigt','✓ Gotowe','✓ Готово','✓ Gata'],
+  'Nemáte nic k potvrzení.': ['Nothing to confirm.','Nichts zu bestätigen.','Nie masz nic do potwierdzenia.','Немає нічого на підтвердження.','Nu aveți nimic de confirmat.'],
+  'Interní směrnice k seznámení.': ['Internal directives to acknowledge.','Interne Richtlinien zur Kenntnisnahme.','Wewnętrzne zarządzenia do zapoznania.','Внутрішні директиви для ознайомлення.','Directive interne de luat la cunoștință.'],
+  'Pracovní řád, SOP, postupy.': ['Work rules, SOPs, procedures.','Arbeitsordnung, SOPs, Abläufe.','Regulamin pracy, SOP, procedury.','Правила роботи, SOP, процедури.','Regulament de muncă, SOP, proceduri.'],
+  'Žádost o dovolenou a konto.': ['Vacation requests and balance.','Urlaubsantrag und Konto.','Wnioski urlopowe i saldo.','Заявки на відпустку та баланс.','Cereri de concediu și sold.'],
+  'Hlídač smluv a termínů.': ['Contract and deadline watchdog.','Vertrags- und Fristenwächter.','Monitor umów i terminów.','Контроль договорів і термінів.','Monitor contracte și termene.'],
+  'Klientské reklamační formuláře a evidence.': ['Client complaint forms and records.','Reklamationsformulare und Übersicht.','Formularze reklamacyjne i ewidencja.','Форми рекламацій та облік.','Formulare de reclamații și evidență.'],
+  'k potvrzení': ['to confirm','zu bestätigen','do potwierdzenia','на підтвердження','de confirmat'],
+  'Vše potvrzeno': ['All confirmed','Alles bestätigt','Wszystko potwierdzone','Усе підтверджено','Totul confirmat'],
+  'Vše v pořádku': ['All good','Alles in Ordnung','Wszystko w porządku','Усе гаразд','Totul în regulă'],
+  'Žádné': ['None','Keine','Brak','Немає','Niciuna'],
+  'Otevřít': ['Open','Öffnen','Otwórz','Відкрити','Deschide'],
+  'Přístup': ['Access','Zugriff','Dostęp','Доступ','Acces'],
+  'ke schválení': ['to approve','zur Genehmigung','do zatwierdzenia','на погодження','de aprobat'],
+  'Konto & žádosti': ['Balance & requests','Konto & Anträge','Saldo i wnioski','Баланс і заявки','Sold și cereri'],
+  'Přečíst a potvrdit': ['Read & confirm','Lesen & bestätigen','Przeczytaj i potwierdź','Прочитати й підтвердити','Citește și confirmă'],
+  'Zobrazit': ['Show','Anzeigen','Pokaż','Показати','Afișează'],
+  'Dnes ve firmě': ['Today at the company','Heute in der Firma','Dziś w firmie','Сьогодні у фірмі','Azi în firmă'],
+  'živě': ['live','live','na żywo','наживо','live'],
+  'Potvrzené směrnice': ['Confirmed directives','Bestätigte Richtlinien','Potwierdzone zarządzenia','Підтверджені директиви','Directive confirmate'],
+  'vše potvrzeno': ['all confirmed','alles bestätigt','wszystko potwierdzone','усе підтверджено','totul confirmat'],
+  'aktivní směrnice': ['active directives','aktive Richtlinien','aktywne zarządzenia','активні директиви','directive active'],
+  'dokumenty knihovny': ['library documents','Bibliotheksdokumente','dokumenty biblioteki','документи бібліотеки','documente bibliotecă'],
+  'moduly': ['modules','Module','moduły','модулі','module'],
+  'Nové produkty': ['New products','Neue Produkte','Nowe produkty','Нові продукти','Produse noi']
+};
+let MJ_LANG = (function(){ try{ const v=localStorage.getItem('mj_lang'); return MJ_LANGS.indexOf(v)>=0?v:'cz'; }catch(e){ return 'cz'; } })();
+function mjT(cz){
+  if(MJ_LANG==='cz') return cz;
+  const t=MJ_L10N[cz]; if(!t) return cz;
+  const i={en:0,de:1,pl:2,ua:3,ro:4}[MJ_LANG];
+  return t[i]||cz;
+}
+function mjLangApply(){
+  const s=document.getElementById('intraLang'); if(s) s.value=MJ_LANG;
+  const a=document.getElementById('mujAdmin'); if(a) a.textContent=mjT('Správa');
+  const o=document.getElementById('mujLogout'); if(o) o.textContent=mjT('Odhlásit');
+}
+function mjLangSet(v){
+  MJ_LANG = MJ_LANGS.indexOf(v)>=0?v:'cz';
+  try{ localStorage.setItem('mj_lang',MJ_LANG); }catch(e){}
+  mjLangApply();
+  if(typeof MUJ!=='undefined' && MUJ.email){
+    if(MUJ.view==='dash' && typeof showDashboard==='function') showDashboard();
+    else renderSidebar();
+  }
+}
+
 async function initIntranet(){
   loadBrandLogo();
   document.getElementById("app").style.display="none";
@@ -1468,6 +1584,7 @@ async function initIntranet(){
   who.textContent = me.employee.name + " · " + me.employee.email;
   logoutBtn.style.display=""; side.style.display="";
   const adminBtn=document.getElementById("mujAdmin"); if(adminBtn) adminBtn.style.display = me.admin ? "" : "none";
+  mjLangApply();
   MUJ.email = me.employee.email; MUJ.name = me.employee.name; MUJ.admin = !!me.admin;
   MUJ.poptavkyNew = (typeof me.poptavkyNew==="number") ? me.poptavkyNew : 0;
   await refreshMy();
@@ -1522,14 +1639,14 @@ function renderSidebar(){
   MUJ_MODS.forEach(m=>{
     if(m.grp!==undefined){ pendingGrp=m.grp; return; }
     if(!moduleVisible(m)) return;
-    if(pendingGrp!==null){ h+='<div class="mj-grp">'+pendingGrp+'</div>'; pendingGrp=null; }
+    if(pendingGrp!==null){ h+='<div class="mj-grp">'+mjT(pendingGrp)+'</div>'; pendingGrp=null; }
     const active = MUJ.view===m.key ? ' active':'';
     const cls = 'mj-link'+active+(m.soon?' soon':'')+((!m.soon&&counts[m.key])?' has-todo':'');
     let right='';
-    if(m.soon) right='<span class="mj-soon">brzy</span>';
+    if(m.soon) right='<span class="mj-soon">'+mjT('brzy')+'</span>';
     else if(counts[m.key]) right='<span class="mj-badge">'+counts[m.key]+'</span>';
     const onclick = m.soon ? 'onclick="mujSoon(\''+m.label+'\')"' : 'onclick="mjGo(\''+m.key+'\')"';
-    h+='<button class="'+cls+'" '+onclick+'>'+mujIcon(m.icon)+'<span class="lbl">'+m.label+'</span>'+right+'</button>';
+    h+='<button class="'+cls+'" '+onclick+'>'+mujIcon(m.icon)+'<span class="lbl">'+mjT(m.label)+'</span>'+right+'</button>';
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
@@ -3593,7 +3710,7 @@ function mujSoon(name){ if(typeof toast==="function") toast(name+" — modul př
 function tile(opts){
   const onclick = opts.soon ? 'onclick="mujSoon(\''+opts.title.replace(/'/g,"")+'\')"' : 'onclick="'+opts.action+'"';
   return '<div class="tile'+(opts.accent?" accent":"")+(opts.soon?" soon":"")+'" '+onclick+'><div class="tile-ic">'+mujIcon(opts.icon)+'</div>'+
-    '<div><h3>'+opts.title+'</h3><p>'+opts.desc+'</p></div><div class="tile-foot">'+opts.badge+'</div></div>';
+    '<div><h3>'+mjT(opts.title)+'</h3><p>'+mjT(opts.desc||'')+'</p></div><div class="tile-foot">'+opts.badge+'</div></div>';
 }
 
 function showDashboard(){
@@ -3604,100 +3721,102 @@ function showDashboard(){
   const popVis = MUJ.admin || (MUJ.modules||[]).some(function(k){return ["kalkulace","obchod","obchodexp"].indexOf(k)>=0;});
   const pop = popVis ? ((MUJ.poptavkyNew)||0) : 0;
   const totalTodo = c.dirTodo + c.libTodo + pop;
-  const dnesStr=new Date().toLocaleDateString("cs-CZ",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const dnesStr=new Date().toLocaleDateString(({cz:"cs-CZ",en:"en-GB",de:"de-DE",pl:"pl-PL",ua:"uk-UA",ro:"ro-RO"})[MJ_LANG]||"cs-CZ",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const vacPend0=(MUJ.data&&MUJ.data.vacPending)||0;
   const nMod=((MUJ.modules||[]).length)||0;
   const initials=((MUJ.name||"").split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0]).join("")).toUpperCase()||"?";
-  const roleStr = MUJ.admin ? "Správce · plný přístup" : (MUJ.email||"");
+  const roleStr = MUJ.admin ? mjT("Správce · plný přístup") : (MUJ.email||"");
   const canPostAkt = !!(MUJ.data && MUJ.data.canPostAktuality);
   const heroImg = (MUJ.data && MUJ.data.heroImage) || "";
   let h = '<div class="mj-hero"'+(heroImg?' style="background-image:var(--hero-scrim),url(\''+heroImg.replace(/'/g,"%27")+'\')"':'')+'>'+
     (canPostAkt?'<button class="hero-edit-btn" type="button" onclick="heroEdit()" title="Změnit obrázek banneru">'+
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><path d="m21 15-5-5L5 21M8.5 8.5h.01"/></svg> Změnit obrázek</button>':'')+
     '<div class="hero-id"><span class="hero-ava">'+esc(initials)+'</span><div><div class="date">'+esc(dnesStr)+'</div><div class="hero-role">'+esc(roleStr)+'</div></div></div>'+
-    '<h2>Dobrý den, '+esc(first)+'</h2>'+
-    '<p>'+(totalTodo ? ('Čeká na vás <strong>'+totalTodo+'</strong> '+plural(totalTodo,"položka","položky","položek")+' k vyřízení. Vše zvládnete přímo odsud.') : 'Skvělá práce — nemáte nic nevyřízeného, vše je hotovo. ✓')+'</p>'+
-    '<label class="hero-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 21-4.4-4.4M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg><input type="search" id="mjSearchInput" autocomplete="off" placeholder="Co dnes potřebujete najít? (směrnice, dokumenty, sekce…)" oninput="mjSearch()" onkeydown="mjSearchKey(event)" onfocus="mjSearch()"></label>'+
+    '<h2>'+mjT('Dobrý den')+', '+esc(first)+'</h2>'+
+    '<p>'+(MJ_LANG==='cz'
+        ? (totalTodo ? ('Čeká na vás <strong>'+totalTodo+'</strong> '+plural(totalTodo,"položka","položky","položek")+' k vyřízení. Vše zvládnete přímo odsud.') : 'Skvělá práce — nemáte nic nevyřízeného, vše je hotovo. ✓')
+        : (totalTodo ? mjT('__heroTodo').replace('%n',totalTodo) : mjT('__heroDone')))+'</p>'+
+    '<label class="hero-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m21 21-4.4-4.4M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z"/></svg><input type="search" id="mjSearchInput" autocomplete="off" placeholder="'+(MJ_LANG==='cz'?'Co dnes potřebujete najít? (směrnice, dokumenty, sekce…)':mjT('__searchPh').replace(/"/g,'&quot;'))+'" oninput="mjSearch()" onkeydown="mjSearchKey(event)" onfocus="mjSearch()"></label>'+
     '<div class="stats">'+
-      '<div class="stat"><b>'+totalTodo+'</b><span>k vyřízení</span></div>'+
-      (vacPend0?'<div class="stat"><b>'+vacPend0+'</b><span>dovolená ke schválení</span></div>':'')+
-      (MUJ.admin?'<div class="stat"><b>vše</b><span>plný přístup</span></div>':'<div class="stat"><b>'+nMod+'</b><span>'+plural(nMod,"dostupný modul","dostupné moduly","dostupných modulů")+'</span></div>')+
+      '<div class="stat"><b>'+totalTodo+'</b><span>'+mjT('k vyřízení')+'</span></div>'+
+      (vacPend0?'<div class="stat"><b>'+vacPend0+'</b><span>'+mjT('dovolená ke schválení')+'</span></div>':'')+
+      (MUJ.admin?'<div class="stat"><b>'+mjT('vše')+'</b><span>'+mjT('plný přístup')+'</span></div>':'<div class="stat"><b>'+nMod+'</b><span>'+(MJ_LANG==='cz'?plural(nMod,"dostupný modul","dostupné moduly","dostupných modulů"):mjT('__mods'))+'</span></div>')+
     '</div></div>';
 
   // Rychlé akce — ploché barevné dlaždice (SharePoint hub)
   const qacts=[["directives","Směrnice",MUJ_IC.file],["ukoly","Úkoly",MUJ_IC.tasks],["library","Knihovna",MUJ_IC.book],["bozp","BOZP",MUJ_IC.shield],["skoleni","Školení",MUJ_IC.school],["dovolena","Dovolená",MUJ_IC.cal],["telefon","Telefony",MUJ_IC.phone],["pruzkumy","Průzkumy",MUJ_IC.poll]];
   h += '<div class="mj-quick">'+qacts.map(q=>'<button onclick="mjGo(\''+q[0]+'\')">'+
     (q[0]==="directives"&&c.dirTodo?'<span class="badge todo qbadge">'+c.dirTodo+'</span>':'')+
-    '<span class="qic"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">'+q[2]+'</svg></span><span class="lbl">'+q[1]+'</span></button>').join('')+'</div>';
+    '<span class="qic"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">'+q[2]+'</svg></span><span class="lbl">'+mjT(q[1])+'</span></button>').join('')+'</div>';
 
   const pend=[];
   c.dirs.filter(d=>!d.ack && d.published).forEach(d=>{
     const link = location.origin+"/s/"+encodeURIComponent(d.id)+"#kdo="+encodeURIComponent(MUJ.email);
-    pend.push({ icon:MUJ_IC.file, t:d.title||"Směrnice", sub:"Směrnice", act:'<a class="btn sm" href="'+link+'">Přečíst a potvrdit</a>' });
+    pend.push({ icon:MUJ_IC.file, t:d.title||"Směrnice", sub:mjT("Směrnice"), act:'<a class="btn sm" href="'+link+'">'+mjT('Přečíst a potvrdit')+'</a>' });
   });
   c.libDocs.filter(d=>d.requireAck && !d.acked).forEach(d=>{
-    pend.push({ icon:MUJ_IC.book, t:d.title||"Dokument", sub:"Knihovna · verze "+d.v, act:'<button class="btn sm" onclick="openLibDoc(\''+d.id+'\','+d.v+')">Přečíst a potvrdit</button>' });
+    pend.push({ icon:MUJ_IC.book, t:d.title||"Dokument", sub:mjT("Knihovna")+" · v"+d.v, act:'<button class="btn sm" onclick="openLibDoc(\''+d.id+'\','+d.v+')">'+mjT('Přečíst a potvrdit')+'</button>' });
   });
   if(pop>0){ pend.push({ icon:MUJ_IC.ticket, t:pop+' '+plural(pop,"nová poptávka","nové poptávky","nových poptávek"), sub:"Kalkulátor lisů · fronta k vyřízení", act:'<button class="btn sm" onclick="mjGo(\'poptavky\')">Zobrazit</button>' }); }
   // Oznámení o nepřečtených aktualitách — „je tam něco nového".
   const aktN=(MUJ.data&&MUJ.data.aktualityNew)||0;
   if(aktN>0){ pend.push({ icon:MUJ_IC.book, t:'🆕 '+aktN+' '+plural(aktN,"nová aktualita","nové aktuality","nových aktualit"), sub:"Nástěnka — novinky ve firmě", act:'<button class="btn sm" onclick="aktScroll()">Zobrazit</button>' }); }
   // ----- Levý sloupec hubu: Aktuality + K vyřízení + Rychlý přístup + Provozy -----
-  let mainH = '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>Aktuality'+(aktN>0?' <span style="background:#e0a400;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;vertical-align:2px">'+aktN+' NOVÉ</span>':'')+'</h3>'+
+  let mainH = '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>'+mjT('Aktuality')+(aktN>0?' <span style="background:#e0a400;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;vertical-align:2px">'+aktN+' '+mjT('NOVÉ')+'</span>':'')+'</h3>'+
     (canPostAkt?'<button class="btn sm" type="button" onclick="aktNew()">+ Přidat</button>':'')+
     '</div><div class="webpart-body" id="aktBody"><div class="muted">Načítám aktuality…</div></div></section>';
-  mainH += '<div class="dash-sec">K vyřízení</div>';
+  mainH += '<div class="dash-sec">'+mjT('K vyřízení')+'</div>';
   if(pend.length){
     pend.forEach(p=> mainH+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(p.icon)+'</div><div><div class="li-t">'+esc(p.t)+'</div>'+
       '<div class="muted" style="font-size:12px;margin-top:2px">'+esc(p.sub)+'</div></div></div>'+p.act+'</div>');
   } else {
-    mainH+='<div class="card pad" style="display:flex;align-items:center;gap:12px"><span class="pill green">✓ Hotovo</span><span class="muted">Nemáte nic k potvrzení.</span></div>';
+    mainH+='<div class="card pad" style="display:flex;align-items:center;gap:12px"><span class="pill green">'+mjT('✓ Hotovo')+'</span><span class="muted">'+mjT('Nemáte nic k potvrzení.')+'</span></div>';
   }
 
-  mainH += '<div class="dash-sec">Rychlý přístup</div><div class="dash-grid">';
+  mainH += '<div class="dash-sec">'+mjT('Rychlý přístup')+'</div><div class="dash-grid">';
   mainH += tile({ icon:MUJ_IC.file, title:"Směrnice", desc:"Interní směrnice k seznámení.", action:"mjGo('directives')", accent:c.dirTodo>0,
-    badge: c.dirTodo ? '<span class="badge todo">'+c.dirTodo+' k potvrzení</span>' : (c.dirs.length ? '<span class="badge ok">Vše potvrzeno</span>' : '<span class="badge soon">Žádné</span>') });
+    badge: c.dirTodo ? '<span class="badge todo">'+c.dirTodo+' '+mjT('k potvrzení')+'</span>' : (c.dirs.length ? '<span class="badge ok">'+mjT('Vše potvrzeno')+'</span>' : '<span class="badge soon">'+mjT('Žádné')+'</span>') });
   mainH += tile({ icon:MUJ_IC.book, title:"Knihovna", desc:"Pracovní řád, SOP, postupy.", action:"mjGo('library')", accent:c.libTodo>0,
-    badge: c.libTodo ? '<span class="badge todo">'+c.libTodo+' k potvrzení</span>' : (c.libDocs.length ? '<span class="badge ok">Vše v pořádku</span>' : '<span class="badge soon">Žádné</span>') });
+    badge: c.libTodo ? '<span class="badge todo">'+c.libTodo+' '+mjT('k potvrzení')+'</span>' : (c.libDocs.length ? '<span class="badge ok">'+mjT('Vše v pořádku')+'</span>' : '<span class="badge soon">'+mjT('Žádné')+'</span>') });
   const vacPend=(MUJ.data&&MUJ.data.vacPending)||0;
   mainH += tile({ icon:MUJ_IC.cal, title:"Dovolená", desc:"Žádost o dovolenou a konto.", action:"mjGo('dovolena')", accent:vacPend>0,
-    badge: vacPend ? '<span class="badge todo">'+vacPend+' ke schválení</span>' : '<span class="badge ok">Konto & žádosti</span>' });
+    badge: vacPend ? '<span class="badge todo">'+vacPend+' '+mjT('ke schválení')+'</span>' : '<span class="badge ok">'+mjT('Konto & žádosti')+'</span>' });
   if(MUJ.admin || (MUJ.modules||[]).indexOf("smlouvy")>=0){
-    mainH += tile({ icon:MUJ_IC.file, title:"Smlouvy", desc:"Hlídač smluv a termínů.", action:"mjGo('smlouvy')", badge:'<span class="badge ok">Otevřít</span>' });
+    mainH += tile({ icon:MUJ_IC.file, title:"Smlouvy", desc:"Hlídač smluv a termínů.", action:"mjGo('smlouvy')", badge:'<span class="badge ok">'+mjT('Otevřít')+'</span>' });
   }
   if(MUJ.admin || (MUJ.modules||[]).indexOf("reklamace")>=0){
-    mainH += tile({ icon:MUJ_IC.shield, title:"Reklamace", desc:"Klientské reklamační formuláře a evidence.", action:"mjGo('reklamace')", badge:'<span class="badge ok">Otevřít</span>' });
+    mainH += tile({ icon:MUJ_IC.shield, title:"Reklamace", desc:"Klientské reklamační formuláře a evidence.", action:"mjGo('reklamace')", badge:'<span class="badge ok">'+mjT('Otevřít')+'</span>' });
   }
   mainH += '</div>';
 
   const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["loznyplan","Ložný plán",MUJ_IC.truck,"Plánování nakládky vozidel a přepravenky"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
-    mainH += '<div class="dash-sec">Provozy</div><div class="dash-grid">';
-    provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
+    mainH += '<div class="dash-sec">'+mjT('Provozy')+'</div><div class="dash-grid">';
+    provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
     mainH += '</div>';
   }
   const kalk = [["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["loxxerkalk","LOXXER — kalkulace",MUJ_IC.calc,"LOXXER — tvorba nabídek"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.calc,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.calc,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(kalk.length){
-    mainH += '<div class="dash-sec">Kalkulačky</div><div class="dash-grid">';
-    kalk.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">Přístup</span>' }));
+    mainH += '<div class="dash-sec">'+mjT('Kalkulačky')+'</div><div class="dash-grid">';
+    kalk.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
     mainH += '</div>';
   }
 
   // ----- Pravý sloupec hubu: KPI „Dnes ve firmě" + Fotka týdne -----
   const dirTot=c.dirs.length, confirmedPct = dirTot ? Math.round((dirTot-c.dirTodo)/dirTot*100) : 100;
-  let sideH = '<section class="webpart"><div class="webpart-head"><h3>Dnes ve firmě</h3><span class="pill green">živě</span></div><div class="webpart-body">'+
+  let sideH = '<section class="webpart"><div class="webpart-head"><h3>'+mjT('Dnes ve firmě')+'</h3><span class="pill green">'+mjT('živě')+'</span></div><div class="webpart-body">'+
     '<div class="kpi-hero"><div class="ring" style="--val:'+confirmedPct+'"><span>'+confirmedPct+'%</span></div>'+
-      '<div class="kpi-txt"><b>Potvrzené směrnice</b><span>'+(c.dirTodo? (c.dirTodo+' '+plural(c.dirTodo,"položka čeká","položky čekají","položek čeká")) : 'vše potvrzeno')+'</span></div></div>'+
+      '<div class="kpi-txt"><b>'+mjT('Potvrzené směrnice')+'</b><span>'+(c.dirTodo? (MJ_LANG==='cz'?(c.dirTodo+' '+plural(c.dirTodo,"položka čeká","položky čekají","položek čeká")):(c.dirTodo+' '+mjT('__waiting'))) : mjT('vše potvrzeno'))+'</span></div></div>'+
     '<div class="metric-grid">'+
-      '<div class="metric"><b>'+dirTot+'</b><span>aktivní směrnice</span></div>'+
-      '<div class="metric"><b>'+c.libDocs.length+'</b><span>dokumenty knihovny</span></div>'+
-      '<div class="metric"><b>'+(MUJ.admin?'vše':nMod)+'</b><span>moduly</span></div>'+
-      '<div class="metric"><b>'+totalTodo+'</b><span>k vyřízení</span></div>'+
+      '<div class="metric"><b>'+dirTot+'</b><span>'+mjT('aktivní směrnice')+'</span></div>'+
+      '<div class="metric"><b>'+c.libDocs.length+'</b><span>'+mjT('dokumenty knihovny')+'</span></div>'+
+      '<div class="metric"><b>'+(MUJ.admin?mjT('vše'):nMod)+'</b><span>'+mjT('moduly')+'</span></div>'+
+      '<div class="metric"><b>'+totalTodo+'</b><span>'+mjT('k vyřízení')+'</span></div>'+
     '</div></div></section>';
   if(MUJ.admin || (MUJ.modules||[]).indexOf("eshop")>=0){
     sideH += '<section class="webpart" id="bilanceWidget" style="cursor:pointer" onclick="mjGo(\'eshop\')" title="Otevřít e-shop"><div class="webpart-head"><h3>Sklad e-shop — bilance</h3><span class="pill green">živě</span></div><div class="webpart-body"><p class="muted" style="margin:0">Načítám…</p></div></section>';
   }
-  sideH += '<section class="spotlight" id="prodSpot"><span class="pill green sp-tag">Nové produkty</span><div class="sp-cap"><h4>Výroba ELKOPLAST</h4><p>Fotky produktů z Disku.</p></div></section>';
+  sideH += '<section class="spotlight" id="prodSpot"><span class="pill green sp-tag">'+mjT('Nové produkty')+'</span><div class="sp-cap"><h4>Výroba ELKOPLAST</h4><p>Fotky produktů z Disku.</p></div></section>';
 
   h += '<div class="hub-grid"><div class="hub-main">'+mainH+'</div><aside class="hub-side">'+sideH+'</aside></div>';
 
