@@ -1155,6 +1155,7 @@ function mount(host) {
       if (p === '/api/konstrukce/vykresy/reindex' && req.method === 'POST') return apiVykresyReindex(req, res);
       if (p === '/api/konstrukce/data' && req.method === 'GET') return apiData(req, res);
       if (p === '/api/konstrukce/zakazka' && req.method === 'POST') return apiCreate(req, res);
+      if (p === '/api/konstrukce/zakazka/smazat' && req.method === 'POST') return apiDeleteZak(req, res);
       if (p === '/api/konstrukce/prideli' && req.method === 'POST') return apiAssign(req, res);
       if (p === '/api/konstrukce/upload' && req.method === 'POST') return apiUpload(req, res);
       if (p === '/api/konstrukce/stav' && req.method === 'POST') return apiTransition(req, res);
@@ -1754,6 +1755,33 @@ function mount(host) {
     audit(z, me.email, 'Č. výrobní zakázky (Helios)', (old ? (old + ' → ') : '') + (cvz || '(smazáno)'));
     save(d);
     json(res, 200, { ok: true, cvz });
+    return true;
+  }
+
+  // ---- smazání zakázky — ochrana: klient musí poslat potvrzeni === „smazat" --
+  // Smí správce, šéf konstrukce, nebo obchodník u vlastní zakázky. Zakázka se
+  // přesune do d.smazane (posledních 200, pro dohledání), soubory verzí z disku pryč.
+  async function apiDeleteZak(req, res) {
+    const me = roleOf(req);
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load();
+    const z = d.zakazky.find(x => x.id === b.id);
+    if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
+    const smi = me.isAdmin || me.role === 'sef' || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email);
+    if (!smi) { json(res, 403, { chyba: 'Zakázku smaže správce, šéf konstrukce nebo obchodník své zakázky.' }); return true; }
+    if (String(b.potvrzeni || '').trim().toLowerCase() !== 'smazat') { json(res, 400, { chyba: 'Potvrzení nesouhlasí — napište „smazat".' }); return true; }
+    if (!Array.isArray(d.smazane)) d.smazane = [];
+    d.smazane.push({
+      id: z.id, cislo: z.cislo, cisloObj: z.cisloObj || '', zakaznik: z.zakaznik, typKey: z.typKey,
+      stav: z.stav, rezim: z.rezim, kodAbr: z.kodAbr || '', obchodnikEmail: z.obchodnikEmail || '',
+      verzi: (z.versions || []).length, createdAt: z.createdAt, smazal: me.email, smazanoAt: Date.now(),
+    });
+    if (d.smazane.length > 200) d.smazane = d.smazane.slice(-200);
+    d.zakazky = d.zakazky.filter(x => x.id !== z.id);
+    try { fs.rmSync(path.join(FILES_DIR, String(z.id).replace(/[^a-z0-9]/gi, '')), { recursive: true, force: true }); } catch (_) {}
+    save(d);
+    console.log('[konstrukce] zakázka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') smazána uživatelem ' + me.email);
+    json(res, 200, { ok: true });
     return true;
   }
   function addComment(z, me, role, text) {

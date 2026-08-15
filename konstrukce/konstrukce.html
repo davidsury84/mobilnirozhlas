@@ -1562,6 +1562,40 @@ function archGo(){
   });
 }
 
+/* ---- smazání zakázky (potvrzení napsáním „smazat") ---- */
+function delBox(z){
+  var smi=ME.isAdmin||ME.role==='sef'||(ME.role==='obchodnik'&&(z.obchodnikEmail||'').toLowerCase()===(ME.email||'').toLowerCase());
+  if(!smi)return '';
+  return '<div style="margin-top:18px;padding-top:12px;border-top:1px dashed var(--line);text-align:right"><button class="btn ghost sm" style="border-color:#dba8a2;color:#b03a2e" onclick="openDeleteZak(\''+z.id+'\')">🗑 Smazat zakázku</button></div>';
+}
+function openDeleteZak(id){
+  var z=D.zakazky.find(function(x){return x.id===id}); if(!z)return;
+  var m=document.getElementById('modal');
+  m.innerHTML='<div class="sheet" style="max-width:460px">'+
+    '<div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0;font-size:16px">Smazat zakázku '+esc(z.cisloZobraz||z.cislo)+'</h3><button class="x" onclick="closeModal()">×</button></div>'+
+    '<p style="font-size:13.5px;color:#5b635c;margin:10px 0 6px">'+esc(z.zakaznik||'')+' · '+esc(z.typName||'')+'</p>'+
+    '<p style="font-size:13px;color:#b03a2e;margin:0 0 12px"><b>Nevratný krok.</b> Smaže se zadání, dotazník, všechny verze výkresu, komentáře i auditní log.</p>'+
+    '<label style="font-size:12.5px;font-weight:600">Pro potvrzení napište slovo <b>smazat</b></label>'+
+    '<input id="delZakInp" autocomplete="off" placeholder="smazat" style="width:100%;margin:5px 0 10px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;font:inherit" oninput="delZakCheck()">'+
+    '<div class="err" id="delZakErr"></div>'+
+    '<div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" onclick="closeModal()">Zrušit</button><button class="btn" id="delZakBtn" disabled style="background:#b03a2e;opacity:.45;cursor:not-allowed" onclick="delZakGo(\''+z.id+'\')">Smazat zakázku</button></div>'+
+  '</div>';
+  m.classList.add('open');
+  var i=document.getElementById('delZakInp'); if(i)i.focus();
+}
+function delZakCheck(){
+  var ok=((document.getElementById('delZakInp')||{}).value||'').trim().toLowerCase()==='smazat';
+  var b=document.getElementById('delZakBtn'); if(!b)return;
+  b.disabled=!ok; b.style.opacity=ok?'1':'.45'; b.style.cursor=ok?'pointer':'not-allowed';
+  var e=document.getElementById('delZakErr'); if(e)e.textContent='';
+}
+function delZakGo(id){
+  var v=((document.getElementById('delZakInp')||{}).value||'');
+  api('/zakazka/smazat','POST',{id:id,potvrzeni:v}).then(function(o){
+    if(!o.ok){var e=document.getElementById('delZakErr');if(e)e.textContent=(o.j&&o.j.chyba)||'Smazání se nepodařilo.';return}
+    closeModal(); closeDrawer(); reloadData();
+  });
+}
 function renderDrawer(z){
   var d=document.getElementById('drawer');
   var params='';var pk=Object.keys(z.params||{});
@@ -1605,6 +1639,7 @@ function renderDrawer(z){
       dotaznikView(z)+'<div id="drwArch"></div>'+params+vers+
       linkBox(z)+
       comments+audit+
+      delBox(z)+
     '</div>';
   archDrawer(z);
 }
