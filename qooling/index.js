@@ -155,8 +155,9 @@ function mount(host) {
     let c = {}; try { c = JSON.parse(fs.readFileSync(CFG_F, 'utf8')) || {}; } catch (_) {}
     return {
       to: Array.isArray(c.to) ? c.to : DEF_TO.slice(),
-      enabled: c.enabled !== undefined ? !!c.enabled : true,       // uživatel report výslovně chtěl → zapnuto
-      weekday: (c.weekday >= 0 && c.weekday <= 6) ? c.weekday : 1  // 1 = pondělí
+      enabled: c.enabled !== undefined ? !!c.enabled : true,        // uživatel report výslovně chtěl → zapnuto
+      weekday: (c.weekday >= 0 && c.weekday <= 6) ? c.weekday : 1,  // 1 = pondělí
+      hour: (c.hour >= 0 && c.hour <= 23) ? c.hour : 7              // odesílá se ráno od této hodiny
     };
   }
   const saveCfg = c => { try { fs.writeFileSync(CFG_F, JSON.stringify(c, null, 2)); } catch (e) { console.error('[qooling] zápis config:', e.message); } };
@@ -265,16 +266,21 @@ function mount(host) {
       const cfg = loadCfg(); const now = new Date();
       if (!cfg.enabled) return;
       if (host.reportDisabled && host.reportDisabled('qooling-tydenni')) return;  // zrušeno v přehledu Rozesílky
-      if (now.getDay() < cfg.weekday || now.getDay() === 0) return;              // od pondělí (ne v neděli)
+      // POUZE ve zvolený den (výchozí pondělí) a od zvolené hodiny. Když ten den server neběží,
+      // report se ten týden nepošle — radši vynechat, než ho poslat v sobotu večer.
+      if (now.getDay() !== cfg.weekday || now.getHours() < cfg.hour) return;
       let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
       const wk = isoWeek(now);
       if (st.lastWeek === wk) return;
+      // Při chybě pošty zkusíme znovu při další hodinové kontrole, ale nejvýš 3× za týden
+      // (jinak by se log Rozesílek zaplnil desítkami chybových pokusů).
+      if (st.failWeek === wk && (st.failCount || 0) >= 3) return;
       const r = await sendReport(cfg.to);
-      // Týden označíme za vyřízený jen při úspěchu — při chybě pošty se zkusí znovu při další hodinové kontrole.
-      if (r.ok) { st.lastWeek = wk; st.lastAt = now.toISOString(); }
+      if (r.ok) { st.lastWeek = wk; st.lastAt = now.toISOString(); st.lastError = ''; delete st.failWeek; delete st.failCount; }
+      else { st.failCount = (st.failWeek === wk ? (st.failCount || 0) : 0) + 1; st.failWeek = wk; st.lastError = r.error || 'odeslání selhalo'; st.lastErrorAt = now.toISOString(); }
       st.lastResult = r;
       try { fs.writeFileSync(STATE_F, JSON.stringify(st, null, 2)); } catch (_) {}
-      console.log('[qooling] týdenní report: ' + (r.ok ? 'odesláno (' + r.to.join(', ') + ')' : 'CHYBA ' + (r.error || 'odeslání selhalo')));
+      console.log('[qooling] týdenní report: ' + (r.ok ? 'odesláno (' + r.to.join(', ') + ')' : 'CHYBA (pokus ' + st.failCount + '/3) ' + st.lastError));
     } catch (e) { console.error('[qooling] tick:', e.message); }
   }
 
@@ -325,12 +331,32 @@ function mount(host) {
   }
 
   // Descriptor pro centrální přehled rozesílek (správce → „Rozesílky")
-  function reports() {
+  const DNY = ['v neděli', 'v pondělí', 'v úterý', 've středu', 've čtvrtek', 'v pátek', 'v sobotu'];
+  function reportDescriptor() {
     const c = loadCfg(); let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
-    return [{ key: 'qooling-tydenni', module: 'Qooling', name: 'Týdenní stav závad kvality', to: c.to || [], enabled: !!c.enabled, schedule: 'týdně v pondělí', lastAt: st.lastAt || null, preview: '/api/qooling/preview', configHint: 'Modul Qooling → nastavení (správce)' }];
+    return {
+      key: 'qooling-tydenni', module: 'Qooling', name: 'Týdenní stav závad kvality',
+      to: c.to || [], enabled: !!c.enabled, day: c.weekday,
+      schedule: 'týdně ' + (DNY[c.weekday] || 'v pondělí') + ' od ' + c.hour + ':00',
+      lastAt: st.lastAt || null, lastError: st.lastError || '',
+      preview: '/api/qooling/preview', send: { url: '/api/qooling/send', body: {} },
+      configHint: 'Modul Qooling → 📧 Pondělní report'
+    };
+  }
+  function reports() { return [reportDescriptor()]; }
+  // Úprava z centrálního přehledu Rozesílky (příjemci / zapnutí / den v týdnu).
+  function setReport(key, b) {
+    if (key !== 'qooling-tydenni') return null;
+    const next = Object.assign({}, loadCfg());
+    if (b.to != null) next.to = cleanEmails(b.to);
+    if (b.enabled != null) next.enabled = !!b.enabled;
+    if (b.day != null && b.day >= 0 && b.day <= 6) next.weekday = +b.day;
+    if (b.hour != null && b.hour >= 0 && b.hour <= 23) next.hour = +b.hour;
+    saveCfg(next);
+    return reportDescriptor();
   }
 
-  return { handle, tick, reports };
+  return { handle, tick, reports, setReport };
 }
 
 module.exports = { mount };

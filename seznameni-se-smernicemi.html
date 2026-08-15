@@ -4343,7 +4343,8 @@ async function renderRozesilky(){
     h+='<tr'+(r.enabled?'':' style="opacity:.72"')+'><td style="text-align:center">'+sw+'</td>'+
       '<td><b>'+esc(r.name||'')+'</b><br><span class="muted" style="font-size:11.5px">'+esc(r.module||'')+(r.configHint?(' · ⚙ '+esc(r.configHint)):'')+'</span></td>'+
       '<td>'+prijemci+'</td><td style="white-space:nowrap">'+kdy+'</td>'+
-      '<td class="muted" style="font-size:12px;white-space:nowrap">'+esc(last)+'</td>'+
+      '<td class="muted" style="font-size:12px;white-space:nowrap">'+esc(last)+
+        (r.lastError?'<br><span style="color:#b3261e;font-size:11px" title="'+esc(r.lastError)+'">✕ poslední pokus selhal</span>':'')+'</td>'+
       '<td style="white-space:nowrap">'+akce+'</td></tr>';
   });
   h+='</tbody></table><div class="muted" id="rozStatus" style="padding:8px 12px;font-size:12.5px;min-height:18px"></div></div>';
