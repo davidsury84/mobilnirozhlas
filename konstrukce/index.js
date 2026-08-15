@@ -394,6 +394,7 @@ const SEED_STREDISKA = [
 const RADY_ABR = [
   ['dsd', 'DSD — kontejnery v normě DIN (DIN 30722)'],
   ['afs', 'AFS — kontejnery v normě AFNOR'],
+  ['ecl', 'ECL — kulaté bezvýztuhové provedení (pipe shape)'],
   ['hbs', 'HBS — Hardox „halbšálen" (půlkulaté provedení)'],
   ['sth', 'STH — stohovací kontejnery dle DIN'],
   ['hbi', 'HBI — Hardox velké vypouklé (BIG & strong)'],
@@ -1061,9 +1062,13 @@ function mount(host) {
       let kodNalez = '';
       for (const si of list) { const m = String(VYK.soubory[si][1]).match(KOD_RE); if (m) { const k = cistKod(m[0]); if (k.length > kodNalez.length) kodNalez = k; } }
       if (!kodNalez) { const m = String(S.cesty[fi]).match(KOD_RE); if (m) kodNalez = cistKod(m[0]); }
+      // generické podsložky (DXF, PDF, VÝKRESY…) pojmenuj i rodičem, ať je jasné, ke které zakázce patří
+      let nazev = VYK.slozky[fi][0];
+      const parIdx = VYK.slozky[fi][1];
+      if (parIdx > 0 && /^(dxf|pdf|dwg|step|v[yý]kres[a-zů+ ]*|kusovn[íi]k[a-zů]*|foto|obr[aá]zky)$/i.test(nazev.trim())) nazev = VYK.slozky[parIdx][0] + ' / ' + nazev;
       return {
         id: VYK.slozky[fi][2],
-        nazev: VYK.slozky[fi][0],
+        nazev,
         cesta: S.cesty[fi],
         rok: S.roky[fi] || null,
         zavod: S.zavody[fi] || '',

@@ -2354,7 +2354,7 @@ function natGrid(f,opts,vol,curOpt,rq){
     '<input class="dq2-req" id="dqr_'+f.k+'" value="'+esc(rq)+'" placeholder="'+esc(tr('požadavek zákazníka…'))+'" style="'+(vol==='pozadavek'?'':'display:none')+'" oninput="segSelect(this,\'pozadavek\')"></div>';
 }
 /* ---- Živý náhled celkového kódu ABR (varianta B — standardy se nevypisují) ---- */
-var ABR_RADY_JS=['dsd','afs','hbs','sth','hbi','lwc'];
+var ABR_RADY_JS=['dsd','afs','ecl','hbs','sth','hbi','lwc'];
 function dqField(k){var t=curType(),r=null;(t.dotaznik||[]).forEach(function(s){(s.fields||[]).forEach(function(f){if(f.k===k)r=f})});return r}
 function dqKodPreview(){
   var el=document.getElementById('dqKod'); if(!el)return;
