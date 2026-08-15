@@ -246,10 +246,12 @@ function mount(host) {
       markdownTo: Array.isArray(c.markdownTo) ? c.markdownTo : DEF_MD.slice(),
       enabled: c.enabled !== undefined ? !!c.enabled : false,   // bezpečně vypnuto — zapne správce po náhledu
       weekday: (c.weekday >= 0 && c.weekday <= 6) ? c.weekday : 1, // 1 = pondělí
+      markdownEvery: (c.markdownEvery === 1 || c.markdownEvery === 2) ? c.markdownEvery : 2,   // „Co zlevnit" = 1× za 14 dní
       // objednávkový report (ERP, 1× za 14 dní) — příjemci editovatelní správcem
       objednavkyTo: Array.isArray(c.objednavkyTo) ? c.objednavkyTo : ['jan.benicek@elkoplast.cz', 'michaela.lizancova@elkoplast.cz', 'david.sury@elkoplast.cz', 'hana.faltynkova@elkoplast.cz'],
       objednavkyEnabled: c.objednavkyEnabled !== undefined ? !!c.objednavkyEnabled : false, // ZATÍM VYPNUTO (uživatel: „zatím nic neposílej")
       objednavkyDay: (c.objednavkyDay >= 0 && c.objednavkyDay <= 6) ? c.objednavkyDay : 1,
+      objednavkyEvery: (c.objednavkyEvery === 1 || c.objednavkyEvery === 2) ? c.objednavkyEvery : 1, // „Co objednat" = týdně
       // ranní bilance skladu (denně) — příjemci editovatelní správcem
       bilanceTo: Array.isArray(c.bilanceTo) ? c.bilanceTo : DEF_PU.slice(),
       bilanceEnabled: c.bilanceEnabled !== undefined ? !!c.bilanceEnabled : false, // VÝCHOZÍ VYPNUTO
@@ -514,7 +516,8 @@ function mount(host) {
       // Objednávkový report — 1× týdně (od zvoleného dne, pojistka 1×/ISO-týden)
       if (cfg.objednavkyEnabled && !dis('objednavky') && now.getDay() >= cfg.objednavkyDay) {
         const wk = isoWeek(now);
-        if (st.objWeek !== wk) { const r = await sendReport('objednavky', cfg.objednavkyTo, cfg); st.objWeek = wk; st.objAt = now.toISOString(); st.objednavky = r; changed = true; console.log('[nakup-report] objednávkový report: ' + (r.ok ? r.count + ' pol.' : 'CHYBA ' + r.error)); }
+        const objGap = st.objAt ? (now - new Date(st.objAt)) / 86400000 : 999;
+        if (st.objWeek !== wk && objGap >= ((cfg.objednavkyEvery || 1) > 1 ? 13 : 6)) { const r = await sendReport('objednavky', cfg.objednavkyTo, cfg); st.objWeek = wk; st.objAt = now.toISOString(); st.objednavky = r; changed = true; console.log('[nakup-report] objednávkový report: ' + (r.ok ? r.count + ' pol.' : 'CHYBA ' + r.error)); }
       }
       // Ranní bilance skladu — denně (od zvolené hodiny), pojistka 1×/den
       if (cfg.bilanceEnabled && !dis('bilance') && now.getHours() >= (cfg.bilanceHour != null ? cfg.bilanceHour : 8)) {
@@ -524,7 +527,8 @@ function mount(host) {
       // Týdenní zlevnění/nákup — volitelné (defaultně vypnuto)
       if (cfg.enabled && !dis('markdown') && now.getDay() >= cfg.weekday) {
         const wk = isoWeek(now);
-        if (st.lastWeek !== wk) { const rM = await sendReport('markdown', cfg.markdownTo, cfg); st.lastWeek = wk; st.lastAt = now.toISOString(); st.markdown = rM; changed = true; }
+        const mdGap = st.lastAt ? (now - new Date(st.lastAt)) / 86400000 : 999;
+        if (st.lastWeek !== wk && mdGap >= ((cfg.markdownEvery || 1) > 1 ? 13 : 6)) { const rM = await sendReport('markdown', cfg.markdownTo, cfg); st.lastWeek = wk; st.lastAt = now.toISOString(); st.markdown = rM; changed = true; }
       }
       if (changed) try { fs.writeFileSync(STATE_F, JSON.stringify(st, null, 2)); } catch (_) {}
     } catch (e) { console.error('[nakup-report] tick:', e.message); }
@@ -670,8 +674,8 @@ function mount(host) {
   // Mapa report → klíče v configu (pro centrální editaci v „Rozesílky")
   const REP_MAP = {
     bilance:    { to: 'bilanceTo',    en: 'bilanceEnabled',    hour: 'bilanceHour' },
-    objednavky: { to: 'objednavkyTo', en: 'objednavkyEnabled', day: 'objednavkyDay' },
-    markdown:   { to: 'markdownTo',   en: 'enabled',           day: 'weekday' }
+    objednavky: { to: 'objednavkyTo', en: 'objednavkyEnabled', day: 'objednavkyDay', every: 'objednavkyEvery' },
+    markdown:   { to: 'markdownTo',   en: 'enabled',           day: 'weekday',        every: 'markdownEvery' }
   };
   function reports() {
     const c = loadCfg(); let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
@@ -681,10 +685,12 @@ function mount(host) {
         hour: (c.bilanceHour != null ? c.bilanceHour : 8), schedule: 'denně ráno (' + (c.bilanceHour != null ? c.bilanceHour : 8) + ':00)',
         lastAt: st.bilanceDay || null, preview: '/api/nakup-report/preview?type=bilance', send: { url: '/api/nakup-report/send', body: { type: 'bilance' } } }),
       Object.assign({}, base, { key: 'objednavky', name: 'Objednávkový report (co objednat)', to: c.objednavkyTo || [], enabled: !!c.objednavkyEnabled,
-        day: (c.objednavkyDay != null ? c.objednavkyDay : 1), schedule: 'týdně (' + DNY[c.objednavkyDay != null ? c.objednavkyDay : 1] + ')',
+        day: (c.objednavkyDay != null ? c.objednavkyDay : 1), every: c.objednavkyEvery || 1,
+        schedule: ((c.objednavkyEvery || 1) > 1 ? '1× za 14 dní' : 'týdně') + ' (' + DNY[c.objednavkyDay != null ? c.objednavkyDay : 1] + ')',
         lastAt: st.objAt || null, preview: '/api/nakup-report/preview?type=objednavky', send: { url: '/api/nakup-report/send', body: { type: 'objednavky' } } }),
       Object.assign({}, base, { key: 'markdown', name: 'Co zlevnit (stárnoucí/mrtvé zásoby)', to: c.markdownTo || [], enabled: !!c.enabled,
-        day: (c.weekday != null ? c.weekday : 1), schedule: 'týdně (' + DNY[c.weekday != null ? c.weekday : 1] + ')',
+        day: (c.weekday != null ? c.weekday : 1), every: c.markdownEvery || 1,
+        schedule: ((c.markdownEvery || 1) > 1 ? '1× za 14 dní' : 'týdně') + ' (' + DNY[c.weekday != null ? c.weekday : 1] + ')',
         lastAt: st.lastAt || null, preview: '/api/nakup-report/preview?type=markdown', send: { url: '/api/nakup-report/send', body: { type: 'markdown' } } })
     ];
   }
@@ -696,6 +702,7 @@ function mount(host) {
     if (patch.enabled != null) c[m.en] = !!patch.enabled;
     if (patch.day != null && m.day && +patch.day >= 0 && +patch.day <= 6) c[m.day] = +patch.day;
     if (patch.hour != null && m.hour && +patch.hour >= 0 && +patch.hour <= 23) c[m.hour] = +patch.hour;
+    if (patch.every != null && m.every && (+patch.every === 1 || +patch.every === 2)) c[m.every] = +patch.every;
     saveCfg(c);
     return reports().find(r => r.key === key) || null;
   }
