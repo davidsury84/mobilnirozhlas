@@ -2,138 +2,640 @@
   "_zdroj": "Google tabulka „Typová řada ABR kontejnerů“ — id 1AfnI-s4-pXTJXIg0MiIdez23yYsyAxC_Pnur2gzIzYU, listy ABR-DSD…ABRTH, přepsáno 2026-08-15. std/opce dle listu řady; kde list uvádí jen text bez kódu, je std ponechán jako token z listu (do kódu se std nevypisuje). Řady bez listu (WF, BS, POP, PAP, AFO, ARC, RAM, ALST) jedou na globálním číselníku. PLATA = společný list pro PAL/PT/PS/PSK/PSN/PSNK/PDK.",
   "dsd": {
     "rozmeryHint": "šířka 2300/2420 · výšky dle katalogu ABR",
-    "provedeni": { "std": "5/3", "opce": ["4/3", "3/3"] },
-    "natahovani": { "stdKod": "NA1570/50", "opceKody": ["NA1570/60", "NH1570/50", "NH1570/60", "NS1570/50", "NS1570/60", "NAT1570/50", "NAT1570/60"] },
-    "napojeni": { "stdKod": "VP250", "opceKody": ["R200", "K90"] },
-    "lem": { "stdKod": "TR89", "opceKody": ["JE100", "TR114"] },
-    "roztecVyztuh": { "stdKod": "SV750", "opceKody": ["SV500"] },
-    "profilVyztuh": { "stdKod": "VU100" },
-    "vrata": { "stdKod": "VRJEKL" },
-    "zavirani": { "stdKod": "VSH", "opceKody": ["VNL", "VDC"] },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] },
-    "hacky": { "stdKod": "HPV500" }
+    "provedeni": {
+      "std": "5/3",
+      "opce": [
+        "4/3",
+        "3/3"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NA1570/50",
+      "opceKody": [
+        "NA1570/60",
+        "NH1570/50",
+        "NH1570/60",
+        "NS1570/50",
+        "NS1570/60",
+        "NAT1570/50",
+        "NAT1570/60",
+        "NHT1570/50",
+        "NHT1570/60"
+      ]
+    },
+    "napojeni": {
+      "stdKod": "VP250",
+      "opceKody": [
+        "R200",
+        "K90"
+      ]
+    },
+    "lem": {
+      "stdKod": "TR89",
+      "opceKody": [
+        "JE100",
+        "TR114"
+      ]
+    },
+    "roztecVyztuh": {
+      "stdKod": "SV750",
+      "opceKody": [
+        "SV500"
+      ]
+    },
+    "profilVyztuh": {
+      "stdKod": "VU100"
+    },
+    "vrata": {
+      "stdKod": "VRJEKL"
+    },
+    "zavirani": {
+      "stdKod": "VSH",
+      "opceKody": [
+        "VNL",
+        "VDC"
+      ]
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "hacky": {
+      "stdKod": "HPV500"
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    },
+    "vyztuhyLyzina": {
+      "stdKod": "NE",
+      "opceKody": [
+        "MZVL"
+      ]
+    },
+    "mezivyztuhy": {
+      "stdKod": "NE",
+      "opceKody": [
+        "ZPN100"
+      ]
+    }
   },
   "afs": {
     "rozmeryHint": "AFNOR; varianty L / UL mají řidší výztuhy (viz list)",
-    "provedeni": { "std": "4/3", "opce": ["5/3", "5/4"] },
-    "natahovani": { "stdKod": "NA1425/50", "opceKody": ["NT1425/50"] },
-    "napojeni": { "stdKod": "VP250", "opceKody": ["R200", "K90"] },
-    "lem": { "stdKod": "JE100", "opceKody": ["TR89"] },
-    "roztecVyztuh": { "stdKod": "SV750", "opceKody": ["SV500"] },
-    "rolny": { "stdKod": "R220/200", "opceKody": ["R159/300"] },
-    "cepRolen": { "stdKod": "CR200/40" },
-    "vrata": { "stdKod": "VRVU", "opceKody": ["VRJEKL"] },
-    "zavirani": { "stdKod": "VNL", "opceKody": ["VSH", "VDC"] },
-    "hacky": { "stdKod": "HPV500", "opceKody": ["HPV300"] }
+    "provedeni": {
+      "std": "4/3",
+      "opce": [
+        "5/3",
+        "5/4"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NA1425/50",
+      "opceKody": [
+        "NT1425/50"
+      ]
+    },
+    "napojeni": {
+      "stdKod": "VP250",
+      "opceKody": [
+        "R200",
+        "K90"
+      ]
+    },
+    "lem": {
+      "stdKod": "JE100",
+      "opceKody": [
+        "TR89"
+      ]
+    },
+    "roztecVyztuh": {
+      "stdKod": "SV750",
+      "opceKody": [
+        "SV500"
+      ]
+    },
+    "rolny": {
+      "stdKod": "R220/200",
+      "opceKody": [
+        "R159/300"
+      ]
+    },
+    "cepRolen": {
+      "stdKod": "CR200/40"
+    },
+    "vrata": {
+      "stdKod": "VRVU",
+      "opceKody": [
+        "VRJEKL"
+      ]
+    },
+    "zavirani": {
+      "stdKod": "VNL",
+      "opceKody": [
+        "VSH",
+        "VDC"
+      ]
+    },
+    "hacky": {
+      "stdKod": "HPV500",
+      "opceKody": [
+        "HPV300"
+      ]
+    },
+    "vyztuhyLyzina": {
+      "stdKod": "NE",
+      "opceKody": [
+        "MZVL"
+      ]
+    }
   },
   "nl": {
-    "provedeni": { "std": "5/3", "opce": ["4/3", "3/3"] },
-    "natahovani": { "stdKod": "NHNL1450/50", "opceKody": ["NL", "NR", "NRS"] },
-    "napojeni": { "stdKod": "R150" },
-    "lem": { "stdKod": "TR114" },
-    "roztecVyztuh": { "stdKod": "SV500" },
-    "vrata": { "stdKod": "VRJEKL" },
-    "zavirani": { "std": "ZVDM", "stdPopis": "zavírání ZV DM (dle listu NL)" },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] }
+    "provedeni": {
+      "std": "5/3",
+      "opce": [
+        "4/3",
+        "3/3"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NHNL1450/50",
+      "opceKody": [
+        "NL",
+        "NR",
+        "NRS"
+      ]
+    },
+    "napojeni": {
+      "stdKod": "R150"
+    },
+    "lem": {
+      "stdKod": "TR114"
+    },
+    "roztecVyztuh": {
+      "stdKod": "SV500"
+    },
+    "vrata": {
+      "stdKod": "VRJEKL"
+    },
+    "zavirani": {
+      "std": "ZVDM",
+      "stdPopis": "zavírání ZV DM (dle listu NL)"
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "vyztuhyLyzina": {
+      "stdKod": "MZVL"
+    },
+    "mezivyztuhy": {
+      "stdKod": "NE",
+      "opceKody": [
+        "ZPN100"
+      ]
+    }
   },
   "wd": {
-    "provedeni": { "std": "5/3", "opce": ["4/3", "3/3"] },
-    "natahovani": { "stdKod": "NA1570/50", "opceKody": ["NH1570/50", "NS1570/50"] },
-    "napojeni": { "stdKod": "R150" },
-    "lem": { "stdKod": "TR114" },
-    "profilVyztuh": { "stdKod": "NE" },
-    "vrata": { "stdKod": "VRVU" },
-    "zavirani": { "stdKod": "VNL", "opceKody": ["VSH"] },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] }
+    "provedeni": {
+      "std": "5/3",
+      "opce": [
+        "4/3",
+        "3/3"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NA1570/50",
+      "opceKody": [
+        "NH1570/50",
+        "NS1570/50"
+      ]
+    },
+    "napojeni": {
+      "stdKod": "R150"
+    },
+    "lem": {
+      "stdKod": "TR114"
+    },
+    "profilVyztuh": {
+      "stdKod": "NE"
+    },
+    "vrata": {
+      "stdKod": "VRVU"
+    },
+    "zavirani": {
+      "stdKod": "VNL",
+      "opceKody": [
+        "VSH"
+      ]
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    },
+    "vyztuhyLyzina": {
+      "stdKod": "NE",
+      "opceKody": [
+        "MZVL"
+      ]
+    }
   },
   "ecl": {
     "rozmeryHint": "délky 6000/6500/7000 · šířka 2400 (2300–2530) · výšky 500–2400",
-    "provedeni": { "std": "5/3", "opce": ["4/3"] },
-    "natahovani": { "stdKod": "NH1570/50", "opceKody": ["NH1570/60", "NS1570/50", "NS1570/60"] },
-    "napojeni": { "std": "R110", "stdPopis": "napojení R110 (dle listu ECL)" },
-    "lem": { "stdKod": "TR114", "opceKody": ["JE100"] },
-    "vrata": { "stdKod": "VRJEKL" },
-    "zavirani": { "stdKod": "VSH", "opceKody": ["VNL"] },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] }
+    "provedeni": {
+      "std": "5/3",
+      "opce": [
+        "4/3"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NH1570/50",
+      "opceKody": [
+        "NH1570/60",
+        "NS1570/50",
+        "NS1570/60"
+      ]
+    },
+    "napojeni": {
+      "std": "R110",
+      "stdPopis": "napojení R110 (dle listu ECL)"
+    },
+    "lem": {
+      "stdKod": "TR114",
+      "opceKody": [
+        "JE100"
+      ]
+    },
+    "vrata": {
+      "stdKod": "VRJEKL"
+    },
+    "zavirani": {
+      "stdKod": "VSH",
+      "opceKody": [
+        "VNL"
+      ]
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "profilVyztuh": {
+      "stdKod": "NE"
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    },
+    "vyztuhyLyzina": {
+      "stdKod": "NE",
+      "opceKody": [
+        "MZVL"
+      ]
+    }
   },
   "lwc": {
-    "provedeni": { "std": "3/2" },
-    "natahovani": { "stdKod": "NA1570/50", "opceKody": ["NH1570/50", "NS1570/50"] },
-    "napojeni": { "std": "VP150", "stdPopis": "VP150 — 45/45° (dle listu LWC)" },
-    "lem": { "stdKod": "OPLWC" },
-    "rolny": { "stdKod": "R159/300" },
-    "zavirani": { "stdKod": "VSH", "opceKody": ["VNL"] },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] }
+    "provedeni": {
+      "std": "3/2"
+    },
+    "natahovani": {
+      "stdKod": "NA1570/50",
+      "opceKody": [
+        "NH1570/50",
+        "NS1570/50"
+      ]
+    },
+    "napojeni": {
+      "std": "VP150",
+      "stdPopis": "VP150 — 45/45° (dle listu LWC)"
+    },
+    "lem": {
+      "stdKod": "OPLWC"
+    },
+    "rolny": {
+      "stdKod": "R159/300"
+    },
+    "zavirani": {
+      "stdKod": "VSH",
+      "opceKody": [
+        "VNL"
+      ]
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "profilVyztuh": {
+      "stdKod": "NE"
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    }
   },
   "sth": {
     "rozmeryHint": "délky 5500/5750/6000/6250 · výšky 650/750 · šířka 2300",
-    "provedeni": { "std": "6/4", "opce": ["5/4"] },
-    "natahovani": { "stdKod": "NS1570/60", "opceKody": ["NS1570/50"] },
-    "napojeni": { "stdKod": "VP250" },
-    "lem": { "stdKod": "JE100", "stdPopis": "JE100 — jekl 100×80×6 (list STH)" },
-    "roztecVyztuh": { "stdKod": "SV750" },
-    "profilVyztuh": { "stdKod": "VU100" },
-    "vrata": { "std": "NE", "opceKody": ["VRJEKL"] },
-    "klapka": { "stdKod": "KLP" },
-    "hacky": { "stdKod": "HPV300" }
+    "provedeni": {
+      "std": "6/4",
+      "opce": [
+        "5/4"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NS1570/60",
+      "opceKody": [
+        "NS1570/50"
+      ]
+    },
+    "napojeni": {
+      "stdKod": "VP250"
+    },
+    "lem": {
+      "stdKod": "JE100",
+      "stdPopis": "JE100 — jekl 100×80×6 (list STH)"
+    },
+    "roztecVyztuh": {
+      "stdKod": "SV750"
+    },
+    "profilVyztuh": {
+      "stdKod": "VU100"
+    },
+    "vrata": {
+      "std": "NE",
+      "opceKody": [
+        "VRJEKL"
+      ]
+    },
+    "klapka": {
+      "stdKod": "KLP"
+    },
+    "hacky": {
+      "stdKod": "HPV300"
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    },
+    "vyztuhyLyzina": {
+      "stdKod": "MZVL"
+    },
+    "mezivyztuhy": {
+      "stdKod": "NE",
+      "opceKody": [
+        "ZPN80"
+      ]
+    }
   },
   "hbi": {
     "rozmeryHint": "délky 6500/7000 · výšky 750–2400 · šířka 2300 nahoře / 2420 uprostřed",
-    "provedeni": { "std": "5/3 HB450", "opce": ["4/3 HB450"] },
-    "natahovani": { "stdKod": "NA1570/60", "opceKody": ["NA1570/50"] },
-    "lem": { "stdKod": "JE100", "opceKody": ["OPQ6"] },
-    "zavirani": { "stdKod": "VSH", "opceKody": ["VNL"] },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] },
-    "zamekPaky": { "stdKod": "PA" }
+    "provedeni": {
+      "std": "5/3 HB450",
+      "opce": [
+        "4/3 HB450"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NA1570/60",
+      "opceKody": [
+        "NA1570/50"
+      ]
+    },
+    "lem": {
+      "stdKod": "JE100",
+      "opceKody": [
+        "OPQ6"
+      ]
+    },
+    "zavirani": {
+      "stdKod": "VSH",
+      "opceKody": [
+        "VNL"
+      ]
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "zamekPaky": {
+      "stdKod": "PA"
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    }
   },
   "hbs": {
     "rozmeryHint": "délky 5500–6500 · výšky 800/1000/1250 · šířka 2300",
-    "provedeni": { "std": "5/5 HARDOX450", "opce": ["4/4 HARDOX450"] },
-    "natahovani": { "stdKod": "NH1570/60", "opceKody": ["NH1570/50"] },
-    "lem": { "std": "OPQ5", "stdPopis": "ohýbaný profil 5 mm / QStE 690 (list HBS)" },
-    "vrata": { "std": "NE" },
-    "klapka": { "stdKod": "KLZ", "opceKody": ["KH"] },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] }
+    "provedeni": {
+      "std": "5/5 HARDOX450",
+      "opce": [
+        "4/4 HARDOX450"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NH1570/60",
+      "opceKody": [
+        "NH1570/50"
+      ]
+    },
+    "lem": {
+      "std": "OPQ5",
+      "stdPopis": "ohýbaný profil 5 mm / QStE 690 (list HBS)"
+    },
+    "vrata": {
+      "std": "NE"
+    },
+    "klapka": {
+      "stdKod": "KLZ",
+      "opceKody": [
+        "KH"
+      ]
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    }
   },
   "hdc": {
     "rozmeryHint": "délky 5500/5750/6000 · výška ~900 · šířka 2300",
-    "provedeni": { "std": "6/4", "opce": ["8/6"] },
-    "natahovani": { "stdKod": "NH1570/60" },
-    "lem": { "std": "OPQ5", "stdPopis": "ohýbaný profil 5 mm / QStE 690 (list HDC)" },
-    "vrata": { "std": "NE" },
-    "klapka": { "stdKod": "KLHDC" },
-    "cepRolen": { "stdKod": "CR300/50" },
-    "hacky": { "stdKod": "HP0", "opceKody": ["HPV500"] }
+    "provedeni": {
+      "std": "6/4",
+      "opce": [
+        "8/6"
+      ]
+    },
+    "natahovani": {
+      "stdKod": "NH1570/60"
+    },
+    "lem": {
+      "std": "OPQ5",
+      "stdPopis": "ohýbaný profil 5 mm / QStE 690 (list HDC)"
+    },
+    "vrata": {
+      "std": "NE"
+    },
+    "klapka": {
+      "stdKod": "KLHDC"
+    },
+    "cepRolen": {
+      "stdKod": "CR300/50"
+    },
+    "hacky": {
+      "stdKod": "HP0",
+      "opceKody": [
+        "HPV500"
+      ]
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    }
   },
   "acts": {
-    "provedeni": { "std": "5/3 S355" },
-    "natahovani": { "stdKod": "NS1570/50", "opceKody": ["NS1570/60"] },
-    "napojeni": { "stdKod": "R200" },
-    "lem": { "stdKod": "TR89" },
-    "roztecVyztuh": { "stdKod": "SV750", "opceKody": ["SV500"] },
-    "profilVyztuh": { "stdKod": "VU120" },
-    "rolny": { "stdKod": "R159/200" },
-    "cepRolen": { "stdKod": "CR200/40" },
-    "vrata": { "stdKod": "VRJEKL" },
-    "hacky": { "stdKod": "HPV500" }
+    "provedeni": {
+      "std": "5/3 S355"
+    },
+    "natahovani": {
+      "stdKod": "NS1570/50",
+      "opceKody": [
+        "NS1570/60"
+      ]
+    },
+    "napojeni": {
+      "stdKod": "R200"
+    },
+    "lem": {
+      "stdKod": "TR89"
+    },
+    "roztecVyztuh": {
+      "stdKod": "SV750",
+      "opceKody": [
+        "SV500"
+      ]
+    },
+    "profilVyztuh": {
+      "stdKod": "VU120"
+    },
+    "rolny": {
+      "stdKod": "R159/200"
+    },
+    "cepRolen": {
+      "stdKod": "CR200/40"
+    },
+    "vrata": {
+      "stdKod": "VRJEKL"
+    },
+    "hacky": {
+      "stdKod": "HPV500"
+    },
+    "vyztuhyLyzina": {
+      "stdKod": "NE",
+      "opceKody": [
+        "MZVL"
+      ]
+    }
   },
   "_plata": {
     "rozmeryHint": "délky 6000/6500/7000 · šířka vnější 2500",
-    "natahovani": { "stdKod": "NH1570/60" },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] }
+    "natahovani": {
+      "stdKod": "NH1570/60"
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    }
   },
-  "pal": { "$ref": "_plata" },
-  "pt": { "$ref": "_plata" },
-  "ps": { "$ref": "_plata" },
-  "psk": { "$ref": "_plata" },
-  "psn": { "$ref": "_plata" },
-  "psnk": { "$ref": "_plata" },
-  "pdk": { "$ref": "_plata" },
+  "pal": {
+    "$ref": "_plata"
+  },
+  "pt": {
+    "$ref": "_plata"
+  },
+  "ps": {
+    "$ref": "_plata"
+  },
+  "psk": {
+    "$ref": "_plata"
+  },
+  "psn": {
+    "$ref": "_plata"
+  },
+  "psnk": {
+    "$ref": "_plata"
+  },
+  "pdk": {
+    "$ref": "_plata"
+  },
   "th": {
     "rozmeryHint": "délky 5500/6000/6500 · šířka vnější 2500 · výška vnitřní ~1400",
-    "provedeni": { "std": "4/4 St52" },
-    "natahovani": { "stdKod": "NH1570/60" },
-    "napojeni": { "stdKod": "K90", "stdPopis": "K90 — 90° s vnitřní šikminou (list TH)" },
-    "cepRolen": { "stdKod": "CR300/40", "opceKody": ["CR300/50"] }
+    "provedeni": {
+      "std": "4/4 St52"
+    },
+    "natahovani": {
+      "stdKod": "NH1570/60"
+    },
+    "napojeni": {
+      "stdKod": "K90",
+      "stdPopis": "K90 — 90° s vnitřní šikminou (list TH)"
+    },
+    "cepRolen": {
+      "stdKod": "CR300/40",
+      "opceKody": [
+        "CR300/50"
+      ]
+    },
+    "lyzina": {
+      "stdKod": "LZP",
+      "opceKody": [
+        "LZA"
+      ]
+    },
+    "vyztuhyLyzina": {
+      "stdKod": "MZVL"
+    }
   }
 }

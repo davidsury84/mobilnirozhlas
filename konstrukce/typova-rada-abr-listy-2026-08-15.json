@@ -1,0 +1,1489 @@
+{
+ "ABR-DSD": [
+  [
+   "ABR-DSD",
+   "standard",
+   "opce",
+   "opce",
+   "opce"
+  ],
+  [
+   "provedení",
+   "2016-03-05 00:00:00",
+   "2016-03-04 00:00:00",
+   "2016-03-03 00:00:00"
+  ],
+  [
+   "natahování",
+   "typ A",
+   "typ H",
+   "sklopné",
+   "tunelové"
+  ],
+  [
+   "průměr háku h 1570 (mm)",
+   "50.0",
+   "60.0"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "45/45, vytažená podlaha (VP 250)",
+   "R200",
+   "90° (K90)",
+   "u 90st šířky 2300 a 2420 mm (tady pouze vrata)"
+  ],
+  [
+   "vrchní lem",
+   "tr 89x6 S355",
+   "jekl 100x80x4 S355",
+   "tr 114x6 S355"
+  ],
+  [
+   "rozteč výztuh bočnice",
+   "750 mm",
+   "500 mm"
+  ],
+  [
+   "profil výztuh bočnice",
+   "U 100x60x3",
+   "U 100x60x4"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "750 mm",
+   "500 mm"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x60x4"
+  ],
+  [
+   "mezivýztuha IPN x podlaha",
+   "ne",
+   "ano"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 300/40)",
+   "50 mm (CR 300/50)"
+  ],
+  [
+   "provedení vrat",
+   "2křídlá",
+   "1křídlá",
+   "klapka"
+  ],
+  [
+   "zavírání vrat",
+   "S hák (typ VSH)",
+   "holandské (VNL)"
+  ],
+  [
+   "střecha",
+   "ne",
+   "mechanická",
+   "hydraulická",
+   "rolovací plachta"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm/10mm",
+   "",
+   "",
+   "",
+   "canvas hooks"
+  ],
+  [
+   "žebřík (výška kont min 1500 mm)",
+   "ano/vlevo ve směru jízdy"
+  ],
+  [
+   "centrální jištění",
+   "ano/2křídla (typ CE)"
+  ],
+  [
+   "dvojité zavírání VDC",
+   "ne",
+   "ano"
+  ],
+  [
+   "zhuštěné nosníky podlahy ZPN",
+   "ne",
+   "ano\n100x60x3 + SD2546 ZÁSLEPKA",
+   "ověřit zda by nemělo být z 4 mm"
+  ],
+  [
+   "vrata jeklové VRJEKL",
+   "ano/levé křídlo jištěné/Shák",
+   "",
+   "profil 100x60"
+  ],
+  [
+   "horizontální výztuha",
+   "ne",
+   "ano 1 ev. 2 řady"
+  ],
+  [
+   "Výztuha v lyžíne",
+   "2100 mm"
+  ],
+  [
+   "mechanická střecha lze u kont min výšky 1250 mm"
+  ],
+  [
+   "žebřík standardně od výšky 1500 mm včetně"
+  ],
+  [
+   "ekologické provedení"
+  ]
+ ],
+ "ABR-AFS": [
+  [
+   "ABR-AFS",
+   "standard ABR-AFS",
+   "opce",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "ABR-AFS-L (light)",
+   "ABR-AFS-UL (ultra light)"
+  ],
+  [
+   "provedení",
+   "2016-03-04 00:00:00",
+   "2016-03-05 00:00:00",
+   "2020-04-05 00:00:00"
+  ],
+  [
+   "natahování",
+   "typ A/za natahováním 2xUPN100",
+   "typ NT 1425/50"
+  ],
+  [
+   "průměr háku h 1425 (mm)",
+   "50 (NA1425/50)"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "45/45, vytažená podlaha (VP 250)",
+   "R200",
+   "90° (K90)"
+  ],
+  [
+   "vrchní lem",
+   "tr 100x80x4 S355 (JE100)",
+   "tr 89x6 S355 (TR89)"
+  ],
+  [
+   "rozteč výztuh bočnice",
+   "750 mm",
+   "500 mm",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "1250 mm",
+   "1250 mm"
+  ],
+  [
+   "profil výztuh bočnice",
+   "U 100x60x3"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "375 mm",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "417 mm",
+   "1250 mm"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x60x4",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "U 100x60x3",
+   "U 100x60x3"
+  ],
+  [
+   "jištění dle Marrel",
+   "ne",
+   "ano"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks",
+   "tr 220x8/2160 (200 mm)",
+   "tr 220x8/1530 (200 mm)",
+   "tr 159x6,3/2160 (300 mm)",
+   "tr 159x6,3/1530 (300 mm)"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm"
+  ],
+  [
+   "provedení vrat",
+   "2křídlá VRVU",
+   "1křídlá",
+   "klapka",
+   "",
+   "",
+   "",
+   "",
+   "2křídlá VRJEKL",
+   "2křídlá VRJEKL"
+  ],
+  [
+   "zavírání vrat",
+   "holandské (VNL)",
+   "S hák (typ VSH)"
+  ],
+  [
+   "střecha",
+   "ne",
+   "mechanická",
+   "hydraulická",
+   "rolovací plachta",
+   "posuvná"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm/10mm",
+   "ano/300 mm od podlahy"
+  ],
+  [
+   "žebřík výška min. 1500 mm",
+   "ano/vlevo ve směru jízdy"
+  ],
+  [
+   "centrální jištění",
+   "ano/2křídla (typ CE)"
+  ],
+  [
+   "dvojité zavírání",
+   "ne",
+   "ano"
+  ],
+  [
+   "mezivýztuha IPN x podlaha",
+   "ne",
+   "ano"
+  ],
+  [
+   "horizontální výztuha",
+   "ne",
+   "ano 1 ev. 2 řady"
+  ],
+  [
+   "vrata jeklové",
+   "ne",
+   "ano/levé křídlo jištěné",
+   "",
+   "",
+   "",
+   "",
+   "",
+   "ANO",
+   "ANO"
+  ],
+  [
+   "aktualizace"
+  ],
+  [
+   "2022/10 uprava rolny trubka159x6,3"
+  ]
+ ],
+ "ABR-NL": [
+  [
+   "ABR-NL",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "2016-03-05 00:00:00",
+   "2016-03-04 00:00:00",
+   "2016-03-03 00:00:00"
+  ],
+  [
+   "natahování",
+   "NH-NL 1450/50",
+   "lanové",
+   "řetězové pevné",
+   "řetězové sklopné"
+  ],
+  [
+   "vnitřní výztuha za natahováním",
+   "UPN 140"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "R150"
+  ],
+  [
+   "vrchní lem",
+   "tr 114x6 S355"
+  ],
+  [
+   "rozteč výztuh bočnice",
+   "500 mm"
+  ],
+  [
+   "profil výztuh bočnice",
+   "U 100x50x4",
+   "U 100x50x3"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "500 mm"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x50x4"
+  ],
+  [
+   "mezivýztuha IPN x podlaha",
+   "ano (pásovina 5 mm)"
+  ],
+  [
+   "výztuha lyžiny IPN 180",
+   "ano / 100x5 délka 3000 mm"
+  ],
+  [
+   "jištění L v lyžině",
+   "ne",
+   "ano"
+  ],
+  [
+   "zadní trámec",
+   "UPN 200"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný",
+   "průměr 40 mm",
+   "průměr 50 mm"
+  ],
+  [
+   "rolny 2 ks typ Marrel 219x110 mm",
+   "ne",
+   "ano"
+  ],
+  [
+   "provedení vrat",
+   "2křídlá",
+   "1křídlá",
+   "klapka"
+  ],
+  [
+   "zavírání vrat",
+   "ZV DM"
+  ],
+  [
+   "střecha",
+   "ne",
+   "mechanická",
+   "hydraulická",
+   "2rám se sítí"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm od země/8mm (???)"
+  ],
+  [
+   "žebřík",
+   "roxor na bočnici (u čela na str řidiče a vzadu na str spolujezdce)",
+   "ano/vlevo ve směru jízdy/přivařen k H nahtahování"
+  ],
+  [
+   "centrální jištění",
+   "ano typ CD",
+   "ano/2křídla -dořešit typ (Domat,Suez, náš?,)"
+  ],
+  [
+   "dvojité zavírání",
+   "ne",
+   "ano"
+  ],
+  [
+   "zhuštěné nosníky podlahy",
+   "ne",
+   "ano 100x50x4"
+  ],
+  [
+   "horizontální výztuha",
+   "ne",
+   "ano 1 ev. 2 řady"
+  ],
+  [
+   "kulatina mezi lyžinami pro aretaci",
+   "ne",
+   "ano"
+  ]
+ ],
+ "ABR-WD": [
+  [
+   "ABR-WD",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "2016-03-05 00:00:00",
+   "2016-03-04 00:00:00",
+   "2016-03-03 00:00:00"
+  ],
+  [
+   "natahování",
+   "NA 1570/50",
+   "NH 1570/50",
+   "NS 1570/50"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "ca R150"
+  ],
+  [
+   "vrchní lem",
+   "Tr 114x6 S355"
+  ],
+  [
+   "rozteč výztuh bočnice",
+   "bez výztuh",
+   "1 x středem vertikálně"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "500 mm"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x60x4"
+  ],
+  [
+   "mezivýztuha IPN x podlaha",
+   "ne",
+   "ano"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 300/40)",
+   "50 mm (CR 300/50)"
+  ],
+  [
+   "provedení vrat",
+   "2křídlá VRVU",
+   "1křídlá",
+   "klapka"
+  ],
+  [
+   "zavírání vrat",
+   "holandské (VNL)",
+   "S hák (typ VSH)"
+  ],
+  [
+   "střecha",
+   "ne",
+   "mechanická",
+   "hydraulická",
+   "rolovací plachta"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm"
+  ],
+  [
+   "žebřík (výška kont min 1500 mm)",
+   "ano/vlevo ve směru jízdy"
+  ],
+  [
+   "centrální jištění",
+   "ano/2křídla (typ CE)"
+  ],
+  [
+   "dvojité zavírání",
+   "ne",
+   "ano"
+  ],
+  [
+   "zhuštěné nosníky podlahy",
+   "ne"
+  ],
+  [
+   "vrata jeklové",
+   "ne",
+   "ano/levé křídlo jištěné/Shák"
+  ]
+ ],
+ "ABR-ECL": [
+  [
+   "ABR-ECL",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "2020-03-05 00:00:00",
+   "2020-03-04 00:00:00"
+  ],
+  [
+   "materiál",
+   "S 355",
+   "S 355"
+  ],
+  [
+   "natahování",
+   "NH 1570/50",
+   "NH 1570/60",
+   "NS 1570/50",
+   "NS 1570/60"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "R110"
+  ],
+  [
+   "vrchní lem",
+   "tr 114x6 S355",
+   "100x100x6 S380/S355",
+   "update 19/2/2024"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "500 mm",
+   "",
+   "změna na 500 mm 28/4/2023"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x60x4"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "mezivýztuha IPN x podlaha",
+   "ne",
+   "ano"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180",
+   "",
+   "update 19/2/2024"
+  ],
+  [
+   "zadní sloupek",
+   "JE 180x100x6 S355",
+   "",
+   "update 3/2/2025"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 300/40)",
+   "50 mm (CR 300/50)"
+  ],
+  [
+   "provedení vrat",
+   "2křídlá"
+  ],
+  [
+   "zavírání vrat",
+   "S hák (typ VSH)",
+   "holandské (VNL)"
+  ],
+  [
+   "střecha",
+   "ne",
+   "rolovací plachta"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm/10mm"
+  ],
+  [
+   "žebřík (výška kont min 1500 mm)",
+   "ano/vlevo ve směru jízdy"
+  ],
+  [
+   "centrální jištění",
+   "ano/2křídla (typ CE)"
+  ],
+  [
+   "dvojité zavírání",
+   "ne",
+   "ano"
+  ],
+  [
+   "rozměry",
+   "6000/6500/7000"
+  ],
+  [
+   "výška",
+   "500/750/1250/1750/2250/2350/2400",
+   "",
+   "update 24/2/2023"
+  ],
+  [
+   "šířka",
+   "2400 (2300-2530 mm)"
+  ]
+ ],
+ "ABR-LWC": [
+  [
+   "ABR-LWC",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "2017-02-03 00:00:00"
+  ],
+  [
+   "materiál",
+   "dno HARDOX 400/stěny STRENX 700"
+  ],
+  [
+   "natahování",
+   "NA 1570/50",
+   "NH 1570/50",
+   "NS 1570/50"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "VP150 (45/45 st.)"
+  ],
+  [
+   "vrchní lem",
+   "ohýbaný profil STRENX 700"
+  ],
+  [
+   "výztuha bočnice",
+   "1 x horizontální profil"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "500 mm"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x6,3"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 300/40)",
+   "50 mm (CR 300/50)"
+  ],
+  [
+   "provedení vrat",
+   "2křídlá"
+  ],
+  [
+   "zavírání vrat",
+   "S hák (typ VSH)",
+   "holandské (VNL)"
+  ],
+  [
+   "střecha",
+   "ne",
+   "rolovací plachta"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm/10mm"
+  ],
+  [
+   "žebřík (výška kont min 1500 mm)",
+   "ano/vlevo ve směru jízdy"
+  ],
+  [
+   "centrální jištění",
+   "ano/2křídla (typ CE)"
+  ],
+  [
+   "dvojité zavírání",
+   "ne",
+   "ano"
+  ],
+  [
+   "zapuštěné natahování",
+   "ne",
+   "ano"
+  ],
+  [
+   "rolovací plachta",
+   "ne",
+   "ano"
+  ],
+  [
+   "rozměry 6500/7000 mm"
+  ],
+  [
+   "výška 2400 mm"
+  ],
+  [
+   "šířka 2300 mm"
+  ]
+ ],
+ "ABR-STH": [
+  [
+   "ABR-STH",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "2020-04-06 00:00:00",
+   "2020-04-05 00:00:00"
+  ],
+  [
+   "natahování",
+   "NS 1570/60",
+   "NS 1570/50"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "VP250 (45/45 st.)"
+  ],
+  [
+   "vrchní lem",
+   "jekl 100x80x6 S355"
+  ],
+  [
+   "rozteč výztuh bočnice",
+   "750 mm"
+  ],
+  [
+   "profil výztuh bočnice",
+   "U 100x60x4"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "750 mm"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x60x4"
+  ],
+  [
+   "mezivýztuha IPN x podlaha 5 mm",
+   "ano"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 300/40)",
+   "50 mm (CR 300/50)"
+  ],
+  [
+   "provedení vrat",
+   "klapka (KLP) 500 mm",
+   "2křídlá (zavírání VSH)"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/300 mm/10mm"
+  ],
+  [
+   "zhuštěné nosníky podlahy",
+   "ne",
+   "ano 80x60x4"
+  ],
+  [
+   "délky",
+   "5500/5750/6000/6250"
+  ],
+  [
+   "výšky",
+   "650/750"
+  ],
+  [
+   "šířka",
+   "2300.0"
+  ]
+ ],
+ "ABR-HBI": [
+  [
+   "",
+   "",
+   "",
+   "aktualizace od",
+   "2024-05-06 00:00:00"
+  ],
+  [
+   "ABR-HBI",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "5/3 HB 450",
+   "4/3 HB 450",
+   "5/4/3 aj."
+  ],
+  [
+   "natahování",
+   "NA 1570/60",
+   "NA 1570/50"
+  ],
+  [
+   "vrchní lem",
+   "100x100x6 S355 (kod JE100)",
+   "ohýbaný profil S700/6mm"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "500 mm"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x60x4 S355"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 300/40)",
+   "50 mm (CR 300/50)"
+  ],
+  [
+   "provedení vrat",
+   "2 křídlá"
+  ],
+  [
+   "zavírání vrat",
+   "S hák (typ VSH)",
+   "holandské (VNL)"
+  ],
+  [
+   "střecha",
+   "ne",
+   "rolovací plachta"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm/10mm"
+  ],
+  [
+   "žebřík (výška kont min 1500 mm)",
+   "ano/vlevo ve směru jízdy"
+  ],
+  [
+   "centrální jištění",
+   "ano/2křídla (typ CE)"
+  ],
+  [
+   "Zámek páky",
+   "kod PA"
+  ],
+  [
+   "Výztuha KOVOŠROT ve vratech",
+   "ano"
+  ],
+  [
+   "délky",
+   "6500/7000"
+  ],
+  [
+   "výšky cca",
+   "750/1250/1500/2250/2300/2350/2400"
+  ],
+  [
+   "trubka mezí ližiny",
+   "ano"
+  ],
+  [
+   "výztuha mezí rolna a ližina",
+   "ano"
+  ],
+  [
+   "šířka",
+   "2300 na hoře /2420 uprostřed",
+   "Upřesnit"
+  ],
+  [
+   "",
+   "",
+   "",
+   "aktualizace od",
+   "2024-08-14 00:00:00"
+  ],
+  [
+   "ABR-HBI-TSR",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "5/3 HB 450"
+  ],
+  [
+   "natahování",
+   "NH 1570/50"
+  ],
+  [
+   "vrchní lem",
+   "OHNUTÝ PROFIL Z PLECHU QSTE690 6mm (kod OPQ6)"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "500 mm"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x60x4 S355"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 300/40)"
+  ],
+  [
+   "provedení vrat",
+   "2 křídlá"
+  ],
+  [
+   "zavírání vrat",
+   "Holandské (kod VNL)"
+  ],
+  [
+   "střecha",
+   "ne"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm/10mm"
+  ],
+  [
+   "žebřík (výška kont min 1500 mm)",
+   "ano/vlevo ve směru jízdy"
+  ],
+  [
+   "centrální jištění",
+   "ano/2křídla (typ CE)"
+  ],
+  [
+   "deska na čip GPS",
+   "ano"
+  ],
+  [
+   "Zámek páky",
+   "kod PR8"
+  ],
+  [
+   "Výztuha KOVOŠROT ve vratech",
+   "ano"
+  ],
+  [
+   "Tabukka \"TSR\" - vrata/čelo",
+   "ano"
+  ],
+  [
+   "Reklama na bočnice",
+   "",
+   "ano"
+  ],
+  [
+   "Výřez / díry na čele",
+   "",
+   "ano"
+  ],
+  [
+   "trubka mezí ližiny",
+   "ano"
+  ],
+  [
+   "výztuha mezí rolna a ližina",
+   "ano"
+  ],
+  [
+   "délky",
+   "6500.0"
+  ],
+  [
+   "výšky cca",
+   "1250/2400"
+  ],
+  [
+   "šířka",
+   "2300 na hoře /2420 uprostřed"
+  ],
+  [
+   "zvážit verzi s lyžinou z UPN 220"
+  ],
+  [
+   "natahování ala ALST"
+  ]
+ ],
+ "ABR-HBS": [
+  [
+   "ABR-HBS",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "5/5 HARDOX 450",
+   "4/4 HARDOX 450"
+  ],
+  [
+   "natahování",
+   "NH 1570/60",
+   "NH 1570/50"
+  ],
+  [
+   "vrchní lem",
+   "5 mm/Qste 690"
+  ],
+  [
+   "výztuhy podlahy",
+   "podélně s lyžinami"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 100x70x5"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 300/40)",
+   "50 mm (CR 300/50)"
+  ],
+  [
+   "provedení vrat",
+   "klapka zvýšená (KLZ)",
+   "klapka hydraulická (KH)"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm/10mm"
+  ],
+  [
+   "délky",
+   "5500/5750/6000/6250/6500"
+  ],
+  [
+   "výšky cca",
+   "800/1000/1250"
+  ],
+  [
+   "šířka",
+   "2300.0"
+  ]
+ ],
+ "ABR-HDC": [
+  [
+   "ABR-HDC",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "2020-04-06 00:00:00",
+   "2020-06-08 00:00:00"
+  ],
+  [
+   "natahování",
+   "NH 1570/60"
+  ],
+  [
+   "vrchní lem",
+   "5 mm/Qste 690"
+  ],
+  [
+   "výztuhy podlahy",
+   "podélně s lyžinami"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 150x50x5 S355"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "U 400x70x8 S355"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "50 mm (CR 300/50)"
+  ],
+  [
+   "provedení vrat",
+   "klapka KLHDC"
+  ],
+  [
+   "háčky na plachtu",
+   "ne",
+   "ano"
+  ],
+  [
+   "délky",
+   "5500/5750/6000"
+  ],
+  [
+   "výšky cca",
+   "900.0"
+  ],
+  [
+   "šířka",
+   "2300.0"
+  ]
+ ],
+ "ABR-ACTS": [
+  [
+   "ABR-ACTS",
+   "standard",
+   "opce"
+  ],
+  [
+   "provedení",
+   "5/3 S355"
+  ],
+  [
+   "natahování",
+   "NS 1570/50",
+   "NS 1570/60"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "R200"
+  ],
+  [
+   "vrchní lem",
+   "tr 89x6 S355"
+  ],
+  [
+   "rozteč výztuh bočnice",
+   "750 mm",
+   "500 mm"
+  ],
+  [
+   "profil výztuh bočnice",
+   "U 120x60x3 S355"
+  ],
+  [
+   "rozteč výztuh podlahy",
+   "750 mm",
+   "500 mm"
+  ],
+  [
+   "profil výztuh podlahy",
+   "U 120x60x4"
+  ],
+  [
+   "mezivýztuha IPN x podlaha",
+   "ne",
+   "ano"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 200 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm (CR 200/40)"
+  ],
+  [
+   "provedení vrat",
+   "2křídlá",
+   "klapka"
+  ],
+  [
+   "střecha",
+   "ne",
+   "rolovací plachta"
+  ],
+  [
+   "háčky na plachtu",
+   "ano/500 mm/10mm"
+  ],
+  [
+   "žebřík (výška kont min 1500 mm)",
+   "ano/vlevo ve směru jízdy"
+  ],
+  [
+   "centrální jištění",
+   "ano/2křídla"
+  ]
+ ],
+ "ABR-POP": [],
+ "ABR-PALPTPSPD": [
+  [
+   "ABR-PLATA",
+   "standard",
+   "opce"
+  ],
+  [
+   "rozměry"
+  ],
+  [
+   "délka",
+   "6000/6500/7000"
+  ],
+  [
+   "šířka vnější",
+   "2500 mm",
+   "upřsnit asi jít na max"
+  ],
+  [
+   "provedení s plechem",
+   "slzičkový plech 5 mm"
+  ],
+  [
+   "natahování",
+   "typ H"
+  ],
+  [
+   "průměr háku h 1570 (mm)",
+   "60.0"
+  ],
+  [
+   "provedení s překližka",
+   "bříz multiplex 27 mm"
+  ],
+  [
+   "výška klanic",
+   "",
+   "upřesníme max 2 délky"
+  ],
+  [
+   "přední čelo",
+   "vytažené po vrch natahování"
+  ],
+  [
+   "profil výztuh boky",
+   "UPN 180"
+  ],
+  [
+   "rozteč výztuh podlaha",
+   "ca 500 dle formátů překližky"
+  ],
+  [
+   "profil výztuh podlaha",
+   "jakl 60x60x6"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný/průměr",
+   "40 mm",
+   "50 mm"
+  ],
+  [
+   "uvazovací prvky",
+   "dořešit (zboku, zapuštěné)"
+  ]
+ ],
+ "ABR-AFO": [],
+ "ABR-TH": [
+  [
+   "ABRTH",
+   "standard",
+   "opce"
+  ],
+  [
+   "rozměry"
+  ],
+  [
+   "délka",
+   "5500/6000/6500"
+  ],
+  [
+   "šířka vnější",
+   "2500 mm",
+   "Martin upřesní dle formátů"
+  ],
+  [
+   "výška vnitřní mm",
+   "1400 mm",
+   "Martin upřesní dle formátů"
+  ],
+  [
+   "provedení",
+   "4/4 st 52"
+  ],
+  [
+   "natahování",
+   "typ H"
+  ],
+  [
+   "průměr háku h 1570 (mm)",
+   "60.0"
+  ],
+  [
+   "napojení podlahaxbočnice",
+   "90°/s vnitřní šikminou"
+  ],
+  [
+   "profil výztuh podlaha",
+   "U 100x60x4"
+  ],
+  [
+   "mezivýztuha IPN x podlaha",
+   "ano"
+  ],
+  [
+   "jištění C v lyžině",
+   "ano",
+   "ne"
+  ],
+  [
+   "zadní trámec",
+   "UPN 180"
+  ],
+  [
+   "rolny 2 ks délka 300 mm",
+   "tr 159x8"
+  ],
+  [
+   "čep rolen mazaný",
+   "průměr 40 mm",
+   "průměr 50 mm"
+  ],
+  [
+   "žebřík",
+   "ano/vlevo ve směru jízdy sklápěcí"
+  ],
+  [
+   "horní víka",
+   "ocelové, 6-8 ks dle délky (použít se starší dokumentace)"
+  ],
+  [
+   "přepážka",
+   "1 komorové",
+   "2 komorový (50/50)"
+  ],
+  [
+   "zadní klapka",
+   "hranatá s 1 nebo 2 menšími otvory/velká klapka otevíratelná pneu válcem"
+  ]
+ ]
+}
