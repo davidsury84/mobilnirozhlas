@@ -1078,6 +1078,11 @@ function mount(host) {
     const pk = kod ? vykParseKod(kod) : null;
     const toks = vykNorm(q || '').split(/\s+/).filter(Boolean);
     const segVar = seg => { const s = vykNorm(seg); return [s, s.replace(/_/g, '/'), s.replace(/_/g, '-')]; };
+    // maximum bodů dosažitelné pro TENTO dotaz (bez bonusů za rok/závod) — z něj se počítá % shody;
+    // plný počet = konstruktér hledá kontejner, který už přesně takhle nakreslený v archivu je
+    let maxShoda = 0;
+    if (toks.length) maxShoda += toks.length * 10;
+    if (pk) { if (pk.dims) maxShoda += (pk.plechy ? 53 : 45); if (pk.typ) maxShoda += 25; maxShoda += pk.segs.length * 7; }
     const out = [];
     for (const [fi, list] of S.skupiny) {
       const h = S.hay.get(fi) || '';
@@ -1118,14 +1123,17 @@ function mount(host) {
         if (score < 25) continue;
       }
       if (!pk && !toks.length) continue;
+      const shodaBody = score;   // body čisté shody (před bonusy) — pro výpočet %
       score += Math.min(6, Math.max(0, ((S.roky[fi] || 2012) - 2012) * 0.5));
       if (vykNorm(S.zavody[fi] || '') === 'bruntal') score += 3;
-      out.push([score, fi]);
+      out.push([score, fi, shodaBody]);
     }
     out.sort((a, b) => b[0] - a[0] || (S.roky[b[1]] || 0) - (S.roky[a[1]] || 0));
     const extRank = e => (e === 'pdf' ? 0 : (e === 'xlsx' || e === 'xls') ? 1 : (e === 'dwg' || e === 'dxf') ? 2 : 3);
     const KOD_RE = /ABR[-_ ]?[A-Z]{2,4}-\d{3,4}x\d{3,4}x\d{3,4}[A-Za-z0-9_\-]*/;
-    return out.slice(0, limit || 20).map(([score, fi]) => {
+    return out.slice(0, limit || 20).map(([score, fi, shodaBody]) => {
+      const pct = maxShoda > 0 ? Math.max(0, Math.min(100, Math.round((shodaBody / maxShoda) * 100))) : null;
+      const presne = !!pk && maxShoda > 0 && shodaBody >= maxShoda;   // vše z dotazu sedí → stejný výkres už v archivu je
       const list = (S.skupiny.get(fi) || []).slice();
       list.sort((a, b) => extRank(VYK.soubory[a][3]) - extRank(VYK.soubory[b][3]) || String(VYK.soubory[a][1]).localeCompare(String(VYK.soubory[b][1]), 'cs'));
       const cistKod = k => String(k || '').replace(/[-_ ]?KUSOVN[A-Za-z0-9]*$/i, '').replace(/[-_ ]?V[YÝ]KRES[A-Za-z0-9]*$/i, '').replace(/[-_ ]?ver\d*$/i, '').replace(/[-_]+$/, '');
@@ -1144,6 +1152,7 @@ function mount(host) {
         zavod: S.zavody[fi] || '',
         link: 'https://drive.google.com/drive/folders/' + VYK.slozky[fi][2],
         score: Math.round(score),
+        pct, presne,
         kod: kodNalez,
         soubory: list.slice(0, 14).map(si => ({
           n: VYK.soubory[si][1], typ: VYK.soubory[si][3] || '',
