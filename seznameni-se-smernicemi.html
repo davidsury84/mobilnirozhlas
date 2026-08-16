@@ -235,7 +235,7 @@ table.matrix .grp-l{border-left:2px solid var(--line-strong)}
 .org-viewport{position:relative}
 .org-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--ink-soft);font-size:14px;padding:20px}
 .org-inner{position:relative;min-width:100%;min-height:100%}
-.org-node{position:absolute;width:198px;background:var(--paper);border:1px solid var(--line-strong);border-radius:11px;
+.org-node{position:absolute;width:236px;background:var(--paper);border:1px solid var(--line-strong);border-radius:11px;
   box-shadow:0 1px 3px rgba(15,21,18,.12);padding:9px 10px 11px;z-index:2;cursor:grab;transition:box-shadow .12s,border-color .12s}
 .org-node.moving{cursor:grabbing;box-shadow:0 12px 30px rgba(8,18,12,.22);z-index:5}
 .org-node .obx-grip{height:13px;margin:-2px 0 3px;text-align:center;color:var(--line-strong);font-size:12px;letter-spacing:3px;cursor:grab;line-height:12px;user-select:none}
@@ -244,12 +244,22 @@ table.matrix .grp-l{border-left:2px solid var(--line-strong)}
 .org-node .obx-title{width:100%;border:1px solid transparent;background:transparent;font-family:inherit;font-weight:700;font-size:13.5px;color:var(--ink);padding:4px 5px;border-radius:6px}
 .org-node .obx-title::placeholder{color:var(--ink-soft);font-weight:500}
 .org-node .obx-title:focus{border-color:var(--line-strong);background:#fff;outline:none;cursor:text}
-.org-node .obx-positions{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+/* Vlastní pozice boxu (např. CEO) — podtitulek pod jménem, ne podřízený */
+.org-node .obx-role{width:100%;border:1px solid transparent;background:transparent;font-family:inherit;font-size:11.5px;font-weight:600;color:var(--green-d);padding:1px 6px;border-radius:6px;margin-top:1px}
+.org-node .obx-role::placeholder{color:var(--ink-soft);font-weight:500}
+.org-node .obx-role:focus{border-color:var(--line-strong);background:#fff;outline:none}
+/* Lidé uvnitř boxu (pozice + jméno) — graficky odsazení jako podřízení daného boxu */
+.org-node .obx-subh{display:flex;align-items:center;gap:6px;margin:9px 0 5px;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft)}
+.org-node .obx-subh::after{content:"";flex:1;height:1px;background:var(--line)}
+.org-node .obx-positions{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .org-node .obx-positions:empty{margin-top:0}
-.org-node .obx-pos{display:flex;align-items:center;gap:3px}
-.org-node .obx-pos input{flex:1;min-width:0;border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 6px;font-size:12px;font-family:inherit;color:var(--ink)}
+.org-node .obx-pos{display:flex;align-items:flex-start;gap:3px;position:relative;padding-left:13px}
+.org-node .obx-pos::before{content:"";position:absolute;left:3px;top:-7px;width:8px;height:17px;border-left:1.5px solid rgba(47,125,50,.45);border-bottom:1.5px solid rgba(47,125,50,.45);border-bottom-left-radius:6px}
+.org-node .obx-pos .pin{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;background:var(--green-soft);border-radius:8px;padding:4px 5px}
+.org-node .obx-pos input{width:100%;min-width:0;border:1px solid transparent;background:#fff;border-radius:5px;padding:2px 6px;font-size:11.5px;font-family:inherit;color:var(--ink-soft)}
+.org-node .obx-pos input.nm{font-size:12.5px;font-weight:700;color:var(--ink)}
 .org-node .obx-pos input:focus{border-color:var(--green-2);outline:none}
-.org-node .obx-pos-del{border:none;background:none;color:#b3261e;cursor:pointer;font-size:14px;font-weight:700;line-height:1;padding:0 3px}
+.org-node .obx-pos-del{border:none;background:none;color:#b3261e;cursor:pointer;font-size:14px;font-weight:700;line-height:1;padding:2px 3px;flex:none}
 .org-node .obx-addpos{width:100%;margin-top:6px;border:1px dashed var(--line-strong);background:#fff;color:var(--green-d);border-radius:7px;padding:4px 8px;font-size:12px;font-weight:600;cursor:pointer}
 .org-node .obx-addpos:hover{border-color:var(--green);background:var(--green-soft)}
 .org-node .obx-foot{display:flex;align-items:center;justify-content:flex-start;margin-top:8px;padding:0 3px}
@@ -948,18 +958,20 @@ img.pv-thumb{background:#fff}
               <button class="btn ghost sm" onclick="orgZoomStep(0.1)" title="Přiblížit">+</button>
             </div>
             <button class="btn sm" onclick="orgAddBox()" title="Přidat nový box">+ Přidat box</button>
+            <button class="btn ghost sm" onclick="orgAutoLayout()" title="Přeskládat boxy do úrovní podle vazeb">Uspořádat</button>
             <button class="btn ghost sm" onclick="orgUnlinkAll()" title="Rozpojit všechny vazby (boxy zůstanou)">Rozpojit vazby</button>
             <button class="btn ghost sm" onclick="orgClearBoxes()" title="Smazat všechny boxy">Vyčistit</button>
           </div>
         </div>
-        <p class="muted" style="margin:0 0 12px;font-size:13px">Přidej box a do textového pole napiš, o jakou <strong>sekci</strong> jde. Box <strong>přesuneš tažením</strong>. Zaškrtnutím <strong>„vedoucí"</strong> ho označíš.<br>
+        <p class="muted" style="margin:0 0 12px;font-size:13px">Přidej box a do textového pole napiš <strong>sekci nebo jméno</strong>. Box <strong>přesuneš tažením</strong>. Zaškrtnutím <strong>„vedoucí"</strong> ho označíš.<br>
+          <strong>Podřízené lidi piš rovnou do boxu</strong> tlačítkem <strong>„+ podřízený"</strong> (pozice + jméno) — nemusíš pro každého zakládat vlastní box. Zobrazí se odsazeně pod nadřízeným. Vlastní box zakládej jen pro toho, kdo má sám podřízené.<br>
           <strong>Vazbu vytvoříš</strong> tažením zeleného kolečka (dole na boxu nadřízeného) na box, který mu má být <strong>podřízený</strong> — šipka pak míří shora dolů k podřízenému.<br>
           <strong>Vazbu zrušíš</strong> křížkem: buď na spojnici (najeď na ni myší), nebo v boxu u řádku „podřízeno". Označenou spojnici smaže i klávesa <strong>Delete</strong>. Změny se ukládají hned.</p>
         <div id="orgCanvas" class="org-canvas"></div>
         <div class="org-legend">
           <span><svg width="42" height="12" style="vertical-align:-2px"><defs><marker id="orgArrLg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#aebaad"/></marker></defs><line x1="0" y1="6" x2="34" y2="6" stroke="#aebaad" stroke-width="1.6" marker-end="url(#orgArrLg)"/></svg> šipka míří k <b>podřízenému</b></span>
           <span><b>▲ podřízeno:</b> v boxu ukazuje jeho nadřízeného</span>
-          <span><b>▼ N podřízených</b> = kolik boxů řídí</span>
+          <span><b>▼ N boxů</b> = kolik podřízených boxů řídí (lidé uvnitř boxu se nepočítají)</span>
         </div>
       </div>
     </div>
@@ -5443,10 +5455,26 @@ function orgAddBox(){
 function orgClearBoxes(){ if(!orgBoxes().length) return; if(!confirm('Smazat všechny boxy z plátna?')) return; DB.settings.orgBoxes=[]; save(); renderOrgCanvas(); }
 function orgBoxDelete(id){ const boxes=orgBoxes(); const i=boxes.findIndex(b=>b.id===id); if(i<0) return; boxes.splice(i,1); boxes.forEach(b=>{ if(b.parent===id) b.parent=null; }); save(); renderOrgCanvas(); }
 function orgBoxTitle(id,val){ const b=orgBoxById(id); if(b){ b.title=val; save(); } }   // bez překreslení (aby nezmizel fokus)
+function orgBoxRole(id,val){ const b=orgBoxById(id); if(b){ b.role=val; save(); } }
+/* Jednorázový převod: dřív se vlastní pozice boxu psala jako jediný řádek „pozice" bez jména
+   (např. David Surý → CEO). Ten teď patří do pole „pozice boxu", ne mezi podřízené. */
+function orgMigrateRoles(){
+  if(!DB.settings) DB.settings={};
+  if(DB.settings.orgRoleMig) return;
+  DB.settings.orgRoleMig=1;
+  orgBoxes().forEach(b=>{
+    const ps=Array.isArray(b.positions)?b.positions:[];
+    if(b.role==null && ps.length===1 && !((ps[0].name||'').trim()) && (ps[0].label||'').trim()){
+      b.role=ps[0].label; b.positions=[];
+    }
+  });
+  save();
+}
 function orgBoxSetVed(id,on){ const b=orgBoxById(id); if(b){ b.vedouci=!!on; save(); renderOrgCanvas(); } }
 // Pozice/oblasti pod boxem (např. marketing).
-function orgAddPos(id){ const b=orgBoxById(id); if(!b) return; if(!Array.isArray(b.positions)) b.positions=[]; const p={ id:'p'+uid(), label:'' }; b.positions.push(p); save(); renderOrgCanvas(); const inp=document.querySelector('.org-node[data-id="'+id+'"] .obx-pos[data-pid="'+p.id+'"] input'); if(inp) inp.focus(); }
+function orgAddPos(id){ const b=orgBoxById(id); if(!b) return; if(!Array.isArray(b.positions)) b.positions=[]; const p={ id:'p'+uid(), label:'', name:'' }; b.positions.push(p); save(); renderOrgCanvas(); const inp=document.querySelector('.org-node[data-id="'+id+'"] .obx-pos[data-pid="'+p.id+'"] input.rl'); if(inp) inp.focus(); }
 function orgPosRename(boxId,posId,val){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const p=b.positions.find(x=>x.id===posId); if(p){ p.label=val; save(); } }
+function orgPosName(boxId,posId,val){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const p=b.positions.find(x=>x.id===posId); if(p){ p.name=val; save(); } }
 function orgPosDelete(boxId,posId){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const i=b.positions.findIndex(x=>x.id===posId); if(i>=0){ b.positions.splice(i,1); save(); renderOrgCanvas(); } }
 function orgBoxDescendants(id){ const set=new Set([id]); const st=[id]; const boxes=orgBoxes(); while(st.length){ const c=st.pop(); boxes.forEach(b=>{ if(b.parent===c && !set.has(b.id)){ set.add(b.id); st.push(b.id); } }); } return set; }
 function orgLink(childId,parentId){ if(childId===parentId){ renderOrgCanvas(); return; } const child=orgBoxById(childId); if(!child) return; if(orgBoxDescendants(childId).has(parentId)){ toast('Nelze — vznikla by smyčka.'); renderOrgCanvas(); return; } child.parent=parentId; save(); renderOrgCanvas(); }
@@ -5482,6 +5510,28 @@ function orgUnlink(childId){
   c.parent=null; if(ORG_SEL===childId) ORG_SEL=null;
   save(); renderOrgCanvas(); if(typeof toast==='function') toast('Vazba zrušena');
 }
+/* Přeskládá boxy do úrovní podle vazeb — po přidání lidí do boxů se staré rozmístění může překrývat. */
+function orgAutoLayout(){
+  const boxes=orgBoxes(); if(!boxes.length) return;
+  if(!confirm('Přeskládat boxy podle vazeb? Ruční rozmístění se přepíše.')) return;
+  const byId={}; boxes.forEach(b=>byId[b.id]=b);
+  const cv=document.getElementById('orgCanvas'); const hById={};
+  if(cv) cv.querySelectorAll('.org-node').forEach(n=>{ hById[n.dataset.id]=n.offsetHeight||140; });
+  const depth=b=>{ let d=0, cur=b; const seen=new Set(); while(cur && cur.parent && byId[cur.parent] && !seen.has(cur.id)){ seen.add(cur.id); cur=byId[cur.parent]; d++; } return d; };
+  const lvl={}; boxes.forEach(b=>{ const d=depth(b); (lvl[d]=lvl[d]||[]).push(b); });
+  const W=236, GX=34, GY=60; let y=24;
+  Object.keys(lvl).map(Number).sort((a,b)=>a-b).forEach(k=>{
+    // sourozenci vedle sebe: řadím podle (nové) pozice nadřízeného, pak podle původního x
+    const row=lvl[k].slice().sort((a,b)=>{
+      const pa=(a.parent&&byId[a.parent])?byId[a.parent].x:(a.x||0), pb=(b.parent&&byId[b.parent])?byId[b.parent].x:(b.x||0);
+      return pa===pb ? ((a.x||0)-(b.x||0)) : pa-pb;
+    });
+    let x=24, maxH=0;
+    row.forEach(b=>{ b.x=x; b.y=y; x+=W+GX; maxH=Math.max(maxH, hById[b.id]||140); });
+    y+=maxH+GY;
+  });
+  save(); renderOrgCanvas(); if(typeof toast==='function') toast('Boxy uspořádány');
+}
 function orgUnlinkAll(){
   const withParent=orgBoxes().filter(b=>b.parent);
   if(!withParent.length){ if(typeof toast==='function') toast('Žádné vazby tu nejsou'); return; }
@@ -5490,6 +5540,7 @@ function orgUnlinkAll(){
 }
 function renderOrgCanvas(){
   const cv=document.getElementById("orgCanvas"); if(!cv) return;
+  orgMigrateRoles();
   const boxes=orgBoxes();
   if(!boxes.length){ cv.innerHTML='<div class="org-empty">Zatím žádný box. Klikni na <strong>„+ Přidat box"</strong>, pojmenuj ho a přidej pozice/oblasti.</div>'; return; }
   let maxX=0,maxY=0; boxes.forEach(b=>{ maxX=Math.max(maxX,b.x||0); maxY=Math.max(maxY,b.y||0); });
@@ -5498,10 +5549,18 @@ function renderOrgCanvas(){
   boxes.forEach(b=>{
     const title=(b.title!=null?b.title:(b.label||''));
     const positions=Array.isArray(b.positions)?b.positions:[];
+    // Lidé přímo v boxu: pozice + jméno. Nemusí se tak zakládat vlastní box pro každého člověka.
     let posHtml='';
     positions.forEach(p=>{
-      posHtml+='<div class="obx-pos" data-pid="'+p.id+'"><input placeholder="Pozice / oblast (např. marketing)…" value="'+esc(p.label||'')+'" oninput="orgPosRename(\''+b.id+'\',\''+p.id+'\',this.value)" onpointerdown="event.stopPropagation()"><button class="obx-pos-del" title="Smazat pozici" onpointerdown="event.stopPropagation()" onclick="orgPosDelete(\''+b.id+'\',\''+p.id+'\')">×</button></div>';
+      posHtml+='<div class="obx-pos" data-pid="'+p.id+'">'+
+        '<div class="pin">'+
+          '<input class="rl" placeholder="Pozice (např. obchodní ředitel)…" value="'+esc(p.label||'')+'" oninput="orgPosRename(\''+b.id+'\',\''+p.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+          '<input class="nm" placeholder="Jméno a příjmení…" value="'+esc(p.name||'')+'" oninput="orgPosName(\''+b.id+'\',\''+p.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+        '</div>'+
+        '<button class="obx-pos-del" title="Odebrat tuto osobu / pozici" onpointerdown="event.stopPropagation()" onclick="orgPosDelete(\''+b.id+'\',\''+p.id+'\')">×</button></div>';
     });
+    if(posHtml) posHtml='<div class="obx-subh">Podřízení</div><div class="obx-positions">'+posHtml+'</div>';
+    else posHtml='<div class="obx-positions"></div>';
     // Kdo je komu podřízený musí být čitelné i bez sledování čar: v boxu je jméno nadřízeného a počet podřízených.
     const par=b.parent?orgBoxById(b.parent):null;
     const parName=par?((par.title||par.label||'').trim()||'(box bez názvu)'):'';
@@ -5513,12 +5572,13 @@ function renderOrgCanvas(){
     nodes+='<div class="org-node'+(b.vedouci?' ved':'')+'" data-id="'+b.id+'" style="left:'+(b.x||0)+'px;top:'+(b.y||0)+'px">'+
       '<span class="rm" title="Smazat box" onpointerdown="event.stopPropagation()" onclick="orgBoxDelete(\''+b.id+'\')">×</span>'+
       '<div class="obx-grip" title="Přesunout box">• • •</div>'+
-      '<input class="obx-title" placeholder="Název boxu…" value="'+esc(title)+'" oninput="orgBoxTitle(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
-      '<div class="obx-positions">'+posHtml+'</div>'+
-      '<button class="obx-addpos" onpointerdown="event.stopPropagation()" onclick="orgAddPos(\''+b.id+'\')">+ pozice</button>'+
+      '<input class="obx-title" placeholder="Název boxu / jméno…" value="'+esc(title)+'" oninput="orgBoxTitle(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+      '<input class="obx-role" placeholder="Pozice tohoto boxu (např. CEO)…" value="'+esc(b.role||'')+'" oninput="orgBoxRole(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+      posHtml+
+      '<button class="obx-addpos" onpointerdown="event.stopPropagation()" onclick="orgAddPos(\''+b.id+'\')" title="Přidat podřízeného přímo sem (pozice + jméno)">+ podřízený</button>'+
       parHtml+
       '<div class="obx-foot"><label class="obx-ved" onpointerdown="event.stopPropagation()"><input type="checkbox" '+(b.vedouci?'checked':'')+' onchange="orgBoxSetVed(\''+b.id+'\',this.checked)"> vedoucí</label>'+
-        (kids?'<span class="obx-kids" title="Počet přímo podřízených boxů">▼ '+kids+' '+plural(kids,'podřízený','podřízené','podřízených')+'</span>':'')+'</div>'+
+        (kids?'<span class="obx-kids" title="Počet přímo podřízených boxů">▼ '+kids+' '+plural(kids,'box','boxy','boxů')+'</span>':'')+'</div>'+
       '<span class="obx-handle" title="Táhni odsud na box, který má být TOMUTO boxu podřízený"></span>'+
       '</div>';
   });
