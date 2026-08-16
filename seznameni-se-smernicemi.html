@@ -259,8 +259,26 @@ table.matrix .grp-l{border-left:2px solid var(--line-strong)}
 .org-node:hover .rm{display:block}
 .org-node .obx-handle{position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:15px;height:15px;border-radius:999px;background:var(--green-2);border:2px solid var(--paper);cursor:crosshair;z-index:4;box-shadow:0 1px 2px rgba(0,0,0,.25)}
 .org-node .obx-handle:hover{background:var(--green);transform:translateX(-50%) scale(1.15)}
+/* Řádek „podřízeno komu" + počet podřízených */
+.org-node .obx-parent{display:flex;align-items:center;gap:5px;margin-top:7px;padding:3px 6px;border-radius:7px;background:var(--green-soft);color:var(--green-d);font-size:11.5px;font-weight:600;line-height:1.3}
+.org-node .obx-parent .pnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.org-node .obx-unlink{border:none;background:none;color:#b3261e;cursor:pointer;font-size:14px;font-weight:800;line-height:1;padding:0 2px;flex:none}
+.org-node .obx-unlink:hover{color:#8c1b16}
+.org-node .obx-kids{margin-left:auto;font-size:11px;color:var(--ink-soft);white-space:nowrap}
 .org-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 12px 30px rgba(8,18,12,.3)}
 svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-events:none}
+/* Spojnice: klikatelné, se šipkou k podřízenému a křížkem pro zrušení vazby */
+svg.org-lines .org-link{pointer-events:auto}
+svg.org-lines .org-link .ln{stroke:#aebaad;stroke-width:1.6;marker-end:url(#orgArr)}
+svg.org-lines .org-link .hit{stroke:rgba(0,0,0,0);stroke-width:16;cursor:pointer}
+svg.org-lines .org-link:hover .ln{stroke:var(--green-2);stroke-width:2.4;marker-end:url(#orgArrOn)}
+svg.org-lines .org-link.sel .ln{stroke:#b3261e;stroke-width:2.6;marker-end:url(#orgArrSel)}
+svg.org-lines .org-link .del{display:none;cursor:pointer}
+svg.org-lines .org-link:hover .del,svg.org-lines .org-link.sel .del{display:block}
+svg.org-lines .org-link .del circle{fill:var(--paper);stroke:#b3261e;stroke-width:1.5}
+svg.org-lines .org-link .del path{stroke:#b3261e;stroke-width:1.9;stroke-linecap:round}
+.org-legend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--ink-soft)}
+.org-legend b{color:var(--ink)}
 
 /* ---------- Modal ---------- */
 .overlay{position:fixed;inset:0;background:rgba(28,29,26,.45);display:none;z-index:60;padding:24px;overflow:auto}
@@ -930,11 +948,19 @@ img.pv-thumb{background:#fff}
               <button class="btn ghost sm" onclick="orgZoomStep(0.1)" title="Přiblížit">+</button>
             </div>
             <button class="btn sm" onclick="orgAddBox()" title="Přidat nový box">+ Přidat box</button>
+            <button class="btn ghost sm" onclick="orgUnlinkAll()" title="Rozpojit všechny vazby (boxy zůstanou)">Rozpojit vazby</button>
             <button class="btn ghost sm" onclick="orgClearBoxes()" title="Smazat všechny boxy">Vyčistit</button>
           </div>
         </div>
-        <p class="muted" style="margin:0 0 12px;font-size:13px">Přidej box a do textového pole napiš, o jakou <strong>sekci</strong> jde. Box <strong>přesuneš tažením</strong>. Zaškrtnutím <strong>„vedoucí"</strong> ho označíš. Spojnici vytvoříš tažením <strong>spojovacího bodu</strong> (kolečko dole na boxu) na jiný box. Změny se ukládají hned.</p>
+        <p class="muted" style="margin:0 0 12px;font-size:13px">Přidej box a do textového pole napiš, o jakou <strong>sekci</strong> jde. Box <strong>přesuneš tažením</strong>. Zaškrtnutím <strong>„vedoucí"</strong> ho označíš.<br>
+          <strong>Vazbu vytvoříš</strong> tažením zeleného kolečka (dole na boxu nadřízeného) na box, který mu má být <strong>podřízený</strong> — šipka pak míří shora dolů k podřízenému.<br>
+          <strong>Vazbu zrušíš</strong> křížkem: buď na spojnici (najeď na ni myší), nebo v boxu u řádku „podřízeno". Označenou spojnici smaže i klávesa <strong>Delete</strong>. Změny se ukládají hned.</p>
         <div id="orgCanvas" class="org-canvas"></div>
+        <div class="org-legend">
+          <span><svg width="42" height="12" style="vertical-align:-2px"><defs><marker id="orgArrLg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#aebaad"/></marker></defs><line x1="0" y1="6" x2="34" y2="6" stroke="#aebaad" stroke-width="1.6" marker-end="url(#orgArrLg)"/></svg> šipka míří k <b>podřízenému</b></span>
+          <span><b>▲ podřízeno:</b> v boxu ukazuje jeho nadřízeného</span>
+          <span><b>▼ N podřízených</b> = kolik boxů řídí</span>
+        </div>
       </div>
     </div>
   </section>
@@ -5386,6 +5412,7 @@ function renderOrg(){
 /* ---------- Organizační plátno (drag & drop editor) ---------- */
 let ORG_MODE='table';
 let ORG_ZOOM=1;
+let ORG_SEL=null;   // id podřízeného boxu = označená vazba (klik na spojnici)
 function orgClampZoom(z){ return Math.max(0.4, Math.min(2, Math.round(z*100)/100)); }
 function orgApplyZoom(cv){
   const inner=cv.querySelector('.org-inner'), vp=cv.querySelector('.org-viewport'); if(!inner||!vp) return;
@@ -5423,14 +5450,43 @@ function orgPosRename(boxId,posId,val){ const b=orgBoxById(boxId); if(!b||!Array
 function orgPosDelete(boxId,posId){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const i=b.positions.findIndex(x=>x.id===posId); if(i>=0){ b.positions.splice(i,1); save(); renderOrgCanvas(); } }
 function orgBoxDescendants(id){ const set=new Set([id]); const st=[id]; const boxes=orgBoxes(); while(st.length){ const c=st.pop(); boxes.forEach(b=>{ if(b.parent===c && !set.has(b.id)){ set.add(b.id); st.push(b.id); } }); } return set; }
 function orgLink(childId,parentId){ if(childId===parentId){ renderOrgCanvas(); return; } const child=orgBoxById(childId); if(!child) return; if(orgBoxDescendants(childId).has(parentId)){ toast('Nelze — vznikla by smyčka.'); renderOrgCanvas(); return; } child.parent=parentId; save(); renderOrgCanvas(); }
-function orgElbow(x1,y1,x2,y2){ const my=(y1+y2)/2; return '<path d="M'+x1+' '+y1+' V'+my.toFixed(1)+' H'+x2+' V'+y2+'" fill="none" stroke="#aebaad" stroke-width="1.6"/>'; }
+function orgElbowD(x1,y1,x2,y2){ const my=(y1+y2)/2; return 'M'+x1+' '+y1+' V'+my.toFixed(1)+' H'+x2+' V'+y2; }
+function orgArrowDefs(){
+  const mk=(id,color)=>'<marker id="'+id+'" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="'+color+'"/></marker>';
+  return '<defs>'+mk('orgArr','#aebaad')+mk('orgArrOn','#3f9c46')+mk('orgArrSel','#b3261e')+'</defs>';
+}
+// Vazba = <g class="org-link" data-child>: viditelná čára se šipkou k podřízenému,
+// široká neviditelná „hit" čára pro klik a křížek uprostřed pro zrušení vazby.
 function orgRedrawLines(cv,extra){
   const svg=cv.querySelector('svg.org-lines'); if(!svg) return;
   const byId={}; cv.querySelectorAll('.org-node').forEach(n=>byId[n.dataset.id]=n);
-  let lines=extra||'';
-  orgBoxes().forEach(b=>{ if(b.parent && byId[b.parent] && byId[b.id]){ const p=byId[b.parent], c=byId[b.id];
-    lines+=orgElbow(p.offsetLeft+p.offsetWidth/2, p.offsetTop+p.offsetHeight, c.offsetLeft+c.offsetWidth/2, c.offsetTop); } });
-  svg.innerHTML=lines;
+  let lines=orgArrowDefs();
+  orgBoxes().forEach(b=>{
+    if(!(b.parent && byId[b.parent] && byId[b.id])) return;
+    const p=byId[b.parent], c=byId[b.id];
+    const x1=p.offsetLeft+p.offsetWidth/2, y1=p.offsetTop+p.offsetHeight;
+    const x2=c.offsetLeft+c.offsetWidth/2, y2=c.offsetTop-7;   // konec kousek nad boxem, ať je vidět hrot šipky
+    const d=orgElbowD(x1,y1,x2,y2);
+    const bx=((x1+x2)/2).toFixed(1), by=((y1+y2)/2).toFixed(1);
+    lines+='<g class="org-link'+(ORG_SEL===b.id?' sel':'')+'" data-child="'+b.id+'">'+
+      '<path class="ln" d="'+d+'" fill="none"/>'+
+      '<path class="hit" d="'+d+'" fill="none"><title>Vazba — klikni pro označení, křížkem zrušíš</title></path>'+
+      '<g class="del" transform="translate('+bx+','+by+')"><title>Zrušit vazbu</title>'+
+        '<circle r="9"/><path d="M-3.4 -3.4 L3.4 3.4 M3.4 -3.4 L-3.4 3.4" fill="none"/></g>'+
+      '</g>';
+  });
+  svg.innerHTML=lines+(extra||'');
+}
+function orgUnlink(childId){
+  const c=orgBoxById(childId); if(!c||!c.parent) return;
+  c.parent=null; if(ORG_SEL===childId) ORG_SEL=null;
+  save(); renderOrgCanvas(); if(typeof toast==='function') toast('Vazba zrušena');
+}
+function orgUnlinkAll(){
+  const withParent=orgBoxes().filter(b=>b.parent);
+  if(!withParent.length){ if(typeof toast==='function') toast('Žádné vazby tu nejsou'); return; }
+  if(!confirm('Zrušit všech '+withParent.length+' vazeb? Boxy zůstanou, jen se rozpojí.')) return;
+  withParent.forEach(b=>{ b.parent=null; }); ORG_SEL=null; save(); renderOrgCanvas();
 }
 function renderOrgCanvas(){
   const cv=document.getElementById("orgCanvas"); if(!cv) return;
@@ -5446,14 +5502,24 @@ function renderOrgCanvas(){
     positions.forEach(p=>{
       posHtml+='<div class="obx-pos" data-pid="'+p.id+'"><input placeholder="Pozice / oblast (např. marketing)…" value="'+esc(p.label||'')+'" oninput="orgPosRename(\''+b.id+'\',\''+p.id+'\',this.value)" onpointerdown="event.stopPropagation()"><button class="obx-pos-del" title="Smazat pozici" onpointerdown="event.stopPropagation()" onclick="orgPosDelete(\''+b.id+'\',\''+p.id+'\')">×</button></div>';
     });
+    // Kdo je komu podřízený musí být čitelné i bez sledování čar: v boxu je jméno nadřízeného a počet podřízených.
+    const par=b.parent?orgBoxById(b.parent):null;
+    const parName=par?((par.title||par.label||'').trim()||'(box bez názvu)'):'';
+    const kids=boxes.filter(x=>x.parent===b.id).length;
+    const parHtml=par
+      ? '<div class="obx-parent" title="Nadřízený box — křížkem vazbu zrušíš"><span>▲</span><span class="pnm">podřízeno: '+esc(parName)+'</span>'+
+        '<button class="obx-unlink" title="Zrušit vazbu na nadřízeného" onpointerdown="event.stopPropagation()" onclick="orgUnlink(\''+b.id+'\')">×</button></div>'
+      : '';
     nodes+='<div class="org-node'+(b.vedouci?' ved':'')+'" data-id="'+b.id+'" style="left:'+(b.x||0)+'px;top:'+(b.y||0)+'px">'+
       '<span class="rm" title="Smazat box" onpointerdown="event.stopPropagation()" onclick="orgBoxDelete(\''+b.id+'\')">×</span>'+
       '<div class="obx-grip" title="Přesunout box">• • •</div>'+
       '<input class="obx-title" placeholder="Název boxu…" value="'+esc(title)+'" oninput="orgBoxTitle(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
       '<div class="obx-positions">'+posHtml+'</div>'+
       '<button class="obx-addpos" onpointerdown="event.stopPropagation()" onclick="orgAddPos(\''+b.id+'\')">+ pozice</button>'+
-      '<div class="obx-foot"><label class="obx-ved" onpointerdown="event.stopPropagation()"><input type="checkbox" '+(b.vedouci?'checked':'')+' onchange="orgBoxSetVed(\''+b.id+'\',this.checked)"> vedoucí</label></div>'+
-      '<span class="obx-handle" title="Táhni na jiný box = spojnice (podřízená sekce)"></span>'+
+      parHtml+
+      '<div class="obx-foot"><label class="obx-ved" onpointerdown="event.stopPropagation()"><input type="checkbox" '+(b.vedouci?'checked':'')+' onchange="orgBoxSetVed(\''+b.id+'\',this.checked)"> vedoucí</label>'+
+        (kids?'<span class="obx-kids" title="Počet přímo podřízených boxů">▼ '+kids+' '+plural(kids,'podřízený','podřízené','podřízených')+'</span>':'')+'</div>'+
+      '<span class="obx-handle" title="Táhni odsud na box, který má být TOMUTO boxu podřízený"></span>'+
       '</div>';
   });
   cv.innerHTML='<div class="org-viewport"><div class="org-inner" style="width:'+W+'px;height:'+H+'px"><svg class="org-lines" width="'+W+'" height="'+H+'"></svg>'+nodes+'</div></div>';
@@ -5464,6 +5530,29 @@ function renderOrgCanvas(){
 }
 function orgBindBoxes(cv){
   const inner=cv.querySelector('.org-inner'); if(!inner) return;
+  // Klik na spojnici = označení vazby, klik na křížek (nebo Delete) = zrušení.
+  const svg=cv.querySelector('svg.org-lines');
+  if(svg) svg.addEventListener('click', ev=>{
+    const g=ev.target.closest('.org-link'); if(!g) return;
+    ev.stopPropagation();
+    if(ev.target.closest('.del')){ orgUnlink(g.dataset.child); return; }
+    ORG_SEL = (ORG_SEL===g.dataset.child) ? null : g.dataset.child;
+    orgRedrawLines(cv);
+  });
+  // Klik do prázdna označení zruší.
+  inner.addEventListener('pointerdown', ev=>{
+    if(ORG_SEL && (ev.target===inner || ev.target.classList.contains('org-lines'))){ ORG_SEL=null; orgRedrawLines(cv); }
+  });
+  if(!cv.__keyBound){
+    cv.__keyBound=true;
+    document.addEventListener('keydown', ev=>{
+      if(!ORG_SEL || ORG_MODE!=='canvas') return;
+      const t=ev.target;
+      if(t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
+      if(ev.key==='Delete'||ev.key==='Backspace'){ ev.preventDefault(); orgUnlink(ORG_SEL); }
+      else if(ev.key==='Escape'){ ORG_SEL=null; const c=document.getElementById('orgCanvas'); if(c) orgRedrawLines(c); }
+    });
+  }
   cv.querySelectorAll('.org-node').forEach(node=>{
     const id=node.dataset.id;
     // Přesun boxu tažením (mimo interaktivní prvky).
