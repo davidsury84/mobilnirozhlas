@@ -108,10 +108,12 @@ function mount(host) {
     arr.sort((a, b) => String(a.date).localeCompare(String(b.date))); while (arr.length > 120) arr.shift();
     try { fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} return arr;
   }
-  function computeBilance(nowRows, nowDate, prevRows) {
+  function computeBilance(nowRows, nowDate, prevRows, prevDate) {
     const Z = () => ({ ks: 0, kc: 0 });
+    // POZOR: stav (sklad/dispo/…) je k ránu `nowDate`, ale POHYBY se staly PŘEDCHOZÍ den → flowDate.
     const B = { date: nowDate, items: (nowRows || []).length, stock: Z(), dispo: Z(), onOrder: Z(), reserved: Z(),
-      flow: { received: Z(), dispatched: Z(), newReserved: Z(), newOnOrder: Z() }, hasFlow: !!(prevRows && prevRows.length) };
+      flow: { received: Z(), dispatched: Z(), newReserved: Z(), newOnOrder: Z() }, hasFlow: !!(prevRows && prevRows.length),
+      flowDate: prevDate || null, flowDays: (prevDate && nowDate) ? daysBetween(prevDate, nowDate) : 1 };
     const pm = {}; (prevRows || []).forEach(r => { pm[r.sk + '-' + r.reg] = { stock: r.stock || 0, onOrder: r.onOrder || 0, reserved: r.reserved || 0 }; });
     (nowRows || []).forEach(r => {
       const v = unitVal(r);
@@ -142,13 +144,13 @@ function mount(host) {
   // bootstrap / přepočet bilance z posledních denních souborů (naskočí hned; forceAll = přepiš i existující dny)
   async function bootstrapBilance(xls, newest, parsedNewest, newestDate, forceAll) {
     const recent = xls.slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).slice(-14);
-    let prevRows = null;
+    let prevRows = null, prevDate = null;
     for (const f of recent) {
       let rows, dt;
       if (f.id === newest.id) { rows = parsedNewest.rows; dt = newestDate; }
       else { const dl = await drive.downloadFileBase64(f.id, 20 * 1024 * 1024); rows = parseObjXlsx(Buffer.from(dl.base64, 'base64')).rows; dt = dateOfName(f.name); }
-      if (dt) { const B = computeBilance(rows, dt, prevRows); if (forceAll) { const arr = loadBilance().filter(e => e.date !== dt); arr.push(B); arr.sort((a, b) => String(a.date).localeCompare(String(b.date))); try { fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} } else pushBilance(B); }
-      prevRows = rows;
+      if (dt) { const B = computeBilance(rows, dt, prevRows, prevDate); if (forceAll) { const arr = loadBilance().filter(e => e.date !== dt); arr.push(B); arr.sort((a, b) => String(a.date).localeCompare(String(b.date))); try { fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} } else pushBilance(B); }
+      prevRows = rows; prevDate = dt;
     }
     console.log('[nakup-report] bootstrap bilance z ' + recent.length + ' souborů');
   }
@@ -173,13 +175,13 @@ function mount(host) {
           if (parsedNow && parsedNow.rows) { await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
         } catch (e) { console.warn('[nakup-report] pohyby (skip):', e.message); }
       }
-      if (loadBilance().length === 0 || !st.bilanceFixV2) {
+      if (loadBilance().length === 0 || !st.bilanceFixV3) {
         try {
           let parsedNow = null; try { parsedNow = JSON.parse(fs.readFileSync(OBJ_LIVE, 'utf8')); } catch (_) {}
           if (parsedNow && parsedNow.rows) {
             const force = loadBilance().length > 0;
             await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today, force);
-            st.bilanceFixV2 = 1;
+            st.bilanceFixV3 = 1;
             console.log('[nakup-report] bilance: ' + (force ? 'jednorázový přepočet historie' : 'bootstrap') + ' z denních souborů');
           }
         } catch (e) { console.warn('[nakup-report] bilance (skip):', e.message); }
@@ -200,13 +202,13 @@ function mount(host) {
       try {
         const prevForFlow = (prev && prev.rows && prev.date && prev.date !== dataDate) ? prev.rows : null;
         if (loadBilance().length === 0) await bootstrapBilance(xls, newest, parsed, dataDate);
-        else if (!st.bilanceFixV2) { await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV2 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů'); }
-        else pushBilance(computeBilance(parsed.rows, dataDate, prevForFlow));
+        else if (!st.bilanceFixV3) { await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV3 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů'); }
+        else pushBilance(computeBilance(parsed.rows, dataDate, prevForFlow, (prev && prev.date) || null));
       } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
       fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder, reserved: r.reserved })) }));
     } catch (e) { console.warn('[nakup-report] pohyby:', e.message); }
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));
-    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV2: st.bilanceFixV2 || 0 };
+    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV3: st.bilanceFixV3 || 0 };
     try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
     console.log('[nakup-report] Drive sync: ' + newest.name + ' → ' + parsed.rows.length + ' položek');
     return { ok: true, file: newest.name, rows: parsed.rows.length };
@@ -251,7 +253,7 @@ function mount(host) {
       objednavkyTo: Array.isArray(c.objednavkyTo) ? c.objednavkyTo : ['jan.benicek@elkoplast.cz', 'michaela.lizancova@elkoplast.cz', 'david.sury@elkoplast.cz', 'hana.faltynkova@elkoplast.cz'],
       objednavkyEnabled: c.objednavkyEnabled !== undefined ? !!c.objednavkyEnabled : false, // ZATÍM VYPNUTO (uživatel: „zatím nic neposílej")
       objednavkyDay: (c.objednavkyDay >= 0 && c.objednavkyDay <= 6) ? c.objednavkyDay : 1,
-      objednavkyEvery: (c.objednavkyEvery === 1 || c.objednavkyEvery === 2) ? c.objednavkyEvery : 1, // „Co objednat" = týdně
+      objednavkyEvery: (c.objednavkyEvery === 1 || c.objednavkyEvery === 2) ? c.objednavkyEvery : 2, // „Co objednat" = 1× za 14 dní
       // ranní bilance skladu (denně) — příjemci editovatelní správcem
       bilanceTo: Array.isArray(c.bilanceTo) ? c.bilanceTo : DEF_PU.slice(),
       bilanceEnabled: c.bilanceEnabled !== undefined ? !!c.bilanceEnabled : false, // VÝCHOZÍ VYPNUTO
@@ -461,7 +463,7 @@ function mount(host) {
     if (L.hasFlow) {
       const fl = (lbl, o) => '<b>' + lbl + ':</b> ' + kc(o.kc) + ' <span style="color:#8a938a">(' + fmt(o.ks) + ' ks)</span>';
       body += '<div style="background:#f2f6ef;border:1px solid #dbe6d6;border-radius:9px;padding:12px 14px;margin:0 0 14px;font-size:13.5px;line-height:1.7">' +
-        '📦 <b>Předchozí den (' + esc(L.date) + ')</b><br>' +
+        '📦 <b>Pohyby za ' + esc(L.flowDate || L.date) + '</b>' + ((L.flowDays || 1) > 1 ? (' <span style="color:#8a938a">(' + L.flowDays + ' dny)</span>') : '') + '<br>' +
         '<span style="color:#2f7d32">▸ Odbyt:</span> ' + fl('Výdej ze skladu (≈ prodej)', f.dispatched) + ' &nbsp;·&nbsp; ' + fl('Nové rezervace zákazníků', f.newReserved) + '<br>' +
         '<span style="color:#2f6f8f">▸ Zásobování:</span> ' + fl('Příjem dodávek na sklad', f.received) + ' &nbsp;·&nbsp; ' + fl('Nově objednáno u dodavatelů', f.newOnOrder) + '</div>';
     }
@@ -503,6 +505,14 @@ function mount(host) {
 
   // ---------- plánovač (týdně, pojistka 1×/ISO-týden) ----------
   function isoWeek(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - day + 3); const f = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)); const wk = 1 + Math.round(((t - f) / 86400000 - 3 + ((f.getUTCDay() + 6) % 7)) / 7); return t.getUTCFullYear() + '-W' + String(wk).padStart(2, '0'); }
+  // Jednorázové zapnutí rozesílek (výslovný pokyn správce 2026-08-16). Poté už se řídí nastavením v „Rozesílky".
+  function activateReportsOnce(st) {
+    if (st.reportsActivatedV1) return false;
+    const c = loadCfg(); c.enabled = true; c.objednavkyEnabled = true; c.bilanceEnabled = true; saveCfg(c);
+    st.reportsActivatedV1 = 1;
+    console.log('[nakup-report] rozesílky jednorázově ZAPNUTY (co objednat, co zlevnit, ranní bilance)');
+    return true;
+  }
   async function tick() {
     // 1) DENNÍ stažení nejnovějšího souboru z Drive (běží nezávisle na e-mailech)
     try { const s = await syncObjednavky(false); if (s && !s.ok && !s.skipped) console.warn('[nakup-report] Drive sync neproběhl:', s.error); } catch (e) { console.error('[nakup-report] Drive sync:', e.message); }
@@ -510,9 +520,9 @@ function mount(host) {
     // 2) E-mailové reporty dle configu
     try {
       const dis = (k) => host.reportDisabled && host.reportDisabled(k);   // zrušeno v přehledu Rozesílky
-      const cfg = loadCfg(); const now = new Date();
       let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
-      let changed = false;
+      let changed = activateReportsOnce(st);
+      const cfg = loadCfg(); const now = new Date();
       // Objednávkový report — 1× týdně (od zvoleného dne, pojistka 1×/ISO-týden)
       if (cfg.objednavkyEnabled && !dis('objednavky') && now.getDay() >= cfg.objednavkyDay) {
         const wk = isoWeek(now);
@@ -559,7 +569,7 @@ function mount(host) {
     if (p === '/api/nakup-report/bilance' && req.method === 'GET') {
       if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
       const arr = loadBilance(); const latest = arr[arr.length - 1] || null; const prev = arr[arr.length - 2] || null;
-      const trend = arr.slice(-30).map(e => ({ date: e.date, stockKc: e.stock.kc, onOrderKc: e.onOrder.kc, reservedKc: e.reserved.kc, dispoKc: e.dispo.kc, dispatchedKc: (e.flow && e.flow.dispatched) ? e.flow.dispatched.kc : 0 }));
+      const trend = arr.slice(-30).map(e => ({ date: e.date, flowDate: e.flowDate || null, stockKc: e.stock.kc, onOrderKc: e.onOrder.kc, reservedKc: e.reserved.kc, dispoKc: e.dispo.kc, dispatchedKc: (e.flow && e.flow.dispatched) ? e.flow.dispatched.kc : 0 }));
       const wkEntries = arr.filter(e => e.hasFlow).slice(-7);
       const week = latest ? { days: wkEntries.length, flow: sumFlows(wkEntries) } : null;
       const dayDelta = (latest && prev) ? dayDeltas(latest, prev) : null;
@@ -575,7 +585,7 @@ function mount(host) {
       Object.keys(mv).forEach(k => { (mv[k].hist || []).forEach(h => { if (!(h.v > 0)) return;
         itemsPerDay[h.d] = (itemsPerDay[h.d] || 0) + 1;
         const t = agg[k] || (agg[k] = { ks: 0, dny: 0 }); t.ks += h.v; t.dny++; }); });
-      const days = bal.map(e => ({ date: e.date, dispKc: e.flow.dispatched.kc, dispKs: e.flow.dispatched.ks,
+      const days = bal.map(e => ({ date: e.flowDate || e.date, souborDate: e.date, dny: e.flowDays || 1, dispKc: e.flow.dispatched.kc, dispKs: e.flow.dispatched.ks,
         recvKc: e.flow.received.kc, resKc: e.flow.newReserved.kc, ordKc: e.flow.newOnOrder.kc,
         stockKc: e.stock.kc, polozek: itemsPerDay[e.date] || 0 }));
       // týdny (ISO)
