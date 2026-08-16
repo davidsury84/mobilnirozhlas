@@ -258,6 +258,11 @@ table.matrix .grp-l{border-left:2px solid var(--line-strong)}
 .org-node .obx-pos .pin{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;background:var(--green-soft);border-radius:8px;padding:4px 5px}
 .org-node .obx-pos input{width:100%;min-width:0;border:1px solid transparent;background:#fff;border-radius:5px;padding:2px 6px;font-size:11.5px;font-family:inherit;color:var(--ink-soft)}
 .org-node .obx-pos input.nm{font-size:12.5px;font-weight:700;color:var(--ink)}
+/* Odznak propojení se zaměstnancem (✓ = najde se v DB) */
+.org-node .nmrow{display:flex;align-items:center;gap:3px}
+.org-node .nmrow input{flex:1;min-width:0}
+.org-node .obx-db{flex:none;width:13px;text-align:center;font-size:11px;font-weight:800;color:var(--line-strong);cursor:default;line-height:1}
+.org-node .obx-db.ok{color:var(--green-2)}
 .org-node .obx-pos input:focus{border-color:var(--green-2);outline:none}
 .org-node .obx-pos-del{border:none;background:none;color:#b3261e;cursor:pointer;font-size:14px;font-weight:700;line-height:1;padding:2px 3px;flex:none}
 .org-node .obx-addpos{width:100%;margin-top:6px;border:1px dashed var(--line-strong);background:#fff;color:var(--green-d);border-radius:7px;padding:4px 8px;font-size:12px;font-weight:600;cursor:pointer}
@@ -287,6 +292,12 @@ svg.org-lines .org-link .del{display:none;cursor:pointer}
 svg.org-lines .org-link:hover .del,svg.org-lines .org-link.sel .del{display:block}
 svg.org-lines .org-link .del circle{fill:var(--paper);stroke:#b3261e;stroke-width:1.5}
 svg.org-lines .org-link .del path{stroke:#b3261e;stroke-width:1.9;stroke-linecap:round}
+/* Našeptávač zaměstnanců nad plátnem */
+.org-ac{background:var(--paper);border:1px solid var(--line-strong);border-radius:11px;box-shadow:0 14px 34px rgba(8,18,12,.22);padding:5px;max-height:290px;overflow:auto}
+.org-ac button{display:block;width:100%;text-align:left;border:none;background:none;padding:6px 9px;border-radius:8px;cursor:pointer;font-family:inherit}
+.org-ac button:hover{background:var(--green-soft)}
+.org-ac b{display:block;font-size:13px;font-weight:700;color:var(--ink);line-height:1.25}
+.org-ac span{display:block;font-size:11.5px;color:var(--ink-soft);line-height:1.25;margin-top:1px}
 .org-legend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--ink-soft)}
 .org-legend b{color:var(--ink)}
 
@@ -958,6 +969,7 @@ img.pv-thumb{background:#fff}
               <button class="btn ghost sm" onclick="orgZoomStep(0.1)" title="Přiblížit">+</button>
             </div>
             <button class="btn sm" onclick="orgAddBox()" title="Přidat nový box">+ Přidat box</button>
+            <button class="btn sm" onclick="orgSyncEmployees()" title="Nastavit nadřízené a pozice u zaměstnanců podle schématu">↧ Promítnout do zaměstnanců</button>
             <button class="btn ghost sm" onclick="orgAutoLayout()" title="Přeskládat boxy do úrovní podle vazeb">Uspořádat</button>
             <button class="btn ghost sm" onclick="orgUnlinkAll()" title="Rozpojit všechny vazby (boxy zůstanou)">Rozpojit vazby</button>
             <button class="btn ghost sm" onclick="orgClearBoxes()" title="Smazat všechny boxy">Vyčistit</button>
@@ -966,7 +978,8 @@ img.pv-thumb{background:#fff}
         <p class="muted" style="margin:0 0 12px;font-size:13px">Přidej box a do textového pole napiš <strong>sekci nebo jméno</strong>. Box <strong>přesuneš tažením</strong>. Zaškrtnutím <strong>„vedoucí"</strong> ho označíš.<br>
           <strong>Podřízené lidi piš rovnou do boxu</strong> tlačítkem <strong>„+ podřízený"</strong> (pozice + jméno) — nemusíš pro každého zakládat vlastní box. Zobrazí se odsazeně pod nadřízeným. Vlastní box zakládej jen pro toho, kdo má sám podřízené.<br>
           <strong>Vazbu vytvoříš</strong> tažením zeleného kolečka (dole na boxu nadřízeného) na box, který mu má být <strong>podřízený</strong> — šipka pak míří shora dolů k podřízenému.<br>
-          <strong>Vazbu zrušíš</strong> křížkem: buď na spojnici (najeď na ni myší), nebo v boxu u řádku „podřízeno". Označenou spojnici smaže i klávesa <strong>Delete</strong>. Změny se ukládají hned.</p>
+          <strong>Vazbu zrušíš</strong> křížkem: buď na spojnici (najeď na ni myší), nebo v boxu u řádku „podřízeno". Označenou spojnici smaže i klávesa <strong>Delete</strong>. Změny se ukládají hned.<br>
+          <strong>Jména se vybírají z databáze zaměstnanců</strong> (začni psát a nabídne se seznam) — propojený člověk má u jména zelenou ✓ a doplní se mu pozice. Tlačítkem <strong>„↧ Promítnout do zaměstnanců"</strong> pak schéma nastaví skutečné <strong>nadřízené</strong> (podle nich se schvaluje dovolená) a pozice v kartách zaměstnanců.</p>
         <div id="orgCanvas" class="org-canvas"></div>
         <div class="org-legend">
           <span><svg width="42" height="12" style="vertical-align:-2px"><defs><marker id="orgArrLg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#aebaad"/></marker></defs><line x1="0" y1="6" x2="34" y2="6" stroke="#aebaad" stroke-width="1.6" marker-end="url(#orgArrLg)"/></svg> šipka míří k <b>podřízenému</b></span>
@@ -5454,7 +5467,73 @@ function orgAddBox(){
 }
 function orgClearBoxes(){ if(!orgBoxes().length) return; if(!confirm('Smazat všechny boxy z plátna?')) return; DB.settings.orgBoxes=[]; save(); renderOrgCanvas(); }
 function orgBoxDelete(id){ const boxes=orgBoxes(); const i=boxes.findIndex(b=>b.id===id); if(i<0) return; boxes.splice(i,1); boxes.forEach(b=>{ if(b.parent===id) b.parent=null; }); save(); renderOrgCanvas(); }
-function orgBoxTitle(id,val){ const b=orgBoxById(id); if(b){ b.title=val; save(); } }   // bez překreslení (aby nezmizel fokus)
+/* ---- Napojení plátna na databázi zaměstnanců ----
+   Jméno v boxu i u podřízeného se dá vybrat z DB (datalist). Když sedí, uloží se empId
+   a schéma pak umí promítnout nadřízené zpět do zaměstnanců (schvalování dovolené). */
+function orgEmpFind(val){
+  const s=(val||'').trim().toLowerCase(); if(!s) return null;
+  const em=(DB.employees||[]);
+  return em.find(e=>(e.name||'').trim().toLowerCase()===s) || em.find(e=>(e.email||'').trim().toLowerCase()===s) || null;
+}
+function orgEmpById(id){ return (DB.employees||[]).find(e=>e.id===id)||null; }
+// Zaměstnanec boxu / řádku: buď uložené empId, nebo shoda podle jména (funguje i pro schémata psaná dřív ručně).
+function orgBoxEmp(b){ if(!b) return null; return (b.empId?orgEmpById(b.empId):null) || orgEmpFind(b.title!=null?b.title:(b.label||'')); }
+function orgPosEmp(p){ if(!p) return null; return (p.empId?orgEmpById(p.empId):null) || orgEmpFind(p.name||''); }
+/* Našeptávač zaměstnanců — vlastní rozbalovací seznam (nabídne se hned při kliknutí i při psaní). */
+let ORG_AC=null;
+function orgAcClose(){ if(ORG_AC){ ORG_AC.remove(); ORG_AC=null; } }
+function orgAcOpen(inp,boxId,posId){
+  orgAcClose();
+  const q=(inp.value||'').trim().toLowerCase();
+  let list=(DB.employees||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','cs'));
+  if(q) list=list.filter(e=>(((e.name||'')+' '+(e.email||'')+' '+(e.pozice||'')+' '+(e.stredisko||'')).toLowerCase()).indexOf(q)>=0);
+  list=list.slice(0,9);
+  if(!list.length) return;
+  const r=inp.getBoundingClientRect();
+  const d=document.createElement('div');
+  d.className='org-ac';
+  const w=Math.max(240,r.width);
+  const left=Math.min(r.left, window.innerWidth-w-12);
+  const below=(window.innerHeight-r.bottom)>200;
+  d.style.cssText='position:fixed;z-index:9999;left:'+Math.max(6,left)+'px;width:'+w+'px;'+(below?('top:'+(r.bottom+3)+'px'):('bottom:'+(window.innerHeight-r.top+3)+'px'));
+  d.innerHTML=list.map(e=>'<button type="button"><b>'+esc(e.name||e.email||'')+'</b><span>'+esc([e.pozice,e.stredisko,e.email].filter(Boolean).join(' · ')||'bez pozice')+'</span></button>').join('');
+  document.body.appendChild(d); ORG_AC=d;
+  d.querySelectorAll('button').forEach((btn,i)=>{
+    // pointerdown + preventDefault → pole neztratí fokus dřív, než se hodnota převezme
+    btn.addEventListener('pointerdown',ev=>{
+      ev.preventDefault(); ev.stopPropagation();
+      const e=list[i]; inp.value=e.name||e.email||'';
+      if(posId) orgPosName(boxId,posId,inp.value); else orgBoxTitle(boxId,inp.value);
+      orgAcClose(); renderOrgCanvas();
+    });
+  });
+}
+if(!window.__orgAcBound){
+  window.__orgAcBound=true;
+  document.addEventListener('pointerdown',e=>{ if(ORG_AC && !e.target.closest('.org-ac') && !e.target.closest('.obx-title') && !e.target.closest('input.nm')) orgAcClose(); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') orgAcClose(); });
+  window.addEventListener('scroll',()=>orgAcClose(),true);
+  window.addEventListener('resize',()=>orgAcClose());
+}
+// Odznak „propojeno s DB" — překresluje se bez re-renderu, aby nezmizel fokus v poli.
+function orgLinkBadge(emp,cls,hideEmpty){
+  const c='obx-db'+(cls?' '+cls:'')+(emp?' ok':'');
+  if(!emp && hideEmpty) return '<span class="'+c+'" style="visibility:hidden">•</span>';
+  return emp ? '<span class="'+c+'" title="Propojeno se zaměstnancem: '+esc(emp.email||emp.name||'')+'">✓</span>'
+             : '<span class="'+c+'" title="Není v databázi zaměstnanců — uloží se jen jako text">•</span>';
+}
+function orgBadgeRefresh(sel,emp,cls,hideEmpty){ const el=document.querySelector(sel); if(el) el.outerHTML=orgLinkBadge(emp,cls,hideEmpty); }
+function orgBoxTitle(id,val){
+  const b=orgBoxById(id); if(!b) return;
+  b.title=val;
+  const emp=orgEmpFind(val); b.empId=emp?emp.id:null;
+  if(emp && !((b.role||'').trim()) && (emp.pozice||'').trim()){
+    b.role=emp.pozice;
+    const r=document.querySelector('.org-node[data-id="'+id+'"] .obx-role'); if(r && !r.value) r.value=emp.pozice;
+  }
+  orgBadgeRefresh('.org-node[data-id="'+id+'"] .obx-db-title', emp, 'obx-db-title', true);
+  save();
+}   // bez překreslení (aby nezmizel fokus)
 function orgBoxRole(id,val){ const b=orgBoxById(id); if(b){ b.role=val; save(); } }
 /* Jednorázový převod: dřív se vlastní pozice boxu psala jako jediný řádek „pozice" bez jména
    (např. David Surý → CEO). Ten teď patří do pole „pozice boxu", ne mezi podřízené. */
@@ -5474,7 +5553,47 @@ function orgBoxSetVed(id,on){ const b=orgBoxById(id); if(b){ b.vedouci=!!on; sav
 // Pozice/oblasti pod boxem (např. marketing).
 function orgAddPos(id){ const b=orgBoxById(id); if(!b) return; if(!Array.isArray(b.positions)) b.positions=[]; const p={ id:'p'+uid(), label:'', name:'' }; b.positions.push(p); save(); renderOrgCanvas(); const inp=document.querySelector('.org-node[data-id="'+id+'"] .obx-pos[data-pid="'+p.id+'"] input.rl'); if(inp) inp.focus(); }
 function orgPosRename(boxId,posId,val){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const p=b.positions.find(x=>x.id===posId); if(p){ p.label=val; save(); } }
-function orgPosName(boxId,posId,val){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const p=b.positions.find(x=>x.id===posId); if(p){ p.name=val; save(); } }
+function orgPosName(boxId,posId,val){
+  const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return;
+  const p=b.positions.find(x=>x.id===posId); if(!p) return;
+  p.name=val;
+  const emp=orgEmpFind(val); p.empId=emp?emp.id:null;
+  if(emp && !((p.label||'').trim()) && (emp.pozice||'').trim()){
+    p.label=emp.pozice;
+    const rl=document.querySelector('.org-node[data-id="'+boxId+'"] .obx-pos[data-pid="'+posId+'"] input.rl'); if(rl && !rl.value) rl.value=emp.pozice;
+  }
+  orgBadgeRefresh('.org-node[data-id="'+boxId+'"] .obx-pos[data-pid="'+posId+'"] .obx-db', emp);
+  save();
+}
+/* Promítnutí schématu do databáze zaměstnanců: nastaví nadřízené (a pozice) podle plátna.
+   Nadřízený = nejbližší předek v hierarchii, který je propojený se zaměstnancem. */
+function orgSyncEmployees(){
+  const boxes=orgBoxes(); const byId={}; boxes.forEach(b=>byId[b.id]=b);
+  const boxOwner=b=>{ let cur=b; const seen=new Set(); while(cur && !seen.has(cur.id)){ seen.add(cur.id); const e=orgBoxEmp(cur); if(e) return e.id; cur=cur.parent?byId[cur.parent]:null; } return null; };
+  const zmenyMgr=[], zmenyPoz=[];
+  const plan=(empId,mgrId,pozice)=>{
+    const e=orgEmpById(empId); if(!e) return;
+    if(mgrId && mgrId!==empId && e.managerId!==mgrId){ const m=orgEmpById(mgrId); zmenyMgr.push({e,mgrId,txt:(e.name||e.email)+' → '+(m?(m.name||m.email):'?')}); }
+    if(pozice && (pozice||'').trim() && (e.pozice||'')!==pozice.trim()) zmenyPoz.push({e,pozice:pozice.trim(),txt:(e.name||e.email)+': '+pozice.trim()});
+  };
+  boxes.forEach(b=>{
+    // lidé zapsaní přímo v boxu → nadřízený je majitel boxu (nebo nejbližší propojený předek)
+    (Array.isArray(b.positions)?b.positions:[]).forEach(p=>{ const pe=orgPosEmp(p); if(pe) plan(pe.id, boxOwner(b), p.label); });
+    // propojený box → nadřízený je nejbližší propojený předek nad ním
+    const be=orgBoxEmp(b); if(be && b.parent && byId[b.parent]) plan(be.id, boxOwner(byId[b.parent]), b.role);
+  });
+  if(!zmenyMgr.length && !zmenyPoz.length){ toast('Není co promítnout — nic se nemění.'); return; }
+  const ukazka=a=>a.slice(0,6).map(x=>'• '+x.txt).join('\n')+(a.length>6?'\n• … a další ('+(a.length-6)+')':'');
+  let msg='Promítnout schéma do databáze zaměstnanců?\n\n';
+  if(zmenyMgr.length) msg+='Nadřízený se nastaví u '+zmenyMgr.length+' lidí:\n'+ukazka(zmenyMgr)+'\n\n';
+  if(zmenyPoz.length) msg+='Pozice se doplní u '+zmenyPoz.length+' lidí:\n'+ukazka(zmenyPoz)+'\n\n';
+  msg+='Stávající nastavení u těchto lidí se přepíše.';
+  if(!confirm(msg)) return;
+  zmenyMgr.forEach(z=>{ z.e.managerId=z.mgrId; const m=orgEmpById(z.mgrId); if(m) m.vedouci=true; });
+  zmenyPoz.forEach(z=>{ z.e.pozice=z.pozice; });
+  save(); renderOrg();
+  toast('Hotovo — nadřízených: '+zmenyMgr.length+', pozic: '+zmenyPoz.length);
+}
 function orgPosDelete(boxId,posId){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const i=b.positions.findIndex(x=>x.id===posId); if(i>=0){ b.positions.splice(i,1); save(); renderOrgCanvas(); } }
 function orgBoxDescendants(id){ const set=new Set([id]); const st=[id]; const boxes=orgBoxes(); while(st.length){ const c=st.pop(); boxes.forEach(b=>{ if(b.parent===c && !set.has(b.id)){ set.add(b.id); st.push(b.id); } }); } return set; }
 function orgLink(childId,parentId){ if(childId===parentId){ renderOrgCanvas(); return; } const child=orgBoxById(childId); if(!child) return; if(orgBoxDescendants(childId).has(parentId)){ toast('Nelze — vznikla by smyčka.'); renderOrgCanvas(); return; } child.parent=parentId; save(); renderOrgCanvas(); }
@@ -5548,14 +5667,18 @@ function renderOrgCanvas(){
   let nodes='';
   boxes.forEach(b=>{
     const title=(b.title!=null?b.title:(b.label||''));
+    const bemp=orgBoxEmp(b);
     const positions=Array.isArray(b.positions)?b.positions:[];
     // Lidé přímo v boxu: pozice + jméno. Nemusí se tak zakládat vlastní box pro každého člověka.
     let posHtml='';
     positions.forEach(p=>{
+      const pemp=orgPosEmp(p);
       posHtml+='<div class="obx-pos" data-pid="'+p.id+'">'+
         '<div class="pin">'+
           '<input class="rl" placeholder="Pozice (např. obchodní ředitel)…" value="'+esc(p.label||'')+'" oninput="orgPosRename(\''+b.id+'\',\''+p.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
-          '<input class="nm" placeholder="Jméno a příjmení…" value="'+esc(p.name||'')+'" oninput="orgPosName(\''+b.id+'\',\''+p.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+          '<div class="nmrow"><input class="nm" placeholder="Jméno — vyber ze zaměstnanců…" value="'+esc(p.name||'')+'" autocomplete="off" '+
+            'oninput="orgPosName(\''+b.id+'\',\''+p.id+'\',this.value);orgAcOpen(this,\''+b.id+'\',\''+p.id+'\')" '+
+            'onfocus="orgAcOpen(this,\''+b.id+'\',\''+p.id+'\')" onpointerdown="event.stopPropagation()">'+orgLinkBadge(pemp)+'</div>'+
         '</div>'+
         '<button class="obx-pos-del" title="Odebrat tuto osobu / pozici" onpointerdown="event.stopPropagation()" onclick="orgPosDelete(\''+b.id+'\',\''+p.id+'\')">×</button></div>';
     });
@@ -5572,7 +5695,9 @@ function renderOrgCanvas(){
     nodes+='<div class="org-node'+(b.vedouci?' ved':'')+'" data-id="'+b.id+'" style="left:'+(b.x||0)+'px;top:'+(b.y||0)+'px">'+
       '<span class="rm" title="Smazat box" onpointerdown="event.stopPropagation()" onclick="orgBoxDelete(\''+b.id+'\')">×</span>'+
       '<div class="obx-grip" title="Přesunout box">• • •</div>'+
-      '<input class="obx-title" placeholder="Název boxu / jméno…" value="'+esc(title)+'" oninput="orgBoxTitle(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
+      '<div class="nmrow"><input class="obx-title" placeholder="Sekce nebo jméno ze zaměstnanců…" value="'+esc(title)+'" autocomplete="off" '+
+        'oninput="orgBoxTitle(\''+b.id+'\',this.value);orgAcOpen(this,\''+b.id+'\',\'\')" onfocus="orgAcOpen(this,\''+b.id+'\',\'\')" onpointerdown="event.stopPropagation()">'+
+        orgLinkBadge(bemp,'obx-db-title',true)+'</div>'+
       '<input class="obx-role" placeholder="Pozice tohoto boxu (např. CEO)…" value="'+esc(b.role||'')+'" oninput="orgBoxRole(\''+b.id+'\',this.value)" onpointerdown="event.stopPropagation()">'+
       posHtml+
       '<button class="obx-addpos" onpointerdown="event.stopPropagation()" onclick="orgAddPos(\''+b.id+'\')" title="Přidat podřízeného přímo sem (pozice + jméno)">+ podřízený</button>'+
