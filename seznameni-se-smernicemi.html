@@ -89,8 +89,11 @@ nav.tabs button{
   padding:8px 14px;border-radius:9px;font-weight:600;font-size:13.5px;transition:.16s;letter-spacing:-.01em;
 }
 nav.tabs button:hover{background:var(--bg-2);color:var(--ink)}
-#intraLang{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:10px;padding:7px 8px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;outline:none}
-#intraLang:hover{border-color:var(--green)}
+#intraLang{display:flex;gap:3px;align-items:center;margin-right:6px}
+#intraLang button{border:1px solid transparent;background:none;border-radius:7px;padding:4px 5px;cursor:pointer;line-height:0;opacity:.55;transition:opacity .12s,border-color .12s,background .12s}
+#intraLang button:hover{opacity:1}
+#intraLang button.on{opacity:1;border-color:var(--green);background:var(--green-soft)}
+#intraLang svg{width:21px;height:14px;border-radius:2.5px;display:block;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
 nav.tabs button.active{background:var(--green-soft);color:var(--green-d);box-shadow:none;font-weight:700}
 
 main{max-width:1180px;margin:0 auto;padding:28px 22px 80px}
@@ -1161,7 +1164,7 @@ img.pv-thumb{background:#fff}
         <div class="logo">✓</div>
         <div><h1>intranet</h1><small id="mujWho">Intranet pro zaměstnance</small></div>
       </div>
-      <nav class="tabs"><select id="intraLang" class="no-print" title="Jazyk / Language" aria-label="Jazyk / Language" onchange="mjLangSet(this.value)"><option value="cz">CZ</option><option value="en">EN</option><option value="de">DE</option><option value="pl">PL</option><option value="ua">UA</option><option value="ro">RO</option></select><button id="mujAdmin" style="display:none" onclick="location.href='/admin'">Správa</button><button id="mujLogout" style="display:none" onclick="location.href='/auth/logout'">Odhlásit</button></nav>
+      <nav class="tabs"><div id="intraLang" class="no-print" role="group" aria-label="Jazyk / Language" style="display:none"></div><button id="mujAdmin" style="display:none" onclick="location.href='/admin'">Správa</button><button id="mujLogout" style="display:none" onclick="location.href='/auth/logout'">Odhlásit</button></nav>
     </div>
   </header>
   <div class="mj-shell">
@@ -1614,8 +1617,26 @@ function mjT(cz){
   const i={en:0,de:1,pl:2,ua:3,ro:4}[MJ_LANG];
   return t[i]||cz;
 }
+/* Mini SVG vlajky (emoji vlajky se na Windows nevykreslují) */
+const MJ_FLAGS = {
+  cz:'<svg viewBox="0 0 18 12"><rect width="18" height="6" fill="#fff"/><rect y="6" width="18" height="6" fill="#d7141a"/><path d="M0 0l9 6-9 6z" fill="#11457e"/></svg>',
+  en:'<svg viewBox="0 0 18 12"><rect width="18" height="12" fill="#012169"/><path d="M0 0l18 12M18 0L0 12" stroke="#fff" stroke-width="2.4"/><path d="M0 0l18 12M18 0L0 12" stroke="#C8102E" stroke-width="1"/><path d="M9 0v12M0 6h18" stroke="#fff" stroke-width="4"/><path d="M9 0v12M0 6h18" stroke="#C8102E" stroke-width="2.4"/></svg>',
+  de:'<svg viewBox="0 0 18 12"><rect width="18" height="4" fill="#000"/><rect y="4" width="18" height="4" fill="#dd0000"/><rect y="8" width="18" height="4" fill="#ffce00"/></svg>',
+  pl:'<svg viewBox="0 0 18 12"><rect width="18" height="6" fill="#fff"/><rect y="6" width="18" height="6" fill="#dc143c"/></svg>',
+  ua:'<svg viewBox="0 0 18 12"><rect width="18" height="6" fill="#005bbb"/><rect y="6" width="18" height="6" fill="#ffd500"/></svg>',
+  ro:'<svg viewBox="0 0 18 12"><rect width="6" height="12" fill="#002b7f"/><rect x="6" width="6" height="12" fill="#fcd116"/><rect x="12" width="6" height="12" fill="#ce1126"/></svg>'
+};
+const MJ_LANG_NAMES = { cz:'Čeština', en:'English', de:'Deutsch', pl:'Polski', ua:'Українська', ro:'Română' };
 function mjLangApply(){
-  const s=document.getElementById('intraLang'); if(s) s.value=MJ_LANG;
+  const box=document.getElementById('intraLang');
+  if(box){
+    box.style.display='';
+    if(!box.dataset.init){
+      box.dataset.init='1';
+      box.innerHTML=MJ_LANGS.map(c=>'<button type="button" data-lang="'+c+'" title="'+MJ_LANG_NAMES[c]+'" aria-label="'+MJ_LANG_NAMES[c]+'" onclick="mjLangSet(\''+c+'\')">'+MJ_FLAGS[c]+'</button>').join('');
+    }
+    box.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.lang===MJ_LANG));
+  }
   const a=document.getElementById('mujAdmin'); if(a) a.textContent=mjT('Správa');
   const o=document.getElementById('mujLogout'); if(o) o.textContent=mjT('Odhlásit');
 }
@@ -3922,7 +3943,7 @@ async function loadBilanceWidget(){
       '<div class="metric"><b>'+bilKc(L.dispo.kc)+'</b><span>dispo · '+bilKs(L.dispo.ks)+' ks'+(dd.dispo?bilDelta(dd.dispo.kc):'')+'</span></div>'+
     '</div>';
     if(L.hasFlow){ h+='<p style="margin:11px 0 2px;font-size:11px;color:#8a938a">± u karet = změna hodnoty proti předchozímu dni.</p>'+
-      '<p class="muted" style="margin:4px 0 0;font-size:12px;line-height:1.6"><b>Předchozí den — odbyt:</b> výdej ze skladu (≈ prodej) <b>'+bilKc(f.dispatched.kc)+' Kč</b> ('+bilKs(f.dispatched.ks)+' ks) · nové rezervace zákazníků '+bilKc(f.newReserved.kc)+' Kč<br>'+
+      '<p class="muted" style="margin:4px 0 0;font-size:12px;line-height:1.6"><b>Pohyby za '+(L.flowDate||'předchozí den')+' — odbyt:</b> výdej ze skladu (≈ prodej) <b>'+bilKc(f.dispatched.kc)+' Kč</b> ('+bilKs(f.dispatched.ks)+' ks) · nové rezervace zákazníků '+bilKc(f.newReserved.kc)+' Kč<br>'+
       '<b>Zásobování:</b> příjem dodávek na sklad '+bilKc(f.received.kc)+' Kč · nově objednáno u dodavatelů '+bilKc(f.newOnOrder.kc)+' Kč</p>'; }
     if(wk&&wk.days){ const W=wk.flow; h+='<p style="margin:8px 0 0;font-size:12.5px;line-height:1.5;color:#2f6f8f"><b>Týden — obrat (výdej ze skladu, '+wk.days+' '+(wk.days===1?'den':(wk.days<5?'dny':'dní'))+'):</b> <b>'+bilKc(W.dispatched.kc)+' Kč</b> ('+bilKs(W.dispatched.ks)+' ks) · naskladněno '+bilKc(W.received.kc)+' Kč · nové rezervace '+bilKc(W.newReserved.kc)+' Kč</p>'; }
     h+='<p style="margin:8px 0 0;font-size:11px;color:#a2a9a0;line-height:1.5"><b>Výdej</b> = expedováno ze skladu (≈ prodej). <b>Příjem</b> = dodávky, co dorazily. <b>Rezervace</b> = objednávky zákazníků. <b>Nově objednáno</b> = objednávky u dodavatelů. Vše v nákladových cenách.</p>';
