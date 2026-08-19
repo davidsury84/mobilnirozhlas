@@ -285,6 +285,9 @@ svg.org-lines{position:absolute;top:0;left:0;overflow:visible;z-index:1;pointer-
 /* Spojnice: klikatelné, se šipkou k podřízenému a křížkem pro zrušení vazby */
 svg.org-lines .org-link{pointer-events:auto}
 svg.org-lines .org-link .ln{stroke:#aebaad;stroke-width:1.6;marker-end:url(#orgArr)}
+svg.org-lines .org-link .bus{stroke:#aebaad;stroke-width:1.6;fill:none}
+svg.org-lines .org-link:hover .bus{stroke:var(--green-2);stroke-width:2.2}
+svg.org-lines .org-link.sel .bus{stroke:#b3261e;stroke-width:2.4}
 svg.org-lines .org-link .hit{stroke:rgba(0,0,0,0);stroke-width:16;cursor:pointer}
 svg.org-lines .org-link:hover .ln{stroke:var(--green-2);stroke-width:2.4;marker-end:url(#orgArrOn)}
 svg.org-lines .org-link.sel .ln{stroke:#b3261e;stroke-width:2.6;marker-end:url(#orgArrSel)}
@@ -298,6 +301,17 @@ svg.org-lines .org-link .del path{stroke:#b3261e;stroke-width:1.9;stroke-linecap
 .org-ac button:hover{background:var(--green-soft)}
 .org-ac b{display:block;font-size:13px;font-weight:700;color:var(--ink);line-height:1.25}
 .org-ac span{display:block;font-size:11.5px;color:var(--ink-soft);line-height:1.25;margin-top:1px}
+/* Skupina boxů (např. Obchod = 3 oddělení) — rámeček za boxy + štítek */
+.org-groups{position:absolute;inset:0;z-index:0;pointer-events:none}
+.org-group{position:absolute;border:1.7px dashed #9fc0a4;border-radius:16px;background:rgba(47,125,50,.05)}
+.org-group .ghead{position:absolute;top:6px;left:12px;display:inline-flex;align-items:center;gap:7px;background:var(--paper);border:1px solid #9fc0a4;border-radius:999px;padding:2px 6px 2px 11px;font-size:11.5px;font-weight:800;color:var(--green-d);pointer-events:auto;box-shadow:0 1px 3px rgba(15,21,18,.08)}
+.org-group .ghead .gnm{cursor:pointer}
+.org-group .ghead .gnm:hover{text-decoration:underline}
+.org-group .ghead button{border:none;background:none;cursor:pointer;font-size:13px;font-weight:700;line-height:1;padding:0 3px;color:var(--ink-soft)}
+.org-group .ghead button:hover{color:#b3261e}
+.org-node .obx-grpline{display:flex;align-items:center;gap:4px;margin-top:6px;font-size:11px;color:var(--ink-soft)}
+.org-node .obx-grpline select{flex:1;min-width:0;border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 4px;font-size:11px;font-family:inherit;color:var(--ink-soft);cursor:pointer}
+.org-node .obx-grpline select:focus{border-color:var(--green-2);outline:none}
 .org-legend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--ink-soft)}
 .org-legend b{color:var(--ink)}
 
@@ -979,12 +993,14 @@ img.pv-thumb{background:#fff}
           <strong>Podřízené lidi piš rovnou do boxu</strong> tlačítkem <strong>„+ podřízený"</strong> (pozice + jméno) — nemusíš pro každého zakládat vlastní box. Zobrazí se odsazeně pod nadřízeným. Vlastní box zakládej jen pro toho, kdo má sám podřízené.<br>
           <strong>Vazbu vytvoříš</strong> tažením zeleného kolečka (dole na boxu nadřízeného) na box, který mu má být <strong>podřízený</strong> — šipka pak míří shora dolů k podřízenému.<br>
           <strong>Vazbu zrušíš</strong> křížkem: buď na spojnici (najeď na ni myší), nebo v boxu u řádku „podřízeno". Označenou spojnici smaže i klávesa <strong>Delete</strong>. Změny se ukládají hned.<br>
+          <strong>Skupinu</strong> (např. Obchod = 3 oddělení) uděláš tak, že u každého boxu vybereš dole stejnou skupinu (⬚ <em>+ nová skupina…</em>). Boxy pak sdílí rámeček a od nadřízeného k nim vede <strong>jedna společná linka</strong>.<br>
           <strong>Jména se vybírají z databáze zaměstnanců</strong> (začni psát a nabídne se seznam) — propojený člověk má u jména zelenou ✓ a doplní se mu pozice. Tlačítkem <strong>„↧ Promítnout do zaměstnanců"</strong> pak schéma nastaví skutečné <strong>nadřízené</strong> (podle nich se schvaluje dovolená) a pozice v kartách zaměstnanců.</p>
         <div id="orgCanvas" class="org-canvas"></div>
         <div class="org-legend">
           <span><svg width="42" height="12" style="vertical-align:-2px"><defs><marker id="orgArrLg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#aebaad"/></marker></defs><line x1="0" y1="6" x2="34" y2="6" stroke="#aebaad" stroke-width="1.6" marker-end="url(#orgArrLg)"/></svg> šipka míří k <b>podřízenému</b></span>
           <span><b>▲ podřízeno:</b> v boxu ukazuje jeho nadřízeného</span>
           <span><b>▼ N boxů</b> = kolik podřízených boxů řídí (lidé uvnitř boxu se nepočítají)</span>
+          <span><b>⬚ skupina</b> = boxy v jednom rámečku, jedna společná linka od nadřízeného</span>
         </div>
       </div>
     </div>
@@ -5597,6 +5613,37 @@ function orgSyncEmployees(){
 function orgPosDelete(boxId,posId){ const b=orgBoxById(boxId); if(!b||!Array.isArray(b.positions)) return; const i=b.positions.findIndex(x=>x.id===posId); if(i>=0){ b.positions.splice(i,1); save(); renderOrgCanvas(); } }
 function orgBoxDescendants(id){ const set=new Set([id]); const st=[id]; const boxes=orgBoxes(); while(st.length){ const c=st.pop(); boxes.forEach(b=>{ if(b.parent===c && !set.has(b.id)){ set.add(b.id); st.push(b.id); } }); } return set; }
 function orgLink(childId,parentId){ if(childId===parentId){ renderOrgCanvas(); return; } const child=orgBoxById(childId); if(!child) return; if(orgBoxDescendants(childId).has(parentId)){ toast('Nelze — vznikla by smyčka.'); renderOrgCanvas(); return; } child.parent=parentId; save(); renderOrgCanvas(); }
+/* ---- Skupiny boxů: víc oddělení pod jednou hlavičkou (např. Obchod) ---- */
+function orgGroups(){ if(!DB.settings) DB.settings={}; if(!Array.isArray(DB.settings.orgGroups)) DB.settings.orgGroups=[]; return DB.settings.orgGroups; }
+function orgGroupById(id){ return orgGroups().find(g=>g.id===id)||null; }
+function orgGroupMembers(){ const m={}; orgBoxes().forEach(b=>{ if(b.grp && orgGroupById(b.grp)) (m[b.grp]=m[b.grp]||[]).push(b); }); return m; }
+function orgSetGroup(boxId,val){
+  const b=orgBoxById(boxId); if(!b) return;
+  if(val==='__new'){
+    const n=(prompt('Název skupiny (např. Obchod):')||'').trim();
+    if(!n){ renderOrgCanvas(); return; }
+    const g={ id:'g'+uid(), name:n }; orgGroups().push(g); b.grp=g.id;
+  } else b.grp=val||null;
+  save(); renderOrgCanvas();
+}
+function orgGroupRename(gid){ const g=orgGroupById(gid); if(!g) return; const n=(prompt('Název skupiny:',g.name)||'').trim(); if(!n) return; g.name=n; save(); renderOrgCanvas(); }
+function orgGroupDissolve(gid){
+  const g=orgGroupById(gid); if(!g) return;
+  if(!confirm('Zrušit skupinu \u201e'+g.name+'\u201c? Boxy zůstanou, zmizí jen rámeček.')) return;
+  orgBoxes().forEach(b=>{ if(b.grp===gid) b.grp=null; });
+  const i=orgGroups().findIndex(x=>x.id===gid); if(i>=0) orgGroups().splice(i,1);
+  if(ORG_SEL==='g:'+gid) ORG_SEL=null;
+  save(); renderOrgCanvas();
+}
+function orgUnlinkGroup(gid){
+  const g=orgGroupById(gid); if(!g) return;
+  const mem=orgBoxes().filter(b=>b.grp===gid && b.parent);
+  if(!mem.length) return;
+  if(!confirm('Zrušit vazbu celé skupiny \u201e'+g.name+'\u201c na nadřízeného? (týká se '+mem.length+' boxů)')) return;
+  mem.forEach(b=>{ b.parent=null; });
+  if(ORG_SEL==='g:'+gid) ORG_SEL=null;
+  save(); renderOrgCanvas(); if(typeof toast==='function') toast('Vazba skupiny zrušena');
+}
 function orgElbowD(x1,y1,x2,y2){ const my=(y1+y2)/2; return 'M'+x1+' '+y1+' V'+my.toFixed(1)+' H'+x2+' V'+y2; }
 function orgArrowDefs(){
   const mk=(id,color)=>'<marker id="'+id+'" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="'+color+'"/></marker>';
@@ -5606,9 +5653,62 @@ function orgArrowDefs(){
 // široká neviditelná „hit" čára pro klik a křížek uprostřed pro zrušení vazby.
 function orgRedrawLines(cv,extra){
   const svg=cv.querySelector('svg.org-lines'); if(!svg) return;
+  const inner=cv.querySelector('.org-inner');
   const byId={}; cv.querySelectorAll('.org-node').forEach(n=>byId[n.dataset.id]=n);
+  const boxById={}; orgBoxes().forEach(b=>boxById[b.id]=b);
   let lines=orgArrowDefs();
+
+  // ---- rámečky skupin (několik oddělení pod jednou hlavičkou) ----
+  const PAD=15, LBL=26;
+  const mem=orgGroupMembers(), frames={};
+  Object.keys(mem).forEach(gid=>{
+    const ns=mem[gid].map(b=>byId[b.id]).filter(Boolean); if(!ns.length) return;
+    let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+    ns.forEach(n=>{ x1=Math.min(x1,n.offsetLeft); y1=Math.min(y1,n.offsetTop);
+      x2=Math.max(x2,n.offsetLeft+n.offsetWidth); y2=Math.max(y2,n.offsetTop+n.offsetHeight); });
+    frames[gid]={ x:x1-PAD, y:y1-PAD-LBL, w:(x2-x1)+PAD*2, h:(y2-y1)+PAD*2+LBL, topBoxes:y1, nodes:ns, boxes:mem[gid] };
+  });
+  const gbox=inner?inner.querySelector('.org-groups'):null;
+  if(gbox){
+    gbox.innerHTML=Object.keys(frames).map(gid=>{
+      const f=frames[gid], g=orgGroupById(gid);
+      return '<div class="org-group" style="left:'+f.x+'px;top:'+f.y+'px;width:'+f.w+'px;height:'+f.h+'px">'+
+        '<span class="ghead"><span class="gnm" title="Přejmenovat skupinu" onclick="orgGroupRename(\''+gid+'\')">'+esc(g?g.name:'')+'</span>'+
+        '<button title="Zrušit skupinu (boxy zůstanou)" onclick="orgGroupDissolve(\''+gid+'\')">×</button></span></div>';
+    }).join('');
+  }
+
+  // ---- jedna společná linka od nadřízeného ke skupině ----
+  const handled=new Set();
+  Object.keys(frames).forEach(gid=>{
+    const f=frames[gid];
+    const withPar=f.boxes.filter(b=>b.parent && byId[b.parent] && (boxById[b.parent]||{}).grp!==gid);
+    const parents=[...new Set(withPar.map(b=>b.parent))];
+    if(withPar.length<2 || parents.length!==1) return;      // společná linka jen když mají stejného nadřízeného
+    const p=byId[parents[0]];
+    const cx=f.x+f.w/2, topY=f.y;
+    const x1=p.offsetLeft+p.offsetWidth/2, y1=p.offsetTop+p.offsetHeight;
+    const d=orgElbowD(x1,y1,cx,topY-7);
+    const bx=((x1+cx)/2).toFixed(1), by=((y1+topY)/2).toFixed(1);
+    // sběrnice uvnitř rámečku + krátké svody do jednotlivých oddělení = provázanost
+    const busY=f.topBoxes-13;
+    const cs=withPar.map(b=>byId[b.id]).filter(Boolean).map(n=>n.offsetLeft+n.offsetWidth/2).sort((a,b)=>a-b);
+    let bus='<path class="bus" d="M'+cx+' '+topY+' V'+busY+'"/>'+
+            '<path class="bus" d="M'+cs[0]+' '+busY+' H'+cs[cs.length-1]+'"/>';
+    withPar.forEach(b=>{ const n=byId[b.id]; if(!n) return;
+      const mx=n.offsetLeft+n.offsetWidth/2;
+      bus+='<path class="ln" d="M'+mx+' '+busY+' V'+(n.offsetTop-7)+'" fill="none"/>'; handled.add(b.id); });
+    lines+='<g class="org-link glink'+(ORG_SEL==='g:'+gid?' sel':'')+'" data-group="'+gid+'">'+
+      '<path class="ln" d="'+d+'" fill="none"/>'+bus+
+      '<path class="hit" d="'+d+'" fill="none"><title>Vazba celé skupiny — klikni pro označení, křížkem zrušíš</title></path>'+
+      '<g class="del" transform="translate('+bx+','+by+')"><title>Zrušit vazbu celé skupiny</title>'+
+        '<circle r="9"/><path d="M-3.4 -3.4 L3.4 3.4 M3.4 -3.4 L-3.4 3.4" fill="none"/></g>'+
+      '</g>';
+  });
+
+  // ---- běžné vazby box → box ----
   orgBoxes().forEach(b=>{
+    if(handled.has(b.id)) return;
     if(!(b.parent && byId[b.parent] && byId[b.id])) return;
     const p=byId[b.parent], c=byId[b.id];
     const x1=p.offsetLeft+p.offsetWidth/2, y1=p.offsetTop+p.offsetHeight;
@@ -5624,6 +5724,7 @@ function orgRedrawLines(cv,extra){
   });
   svg.innerHTML=lines+(extra||'');
 }
+
 function orgUnlink(childId){
   const c=orgBoxById(childId); if(!c||!c.parent) return;
   c.parent=null; if(ORG_SEL===childId) ORG_SEL=null;
@@ -5638,12 +5739,15 @@ function orgAutoLayout(){
   if(cv) cv.querySelectorAll('.org-node').forEach(n=>{ hById[n.dataset.id]=n.offsetHeight||140; });
   const depth=b=>{ let d=0, cur=b; const seen=new Set(); while(cur && cur.parent && byId[cur.parent] && !seen.has(cur.id)){ seen.add(cur.id); cur=byId[cur.parent]; d++; } return d; };
   const lvl={}; boxes.forEach(b=>{ const d=depth(b); (lvl[d]=lvl[d]||[]).push(b); });
-  const W=236, GX=34, GY=60; let y=24;
+  const W=236, GX=34, GY=78; let y=30;
   Object.keys(lvl).map(Number).sort((a,b)=>a-b).forEach(k=>{
     // sourozenci vedle sebe: řadím podle (nové) pozice nadřízeného, pak podle původního x
     const row=lvl[k].slice().sort((a,b)=>{
       const pa=(a.parent&&byId[a.parent])?byId[a.parent].x:(a.x||0), pb=(b.parent&&byId[b.parent])?byId[b.parent].x:(b.x||0);
-      return pa===pb ? ((a.x||0)-(b.x||0)) : pa-pb;
+      if(pa!==pb) return pa-pb;
+      const ga=a.grp||'zzz', gb=b.grp||'zzz';           // členy skupiny vedle sebe
+      if(ga!==gb) return ga<gb?-1:1;
+      return (a.x||0)-(b.x||0);
     });
     let x=24, maxH=0;
     row.forEach(b=>{ b.x=x; b.y=y; x+=W+GX; maxH=Math.max(maxH, hById[b.id]||140); });
@@ -5692,6 +5796,12 @@ function renderOrgCanvas(){
       ? '<div class="obx-parent" title="Nadřízený box — křížkem vazbu zrušíš"><span>▲</span><span class="pnm">podřízeno: '+esc(parName)+'</span>'+
         '<button class="obx-unlink" title="Zrušit vazbu na nadřízeného" onpointerdown="event.stopPropagation()" onclick="orgUnlink(\''+b.id+'\')">×</button></div>'
       : '';
+    // volba skupiny (např. Obchod) — víc oddělení pak sdílí jeden rámeček a jednu linku
+    const grpOpts=orgGroups().map(g=>'<option value="'+g.id+'"'+(b.grp===g.id?' selected':'')+'>'+esc(g.name)+'</option>').join('');
+    const grpHtml='<div class="obx-grpline" title="Skupina boxů — několik oddělení pod jednou hlavičkou"><span>⬚</span>'+
+      '<select onpointerdown="event.stopPropagation()" onchange="orgSetGroup(\''+b.id+'\',this.value)">'+
+      '<option value=""'+(!b.grp?' selected':'')+'>— bez skupiny —</option>'+grpOpts+
+      '<option value="__new">+ nová skupina…</option></select></div>';
     nodes+='<div class="org-node'+(b.vedouci?' ved':'')+'" data-id="'+b.id+'" style="left:'+(b.x||0)+'px;top:'+(b.y||0)+'px">'+
       '<span class="rm" title="Smazat box" onpointerdown="event.stopPropagation()" onclick="orgBoxDelete(\''+b.id+'\')">×</span>'+
       '<div class="obx-grip" title="Přesunout box">• • •</div>'+
@@ -5702,12 +5812,13 @@ function renderOrgCanvas(){
       posHtml+
       '<button class="obx-addpos" onpointerdown="event.stopPropagation()" onclick="orgAddPos(\''+b.id+'\')" title="Přidat podřízeného přímo sem (pozice + jméno)">+ podřízený</button>'+
       parHtml+
+      grpHtml+
       '<div class="obx-foot"><label class="obx-ved" onpointerdown="event.stopPropagation()"><input type="checkbox" '+(b.vedouci?'checked':'')+' onchange="orgBoxSetVed(\''+b.id+'\',this.checked)"> vedoucí</label>'+
         (kids?'<span class="obx-kids" title="Počet přímo podřízených boxů">▼ '+kids+' '+plural(kids,'box','boxy','boxů')+'</span>':'')+'</div>'+
       '<span class="obx-handle" title="Táhni odsud na box, který má být TOMUTO boxu podřízený"></span>'+
       '</div>';
   });
-  cv.innerHTML='<div class="org-viewport"><div class="org-inner" style="width:'+W+'px;height:'+H+'px"><svg class="org-lines" width="'+W+'" height="'+H+'"></svg>'+nodes+'</div></div>';
+  cv.innerHTML='<div class="org-viewport"><div class="org-inner" style="width:'+W+'px;height:'+H+'px"><div class="org-groups"></div><svg class="org-lines" width="'+W+'" height="'+H+'"></svg>'+nodes+'</div></div>';
   orgRedrawLines(cv);
   orgBindBoxes(cv);
   orgApplyZoom(cv);
@@ -5720,8 +5831,9 @@ function orgBindBoxes(cv){
   if(svg) svg.addEventListener('click', ev=>{
     const g=ev.target.closest('.org-link'); if(!g) return;
     ev.stopPropagation();
-    if(ev.target.closest('.del')){ orgUnlink(g.dataset.child); return; }
-    ORG_SEL = (ORG_SEL===g.dataset.child) ? null : g.dataset.child;
+    const key = g.dataset.group ? ('g:'+g.dataset.group) : g.dataset.child;
+    if(ev.target.closest('.del')){ if(g.dataset.group) orgUnlinkGroup(g.dataset.group); else orgUnlink(g.dataset.child); return; }
+    ORG_SEL = (ORG_SEL===key) ? null : key;
     orgRedrawLines(cv);
   });
   // Klik do prázdna označení zruší.
@@ -5734,7 +5846,7 @@ function orgBindBoxes(cv){
       if(!ORG_SEL || ORG_MODE!=='canvas') return;
       const t=ev.target;
       if(t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
-      if(ev.key==='Delete'||ev.key==='Backspace'){ ev.preventDefault(); orgUnlink(ORG_SEL); }
+      if(ev.key==='Delete'||ev.key==='Backspace'){ ev.preventDefault(); if(String(ORG_SEL).indexOf('g:')===0) orgUnlinkGroup(String(ORG_SEL).slice(2)); else orgUnlink(ORG_SEL); }
       else if(ev.key==='Escape'){ ORG_SEL=null; const c=document.getElementById('orgCanvas'); if(c) orgRedrawLines(c); }
     });
   }
