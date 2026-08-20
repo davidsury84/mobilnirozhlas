@@ -1077,6 +1077,9 @@ function mount(host) {
     const S = vykIndex();
     const pk = kod ? vykParseKod(kod) : null;
     const toks = vykNorm(q || '').split(/\s+/).filter(Boolean);
+    // Literál z celého zadaného kódu (bez prefixu ABR-) pro fulltext fallback —
+    // aby se našly i části mimo gramatiku kódu (jména zákazníků: RENEWI, SUEZ…).
+    const litNorm = kod ? vykNorm(kod).replace(/^abr[-_ ]?/, '').trim() : '';
     const segVar = seg => { const s = vykNorm(seg); return [s, s.replace(/_/g, '/'), s.replace(/_/g, '-')]; };
     // maximum bodů dosažitelné pro TENTO dotaz (bez bonusů za rok/závod) — z něj se počítá % shody;
     // plný počet = konstruktér hledá kontejner, který už přesně takhle nakreslený v archivu je
@@ -1093,7 +1096,7 @@ function mount(host) {
         if (!pk && hit < toks.length) continue;      // čistý fulltext: musí sedět všechna slova
         score += hit * 10;
       }
-      let dimScore = 0;
+      let dimScore = 0, lit = 0;
       if (pk) {
         if (pk.dims) {
           const [L, W, H] = pk.dims;
@@ -1119,11 +1122,18 @@ function mount(host) {
           const vars = segVar(seg);
           if (vars.some(v => vykHasTok(h, v))) score += 7; else score -= 1;
         }
-        if (pk.dims && dimScore === 0 && score < 40) continue;  // bez rozměrové shody jen při silné shodě jinde
-        if (score < 25) continue;
+        // Literální fulltext: co uživatel napsal (i jméno zákazníka mimo gramatiku
+        // ABR-kódu, např. „RENEWI") a co je doslova v názvu, je silná shoda.
+        if (litNorm) {
+          if (h.includes(litNorm)) lit = 30;
+          else { const lt = litNorm.split(/[-_\s]+/).filter(t => t.length >= 3); if (lt.length && lt.every(t => h.includes(t))) lit = 26; }
+        }
+        if (pk.dims && dimScore === 0 && score + lit < 40) continue;  // bez rozměrové shody jen při silné shodě jinde
+        if (score + lit < 25) continue;
       }
       if (!pk && !toks.length) continue;
-      const shodaBody = score;   // body čisté shody (před bonusy) — pro výpočet %
+      const shodaBody = score;   // body čisté shody KÓDU (bez literálního bonusu) — pro výpočet %
+      score += lit;              // literální shoda (jméno zákazníka apod.) do řazení, ne do %
       score += Math.min(6, Math.max(0, ((S.roky[fi] || 2012) - 2012) * 0.5));
       if (vykNorm(S.zavody[fi] || '') === 'bruntal') score += 3;
       out.push([score, fi, shodaBody]);
