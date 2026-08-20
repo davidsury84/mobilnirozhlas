@@ -2085,7 +2085,7 @@ function objSalesPeriodShort(){ try{ const s=(typeof EMBEDDED_PERIOD_INFO!=='und
 function objFreshInfo(){ return 'Počítáno z: ERP <b>'+esc((OBJ_DATA&&OBJ_DATA.date)||'?')+'</b> (denně z Drive) · prodeje '+esc(window.__salesSrc||(objSalesPeriodShort()+' (vestavěný snapshot)')); }
 function objAskFind(q){
   q=String(q||'').trim(); if(!q)return null;
-  const rows=(OBJ_DATA&&OBJ_DATA.rows)||[]; const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,'');
+  const rows=(OBJ_DATA&&(OBJ_DATA.allRows||OBJ_DATA.rows))||[]; const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,'');
   const qq=norm(q).replace(/[–—]/g,'-');
   let hit=rows.find(x=>norm(x.sk+'-'+x.reg)===qq); if(hit)return hit;
   const m=q.match(/(\d+)\D+(\d+)/); if(m){hit=rows.find(x=>String(x.sk)===m[1]&&String(x.reg)===m[2]); if(hit)return hit;}
@@ -2121,12 +2121,23 @@ function objAsk(){
   const q=($('#objAsk')&&$('#objAsk').value)||''; const box=$('#objAskResult'); if(!box)return;
   if(!q.trim()){box.innerHTML='';return;}
   const x=objAskFind(q);
+  if(x&&!x._o){   // nalezena v ERP, ale není v „obrat plasty" → nemá prodejní historii
+    box.innerHTML='<div style="background:#fff;border:1px solid #dbe2d8;border-radius:12px;padding:14px 16px">'
+      +'<div style="font-size:16px;font-weight:700">'+esc(x.nazev)+'</div>'
+      +'<div class="muted" style="font-size:12.5px;margin-bottom:10px">'+esc(x.sk+'-'+x.reg)+(x.dodKod?(' · '+esc(x.dodKod)):'')+' · '+esc(x.skupina)+'</div>'
+      +'<div style="font-size:22px;font-weight:800;color:#2f7d32">Neobjednávat</div>'
+      +'<div style="background:#f5f8f3;border:1px solid #e2e9dc;border-radius:9px;padding:9px 12px;font-size:13.5px;line-height:1.55;margin-top:10px">'
+      +'<b>Proč:</b> Položka je v ERP (sklad '+fmt(x.stock)+' ks, k dispozici '+fmt(x.avail)+' ks), ale <b>nemá žádnou prodejní historii</b> v podkladu „obrat plasty" — za posledních 12 měsíců se neprodávala. Bez prodejů nelze spočítat poptávku, takže se neobjednává a v tabulce se nezobrazuje.</div>'
+      +'<div class="muted" style="font-size:11.5px;margin-top:8px">'+objFreshInfo()+'</div></div>';
+    return;
+  }
   if(!x){box.innerHTML='<div class="muted" style="padding:6px">Položku „'+esc(q)+'" jsem nenašel. Zkus SK-reg (313-72562), samotné reg. číslo, nebo doplňkový kód.</div>';return;}
   box.innerHTML=objAskCard(x);
 }
 async function renderObjednavky(){
   if(!OBJ_DATA){
     try{const r=await fetch('/api/nakup-report/objednavky',{cache:'no-store'});OBJ_DATA=await r.json();}catch(e){OBJ_DATA={rows:[]};}
+    OBJ_DATA.allRows=(OBJ_DATA.rows||[]).slice();   // plný ERP seznam (pro poradce podle kódu)
     const sups=[...new Set((OBJ_DATA.rows||[]).map(x=>x.skupina))].sort((a,b)=>String(a).localeCompare(String(b),'cs'));
     const sel=$('#objSup');if(sel)sel.innerHTML='<option value="">Všichni dodavatelé ('+(OBJ_DATA.rows||[]).length+')</option>'+sups.map(s=>'<option>'+esc(s)+'</option>').join('');
     const dt=$('#objDate');if(dt)dt.textContent=(OBJ_DATA.date||'?')+' · '+(OBJ_DATA.rows||[]).length+' položek';
@@ -2137,7 +2148,17 @@ async function renderObjednavky(){
     for(let i=0;i<80 && (typeof ROWS==='undefined'||!ROWS.length);i++){ await new Promise(r=>setTimeout(r,100)); }
   }
   const fr=$('#objFresh'); if(fr)fr.innerHTML=objFreshInfo();
-  const smap=objSalesMap();const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
+  const smap=objSalesMap();
+  // Pracujeme jen s položkami, které jsou v „obrat plasty" — zbytek ERP nemá prodejní historii,
+  // nedá se u něj nic doporučit a jen zaplevelí tabulku (1 469 řádků balastu).
+  if(OBJ_DATA.allRows && Object.keys(smap).length){
+    OBJ_DATA.rows=OBJ_DATA.allRows.filter(x=>smap[String(x.sk)+'-'+String(x.reg)]!==undefined);
+    const sel=$('#objSup');
+    if(sel){const sups=[...new Set(OBJ_DATA.rows.map(x=>x.skupina))].sort((a,b)=>String(a).localeCompare(String(b),'cs'));
+      const cur=sel.value; sel.innerHTML='<option value="">Všichni dodavatelé ('+OBJ_DATA.rows.length+')</option>'+sups.map(s=>'<option>'+esc(s)+'</option>').join(''); sel.value=cur;}
+    const dt=$('#objDate'); if(dt)dt.textContent=(OBJ_DATA.date||'?')+' · '+OBJ_DATA.rows.length+' položek s prodejní historií (z '+OBJ_DATA.allRows.length+' v ERP)';
+  }
+  const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
   const robMap={}; Object.keys(smap).forEach(k=>{robMap[k]=objRobust(smap[k]);});   // robustní poptávka (bez jednorázových extrémů)
   const hold=objHoldRate(); OBJ_CYCLES=objSupplierCycles(OBJ_DATA.rows||[],robMap,hold);
