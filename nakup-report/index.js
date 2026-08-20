@@ -516,6 +516,15 @@ function mount(host) {
     console.log('[nakup-report] rozesílky jednorázově ZAPNUTY (co objednat, co zlevnit, ranní bilance)');
     return true;
   }
+  // Neúspěšné odeslání nesmí den „spotřebovat" — zkusí se znovu, ale nejvýš 3× (pak čeká na další období).
+  const MAX_POKUSU = 3;
+  function odeslano(st, klic, obdobi, r) {
+    st[klic + 'Try'] = st[klic + 'Try'] || {};
+    if (r && r.ok) { st[klic + 'Try'] = {}; return true; }
+    const n = (st[klic + 'Try'][obdobi] || 0) + 1; st[klic + 'Try'][obdobi] = n;
+    if (n >= MAX_POKUSU) { console.warn('[nakup-report] ' + klic + ': ' + n + ' neúspěšné pokusy, období ' + obdobi + ' se přeskakuje'); return true; }
+    return false;   // false = ještě zkusíme příště
+  }
   async function tick() {
     // 1) DENNÍ stažení nejnovějšího souboru z Drive (běží nezávisle na e-mailech)
     try { const s = await syncObjednavky(false); if (s && !s.ok && !s.skipped) console.warn('[nakup-report] Drive sync neproběhl:', s.error); } catch (e) { console.error('[nakup-report] Drive sync:', e.message); }
@@ -530,18 +539,24 @@ function mount(host) {
       if (cfg.objednavkyEnabled && !dis('objednavky') && now.getDay() >= cfg.objednavkyDay) {
         const wk = isoWeek(now);
         const objGap = st.objAt ? (now - new Date(st.objAt)) / 86400000 : 999;
-        if (st.objWeek !== wk && objGap >= ((cfg.objednavkyEvery || 1) > 1 ? 13 : 6)) { const r = await sendReport('objednavky', cfg.objednavkyTo, cfg); st.objWeek = wk; st.objAt = now.toISOString(); st.objednavky = r; changed = true; console.log('[nakup-report] objednávkový report: ' + (r.ok ? r.count + ' pol.' : 'CHYBA ' + r.error)); }
+        if (st.objWeek !== wk && objGap >= ((cfg.objednavkyEvery || 1) > 1 ? 13 : 6)) { const r = await sendReport('objednavky', cfg.objednavkyTo, cfg); st.objednavky = r; changed = true;
+          if (odeslano(st, 'objednavky', wk, r)) { st.objWeek = wk; st.objAt = now.toISOString(); }
+          console.log('[nakup-report] objednávkový report: ' + (r.ok ? r.count + ' pol. odesláno (' + (r.to || []).join(', ') + ')' : 'CHYBA ' + r.error)); }
       }
       // Ranní bilance skladu — denně (od zvolené hodiny), pojistka 1×/den
       if (cfg.bilanceEnabled && !dis('bilance') && now.getHours() >= (cfg.bilanceHour != null ? cfg.bilanceHour : 8)) {
         const dstr = now.toISOString().slice(0, 10);
-        if (st.bilanceDay !== dstr) { const rB = await sendReport('bilance', cfg.bilanceTo, cfg); st.bilanceDay = dstr; st.bilance = rB; changed = true; console.log('[nakup-report] ranní bilance: ' + (rB.ok ? 'odesláno' : 'CHYBA ' + rB.error)); }
+        if (st.bilanceDay !== dstr) { const rB = await sendReport('bilance', cfg.bilanceTo, cfg); st.bilance = rB; changed = true;
+          if (odeslano(st, 'bilance', dstr, rB)) st.bilanceDay = dstr;
+          console.log('[nakup-report] ranní bilance: ' + (rB.ok ? 'odesláno (' + (rB.to || []).join(', ') + ')' : 'CHYBA ' + rB.error)); }
       }
       // Týdenní zlevnění/nákup — volitelné (defaultně vypnuto)
       if (cfg.enabled && !dis('markdown') && now.getDay() >= cfg.weekday) {
         const wk = isoWeek(now);
         const mdGap = st.lastAt ? (now - new Date(st.lastAt)) / 86400000 : 999;
-        if (st.lastWeek !== wk && mdGap >= ((cfg.markdownEvery || 1) > 1 ? 13 : 6)) { const rM = await sendReport('markdown', cfg.markdownTo, cfg); st.lastWeek = wk; st.lastAt = now.toISOString(); st.markdown = rM; changed = true; }
+        if (st.lastWeek !== wk && mdGap >= ((cfg.markdownEvery || 1) > 1 ? 13 : 6)) { const rM = await sendReport('markdown', cfg.markdownTo, cfg); st.markdown = rM; changed = true;
+          if (odeslano(st, 'markdown', wk, rM)) { st.lastWeek = wk; st.lastAt = now.toISOString(); }
+          console.log('[nakup-report] report „co zlevnit": ' + (rM.ok ? 'odesláno (' + (rM.to || []).join(', ') + ')' : 'CHYBA ' + rM.error)); }
       }
       if (changed) try { fs.writeFileSync(STATE_F, JSON.stringify(st, null, 2)); } catch (_) {}
     } catch (e) { console.error('[nakup-report] tick:', e.message); }
