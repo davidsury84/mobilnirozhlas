@@ -65,7 +65,10 @@ function mount(host) {
     const mv = loadMoves(), pm = snapMap(prevRows), dd = daysBetween(prevDate, nowDate);
     nowRows.forEach(r => { const k = r.sk + '-' + r.reg, p = pm[k]; if (!p) return;
       const v = dispatchDiff(p, r), e = mv[k] || (mv[k] = { sum: 0, days: 0, hist: [] });
-      e.sum += v; e.days += dd; e.hist.push({ d: nowDate, v: Math.round(v) }); if (e.hist.length > 90) e.hist.shift(); });
+      e.sum += v; e.days += dd;
+      // Ukládej do historie jen dny se skutečným pohybem — od 20. 8. 2026 chodí v exportu i položky
+      // s nulovým stavem (2 500 místo 850 řádků) a nulové záznamy by soubor zbytečně nafukovaly.
+      if (v > 0) { e.hist.push({ d: nowDate, v: Math.round(v) }); if (e.hist.length > 90) e.hist.shift(); } });
     try { fs.writeFileSync(MOVE_F, JSON.stringify(mv)); } catch (_) {}
   }
   const dateOfName = nm => { const m = /(\d{4})[-.]?(\d{2})[-.]?(\d{2})/.exec(nm || ''); return m ? (m[1] + '-' + m[2] + '-' + m[3]) : null; };

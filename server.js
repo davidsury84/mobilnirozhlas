@@ -554,8 +554,13 @@ function resendSend(mail) {
     const fromEmail = (mail.fromEmail || process.env.RESEND_FROM || 'onboarding@resend.dev').trim();
     const fromName = mail.fromName || '';
     const from = fromName ? (fromName + ' <' + fromEmail + '>') : fromEmail;
-    const cc = mail.cc ? (Array.isArray(mail.cc) ? mail.cc : [mail.cc]).map((x) => String(x).trim()).filter(Boolean) : [];
-    const payload = JSON.stringify({ from: from, to: [mail.to], cc: cc.length ? cc : undefined, subject: mail.subject || '', html: mail.html || undefined, text: mail.text || undefined });
+    // Resend chce POLE adres. Příjemci k nám chodí i jako řetězec „a@x.cz, b@x.cz" → rozdělit,
+    // jinak Resend vrátí 422 (Invalid `to` field) a e-mail s více příjemci se neodešle.
+    const addrs = (v) => (Array.isArray(v) ? v : String(v || '').split(/[;,\n]/))
+      .map((x) => String(x).trim()).filter((x) => x && x.indexOf('@') > 0);
+    const to = addrs(mail.to), cc = addrs(mail.cc);
+    if (!to.length) return reject(new Error('Resend: chybí platný příjemce (' + String(mail.to || '') + ')'));
+    const payload = JSON.stringify({ from: from, to: to, cc: cc.length ? cc : undefined, subject: mail.subject || '', html: mail.html || undefined, text: mail.text || undefined });
     const r = https.request({ method: 'POST', hostname: 'api.resend.com', path: '/emails', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } }, (resp) => {
       let d = ''; resp.on('data', c => d += c); resp.on('end', () => {
         if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(true);
