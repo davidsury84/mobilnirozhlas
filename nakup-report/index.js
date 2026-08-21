@@ -295,6 +295,9 @@ function mount(host) {
   const saveNew = m => { try { fs.writeFileSync(NEW_F, JSON.stringify(m, null, 2)); } catch (_) {} };
   // Důkaz, že položka „žije": měla pohyb, někdo si ji objednal, nebo je objednaná u dodavatele.
   function isNewActive(r, mv) {
+    // Musi mit platnou nakupni cenu — bez ni to neni zbozi k objednani, ale sluzba
+    // („Doprava realizovana cizimi vozidly") nebo nedokoncena kmenova karta.
+    if (!((r.unitCost || 0) > 0 || (r.unitPrice || 0) > 0)) return false;
     const e = mv[r.sk + '-' + r.reg];
     return !!((e && e.sum > 0) || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0);
   }
