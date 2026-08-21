@@ -551,6 +551,8 @@ function mount(host) {
     return false;   // false = ještě zkusíme příště
   }
   async function tick() {
+    // Krátká diagnostika stavu dat — ať je v logu hned vidět, z čeho se reporty počítají.
+    try { const o = loadObj(); console.log('[nakup-report] tick: ERP ' + ((o.rows || []).length) + ' pol. (' + (o.date || '?') + ') · bilance ' + loadBilance().length + ' dnů · pohyby ' + Object.keys(loadMoves()).length + ' položek'); } catch (_) {}
     // 1) DENNÍ stažení nejnovějšího souboru z Drive (běží nezávisle na e-mailech)
     try { const s = await syncObjednavky(false); if (s && !s.ok && !s.skipped) console.warn('[nakup-report] Drive sync neproběhl:', s.error); } catch (e) { console.error('[nakup-report] Drive sync:', e.message); }
     if (OBRAT_FOLDER) { try { const so = await syncObrat(false); if (so && !so.ok && !so.skipped) console.warn('[nakup-report] obrat plasty sync neproběhl:', so.error); } catch (e) { console.error('[nakup-report] obrat sync:', e.message); } }
