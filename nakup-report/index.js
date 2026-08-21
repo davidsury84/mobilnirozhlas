@@ -459,6 +459,7 @@ function mount(host) {
   }
   function buildObjednavky(cfg) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
+    try { detectNew(obj.rows); } catch (_) {}   // NEJDRIV detekce novych, at se dostanou i do doporuceni
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1 };
     let list = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) })).filter(r => r.o.rec > 0 || r.x.avail < 0);
@@ -469,7 +470,6 @@ function mount(host) {
     const R = t => '<th style="text-align:right;border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">' + esc(t) + '</th>';
     const cellR = v => '<td style="text-align:right;border-bottom:1px solid #eef1ec;padding:4px 7px">' + v + '</td>';
     // Nové položky, které ještě nejsou v kvartálním „obrat plasty" — nákup o nich musí vědět.
-    try { detectNew(obj.rows); } catch (_) {}   // detekce i tady, at report nezavisi na behu Drive syncu
     const novePol = Object.values(loadNew());
     let noveHtml = '';
     if (novePol.length) {
