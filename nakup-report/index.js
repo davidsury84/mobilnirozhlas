@@ -44,7 +44,14 @@ function mount(host) {
     const rows = xlsxMini.parse(buf); if (!rows.length) return { rows: [], columns: [] };
     const hdr = rows[0].map(x => String(x == null ? '' : x).trim());
     const find = (...names) => { for (const nm of names) { const i = hdr.findIndex(h => h.toLowerCase() === nm.toLowerCase()); if (i >= 0) return i; } return -1; };
-    const ci = { sk: find('SK'), reg: find('Registrační číslo', 'Reg. číslo'), nazev: find('Název 1'), skupina: find('Název'), dodKod: find('Doplňkový kód'), stock: find('Mn.po p/v'), avail: find('K dispo. po p/v'), unitPrice: find('Vypočtený průměr'), unitCost: find('Průměr+SN'), onOrder: find('Objednáno'), reserved: find('Rezervováno'), lead: find('Dodací lhůta') };
+    // Nazvy sloupcu se v exportech obcas meni („Registrační číslo" → „Reg. č." 20. 8. 2026 — ten den
+    // se historie tise rozbila: 2 512 radku s prazdnym reg. cislem, sklad 0, ztracene pohyby).
+    // Proto tolerantni varianty + prefixovy fallback + tvrda pojistka nize.
+    const findPrefix = pre => hdr.findIndex(h => h.toLowerCase().startsWith(pre));
+    let regI = find('Registrační číslo', 'Reg. číslo', 'Reg. č.', 'Reg.č.', 'Reg č'); if (regI < 0) regI = findPrefix('reg');
+    const ci = { sk: find('SK'), reg: regI, nazev: find('Název 1'), skupina: find('Název'), dodKod: find('Doplňkový kód'), stock: find('Mn.po p/v'), avail: find('K dispo. po p/v'), unitPrice: find('Vypočtený průměr'), unitCost: find('Průměr+SN'), onOrder: find('Objednáno'), reserved: find('Rezervováno'), lead: find('Dodací lhůta') };
+    // Bez SK nebo reg. cisla nejde parovat → radeji ohlasit nezparsovany soubor nez zapsat rozbite klice.
+    if (ci.sk < 0 || ci.reg < 0) { console.warn('[nakup-report] parseObjXlsx: nenalezen sloupec SK/reg — hlavička: ' + hdr.join(' | ')); return { rows: [], columns: hdr }; }
     const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isNaN(n) ? 0 : Math.round(n * 1000) / 1000; };
     const str = v => String(v == null ? '' : v).trim();
     const out = [];
@@ -83,6 +90,7 @@ function mount(host) {
       let rows, dt;
       if (f.id === newest.id) { rows = parsedNewest.rows; dt = newestDate; }
       else { const dl = await drive.downloadFileBase64(f.id, 20 * 1024 * 1024); rows = parseObjXlsx(Buffer.from(dl.base64, 'base64')).rows; dt = dateOfName(f.name); }
+      if (!fullSnap(rows)) { console.warn('[nakup-report] bootstrap pohybů: ' + f.name + ' vypadá jako částečný export (' + rows.length + ' řádků) — přeskočen'); continue; }
       if (prevRows && dt && prevDate && dt !== prevDate) applyMovement(prevRows, prevDate, rows, dt);
       prevRows = rows; prevDate = dt;
     }
@@ -156,6 +164,10 @@ function mount(host) {
       let rows, dt;
       if (f.id === newest.id) { rows = parsedNewest.rows; dt = newestDate; }
       else { const dl = await drive.downloadFileBase64(f.id, 20 * 1024 * 1024); rows = parseObjXlsx(Buffer.from(dl.base64, 'base64')).rows; dt = dateOfName(f.name); }
+      if (!fullSnap(rows)) { console.warn('[nakup-report] bootstrap bilance: ' + f.name + ' vypadá jako částečný export (' + rows.length + ' řádků) — přeskočen');
+        // pri prepoctu smaz i stary zaznam toho dne (mohl vzniknout drive s rozbitym parserem)
+        if (forceAll && dt) { try { const arr = loadBilance().filter(e => e.date !== dt); fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} }
+        continue; }
       if (dt) { const B = computeBilance(rows, dt, prevRows, prevDate); if (forceAll) { const arr = loadBilance().filter(e => e.date !== dt); arr.push(B); arr.sort((a, b) => String(a.date).localeCompare(String(b.date))); try { fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} } else pushBilance(B); }
       prevRows = rows; prevDate = dt;
     }
@@ -182,7 +194,7 @@ function mount(host) {
           if (parsedNow && parsedNow.rows) { await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
         } catch (e) { console.warn('[nakup-report] pohyby (skip):', e.message); }
       }
-      if (loadBilance().length === 0 || !st.bilanceFixV5) {
+      if (loadBilance().length === 0 || !st.bilanceFixV6) {
         try {
           // Pozor: dřív se tu jen četl OBJ_LIVE a když chyběl, TIŠE se nestalo nic → bilance zůstala
           // navždy prázdná. Nově se soubor v takovém případě stáhne z Disku.
@@ -193,8 +205,12 @@ function mount(host) {
             console.log('[nakup-report] bilance: OBJ_LIVE chyběl → soubor stažen z Disku');
           }
           const force = loadBilance().length > 0;
+          // V6: soubor z 20. 8. 2026 měl přejmenovaný sloupec a rozbil klíče → v historii je den
+          // se skladem 0 a dva dny bez pohybů. Přepočet bilance I pohybů ze všech souborů.
+          try { fs.unlinkSync(MOVE_F); } catch (_) {}
+          await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today);
           await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today, force);
-          st.bilanceFixV5 = 1;
+          st.bilanceFixV6 = 1;
           console.log('[nakup-report] bilance: ' + (force ? 'jednorázový přepočet historie' : 'bootstrap') + ' z denních souborů → ' + loadBilance().length + ' dnů');
         } catch (e) { console.warn('[nakup-report] bilance (skip):', e.message); }
       }
@@ -204,6 +220,7 @@ function mount(host) {
     const dl = await drive.downloadFileBase64(newest.id, 20 * 1024 * 1024);
     const parsed = parseObjXlsx(Buffer.from(dl.base64, 'base64'));
     if (!parsed.rows.length) return { ok: false, error: 'Soubor ' + newest.name + ' se nepodařilo rozparsovat.' };
+    if (!fullSnap(parsed.rows)) return { ok: false, error: 'Soubor ' + newest.name + ' vypadá jako ČÁSTEČNÝ export (' + parsed.rows.length + ' řádků, méně než polovina sortimentu) — přeskočen, jede se z posledního plného dne.' };
     const dataDate = dateOfName(newest.name) || today;
     // --- POHYBY: rozdíl vůči předchozí momentce; při prázdné historii bootstrap z denních souborů ---
     try {
@@ -215,13 +232,13 @@ function mount(host) {
       try {
         const prevForFlow = (prev && prev.rows && prev.date && prev.date !== dataDate) ? prev.rows : null;
         if (loadBilance().length === 0) await bootstrapBilance(xls, newest, parsed, dataDate);
-        else if (!st.bilanceFixV5) { await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV5 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů'); }
+        else if (!st.bilanceFixV6) { try { fs.unlinkSync(MOVE_F); } catch (_) {} await bootstrapMovements(xls, newest, parsed, dataDate); await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV6 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů (V6)'); }
         else pushBilance(computeBilance(parsed.rows, dataDate, prevForFlow, prevForFlow ? prev.date : null));
       } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
       fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder, reserved: r.reserved })) }));
     } catch (e) { console.warn('[nakup-report] pohyby:', e.message); }
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));
-    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV5: st.bilanceFixV5 || 0 };
+    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV6: st.bilanceFixV6 || 0 };
     try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
     console.log('[nakup-report] Drive sync: ' + newest.name + ' → ' + parsed.rows.length + ' položek');
     return { ok: true, file: newest.name, rows: parsed.rows.length };
@@ -345,6 +362,14 @@ function mount(host) {
   const onlyActive = rows => { const k = activeKeys(); if (!k.size) return rows || []; const nk = newKeys();
     return (rows || []).filter(r => { const key = r.sk + '-' + r.reg; return k.has(key) || nk.has(key); }); };
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
+  // Plny snimek skladu = soubor pokryva aspon polovinu aktivniho sortimentu. Castecne exporty
+  // (20260804.xlsx: 364 radku, jen oversold polozky se zapornym skladem) nesmi do bilance ani
+  // do pohybu — rozdil proti nim vyrobi fantomovy vydej v milionech (« extrem 5,18 M z 4. 8. »).
+  function fullSnap(rows) {
+    const act = activeKeys(); if (!act.size) return true;
+    let n = 0; (rows || []).forEach(r => { if (act.has(r.sk + '-' + r.reg)) n++; });
+    return n >= act.size * 0.5;
+  }
 
   // ---------- výpočet (port klasifikace + markdown + nákup z klientské appky) ----------
   function analyze(cfg) {
