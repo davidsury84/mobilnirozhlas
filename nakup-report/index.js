@@ -180,13 +180,18 @@ function mount(host) {
       }
       if (loadBilance().length === 0 || !st.bilanceFixV4) {
         try {
+          // Pozor: dřív se tu jen četl OBJ_LIVE a když chyběl, TIŠE se nestalo nic → bilance zůstala
+          // navždy prázdná. Nově se soubor v takovém případě stáhne z Disku.
           let parsedNow = null; try { parsedNow = JSON.parse(fs.readFileSync(OBJ_LIVE, 'utf8')); } catch (_) {}
-          if (parsedNow && parsedNow.rows) {
-            const force = loadBilance().length > 0;
-            await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today, force);
-            st.bilanceFixV4 = 1;
-            console.log('[nakup-report] bilance: ' + (force ? 'jednorázový přepočet historie' : 'bootstrap') + ' z denních souborů');
+          if (!(parsedNow && parsedNow.rows && parsedNow.rows.length)) {
+            const dl = await drive.downloadFileBase64(newest.id, 20 * 1024 * 1024);
+            parsedNow = { rows: parseObjXlsx(Buffer.from(dl.base64, 'base64')).rows, date: dateOfName(newest.name) };
+            console.log('[nakup-report] bilance: OBJ_LIVE chyběl → soubor stažen z Disku');
           }
+          const force = loadBilance().length > 0;
+          await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today, force);
+          st.bilanceFixV4 = 1;
+          console.log('[nakup-report] bilance: ' + (force ? 'jednorázový přepočet historie' : 'bootstrap') + ' z denních souborů → ' + loadBilance().length + ' dnů');
         } catch (e) { console.warn('[nakup-report] bilance (skip):', e.message); }
       }
       st.lastSyncDate = today; try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
