@@ -427,14 +427,17 @@ function mount(host) {
   function computeOrderRow(x, sales, P, m0) {
     // Nová položka bez kvartální historie: poptávku odhadneme z pozorované denní spotřeby
     // (denní snímky skladu) — plochý průměr, dokud se neobjeví v kvartálním reportu.
+    let novaPolozka = false;
     if (!sales || !sales.reduce((s, v) => s + (v || 0), 0)) {
       const e = loadMoves()[x.sk + '-' + x.reg];
       // Potreba aspon 10 dnu pozorovani, jinak je odhad z par dnu nespolehlivy (jen se ohlasi, neobjednava).
-      if (e && e.days >= 10 && e.sum > 0) { const perMonth = (e.sum / e.days) * 30; sales = new Array(12).fill(perMonth); }
+      if (e && e.days >= 10 && e.sum > 0) { const perMonth = (e.sum / e.days) * 30; sales = new Array(12).fill(perMonth); novaPolozka = true; }
     }
     const D = sales ? sales.reduce((s, v) => s + (v || 0), 0) : 0;
     const dem = robustSales(sales);
-    const Lm = (x.lead || 0) / 30, coverM = Math.max(0.5, P.cover || 2);
+    // U nove polozky je poptavka odhad z par tydnu pozorovani → objednavame opatrneji: lhuta + 1 mesic
+    // misto lhuta + 2. Za mesic bude vic dat a doobjedna se; lepsi objednat dvakrat nez jednou moc.
+    const Lm = (x.lead || 0) / 30, coverM = novaPolozka ? Math.min(1, Math.max(0.5, P.cover || 2)) : Math.max(0.5, P.cover || 2);
     let windowM = Lm + coverM, ramp = false, rampTo = '';
     // Náběh sezóny: sezónní produkt objednávej s předstihem (lhůta + pokrytí) před špičkou, pokryj do konce špičky.
     const sea = seasonInfo(dem);
@@ -452,7 +455,7 @@ function mount(host) {
     else if (D <= 0) status = 'bez prodeje';
     else if (ramp) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = 'náběh sezóny ' + rampTo; } else status = 'sezóna pokryta'; }
     else if (windowDem < 0.5) status = 'mimo sezónu';
-    else if (position <= rop) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = 'objednat'; } else status = 'zásoba stačí'; }
+    else if (position <= rop) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = novaPolozka ? 'objednat (nová položka)' : 'objednat'; } else status = 'zásoba stačí'; }
     rec = Math.max(0, rec);
     const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, dem, m0);
     return { D, rec, status, ramp, value: (x.unitCost > 0 ? x.unitCost : (x.unitPrice || 0)) * rec, coverAfter };
@@ -678,7 +681,8 @@ function mount(host) {
     if (p === '/api/nakup-report/objednavky' && req.method === 'GET') {
       const o = loadObj(), mv = loadMoves();
       const rows = (o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
-      json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup() }));
+      try { detectNew(o.rows); } catch (_) {}
+      json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup(), noveKlice: Object.keys(loadNew()) }));
       return true;
     }
     // „obrat plasty" (prodejní historie) — čerstvý raw xlsx pro klienta (SMI app ho parsuje). Přihlášený.

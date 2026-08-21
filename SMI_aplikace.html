@@ -2039,9 +2039,15 @@ function objRobust(sales){
   return {robust:robust,raw:arr,outlier:outlier,sporadic:sporadic};
 }
 function objComputeOrder(x,sales,P,m0,sea,dem){
+  // Nova polozka (neni v kvartalnim prehledu): poptavka z pozorovane denni spotreby, min. 10 dnu,
+  // a opatrnejsi kryti — lhuta + 1 mesic misto + 2.
+  let nova=false;
+  if((!sales||!sales.reduce((s,v)=>s+(v||0),0)) && x.recentDaily>0 && (x.moveDays||0)>=10){
+    const perMonth=x.recentDaily*30; sales=new Array(12).fill(perMonth); dem=sales; nova=true;
+  }
   dem=dem||sales;                          // dem = robustní poptávka (bez jednorázového extrému); sales = skutečná pro roční prodej D
   const D=sales?sales.reduce((s,v)=>s+v,0):0;
-  const Lm=(x.lead||0)/30, coverM=Math.max(0.5,P.cover);
+  const Lm=(x.lead||0)/30, coverM=nova?Math.min(1,Math.max(0.5,P.cover)):Math.max(0.5,P.cover);
   let windowM=Lm+coverM, ramp=false, rampTo='';
   // Náběh sezóny: u sezónního produktu objednávej s předstihem (lhůta + cíl. pokrytí)
   // před začátkem špičky a pokryj poptávku až do konce špičky.
@@ -2060,10 +2066,10 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   else if(D<=0){ status='Bez prodeje'; }
   else if(ramp){ const need=Math.round(windowDem-position); if(need>0){ rec=Math.max(P.MOQ||1,need); status='Náběh sezóny '+rampTo; } else status='Sezóna pokryta'; }
   else if(windowDem<0.5){ status='Mimo sezónu'; }
-  else if(position<=rop){ const need=Math.round(windowDem-position); if(need>0){ rec=Math.max(P.MOQ||1,need); status='Objednat'; } else status='Zásoba stačí'; }
+  else if(position<=rop){ const need=Math.round(windowDem-position); if(need>0){ rec=Math.max(P.MOQ||1,need); status=nova?'Objednat (nová položka)':'Objednat'; } else status='Zásoba stačí'; }
   rec=Math.max(0,rec);
   const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,dem,m0);
-  return {D,rec,status,ramp,value:(x.unitCost>0?x.unitCost:(x.unitPrice||0))*rec,windowDem:Math.round(windowDem),coverAfter:coverAfter};
+  return {D,rec,status,ramp,nova,value:(x.unitCost>0?x.unitCost:(x.unitPrice||0))*rec,windowDem:Math.round(windowDem),coverAfter:coverAfter};
 }
 // Společné objednávání dodavatele (joint replenishment): z Číny jede jedna zásilka se sortimentem
 // celého dodavatele → doprava se sdílí. Optimální společný interval T* = √(2·doprava / Σ(poptávka×skladné/ks)).
@@ -2160,7 +2166,9 @@ async function renderObjednavky(){
   // Pracujeme jen s položkami, které jsou v „obrat plasty" — zbytek ERP nemá prodejní historii,
   // nedá se u něj nic doporučit a jen zaplevelí tabulku (1 469 řádků balastu).
   if(OBJ_DATA.allRows && Object.keys(smap).length){
-    OBJ_DATA.rows=OBJ_DATA.allRows.filter(x=>smap[String(x.sk)+'-'+String(x.reg)]!==undefined);
+    // Nove polozky jeste nejsou v kvartalnim prehledu — server je hlasi zvlast, at nezmizi z tabulky.
+    const nove=new Set(OBJ_DATA.noveKlice||[]);
+    OBJ_DATA.rows=OBJ_DATA.allRows.filter(x=>{const k=String(x.sk)+'-'+String(x.reg);return smap[k]!==undefined||nove.has(k);});
     const sel=$('#objSup');
     if(sel){const sups=[...new Set(OBJ_DATA.rows.map(x=>x.skupina))].sort((a,b)=>String(a).localeCompare(String(b),'cs'));
       const cur=sel.value; sel.innerHTML='<option value="">Všichni dodavatelé ('+OBJ_DATA.rows.length+')</option>'+sups.map(s=>'<option>'+esc(s)+'</option>').join(''); sel.value=cur;}
