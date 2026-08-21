@@ -2064,6 +2064,32 @@ function objMonthsSilent(sales){
   let gap=0; for(let k=0;k<12;k++){ if(s[((a.idx-k)%12+12)%12]>0)break; gap++; }
   return gap+a.stale;
 }
+// Charakter prodeje, než položka ztichla — viz salesPattern() na serveru.
+// 'ukonceny' = pravidelný prodej měsíc po měsíci, který skončil (konec sortimentu / ztracený zákazník)
+// 'narazovy' = pár měsíců a jinak ticho (projektová zakázka, která doběhla)
+function objSalesPattern(sales){
+  const a=objAnchor(), s=(sales||[]).map(v=>+v||0), MR=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+  if(!s.reduce((x,v)=>x+v,0))return {typ:'',mesicu:0,beh:0,prubeh:'',ts:[],lbl:[]};
+  const ts=[],lbl=[];
+  for(let k=11;k>=0;k--){ const ci=((a.idx-k)%12+12)%12; let y=a.year,mo=a.idx+1-k; while(mo<=0){mo+=12;y--;}
+    ts.push(s[ci]); lbl.push(MR[mo-1]); }
+  let beh=0,mx=0,mesicu=0;
+  ts.forEach(v=>{ if(v>0){beh++; if(beh>mx)mx=beh; mesicu++;} else beh=0; });
+  return {typ:(mx>=4||mesicu>=6)?'ukonceny':'narazovy',mesicu,beh:mx,ts,lbl,
+    prubeh:ts.map((v,i)=>v>0?(lbl[i]+' '+fmt(v)):null).filter(Boolean).join(' · ')};
+}
+// Kolik ze svého ročního prodeje položka „zmeškala" od posledního prodeje dodnes.
+// Sezónní položka mimo sezónu mlčí právem (zimní posyp v srpnu) — to není utichnutí.
+function objMissedShare(sales,m0){
+  const a=objAnchor(), s=(sales||[]).map(v=>+v||0);
+  const D=s.reduce((x,v)=>x+v,0); if(D<=0)return 0;
+  let lastCi=-1;
+  for(let k=0;k<12;k++){const ci=((a.idx-k)%12+12)%12; if(s[ci]>0){lastCi=ci;break;}}
+  if(lastCi<0)return 1;
+  let missed=0;
+  for(let ci=(lastCi+1)%12,g=0;g<12;ci=(ci+1)%12,g++){ missed+=s[ci]; if(ci===m0)break; }
+  return missed/D;
+}
 function objLastSale(sales){
   const a=objAnchor(), s=(sales||[]).map(v=>+v||0), MR=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
   if(!s.reduce((x,v)=>x+v,0))return '';
@@ -2125,8 +2151,9 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   const silentM=nova?0:objMonthsSilent(sales);
   const dec=objDecFor(x.sk+'-'+x.reg);
   // Potvrzená položka („zakázka se opakuje") jede normálně, dokud potvrzení platí.
-  const utichla=!nova && D>0 && (x.avail||0)>=0 && silentM>=(P.silent||5) && !(x.recentDaily>0)
-    && !(dec&&dec.stav==='potvrzeno');
+  const missed=nova?0:objMissedShare(sales,m0);
+  const utichla=!nova && D>0 && (x.avail||0)>=0 && silentM>=(P.silent||5)
+    && missed>=(P.missed||0.10) && !(x.recentDaily>0) && !(dec&&dec.stav==='potvrzeno');
   let utichlaKs=0; const unitC=(x.unitCost>0?x.unitCost:(x.unitPrice||0));
   const vyrazeno=!!(dec&&dec.stav==='vyrazeno');
   if(vyrazeno){ utichlaKs=rec; rec=0; status='Vyřazeno (rozhodnutí nákupu)'; }
@@ -2134,7 +2161,8 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,dem,m0);
   return {D,rec,status,ramp,nova,value:unitC*rec,windowDem:Math.round(windowDem),coverAfter:coverAfter,
     utichla,vyrazeno,dec:dec||null,silentM,utichlaKs,utichlaVal:unitC*utichlaKs,
-    lastSale:(utichla||vyrazeno)?objLastSale(sales):''};
+    lastSale:(utichla||vyrazeno)?objLastSale(sales):'',
+    pattern:(utichla||vyrazeno)?objSalesPattern(sales):null};
 }
 // Společné objednávání dodavatele (joint replenishment): z Číny jede jedna zásilka se sortimentem
 // celého dodavatele → doprava se sdílí. Optimální společný interval T* = √(2·doprava / Σ(poptávka×skladné/ks)).
@@ -2266,32 +2294,49 @@ function objDraw(){
     if(!utichle.length&&!rozhodnute.length){ utEl.innerHTML=''; }
     else {
       const utVal=utichle.reduce((s2,x)=>s2+x._o.utichlaVal,0);
+      const uk=utichle.filter(x=>x._o.pattern&&x._o.pattern.typ==='ukonceny');
+      const na=utichle.filter(x=>!(x._o.pattern&&x._o.pattern.typ==='ukonceny'));
+      const sumV=a=>a.reduce((s2,x)=>s2+x._o.utichlaVal,0);
+      // Mini sloupcový průběh 12 měsíců — výška podle kusů, ať je vzorec vidět na první pohled.
+      const spark=pt=>{ if(!pt||!pt.ts||!pt.ts.length)return '';
+        const mx=Math.max.apply(null,pt.ts)||1;
+        return '<span style="display:inline-flex;align-items:flex-end;gap:1px;height:18px" title="'+esc(pt.prubeh)+'">'
+          +pt.ts.map((v,k)=>'<i style="display:block;width:5px;height:'+(v>0?Math.max(3,Math.round(v/mx*18)):1)+'px;background:'+(v>0?'#8a2f52':'#e2d5da')+'"></i>').join('')
+          +'</span>'; };
+      const tabulka=(nadpis,arr,barva,popis)=>{ if(!arr.length)return '';
+        return '<h4 style="margin:16px 0 3px;font-size:14px;color:'+barva+'">'+nadpis
+          +' <span class="muted" style="font-weight:400">· '+fmt(arr.length)+' pol. · '+fmt(sumV(arr))+' Kč</span></h4>'
+          +'<div class="muted" style="font-size:12.5px;margin-bottom:7px">'+popis+'</div>'
+          +'<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>'
+          +['Kód','Položka','Dodavatel','Průběh 12 měs.','Měs.','Ticho','Roč.','Sklad','Objednal by','Hodnota','Rozhodnutí']
+            .map((t,k)=>'<th style="text-align:'+(k>3?'right':'left')+';padding:5px 8px;border-bottom:1px solid #eccdd9;font-size:11px;color:#8a2f52">'+esc(t)+'</th>').join('')
+          +'</tr></thead><tbody>'
+          +arr.map(x=>'<tr>'
+            +'<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">'+esc(x.sk+'-'+x.reg)+'</td>'
+            +'<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea"><b>'+esc(x.nazev)+'</b></td>'
+            +'<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea" class="muted">'+esc(x.skupina)+'</td>'
+            +'<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">'+spark(x._o.pattern)+'</td>'
+            +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+((x._o.pattern&&x._o.pattern.mesicu)||0)+'</td>'
+            +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+(x._o.silentM>=99?'12+ m':x._o.silentM+' m')+'</td>'
+            +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+fmt(x._o.D)+'</td>'
+            +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+fmt(x.stock)+'</td>'
+            +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+fmt(x._o.utichlaKs)+' ks</td>'
+            +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea"><b>'+fmt(x._o.utichlaVal)+' Kč</b></td>'
+            +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea;white-space:nowrap">'
+              +'<button class="btn" style="padding:3px 9px;font-size:12px" onclick="utRozhodni(\''+esc(x.sk+'-'+x.reg)+'\',\'vyrazeno\')" title="Neobjednávat">Vyřadit</button> '
+              +'<button class="btn" style="padding:3px 9px;font-size:12px" onclick="utRozhodni(\''+esc(x.sk+'-'+x.reg)+'\',\'potvrzeno\')" title="Objednávat normálně">Potvrdit</button> '
+              +'<button class="btn" style="padding:3px 7px;font-size:12px" onclick="objAsk(\''+esc(x.sk+'-'+x.reg)+'\')" title="Poradce k položce">?</button>'
+            +'</td></tr>').join('')
+          +'</tbody></table>'; };
       utEl.innerHTML='<div style="background:#fdf2f6;border:1px solid #eccdd9;border-radius:12px;padding:12px 15px;margin:10px 0 14px">'
         +'<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">'
-        +'<div><b style="font-size:15px">🔕 '+fmt(utichle.length)+' položek utichlo — ověřit u nákupu / obchodu</b>'
-        +'<div class="muted" style="font-size:12.5px;margin-top:2px">Neprodávají 5+ měsíců, ale model by je objednal za '+fmt(utVal)+' Kč. '
-        +'Typicky doběhlá projektová zakázka — proto se <b>neobjednávají automaticky</b>. '
-        +'U každé rozhodněte: <b>Vyřadit</b> (zakázka doběhla) nebo <b>Potvrdit</b> (odbyt pokračuje → objednávat normálně).</div></div>'
+        +'<div><b style="font-size:15px">🔕 '+fmt(utichle.length)+' položek utichlo — rozhodnout o vyřazení / potvrzení</b>'
+        +'<div class="muted" style="font-size:12.5px;margin-top:2px">Neprodávají 5+ měsíců, ale model by je objednal za '+fmt(utVal)+' Kč — proto se <b>neobjednávají automaticky</b>.<br>'
+        +'📉 <b>'+fmt(uk.length)+'</b> ukončený sortiment ('+fmt(sumV(uk))+' Kč) · 📦 <b>'+fmt(na.length)+'</b> nárazová zakázka ('+fmt(sumV(na))+' Kč)</div></div>'
         +'<button class="btn" id="utToggle" style="white-space:nowrap">Zobrazit seznam</button></div>'
-        +'<div id="utBody" style="display:none;margin-top:12px;overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:13px">'
-        +'<thead><tr>'+['Kód','Položka','Dodavatel','Poslední prodej','Ticho','Sklad','K dispo','Model by objednal','Hodnota','Rozhodnutí']
-          .map((t,i)=>'<th style="text-align:'+(i>3?'right':'left')+';padding:5px 8px;border-bottom:1px solid #eccdd9;font-size:11px;color:#8a2f52">'+esc(t)+'</th>').join('')+'</tr></thead><tbody>'
-        +utichle.map(x=>'<tr>'
-          +'<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">'+esc(x.sk+'-'+x.reg)+'</td>'
-          +'<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea"><b>'+esc(x.nazev)+'</b></td>'
-          +'<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea" class="muted">'+esc(x.skupina)+'</td>'
-          +'<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">'+esc(x._o.lastSale||'—')+'</td>'
-          +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+(x._o.silentM>=99?'12+ m':x._o.silentM+' m')+'</td>'
-          +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+fmt(x.stock)+'</td>'
-          +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+fmt(x.avail)+'</td>'
-          +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">'+fmt(x._o.utichlaKs)+' ks</td>'
-          +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea"><b>'+fmt(x._o.utichlaVal)+' Kč</b></td>'
-          +'<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea;white-space:nowrap">'
-            +'<button class="btn" style="padding:3px 9px;font-size:12px" onclick="utRozhodni(\''+esc(x.sk+'-'+x.reg)+'\',\'vyrazeno\')" title="Zakázka doběhla — položku neobjednávat">Vyřadit</button> '
-            +'<button class="btn" style="padding:3px 9px;font-size:12px" onclick="utRozhodni(\''+esc(x.sk+'-'+x.reg)+'\',\'potvrzeno\')" title="Odbyt bude pokračovat — objednávat normálně">Potvrdit</button> '
-            +'<button class="btn" style="padding:3px 7px;font-size:12px" onclick="objAsk(\''+esc(x.sk+'-'+x.reg)+'\')" title="Otevřít poradce k této položce">?</button>'
-          +'</td></tr>').join('')
-        +'</tbody></table>'
+        +'<div id="utBody" style="display:none;margin-top:6px;overflow-x:auto">'
+        +tabulka('📉 Ukončený sortiment',uk,'#8a2f52','Prodávalo se <b>pravidelně měsíc po měsíci</b> a pak to skončilo. <b>Proč?</b> Konec sortimentu (nahrazeno, dodavatel skončil), nebo <b>ztracený zákazník</b>, kterého chceme zpět?')
+        +tabulka('📦 Nárazová zakázka',na,'#7a5200','Prodalo se <b>v pár měsících a jinak ticho</b> — projektová/obecní zakázka, která doběhla. <b>Bude se opakovat?</b> Pokud ne, objedná se až proti konkrétní objednávce.')
         +(rozhodnute.length?('<div style="margin-top:12px;padding-top:10px;border-top:1px solid #eccdd9;font-size:12.5px">'
           +'<b>Už rozhodnuto ('+fmt(rozhodnute.length)+'):</b> '
           +rozhodnute.map(x=>'<span style="display:inline-block;background:#fff;border:1px solid #e0d0d8;border-radius:6px;padding:2px 7px;margin:3px 4px 0 0">'

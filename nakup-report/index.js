@@ -464,6 +464,40 @@ function mount(host) {
     for (let k = 0; k < 12; k++) { if (s[((a.idx - k) % 12 + 12) % 12] > 0) break; gap++; }
     return gap + a.stale;
   }
+  // Charakter prodeje utichle polozky. Neni jedno, JAK se prodavala, nez ztichla:
+  //   'ukonceny'  = prodavala se pravidelne mesic po mesici (napr. II-VIII) a pak to skonclo
+  //                 -> konec sortimentu / ztraceny zakaznik. Otazka: proc a je to nahrazene?
+  //   'narazovy'  = prodala se v par mesicich a jinak ticho (napr. 415 ks v jednom mesici)
+  //                 -> projektova/obecni zakazka. Otazka: bude se opakovat?
+  // Prah: 4+ mesicu v souvislem behu NEBO 6+ mesicu s prodejem = pravidelny sortiment.
+  function salesPattern(sales) {
+    const a = salesAnchor(), s = (sales || []).map(v => +v || 0);
+    if (!s.reduce((x, v) => x + v, 0)) return { typ: '', mesicu: 0, beh: 0, prubeh: '' };
+    const ts = [], lbl = [];
+    for (let k = 11; k >= 0; k--) {
+      const ci = ((a.idx - k) % 12 + 12) % 12;
+      let y = a.year, mo = a.idx + 1 - k; while (mo <= 0) { mo += 12; y--; }
+      ts.push(s[ci]); lbl.push(MN_RIM[mo - 1]);
+    }
+    let beh = 0, mx = 0, mesicu = 0;
+    ts.forEach(v => { if (v > 0) { beh++; if (beh > mx) mx = beh; mesicu++; } else beh = 0; });
+    return { typ: (mx >= 4 || mesicu >= 6) ? 'ukonceny' : 'narazovy', mesicu, beh: mx, ts, lbl,
+      prubeh: ts.map((v, i) => v > 0 ? (lbl[i] + ' ' + fmt(v)) : null).filter(Boolean).join(' · ') };
+  }
+  // Kolik ze sveho ROCNIHO prodeje polozka „zmeskala" od posledniho prodeje do dneska.
+  // Pouhy pocet mesicu ticha nestaci: „Nadoba na zimni posyp" prodava IX-II, takze v srpnu
+  // mlci PRAVEM — to neni utichnuti, to je mimo sezonu. Signal je az to, ze polozka mine mesice,
+  // ve kterych HISTORICKY prodavala, a nic se nestane.
+  function missedShare(sales, m0) {
+    const a = salesAnchor(), s = (sales || []).map(v => +v || 0);
+    const D = s.reduce((x, v) => x + v, 0); if (D <= 0) return 0;
+    let lastCi = -1;
+    for (let k = 0; k < 12; k++) { const ci = ((a.idx - k) % 12 + 12) % 12; if (s[ci] > 0) { lastCi = ci; break; } }
+    if (lastCi < 0) return 1;
+    let missed = 0;
+    for (let ci = (lastCi + 1) % 12, g = 0; g < 12; ci = (ci + 1) % 12, g++) { missed += s[ci]; if (ci === m0) break; }
+    return missed / D;
+  }
   // Popisek posledniho prodeje, napr. „XII 2025 (18 ks)".
   function lastSaleTxt(sales) {
     const a = salesAnchor(), s = (sales || []).map(v => +v || 0);
@@ -539,8 +573,12 @@ function mount(host) {
     const silentM = novaPolozka ? 0 : monthsSilent(sales);
     const dec = decFor(x.sk + '-' + x.reg);
     // Potvrzena polozka („zakazka se opakuje") jede normalne, dokud potvrzeni plati.
+    // Utichla = mlci 5+ mesicu A ZAROVEN uz zmeskala aspon 10 % sveho rocniho prodeje
+    // (tj. minula mesice, ve kterych normalne prodava). Bez druhe podminky by se do seznamu
+    // dostavaly sezonni polozky mimo sezonu — zimni posyp v srpnu apod.
+    const missed = novaPolozka ? 0 : missedShare(sales, m0);
     const utichla = !novaPolozka && D > 0 && (x.avail || 0) >= 0 && silentM >= (P.silent || 5)
-      && !(mvE && mvE.sum > 0) && !(dec && dec.stav === 'potvrzeno');
+      && missed >= (P.missed || 0.10) && !(mvE && mvE.sum > 0) && !(dec && dec.stav === 'potvrzeno');
     let utichlaKs = 0;
     const unitC = (x.unitCost > 0 ? x.unitCost : (x.unitPrice || 0));
     const vyrazeno = !!(dec && dec.stav === 'vyrazeno');
@@ -549,7 +587,8 @@ function mount(host) {
     const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, dem, m0);
     return { D, rec, status, ramp, value: unitC * rec, coverAfter,
       utichla, vyrazeno, dec: dec || null, silentM, utichlaKs, utichlaVal: unitC * utichlaKs,
-      lastSale: (utichla || vyrazeno) ? lastSaleTxt(sales) : '' };
+      lastSale: (utichla || vyrazeno) ? lastSaleTxt(sales) : '',
+      pattern: (utichla || vyrazeno) ? salesPattern(sales) : null, missed };
   }
   // Seznam utichlých položek čekajících na rozhodnutí — sdílený reportem i aplikací.
   // Hlásíme jen ty, které by model JINAK objednal; ostatní jsou šum.
@@ -566,42 +605,60 @@ function mount(host) {
     // Přehled už rozhodnutých (pro kontext v reportu i v aplikaci).
     const dec = decCached(); const rozhodnuto = { vyrazeno: 0, potvrzeno: 0 };
     Object.keys(dec).forEach(k => { const d = decFor(k); if (d && rozhodnuto[d.stav] != null) rozhodnuto[d.stav]++; });
-    return { items: out, val: out.reduce((s2, r) => s2 + r.o.utichlaVal, 0), date: obj.date || obj.source || '', rozhodnuto };
+    const ukonceny = out.filter(r => r.o.pattern && r.o.pattern.typ === 'ukonceny');
+    const narazovy = out.filter(r => !(r.o.pattern && r.o.pattern.typ === 'ukonceny'));
+    const sumVal = a => a.reduce((s2, r) => s2 + r.o.utichlaVal, 0);
+    return { items: out, ukonceny, narazovy, val: sumVal(out),
+      valUkonceny: sumVal(ukonceny), valNarazovy: sumVal(narazovy),
+      date: obj.date || obj.source || '', rozhodnuto };
   }
 
   // ---------- report „utichlé položky — rozhodnout" ----------
   function buildUtichle(cfg) {
-    const { items, val, date, rozhodnuto: roz } = collectUtichle(cfg);
+    const { items, ukonceny, narazovy, val, valUkonceny, valNarazovy, date, rozhodnuto: roz } = collectUtichle(cfg);
     const url = String((host.mailFrom && host.mailFrom.publicUrl) || process.env.PUBLIC_URL || 'https://intranet.elkoplast.cz').replace(/\/$/, '');
     const odkaz = url + '/smi-app';
     if (!items.length) {
       return { subject: 'Utichlé položky — nic k rozhodnutí · ' + date, count: 0, val: 0,
         html: wrap('Utichlé položky', 'Nic k rozhodnutí', '<p>Žádná položka teď nečeká na rozhodnutí. Všechny, které model doporučuje, mají živý prodej.</p>', date) };
     }
+    const sekce = (nadpis, arr, sval, barva, popis) => {
+      if (!arr.length) return '';
+      return '<h3 style="margin:22px 0 4px;font-size:16px;color:' + barva + '">' + esc(nadpis) +
+        ' <span style="color:#8a938a;font-weight:400;font-size:13px">· ' + fmt(arr.length) + ' pol. · ' + kc(sval) + '</span></h3>' +
+        '<p style="margin:0 0 8px;font-size:13px;color:#4a544c">' + popis + '</p>' +
+        '<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>' +
+        L('Kód') + L('Položka') + L('Dodavatel') + L('Průběh prodeje (12 měsíců)') + R('Měs.') + R('Ticho') + R('Roč.') + R('Sklad') + R('Objednal by') + R('Hodnota') +
+        '</tr></thead><tbody>' + arr.map(r =>
+          '<tr><td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">' + esc(r.x.sk + '-' + r.x.reg) + '</td>' +
+          '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea"><b>' + esc(r.x.nazev || '') + '</b></td>' +
+          '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">' + esc(r.x.skupina || '') + '</td>' +
+          '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea;font-size:12px;color:#4a544c">' + esc((r.o.pattern && r.o.pattern.prubeh) || '—') + '</td>' +
+          cR((r.o.pattern && r.o.pattern.mesicu) || 0) + cR(r.o.silentM >= 99 ? '12+ m' : r.o.silentM + ' m') +
+          cR(fmt(r.o.D)) + cR(fmt(r.x.stock || 0)) +
+          cR('<b>' + fmt(r.o.utichlaKs) + ' ks</b>') + cR('<b>' + kc(r.o.utichlaVal) + '</b>') + '</tr>').join('') +
+        '</tbody></table>';
+    };
     const R = t => '<th style="text-align:right;border-bottom:1px solid #eccdd9;padding:5px 8px;font-size:11px;color:#8a2f52">' + esc(t) + '</th>';
     const L = t => '<th style="text-align:left;border-bottom:1px solid #eccdd9;padding:5px 8px;font-size:11px;color:#8a2f52">' + esc(t) + '</th>';
     const cR = v => '<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">' + v + '</td>';
     const body = explainBox([
       ['Co po vás chceme', '<b>U každé položky rozhodnout: vyřadit, nebo potvrdit.</b> <b>Vyřadit</b> = zakázka doběhla, položku neobjednávat (zmizí z doporučení). <b>Potvrdit</b> = odbyt bude pokračovat → model ji začne objednávat normálně. Rozhoduje se v aplikaci: <a href="' + esc(odkaz) + '">E-shop → Optimalizace nákupu</a>, blok „Utichlé položky".'],
-      ['Proč to řešíme', 'Tyto položky <b>neprodávají 5 a více měsíců</b>, ale podle starší prodejní historie by je model objednal na sklad. Typicky jde o <b>projektovou nebo obecní zakázku, která skončila</b> — velká dodávka jednou, pak ticho. Kdyby se objednaly automaticky, uvázalo by to peníze v zásobě, která se nemusí prodat.'],
+      ['Proč to řešíme', 'Tyto položky <b>neprodávají 5 a více měsíců</b>, ale podle starší prodejní historie by je model objednal na sklad. Kdyby se objednaly automaticky, uvázalo by to peníze v zásobě, která se nemusí prodat.'],
+      ['Dva různé případy', 'Seznam je <b>rozdělený podle toho, jak se položka prodávala, než ztichla</b> — protože každý případ znamená něco jiného. <b>Ukončený sortiment</b> = prodávalo se pravidelně měsíc po měsíci a pak to skončilo (konec sortimentu, ztracený zákazník, náhrada jiným zbožím). <b>Nárazová zakázka</b> = prodalo se v pár měsících a jinak ticho (projektová/obecní zakázka, která doběhla). U každé skupiny se ptáme na něco jiného — viz nadpis sekce.'],
       ['Co se stane, když nerozhodnete', 'Nic se neobjedná a položka přijde v dalším reportu znovu. <b>Neriskujete přeskladnění</b>, ale ani nevykryjete zakázku, která by přišla. Proto raději rozhodnout.'],
       ['Jak dlouho platí „potvrdit"', 'Potvrzení platí <b>' + DEC_PLATNOST_M + ' měsíců</b>. Pak se zeptáme znovu — aby se doběhlá zakázka nevlekla v objednávkách roky.'],
       ['Jak poznáme, že položka utichla', 'Od posledního měsíce s prodejem v přehledu „obrat plasty" + doba, o kterou je tento přehled starší než dnešek. Položka, která se hýbe v <b>denních pohybech skladu</b> nebo má <b>rezervace zákazníků</b>, se za utichlou nepovažuje — je živá.']
     ]) +
       '<div style="background:#fdf2f6;border:1px solid #eccdd9;border-radius:10px;padding:12px 14px;margin:0 0 14px">' +
       '<b style="font-size:15px">🔕 ' + fmt(items.length) + ' položek čeká na rozhodnutí</b> — model by je objednal za <b>' + kc(val) + '</b>.' +
+      '<br><span style="font-size:13px">📉 <b>' + fmt(ukonceny.length) + '</b> ukončený sortiment (' + kc(valUkonceny) + ') · 📦 <b>' + fmt(narazovy.length) + '</b> nárazová zakázka (' + kc(valNarazovy) + ')</span>' +
       ((roz.vyrazeno || roz.potvrzeno) ? ('<br><span style="font-size:13px;color:#6b5560">Už rozhodnuto: <b>' + fmt(roz.vyrazeno) + '</b> vyřazeno · <b>' + fmt(roz.potvrzeno) + '</b> potvrzeno (objednávají se normálně).</span>') : '') + '<br>' +
       '<a href="' + esc(odkaz) + '" style="display:inline-block;margin-top:8px;background:#8a2f52;color:#fff;text-decoration:none;padding:8px 14px;border-radius:7px;font-weight:600">Rozhodnout v aplikaci →</a></div>' +
-      '<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>' +
-      L('Kód') + L('Položka') + L('Dodavatel') + L('Poslední prodej') + R('Ticho') + R('Roč. prodej') + R('Sklad') + R('Model by objednal') + R('Hodnota') +
-      '</tr></thead><tbody>' + items.map(r =>
-        '<tr><td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">' + esc(r.x.sk + '-' + r.x.reg) + '</td>' +
-        '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea"><b>' + esc(r.x.nazev || '') + '</b></td>' +
-        '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">' + esc(r.x.skupina || '') + '</td>' +
-        '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">' + esc(r.o.lastSale || '—') + '</td>' +
-        cR(r.o.silentM >= 99 ? '12+ m' : r.o.silentM + ' m') + cR(fmt(r.o.D)) + cR(fmt(r.x.stock || 0)) +
-        cR('<b>' + fmt(r.o.utichlaKs) + ' ks</b>') + cR('<b>' + kc(r.o.utichlaVal) + '</b>') + '</tr>').join('') +
-      '</tbody></table>';
+      sekce('📉 Ukončený sortiment', ukonceny, valUkonceny, '#8a2f52',
+        'Prodávalo se <b>pravidelně měsíc po měsíci</b> a pak to skončilo. <b>Ptáme se: proč?</b> Je to konec sortimentu (nahrazeno, dodavatel skončil, změna normy), nebo jsme <b>ztratili zákazníka</b> a chceme ho zpět? Podle toho vyřadit, nebo potvrdit a řešit obchodně.') +
+      sekce('📦 Nárazová zakázka', narazovy, valNarazovy, '#7a5200',
+        'Prodalo se <b>v pár měsících a jinak ticho</b> — vypadá to na projektovou nebo obecní zakázku, která doběhla. <b>Ptáme se: bude se opakovat?</b> Pokud ano, potvrďte a bude se objednávat. Pokud ne, vyřaďte — objedná se pak až proti konkrétní objednávce.');
     return { subject: 'Utichlé položky — rozhodnout o vyřazení / potvrzení (' + fmt(items.length) + ' pol.) · ' + date,
       html: wrap('Utichlé položky — rozhodnout', 'Neprodávají 5+ měsíců, ale model by je objednal', body, date), count: items.length, val };
   }
@@ -870,7 +927,7 @@ function mount(host) {
       return json(res, 200, { date: d2, val: v2, rozhodnuto, platnostM: DEC_PLATNOST_M, rozhodnuti: loadDec(),
         items: it2.map(r => ({ key: r.x.sk + '-' + r.x.reg, nazev: r.x.nazev, dodavatel: r.x.skupina,
           stock: r.x.stock, avail: r.x.avail, D: r.o.D, silentM: r.o.silentM, lastSale: r.o.lastSale,
-          ks: r.o.utichlaKs, val: r.o.utichlaVal })) }), true;
+          ks: r.o.utichlaKs, val: r.o.utichlaVal, pattern: r.o.pattern })) }), true;
     }
     if (p === '/api/nakup-report/utichle' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
