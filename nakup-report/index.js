@@ -606,18 +606,26 @@ function mount(host) {
       const days = bal.map(e => ({ date: e.flowDate, souborDate: e.date, dny: e.flowDays || 1, dispKc: e.flow.dispatched.kc, dispKs: e.flow.dispatched.ks,
         recvKc: e.flow.received.kc, resKc: e.flow.newReserved.kc, ordKc: e.flow.newOnOrder.kc,
         stockKc: e.stock.kc, polozek: itemsPerDay[e.date] || 0 }));
-      // týdny (ISO)
+      // Mimořádné dny: jednorázové zaúčtování / inventurní úprava, ne prodej. Poznáme je podle
+      // násobku mediánu dnů s pohybem (stejný princip jako u jednorázových extrémů v prodejích).
+      const nz = days.filter(d => d.dispKc > 0).map(d => d.dispKc).sort((a, b) => a - b);
+      const med = nz.length ? (nz.length % 2 ? nz[(nz.length - 1) / 2] : (nz[nz.length / 2 - 1] + nz[nz.length / 2]) / 2) : 0;
+      const limit = med > 0 ? med * 5 : Infinity;
+      days.forEach(d => { d.mimoradny = d.dispKc > limit; });
+      // týdny (ISO) — mimořádné dny se do obratu NEPOČÍTAJÍ, evidují se zvlášť
       const wk = {};
       days.forEach(d => { const dt = new Date(d.date + 'T00:00:00Z'); if (isNaN(dt)) return;
-        const w = isoWeek(dt), e = wk[w] || (wk[w] = { week: w, from: d.date, to: d.date, dispKc: 0, dispKs: 0, recvKc: 0, resKc: 0, dni: 0, polozek: 0 });
+        const w = isoWeek(dt), e = wk[w] || (wk[w] = { week: w, from: d.date, to: d.date, dispKc: 0, dispKs: 0, recvKc: 0, resKc: 0, dni: 0, polozek: 0, mimoradneKc: 0, mimoradnychDnu: 0 });
         if (d.date < e.from) e.from = d.date; if (d.date > e.to) e.to = d.date;
-        e.dispKc += d.dispKc; e.dispKs += d.dispKs; e.recvKc += d.recvKc; e.resKc += d.resKc; e.dni++; e.polozek += d.polozek; });
+        e.recvKc += d.recvKc; e.resKc += d.resKc; e.dni++; e.polozek += d.polozek;
+        if (d.mimoradny) { e.mimoradneKc += d.dispKc; e.mimoradnychDnu++; }
+        else { e.dispKc += d.dispKc; e.dispKs += d.dispKs; } });
       const weeks = Object.values(wk).sort((a, b) => String(a.week).localeCompare(String(b.week)));
       const top = Object.keys(agg).map(k => { const m = meta[k] || {};
         return { kod: k, nazev: m.n || k, dodavatel: m.sup || '', ks: agg[k].ks, dny: agg[k].dny, kc: Math.round(agg[k].ks * (m.uc || 0)) }; })
         .sort((a, b) => b.ks - a.ks).slice(0, 30);
       const itemHist = {}; top.forEach(t => { itemHist[t.kod] = (mv[t.kod] || {}).hist || []; });
-      return json(res, 200, { ok: true, days, weeks, top, itemHist, dataDate: o.date || '', dniCelkem: days.length }), true;
+      return json(res, 200, { ok: true, days, weeks, top, itemHist, dataDate: o.date || '', dniCelkem: days.length, limitMimoradne: isFinite(limit) ? Math.round(limit) : null }), true;
     }
     // Historie snímků SMI (mrtvé zásoby v čase) — sdílená, přístup jako e-shop
     if (p === '/api/nakup-report/historie' && req.method === 'GET') {

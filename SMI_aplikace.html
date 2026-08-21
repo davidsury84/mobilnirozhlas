@@ -291,7 +291,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="charts" style="grid-template-columns:1fr 1fr">
         <div class="card"><h3>Týdenní obrat (výdej ze skladu)</h3><canvas id="veWeekChart" height="150"></canvas>
           <div class="note" style="margin-top:8px">Klikni na sloupec týdne → rozpad po dnech níže.</div></div>
-        <div class="card"><h3>Denní výdej</h3><canvas id="veDayChart" height="150"></canvas></div>
+        <div class="card"><h3>Denní výdej</h3><canvas id="veDayChart" height="150"></canvas>
+          <div class="note" id="veOutNote" style="margin-top:8px;display:none"></div></div>
       </div>
       <div class="charts" style="grid-template-columns:1fr 1fr;margin-top:14px">
         <div class="card"><h3>Týdny <span class="muted" style="font-weight:400;font-size:12px">— klikatelné</span></h3>
@@ -1321,22 +1322,29 @@ async function renderVyvojEshop(){
         scales:{y:{ticks:{color:mut,callback:v=>veKc(v)},grid:{color:line}},x:{ticks:{color:mut},grid:{display:false}}},
         onClick:(e,el)=>{if(el&&el.length){VE_WEEK=weeks[el[0].index].week;renderVyvojEshop();}}}}));
     const c2=$('#veDayChart');
-    if(c2)VE_CHARTS.push(new Chart(c2,{type:'bar',data:{labels:days.map(x=>veDen(x.date)+' '+veDow(x.date)),datasets:[{label:'Výdej (Kč)',data:days.map(x=>x.dispKc),backgroundColor:'#34c98e',borderRadius:4}]},
-      options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:c=>veKc(c.raw)+' Kč'}}},
+    if(c2)VE_CHARTS.push(new Chart(c2,{type:'bar',data:{labels:days.map(x=>veDen(x.date)+' '+veDow(x.date)),datasets:[{label:'Výdej (Kč)',data:days.map(x=>x.dispKc),backgroundColor:days.map(x=>x.mimoradny?'#b9c0b7':'#34c98e'),borderRadius:4}]},
+      options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:c=>veKc(c.raw)+' Kč'+(days[c.dataIndex]&&days[c.dataIndex].mimoradny?' · mimořádný pohyb (nepočítá se do obratu)':'')}}},
         scales:{y:{ticks:{color:mut,callback:v=>veKc(v)},grid:{color:line}},x:{ticks:{color:mut},grid:{display:false}}}}}));
   }
+  // vysvětlivka k mimořádným dnům
+  const outs=days.filter(x=>x.mimoradny), on=$('#veOutNote');
+  if(on){ if(outs.length){ on.style.display='';
+      on.innerHTML='<b>Šedé sloupce = mimořádné pohyby</b> ('+outs.map(x=>veDen(x.date)+' '+veKc(x.dispKc)+' Kč').join(', ')+'). '+
+        'Jde o jednorázová zaúčtování nebo inventurní úpravy, ne prodej — <b>do obratu se nezapočítávají</b>, ať týdenní čísla sedí. '+
+        'Hranice: víc než 5× medián běžného dne'+(d.limitMimoradne?(' (nad '+veKc(d.limitMimoradne)+' Kč)'):'')+'.';
+    } else on.style.display='none'; }
   // tabulka týdnů (klikatelná)
   const R='style="text-align:right"';
   $('#veWeekTbl').innerHTML='<thead><tr><th>Týden</th><th>Období</th><th '+R+'>Obrat</th><th '+R+'>Kusů</th><th '+R+'>Dní</th></tr></thead><tbody>'+
     [...weeks].reverse().map(x=>'<tr style="cursor:pointer'+(x.week===VE_WEEK?';background:rgba(176,111,0,.10)':'')+'" onclick="veSetWeek(\''+x.week+'\')">'+
       '<td><b>'+esc(x.week)+'</b></td><td class="muted">'+veDen(x.from)+'–'+veDen(x.to)+'</td>'+
-      '<td '+R+'><b>'+veKc(x.dispKc)+' Kč</b></td><td '+R+'>'+fmt(x.dispKs)+'</td><td '+R+'>'+x.dni+'</td></tr>').join('')+'</tbody>';
+      '<td '+R+'><b>'+veKc(x.dispKc)+' Kč</b>'+(x.mimoradneKc?('<br><span class="muted" style="font-size:11px" title="mimořádné pohyby mimo obrat">+ '+veKc(x.mimoradneKc)+' mimoř.</span>'):'')+'</td><td '+R+'>'+fmt(x.dispKs)+'</td><td '+R+'>'+x.dni+'</td></tr>').join('')+'</tbody>';
   // tabulka dnů (filtr dle vybraného týdne)
   const dd=VE_WEEK?days.filter(x=>{const t=new Date(x.date+'T00:00:00Z');return veIso(t)===VE_WEEK;}):days;
   const dt=$('#veDayTitle');if(dt)dt.innerHTML='Dny'+(VE_WEEK?(' · '+esc(VE_WEEK)+' <button class="btn ghost sm" style="margin-left:6px" onclick="veSetWeek(null)">✕ zrušit filtr</button>'):' <span class="muted" style="font-weight:400;font-size:12px">— klikatelné</span>');
   $('#veDayTbl').innerHTML='<thead><tr><th>Den</th><th '+R+'>Výdej</th><th '+R+'>Kusů</th><th '+R+'>Položek</th><th '+R+'>Příjem</th><th '+R+'>Nové rez.</th></tr></thead><tbody>'+
-    [...dd].reverse().map(x=>'<tr style="cursor:pointer" onclick="veShowDay(\''+x.date+'\')"><td>'+veDen(x.date)+' <span class="muted">'+veDow(x.date)+'</span></td>'+
-      '<td '+R+'><b>'+veKc(x.dispKc)+' Kč</b></td><td '+R+'>'+fmt(x.dispKs)+'</td><td '+R+'>'+fmt(x.polozek)+'</td>'+
+    [...dd].reverse().map(x=>'<tr style="cursor:pointer'+(x.mimoradny?';opacity:.7':'')+'" onclick="veShowDay(\''+x.date+'\')"><td>'+veDen(x.date)+' <span class="muted">'+veDow(x.date)+'</span>'+(x.mimoradny?' <span style="font-size:10.5px;background:#eceeeb;color:#5a655c;padding:1px 6px;border-radius:8px" title="Jednorázové zaúčtování / inventurní úprava — nepočítá se do obratu">mimořádné</span>':'')+'</td>'+
+      '<td '+R+'>'+(x.mimoradny?('<span class="muted">'+veKc(x.dispKc)+' Kč</span>'):('<b>'+veKc(x.dispKc)+' Kč</b>'))+'</td><td '+R+'>'+fmt(x.dispKs)+'</td><td '+R+'>'+fmt(x.polozek)+'</td>'+
       '<td '+R+' class="muted">'+veKc(x.recvKc)+'</td><td '+R+' class="muted">'+veKc(x.resKc)+'</td></tr>').join('')+'</tbody>';
   // top položky (klikatelné)
   $('#veTopTbl').innerHTML='<thead><tr><th>#</th><th>Položka</th><th>Kód</th><th>Dodavatel</th><th '+R+'>Vydáno ks</th><th '+R+'>Hodnota</th><th '+R+'>Dnů s výdejem</th></tr></thead><tbody>'+
