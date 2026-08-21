@@ -855,11 +855,18 @@ function mount(host) {
 
   // Jednorázové zapnutí rozesílek (výslovný pokyn správce 2026-08-16). Poté už se řídí nastavením v „Rozesílky".
   function activateReportsOnce(st) {
-    if (st.reportsActivatedV1) return false;
-    const c = loadCfg(); c.enabled = true; c.objednavkyEnabled = true; c.bilanceEnabled = true; saveCfg(c);
-    st.reportsActivatedV1 = 1;
-    console.log('[nakup-report] rozesílky jednorázově ZAPNUTY (co objednat, co zlevnit, ranní bilance)');
-    return true;
+    let changed = false;
+    if (!st.reportsActivatedV1) {
+      const c = loadCfg(); c.enabled = true; c.objednavkyEnabled = true; c.bilanceEnabled = true; saveCfg(c);
+      st.reportsActivatedV1 = 1; changed = true;
+      console.log('[nakup-report] rozesílky jednorázově ZAPNUTY (co objednat, co zlevnit, ranní bilance)');
+    }
+    if (!st.reportsActivatedV2) {
+      const c = loadCfg(); c.utichleEnabled = true; saveCfg(c);
+      st.reportsActivatedV2 = 1; changed = true;
+      console.log('[nakup-report] rozesílka „utichlé položky" jednorázově ZAPNUTA (1× za 4 týdny, pondělí)');
+    }
+    return changed;
   }
   // Neúspěšné odeslání nesmí den „spotřebovat" — zkusí se znovu, ale nejvýš 3× (pak čeká na další období).
   const MAX_POKUSU = 3;
@@ -913,7 +920,8 @@ function mount(host) {
           console.log('[nakup-report] report „co zlevnit": ' + (rM.ok ? 'odesláno (' + (rM.to || []).join(', ') + ')' : 'CHYBA ' + rM.error)); }
       }
       // Utichlé položky — rozhodnutí o vyřazení/potvrzení (výchozí 1× za 4 týdny)
-      if (cfg.utichleEnabled && !dis('utichle') && now.getDay() >= (cfg.utichleDay != null ? cfg.utichleDay : 1)) {
+      // Jen PRESNE ve zvoleny den (ne „od toho dne dal") — jinak by aktivace v patek poslala report hned.
+      if (cfg.utichleEnabled && !dis('utichle') && now.getDay() === (cfg.utichleDay != null ? cfg.utichleDay : 1)) {
         const wk = isoWeek(now), ev = cfg.utichleEvery || 4;
         const gapDays = st.utichleAt ? (now - new Date(st.utichleAt)) / 86400000 : 999;
         const minGap = ev === 4 ? 27 : ev === 2 ? 13 : 6;
