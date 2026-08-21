@@ -596,6 +596,12 @@ function rozesilkyOffWrite(o) { try { fs.writeFileSync(ROZESILKY_OFF_F(), JSON.s
 function reportDisabled(key) { return !!rozesilkyOff()[key]; }
 function deliver(mail) {
   const zaznam = { ts: Date.now(), to: String((mail && mail.to) || ''), subject: String((mail && mail.subject) || '').slice(0, 200), from: String((mail && (mail.fromName || mail.fromAddr)) || '').slice(0, 100) };
+  // MAIL_DRY_RUN=1 → nic se neodešle, jen se vypíše co by odešlo. Pro lokální běh s produkčními
+  // proměnnými (railway run): jinak plánovač nad prázdným DATA_DIR rozešle všechny reporty naostro.
+  if ((process.env.MAIL_DRY_RUN || '') === '1') {
+    console.log('[mail:DRY_RUN] NEODESLÁNO → ' + zaznam.to + ' · ' + zaznam.subject);
+    return Promise.resolve({ ok: true, dryRun: true });
+  }
   const p = process.env.RESEND_API_KEY ? resendSend(mail) : smtpSend(CFG, mail);
   return Promise.resolve(p).then(
     (r) => { mailLogAppend(Object.assign({ ok: true }, zaznam)); return r; },

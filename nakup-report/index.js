@@ -57,6 +57,9 @@ function mount(host) {
   const PREV_F = path.join(host.dataDir || __dirname, 'objednavky-prev.json');   // předchozí momentka (pro rozdíly)
   const MOVE_F = path.join(host.dataDir || __dirname, 'objednavky-pohyby.json'); // historie pohybů (výdej/den z rozdílů)
   const loadMoves = () => { try { return JSON.parse(fs.readFileSync(MOVE_F, 'utf8')); } catch (_) { return {}; } };
+  // Pohyby ctou skoro vsechny radky pri stavbe reportu -> kratka cache, at to neni 1000+ cteni souboru.
+  let _mv = null, _mvAt = 0;
+  const movesCached = () => { if (_mv && (Date.now() - _mvAt) < 60000) return _mv; _mv = loadMoves(); _mvAt = Date.now(); return _mv; };
   const snapMap = rows => { const m = {}; (rows || []).forEach(r => { m[r.sk + '-' + r.reg] = { stock: r.stock, onOrder: r.onOrder }; }); return m; };
   // odhad výdeje za interval: příjem (pokles Objednáno) − nárůst skladu = kolik se vydalo
   const dispatchDiff = (p, n) => { const prijem = Math.max(0, (p.onOrder || 0) - (n.onOrder || 0)); return Math.max(0, prijem - ((n.stock || 0) - (p.stock || 0))); };
@@ -264,6 +267,11 @@ function mount(host) {
       objednavkyEnabled: c.objednavkyEnabled !== undefined ? !!c.objednavkyEnabled : false, // ZATÍM VYPNUTO (uživatel: „zatím nic neposílej")
       objednavkyDay: (c.objednavkyDay >= 0 && c.objednavkyDay <= 6) ? c.objednavkyDay : 1,
       objednavkyEvery: (c.objednavkyEvery === 1 || c.objednavkyEvery === 2) ? c.objednavkyEvery : 2, // „Co objednat" = 1× za 14 dní
+      // utichlé položky (rozhodnout o vyřazení/potvrzení) — samostatný report, řidší kadence
+      utichleTo: Array.isArray(c.utichleTo) ? c.utichleTo : ['jan.benicek@elkoplast.cz', 'michaela.lizancova@elkoplast.cz', 'david.sury@elkoplast.cz'],
+      utichleEnabled: c.utichleEnabled !== undefined ? !!c.utichleEnabled : false,
+      utichleDay: (c.utichleDay >= 0 && c.utichleDay <= 6) ? c.utichleDay : 1,
+      utichleEvery: [1, 2, 4].indexOf(c.utichleEvery) >= 0 ? c.utichleEvery : 4,   // výchozí 1× za 4 týdny
       // ranní bilance skladu (denně) — příjemci editovatelní správcem
       bilanceTo: Array.isArray(c.bilanceTo) ? c.bilanceTo : DEF_PU.slice(),
       bilanceEnabled: c.bilanceEnabled !== undefined ? !!c.bilanceEnabled : false, // VÝCHOZÍ VYPNUTO
@@ -314,6 +322,25 @@ function mount(host) {
     saveNew(reg); return { reg, fresh };
   }
   const newKeys = () => new Set(Object.keys(loadNew()));
+
+  // ---------- rozhodnutí o utichlých položkách ----------
+  // Utichlá položka (5+ měsíců bez prodeje) čeká na rozhodnutí nákupu/obchodu:
+  //   'vyrazeno'  = zakázka doběhla, položku neobjednávat (zmizí z doporučení i ze seznamu)
+  //   'potvrzeno' = zakázka se bude opakovat → pojistka se sejme a objednává se normálně,
+  //                 ale jen na PLATIDO (6 měsíců), pak se zeptáme znovu.
+  const DEC_F = path.join(host.dataDir || __dirname, 'utichle-rozhodnuti.json');
+  const loadDec = () => { try { return JSON.parse(fs.readFileSync(DEC_F, 'utf8')) || {}; } catch (_) { return {}; } };
+  const saveDec = m => { try { fs.writeFileSync(DEC_F, JSON.stringify(m, null, 2)); _dec = null; } catch (_) {} };
+  let _dec = null, _decAt = 0;
+  const decCached = () => { if (_dec && (Date.now() - _decAt) < 30000) return _dec; _dec = loadDec(); _decAt = Date.now(); return _dec; };
+  const DEC_PLATNOST_M = 6;
+  // Platné rozhodnutí ke klíči (prošlé potvrzení se ignoruje → položka se zeptá znovu).
+  function decFor(key) {
+    const d = decCached()[key]; if (!d) return null;
+    if (d.stav === 'potvrzeno' && d.platiDo && d.platiDo < new Date().toISOString().slice(0, 10)) return null;
+    return d;
+  }
+
   // Pracovní sortiment = kvartální report + nově zavedené živé položky.
   const onlyActive = rows => { const k = activeKeys(); if (!k.size) return rows || []; const nk = newKeys();
     return (rows || []).filter(r => { const key = r.sk + '-' + r.reg; return k.has(key) || nk.has(key); }); };
@@ -326,9 +353,13 @@ function mount(host) {
     const items = rows.map(r => {
       const sales = (r.sales || []).map(x => +x || 0);
       const D = sales.reduce((s, x) => s + x, 0), avgM = D / 12;
+      // Recency se pocita od KONCE OKNA DAT, ne od aktualniho mesice — viz salesAnchor().
+      // Drive se cetlo sales[(m0-k)] od dnesniho mesice, coz v srpnu 2026 sahalo na srpen 2025
+      // a polozka utichla v prosinci se tvarila jako cerstve prodana.
+      const anch = salesAnchor();
       let gap = 0, lastMo = 0;
-      for (let k = 0; k < 12; k++) { const ci = ((m0 - k) % 12 + 12) % 12; if (sales[ci] > 0) { lastMo = ci + 1; break; } gap++; }
-      const monthsNoSale = lastMo === 0 ? 12 : gap;
+      for (let k = 0; k < 12; k++) { const ci = ((anch.idx - k) % 12 + 12) % 12; if (sales[ci] > 0) { lastMo = ci + 1; break; } gap++; }
+      const monthsNoSale = lastMo === 0 ? 12 : gap + anch.stale;
       const AZ = +r.AZ || 0, nd = /náhradní díly/i.test(r.name || '');
       const cover = AZ <= 0 ? 0 : (avgM > 0 ? AZ / avgM : Infinity);
       const sevR = monthsNoSale >= cfg.dead ? 3 : monthsNoSale >= cfg.aging ? 2 : monthsNoSale >= cfg.slow ? 1 : 0;
@@ -406,6 +437,43 @@ function mount(host) {
   }
   const covTxt = cv => cv === 0 ? '0' : !isFinite(cv) ? '∞' : cv >= 48 ? '4+ r' : cv >= 24 ? (Math.round(cv / 12 * 10) / 10).toLocaleString('cs-CZ') + ' r' : (Math.round(cv * 10) / 10).toLocaleString('cs-CZ') + ' m';
   const MN_RIM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+  // ---------- kotva prodejni historie ----------
+  // „obrat plasty" je klouzave 12mesicni okno, ktere KONCI DRIV nez dnes (napr. okno 2025-07..2026-06,
+  // ale dnes je srpen 2026). sales[] je v kalendarnim poradi (index 0 = leden), takze cist recency
+  // od aktualniho mesice znamena trefit se do dat starych rok: sales[7] v srpnu 2026 = srpen 2025.
+  // Proto se recency pocita od POSLEDNIHO MESICE OKNA a pricita se stari okna (kolik mesicu uz uteklo).
+  let _anch = null, _anchAt = 0;
+  function salesAnchor() {
+    if (_anch && (Date.now() - _anchAt) < 300000) return _anch;
+    const now = new Date();
+    let r = { idx: (now.getMonth() + 11) % 12, year: now.getFullYear(), stale: 0, end: '' };
+    // „klouzavych 12 mesicu 2025-07 az 2026-06" — mezi daty muze byt „az", pomlcka, cokoli necislicoveho
+    const m = String(loadData().periodInfo || '').match(/(\d{4})-(\d{2})\D{1,8}(\d{4})-(\d{2})/);
+    if (m) {
+      const y = +m[3], mo = +m[4];
+      r = { idx: mo - 1, year: y, stale: Math.max(0, (now.getFullYear() - y) * 12 + (now.getMonth() + 1 - mo)), end: m[3] + '-' + m[4] };
+    }
+    _anch = r; _anchAt = Date.now(); return r;
+  }
+  // Kolik mesicu uz polozka neprodava (od konce okna zpet + stari okna). 99 = zadny prodej v okne.
+  function monthsSilent(sales) {
+    const a = salesAnchor(), s = (sales || []).map(v => +v || 0);
+    if (!s.reduce((x, v) => x + v, 0)) return 99;
+    let gap = 0;
+    for (let k = 0; k < 12; k++) { if (s[((a.idx - k) % 12 + 12) % 12] > 0) break; gap++; }
+    return gap + a.stale;
+  }
+  // Popisek posledniho prodeje, napr. „XII 2025 (18 ks)".
+  function lastSaleTxt(sales) {
+    const a = salesAnchor(), s = (sales || []).map(v => +v || 0);
+    if (!s.reduce((x, v) => x + v, 0)) return '';
+    for (let k = 0; k < 12; k++) {
+      const ci = ((a.idx - k) % 12 + 12) % 12;
+      if (s[ci] > 0) { let y = a.year, mo = a.idx + 1 - k; while (mo <= 0) { mo += 12; y--; } return MN_RIM[mo - 1] + ' ' + y + ' (' + fmt(s[ci]) + ' ks)'; }
+    }
+    return '';
+  }
   function seasonInfo(sales) { // sezónní = nejsilnější souvislé 3měsíční okno ≥55 % ročního prodeje & D≥12
     if (!sales) return { isSeasonal: false, winStart: -1, peak: '' };
     const D = sales.reduce((a, b) => a + (b || 0), 0); if (D <= 0) return { isSeasonal: false, winStart: -1, peak: '' };
@@ -460,15 +528,95 @@ function mount(host) {
     else if (windowDem < 0.5) status = 'mimo sezónu';
     else if (position <= rop) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = novaPolozka ? 'objednat (nová položka)' : 'objednat'; } else status = 'zásoba stačí'; }
     rec = Math.max(0, rec);
+    // POJISTKA — utichla polozka. Kdyz polozka v prodejni historii mlci 5+ mesicu, je to typicky
+    // projektova/obecni zakazka, ktera skoncila (velka dodavka jednou, pak ticho). Model ji ale vidi
+    // jako sezonu, kterou je treba znovu pokryt, a predzasobil by se za statisice. Neobjednavame
+    // automaticky — polozka jde do bloku „ overit u nakupu / obchodu".
+    // Vyjimky: oversold (zakaznici uz maji rezervovano -> poptavka je realna a objednavka povinna),
+    // nova polozka (nema kvartalni historii, jede z dennich pohybu) a polozka, ktera se hybe
+    // v DENNICH pohybech — ta je ziva bez ohledu na to, co rika starsi kvartalni report.
+    const mvE = movesCached()[x.sk + '-' + x.reg];
+    const silentM = novaPolozka ? 0 : monthsSilent(sales);
+    const dec = decFor(x.sk + '-' + x.reg);
+    // Potvrzena polozka („zakazka se opakuje") jede normalne, dokud potvrzeni plati.
+    const utichla = !novaPolozka && D > 0 && (x.avail || 0) >= 0 && silentM >= (P.silent || 5)
+      && !(mvE && mvE.sum > 0) && !(dec && dec.stav === 'potvrzeno');
+    let utichlaKs = 0;
+    const unitC = (x.unitCost > 0 ? x.unitCost : (x.unitPrice || 0));
+    const vyrazeno = !!(dec && dec.stav === 'vyrazeno');
+    if (vyrazeno) { utichlaKs = rec; rec = 0; status = 'vyřazeno (rozhodnutí nákupu)'; }
+    else if (utichla) { utichlaKs = rec; rec = 0; status = 'utichlo — rozhodnout'; }
     const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, dem, m0);
-    return { D, rec, status, ramp, value: (x.unitCost > 0 ? x.unitCost : (x.unitPrice || 0)) * rec, coverAfter };
+    return { D, rec, status, ramp, value: unitC * rec, coverAfter,
+      utichla, vyrazeno, dec: dec || null, silentM, utichlaKs, utichlaVal: unitC * utichlaKs,
+      lastSale: (utichla || vyrazeno) ? lastSaleTxt(sales) : '' };
   }
+  // Seznam utichlých položek čekajících na rozhodnutí — sdílený reportem i aplikací.
+  // Hlásíme jen ty, které by model JINAK objednal; ostatní jsou šum.
+  function collectUtichle(cfg) {
+    const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
+    const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
+    const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1 };
+    const out = onlyActive(obj.rows)
+      .map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) }))
+      // Rozhodnuté položky už do seznamu nepatří: 'vyrazeno' je vyřízené, 'potvrzeno' vypne
+      // příznak utichla úplně. Prošlé potvrzení vrací decFor() jako null → položka se zeptá znovu.
+      .filter(r => r.o.utichla && r.o.utichlaKs > 0 && !r.o.dec)
+      .sort((a, b) => b.o.utichlaVal - a.o.utichlaVal);
+    // Přehled už rozhodnutých (pro kontext v reportu i v aplikaci).
+    const dec = decCached(); const rozhodnuto = { vyrazeno: 0, potvrzeno: 0 };
+    Object.keys(dec).forEach(k => { const d = decFor(k); if (d && rozhodnuto[d.stav] != null) rozhodnuto[d.stav]++; });
+    return { items: out, val: out.reduce((s2, r) => s2 + r.o.utichlaVal, 0), date: obj.date || obj.source || '', rozhodnuto };
+  }
+
+  // ---------- report „utichlé položky — rozhodnout" ----------
+  function buildUtichle(cfg) {
+    const { items, val, date, rozhodnuto: roz } = collectUtichle(cfg);
+    const url = String((host.mailFrom && host.mailFrom.publicUrl) || process.env.PUBLIC_URL || 'https://intranet.elkoplast.cz').replace(/\/$/, '');
+    const odkaz = url + '/smi-app';
+    if (!items.length) {
+      return { subject: 'Utichlé položky — nic k rozhodnutí · ' + date, count: 0, val: 0,
+        html: wrap('Utichlé položky', 'Nic k rozhodnutí', '<p>Žádná položka teď nečeká na rozhodnutí. Všechny, které model doporučuje, mají živý prodej.</p>', date) };
+    }
+    const R = t => '<th style="text-align:right;border-bottom:1px solid #eccdd9;padding:5px 8px;font-size:11px;color:#8a2f52">' + esc(t) + '</th>';
+    const L = t => '<th style="text-align:left;border-bottom:1px solid #eccdd9;padding:5px 8px;font-size:11px;color:#8a2f52">' + esc(t) + '</th>';
+    const cR = v => '<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #f6e3ea">' + v + '</td>';
+    const body = explainBox([
+      ['Co po vás chceme', '<b>U každé položky rozhodnout: vyřadit, nebo potvrdit.</b> <b>Vyřadit</b> = zakázka doběhla, položku neobjednávat (zmizí z doporučení). <b>Potvrdit</b> = odbyt bude pokračovat → model ji začne objednávat normálně. Rozhoduje se v aplikaci: <a href="' + esc(odkaz) + '">E-shop → Optimalizace nákupu</a>, blok „Utichlé položky".'],
+      ['Proč to řešíme', 'Tyto položky <b>neprodávají 5 a více měsíců</b>, ale podle starší prodejní historie by je model objednal na sklad. Typicky jde o <b>projektovou nebo obecní zakázku, která skončila</b> — velká dodávka jednou, pak ticho. Kdyby se objednaly automaticky, uvázalo by to peníze v zásobě, která se nemusí prodat.'],
+      ['Co se stane, když nerozhodnete', 'Nic se neobjedná a položka přijde v dalším reportu znovu. <b>Neriskujete přeskladnění</b>, ale ani nevykryjete zakázku, která by přišla. Proto raději rozhodnout.'],
+      ['Jak dlouho platí „potvrdit"', 'Potvrzení platí <b>' + DEC_PLATNOST_M + ' měsíců</b>. Pak se zeptáme znovu — aby se doběhlá zakázka nevlekla v objednávkách roky.'],
+      ['Jak poznáme, že položka utichla', 'Od posledního měsíce s prodejem v přehledu „obrat plasty" + doba, o kterou je tento přehled starší než dnešek. Položka, která se hýbe v <b>denních pohybech skladu</b> nebo má <b>rezervace zákazníků</b>, se za utichlou nepovažuje — je živá.']
+    ]) +
+      '<div style="background:#fdf2f6;border:1px solid #eccdd9;border-radius:10px;padding:12px 14px;margin:0 0 14px">' +
+      '<b style="font-size:15px">🔕 ' + fmt(items.length) + ' položek čeká na rozhodnutí</b> — model by je objednal za <b>' + kc(val) + '</b>.' +
+      ((roz.vyrazeno || roz.potvrzeno) ? ('<br><span style="font-size:13px;color:#6b5560">Už rozhodnuto: <b>' + fmt(roz.vyrazeno) + '</b> vyřazeno · <b>' + fmt(roz.potvrzeno) + '</b> potvrzeno (objednávají se normálně).</span>') : '') + '<br>' +
+      '<a href="' + esc(odkaz) + '" style="display:inline-block;margin-top:8px;background:#8a2f52;color:#fff;text-decoration:none;padding:8px 14px;border-radius:7px;font-weight:600">Rozhodnout v aplikaci →</a></div>' +
+      '<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>' +
+      L('Kód') + L('Položka') + L('Dodavatel') + L('Poslední prodej') + R('Ticho') + R('Roč. prodej') + R('Sklad') + R('Model by objednal') + R('Hodnota') +
+      '</tr></thead><tbody>' + items.map(r =>
+        '<tr><td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">' + esc(r.x.sk + '-' + r.x.reg) + '</td>' +
+        '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea"><b>' + esc(r.x.nazev || '') + '</b></td>' +
+        '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">' + esc(r.x.skupina || '') + '</td>' +
+        '<td style="padding:5px 8px;border-bottom:1px solid #f6e3ea">' + esc(r.o.lastSale || '—') + '</td>' +
+        cR(r.o.silentM >= 99 ? '12+ m' : r.o.silentM + ' m') + cR(fmt(r.o.D)) + cR(fmt(r.x.stock || 0)) +
+        cR('<b>' + fmt(r.o.utichlaKs) + ' ks</b>') + cR('<b>' + kc(r.o.utichlaVal) + '</b>') + '</tr>').join('') +
+      '</tbody></table>';
+    return { subject: 'Utichlé položky — rozhodnout o vyřazení / potvrzení (' + fmt(items.length) + ' pol.) · ' + date,
+      html: wrap('Utichlé položky — rozhodnout', 'Neprodávají 5+ měsíců, ale model by je objednal', body, date), count: items.length, val };
+  }
+
   function buildObjednavky(cfg) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
     try { detectNew(obj.rows); } catch (_) {}   // NEJDRIV detekce novych, at se dostanou i do doporuceni
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1 };
-    let list = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) })).filter(r => r.o.rec > 0 || r.x.avail < 0);
+    const scored = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) }));
+    let list = scored.filter(r => r.o.rec > 0 || r.x.avail < 0);
+    // Utichle: hlasime jen ty, ktere by model JINAK objednal — ostatni jsou jen sum.
+    // Stejný filtr jako collectUtichle() — rozhodnuté položky se už nepřipomínají.
+    const utichle = scored.filter(r => r.o.utichla && r.o.utichlaKs > 0 && !r.o.dec).sort((a, b) => b.o.utichlaVal - a.o.utichlaVal);
+    const utichleVal = utichle.reduce((s2, r) => s2 + r.o.utichlaVal, 0);
     const totVal = list.reduce((s, r) => s + r.o.value, 0), totKs = list.reduce((s, r) => s + r.o.rec, 0), oversold = list.filter(r => r.x.avail < 0).length;
     // seskupit dle dodavatele, řadit dle hodnoty
     const bySup = {}; list.forEach(r => { const k = r.x.skupina || '—'; (bySup[k] = bySup[k] || []).push(r); });
@@ -502,10 +650,19 @@ function mount(host) {
       // označ jako ohlášené
       try { const reg = loadNew(); Object.keys(reg).forEach(k => { reg[k].ohlaseno = true; }); saveNew(reg); } catch (_) {}
     }
-    let body = noveHtml + explainBox([
+    // Utichlé položky mají VLASTNÍ report („utichlé — rozhodnout"), tady jen krátký odkaz,
+    // ať objednávkový report zůstane čistě o tom, co objednat.
+    let utichleHtml = '';
+    if (utichle.length) {
+      utichleHtml = '<div style="background:#fdf2f6;border:1px solid #eccdd9;border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:13px">' +
+        '🔕 <b>' + fmt(utichle.length) + ' položek utichlo</b> (neprodávají 5+ měsíců) — model by je objednal za <b>' + kc(utichleVal) + '</b>, ' +
+        'ale <b>nejsou v tomto seznamu</b>. Řeší je samostatný report <i>„Utichlé položky — rozhodnout o vyřazení / potvrzení"</i>.</div>';
+    }
+    let body = noveHtml + utichleHtml + explainBox([
       ['Co to je', 'Seznam <b>co objednat u dodavatelů</b>, spočítaný z aktuálního stavu skladu (ERP) a historie prodejů. Seskupeno <b>podle dodavatele</b> a seřazeno podle hodnoty objednávky.'],
       ['Jak počítáme „Objednat"', 'Cílem je mít na skladě zásobu na <b>dodací lhůtu + ' + (cfg.cover || 2) + ' měsíce</b>. Objednat = tato cílová poptávka − (co je <i>k dispozici</i> + co už je <i>objednáno</i>). Poptávka je <b>sezónní</b> (počítá se dopředu od aktuálního měsíce) a <b>robustní</b> — jednorázové výkyvy (velká jednorázová zakázka) se do ní nezapočítávají.'],
       ['Zvláštní případy', '<b style="color:#b23">Oversold</b> (červeně) = zákazníci mají rezervováno víc, než je skladem → objednávka je <b>povinná</b> (vykrytí objednávek). <b>Náběh sezóny</b> = předzásobení na nadcházející špičku s předstihem o dodací lhůtu. Řídce prodávané položky jedou na plochém průměru (ne na falešné špičce).'],
+      ['Utichlé položky', 'Položka, která <b>neprodává 5+ měsíců</b>, se <b>automaticky neobjednává</b> — i kdyby ji starší historie doporučovala. Bývá to doběhlá projektová zakázka. Jde do samostatného bloku <b>na ověření u nákupu / obchodu</b>. Výjimka: pokud se položka hýbe v denních pohybech nebo je oversold, bere se jako živá a objedná se normálně.'],
       ['Jak číst sloupce', '<b>K dispo</b> = sklad − rezervace zákazníků. <b>Objednat</b> = doporučený počet ks. <b>Krytí po obj.</b> = na jak dlouho zásoba vydrží po naskladnění (u pomalých/sezónních položek číslo roste, protože se pak dlouho neprodává — není to přeskladnění). <b>Hodnota</b> = objednat × nákupní (landed) cena.'],
       ['Co s tím', 'Podklad pro objednávky u dodavatelů. V aplikaci lze u každého dodavatele <b>předat objednávku nákupčímu</b> (modul Požadavky nákupu) nebo stáhnout Excel.']
     ]) +
@@ -522,7 +679,7 @@ function mount(host) {
           cellR(fmt(r.x.stock)) + cellR((r.x.avail < 0 ? '<b style="color:#b23">' : '') + fmt(r.x.avail) + (r.x.avail < 0 ? '</b>' : '')) + cellR(fmt(r.x.onOrder)) + cellR(fmt(r.x.lead)) + cellR(fmt(r.o.D)) +
           cellR('<b>' + fmt(r.o.rec) + '</b>') + cellR(covTxt(r.o.coverAfter)) + cellR(r.o.value ? kc(r.o.value) : '—') + '</tr>').join('') + '</tbody></table>';
     });
-    return { subject: 'Objednávkový report (ERP) — co objednat · ' + (obj.date || ''), html: wrap('Co objednat (ERP × prodeje)', 'Položky pod bodem objednání, seskupené dle dodavatele', body, obj.date || obj.source || '—'), count: list.length, totVal };
+    return { subject: 'Objednávkový report (ERP) — co objednat · ' + (obj.date || ''), html: wrap('Co objednat (ERP × prodeje)', 'Položky pod bodem objednání, seskupené dle dodavatele', body, obj.date || obj.source || '—'), count: list.length, totVal, utichle: utichle.length, utichleVal };
   }
 
   // ---------- ranní bilance skladu (e-mail) ----------
@@ -582,7 +739,8 @@ function mount(host) {
   async function sendReport(kind, toList, cfg) {
     const to = cleanEmails(toList);
     if (!to.length) return { ok: false, error: 'žádný příjemce' };
-    const rep = kind === 'bilance' ? buildBilance(cfg) : kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
+    const rep = kind === 'bilance' ? buildBilance(cfg) : kind === 'objednavky' ? buildObjednavky(cfg)
+      : kind === 'utichle' ? buildUtichle(cfg) : buildMarkdown(cfg);
     const from = (host.mailFrom && host.mailFrom.user) || '';
     const name = (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — nákup';
     try {
@@ -672,6 +830,17 @@ function mount(host) {
           if (odeslano(st, 'markdown', wk, rM)) { st.lastWeek = wk; st.lastAt = now.toISOString(); }
           console.log('[nakup-report] report „co zlevnit": ' + (rM.ok ? 'odesláno (' + (rM.to || []).join(', ') + ')' : 'CHYBA ' + rM.error)); }
       }
+      // Utichlé položky — rozhodnutí o vyřazení/potvrzení (výchozí 1× za 4 týdny)
+      if (cfg.utichleEnabled && !dis('utichle') && now.getDay() >= (cfg.utichleDay != null ? cfg.utichleDay : 1)) {
+        const wk = isoWeek(now), ev = cfg.utichleEvery || 4;
+        const gapDays = st.utichleAt ? (now - new Date(st.utichleAt)) / 86400000 : 999;
+        const minGap = ev === 4 ? 27 : ev === 2 ? 13 : 6;
+        if (st.utichleWeek !== wk && gapDays >= minGap) {
+          const rU = await sendReport('utichle', cfg.utichleTo, cfg); st.utichle = rU; changed = true;
+          if (odeslano(st, 'utichle', wk, rU)) { st.utichleWeek = wk; st.utichleAt = now.toISOString(); }
+          console.log('[nakup-report] utichlé položky: ' + (rU.ok ? (rU.count + ' pol. k rozhodnutí odesláno (' + (rU.to || []).join(', ') + ')') : 'CHYBA ' + rU.error));
+        }
+      }
       if (changed) try { fs.writeFileSync(STATE_F, JSON.stringify(st, null, 2)); } catch (_) {}
     } catch (e) { console.error('[nakup-report] tick:', e.message); }
   }
@@ -685,7 +854,8 @@ function mount(host) {
       const o = loadObj(), mv = loadMoves();
       const rows = (o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
       try { detectNew(o.rows); } catch (_) {}
-      json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup(), noveKlice: Object.keys(loadNew()) }));
+      json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup(),
+        noveKlice: Object.keys(loadNew()), rozhodnuti: loadDec(), platnostM: DEC_PLATNOST_M }));
       return true;
     }
     // „obrat plasty" (prodejní historie) — čerstvý raw xlsx pro klienta (SMI app ho parsuje). Přihlášený.
@@ -693,6 +863,32 @@ function mount(host) {
       try { const b64 = fs.readFileSync(OBRAT_RAW).toString('base64'); const m = obratMeta();
         return json(res, 200, { ok: true, name: m.lastFileName || '', date: m.date || '', syncedAt: m.lastAt || '', b64 }), true; }
       catch (_) { return json(res, 200, { ok: false, error: 'Zatím není načten obrat plasty z Drive.' }), true; }
+    }
+    // Utichlé položky — seznam k rozhodnutí + zápis rozhodnutí (přihlášený uživatel).
+    if (p === '/api/nakup-report/utichle' && req.method === 'GET') {
+      const { items: it2, val: v2, date: d2, rozhodnuto } = collectUtichle(loadCfg());
+      return json(res, 200, { date: d2, val: v2, rozhodnuto, platnostM: DEC_PLATNOST_M, rozhodnuti: loadDec(),
+        items: it2.map(r => ({ key: r.x.sk + '-' + r.x.reg, nazev: r.x.nazev, dodavatel: r.x.skupina,
+          stock: r.x.stock, avail: r.x.avail, D: r.o.D, silentM: r.o.silentM, lastSale: r.o.lastSale,
+          ks: r.o.utichlaKs, val: r.o.utichlaVal })) }), true;
+    }
+    if (p === '/api/nakup-report/utichle' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
+      const key = String(b.key || '').trim();
+      const stav = ['vyrazeno', 'potvrzeno', 'zrusit'].indexOf(b.stav) >= 0 ? b.stav : null;
+      if (!key || !stav) return json(res, 400, { error: 'Chybí položka nebo rozhodnutí.' }), true;
+      const se = host.empSession && host.empSession(req);
+      const kdo = (se && (se.jmeno || se.email)) || 'neznámý';
+      const d = loadDec();
+      if (stav === 'zrusit') { delete d[key]; }
+      else {
+        const dnes = new Date(); const rec = { stav, kdo, kdy: dnes.toISOString().slice(0, 10), pozn: String(b.pozn || '').slice(0, 300) };
+        if (stav === 'potvrzeno') { const t = new Date(dnes); t.setMonth(t.getMonth() + DEC_PLATNOST_M); rec.platiDo = t.toISOString().slice(0, 10); }
+        d[key] = rec;
+      }
+      saveDec(d);
+      console.log('[nakup-report] utichlé: ' + key + ' → ' + stav + ' (' + kdo + ')');
+      return json(res, 200, { ok: true, rozhodnuti: d[key] || null }), true;
     }
     // Dotazník dodavatelů — čtení pro přihlášené (EOQ v appce potřebuje náklad na dopravu + lhůtu)
     if (p === '/api/nakup-report/suppliers' && req.method === 'GET') {
@@ -805,15 +1001,17 @@ function mount(host) {
       catch (e) { return json(res, 500, { ok: false, error: e.message }), true; }
     }
     if (p === '/api/nakup-report/preview' && req.method === 'GET') {
-      const cfg = loadCfg(); const kind = ['objednavky', 'bilance', 'markdown'].indexOf(u.query.type) >= 0 ? u.query.type : 'markdown';
-      const rep = kind === 'bilance' ? buildBilance(cfg) : kind === 'objednavky' ? buildObjednavky(cfg) : buildMarkdown(cfg);
+      const cfg = loadCfg(); const kind = ['objednavky', 'bilance', 'markdown', 'utichle'].indexOf(u.query.type) >= 0 ? u.query.type : 'markdown';
+      const rep = kind === 'bilance' ? buildBilance(cfg) : kind === 'objednavky' ? buildObjednavky(cfg)
+      : kind === 'utichle' ? buildUtichle(cfg) : buildMarkdown(cfg);
       return htmlOut(res, 200, rep.html), true;
     }
     if (p === '/api/nakup-report/send' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
       const cfg = loadCfg();
-      const kind = ['objednavky', 'bilance', 'markdown'].indexOf(b.type) >= 0 ? b.type : 'markdown';
-      const def = kind === 'bilance' ? cfg.bilanceTo : kind === 'objednavky' ? cfg.objednavkyTo : cfg.markdownTo;
+      const kind = ['objednavky', 'bilance', 'markdown', 'utichle'].indexOf(b.type) >= 0 ? b.type : 'markdown';
+      const def = kind === 'bilance' ? cfg.bilanceTo : kind === 'objednavky' ? cfg.objednavkyTo
+        : kind === 'utichle' ? cfg.utichleTo : cfg.markdownTo;
       const to = b.to ? cleanEmails(b.to) : def;
       const r = await sendReport(kind, to, cfg);
       return json(res, r.ok ? 200 : 500, r), true;
@@ -827,8 +1025,10 @@ function mount(host) {
   const REP_MAP = {
     bilance:    { to: 'bilanceTo',    en: 'bilanceEnabled',    hour: 'bilanceHour' },
     objednavky: { to: 'objednavkyTo', en: 'objednavkyEnabled', day: 'objednavkyDay', every: 'objednavkyEvery' },
-    markdown:   { to: 'markdownTo',   en: 'enabled',           day: 'weekday',        every: 'markdownEvery' }
+    markdown:   { to: 'markdownTo',   en: 'enabled',           day: 'weekday',        every: 'markdownEvery' },
+    utichle:    { to: 'utichleTo',    en: 'utichleEnabled',    day: 'utichleDay',     every: 'utichleEvery' }
   };
+  const KADENCE = e => (+e === 4 ? '1× za 4 týdny' : +e === 2 ? '1× za 14 dní' : 'týdně');
   function reports() {
     const c = loadCfg(); let st = {}; try { st = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
     const base = { module: 'E-shop · Nákup', configHint: 'lze upravit i v E-shop → Optimalizace nákupu → 📧 Reporty' };
@@ -843,7 +1043,11 @@ function mount(host) {
       Object.assign({}, base, { key: 'markdown', name: 'Co zlevnit (stárnoucí/mrtvé zásoby)', to: c.markdownTo || [], enabled: !!c.enabled,
         day: (c.weekday != null ? c.weekday : 1), every: c.markdownEvery || 1,
         schedule: ((c.markdownEvery || 1) > 1 ? '1× za 14 dní' : 'týdně') + ' (' + DNY[c.weekday != null ? c.weekday : 1] + ')',
-        lastAt: st.lastAt || null, preview: '/api/nakup-report/preview?type=markdown', send: { url: '/api/nakup-report/send', body: { type: 'markdown' } } })
+        lastAt: st.lastAt || null, preview: '/api/nakup-report/preview?type=markdown', send: { url: '/api/nakup-report/send', body: { type: 'markdown' } } }),
+      Object.assign({}, base, { key: 'utichle', name: 'Utichlé položky (rozhodnout o vyřazení/potvrzení)', to: c.utichleTo || [], enabled: !!c.utichleEnabled,
+        day: (c.utichleDay != null ? c.utichleDay : 1), every: c.utichleEvery || 4,
+        schedule: KADENCE(c.utichleEvery || 4) + ' (' + DNY[c.utichleDay != null ? c.utichleDay : 1] + ')',
+        lastAt: st.utichleAt || null, preview: '/api/nakup-report/preview?type=utichle', send: { url: '/api/nakup-report/send', body: { type: 'utichle' } } })
     ];
   }
   // Centrální editace z „Rozesílky" (správce): zapnout/vypnout, příjemci, den, hodina.
@@ -854,7 +1058,7 @@ function mount(host) {
     if (patch.enabled != null) c[m.en] = !!patch.enabled;
     if (patch.day != null && m.day && +patch.day >= 0 && +patch.day <= 6) c[m.day] = +patch.day;
     if (patch.hour != null && m.hour && +patch.hour >= 0 && +patch.hour <= 23) c[m.hour] = +patch.hour;
-    if (patch.every != null && m.every && (+patch.every === 1 || +patch.every === 2)) c[m.every] = +patch.every;
+    if (patch.every != null && m.every && [1, 2, 4].indexOf(+patch.every) >= 0) c[m.every] = +patch.every;
     saveCfg(c);
     return reports().find(r => r.key === key) || null;
   }
