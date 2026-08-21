@@ -207,6 +207,7 @@ function mount(host) {
       let prev = null; try { prev = JSON.parse(fs.readFileSync(PREV_F, 'utf8')); } catch (_) {}
       if (prev && prev.rows && prev.date) { if (prev.date !== dataDate) applyMovement(prev.rows, prev.date, parsed.rows, dataDate); }
       else if (Object.keys(loadMoves()).length === 0) { await bootstrapMovements(xls, newest, parsed, dataDate); }
+      try { const dn = detectNew(parsed.rows); if (dn.fresh.length) console.log('[nakup-report] nové položky mimo kvartální report: +' + dn.fresh.length + ' (' + dn.fresh.slice(0, 3).map(x => x.nazev).join(', ') + (dn.fresh.length > 3 ? '…' : '') + ')'); } catch (e) { console.warn('[nakup-report] detekce nových:', e.message); }
       // denní bilance skladu (stav + pohyby vs PŘEDCHOZÍ DEN — nikdy ne proti témuž dni, jinak vyjdou nulové pohyby)
       try {
         const prevForFlow = (prev && prev.rows && prev.date && prev.date !== dataDate) ? prev.rows : null;
@@ -285,7 +286,34 @@ function mount(host) {
     const s = new Set(); (loadData().rows || []).forEach(r => s.add(String(r.sk) + '-' + String(r.reg)));
     _akKeys = s; _akAt = Date.now(); return s;
   }
-  const onlyActive = rows => { const k = activeKeys(); return k.size ? (rows || []).filter(r => k.has(r.sk + '-' + r.reg)) : (rows || []); };
+  // NOVÉ POLOŽKY: kvartální „obrat plasty" se aktualizuje jednou za čtvrtletí, takže nově zavedené
+  // zboží (např. nový textil) v něm ještě není — ale v denních pohybech už ano. Takové položky
+  // nesmíme schovat: evidujeme je zvlášť, hlásíme je a v optimalizaci s nimi pracujeme jako
+  // s novým produktem (poptávka z pozorované denní spotřeby).
+  const NEW_F = path.join(host.dataDir || __dirname, 'nove-polozky.json');
+  const loadNew = () => { try { return JSON.parse(fs.readFileSync(NEW_F, 'utf8')) || {}; } catch (_) { return {}; } };
+  const saveNew = m => { try { fs.writeFileSync(NEW_F, JSON.stringify(m, null, 2)); } catch (_) {} };
+  // Důkaz, že položka „žije": měla pohyb, někdo si ji objednal, nebo je objednaná u dodavatele.
+  function isNewActive(r, mv) {
+    const e = mv[r.sk + '-' + r.reg];
+    return !!((e && e.sum > 0) || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0);
+  }
+  // Projde ERP, najde živé položky mimo kvartální report a zapíše je do evidence.
+  function detectNew(rows) {
+    const ak = activeKeys(); if (!ak.size) return { reg: loadNew(), fresh: [] };
+    const mv = loadMoves(), reg = loadNew(), fresh = [], dnes = new Date().toISOString().slice(0, 10);
+    (rows || []).forEach(r => { const k = r.sk + '-' + r.reg;
+      if (ak.has(k) || !isNewActive(r, mv)) return;
+      if (!reg[k]) { reg[k] = { key: k, nazev: r.nazev, dodavatel: r.skupina, odKdy: dnes, ohlaseno: false }; fresh.push(reg[k]); }
+      else if (!reg[k].nazev) reg[k].nazev = r.nazev; });
+    // položka, která se mezitím dostala do kvartálního reportu, už není „nová"
+    Object.keys(reg).forEach(k => { if (ak.has(k)) delete reg[k]; });
+    saveNew(reg); return { reg, fresh };
+  }
+  const newKeys = () => new Set(Object.keys(loadNew()));
+  // Pracovní sortiment = kvartální report + nově zavedené živé položky.
+  const onlyActive = rows => { const k = activeKeys(); if (!k.size) return rows || []; const nk = newKeys();
+    return (rows || []).filter(r => { const key = r.sk + '-' + r.reg; return k.has(key) || nk.has(key); }); };
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
 
   // ---------- výpočet (port klasifikace + markdown + nákup z klientské appky) ----------
@@ -397,6 +425,13 @@ function mount(host) {
     return r;
   }
   function computeOrderRow(x, sales, P, m0) {
+    // Nová položka bez kvartální historie: poptávku odhadneme z pozorované denní spotřeby
+    // (denní snímky skladu) — plochý průměr, dokud se neobjeví v kvartálním reportu.
+    if (!sales || !sales.reduce((s, v) => s + (v || 0), 0)) {
+      const e = loadMoves()[x.sk + '-' + x.reg];
+      // Potreba aspon 10 dnu pozorovani, jinak je odhad z par dnu nespolehlivy (jen se ohlasi, neobjednava).
+      if (e && e.days >= 10 && e.sum > 0) { const perMonth = (e.sum / e.days) * 30; sales = new Array(12).fill(perMonth); }
+    }
     const D = sales ? sales.reduce((s, v) => s + (v || 0), 0) : 0;
     const dem = robustSales(sales);
     const Lm = (x.lead || 0) / 30, coverM = Math.max(0.5, P.cover || 2);
@@ -433,7 +468,35 @@ function mount(host) {
     const sups = Object.keys(bySup).map(k => ({ sup: k, items: bySup[k].sort((a, b) => b.o.value - a.o.value), val: bySup[k].reduce((s, r) => s + r.o.value, 0) })).sort((a, b) => b.val - a.val);
     const R = t => '<th style="text-align:right;border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">' + esc(t) + '</th>';
     const cellR = v => '<td style="text-align:right;border-bottom:1px solid #eef1ec;padding:4px 7px">' + v + '</td>';
-    let body = explainBox([
+    // Nové položky, které ještě nejsou v kvartálním „obrat plasty" — nákup o nich musí vědět.
+    try { detectNew(obj.rows); } catch (_) {}   // detekce i tady, at report nezavisi na behu Drive syncu
+    const novePol = Object.values(loadNew());
+    let noveHtml = '';
+    if (novePol.length) {
+      const mvN = loadMoves(), byKey = {}; (obj.rows || []).forEach(r => { byKey[r.sk + '-' + r.reg] = r; });
+      const radky = novePol.map(n => { const r = byKey[n.key] || {}, e = mvN[n.key] || {};
+        return { n, r, den: (e.days > 0 ? e.sum / e.days : 0) };
+      }).sort((a, b) => b.den - a.den);
+      noveHtml = '<div style="background:#fff7e6;border:1px solid #f0dcb0;border-radius:10px;padding:12px 14px;margin:0 0 16px">' +
+        '<b>🆕 ' + fmt(radky.length) + ' nových položek</b>, které zatím nejsou v kvartálním přehledu prodejů — objevily se v denních pohybech. ' +
+        'Poptávka se u nich odhaduje z <b>pozorované denní spotřeby</b> (potřeba aspoň 10 dnů), dokud nepřibudou do kvartálního reportu. ' +
+        '<b>Doporučené množství u nich prosím ověřte</b> — vychází z krátké historie, ne z celého roku.' +
+        '<table style="border-collapse:collapse;width:100%;margin-top:10px;font-size:13px"><thead><tr>' +
+        ['Kód', 'Položka', 'Dodavatel', 'Od kdy', 'Sklad', 'Rezerv.', 'Spotřeba/den'].map((t, i) =>
+          '<th style="text-align:' + (i > 3 ? 'right' : 'left') + ';border-bottom:1px solid #e6d5a8;padding:4px 7px;font-size:11px;color:#7a5200">' + esc(t) + '</th>').join('') +
+        '</tr></thead><tbody>' + radky.map(x =>
+          '<tr><td style="padding:4px 7px;border-bottom:1px solid #f3e8cf">' + esc(x.n.key) + '</td>' +
+          '<td style="padding:4px 7px;border-bottom:1px solid #f3e8cf"><b>' + esc(x.n.nazev || '') + '</b></td>' +
+          '<td style="padding:4px 7px;border-bottom:1px solid #f3e8cf">' + esc(x.n.dodavatel || x.r.skupina || '') + '</td>' +
+          '<td style="padding:4px 7px;border-bottom:1px solid #f3e8cf">' + esc(x.n.odKdy || '') + '</td>' +
+          '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #f3e8cf">' + fmt(x.r.stock || 0) + '</td>' +
+          '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #f3e8cf">' + fmt(x.r.reserved || 0) + '</td>' +
+          '<td style="text-align:right;padding:4px 7px;border-bottom:1px solid #f3e8cf">' + (x.den > 0 ? (Math.round(x.den * 100) / 100).toLocaleString('cs-CZ') : '—') + '</td></tr>').join('') +
+        '</tbody></table></div>';
+      // označ jako ohlášené
+      try { const reg = loadNew(); Object.keys(reg).forEach(k => { reg[k].ohlaseno = true; }); saveNew(reg); } catch (_) {}
+    }
+    let body = noveHtml + explainBox([
       ['Co to je', 'Seznam <b>co objednat u dodavatelů</b>, spočítaný z aktuálního stavu skladu (ERP) a historie prodejů. Seskupeno <b>podle dodavatele</b> a seřazeno podle hodnoty objednávky.'],
       ['Jak počítáme „Objednat"', 'Cílem je mít na skladě zásobu na <b>dodací lhůtu + ' + (cfg.cover || 2) + ' měsíce</b>. Objednat = tato cílová poptávka − (co je <i>k dispozici</i> + co už je <i>objednáno</i>). Poptávka je <b>sezónní</b> (počítá se dopředu od aktuálního měsíce) a <b>robustní</b> — jednorázové výkyvy (velká jednorázová zakázka) se do ní nezapočítávají.'],
       ['Zvláštní případy', '<b style="color:#b23">Oversold</b> (červeně) = zákazníci mají rezervováno víc, než je skladem → objednávka je <b>povinná</b> (vykrytí objednávek). <b>Náběh sezóny</b> = předzásobení na nadcházející špičku s předstihem o dodací lhůtu. Řídce prodávané položky jedou na plochém průměru (ne na falešné špičce).'],
