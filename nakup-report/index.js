@@ -63,7 +63,7 @@ function mount(host) {
   const daysBetween = (d1, d2) => { const a = Date.parse(d1), b = Date.parse(d2); return (isNaN(a) || isNaN(b)) ? 1 : Math.max(1, Math.round((b - a) / 86400000)); };
   function applyMovement(prevRows, prevDate, nowRows, nowDate) {
     const mv = loadMoves(), pm = snapMap(prevRows), dd = daysBetween(prevDate, nowDate);
-    nowRows.forEach(r => { const k = r.sk + '-' + r.reg, p = pm[k]; if (!p) return;
+    onlyActive(nowRows).forEach(r => { const k = r.sk + '-' + r.reg, p = pm[k]; if (!p) return;
       const v = dispatchDiff(p, r), e = mv[k] || (mv[k] = { sum: 0, days: 0, hist: [] });
       e.sum += v; e.days += dd;
       // Ukládej do historie jen dny se skutečným pohybem — od 20. 8. 2026 chodí v exportu i položky
@@ -112,6 +112,7 @@ function mount(host) {
     try { fs.writeFileSync(BAL_F, JSON.stringify(arr)); } catch (_) {} return arr;
   }
   function computeBilance(nowRows, nowDate, prevRows, prevDate) {
+    nowRows = onlyActive(nowRows); prevRows = prevRows ? onlyActive(prevRows) : prevRows;
     const Z = () => ({ ks: 0, kc: 0 });
     // POZOR: stav (sklad/dispo/…) je k ránu `nowDate`, ale POHYBY se staly PŘEDCHOZÍ den → flowDate.
     const B = { date: nowDate, items: (nowRows || []).length, stock: Z(), dispo: Z(), onOrder: Z(), reserved: Z(),
@@ -178,7 +179,7 @@ function mount(host) {
           if (parsedNow && parsedNow.rows) { await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
         } catch (e) { console.warn('[nakup-report] pohyby (skip):', e.message); }
       }
-      if (loadBilance().length === 0 || !st.bilanceFixV4) {
+      if (loadBilance().length === 0 || !st.bilanceFixV5) {
         try {
           // Pozor: dřív se tu jen četl OBJ_LIVE a když chyběl, TIŠE se nestalo nic → bilance zůstala
           // navždy prázdná. Nově se soubor v takovém případě stáhne z Disku.
@@ -190,7 +191,7 @@ function mount(host) {
           }
           const force = loadBilance().length > 0;
           await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today, force);
-          st.bilanceFixV4 = 1;
+          st.bilanceFixV5 = 1;
           console.log('[nakup-report] bilance: ' + (force ? 'jednorázový přepočet historie' : 'bootstrap') + ' z denních souborů → ' + loadBilance().length + ' dnů');
         } catch (e) { console.warn('[nakup-report] bilance (skip):', e.message); }
       }
@@ -210,13 +211,13 @@ function mount(host) {
       try {
         const prevForFlow = (prev && prev.rows && prev.date && prev.date !== dataDate) ? prev.rows : null;
         if (loadBilance().length === 0) await bootstrapBilance(xls, newest, parsed, dataDate);
-        else if (!st.bilanceFixV4) { await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV4 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů'); }
+        else if (!st.bilanceFixV5) { await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV5 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů'); }
         else pushBilance(computeBilance(parsed.rows, dataDate, prevForFlow, prevForFlow ? prev.date : null));
       } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
       fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder, reserved: r.reserved })) }));
     } catch (e) { console.warn('[nakup-report] pohyby:', e.message); }
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));
-    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV4: st.bilanceFixV4 || 0 };
+    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV5: st.bilanceFixV5 || 0 };
     try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
     console.log('[nakup-report] Drive sync: ' + newest.name + ' → ' + parsed.rows.length + ' položek');
     return { ok: true, file: newest.name, rows: parsed.rows.length };
@@ -275,6 +276,16 @@ function mount(host) {
   }
   function saveCfg(c) { try { fs.writeFileSync(CFG_F, JSON.stringify(c, null, 2)); } catch (e) { console.error('[nakup-report] zápis config:', e.message); } }
   const loadData = () => { try { return JSON.parse(fs.readFileSync(SRC_F, 'utf8')); } catch (_) { return { rows: [], period: '' }; } };
+  // Aktivní sortiment = položky z „obrat plasty" (kvartální report, záložka „📋 Vše").
+  // ERP export obsahuje i neaktivní/neprodávané položky a služby („Doprava realizovaná cizími vozidly"),
+  // ty nesmí do doporučení ani do bilance. Když by seznam byl prázdný, filtr se NEPOUŽIJE (pojistka).
+  let _akKeys = null, _akAt = 0;
+  function activeKeys() {
+    if (_akKeys && (Date.now() - _akAt) < 300000) return _akKeys;
+    const s = new Set(); (loadData().rows || []).forEach(r => s.add(String(r.sk) + '-' + String(r.reg)));
+    _akKeys = s; _akAt = Date.now(); return s;
+  }
+  const onlyActive = rows => { const k = activeKeys(); return k.size ? (rows || []).filter(r => k.has(r.sk + '-' + r.reg)) : (rows || []); };
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
 
   // ---------- výpočet (port klasifikace + markdown + nákup z klientské appky) ----------
@@ -415,7 +426,7 @@ function mount(host) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1 };
-    let list = (obj.rows || []).map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) })).filter(r => r.o.rec > 0 || r.x.avail < 0);
+    let list = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) })).filter(r => r.o.rec > 0 || r.x.avail < 0);
     const totVal = list.reduce((s, r) => s + r.o.value, 0), totKs = list.reduce((s, r) => s + r.o.rec, 0), oversold = list.filter(r => r.x.avail < 0).length;
     // seskupit dle dodavatele, řadit dle hodnoty
     const bySup = {}; list.forEach(r => { const k = r.x.skupina || '—'; (bySup[k] = bySup[k] || []).push(r); });
@@ -633,8 +644,9 @@ function mount(host) {
       const bal = loadBilance().filter(e => e.hasFlow && e.flowDate), mv = loadMoves(), o = loadObj();
       const meta = {}; (o.rows || []).forEach(r => { meta[r.sk + '-' + r.reg] = { n: r.nazev, sup: r.skupina, uc: unitVal(r) }; });
       // per-den: kolik položek se hýbalo + agregace top položek
-      const itemsPerDay = {}, agg = {};
-      Object.keys(mv).forEach(k => { (mv[k].hist || []).forEach(h => { if (!(h.v > 0)) return;
+      const itemsPerDay = {}, agg = {}, ak = activeKeys();
+      Object.keys(mv).forEach(k => { if (ak.size && !ak.has(k)) return;   // jen aktivní sortiment
+        (mv[k].hist || []).forEach(h => { if (!(h.v > 0)) return;
         itemsPerDay[h.d] = (itemsPerDay[h.d] || 0) + 1;
         const t = agg[k] || (agg[k] = { ks: 0, dny: 0 }); t.ks += h.v; t.dny++; }); });
       const days = bal.map(e => ({ date: e.flowDate, souborDate: e.date, dny: e.flowDays || 1, dispKc: e.flow.dispatched.kc, dispKs: e.flow.dispatched.ks,
