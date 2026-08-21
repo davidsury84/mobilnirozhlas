@@ -508,6 +508,26 @@ function mount(host) {
 
   // ---------- plánovač (týdně, pojistka 1×/ISO-týden) ----------
   function isoWeek(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - day + 3); const f = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)); const wk = 1 + Math.round(((t - f) / 86400000 - 3 + ((f.getUTCDay() + 6) % 7)) / 7); return t.getUTCFullYear() + '-W' + String(wk).padStart(2, '0'); }
+  // Pojistka: bilance se nesmí odeslat prázdná. Když historie chybí (nový volume, výpadek zápisu),
+  // dopočítá se z denních souborů na Disku ještě před odesláním e-mailu.
+  async function ensureBilance() {
+    if (loadBilance().length) return false;
+    if (!drive || !drive.configured() || !OBJ_FOLDER) return false;
+    const files = await drive.listFolder(OBJ_FOLDER);
+    const xls = (files || []).filter(f => /\.xlsx$/i.test(f.name || '') || /spreadsheetml/.test(f.mimeType || ''));
+    if (!xls.length) return false;
+    xls.sort((a, b) => String(b.createdTime || '').localeCompare(String(a.createdTime || '')) || String(b.name || '').localeCompare(String(a.name || '')));
+    const newest = xls[0];
+    let parsedNow = null; try { parsedNow = JSON.parse(fs.readFileSync(OBJ_LIVE, 'utf8')); } catch (_) {}
+    if (!(parsedNow && parsedNow.rows && parsedNow.rows.length)) {
+      const dl = await drive.downloadFileBase64(newest.id, 20 * 1024 * 1024);
+      parsedNow = { rows: parseObjXlsx(Buffer.from(dl.base64, 'base64')).rows, date: dateOfName(newest.name) };
+    }
+    await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || new Date().toISOString().slice(0, 10), true);
+    console.log('[nakup-report] bilance chyběla → dopočítána z Drive (' + loadBilance().length + ' dnů)');
+    return true;
+  }
+
   // Jednorázové zapnutí rozesílek (výslovný pokyn správce 2026-08-16). Poté už se řídí nastavením v „Rozesílky".
   function activateReportsOnce(st) {
     if (st.reportsActivatedV1) return false;
@@ -546,9 +566,16 @@ function mount(host) {
       // Ranní bilance skladu — denně (od zvolené hodiny), pojistka 1×/den
       if (cfg.bilanceEnabled && !dis('bilance') && now.getHours() >= (cfg.bilanceHour != null ? cfg.bilanceHour : 8)) {
         const dstr = now.toISOString().slice(0, 10);
-        if (st.bilanceDay !== dstr) { const rB = await sendReport('bilance', cfg.bilanceTo, cfg); st.bilance = rB; changed = true;
-          if (odeslano(st, 'bilance', dstr, rB)) st.bilanceDay = dstr;
-          console.log('[nakup-report] ranní bilance: ' + (rB.ok ? 'odesláno (' + (rB.to || []).join(', ') + ')' : 'CHYBA ' + rB.error)); }
+        if (st.bilanceDay !== dstr) {
+          try { await ensureBilance(); } catch (e) { console.warn('[nakup-report] dopočet bilance:', e.message); }
+          const dnu = loadBilance().length;
+          if (!dnu) { console.warn('[nakup-report] ranní bilance NEODESLÁNA — chybí denní data (zkusím při dalším běhu).'); }
+          else {
+            const rB = await sendReport('bilance', cfg.bilanceTo, cfg); st.bilance = rB; changed = true;
+            if (odeslano(st, 'bilance', dstr, rB)) st.bilanceDay = dstr;
+            console.log('[nakup-report] ranní bilance: ' + (rB.ok ? ('odesláno · ' + dnu + ' dnů historie (' + (rB.to || []).join(', ') + ')') : 'CHYBA ' + rB.error));
+          }
+        }
       }
       // Týdenní zlevnění/nákup — volitelné (defaultně vypnuto)
       if (cfg.enabled && !dis('markdown') && now.getDay() >= cfg.weekday) {
