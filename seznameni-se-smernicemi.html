@@ -6660,8 +6660,9 @@ function exportProduktySkoleni(type){
 let MOBILIAR_DATA={kategorie:[],zaznamy:[]};
 let MOBILIAR_FILTR={role:'',kat:'',sort:'top'};
 const MOBILIAR_ROLE_NAZVY={obchodnik:'Obchodník ELKOPLAST',zakaznik:'Zákazník',ostatni:'Jiné',neuvedeno:'Neuvedeno'};
+function mobiliarUrl(){ return MOBILIAR_DATA.verejnyOdkaz||(location.origin+'/mobiliar'); }   /* sběrná doména (vyzkum.elkoplast.cz), bez „intranet" v adrese */
 function mobiliarCopyLink(){
-  const url=location.origin+'/mobiliar';
+  const url=mobiliarUrl();
   (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>toast('Odkaz zkopírován: '+url)).catch(()=>prompt('Zkopírujte odkaz:',url));
 }
 function mobiliarKodNazev(kod){ return 'WD-'+kod.toUpperCase(); }   /* ob-001 → WD-OB-001 (kód z katalogu) */
@@ -6678,7 +6679,7 @@ function mobiliarAgregace(){
 async function mobiliarBlockHtml(){
   try{ const r=await fetch('/api/mobiliar-results',{cache:'no-store'}); if(r.status===401){ showLogin(); return ''; } MOBILIAR_DATA=await r.json(); }catch(e){ MOBILIAR_DATA={kategorie:[],zaznamy:[]}; }
   setTimeout(mobiliarRerender,0);   /* innerHTML skripty nespouští — žebříček se dorenderuje po vložení */
-  const url=location.origin+'/mobiliar';
+  const url=mobiliarUrl();
   return '<div class="card pad" style="margin-bottom:18px">'+
     '<div class="spread" style="margin-bottom:6px"><strong>Hodnocení venkovního mobiliáře (katalog WeiDu 2025)</strong>'+
       '<div class="inline-actions"><button class="btn ghost sm" onclick="exportMobiliar()">⬇ Export (CSV)</button></div></div>'+

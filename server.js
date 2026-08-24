@@ -189,6 +189,10 @@ const VYKRESY_SKOLENI_F = path.join(DATA_DIR, 'vykresy-skoleni-results.json'); /
 const SVAROVANI_SKOLENI_F = path.join(DATA_DIR, 'svarovani-skoleni-results.json'); // výsledky testu školení Průvodce svařováním — max 3 pokusy na osobu
 const MOBILIAR_FILE = path.join(ROOT, 'mobiliar.html');      // veřejné obrázkové hodnocení venkovního mobiliáře (katalog WeiDu)
 const MOBILIAR_F = path.join(DATA_DIR, 'mobiliar-hlasovani.json'); // hlasy hodnocení mobiliáře — upsert dle rid (anonymní id prohlížeče)
+// Veřejná sběrná doména průzkumu (alias na tuto app, bez „intranet" v adrese): kořen servíruje hodnocení
+// mobiliáře a nic intranetového na ní není dostupné. Víc hostů odděl čárkou; první = adresa v adminu.
+const SURVEY_HOSTS = (process.env.SURVEY_HOSTS || 'vyzkum.elkoplast.cz,survey.elkoplast.cz').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+const SURVEY_PUBLIC_URL = process.env.SURVEY_PUBLIC_URL || ('https://' + SURVEY_HOSTS[0]);
 const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
 const ACTLOG_F  = path.join(DATA_DIR, 'activity.json');   // jednoduchý log aktivity (přihlášení, pozvánky, průzkumy)
@@ -2484,6 +2488,19 @@ const server = http.createServer(async (req, res) => {
   // Klientská doména mobilní-lisy.cz (alias na tuto app) — jen prezentace + dotazník, PŘED závorou.
   if (mobilniLisyMod && await mobilniLisyMod.handleClientHost(req, res)) return;
 
+  // Veřejná sběrná doména průzkumu (vyzkum.elkoplast.cz) — servíruje JEN hodnocení mobiliáře, PŘED závorou.
+  // Kořen = průzkum; fotky a příjem hlasů propadnou níže (jsou veřejné); vše ostatní přesměruje na kořen,
+  // takže intranet na této adrese není dostupný (ani přihlášení — roli si tu respondent volí ručně).
+  const surveyHost = SURVEY_HOSTS.indexOf((req.headers.host || '').toLowerCase().replace(/:\d+$/, '')) >= 0;
+  if (surveyHost) {
+    if (p === '/' || p === '/index.html' || p === '/mobiliar' || p === '/mobiliar.html') {
+      if (!fs.existsSync(MOBILIAR_FILE)) return send(res, 404, '<h1>Chybí mobiliar.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(MOBILIAR_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    const surveyOk = p.indexOf('/mobiliar-foto/') === 0 || (p === '/api/mobiliar/vote' && req.method === 'POST') || p === '/healthz' || p === '/api/version';
+    if (!surveyOk) { res.writeHead(302, { 'Location': '/' }); return res.end(); }
+  }
+
   // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
   const invite = inviteVerify(u.query.i || '');
   const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/vykresy', '/vykresy.html', '/logika', '/logika.html', '/api/grit', '/api/jss', '/api/tw44', '/api/vykresy', '/api/logika'];
@@ -2854,7 +2871,7 @@ const server = http.createServer(async (req, res) => {
       if (r.error) return send(res, 400, r);
       return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' });
     }
-    if (p === '/api/mobiliar-results' && req.method === 'GET') return send(res, 200, { kategorie: MOBILIAR_KATEGORIE, zaznamy: readJson(MOBILIAR_F, []) });
+    if (p === '/api/mobiliar-results' && req.method === 'GET') return send(res, 200, { kategorie: MOBILIAR_KATEGORIE, zaznamy: readJson(MOBILIAR_F, []), verejnyOdkaz: SURVEY_PUBLIC_URL });
     // ABROLL test: GET = stav pokusů dané osoby, POST = odeslání pokusu (max 3)
     if (p === '/api/abroll' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, abrollStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
