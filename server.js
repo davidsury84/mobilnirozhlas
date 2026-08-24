@@ -839,7 +839,8 @@ function recordVykresy(a) {
 }
 /* ---- Hodnocení venkovního mobiliáře (katalog WeiDu) — veřejný obrázkový průzkum ----
    Fotky: assets/mobiliar/<kód>.jpg (např. ob-001), kódy odpovídají katalogu (ob-001 = WD-OB-001).
-   Hlasy 1–5, 0 = přeskočeno. Klient posílá průběžně celý svůj stav; server upsertuje dle rid. */
+   Respondent vybírá z šestic fotek 2 nejhezčí: 1 = vybráno, 0 = zobrazeno/nevybráno.
+   Anonymní (bez jména). Klient posílá průběžně celý svůj stav; server upsertuje dle rid. */
 const MOBILIAR_KATEGORIE = [
   { key: 'ob',  nazev: 'Lavičky',         pocet: 96 },
   { key: 'tc',  nazev: 'Stoly a sezení',  pocet: 36 },
@@ -862,19 +863,18 @@ function recordMobiliar(b) {
   for (const kod of Object.keys(votesIn)) {
     if (!mobiliarKodOk(kod)) continue;
     const v = Math.round(+votesIn[kod]);
-    if (v >= 0 && v <= 5) votes[kod] = v;
+    if (v >= 0 && v <= 5) votes[kod] = v > 0 ? 1 : 0;
   }
   const all = readJson(MOBILIAR_F, []);
   let rec = all.find(r => r.rid === rid);
   const novy = !rec;
   if (!rec) { rec = { rid, createdAt: Date.now() }; all.push(rec); }
-  rec.name = String(b.name || '').slice(0, 80) || rec.name || '';
   rec.role = ROLE.indexOf(b.role) >= 0 ? b.role : (rec.role || 'neuvedeno');
   // hlasy jen přibývají/mění se — menší payload (např. ze staré záložky) nesmí smazat už uložené
   rec.votes = Object.assign({}, rec.votes || {}, votes);
   rec.ts = Date.now();
   writeJson(MOBILIAR_F, all);
-  if (novy) logActivity('mobiliar', { email: '', name: rec.name || 'anonym' }, 'Hodnocení mobiliáře: nový respondent (' + rec.role + ')');
+  if (novy) logActivity('mobiliar', { email: '', name: 'anonym' }, 'Hodnocení mobiliáře: nový respondent (' + rec.role + ')');
   return { ok: true, ulozeno: Object.keys(rec.votes).length };
 }
 /* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
@@ -2627,7 +2627,7 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(VYKRESY_FILE)) return send(res, 404, '<h1>Chybí vykresy.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(VYKRESY_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
-    // Veřejné hodnocení venkovního mobiliáře — přihlášenému zaměstnanci předvyplní jméno a roli obchodníka.
+    // Veřejné hodnocení venkovního mobiliáře — přihlášenému zaměstnanci předvybere roli obchodníka.
     if (p === '/mobiliar' || p === '/mobiliar.html') {
       if (!fs.existsSync(MOBILIAR_FILE)) return send(res, 404, '<h1>Chybí mobiliar.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       let html = fs.readFileSync(MOBILIAR_FILE, 'utf8');
