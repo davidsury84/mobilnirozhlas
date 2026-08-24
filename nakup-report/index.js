@@ -1083,6 +1083,10 @@ function mount(host) {
       if (b.bilanceTo != null) next.bilanceTo = cleanEmails(b.bilanceTo);
       if (b.bilanceEnabled != null) next.bilanceEnabled = !!b.bilanceEnabled;
       if (b.bilanceHour != null && b.bilanceHour >= 0 && b.bilanceHour <= 23) next.bilanceHour = +b.bilanceHour;
+      if (b.utichleTo != null) next.utichleTo = cleanEmails(b.utichleTo);
+      if (b.utichleEnabled != null) next.utichleEnabled = !!b.utichleEnabled;
+      if (b.utichleDay != null && b.utichleDay >= 0 && b.utichleDay <= 6) next.utichleDay = +b.utichleDay;
+      if (b.utichleEvery != null && [1, 2, 4].indexOf(+b.utichleEvery) >= 0) next.utichleEvery = +b.utichleEvery;
       saveCfg(next);
       return json(res, 200, { ok: true, config: next }), true;
     }
