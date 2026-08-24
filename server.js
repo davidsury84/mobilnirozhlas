@@ -185,6 +185,8 @@ const LOXXER_SKOLENI_F = path.join(DATA_DIR, 'loxxer-skoleni-results.json'); // 
 const ACTS_SKOLENI_F = path.join(DATA_DIR, 'acts-skoleni-results.json'); // výsledky testu ACTS (železniční abroll kontejnery) — max 3 pokusy na osobu
 const VYKRESY_SKOLENI_F = path.join(DATA_DIR, 'vykresy-skoleni-results.json'); // výsledky testu školení Čtení výkresů — max 3 pokusy na osobu
 const SVAROVANI_SKOLENI_F = path.join(DATA_DIR, 'svarovani-skoleni-results.json'); // výsledky testu školení Průvodce svařováním — max 3 pokusy na osobu
+const MOBILIAR_FILE = path.join(ROOT, 'mobiliar.html');      // veřejné obrázkové hodnocení venkovního mobiliáře (katalog WeiDu)
+const MOBILIAR_F = path.join(DATA_DIR, 'mobiliar-hlasovani.json'); // hlasy hodnocení mobiliáře — upsert dle rid (anonymní id prohlížeče)
 const CFG_F    = path.join(DATA_DIR, 'mail.config.json');
 const SECRET_F = path.join(DATA_DIR, 'secret.json');
 const ACTLOG_F  = path.join(DATA_DIR, 'activity.json');   // jednoduchý log aktivity (přihlášení, pozvánky, průzkumy)
@@ -834,6 +836,46 @@ function recordVykresy(a) {
   writeJson(VYKRESY_F, results);
   logActivity('survey', { email, name }, 'Test čtení výkresů');
   return rec;
+}
+/* ---- Hodnocení venkovního mobiliáře (katalog WeiDu) — veřejný obrázkový průzkum ----
+   Fotky: assets/mobiliar/<kód>.jpg (např. ob-001), kódy odpovídají katalogu (ob-001 = WD-OB-001).
+   Hlasy 1–5, 0 = přeskočeno. Klient posílá průběžně celý svůj stav; server upsertuje dle rid. */
+const MOBILIAR_KATEGORIE = [
+  { key: 'ob',  nazev: 'Lavičky',         pocet: 96 },
+  { key: 'tc',  nazev: 'Stoly a sezení',  pocet: 36 },
+  { key: 'otc', nazev: 'Odpadkové koše',  pocet: 84 },
+  { key: 'osl', nazev: 'Lehátka',         pocet: 24 },
+  { key: 'opb', nazev: 'Květináče',       pocet: 24 },
+];
+function mobiliarKodOk(kod) {
+  const m = /^([a-z]+)-(\d{3})$/.exec(String(kod || ''));
+  if (!m) return false;
+  const kat = MOBILIAR_KATEGORIE.find(k => k.key === m[1]);
+  return !!kat && +m[2] >= 1 && +m[2] <= kat.pocet;
+}
+function recordMobiliar(b) {
+  const rid = String(b.rid || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40);
+  if (rid.length < 8) return { error: 'Neplatné id hlasování.' };
+  const ROLE = ['obchodnik', 'zakaznik', 'ostatni', 'neuvedeno'];
+  const votesIn = (b.votes && typeof b.votes === 'object') ? b.votes : {};
+  const votes = {};
+  for (const kod of Object.keys(votesIn)) {
+    if (!mobiliarKodOk(kod)) continue;
+    const v = Math.round(+votesIn[kod]);
+    if (v >= 0 && v <= 5) votes[kod] = v;
+  }
+  const all = readJson(MOBILIAR_F, []);
+  let rec = all.find(r => r.rid === rid);
+  const novy = !rec;
+  if (!rec) { rec = { rid, createdAt: Date.now() }; all.push(rec); }
+  rec.name = String(b.name || '').slice(0, 80) || rec.name || '';
+  rec.role = ROLE.indexOf(b.role) >= 0 ? b.role : (rec.role || 'neuvedeno');
+  // hlasy jen přibývají/mění se — menší payload (např. ze staré záložky) nesmí smazat už uložené
+  rec.votes = Object.assign({}, rec.votes || {}, votes);
+  rec.ts = Date.now();
+  writeJson(MOBILIAR_F, all);
+  if (novy) logActivity('mobiliar', { email: '', name: rec.name || 'anonym' }, 'Hodnocení mobiliáře: nový respondent (' + rec.role + ')');
+  return { ok: true, ulozeno: Object.keys(rec.votes).length };
 }
 /* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
 const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)', vykresy: 'Test čtení výkresů' };
@@ -2378,6 +2420,8 @@ const server = http.createServer(async (req, res) => {
   const libraryIngestPublic = (p === '/api/library/ingest-ext' && req.method === 'POST');   // Bearer SSO_SHARED_SECRET (vkládání dokumentů přes chat)
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
+  // Veřejné cesty hodnocení mobiliáře (obrázkový průzkum pro obchodníky i zákazníky): stránka + fotky + hlasy.
+  const mobiliarPublic = p === '/mobiliar' || p === '/mobiliar.html' || p.indexOf('/mobiliar-foto/') === 0 || (p === '/api/mobiliar/vote' && req.method === 'POST');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
@@ -2442,7 +2486,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !libraryIngestPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !libraryIngestPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -2463,7 +2507,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // chráněné cesty (správa)
-  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results'];
+  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results', '/api/mobiliar-results'];
   if (PROTECTED.indexOf(p) >= 0 && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
@@ -2562,6 +2606,22 @@ const server = http.createServer(async (req, res) => {
     if (p === '/vykresy' || p === '/vykresy.html') {
       if (!fs.existsSync(VYKRESY_FILE)) return send(res, 404, '<h1>Chybí vykresy.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(VYKRESY_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    // Veřejné hodnocení venkovního mobiliáře — přihlášenému zaměstnanci předvyplní jméno a roli obchodníka.
+    if (p === '/mobiliar' || p === '/mobiliar.html') {
+      if (!fs.existsSync(MOBILIAR_FILE)) return send(res, 404, '<h1>Chybí mobiliar.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      let html = fs.readFileSync(MOBILIAR_FILE, 'utf8');
+      const e = empSession(req);
+      if (e) html = html.replace('/*__MJ_EMP__*/', 'window.MJ_EMP=' + JSON.stringify({ name: e.name || '', email: e.email || '' }) + ';');
+      return send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    // Fotky mobiliáře (assets/mobiliar) — vlastní veřejná cesta, /assets/ podadresáře neumí a je za závorou.
+    if (p.indexOf('/mobiliar-foto/') === 0) {
+      const rel = p.slice('/mobiliar-foto/'.length).replace(/[^a-z0-9.-]/g, '');
+      const f = path.join(ROOT, 'assets', 'mobiliar', rel);
+      if (!rel.endsWith('.jpg') || rel.indexOf('..') >= 0 || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
+      res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=604800' });
+      return res.end(fs.readFileSync(f));
     }
     if (p === '/koncept' || p === '/koncept.html') {
       if (!fs.existsSync(KONCEPT_FILE)) return send(res, 404, '<h1>Chybí intranet-koncept.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
@@ -2697,6 +2757,15 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/vykresy' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordVykresy(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('vykresy', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, skore: rec.skore, procenta: rec.procenta }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/vykresy-results' && req.method === 'GET') return send(res, 200, readJson(VYKRESY_F, []));
+
+    // Hodnocení mobiliáře: příjem hlasů (veřejné, upsert dle rid) + výsledky pro admin.
+    if (p === '/api/mobiliar/vote' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const r = recordMobiliar(b);
+      if (r.error) return send(res, 400, r);
+      return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' });
+    }
+    if (p === '/api/mobiliar-results' && req.method === 'GET') return send(res, 200, { kategorie: MOBILIAR_KATEGORIE, zaznamy: readJson(MOBILIAR_F, []) });
     // ABROLL test: GET = stav pokusů dané osoby, POST = odeslání pokusu (max 3)
     if (p === '/api/abroll' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, abrollStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }

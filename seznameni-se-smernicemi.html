@@ -6478,6 +6478,7 @@ const PRUZKUMY_DEFS=[
   {kind:'jss',     typ:'pruzkum', sendId:'survey-jss',     nazev:'Dotazník pracovní spokojenosti (JSS)', popis:'36 výroků · 9 oblastí pracovní spokojenosti'},
   {kind:'tw44',    typ:'pruzkum', sendId:'survey-tw44',    nazev:'Test kognitivní zátěže (TW44)',        popis:'vyhledávání v tabulce 10×10 · výkon pod časovým tlakem'},
   {kind:'vykresy', typ:'pruzkum', sendId:'survey-vykresy', nazev:'Test čtení výkresů',                   popis:'15 otázek · praktické čtení výkresové dokumentace'},
+  {kind:'mobiliar', typ:'pruzkum', nazev:'Hodnocení mobiliáře (WeiDu)', popis:'obrázkový průzkum vzhledu — lavičky, stoly, koše, lehátka, květináče · veřejný odkaz /mobiliar'},
   {kind:'abroll',        typ:'skoleni', nazev:'Školení ABROLL',        popis:'kódování ABROLL kontejnerů · závěrečný test, max 3 pokusy'},
   {kind:'prumysl',       typ:'skoleni', nazev:'Školení Průmysl',       popis:'skladování, Li-Ion, ADR · závěrečný test, max 3 pokusy'},
   {kind:'loxxer',        typ:'skoleni', nazev:'Školení LOXXER',        popis:'protipožární skříně na Li-Ion baterie · závěrečný test, max 3 pokusy'},
@@ -6501,13 +6502,14 @@ function skolStaty(res,maxPokusu){
 async function renderPruzkumyPrehled(){
   const box=document.getElementById("gritAdmin");
   box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám přehled testů…</p></div>';
-  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto','/api/vykresy-skoleni-results','/api/svarovani-skoleni-results'];
+  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto','/api/vykresy-skoleni-results','/api/svarovani-skoleni-results','/api/mobiliar-results'];
   let neprihlasen=false;
   const data=await Promise.all(eps.map(u=>fetch(u,{cache:'no-store'}).then(r=>{ if(r.status===401){ neprihlasen=true; return []; } return r.json(); }).catch(()=>[])));
   if(neprihlasen){ showLogin(); return; }
   GRIT_RESULTS=data[0]||[]; JSS_RESULTS=data[1]||[]; TW44_RESULTS=data[2]||[]; VYKRESY_RESULTS=data[3]||[];
   ABROLL_RESULTS=data[4]||[]; PRUMYSL_RESULTS=data[5]||[]; LOXXER_SKOLENI_RESULTS=data[6]||[]; ACTS_SKOLENI_RESULTS=data[7]||[];
   PRODUKTY_SKOLENI_RESULTS.kovo=data[8]||[]; PRODUKTY_SKOLENI_RESULTS.roto=data[9]||[]; VYKRESY_SKOLENI_RESULTS=data[10]||[]; SVAROVANI_SKOLENI_RESULTS=data[11]||[];
+  MOBILIAR_DATA=(data[12]&&data[12].zaznamy)?data[12]:{kategorie:[],zaznamy:[]};
   const fmtD=ts=>ts?new Date(ts).toLocaleDateString('cs-CZ'):'—';
   const pill=(t,c)=>'<span class="pill '+c+'">'+t+'</span>';
   /* statistiky jednotlivých testů do sloupců: [vyplnilo, Ø výsledek, stav, poslední] */
@@ -6527,6 +6529,11 @@ async function renderPruzkumyPrehled(){
       const avgP=Math.round(res.reduce((s,r)=>s+(r.procenta||0),0)/res.length);
       const ok=res.filter(r=>(r.procenta||0)>=70).length, pa=vykresyPasmoCl(avgP);
       return {n:res.length, vysledek:'Ø úspěšnost '+avgP+' %', stav:pill(pa[0],pa[1])+' <span class="muted" style="font-size:11px">≥ 70 %: '+ok+' z '+res.length+'</span>', last:Math.max(...res.map(r=>r.ts||0))}; }
+    if(kind==='mobiliar'){ const res=MOBILIAR_DATA.zaznamy||[]; if(!res.length) return {n:0};
+      let hlasu=0,soucet=0; res.forEach(r=>{ Object.values(r.votes||{}).forEach(v=>{ if(v>0){ hlasu++; soucet+=v; } }); });
+      const ob=res.filter(r=>r.role==='obchodnik').length, za=res.filter(r=>r.role==='zakaznik').length;
+      return {n:res.length, vysledek:(hlasu?('Ø '+(soucet/hlasu).toFixed(1).replace('.',',')+' ★ · '+hlasu+' hlasů'):'zatím bez hlasů'),
+        stav:(ob?pill('obchodníci: '+ob,'green'):'')+(za?' '+pill('zákazníci: '+za,'amber'):''), last:Math.max(...res.map(r=>r.ts||0))}; }
     const res=kind==='abroll'?ABROLL_RESULTS:kind==='prumysl'?PRUMYSL_RESULTS:kind==='loxxer'?LOXXER_SKOLENI_RESULTS:kind==='acts'?ACTS_SKOLENI_RESULTS:kind==='produkty-kovo'?PRODUKTY_SKOLENI_RESULTS.kovo:kind==='vykresy-skoleni'?VYKRESY_SKOLENI_RESULTS:kind==='svarovani-skoleni'?SVAROVANI_SKOLENI_RESULTS:PRODUKTY_SKOLENI_RESULTS.roto;
     if(!res.length) return {n:0};
     const st=skolStaty(res, kind==='svarovani-skoleni'?1:3);
@@ -6546,6 +6553,7 @@ async function renderPruzkumyPrehled(){
     const s=statRadku(d.kind);
     const invKey=SKOL_INVITE_MAP[d.kind];
     const akce=(d.sendId?'<button class="btn sm" onclick="event.stopPropagation();openSendModal(\''+d.sendId+'\')">✉ Rozeslat</button> ':'')+
+      (d.kind==='mobiliar'?'<button class="btn sm" onclick="event.stopPropagation();mobiliarCopyLink()">🔗 Veřejný odkaz</button> ':'')+
       (invKey?'<button class="btn sm" onclick="event.stopPropagation();skolPozvat(\''+invKey+'\',\''+esc(d.nazev).replace(/'/g,"\\'")+'\')">✉ Rozeslat</button> ':'')+
       '<button class="btn ghost sm" onclick="event.stopPropagation();openPruzkumDetail(\''+d.kind+'\')">Spravovat →</button>';
     return '<tr data-klik onclick="openPruzkumDetail(\''+d.kind+'\')">'+
@@ -6573,7 +6581,7 @@ async function openPruzkumDetail(kind){
   box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám…</p></div>';
   const def=PRUZKUMY_DEFS.find(d=>d.kind===kind)||{};
   const back='<div class="spread" style="margin-bottom:14px"><button class="btn ghost sm" onclick="renderGritAdmin()">← Zpět na přehled testů</button>'+
-    '<span class="muted" style="font-size:12px">'+esc(def.typ==='pruzkum'?'Dotazník / test — rozeslání osobním odkazem':'Školení — závěrečný test')+'</span></div>';
+    '<span class="muted" style="font-size:12px">'+esc(kind==='mobiliar'?'Obrázkový průzkum — veřejný odkaz, bez přihlášení':def.typ==='pruzkum'?'Dotazník / test — rozeslání osobním odkazem':'Školení — závěrečný test')+'</span></div>';
   let inner='';
   if(kind==='grit') inner=await gritBlockHtml();
   else if(kind==='jss') inner=await jssBlockHtml();
@@ -6587,6 +6595,7 @@ async function openPruzkumDetail(kind){
   else if(kind==='produkty-roto') inner=await produktySkoleniBlockHtml('roto');
   else if(kind==='vykresy-skoleni') inner=await vykresySkoleniBlockHtml();
   else if(kind==='svarovani-skoleni') inner=await svarovaniSkoleniBlockHtml();
+  else if(kind==='mobiliar') inner=await mobiliarBlockHtml();
   box.innerHTML=back+inner;
   window.scrollTo(0,0);
 }
@@ -6632,6 +6641,110 @@ function exportProduktySkoleni(type){
   const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(";")).join("\r\n");
   const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob);
   const a=document.createElement("a"); a.href=url; a.download="produkty-"+type+"-vysledky.csv"; a.click(); URL.revokeObjectURL(url);
+}
+/* ---- Hodnocení mobiliáře (WeiDu) — obrázkový průzkum, veřejný odkaz /mobiliar ---- */
+let MOBILIAR_DATA={kategorie:[],zaznamy:[]};
+let MOBILIAR_FILTR={role:'',kat:'',sort:'top'};
+const MOBILIAR_ROLE_NAZVY={obchodnik:'Obchodník ELKOPLAST',zakaznik:'Zákazník',ostatni:'Jiné',neuvedeno:'Neuvedeno'};
+function mobiliarCopyLink(){
+  const url=location.origin+'/mobiliar';
+  (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>toast('Odkaz zkopírován: '+url)).catch(()=>prompt('Zkopírujte odkaz:',url));
+}
+function mobiliarKodNazev(kod){ return 'WD-'+kod.toUpperCase(); }   /* ob-001 → WD-OB-001 (kód z katalogu) */
+/* agregace hlasů přes respondenty dle aktivního filtru role */
+function mobiliarAgregace(){
+  const zazn=(MOBILIAR_DATA.zaznamy||[]).filter(r=>!MOBILIAR_FILTR.role||((r.role||'neuvedeno')===MOBILIAR_FILTR.role));
+  const prod={};
+  (MOBILIAR_DATA.kategorie||[]).forEach(k=>{ for(let i=1;i<=k.pocet;i++){ const kod=k.key+'-'+String(i).padStart(3,'0'); prod[kod]={kod,kat:k,n:0,soucet:0,preskoceno:0,dist:[0,0,0,0,0]}; } });
+  zazn.forEach(r=>{ Object.entries(r.votes||{}).forEach(([kod,v])=>{ const p=prod[kod]; if(!p) return; if(v>0){ p.n++; p.soucet+=v; p.dist[v-1]++; } else p.preskoceno++; }); });
+  Object.values(prod).forEach(p=>{ p.avg=p.n?p.soucet/p.n:0; });
+  return {zazn,prod};
+}
+async function mobiliarBlockHtml(){
+  try{ const r=await fetch('/api/mobiliar-results',{cache:'no-store'}); if(r.status===401){ showLogin(); return ''; } MOBILIAR_DATA=await r.json(); }catch(e){ MOBILIAR_DATA={kategorie:[],zaznamy:[]}; }
+  setTimeout(mobiliarRerender,0);   /* innerHTML skripty nespouští — žebříček se dorenderuje po vložení */
+  const url=location.origin+'/mobiliar';
+  return '<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:6px"><strong>Hodnocení venkovního mobiliáře (katalog WeiDu 2025)</strong>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="exportMobiliar()">⬇ Export (CSV)</button></div></div>'+
+    '<p class="muted" style="font-size:13px;margin:0 0 10px">Respondenti hodnotí fotky známkou 1–5 (bez textů a parametrů). Odkaz je veřejný — pošlete ho obchodníkům i zákazníkům:</p>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--green-soft);border:1px solid var(--line);border-radius:10px;padding:9px 12px">'+
+      '<code style="font-size:13.5px;font-weight:700">'+esc(url)+'</code>'+
+      '<button class="btn sm" onclick="mobiliarCopyLink()">🔗 Kopírovat</button></div>'+
+    '</div>'+
+    '<div id="mobiliarVysledky"></div>';
+}
+function mobiliarRerender(){
+  const box=document.getElementById('mobiliarVysledky'); if(!box) return;
+  const {zazn,prod}=mobiliarAgregace();
+  const vsech=(MOBILIAR_DATA.zaznamy||[]).length;
+  let hlasu=0,soucet=0,pokryto=0;
+  Object.values(prod).forEach(p=>{ hlasu+=p.n; soucet+=p.soucet; if(p.n) pokryto++; });
+  const fmtD=ts=>ts?new Date(ts).toLocaleDateString('cs-CZ'):'—';
+  const F=MOBILIAR_FILTR;
+  /* souhrn */
+  let h='<div class="card pad" style="margin-bottom:14px;display:flex;gap:26px;flex-wrap:wrap">'+
+    '<div><div class="muted" style="font-size:12px">Respondentů'+(F.role?' (filtr)':'')+'</div><strong style="font-size:20px">'+zazn.length+(F.role?' <span class="muted" style="font-size:13px">z '+vsech+'</span>':'')+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Hlasů (1–5)</div><strong style="font-size:20px">'+hlasu+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Ø hodnocení</div><strong style="font-size:20px">'+(hlasu?(soucet/hlasu).toFixed(2).replace('.',','):'—')+' ★</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Ohodnoceno produktů</div><strong style="font-size:20px">'+pokryto+' <span class="muted" style="font-size:13px">z '+Object.keys(prod).length+'</span></strong></div></div>';
+  /* filtry */
+  const rolePill=(val,txt)=>'<button class="btn sm '+(F.role===val?'':'ghost ')+'" onclick="MOBILIAR_FILTR.role=\''+val+'\';mobiliarRerender()">'+txt+'</button>';
+  const katPill=(val,txt)=>'<button class="btn sm '+(F.kat===val?'':'ghost ')+'" onclick="MOBILIAR_FILTR.kat=\''+val+'\';mobiliarRerender()">'+txt+'</button>';
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+rolePill('','Všichni')+rolePill('obchodnik','Obchodníci')+rolePill('zakaznik','Zákazníci')+rolePill('ostatni','Jiné')+rolePill('neuvedeno','Neuvedeno')+'</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">'+katPill('','Vše')+(MOBILIAR_DATA.kategorie||[]).map(k=>katPill(k.key,k.nazev)).join('')+'</div>'+
+    '<select style="width:auto;padding:7px 10px" onchange="MOBILIAR_FILTR.sort=this.value;mobiliarRerender()">'+
+      '<option value="top"'+(F.sort==='top'?' selected':'')+'>Nejlépe hodnocené</option>'+
+      '<option value="flop"'+(F.sort==='flop'?' selected':'')+'>Nejhůře hodnocené</option>'+
+      '<option value="pocet"'+(F.sort==='pocet'?' selected':'')+'>Nejvíc hlasů</option></select></div>';
+  /* žebříček produktů */
+  let items=Object.values(prod).filter(p=>!F.kat||p.kat.key===F.kat);
+  const sHlasy=items.filter(p=>p.n);
+  sHlasy.sort((a,b)=>F.sort==='pocet'?(b.n-a.n||b.avg-a.avg):F.sort==='flop'?(a.avg-b.avg||b.n-a.n):(b.avg-a.avg||b.n-a.n));
+  if(!sHlasy.length){
+    h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné hlasy'+(F.role||F.kat?' pro zvolený filtr':'')+'. Rozešlete veřejný odkaz výše.</p></div>';
+  }else{
+    const barvy=['#d03b3b','#e08a2e','#d8b40a','#7fb437','#0e8a43'];
+    const karta=(p,poradi)=>{
+      const distMax=Math.max(1,...p.dist);
+      return '<div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden">'+
+        '<div style="position:relative;background:#fff;aspect-ratio:3/2.1"><img loading="lazy" src="/mobiliar-foto/'+p.kod+'.jpg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain">'+
+          '<span style="position:absolute;top:6px;left:6px;background:rgba(17,23,19,.78);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px">'+poradi+'.</span></div>'+
+        '<div style="padding:8px 10px 10px">'+
+          '<div class="spread" style="gap:6px"><span class="muted" style="font-size:11px;letter-spacing:.04em">'+mobiliarKodNazev(p.kod)+'</span>'+
+            '<strong style="font-size:15px;color:var(--green-d)">'+p.avg.toFixed(1).replace('.',',')+' ★</strong></div>'+
+          '<div style="display:flex;align-items:flex-end;gap:2px;height:22px;margin:6px 0 4px">'+
+            p.dist.map((d,i)=>'<span title="'+(i+1)+' ★: '+d+'×" style="flex:1;background:'+barvy[i]+';opacity:'+(d?'1':'.15')+';height:'+Math.max(8,Math.round(d/distMax*100))+'%;border-radius:2px 2px 0 0"></span>').join('')+'</div>'+
+          '<div class="muted" style="font-size:11.5px">'+p.n+'× hodnoceno'+(p.preskoceno?' · '+p.preskoceno+'× přeskočeno':'')+' · '+esc(p.kat.nazev)+'</div>'+
+        '</div></div>';
+    };
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px">'+sHlasy.map((p,i)=>karta(p,i+1)).join('')+'</div>';
+    const bezHlasu=items.length-sHlasy.length;
+    if(bezHlasu) h+='<p class="muted" style="font-size:12px;margin-top:10px">'+bezHlasu+' produktů zatím nikdo neohodnotil — v žebříčku se objeví s prvním hlasem.</p>';
+  }
+  /* respondenti */
+  if(vsech){
+    const radky=(MOBILIAR_DATA.zaznamy||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).map(r=>{
+      const hodn=Object.values(r.votes||{}).filter(v=>v>0), presk=Object.values(r.votes||{}).length-hodn.length;
+      const avg=hodn.length?(hodn.reduce((s,v)=>s+v,0)/hodn.length).toFixed(1).replace('.',','):'—';
+      return '<tr><td><strong>'+esc(r.name||'Anonym')+'</strong></td><td>'+esc(MOBILIAR_ROLE_NAZVY[r.role]||r.role||'—')+'</td>'+
+        '<td class="num">'+hodn.length+'</td><td class="num">'+presk+'</td><td class="num">'+avg+'</td><td class="muted">'+fmtD(r.ts)+'</td></tr>';
+    }).join('');
+    h+='<div class="card pad" style="margin-top:16px"><strong style="display:block;margin-bottom:8px">Respondenti ('+vsech+')</strong>'+
+      '<div class="matrix-wrap" style="max-height:340px"><table class="grid"><thead><tr><th>Jméno</th><th>Role</th><th class="num">Hodnoceno</th><th class="num">Přeskočeno</th><th class="num">Ø</th><th>Naposledy</th></tr></thead><tbody>'+radky+'</tbody></table></div></div>';
+  }
+  box.innerHTML=h;
+}
+function exportMobiliar(){
+  const {prod}=mobiliarAgregace();
+  const items=Object.values(prod).filter(p=>!MOBILIAR_FILTR.kat||p.kat.key===MOBILIAR_FILTR.kat);
+  if(!items.some(p=>p.n||p.preskoceno)){ toast('Žádná data k exportu.'); return; }
+  const rows=[['Kód','Kategorie','Hlasů','Ø hodnocení','1★','2★','3★','4★','5★','Přeskočeno']];
+  items.sort((a,b)=>b.avg-a.avg||b.n-a.n).forEach(p=>rows.push([mobiliarKodNazev(p.kod),p.kat.nazev,p.n,p.n?p.avg.toFixed(2).replace('.',','):'',...p.dist,p.preskoceno]));
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const u=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=u; a.download='mobiliar-hodnoceni.csv'; a.click(); URL.revokeObjectURL(u);
 }
 /* ---- Školení Čtení technických výkresů — výsledky závěrečného testu ---- */
 let VYKRESY_SKOLENI_RESULTS=[];

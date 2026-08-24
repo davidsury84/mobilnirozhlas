@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Venkovní mobiliář — hodnocení</title>
+<meta property="og:title" content="Líbí se vám náš venkovní mobiliář?">
+<meta property="og:description" content="Krátké obrázkové hodnocení laviček, stolů, košů, lehátek a květináčů — rozhoduje jen vzhled.">
+<meta name="robots" content="noindex">
+<style>
+  :root{
+    --bg:#f2f5f1; --paper:#ffffff; --paper-soft:#f8faf7;
+    --ink:#111713; --ink-soft:#5d675f; --muted:#8a948c;
+    --line:#dce4dc; --line-strong:#b9c8bc;
+    --green:#0e8a43; --green-2:#18a957; --green-d:#08612d; --green-soft:#e3f3e9;
+    --yellow:#ffd21a; --bad:#d03b3b;
+    --r:16px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html{color-scheme:light}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    min-height:100svh;
+  }
+  header.app{background:var(--paper); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:40}
+  .app-in{max-width:760px; margin:0 auto; padding:10px 16px; display:flex; align-items:center; gap:14px}
+  .brand{line-height:1.15}
+  .brand b{font-size:14px; letter-spacing:.05em; color:var(--green-d)}
+  .brand span{display:block; font-size:9.5px; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); font-weight:600}
+  .head-prog{flex:1; text-align:right; font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink-soft)}
+  .head-prog small{display:block; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.1em; color:var(--green)}
+  .pbar{height:4px; background:var(--line)}
+  .pbar i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--green),var(--green-2)); transition:width .3s ease}
+
+  main{max-width:760px; margin:0 auto; padding:22px 16px 64px}
+  .screen{display:none}
+  .screen.active{display:block; animation:fade .22s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+  .card{background:var(--paper); border:1px solid var(--line); border-radius:var(--r); padding:24px; box-shadow:0 1px 2px rgba(17,23,19,.05)}
+  .card + .card{margin-top:14px}
+  h1{font-size:26px; line-height:1.2; letter-spacing:-.01em; margin-bottom:10px}
+  .lead{color:var(--ink-soft); font-size:15px}
+  .hint{color:var(--muted); font-size:12.5px}
+
+  label.fld{display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin:18px 0 6px}
+  input[type=text]{
+    width:100%; padding:11px 13px; font-size:15px; font-family:inherit;
+    border:1px solid var(--line-strong); border-radius:10px; background:var(--paper);
+  }
+  input[type=text]:focus{outline:2px solid var(--green-2); outline-offset:1px; border-color:var(--green-2)}
+
+  .pills{display:flex; flex-wrap:wrap; gap:8px}
+  .pill-btn{
+    padding:9px 14px; font-size:14px; font-family:inherit; cursor:pointer;
+    border:1.5px solid var(--line-strong); border-radius:999px; background:var(--paper); color:var(--ink-soft);
+  }
+  .pill-btn.on{background:var(--green-soft); border-color:var(--green); color:var(--green-d); font-weight:700}
+
+  .cats{display:grid; gap:8px; margin-top:4px}
+  .cat{
+    display:flex; align-items:center; gap:11px; padding:11px 13px; cursor:pointer;
+    border:1.5px solid var(--line-strong); border-radius:12px; background:var(--paper); user-select:none;
+  }
+  .cat.on{background:var(--green-soft); border-color:var(--green)}
+  .cat input{width:18px; height:18px; accent-color:var(--green); flex:none}
+  .cat b{font-size:15px}
+  .cat span{margin-left:auto; font-size:12.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+
+  .btn{
+    display:inline-block; padding:13px 22px; font-size:16px; font-weight:700; font-family:inherit; cursor:pointer;
+    border:none; border-radius:12px; background:var(--green); color:#fff;
+  }
+  .btn:hover{background:var(--green-d)}
+  .btn:disabled{background:var(--line-strong); cursor:not-allowed}
+  .btn.ghost{background:transparent; color:var(--green-d); border:1.5px solid var(--line-strong); font-weight:600}
+  .btn.ghost:hover{border-color:var(--green); background:var(--green-soft)}
+  .btn.sm{padding:8px 14px; font-size:13.5px; border-radius:10px}
+
+  .resume{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    background:var(--green-soft); border:1.5px solid var(--green); border-radius:12px; padding:13px 15px; margin-bottom:16px;
+  }
+  .resume b{color:var(--green-d)}
+
+  /* ---------- hodnocení ---------- */
+  .photo-card{background:var(--paper); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; box-shadow:0 1px 2px rgba(17,23,19,.05)}
+  .photo-top{display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:1px solid var(--line)}
+  .photo-cat{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.12em; color:var(--green)}
+  .photo-n{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums}
+  .photo-wrap{position:relative; background:#fff; aspect-ratio:3/2.05}
+  .photo-wrap img{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity .18s ease}
+  .photo-wrap img.ready{opacity:1}
+  .photo-wrap .spin{
+    position:absolute; inset:0; margin:auto; width:30px; height:30px; border-radius:50%;
+    border:3px solid var(--line); border-top-color:var(--green); animation:rot .8s linear infinite;
+  }
+  @keyframes rot{to{transform:rotate(360deg)}}
+
+  .rate-q{text-align:center; font-size:15px; font-weight:700; margin:18px 0 10px}
+  .rate-row{display:flex; gap:8px; justify-content:center}
+  .rate{
+    flex:1; max-width:104px; padding:10px 4px 8px; cursor:pointer; font-family:inherit;
+    border:1.5px solid var(--line-strong); border-radius:14px; background:var(--paper);
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    transition:transform .08s ease, background .12s ease, border-color .12s ease;
+  }
+  .rate em{font-style:normal; font-size:26px; line-height:1}
+  .rate b{font-size:12px; color:var(--muted)}
+  .rate:hover{border-color:var(--green); background:var(--green-soft)}
+  .rate:active{transform:scale(.94)}
+  .rate.sel{border-color:var(--green); background:var(--green-soft); box-shadow:0 0 0 2px var(--green-soft)}
+  .rate.sel b{color:var(--green-d); font-weight:800}
+  .rate-legend{display:flex; justify-content:space-between; max-width:560px; margin:6px auto 0; padding:0 4px}
+  .rate-legend span{font-size:11px; color:var(--muted)}
+  .rate-nav{display:flex; align-items:center; justify-content:space-between; margin-top:16px}
+  .navlink{background:none; border:none; font-family:inherit; font-size:14px; color:var(--ink-soft); cursor:pointer; padding:8px 10px; border-radius:8px}
+  .navlink:hover{background:var(--paper); color:var(--ink)}
+  .navlink:disabled{opacity:.35; cursor:default}
+  .navlink.skip{color:var(--green-d); font-weight:600}
+  .kbd-hint{text-align:center; margin-top:14px}
+  @media (pointer:coarse){ .kbd-hint{display:none} }
+
+  /* ---------- závěr ---------- */
+  .done-emoji{font-size:52px; text-align:center; margin-bottom:6px}
+  .done-stats{display:flex; gap:26px; flex-wrap:wrap; justify-content:center; margin:18px 0 4px}
+  .done-stats div{text-align:center}
+  .done-stats b{display:block; font-size:26px; color:var(--green-d)}
+  .done-stats span{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-weight:600}
+  .center{text-align:center}
+  .savenote{position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:60;
+    background:var(--ink); color:#fff; font-size:12.5px; padding:7px 14px; border-radius:999px; opacity:0; transition:opacity .25s ease; pointer-events:none}
+  .savenote.show{opacity:.92}
+</style>
+</head>
+<body>
+<script>/*__MJ_EMP__*/</script>
+
+<header class="app">
+  <div class="app-in">
+    <div class="brand"><b>ELKOPLAST CZ</b><span>Venkovní mobiliář · hodnocení</span></div>
+    <div class="head-prog" id="headProg" hidden><small id="headCat"></small><span id="headN"></span></div>
+  </div>
+  <div class="pbar"><i id="pbarFill"></i></div>
+</header>
+
+<main>
+  <!-- ÚVOD -->
+  <section class="screen active" id="scrIntro">
+    <div class="card">
+      <h1>Který mobiliář se vám líbí?</h1>
+      <p class="lead">Ukážeme vám fotografie venkovního mobiliáře — laviček, stolů, odpadkových košů, lehátek a květináčů.
+        U každé fotky jen zvolíte, jak moc se vám design líbí. Žádné texty ani parametry, rozhoduje čistě vzhled.</p>
+      <p class="hint" style="margin-top:8px">Hodnocení můžete kdykoliv ukončit — každý hlas se ukládá průběžně. Výsledky nám pomohou vybrat, co zařadit do nabídky.</p>
+
+      <div id="resumeBox"></div>
+
+      <label class="fld" for="inName">Vaše jméno <span style="font-weight:400; text-transform:none; letter-spacing:0">(nepovinné)</span></label>
+      <input type="text" id="inName" maxlength="80" placeholder="Jméno a příjmení" autocomplete="name">
+
+      <label class="fld">Kdo jste?</label>
+      <div class="pills" id="rolePills">
+        <button type="button" class="pill-btn" data-role="obchodnik">Obchodník ELKOPLAST</button>
+        <button type="button" class="pill-btn" data-role="zakaznik">Zákazník</button>
+        <button type="button" class="pill-btn" data-role="ostatni">Jiné</button>
+      </div>
+
+      <label class="fld">Co chcete hodnotit?</label>
+      <div class="cats" id="catList"></div>
+
+      <div style="margin-top:22px; display:flex; align-items:center; gap:14px; flex-wrap:wrap">
+        <button class="btn" id="btnStart">Začít hodnocení</button>
+        <span class="hint" id="startInfo"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- HODNOCENÍ -->
+  <section class="screen" id="scrRate">
+    <div class="photo-card">
+      <div class="photo-top">
+        <span class="photo-cat" id="rCat"></span>
+        <span class="photo-n" id="rN"></span>
+      </div>
+      <div class="photo-wrap" id="photoWrap">
+        <div class="spin" id="spin"></div>
+        <img id="photo" alt="Fotografie produktu">
+      </div>
+    </div>
+
+    <p class="rate-q">Jak moc se vám líbí?</p>
+    <div class="rate-row" id="rateRow">
+      <button class="rate" data-v="1" aria-label="1 — vůbec se mi nelíbí"><em aria-hidden="true">😖</em><b>1</b></button>
+      <button class="rate" data-v="2" aria-label="2 — spíš se mi nelíbí"><em aria-hidden="true">🙁</em><b>2</b></button>
+      <button class="rate" data-v="3" aria-label="3 — nevím"><em aria-hidden="true">😐</em><b>3</b></button>
+      <button class="rate" data-v="4" aria-label="4 — líbí se mi"><em aria-hidden="true">🙂</em><b>4</b></button>
+      <button class="rate" data-v="5" aria-label="5 — moc se mi líbí"><em aria-hidden="true">😍</em><b>5</b></button>
+    </div>
+    <div class="rate-legend"><span>vůbec se mi nelíbí</span><span>moc se mi líbí</span></div>
+
+    <div class="rate-nav">
+      <button class="navlink" id="btnBack">← Zpět</button>
+      <button class="navlink skip" id="btnSkip">Přeskočit →</button>
+    </div>
+    <p class="hint kbd-hint">Na klávesnici: <b>1–5</b> hodnocení · <b>šipka vlevo</b> zpět · <b>mezerník</b> přeskočit</p>
+  </section>
+
+  <!-- ZÁVĚR -->
+  <section class="screen" id="scrDone">
+    <div class="card center">
+      <div class="done-emoji">🙌</div>
+      <h1 style="margin-bottom:4px">Díky za váš názor!</h1>
+      <p class="lead">Hodnocení je uložené. Pomůže nám rozhodnout, který mobiliář zařadíme do nabídky.</p>
+      <div class="done-stats">
+        <div><b id="dRated">0</b><span>ohodnoceno</span></div>
+        <div><b id="dSkip">0</b><span>přeskočeno</span></div>
+        <div><b id="dAvg">—</b><span>váš průměr</span></div>
+      </div>
+      <div id="doneMore" style="margin-top:16px"></div>
+      <p class="hint" style="margin-top:18px">Okno teď můžete zavřít.</p>
+    </div>
+  </section>
+</main>
+
+<div class="savenote" id="saveNote">Uloženo ✓</div>
+
+<script>
+'use strict';
+/* Kategorie odpovídají fotkám v /mobiliar-foto/ (kód = <key>-<001..pocet>.jpg). */
+var KATEGORIE = [
+  { key:'ob',  nazev:'Lavičky',         pocet:96 },
+  { key:'tc',  nazev:'Stoly a sezení',  pocet:36 },
+  { key:'otc', nazev:'Odpadkové koše',  pocet:84 },
+  { key:'osl', nazev:'Lehátka',         pocet:24 },
+  { key:'opb', nazev:'Květináče',       pocet:24 }
+];
+var LS_KEY = 'mobiliarHlasovani';
+var $ = function(id){ return document.getElementById(id); };
+
+var S = load() || fresh();
+function fresh(){
+  var rid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g,'').slice(0,24)
+          : ('r' + Date.now().toString(36) + Math.random().toString(36).slice(2,12));
+  return { rid:rid, name:'', role:'', cats:KATEGORIE.map(function(k){return k.key;}), order:[], idx:0, votes:{}, started:false };
+}
+function load(){ try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); return (d && d.rid) ? d : null; }catch(_){ return null; } }
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(_){ } }
+
+/* předvyplnění pro přihlášeného zaměstnance (injektuje server) */
+if (window.MJ_EMP && !S.name){ S.name = MJ_EMP.name || ''; if (!S.role) S.role = 'obchodnik'; }
+
+/* ---------- synchronizace na server ---------- */
+var syncTimer = null, unsyncedSince = 0;
+function payload(){ return JSON.stringify({ rid:S.rid, name:S.name, role:S.role || 'neuvedeno', votes:S.votes }); }
+function syncNow(){
+  clearTimeout(syncTimer); syncTimer = null;
+  if (!Object.keys(S.votes).length) return;
+  fetch('/api/mobiliar/vote', { method:'POST', headers:{'Content-Type':'application/json'}, body:payload(), keepalive:true })
+    .then(function(r){ if (r.ok){ unsyncedSince = 0; flashSaved(); } })
+    .catch(function(){ /* zůstane v localStorage, pošle se příště */ });
+}
+function syncSoon(){ unsyncedSince = unsyncedSince || Date.now(); clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 2500); }
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'hidden' && unsyncedSince && navigator.sendBeacon)
+    { navigator.sendBeacon('/api/mobiliar/vote', new Blob([payload()], {type:'application/json'})); unsyncedSince = 0; }
+});
+var savedTimer = null;
+function flashSaved(){ var n = $('saveNote'); n.classList.add('show'); clearTimeout(savedTimer); savedTimer = setTimeout(function(){ n.classList.remove('show'); }, 1200); }
+
+/* ---------- pomocné ---------- */
+function katOf(code){ var p = code.split('-')[0]; for (var i=0;i<KATEGORIE.length;i++) if (KATEGORIE[i].key===p) return KATEGORIE[i]; return null; }
+function codesFor(keys){
+  var out = [];
+  KATEGORIE.forEach(function(k){
+    if (keys.indexOf(k.key) < 0) return;
+    var arr = [];
+    for (var i=1;i<=k.pocet;i++) arr.push(k.key + '-' + String(i).padStart(3,'0'));
+    for (var j=arr.length-1;j>0;j--){ var t=Math.floor(Math.random()*(j+1)); var x=arr[j]; arr[j]=arr[t]; arr[t]=x; }
+    out = out.concat(arr);
+  });
+  return out;
+}
+function fotoUrl(code){ return '/mobiliar-foto/' + code + '.jpg'; }
+function show(id){ ['scrIntro','scrRate','scrDone'].forEach(function(s){ $(s).classList.toggle('active', s===id); }); window.scrollTo(0,0); }
+
+/* ---------- úvodní obrazovka ---------- */
+function renderIntro(){
+  $('inName').value = S.name || '';
+  var pills = $('rolePills').querySelectorAll('.pill-btn');
+  pills.forEach(function(b){ b.classList.toggle('on', b.dataset.role === S.role); });
+  var h = '';
+  KATEGORIE.forEach(function(k){
+    var on = S.cats.indexOf(k.key) >= 0;
+    h += '<label class="cat' + (on?' on':'') + '"><input type="checkbox" data-key="' + k.key + '"' + (on?' checked':'') + '>' +
+         '<b>' + k.nazev + '</b><span>' + k.pocet + ' fotek</span></label>';
+  });
+  $('catList').innerHTML = h;
+  $('catList').querySelectorAll('input').forEach(function(ch){
+    ch.addEventListener('change', function(){
+      var key = ch.dataset.key;
+      if (ch.checked){ if (S.cats.indexOf(key) < 0) S.cats.push(key); }
+      else S.cats = S.cats.filter(function(c){ return c !== key; });
+      ch.closest('.cat').classList.toggle('on', ch.checked);
+      updateStartInfo(); save();
+    });
+  });
+  var voted = Object.keys(S.votes).length;
+  $('resumeBox').innerHTML = (S.started && voted && S.idx < S.order.length)
+    ? '<div class="resume"><span>Máte rozpracované hodnocení — <b>' + voted + ' z ' + S.order.length + '</b> fotek.</span>' +
+      '<button class="btn sm" id="btnResume">Pokračovat</button><button class="btn ghost sm" id="btnRestart">Začít znovu</button></div>'
+    : '';
+  if ($('btnResume')) $('btnResume').onclick = function(){ show('scrRate'); renderRate(); };
+  if ($('btnRestart')) $('btnRestart').onclick = function(){ if (confirm('Smazat rozpracované hodnocení a začít znovu?')){ S = fresh(); save(); renderIntro(); } };
+  updateStartInfo();
+}
+function updateStartInfo(){
+  var total = KATEGORIE.filter(function(k){ return S.cats.indexOf(k.key) >= 0; }).reduce(function(s,k){ return s + k.pocet; }, 0);
+  $('btnStart').disabled = !total;
+  $('startInfo').textContent = total ? (total + ' fotek · cca ' + Math.max(2, Math.round(total * 2.2 / 60)) + ' min') : 'Vyberte aspoň jednu kategorii.';
+}
+$('rolePills').addEventListener('click', function(e){
+  var b = e.target.closest('.pill-btn'); if (!b) return;
+  S.role = (S.role === b.dataset.role) ? '' : b.dataset.role;
+  $('rolePills').querySelectorAll('.pill-btn').forEach(function(x){ x.classList.toggle('on', x.dataset.role === S.role); });
+  save();
+});
+$('inName').addEventListener('input', function(){ S.name = $('inName').value.trim(); save(); });
+$('btnStart').onclick = function(){
+  /* nové pořadí jen pro fotky bez hlasu; už ohodnocené se nevrací */
+  S.order = codesFor(S.cats).filter(function(c){ return !(c in S.votes); });
+  if (!S.order.length){ show('scrDone'); renderDone(); return; }
+  S.idx = 0; S.started = true; save();
+  show('scrRate'); renderRate();
+};
+
+/* ---------- hodnocení ---------- */
+var totalSel = 0;
+function renderRate(){
+  while (S.idx < S.order.length && (S.order[S.idx] in S.votes)) S.idx++;
+  if (S.idx >= S.order.length){ save(); syncNow(); show('scrDone'); renderDone(); return; }
+  var code = S.order[S.idx], kat = katOf(code);
+  totalSel = S.order.length;
+  var done = S.idx;
+  $('headProg').hidden = false;
+  $('headCat').textContent = kat ? kat.nazev : '';
+  $('headN').textContent = (done + 1) + ' / ' + totalSel;
+  $('pbarFill').style.width = Math.round(done / totalSel * 100) + '%';
+  $('rCat').textContent = kat ? kat.nazev : '';
+  $('rN').textContent = 'fotka ' + (done + 1) + ' z ' + totalSel;
+  var img = $('photo');
+  img.classList.remove('ready'); $('spin').style.display = '';
+  img.onload = function(){ img.classList.add('ready'); $('spin').style.display = 'none'; };
+  img.onerror = function(){ $('spin').style.display = 'none'; };
+  img.src = fotoUrl(code);
+  for (var i = 1; i <= 3; i++) if (S.order[S.idx + i]) (new Image()).src = fotoUrl(S.order[S.idx + i]);
+  var cur = S.votes[code];
+  $('rateRow').querySelectorAll('.rate').forEach(function(b){ b.classList.toggle('sel', +b.dataset.v === cur); });
+  $('btnBack').disabled = S.idx === 0;
+}
+function vote(v){
+  var code = S.order[S.idx]; if (!code) return;
+  S.votes[code] = v; S.idx++;
+  save(); syncSoon();
+  renderRate();
+}
+$('rateRow').addEventListener('click', function(e){
+  var b = e.target.closest('.rate'); if (!b) return;
+  b.blur();   /* aby mezerník (přeskočit) později neaktivoval fokusované tlačítko */
+  b.classList.add('sel');
+  setTimeout(function(){ vote(+b.dataset.v); }, 110);
+});
+$('btnSkip').onclick = function(){ $('btnSkip').blur(); vote(0); };
+$('btnBack').onclick = function(){
+  if (!S.idx) return;
+  S.idx--;
+  var code = S.order[S.idx];
+  delete S.votes[code];   /* vrátí fotku k novému ohodnocení */
+  save(); renderRate();
+};
+document.addEventListener('keydown', function(e){
+  if (!$('scrRate').classList.contains('active') || e.repeat) return;
+  if (e.key >= '1' && e.key <= '5'){ e.preventDefault(); vote(+e.key); }
+  else if (e.key === 'ArrowLeft'){ e.preventDefault(); $('btnBack').click(); }
+  else if (e.key === ' ' || e.code === 'Space' || e.key === 'Spacebar'){ e.preventDefault(); vote(0); }
+});
+
+/* ---------- závěr ---------- */
+function renderDone(){
+  $('headProg').hidden = true; $('pbarFill').style.width = '100%';
+  var vals = Object.keys(S.votes).map(function(k){ return S.votes[k]; });
+  var rated = vals.filter(function(v){ return v > 0; });
+  $('dRated').textContent = rated.length;
+  $('dSkip').textContent = vals.length - rated.length;
+  $('dAvg').textContent = rated.length ? (rated.reduce(function(a,b){ return a + b; }, 0) / rated.length).toFixed(1).replace('.', ',') : '—';
+  var zbyva = 0;
+  KATEGORIE.forEach(function(k){
+    for (var i = 1; i <= k.pocet; i++) if (!((k.key + '-' + String(i).padStart(3,'0')) in S.votes)) zbyva++;
+  });
+  $('doneMore').innerHTML = zbyva
+    ? '<button class="btn ghost" id="btnMore">Ohodnotit i zbývající fotky (' + zbyva + ')</button>'
+    : '<p class="hint">Ohodnotili jste kompletní katalog — paráda!</p>';
+  if ($('btnMore')) $('btnMore').onclick = function(){
+    S.cats = KATEGORIE.map(function(k){ return k.key; });
+    S.order = codesFor(S.cats).filter(function(c){ return !(c in S.votes); });
+    S.idx = 0; save(); show('scrRate'); renderRate();
+  };
+  syncNow();
+}
+
+renderIntro();
+</script>
+</body>
+</html>
