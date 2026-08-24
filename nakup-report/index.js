@@ -948,6 +948,14 @@ function mount(host) {
         noveKlice: Object.keys(loadNew()), rozhodnuti: loadDec(), platnostM: DEC_PLATNOST_M }));
       return true;
     }
+    // Prodejní ceny e-shopu (export Shop.CZ feedu, commitnutý v kořeni jako eshop-ceny.json).
+    // SMI appka z nich počítá markdown/přecenění — nová cena se navrhuje z REÁLNÉ prodejní ceny,
+    // ne z průměrné skladové (nákupní) hodnoty. Aktualizace: tools-gen-eshop-ceny.py + commit.
+    if (p === '/api/nakup-report/eshop-ceny' && req.method === 'GET') {
+      try { const d = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'eshop-ceny.json'), 'utf8'));
+        return json(res, 200, Object.assign({ ok: true }, d)), true; }
+      catch (_) { return json(res, 200, { ok: false, error: 'eshop-ceny.json není k dispozici.' }), true; }
+    }
     // „obrat plasty" (prodejní historie) — čerstvý raw xlsx pro klienta (SMI app ho parsuje). Přihlášený.
     if (p === '/api/nakup-report/obrat-plasty' && req.method === 'GET') {
       try { const b64 = fs.readFileSync(OBRAT_RAW).toString('base64'); const m = obratMeta();

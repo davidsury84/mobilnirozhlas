@@ -165,6 +165,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .bulkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px}
   .grp{background:rgba(14,138,67,.10);font-weight:600}
   .tot{background:rgba(14,138,67,.16);font-weight:700}
+.eshop-src{background:#fff7e6;border-radius:5px;padding:1px 5px;white-space:nowrap}
 </style>
 <script>
 /* Napojení na barevný motiv intranetu (sdílený localStorage, stejná doména) */
@@ -314,7 +315,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="tblwrap"><table id="errTbl"></table></div>
     </div>
     <div class="pane" id="pane-ceny">
-      <div class="note">Automatické přeceňování (NIFO): cílová cena z nové nákupní ceny = C_last × k_inf × (1+marže). Přeceňuje se až při růstu nad práh (dead band). Nízká obrátka → skok na novou cenu přes max(); vysoká obrátka → plynulé vyhlazení vahou w. Mrtvé/stárnoucí/pomalé navíc dostávají markdown (s podlahou na úrovni nové nákupní ceny). Náhradní díly se neslevňují.</div>
+      <div class="note">Automatické přeceňování (NIFO): cílová cena z nové nákupní ceny = C_last × k_inf × (1+marže). Přeceňuje se až při růstu nad práh (dead band). Nízká obrátka → skok na novou cenu přes max(); vysoká obrátka → plynulé vyhlazení vahou w. Mrtvé/stárnoucí/pomalé navíc dostávají markdown (s podlahou na úrovni nové nákupní ceny; mrtvá zásoba smí pod nákup — likvidace). Náhradní díly se neslevňují.</div>
+      <div class="note" style="background:#fff7e6;border-color:#f0dcb0"><b>Základ přecenění:</b> <span class="eshop-src">🛒 cena</span> = <b>reálná prodejní cena z exportu e-shopu</b> (bez DPH) — z ní se počítá sleva i nová cena. <b>~ cena</b> = položka na e-shopu není, jen orientační odhad z průměrné skladové (nákupní) hodnoty. Marže = (prodejní − skladová hodnota/ks) ÷ prodejní; červeně = prodej pod nákupem.</div>
       <div class="toolbar">
         <input type="text" id="priceSearch" placeholder="Hledat položku…" style="min-width:240px">
         <select id="priceFilter"><option value="">Vše</option><option value="changed">Jen se změnou</option><option value="down">Zlevnění</option></select>
@@ -351,7 +353,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="tblwrap"><table id="mevaTbl"></table></div>
     </div>
     <div class="pane" id="pane-mrtve">
-      <div class="note">Mrtvá zásoba = 10+ měsíců bez prodeje. Řazeno dle priority ICC (A = mrtvá + hodnota ≥ 50 000 Kč). Sleva max. 25 %.</div>
+      <div class="note">Mrtvá zásoba = 10+ měsíců bez prodeje. Řazeno dle priority ICC (A = mrtvá + hodnota ≥ 50 000 Kč). Sleva max. 25 %. Ve sloupci „Cena → nová": <span class="eshop-src">🛒</span> = reálná prodejní cena z exportu e-shopu (z ní se slevňuje), ~ = položka na e-shopu není (odhad z nákladové hodnoty).</div>
       <div class="period-tag" data-period="stock" style="font-size:12px;color:var(--mut);margin:2px 0 8px;font-weight:600"></div>
       <div class="toolbar">
         <input type="text" id="deadSearch" placeholder="Hledat položku…" style="min-width:240px">
@@ -955,22 +957,66 @@ function applyPeriodTags(){
   });
   const b=document.getElementById('dataPeriodBadge');
   if(b){const t=info?('📅 '+info+(stock?' · '+stock:'')):'';b.textContent=t;b.style.display=t?'':'none';}
+  // badge zdroje prodejnich cen (plni loadEshopCeny) — vytvorit vedle datoveho badge
+  if(b&&!document.getElementById('eshopBadge')){
+    const e=document.createElement('span'); e.id='eshopBadge';
+    e.style.cssText='display:none;margin-left:10px;background:#fff7e6;border:1px solid #f0dcb0;border-radius:8px;padding:3px 10px;font-size:12px;color:#7a5200';
+    b.after(e);
+  }
 }
 
+// ---- prodejní ceny z e-shopu (export Shop.CZ feedu, servíruje intranet) ----
+// Markdown a přecenění se počítá z REÁLNÉ prodejní ceny e-shopu. Průměrná skladová
+// hodnota (unitPrice = BB/BA) je NÁKUPNÍ základ — sleva z ní počítaná je nesmysl;
+// používá se jen jako označený odhad u položek, které na e-shopu nejsou.
+let ESHOP_CENY=null, ESHOP_META='';
+function eshopRec(it){
+  if(!ESHOP_CENY||it==null) return null;
+  return ESHOP_CENY[String(it.sk||'').trim()+'-'+String(it.reg||'').trim()]||null;
+}
+async function loadEshopCeny(){
+  try{
+    const r=await fetch('/api/nakup-report/eshop-ceny',{cache:'no-store'});
+    const d=await r.json();
+    if(d&&d.ok&&d.polozky){
+      ESHOP_CENY=d.polozky;
+      ESHOP_META='export e-shopu '+(d.zdrojDatum||'')+' · '+Object.keys(d.polozky).length+' položek';
+    }
+  }catch(e){}
+  const b=document.getElementById('eshopBadge');
+  if(b){
+    if(ESHOP_CENY){ const sparovano=ROWS.filter(r=>eshopRec(r)).length;
+      b.innerHTML='🛒 Prodejní ceny: <b>'+esc(ESHOP_META)+'</b>'+(ROWS.length?(' · spárováno '+sparovano+' z '+ROWS.length):''); b.style.display=''; }
+    else { b.innerHTML='🛒 Prodejní ceny e-shopu nenačteny — „nová cena" je jen odhad z nákladové hodnoty (~)'; b.style.display=''; }
+  }
+  if(ROWS.length){ try{ recalc(); renderErr();renderPrice();renderDead();renderAll();renderModel();renderSouhrn(); }catch(e){} }
+}
 // ---- model ----
 function reprice(it){
-  const U=it.unitPrice; if(U==null) return {np:null,method:'—'};
+  // Základ přecenění: 🛒 = reálná prodejní cena z e-shopu; ~ = odhad z průměrné skladové
+  // (nákupní) hodnoty — jen když položka na e-shopu není, a vždy takto označený.
+  const maEshop=(it.eshopPrice!=null&&it.eshopPrice>0);
+  const base=maEshop?it.eshopPrice:it.unitPrice;
+  const zn=maEshop?'🛒 ':'~ ';
+  if(base==null) return {np:null,method:'—'};
   const L=it.cLast, kinf=(P.kinf||1), thr=(P.thr||1), M=P.marg, w=P.w;
   const lowTurn=it.monthsNoSale>=P.slow;
-  let rep=U, method;
-  if(L==null){ method='Drží (bez nákupní ceny)'; }
+  let rep=base, method;
+  if(L==null){ method=zn+'Drží (bez nákupní ceny)'; }
   else { const PN=L*kinf*(1+M);
-    if(PN<=U*thr){ method='Drží (růst pod prahem)'; }
-    else if(lowTurn){ rep=Math.max(U,PN); method='NIFO – skok na novou'; }
-    else { rep=(1-w)*U+w*PN; method='Vyhlazení (w)'; }
+    if(PN<=base*thr){ method=zn+'Drží (růst pod prahem)'; }
+    else if(lowTurn){ rep=Math.max(base,PN); method=zn+'NIFO – skok na novou'; }
+    else { rep=(1-w)*base+w*PN; method=zn+'Vyhlazení (w)'; }
   }
   let np=rep;
-  if(it.disc>0){ np=rep*(1-it.disc); if(L!=null) np=Math.max(np, L*kinf); }
+  if(it.disc>0){
+    np=rep*(1-it.disc);
+    // dno = nákupní cena; MRTVÁ zásoba smí pod nákup (likvidace je levnější než držet)
+    if(L!=null&&np<L*kinf){
+      if((it.sev??0)>=3){ method+=' · pod nákupní (likvidace)'; }
+      else { np=L*kinf; method+=' · dno = nákupní'; }
+    }
+  }
   return {np, method};
 }
 function computeRow(it){
@@ -981,7 +1027,8 @@ function computeRow(it){
   else if(it.disc>0)it.action='Markdown';else it.action='Plná cena';
   const rp=reprice(it);it.method=rp.method;it.newPriceCalc=rp.np;
   it.newPrice=(it.priceOv!=null&&!isNaN(it.priceOv))?it.priceOv:rp.np;
-  it.priceDelta=(it.newPrice!=null&&it.unitPrice)?it.newPrice-it.unitPrice:null;
+  const _base=(it.eshopPrice!=null&&it.eshopPrice>0)?it.eshopPrice:it.unitPrice;
+  it.priceDelta=(it.newPrice!=null&&_base)?it.newPrice-_base:null;
 }
 function bulkApply(){
   const act=$('#bulkAction').value, val=parseFloat($('#bulkValue').value), scope=$('#bulkScope').value;
@@ -1042,6 +1089,10 @@ function recalc(){
     it.iccCost=(it.AZ==null||it.AZ<=0)?0:(it.BB||0)*P.icc;
     it.unitPrice=(it.BB&&it.BA)?it.BB/it.BA:(it.BD&&it.BC?it.BD/it.BC:null);
     it.realPrice=(it.BD&&it.BC)?it.BD/it.BC:null;
+    const _er=eshopRec(it);
+    it.eshopPrice=_er&&_er.prodejniBezDph>0?_er.prodejniBezDph:null;
+    it.eshopSleva=_er?(_er.sleva||0):0;
+    it.eshopEff=(it.eshopPrice!=null)?it.eshopPrice*(1-(it.eshopSleva||0)):null;
     const _covTxt=(it.AZ==null||it.AZ<=0)?'':(!isFinite(it.coverMonths)?' (bez prodeje 12 měs)':it.coverMonths>=24?' ('+(it.coverMonths/12).toFixed(it.coverMonths>=120?0:1)+' let zásoby)':' ('+Math.round(it.coverMonths)+' měs. zásoby)');
     it.comment=(it.AZ==null||it.AZ<=0)?'Položka bez zásoby':it.nd?'Kategorie ND - mimo plošný markdown':
       ((_sev>=3?'Urgentní likvidace zásoby':_sev>=2?'Zahájit markdown':_sev>=1?'Test elasticity trhu':'Bez zásahu')+((it.sevBy==='krytí'&&_sev>=1)?' — přeskladněno'+_covTxt:''));
@@ -1117,11 +1168,17 @@ function renderErr(){
 }
 function renderPrice(){
   const q=$('#priceSearch').value.toLowerCase(),f=$('#priceFilter').value;
-  let rows=ROWS.filter(r=>r.unitPrice!=null);
+  let rows=ROWS.filter(r=>r.eshopPrice!=null||r.unitPrice!=null);
   rows=rows.filter(r=>{if(f==='changed')return r.priceDelta&&Math.abs(r.priceDelta)>0.005;if(f==='down')return r.priceDelta<-0.005;return true;}).filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q));
   rows.sort((a,b)=>Math.abs(b.priceDelta||0)-Math.abs(a.priceDelta||0));
-  $('#priceTbl').innerHTML=`<thead><tr><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Akt. cena/ks</th><th class="num">Sleva</th><th class="num">Nová cena/ks</th><th class="num">Změna</th><th>Akce</th></tr></thead><tbody>`+
-    rows.slice(0,1500).map(r=>{const d=r.priceDelta,cls=d<-0.005?'sev-err':'';const a=d<-0.005?'▼':'–';return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${fmt(r.unitPrice,1)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num"><b>${fmt(r.newPrice,1)}</b></td><td class="num ${cls}">${a} ${d==null?'—':fmt(Math.abs(d),1)}</td><td>${esc(r.action)}</td></tr>`;}).join('')+`</tbody>`;
+  $('#priceTbl').innerHTML=`<thead><tr><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Prodejní cena/ks</th><th class="num">Marže</th><th class="num">Sleva (návrh)</th><th class="num">Nová cena/ks</th><th class="num">Změna</th><th>Akce</th></tr></thead><tbody>`+
+    rows.slice(0,1500).map(r=>{const d=r.priceDelta,cls=d<-0.005?'sev-err':'';const a=d<-0.005?'▼':'–';
+    const cenaCell=r.eshopPrice!=null
+      ?`<span class="eshop-src" title="Reálná prodejní cena z exportu e-shopu (bez DPH)${r.eshopSleva>0?' · na e-shopu už běží sleva '+Math.round(r.eshopSleva*100)+' %':''}">🛒 ${fmt(r.eshopPrice,1)}</span>${r.eshopSleva>0?` <span class="muted" style="font-size:11px">−${Math.round(r.eshopSleva*100)} %</span>`:''}`
+      :`<span class="muted" title="Položka není na e-shopu — odhad z průměrné skladové (nákupní) hodnoty">~ ${fmt(r.unitPrice,1)}</span>`;
+    const mrz=(r.eshopPrice!=null&&r.unitPrice)?(r.eshopPrice-r.unitPrice)/r.eshopPrice:null;
+    const mrzCell=mrz==null?'—':`<span${mrz<0?' class="sev-err" title="Prodává se POD nákupní cenou"':''}>${Math.round(mrz*100)} %</span>`;
+    return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${cenaCell}</td><td class="num">${mrzCell}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num"><b>${fmt(r.newPrice,1)}</b></td><td class="num ${cls}">${a} ${d==null?'—':fmt(Math.abs(d),1)}</td><td>${esc(r.action)}</td></tr>`;}).join('')+`</tbody>`;
 }
 function renderDead(){
   const q=$('#deadSearch').value.toLowerCase(),f=$('#deadFilter').value;
@@ -1130,7 +1187,7 @@ function renderDead(){
   rows=rows.filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q));
   const o={A:0,B:1,C:2,'-':3};rows.sort((a,b)=>o[a.prio]-o[b.prio]||(b.BB||0)-(a.BB||0));
   $('#deadTbl').innerHTML=`<thead><tr><th>Priorita</th><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Měs. bez prodeje</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th class="num">Roční ICC</th><th class="num">Sleva</th><th class="num">Cena → nová</th><th>Akce</th></tr></thead><tbody>`+
-    rows.map(r=>`<tr><td>${prioPill(r.prio)}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${fmt(r.iccCost)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${fmt(r.unitPrice,1)} → <b>${fmt(r.newPrice,1)}</b></td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
+    rows.map(r=>`<tr><td>${prioPill(r.prio)}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${fmt(r.iccCost)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${r.eshopPrice!=null?`<span class="eshop-src" title="Reálná prodejní cena z e-shopu">🛒 ${fmt(r.eshopPrice,1)}</span>`:`<span class="muted" title="Není na e-shopu — odhad z nákladové hodnoty">~ ${fmt(r.unitPrice,1)}</span>`} → <b>${fmt(r.newPrice,1)}</b></td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
   if(!rows.length)$('#deadTbl').innerHTML+='<tbody><tr><td colspan="11" class="muted" style="padding:18px">Žádné položky.</td></tr></tbody>';
 }
 function renderAll(){
@@ -1412,6 +1469,9 @@ function mevaNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace
 function mevaToks(s){return mevaNorm(s).split(/[^a-z0-9]+/).filter(t=>t.length>1);}
 function mevaOurPrice(it){
   if(!it) return null;
+  // 1) zivy export e-shopu (efektivni cena po sleve), 2) stary zapeceny cenik, 3) model
+  const zivy=eshopRec(it);
+  if(zivy&&zivy.prodejniBezDph>0) return zivy.prodejniBezDph*(1-(zivy.sleva||0));
   const eshop=(typeof ESHOP_PRICE!=='undefined'&&ESHOP_PRICE&&it.reg!=null)?ESHOP_PRICE[String(it.reg).trim()]:null;
   return eshop!=null?eshop:(it.newPrice!=null?it.newPrice:it.unitPrice);
 }
@@ -3443,6 +3503,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     await loadWorkbook(SRC_BUFFER,true,true);
   }
   try{ await histInit(); }catch(e){}   // historie ze serveru (sdílená) + případná migrace z prohlížeče
+  try{ loadEshopCeny(); }catch(e){}    // prodejní ceny z exportu e-shopu (markdown počítá z nich, ne z nákupních)
   try{ renderVyvojEshop(); }catch(e){}  // první záložka = přehled vývoje e-shopu
 });
 </script>
