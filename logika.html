@@ -48,7 +48,7 @@ label b{font-size:13px}
   <div id="scr-intro" class="card">
     <h1>🧩 Test logického myšlení</h1>
     <p class="muted" style="margin:0 0 14px">pro pozice nákupčí a logistik · ELKOPLAST CZ</p>
-    <p>Test má <b>25 úloh</b> a limit <b>35 minut</b>. Nezkouší naučené vzorce ani definice — zkoumá, jak přemýšlíte:
+    <p>Test má <b><span id="introN">25</span> úloh</b> a limit <b><span id="introMin">35</span> minut</b>. Nezkouší naučené vzorce ani definice — zkoumá, jak přemýšlíte:
     odhady, práci s čísly z hlavy, logické vyvozování a rozhodování v situacích z nákupu a logistiky.</p>
     <ul style="margin:0 0 14px;padding-left:20px;font-size:14px;line-height:1.7">
       <li>Každá úloha má <b>právě jednu správnou odpověď</b> ze čtyř možností.</li>
@@ -111,8 +111,13 @@ function inviteName(tok){
   }catch(e){return "";}
 }
 const API=INVITE_TOKEN?("/api/logika?i="+encodeURIComponent(INVITE_TOKEN)):"/api/logika";
+/*__LOGIKA_ADMIN__*/
+/* Náhled pro správce (?preview=1): výsledek se NEUKLÁDÁ a na konci se ukáže rozbor
+   s správnými odpověďmi a logikou. Server příznak vstříkne jen skutečnému adminovi —
+   kandidát s pozvánkou si parametrem preview nic nezobrazí. */
+const PREVIEW=!!(window.LOGIKA_ADMIN&&/[?&]preview=1/.test(location.search));
 
-const LIMIT_S=35*60;
+let LIMIT_S=35*60;
 const CATS=["Procenta a ceny","Odhad a čísla","Logická dedukce","Rozhodování a optimalizace","Prostor a logistika","Práce s daty","Řízení zásob a objednávání"];
 
 /* 25 úloh. correct = index správné možnosti v PŮVODNÍM pořadí; možnosti se při
@@ -204,10 +209,37 @@ const QUESTIONS=[
 
 /* ---------------- stav ---------------- */
 const $=id=>document.getElementById(id);
+/* Otázky se načítají ze serveru (/api/logika-zadani — editovatelné správcem v adminu);
+   vestavěná sada výše je záloha pro případ výpadku. */
+let ZADANI_NACTENO=false;
+(async()=>{
+  try{
+    const u="/api/logika-zadani"+(INVITE_TOKEN?("?i="+encodeURIComponent(INVITE_TOKEN)):"");
+    const r=await fetch(u,{cache:"no-store"});const d=await r.json();
+    if(d&&d.ok&&Array.isArray(d.questions)&&d.questions.length&&!state.t0){ // nikdy neměnit zadání po startu testu
+      QUESTIONS.length=0;d.questions.forEach(q=>QUESTIONS.push(q));
+      CATS.length=0;d.cats.forEach(x=>CATS.push(x));
+      LIMIT_S=Math.round((d.limitMin||35)*60);
+      state.answers=new Array(QUESTIONS.length).fill(null);
+      state.order=QUESTIONS.map(q=>shuffled(q.options.length));
+    }
+  }catch(e){}
+  ZADANI_NACTENO=true;
+  const n=$("introN"),m=$("introMin");
+  if(n)n.textContent=QUESTIONS.length; if(m)m.textContent=Math.round(LIMIT_S/60);
+  const t=$("timer");if(t)t.textContent=Math.floor(LIMIT_S/60)+":"+String(LIMIT_S%60).padStart(2,"0");
+  if(PREVIEW){
+    $("inName").value="Náhled správce";$("inEmail").value="preview@elkoplast.cz";
+    const bar=document.createElement("div");
+    bar.style.cssText="background:#fdf3dd;border:1px solid #ecd9a8;border-radius:10px;padding:10px 14px;margin:0 auto 14px;max-width:760px;font-size:13.5px;font-weight:600;color:#7a5200";
+    bar.textContent="👁 NÁHLED SPRÁVCE — výsledek se neukládá ani neodesílá; na konci uvidíte rozbor se správnými odpověďmi a logikou.";
+    document.querySelector(".wrap").prepend(bar);
+  }
+})();
 const state={i:0,answers:new Array(QUESTIONS.length).fill(null),order:[],name:"",email:"",pos:"",t0:0,left:LIMIT_S,timedOut:false,tick:null,sel:null};
 /* Míchání odpovědí (preference: správná odpověď nesmí být vždy na stejné pozici) */
 function shuffled(n){const a=[...Array(n).keys()];for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-QUESTIONS.forEach((q,k)=>{state.order[k]=shuffled(q.options.length);});
+state.order=QUESTIONS.map(q=>shuffled(q.options.length));
 
 const inviteN=INVITE_TOKEN?inviteName(INVITE_TOKEN):"";
 if(inviteN){$("inName").value=inviteN;}
@@ -293,10 +325,26 @@ function finish(){
       return {otazka:k+1,oblast:CATS[q.cat],spravne:!!(a&&a.ok),
         odpovedKandidata:a?a.ansText:null,spravnaOdpoved:q.correctText};})
   };
-  fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
-    .then(r=>r.json()).then(d=>{
-      if(d&&d.blocked){$("resTime").textContent="Test jste nedávno vyplnili — uložen zůstává původní výsledek.";}
-    }).catch(()=>{});
+  if(PREVIEW){
+    // Rozbor jen v náhledu správce: každá úloha se správnou odpovědí a logikou „proč".
+    document.querySelector("#scr-result .note:last-child").textContent="Náhled správce — výsledek nebyl uložen ani odeslán.";
+    const rozbor=document.createElement("div");
+    rozbor.innerHTML='<h2 style="margin:22px 0 8px">Rozbor úloh (jen v náhledu)</h2>'+QUESTIONS.map((q,k)=>{
+      const a=state.answers[k];
+      const ok=!!(a&&a.ok);
+      return '<div style="border-left:4px solid '+(ok?'#12752f':'#b3261e')+';background:'+(ok?'#f4faf6':'#fdf4f3')+';border-radius:0 10px 10px 0;padding:11px 14px;margin:0 0 10px">'
+        +'<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#66716a"><b style="color:#1d2721">'+(ok?'✓':'✕')+' Úloha '+(k+1)+'</b><span>'+CATS[q.cat]+'</span></div>'
+        +'<div style="font-size:14px;margin:5px 0 7px">'+q.text+'</div>'
+        +'<div style="font-size:13.5px">Vaše odpověď: <b>'+(a?a.ansText:'— přeskočeno')+'</b></div>'
+        +'<div style="font-size:13.5px;color:#12561f;margin-top:3px">Správně a proč: <b>'+q.correctText+'</b></div></div>';
+    }).join("");
+    $("resTime").after(rozbor);
+  } else {
+    fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+      .then(r=>r.json()).then(d=>{
+        if(d&&d.blocked){$("resTime").textContent="Test jste nedávno vyplnili — uložen zůstává původní výsledek.";}
+      }).catch(()=>{});
+  }
   show("scr-result");
 }
 function fmtCas(s){s=Math.round(s);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}

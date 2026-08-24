@@ -180,6 +180,8 @@ const JSS_F    = path.join(DATA_DIR, 'jss-results.json');    // výsledky dotazn
 const TW44_F   = path.join(DATA_DIR, 'tw44-results.json');   // výsledky testu kognitivní zátěže (neanonymní)
 const VYKRESY_F = path.join(DATA_DIR, 'vykresy-results.json'); // výsledky testu čtení výkresů (zaměstnanci i uchazeči)
 const LOGIKA_F = path.join(DATA_DIR, 'logika-results.json'); // výsledky testu logického myšlení (nábor nákupčí/logistik)
+const LOGIKA_OT_SEED = path.join(ROOT, 'logika-otazky.json');      // otázky testu logiky — seed v repu (výchozí sada 25 úloh)
+const LOGIKA_OT_F = path.join(DATA_DIR, 'logika-otazky.json');     // otázky testu logiky — editovatelná kopie na volume (má přednost)
 const ABROLL_F = path.join(DATA_DIR, 'abroll-results.json'); // výsledky testu ABROLL (max 3 pokusy na osobu)
 const PRODUKTY_F = path.join(DATA_DIR, 'produkty-results.json'); // výsledky testu znalosti produktů (max 3 pokusy na osobu)
 const PRUMYSL_F = path.join(DATA_DIR, 'prumysl-results.json'); // výsledky testu Průmysl (obchodník) — max 3 pokusy na osobu
@@ -880,6 +882,27 @@ function recordLogika(a) {
   writeJson(LOGIKA_F, results);
   logActivity('survey', { email, name }, 'Test logického myšlení (nákup a logistika)');
   return rec;
+}
+// Otázky testu logiky: editovaná verze z volume má přednost, jinak seed z repa.
+function loadLogikaOtazky() {
+  for (const f of [LOGIKA_OT_F, LOGIKA_OT_SEED]) {
+    try { const d = JSON.parse(fs.readFileSync(f, 'utf8')); if (d && Array.isArray(d.questions) && d.questions.length) return d; } catch (_) {}
+  }
+  return null;
+}
+function validLogikaOtazky(d) {
+  if (!d || !Array.isArray(d.cats) || d.cats.length < 1 || d.cats.length > 12) return 'Chybí oblasti (1–12).';
+  if (!Array.isArray(d.questions) || d.questions.length < 5 || d.questions.length > 60) return 'Počet úloh musí být 5–60.';
+  const lm = Math.round(+d.limitMin || 0); if (lm < 5 || lm > 120) return 'Limit musí být 5–120 minut.';
+  for (let i = 0; i < d.questions.length; i++) {
+    const q = d.questions[i];
+    if (!q || typeof q.text !== 'string' || q.text.trim().length < 10) return 'Úloha ' + (i + 1) + ': chybí zadání.';
+    if (!Array.isArray(q.options) || q.options.length !== 4 || q.options.some(o => typeof o !== 'string' || !o.trim())) return 'Úloha ' + (i + 1) + ': musí mít přesně 4 neprázdné možnosti.';
+    if (!(q.correct >= 0 && q.correct <= 3)) return 'Úloha ' + (i + 1) + ': správná odpověď musí být jedna ze 4 možností.';
+    if (!(q.cat >= 0 && q.cat < d.cats.length)) return 'Úloha ' + (i + 1) + ': neplatná oblast.';
+    if (typeof q.correctText !== 'string' || q.correctText.trim().length < 5) return 'Úloha ' + (i + 1) + ': chybí vysvětlení (proč je odpověď správně).';
+  }
+  return null;
 }
 /* ---- Hodnocení venkovního mobiliáře (katalog WeiDu) — veřejný obrázkový průzkum ----
    Fotky: assets/mobiliar/<kód>.jpg (např. ob-001), kódy odpovídají katalogu (ob-001 = WD-OB-001).
@@ -2503,7 +2526,7 @@ const server = http.createServer(async (req, res) => {
 
   // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
   const invite = inviteVerify(u.query.i || '');
-  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/vykresy', '/vykresy.html', '/logika', '/logika.html', '/api/grit', '/api/jss', '/api/tw44', '/api/vykresy', '/api/logika'];
+  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/vykresy', '/vykresy.html', '/logika', '/logika.html', '/api/grit', '/api/jss', '/api/tw44', '/api/vykresy', '/api/logika', '/api/logika-zadani'];
   const inviteOk = !!(invite && INVITE_ROUTES.indexOf(p) >= 0);
   // Veřejné cesty modulu Smlouvy (mimo SSO závoru): potvrzení termínu tokenem + Resend webhook.
   const smlouvyPublic = p.startsWith('/smlouvy/potvrdit') || p === '/api/smlouvy/webhook/resend';
@@ -2709,7 +2732,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/logika' || p === '/logika.html') {
       if (!fs.existsSync(LOGIKA_FILE)) return send(res, 404, '<h1>Chybí logika.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(LOGIKA_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      let html = fs.readFileSync(LOGIKA_FILE, 'utf8');
+      // Režim náhledu (?preview=1) smí zapnout jen skutečný správce — kandidát s pozvánkou
+      // by si jinak přidáním parametru zobrazil správné odpovědi bez uložení výsledku.
+      if (isRealAdmin(req)) html = html.replace('/*__LOGIKA_ADMIN__*/', 'window.LOGIKA_ADMIN=1;');
+      return send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     // Veřejné hodnocení venkovního mobiliáře — přihlášenému zaměstnanci předvybere roli obchodníka.
     if (p === '/mobiliar' || p === '/mobiliar.html') {
@@ -2863,6 +2890,31 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/vykresy-results' && req.method === 'GET') return send(res, 200, readJson(VYKRESY_F, []));
     if (p === '/api/logika' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordLogika(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('logika', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, skore: rec.skore, procenta: rec.procenta }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/logika-results' && req.method === 'GET') return send(res, 200, readJson(LOGIKA_F, []));
+    // Zadání testu (vč. správných odpovědí — klient hodnotí sám; stejná expozice jako dřívější embed v HTML).
+    if (p === '/api/logika-zadani' && req.method === 'GET') {
+      const d = loadLogikaOtazky();
+      if (!d) return send(res, 200, { ok: false }, { 'Access-Control-Allow-Origin': '*' });
+      return send(res, 200, { ok: true, limitMin: d.limitMin || 35, cats: d.cats, questions: d.questions }, { 'Access-Control-Allow-Origin': '*' });
+    }
+    // Editace otázek — jen správce. Uloží se na volume; seed v repu zůstává jako záloha.
+    if (p === '/api/logika-otazky' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const d = loadLogikaOtazky() || { limitMin: 35, cats: [], questions: [] };
+      return send(res, 200, Object.assign({ upraveno: fs.existsSync(LOGIKA_OT_F) }, d));
+    }
+    if (p === '/api/logika-otazky' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req));
+      const doc = { limitMin: Math.round(+b.limitMin || 35), cats: (b.cats || []).map(x => String(x).slice(0, 60)),
+        questions: (b.questions || []).map(q => ({ cat: Math.round(+q.cat || 0), text: String(q.text || '').slice(0, 2000),
+          options: (q.options || []).map(o => String(o).slice(0, 300)), correct: Math.round(+q.correct || 0),
+          correctText: String(q.correctText || '').slice(0, 500) })) };
+      const chyba = validLogikaOtazky(doc);
+      if (chyba) return send(res, 400, { error: chyba });
+      writeJson(LOGIKA_OT_F, doc);
+      logActivity('admin', { email: '', name: 'Správce' }, 'Test logiky: uloženy otázky (' + doc.questions.length + ' úloh)');
+      return send(res, 200, { ok: true, questions: doc.questions.length });
+    }
 
     // Hodnocení mobiliáře: příjem hlasů (veřejné, upsert dle rid) + výsledky pro admin.
     if (p === '/api/mobiliar/vote' && req.method === 'POST') {

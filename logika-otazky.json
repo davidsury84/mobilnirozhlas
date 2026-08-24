@@ -1,0 +1,314 @@
+{
+ "limitMin": 35,
+ "cats": [
+  "Procenta a ceny",
+  "Odhad a čísla",
+  "Logická dedukce",
+  "Rozhodování a optimalizace",
+  "Prostor a logistika",
+  "Práce s daty",
+  "Řízení zásob a objednávání"
+ ],
+ "questions": [
+  {
+   "cat": 0,
+   "text": "Zboží nakupujete za <span class=\"em\">800 Kč</span> a chcete na něm marži <span class=\"em\">20 % z prodejní ceny</span>. Za kolik ho musíte prodávat?",
+   "options": [
+    "960 Kč",
+    "1 000 Kč",
+    "1 040 Kč",
+    "833 Kč"
+   ],
+   "correct": 1,
+   "correctText": "1 000 Kč — nákup je 80 % prodejní ceny (800 ÷ 0,8)"
+  },
+  {
+   "cat": 0,
+   "text": "Dodavatel A nabízí „slevu <span class=\"em\">30 % a k tomu dalších 20 %</span>\" (počítáno postupně). Dodavatel B nabízí rovnou <span class=\"em\">45 %</span>. Kdo je levnější?",
+   "options": [
+    "A — o 5 procentních bodů",
+    "Oba stejně",
+    "B — o 1 procentní bod",
+    "A — o 1 procentní bod"
+   ],
+   "correct": 2,
+   "correctText": "B o 1 p. b. — 0,70 × 0,80 = 0,56, tedy sleva jen 44 %"
+  },
+  {
+   "cat": 0,
+   "text": "Cena oceli nejprve <span class=\"em\">vzrostla o 25 %</span> a poté <span class=\"em\">klesla o 25 %</span>. Jaká je proti původní ceně?",
+   "options": [
+    "Stejná",
+    "O 6,25 % nižší",
+    "O 6,25 % vyšší",
+    "O 12,5 % nižší"
+   ],
+   "correct": 1,
+   "correctText": "o 6,25 % nižší — 1,25 × 0,75 = 0,9375"
+  },
+  {
+   "cat": 1,
+   "text": "Krychlové krabice o hraně <span class=\"em\">40 cm</span> skládáte do přepravního boxu <span class=\"em\">120 × 80 × 100 cm</span> (rovně, bez naklánění). Kolik se jich dovnitř vejde?",
+   "options": [
+    "15",
+    "12",
+    "10",
+    "24"
+   ],
+   "correct": 1,
+   "correctText": "12 — na délku 3, na šířku 2, na výšku jen 2 vrstvy (100 ÷ 40 = 2,5); dělení objemů (15) klame"
+  },
+  {
+   "cat": 1,
+   "text": "E-shop odešle průměrně <span class=\"em\">250 zásilek denně</span>, v zásilce jsou průměrně <span class=\"em\">2,1 položky</span>, rok má zhruba <span class=\"em\">250 expedičních dnů</span>. Kolik položek projde skladem za rok — řádově?",
+   "options": [
+    "≈ 13 000",
+    "≈ 130 000",
+    "≈ 1 300 000",
+    "≈ 500 000"
+   ],
+   "correct": 1,
+   "correctText": "≈ 130 000 (250 × 2,1 × 250 = 131 250)"
+  },
+  {
+   "cat": 2,
+   "text": "Do skladu mají v pondělí, úterý a středu dorazit dodávky <span class=\"em\">A, B a C</span> — každý den právě jedna. Víte, že <span class=\"em\">A musí dorazit dříve než B</span> a <span class=\"em\">C nesmí dorazit jako první</span>. Kolik různých pořadí připadá v úvahu?",
+   "options": [
+    "1",
+    "2",
+    "3",
+    "4"
+   ],
+   "correct": 1,
+   "correctText": "2 — pouze A-B-C a A-C-B"
+  },
+  {
+   "cat": 2,
+   "text": "Zásilku zpozdil právě jeden ze tří dopravců. Vyjádřili se takto — <b>X:</b> „Zpozdil to Y.“ · <b>Y:</b> „Zpozdil to Z.“ · <b>Z:</b> „Já to nezpozdil.“ Víte, že <span class=\"em\">právě jeden z nich lže</span>. Kdo zásilku zpozdil?",
+   "options": [
+    "X",
+    "Y",
+    "Z",
+    "Nelze jednoznačně určit"
+   ],
+   "correct": 1,
+   "correctText": "Y — lže právě Y; výroky X a Z pak sedí (Y zpozdil, Z ne)"
+  },
+  {
+   "cat": 2,
+   "text": "Máte <span class=\"em\">9 krabic se šrouby</span>; v jedné chybí část obsahu, je tedy lehčí (jinak jsou k nerozeznání). K dispozici je rovnoramenná váha bez závaží. Kolik <span class=\"em\">nejméně vážení</span> potřebujete, abyste ji s jistotou našli?",
+   "options": [
+    "2",
+    "3",
+    "4",
+    "8"
+   ],
+   "correct": 0,
+   "correctText": "2 — vážit 3 proti 3 (třetí trojice stranou), pak 1 proti 1 z lehčí trojice"
+  },
+  {
+   "cat": 2,
+   "text": "Ve firmě platí pravidlo: <span class=\"em\">„Pokud je objednávka nad 100 000 Kč, musí ji schválit ředitel.“</span> Které tvrzení z tohoto pravidla <b>logicky plyne</b>?",
+   "options": [
+    "Objednávku pod 100 000 Kč ředitel neschvaluje",
+    "Když objednávku schválil ředitel, byla nad 100 000 Kč",
+    "Když objednávku ředitel neschválil, nebyla nad 100 000 Kč",
+    "Neplyne z něj žádné z uvedených tvrzení"
+   ],
+   "correct": 2,
+   "correctText": "„Neschválil → nebyla nad 100 000 Kč“ (obměna implikace); zbylá dvě jsou klasické logické chyby"
+  },
+  {
+   "cat": 2,
+   "text": "Audit kontroluje pravidlo: <span class=\"em\">„Každá faktura nad 50 000 Kč musí mít objednávku.“</span> Na stole jsou čtyři faktury — u dvou vidíte jen částku, u dvou jen to, zda mají objednávku: <b>(1)</b> faktura na 80 000 Kč, <b>(2)</b> faktura na 30 000 Kč, <b>(3)</b> faktura s objednávkou, <b>(4)</b> faktura bez objednávky. Ověření skrytého údaje stojí čas. Které <span class=\"em\">dvě</span> faktury je <b>nutné</b> ověřit?",
+   "options": [
+    "1 a 3",
+    "1 a 4",
+    "2 a 4",
+    "1 a 2"
+   ],
+   "correct": 1,
+   "correctText": "1 a 4 — jen ty mohou pravidlo porušit; faktura s objednávkou (3) ho porušit nemůže"
+  },
+  {
+   "cat": 3,
+   "text": "U dodavatele A jste složili <span class=\"em\">nevratnou zálohu 20 000 Kč</span>; do dokončení zakázky zbývá doplatit <span class=\"em\">80 000 Kč</span>. Dodavatel B nabídl totéž zboží kompletně za <span class=\"em\">85 000 Kč</span>. Co je ekonomicky nejvýhodnější?",
+   "options": [
+    "Přejít k B — celkově je levnější",
+    "Dokončit u A — od této chvíle zaplatíme méně",
+    "Vyjde to úplně stejně",
+    "Nelze rozhodnout bez výše zálohy u B"
+   ],
+   "correct": 1,
+   "correctText": "dokončit u A — záloha je utopený náklad; rozhoduje 80 000 vs. 85 000"
+  },
+  {
+   "cat": 3,
+   "text": "Dodavatel S dodá spolehlivě za <span class=\"em\">100 000 Kč</span>. Dodavatel L je levnější — <span class=\"em\">90 000 Kč</span> — ale s pravděpodobností <span class=\"em\">20 %</span> dodá pozdě, což nás vyjde na dalších <span class=\"em\">40 000 Kč</span> (prostoje výroby). Který dodavatel má nižší <b>očekávaný</b> náklad?",
+   "options": [
+    "S — spolehlivost vždy vyhrává",
+    "L — v průměru o 2 000 Kč",
+    "L — v průměru o 10 000 Kč",
+    "Očekávané náklady jsou stejné"
+   ],
+   "correct": 1,
+   "correctText": "L: 90 000 + 0,2 × 40 000 = 98 000 Kč, tedy o 2 000 Kč méně"
+  },
+  {
+   "cat": 3,
+   "text": "Balicí linka má tři kroky za sebou: navažování <span class=\"em\">40 ks/h</span> → balení <span class=\"em\">30 ks/h</span> → etiketování <span class=\"em\">60 ks/h</span>. Brigádník zdvojnásobí výkon právě jednoho kroku. Kterého, aby linka zrychlila nejvíce?",
+   "options": [
+    "Navažování",
+    "Balení",
+    "Etiketování",
+    "Je to jedno — přidá vždy stejně"
+   ],
+   "correct": 1,
+   "correctText": "balení — je úzkým hrdlem (30 ks/h); linka pak pojede 40 ks/h, jinde se nezmění nic"
+  },
+  {
+   "cat": 3,
+   "text": "Vlastní rozvoz stojí <span class=\"em\">18 000 Kč měsíčně</span> (fix) plus <span class=\"em\">25 Kč na zásilku</span>. Externí dopravce účtuje <span class=\"em\">70 Kč za zásilku</span>. Při kolika zásilkách měsíčně vyjdou obě varianty <b>nastejno</b>?",
+   "options": [
+    "257",
+    "300",
+    "400",
+    "720"
+   ],
+   "correct": 2,
+   "correctText": "400 — 18 000 ÷ (70 − 25)"
+  },
+  {
+   "cat": 3,
+   "text": "Kus stojí <span class=\"em\">100 Kč</span>; při odběru <span class=\"em\">od 300 ks</span> dá dodavatel slevu <span class=\"em\">10 % na celou objednávku</span>. Potřebujete <span class=\"em\">280 ks</span>. Jak vyjde objednávka 300 ks proti objednávce 280 ks?",
+   "options": [
+    "Je o 2 000 Kč dražší",
+    "Je o 1 000 Kč levnější — a máme 20 ks navíc",
+    "Vyjde úplně stejně",
+    "Je o 1 000 Kč dražší"
+   ],
+   "correct": 1,
+   "correctText": "300 × 90 = 27 000 Kč vs. 280 × 100 = 28 000 Kč — víc zboží za méně peněz"
+  },
+  {
+   "cat": 4,
+   "text": "Kamion jede do skladu průměrnou rychlostí <span class=\"em\">60 km/h</span> a stejnou trasou zpět <span class=\"em\">40 km/h</span>. Jaká je jeho průměrná rychlost za celou cestu?",
+   "options": [
+    "50 km/h",
+    "48 km/h",
+    "49 km/h",
+    "52 km/h"
+   ],
+   "correct": 1,
+   "correctText": "48 km/h — na pomalejší úsek padne více času; 2·60·40 ÷ (60+40)"
+  },
+  {
+   "cat": 4,
+   "text": "Trubku dlouhou <span class=\"em\">2,9 m</span> potřebujete uložit do skladové klece o rozměrech <span class=\"em\">2,4 × 1,2 × 1,2 m</span>. Vejde se?",
+   "options": [
+    "Ne — je o půl metru delší než klec",
+    "Ano — po úhlopříčce podlahy",
+    "Ano — po prostorové úhlopříčce",
+    "Jen když ji rozdělíme na dva kusy"
+   ],
+   "correct": 2,
+   "correctText": "ano, po prostorové úhlopříčce — √(2,4² + 1,2² + 1,2²) ≈ 2,94 m (podlahová ≈ 2,68 m nestačí)"
+  },
+  {
+   "cat": 4,
+   "text": "Kamion uveze nejvýše <span class=\"em\">24 tun</span> nebo <span class=\"em\">33 palet</span> — podle toho, co nastane dříve. Naloženo je <span class=\"em\">15 palet po 900 kg</span>. Kolik palet po <span class=\"em\">400 kg</span> lze ještě přiložit?",
+   "options": [
+    "26",
+    "18",
+    "21",
+    "24"
+   ],
+   "correct": 1,
+   "correctText": "18 — hmotnostně by se vešlo 26 (10,5 t ÷ 400 kg), ale zbývá jen 33 − 15 = 18 paletových míst"
+  },
+  {
+   "cat": 5,
+   "text": "Podíl reklamací dvou dodavatelů:<br><b>Dodavatel A</b> — leden: 1 % ze 100 ks · únor: 5 % z 1 000 ks<br><b>Dodavatel B</b> — leden: 2 % z 1 000 ks · únor: 6 % ze 100 ks<br>A byl lepší v lednu i v únoru. Který dodavatel má <b>celkově</b> nižší podíl reklamací?",
+   "options": [
+    "A — byl lepší v obou měsících, tedy i celkem",
+    "B",
+    "Oba stejně",
+    "Z těchto údajů to nelze spočítat"
+   ],
+   "correct": 1,
+   "correctText": "B — A: 51 vad z 1 100 (4,6 %), B: 26 z 1 100 (2,4 %); rozhodují objemy, ne měsíční procenta (Simpsonův paradox)"
+  },
+  {
+   "cat": 5,
+   "text": "Na faktuře stojí: <span class=\"em\">1 200 ks × 84,50 Kč = 121 400 Kč</span>. Rychlá kontrola z hlavy, bez kalkulačky — je částka v pořádku?",
+   "options": [
+    "Ano, souhlasí",
+    "Ne — správně je zhruba 101 000 Kč",
+    "Ne — správně je zhruba 110 000 Kč",
+    "Bez kalkulačky to ověřit nejde"
+   ],
+   "correct": 1,
+   "correctText": "≈ 101 400 Kč — 1 200 × 80 = 96 000 a 1 200 × 4,5 = 5 400; faktura je o 20 000 Kč vyšší"
+  },
+  {
+   "cat": 6,
+   "text": "Položka e-shopu: skladem <span class=\"em\">8 ks</span>, zákazníci mají rezervováno <span class=\"em\">12 ks</span>, u dodavatele je na cestě <span class=\"em\">10 ks</span>. Prodává se ~6 ks měsíčně, dodací lhůta je 1 měsíc a chcete mít zásobu na <span class=\"em\">3 měsíce prodeje (18 ks)</span>. Kolik objednat?",
+   "options": [
+    "22 ks",
+    "12 ks",
+    "18 ks",
+    "4 ks"
+   ],
+   "correct": 1,
+   "correctText": "12 ks — pozice = (8 − 12) + 10 na cestě = 6 ks; objednat 18 − 6. Kdo zapomene na zboží na cestě, objedná 22 a přeskladní"
+  },
+  {
+   "cat": 6,
+   "text": "Prakticky celý roční prodej položky padne do <span class=\"em\">června až srpna</span>. Dodavatel má dodací lhůtu <span class=\"em\">3 měsíce</span>. Kdy nejpozději musíte objednat, aby zboží stihlo pokrýt špičku od začátku června?",
+   "options": [
+    "Začátkem června",
+    "Začátkem května",
+    "Začátkem března",
+    "Stačí v dubnu"
+   ],
+   "correct": 2,
+   "correctText": "začátkem března — červen minus 3 měsíce lhůty; sezónní zboží se objednává s předstihem o dodací lhůtu"
+  },
+  {
+   "cat": 6,
+   "text": "Roční prodej položky je <span class=\"em\">573 ks</span> — ale <span class=\"em\">300 ks</span> z toho byla jediná obecní zakázka v září; běžně se prodává ~25 ks měsíčně. Sklad je nula. Jak nastavit objednávání na příští měsíce?",
+   "options": [
+    "Podle průměru 573 ÷ 12 ≈ 48 ks měsíčně",
+    "Podle běžného prodeje ~25 ks měsíčně; velkou zakázku řešit zvlášť, až přijde",
+    "Předzásobit se na září 300 ks — zakázka se může opakovat",
+    "Neobjednávat nic — položka je mrtvá"
+   ],
+   "correct": 1,
+   "correctText": "podle běžného prodeje ~25 ks/měs — jednorázový extrém nesmí nafouknout skladovou zásobu; 300ks zakázka se objednává až proti konkrétní objednávce"
+  },
+  {
+   "cat": 6,
+   "text": "Sklad sledujete jen z ranních snímků. Včera: sklad <span class=\"em\">100 ks</span>, u dodavatele objednáno <span class=\"em\">40 ks</span>. Dnes: sklad <span class=\"em\">115 ks</span>, objednáno <span class=\"em\">10 ks</span>. Kolik kusů se včera vydalo zákazníkům?",
+   "options": [
+    "0 — sklad přece vzrostl",
+    "15 ks",
+    "30 ks",
+    "45 ks"
+   ],
+   "correct": 1,
+   "correctText": "15 ks — dorazilo 40 − 10 = 30 ks (pokles „objednáno“), ale sklad vzrostl jen o 15; zbytek musel odejít. Růst skladu neznamená, že se neprodávalo"
+  },
+  {
+   "cat": 6,
+   "text": "Dvě položky nemají <span class=\"em\">od března do srpna</span> jediný prodej. <b>Nádoba na zimní posyp</b> historicky prodává říjen–únor; <b>plastový kontejner</b> se historicky prodával rovnoměrně celý rok. Co z toho plyne?",
+   "options": [
+    "Obě jsou mrtvé — vyřadit ze sortimentu",
+    "U obou je vše v pořádku — půl roku bez prodeje nic neznamená",
+    "Posyp je v pořádku (mimo sezónu, objednat před zimou); kontejner je varovný signál — ověřit, proč přestal",
+    "Posyp je problém; kontejner je v pořádku"
+   ],
+   "correct": 2,
+   "correctText": "ticho se posuzuje proti VLASTNÍ sezóně položky: posyp v létě mlčí právem, celoroční kontejner, který umlkl, je signál (konec sortimentu / ztracený zákazník)"
+  }
+ ]
+}

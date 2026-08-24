@@ -7173,13 +7173,16 @@ async function logikaBlockHtml(){
   const catChecks=DB.categories.map(cc=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0"><input type="checkbox" class="logcat" value="'+cc.id+'" '+(LOGIKA_ASSIGN.cats.includes(cc.id)?"checked":"")+' onchange="logikaReadCats()"> '+esc(cc.name)+'</label>').join("")||'<span class="muted">Nejprve přidej oddělení (kategorie).</span>';
   let h='<div class="card pad" style="margin-bottom:18px">'+
     '<div class="spread" style="margin-bottom:8px"><strong>Test logického myšlení (nákup a logistika)</strong>'+
-      '<div class="inline-actions"><button class="btn ghost sm" onclick="copyLogikaLinks()">Zkopírovat odkazy</button>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="window.open(\'/logika?preview=1\',\'_blank\')">👁 Vyzkoušet (náhled)</button>'+
+      '<button class="btn ghost sm" onclick="logikaToggleEditor()">📖 Otázky &amp; editace</button>'+
+      '<button class="btn ghost sm" onclick="copyLogikaLinks()">Zkopírovat odkazy</button>'+
       '<button class="btn sm" onclick="openSendModal(\'survey-logika\')">Rozeslat</button></div></div>'+
     '<div class="muted" style="font-size:13px;margin-bottom:12px">25 úloh · 7 oblastí · limit 35 minut · neanonymní · osobní odkaz e-mailem — primárně pro nábor na pozice nákupčí a logistik.</div>'+
     '<div style="background:var(--green-soft);border:1px solid #cfe9d8;border-radius:10px;padding:14px 16px;margin-bottom:12px;font-size:14px;line-height:1.55">'+
       '<strong>O čem to je:</strong> Těžký test <strong>úsudku, ne znalostí</strong> — žádné definice ani vzorce k memorování. Kandidát řeší chytáky s procenty a maržemi, odhady z hlavy, logickou dedukci (kdo lže, co plyne z pravidla, které doklady auditovat), rozhodovací situace (utopené náklady, očekávaný náklad rizika, úzké hrdlo linky, slevové prahy) a prostorové i datové úlohy (nakládka kamionu, Simpsonův paradox u reklamací) a <strong>řízení zásob z praxe našeho e-shopu</strong> (oversold se zbožím na cestě, jednorázová obecní zakázka vs. běžný prodej, sezónní pauza vs. mrtvá položka, náběh sezóny, pohyby skladu z denních snímků). Možnosti odpovědí se každému míchají náhodně.'+
       '<div class="muted" style="margin-top:6px;font-size:13px">Hodnocení: ≥ 85 % výborné · 65–84 % dobré · 45–64 % průměr · &lt; 45 % slabé. Po vypršení limitu se test sám odešle (nezodpovězené = chybné). Kandidát správné odpovědi nevidí — plný rozbor je jen tady a v e-mailu pro HR.</div>'+
     '</div>'+
+    '<div id="logikaEditor" style="display:none;margin-bottom:12px"></div>'+
     '<label class="field" style="margin-bottom:4px"><span>Komu rozeslat — oddělení</span>'+
       '<label style="display:inline-flex;gap:6px;align-items:center;margin:0 0 8px"><input type="checkbox" id="logAll" '+(LOGIKA_ASSIGN.all?"checked":"")+' onchange="logikaAssignAll(this.checked)"> Všem zaměstnancům</label></label>'+
     '<div id="logCatWrap" style="opacity:'+(LOGIKA_ASSIGN.all?.4:1)+'">'+catChecks+'</div></div>';
@@ -7209,6 +7212,62 @@ async function logikaBlockHtml(){
     h+='</tbody></table></div>';
   });
   return h;
+}
+
+/* ---- Editor otázek testu logiky (jen správce): detailní náhled s logikou „proč" + editace ---- */
+let LOGIKA_OT=null;
+async function logikaToggleEditor(){
+  const box=document.getElementById('logikaEditor'); if(!box) return;
+  if(box.style.display!=='none'){ box.style.display='none'; return; }
+  box.style.display='';
+  box.innerHTML='<p class="muted">Načítám otázky…</p>';
+  try{ const r=await fetch('/api/logika-otazky',{cache:'no-store'}); if(r.status===401){ showLogin(); return; } LOGIKA_OT=await r.json(); }
+  catch(e){ box.innerHTML='<p class="muted">Otázky se nepodařilo načíst.</p>'; return; }
+  logikaRenderEditor();
+}
+function logikaRenderEditor(){
+  const box=document.getElementById('logikaEditor'); const d=LOGIKA_OT; if(!box||!d) return;
+  const inp='width:100%;padding:7px 9px;font:inherit;border:1px solid #cdd4cc;border-radius:8px;background:#fff;box-sizing:border-box';
+  let h='<div style="background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:16px 18px">'+
+    '<div class="spread" style="margin-bottom:6px"><strong>Otázky testu — náhled a editace</strong>'+
+      '<span class="muted" style="font-size:12px">'+(d.upraveno?'upravená verze (uložena na serveru)':'výchozí sada')+'</span></div>'+
+    '<p class="muted" style="font-size:12.5px;margin:0 0 12px">U každé úlohy je vidět zadání, všechny možnosti, <b>správná odpověď (zeleně)</b> a <b>logika „proč"</b> — ta se kandidátům nikdy nezobrazuje, jde jen do rozboru pro HR. Změny se projeví okamžitě u všech nových vyplnění (rozeslané odkazy zůstávají platné). Možnosti se kandidátům míchají automaticky — na pořadí tady nezáleží.</p>'+
+    '<label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px">Časový limit (minuty) <input type="number" id="logLimit" min="5" max="120" value="'+(d.limitMin||35)+'" style="width:70px;padding:6px"></label>';
+  d.questions.forEach((q,k)=>{
+    h+='<details style="border:1px solid var(--line);border-radius:10px;margin:0 0 8px;background:#fafbfa"><summary style="cursor:pointer;padding:9px 12px;font-size:13.5px"><b>Úloha '+(k+1)+'</b> · <span class="muted">'+esc(d.cats[q.cat]||'?')+'</span> — '+esc(String(q.text).replace(/<[^>]+>/g,'').slice(0,90))+'…</summary>'+
+      '<div style="padding:4px 12px 12px;display:grid;gap:8px">'+
+      '<label style="font-size:12px">Oblast<br><select data-k="'+k+'" class="logQCat" style="'+inp+'">'+d.cats.map((cn,ci)=>'<option value="'+ci+'"'+(ci===q.cat?' selected':'')+'>'+esc(cn)+'</option>').join('')+'</select></label>'+
+      '<label style="font-size:12px">Zadání (může obsahovat HTML zvýraznění &lt;span class=&quot;em&quot;&gt;)<br><textarea data-k="'+k+'" class="logQText" rows="3" style="'+inp+'">'+esc(q.text)+'</textarea></label>'+
+      q.options.map((o,oi)=>'<label style="font-size:12px;display:flex;gap:8px;align-items:center"><input type="radio" name="logQC'+k+'" value="'+oi+'"'+(oi===q.correct?' checked':'')+' title="Označit jako správnou"> <input type="text" data-k="'+k+'" data-oi="'+oi+'" class="logQOpt" value="'+esc(o).replace(/"/g,'&quot;')+'" style="'+inp+';'+(oi===q.correct?'border-color:#12752f;background:#f2faf4':'')+'"></label>').join('')+
+      '<label style="font-size:12px;color:#12561f">Logika „proč" (jen pro HR a rozbor)<br><textarea data-k="'+k+'" class="logQWhy" rows="2" style="'+inp+';border-color:#bfe0c8">'+esc(q.correctText)+'</textarea></label>'+
+      '<div><button class="btn ghost sm" onclick="logikaDelQ('+k+')">🗑 Smazat úlohu</button></div>'+
+      '</div></details>';
+  });
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+     '<button class="btn ghost sm" onclick="logikaAddQ()">➕ Přidat úlohu</button>'+
+     '<button class="btn sm" onclick="logikaSaveOt()">💾 Uložit otázky</button>'+
+     '<span class="muted" id="logOtStatus" style="font-size:12px;align-self:center"></span></div></div>';
+  box.innerHTML=h;
+}
+function logikaReadEditor(){
+  const d=LOGIKA_OT;
+  document.querySelectorAll('.logQCat').forEach(el=>{ d.questions[+el.dataset.k].cat=+el.value; });
+  document.querySelectorAll('.logQText').forEach(el=>{ d.questions[+el.dataset.k].text=el.value; });
+  document.querySelectorAll('.logQOpt').forEach(el=>{ d.questions[+el.dataset.k].options[+el.dataset.oi]=el.value; });
+  document.querySelectorAll('.logQWhy').forEach(el=>{ d.questions[+el.dataset.k].correctText=el.value; });
+  d.questions.forEach((q,k)=>{ const r=document.querySelector('input[name="logQC'+k+'"]:checked'); if(r) q.correct=+r.value; });
+  d.limitMin=+document.getElementById('logLimit').value||35;
+}
+function logikaDelQ(k){ logikaReadEditor(); if(!confirm('Smazat úlohu '+(k+1)+'?')) return; LOGIKA_OT.questions.splice(k,1); logikaRenderEditor(); }
+function logikaAddQ(){ logikaReadEditor(); LOGIKA_OT.questions.push({cat:0,text:'Nová úloha — doplňte zadání…',options:['Možnost A','Možnost B','Možnost C','Možnost D'],correct:0,correctText:'Doplňte vysvětlení, proč je odpověď správně.'}); logikaRenderEditor(); const det=document.querySelectorAll('#logikaEditor details'); if(det.length) det[det.length-1].open=true; }
+async function logikaSaveOt(){
+  logikaReadEditor();
+  const st=document.getElementById('logOtStatus'); st.textContent='Ukládám…';
+  try{
+    const r=await fetch('/api/logika-otazky',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(LOGIKA_OT)});
+    const j=await r.json();
+    st.textContent=r.ok&&j.ok?('✓ Uloženo — '+j.questions+' úloh (platí pro všechna nová vyplnění)'):('Chyba: '+(j.error||r.status));
+  }catch(e){ st.textContent='Chyba uložení: '+e.message; }
 }
 
 /* ---- Školení ABROLL – závěrečný test (výsledky, max 3 pokusy) ---- */
