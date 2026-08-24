@@ -1987,6 +1987,25 @@ function isObchodnikEmail(email) {
   try { const mods = employeeModules(email) || []; if (mods.some(m => OBCHOD_MODULE_KEYS.indexOf(m) >= 0)) return true; } catch (_) {}
   return obchodniciEmailSet().has(email);
 }
+// Jmenovitý přehled implicitních obchodníků (pro admin sekci Konstrukce → Role):
+// projde zaměstnance s modulem obchod/obchodexp + osoby z Rozdělení obchodníků.
+function obchodniciPrehled() {
+  const out = new Map();
+  const add = (em, zdroj) => { em = (em || '').toLowerCase(); if (!em) return; const r = out.get(em) || { email: em, zdroje: [] }; if (!r.zdroje.includes(zdroj)) r.zdroje.push(zdroj); out.set(em, r); };
+  try {
+    const s = getState();
+    (s.employees || []).forEach(e => {
+      const em = (e.email || '').toLowerCase(); if (!em) return;
+      try {
+        const mods = employeeModules(em) || [];
+        if (mods.includes('obchod')) add(em, 'modul Obchod');
+        if (mods.includes('obchodexp')) add(em, 'modul Obchod EXP');
+      } catch (_) {}
+    });
+  } catch (_) {}
+  try { obchodniciEmailSet().forEach(em => add(em, 'Rozdělení obchodníků')); } catch (_) {}
+  return [...out.values()];
+}
 
 /* ---------- Obchod → Leady: kontakty z veřejné kalkulačky překladiště ----------
    Lead vzniká odesláním veřejného formuláře na /preklad (mimo přihlašovací závoru).
@@ -2305,6 +2324,7 @@ try {
   konstrukceMod = require('./konstrukce').mount({ reportDisabled,
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
     isObchodnik: isObchodnikEmail,
+    obchodniciList: obchodniciPrehled,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – konstrukce', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
     // Archiv výkresů: čtení sdíleného Disku výroby Bruntál přes service account

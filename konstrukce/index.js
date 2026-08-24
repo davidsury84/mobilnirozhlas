@@ -1326,6 +1326,11 @@ function mount(host) {
       natahImg: NATAH_IMG,                             // kod natahování → soubor ilustrace (natah-img/)
       roles: (me.isAdmin) ? roleAssignments(d) : undefined,
       employees: (me.isAdmin) ? adminEmployees() : undefined,
+      // jmenovitý přehled implicitních obchodníků (modul Obchod / EXP / Rozdělení) — pro kartu Obchodníci
+      obchodniciImplicit: (me.isAdmin && host.obchodniciList)
+        ? host.obchodniciList().map(o => ({ email: o.email, name: empName(o.email), zdroje: o.zdroje }))
+            .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'))
+        : undefined,
       workflow: d.workflow,                            // pravidlo toku (graf) — pro schéma i plátno
       workflowDraft: (me.isAdmin) ? (d.workflowDraft || null) : undefined,  // rozpracovaný koncept plátna
       roleLabels: ROLE_LABELS,

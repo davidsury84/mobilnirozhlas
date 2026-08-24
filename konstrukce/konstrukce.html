@@ -3356,7 +3356,7 @@ function renderNastaveni(m){
   h+=roleCard('Výkonný ředitel výroby','vykonny-reditel',R['vykonny-reditel'],'První krok toku — rozděluje nové zakázky do výrobních závodů (Bruntál / Chomutov / Supíkovice). Vidí vše.',false);
   h+=roleCard('Šéf konstrukce','sef',R.sef,'Po rozdělení do závodu přiděluje konstruktéra, provádí interní kontrolu. Vidí vše v konstrukci.',false);
   h+=roleCard('Konstruktéři','konstrukter',R.konstrukter,'Zpracovávají přidělené výkresy. U každého nastavte týdenní fond hodin a skupiny výrobků, které dělá (MULDA/CITY apod. tak dostanou své konstruktéry). Při přidělování se nabídnou jen konstruktéři dané skupiny.',true,true);
-  h+=roleCard('Obchodníci','obchodnik',R.obchodnik,'Zadávají požadavky, potvrzují výkresy a odesílají náhledy klientům. Všichni s přístupem k modulu Obchod (a lidé z „Rozdělení obchodníků") mají zadávání do konstrukce implicitně — níže přidáváš jen výjimky navíc.',false);
+  h+=roleCard('Obchodníci','obchodnik',R.obchodnik,'Zadávají požadavky, potvrzují výkresy a odesílají náhledy klientům. Všichni s přístupem k modulu Obchod (a lidé z „Rozdělení obchodníků") mají zadávání do konstrukce implicitně — níže přidáváš jen výjimky navíc.',false,false,obchodniciTable());
   h+=roleCard('Ředitel (přehledy / KPI)','reditel',R.reditel,'Přístup jen pro čtení k reportům a KPI; příjemce eskalací.',false);
   // — výrobní oblasti + jejich ředitelé —
   h+='<div class="sec">Výroba — oblasti a výrobní ředitelé</div><div class="card"><p class="muted" style="margin-top:0">Každá výrobní oblast má svého ředitele (konkrétní osoba z databáze). Schválená zakázka se předává do vybrané oblasti a je na tahu její výrobní ředitel.</p>';
@@ -3435,7 +3435,7 @@ function personPicker(id,sel,onchange,placeholder){
   emps.forEach(function(e){opts+='<option value="'+esc(e.email)+'"'+(sel===e.email?' selected':'')+'>'+esc(e.name)+'</option>'});
   return '<select id="'+id+'" onchange="'+onchange+'" style="width:100%;max-width:300px">'+opts+'</select>';
 }
-function roleCard(title,role,people,desc,withFond,withGroups){
+function roleCard(title,role,people,desc,withFond,withGroups,extra){
   var h='<div class="card"><b>'+esc(title)+'</b><p class="muted" style="margin:4px 0 8px">'+esc(desc)+'</p>';
   (people||[]).forEach(function(p){
     h+='<div style="padding:6px 0;border-bottom:1px solid var(--line)">'+
@@ -3446,8 +3446,32 @@ function roleCard(title,role,people,desc,withFond,withGroups){
       '</div>';
   });
   if(!people||!people.length)h+='<p class="muted" style="margin:6px 0">Zatím nikdo.</p>';
-  h+='<div class="row" style="margin-top:8px">'+personPicker('add_'+role,'','addRolePerson(\''+role+'\',this.value)','+ přidat osobu…')+'</div></div>';
+  h+='<div class="row" style="margin-top:8px">'+personPicker('add_'+role,'','addRolePerson(\''+role+'\',this.value)','+ přidat osobu…')+'</div>'+(extra||'')+'</div>';
   return h;
+}
+// Rozbalovací jmenovitý přehled: kdo všechno může zadávat do konstrukce
+// (implicitně z modulu Obchod / Obchod EXP / Rozdělení obchodníků + výjimky z číselníku zde).
+function obchodniciTable(){
+  var imp=D.obchodniciImplicit||[];
+  var vyj=((D.roles||{}).obchodnik)||[];
+  var mapa={};
+  imp.forEach(function(o){mapa[o.email]={name:o.name,email:o.email,zdroje:(o.zdroje||[]).slice()}});
+  vyj.forEach(function(p){var r=mapa[p.email]||(mapa[p.email]={name:p.name,email:p.email,zdroje:[]});r.zdroje.push('výjimka v číselníku');});
+  var vsichni=Object.keys(mapa).map(function(k){return mapa[k]}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'','cs')});
+  var rows=vsichni.map(function(o){
+    var badges=(o.zdroje||[]).map(function(z){var c=z==='výjimka v číselníku'?'background:#fff0d9;color:#9a6400':(z==='Rozdělení obchodníků'?'background:#e8f0fb;color:#2a5fa3':'background:#eaf3e6;color:#2f6a33');return '<span style="display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;margin:1px 3px 1px 0;'+c+'">'+esc(z)+'</span>'}).join('');
+    return '<tr><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap"><b>'+esc(o.name||o.email)+'</b></td>'+
+      '<td style="padding:5px 8px;border-bottom:1px solid var(--line)" class="muted">'+esc(o.email)+'</td>'+
+      '<td style="padding:5px 8px;border-bottom:1px solid var(--line)">'+badges+'</td></tr>';
+  }).join('');
+  return '<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700;font-size:13px">Kdo má zadávání do konstrukce ('+vsichni.length+' osob) — jmenovitě</summary>'+
+    (vsichni.length
+      ?('<div style="overflow-x:auto;margin-top:8px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>'+
+        '<th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--line)">Jméno</th>'+
+        '<th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--line)">E-mail</th>'+
+        '<th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--line)">Odkud má přístup</th></tr></thead><tbody>'+rows+'</tbody></table></div>')
+      :'<p class="muted" style="margin:8px 0 0">Zatím nikdo — nikdo nemá modul Obchod ani není v Rozdělení obchodníků.</p>')+
+    '</details>';
 }
 function groupChecks(p){
   var fams=D.families||[]; var g=p.groups||[];
