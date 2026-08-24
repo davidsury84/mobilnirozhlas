@@ -1,5 +1,5 @@
 {
- "limitMin": 35,
+ "limitMin": 40,
  "cats": [
   "Procenta a ceny",
   "Odhad a čísla",
@@ -309,6 +309,42 @@
    ],
    "correct": 2,
    "correctText": "ticho se posuzuje proti VLASTNÍ sezóně položky: posyp v létě mlčí právem, celoroční kontejner, který umlkl, je signál (konec sortimentu / ztracený zákazník)"
+  },
+  {
+   "cat": 6,
+   "text": "Položku nakupujete za <span class=\"em\">100 000 Kč měsíčně</span>. Dodavatel nabízí: když objednáte rovnou <span class=\"em\">zásobu na 5 měsíců</span>, dá <span class=\"em\">slevu 15 %</span>. Držení zásoby (vázané peníze, sklad, riziko) vás stojí <span class=\"em\">2 % z její hodnoty měsíčně</span> a předzásobením budete držet v průměru o ~200 000 Kč vyšší zásobu. Co je výhodnější?",
+   "options": [
+    "Objednávat dál měsíčně — sleva se nevyplatí",
+    "Předzásobit se: čistá úspora ~55 000 Kč — pokud odbyt poběží podle plánu",
+    "Předzásobit se: úspora celých 75 000 Kč",
+    "Vyjde to úplně stejně"
+   ],
+   "correct": 1,
+   "correctText": "sleva 15 % z 500 000 = 75 000 Kč, ale držení navíc stojí ~200 000 × 2 % × 5 měs. = 20 000 Kč → čistě +55 000. Rozhodnutí ale platí, jen POKUD se zboží prodá — sleva se počítá vždy proti nákladům na držení a riziku, ne sama o sobě"
+  },
+  {
+   "cat": 6,
+   "text": "Položka má průměrnou zásobu na <span class=\"em\">6 měsíců spotřeby</span>; spotřeba je <span class=\"em\">40 000 Kč měsíčně</span> (v nákupních cenách). Nákupčí zkrátí objednací cyklus tak, že zásoba klesne na <span class=\"em\">2 měsíce</span>. Kolik hotovosti se tím jednorázově uvolní?",
+   "options": [
+    "Žádná — je to jen účetní změna",
+    "80 000 Kč",
+    "160 000 Kč",
+    "240 000 Kč"
+   ],
+   "correct": 2,
+   "correctText": "160 000 Kč — zásoba klesne z 6 × 40 000 na 2 × 40 000; rozdíl se jednorázově promění ve volnou hotovost. Snížení zásob = reálné peníze, ne účetnictví"
+  },
+  {
+   "cat": 4,
+   "text": "Celý kamion stojí <span class=\"em\">14 000 Kč</span> bez ohledu na vytížení; dokládka (sběrná služba) stojí <span class=\"em\">600 Kč za paletu</span>. Od kolika palet se vyplatí objednat celý kamion?",
+   "options": [
+    "Od 20 palet",
+    "Od 23 palet",
+    "Od 24 palet",
+    "Vždy je levnější dokládka"
+   ],
+   "correct": 2,
+   "correctText": "od 24 palet — 23 × 600 = 13 800 Kč (dokládka ještě levnější), 24 × 600 = 14 400 > 14 000. Paušál vs. cena za jednotku se láme na 14 000 ÷ 600 ≈ 23,3"
   }
  ]
 }
