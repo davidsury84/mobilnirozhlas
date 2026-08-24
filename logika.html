@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Test logického myšlení — nákup a logistika · ELKOPLAST</title>
+<style>
+:root{--green:#2e7d32;--green-dk:#1b5e20;--ink:#1d2721;--soft:#66716a;--line:#dde3dd;--bg:#f2f5f1;--card:#fff;--red:#b3261e;--amber:#c98a00}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 -apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;box-shadow:0 2px 10px rgba(20,40,20,.05)}
+h1{font-size:22px;margin:0 0 6px}
+h2{font-size:17px;margin:0 0 10px}
+.muted{color:var(--soft)}
+.btn{font:inherit;font-weight:700;background:var(--green);color:#fff;border:0;border-radius:10px;padding:11px 22px;cursor:pointer}
+.btn:hover{background:var(--green-dk)}
+.btn.ghost{background:#eef1ec;color:var(--ink);font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+input[type=text],input[type=email]{width:100%;padding:10px 12px;font:inherit;border:1px solid #cdd4cc;border-radius:9px;background:#fff}
+label b{font-size:13px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.timer{font-variant-numeric:tabular-nums;font-weight:800;font-size:18px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 14px}
+.timer.warn{color:var(--red);border-color:#e8c5c2}
+.prog{height:7px;background:#e2e8e1;border-radius:4px;overflow:hidden;margin:0 0 16px}
+.prog i{display:block;height:100%;background:var(--green);transition:width .25s}
+.qcat{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft);margin-bottom:6px}
+.qtext{font-size:16.5px;line-height:1.6;margin:0 0 16px}
+.qtext .em{color:var(--green-dk);font-weight:700}
+.opt{display:block;width:100%;text-align:left;font:inherit;background:#fff;border:1.6px solid var(--line);border-radius:11px;padding:12px 15px;margin:0 0 9px;cursor:pointer;line-height:1.5}
+.opt:hover{border-color:var(--green);background:#f5faf5}
+.opt.sel{border-color:var(--green);background:#e9f4e9;font-weight:700}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:16px}
+.pill{display:inline-block;padding:3px 12px;border-radius:99px;font-size:13px;font-weight:700}
+.pill.g{background:#e3f1e4;color:#12752f}.pill.y{background:#fdf3dd;color:#8a6100}.pill.r{background:#fbe9e7;color:#a03028}
+.big{font-size:40px;font-weight:800;line-height:1.1}
+.bar{height:9px;background:#eef0ed;border-radius:5px;margin-top:5px}
+.bar i{display:block;height:100%;border-radius:5px}
+.hid{display:none}
+.note{font-size:12.5px;color:var(--soft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ ÚVOD ============ -->
+  <div id="scr-intro" class="card">
+    <h1>🧩 Test logického myšlení</h1>
+    <p class="muted" style="margin:0 0 14px">pro pozice nákupčí a logistik · ELKOPLAST CZ</p>
+    <p>Test má <b>20 úloh</b> a limit <b>30 minut</b>. Nezkouší naučené vzorce ani definice — zkoumá, jak přemýšlíte:
+    odhady, práci s čísly z hlavy, logické vyvozování a rozhodování v situacích z nákupu a logistiky.</p>
+    <ul style="margin:0 0 14px;padding-left:20px;font-size:14px;line-height:1.7">
+      <li>Každá úloha má <b>právě jednu správnou odpověď</b> ze čtyř možností.</li>
+      <li>Můžete použít <b>papír a tužku</b>. Kalkulačku nepotřebujete — úlohy jsou stavěné na úsudek.</li>
+      <li>Úlohu můžete <b>přeskočit</b>; přeskočená se počítá jako nezodpovězená.</li>
+      <li>Po vypršení času se test sám odešle.</li>
+    </ul>
+    <div style="display:grid;gap:10px;max-width:440px">
+      <label><b>Jméno a příjmení</b><input type="text" id="inName" autocomplete="name"></label>
+      <label id="rowEmail"><b>E-mail</b><input type="email" id="inEmail" autocomplete="email"></label>
+      <label><b>Pozice, o kterou se ucházíte / kterou zastáváte</b><input type="text" id="inPos" placeholder="např. nákupčí"></label>
+    </div>
+    <div class="foot"><span class="note">Výsledek se odešle personálnímu oddělení.</span>
+      <button class="btn" id="btnStart">Spustit test →</button></div>
+  </div>
+
+  <!-- ============ TEST ============ -->
+  <div id="scr-test" class="card hid">
+    <div class="top">
+      <div class="muted" id="qNum" style="font-weight:700"></div>
+      <div class="timer" id="timer">30:00</div>
+    </div>
+    <div class="prog"><i id="progBar" style="width:0%"></i></div>
+    <div class="qcat" id="qCat"></div>
+    <p class="qtext" id="qText"></p>
+    <div id="qOpts"></div>
+    <div class="foot">
+      <button class="btn ghost" id="btnSkip">Přeskočit</button>
+      <button class="btn" id="btnNext" disabled>Další →</button>
+    </div>
+  </div>
+
+  <!-- ============ VÝSLEDEK ============ -->
+  <div id="scr-result" class="card hid">
+    <h1>Hotovo — děkujeme!</h1>
+    <p class="muted" id="resWho" style="margin:0 0 18px"></p>
+    <div style="display:flex;gap:36px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
+      <div><div class="note">Skóre</div><div class="big" id="resScore"></div></div>
+      <div><div class="note">Úspěšnost</div><div class="big" id="resPct"></div></div>
+      <div><div class="note">Hodnocení</div><div style="margin-top:8px"><span class="pill" id="resBand"></span></div></div>
+    </div>
+    <div id="resAreas"></div>
+    <p class="note" id="resTime" style="margin-top:16px"></p>
+    <p class="note">Výsledek byl odeslán personálnímu oddělení. Správné odpovědi se z důvodu férovosti výběrového řízení nezobrazují.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* Intranet ELKOPLAST: osobní pozvánkový odkaz (?i=podepsaný hash — stejný mechanismus
+   jako Grit/JSS/TW44/výkresy). Je-li token přítomen, jméno se předvyplní z pozvánky
+   a výsledek se uloží pod e-mail z pozvánky (funguje pro zaměstnance i uchazeče). */
+const INVITE_TOKEN=(location.search.match(/[?&]i=([^&]+)/i)||[])[1]||"";
+function inviteName(tok){
+  try{
+    const data=tok.split(".")[0].replace(/-/g,"+").replace(/_/g,"/");
+    const bin=atob(data+"=".repeat((4-data.length%4)%4));
+    const o=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))));
+    return (o&&o.n)||"";
+  }catch(e){return "";}
+}
+const API=INVITE_TOKEN?("/api/logika?i="+encodeURIComponent(INVITE_TOKEN)):"/api/logika";
+
+const LIMIT_S=30*60;
+const CATS=["Procenta a ceny","Odhad a čísla","Logická dedukce","Rozhodování a optimalizace","Prostor a logistika","Práce s daty"];
+
+/* 20 úloh. correct = index správné možnosti v PŮVODNÍM pořadí; možnosti se při
+   zobrazení míchají (Fisher–Yates), takže správná odpověď není vždy na stejné pozici. */
+const QUESTIONS=[
+/* --- Procenta a ceny --- */
+{cat:0,text:'Zboží nakupujete za <span class="em">800 Kč</span> a chcete na něm marži <span class="em">20 % z prodejní ceny</span>. Za kolik ho musíte prodávat?',
+ options:["960 Kč","1 000 Kč","1 040 Kč","833 Kč"],correct:1,
+ correctText:"1 000 Kč — nákup je 80 % prodejní ceny (800 ÷ 0,8)"},
+{cat:0,text:'Dodavatel A nabízí „slevu <span class="em">30 % a k tomu dalších 20 %</span>" (počítáno postupně). Dodavatel B nabízí rovnou <span class="em">45 %</span>. Kdo je levnější?',
+ options:["A — o 5 procentních bodů","Oba stejně","B — o 1 procentní bod","A — o 1 procentní bod"],correct:2,
+ correctText:"B o 1 p. b. — 0,70 × 0,80 = 0,56, tedy sleva jen 44 %"},
+{cat:0,text:'Cena oceli nejprve <span class="em">vzrostla o 25 %</span> a poté <span class="em">klesla o 25 %</span>. Jaká je proti původní ceně?',
+ options:["Stejná","O 6,25 % nižší","O 6,25 % vyšší","O 12,5 % nižší"],correct:1,
+ correctText:"o 6,25 % nižší — 1,25 × 0,75 = 0,9375"},
+/* --- Odhad a čísla --- */
+{cat:1,text:'Krychlové krabice o hraně <span class="em">40 cm</span> skládáte do přepravního boxu <span class="em">120 × 80 × 100 cm</span> (rovně, bez naklánění). Kolik se jich dovnitř vejde?',
+ options:["15","12","10","24"],correct:1,
+ correctText:"12 — na délku 3, na šířku 2, na výšku jen 2 vrstvy (100 ÷ 40 = 2,5); dělení objemů (15) klame"},
+{cat:1,text:'E-shop odešle průměrně <span class="em">250 zásilek denně</span>, v zásilce jsou průměrně <span class="em">2,1 položky</span>, rok má zhruba <span class="em">250 expedičních dnů</span>. Kolik položek projde skladem za rok — řádově?',
+ options:["≈ 13 000","≈ 130 000","≈ 1 300 000","≈ 500 000"],correct:1,
+ correctText:"≈ 130 000 (250 × 2,1 × 250 = 131 250)"},
+/* --- Logická dedukce --- */
+{cat:2,text:'Do skladu mají v pondělí, úterý a středu dorazit dodávky <span class="em">A, B a C</span> — každý den právě jedna. Víte, že <span class="em">A musí dorazit dříve než B</span> a <span class="em">C nesmí dorazit jako první</span>. Kolik různých pořadí připadá v úvahu?',
+ options:["1","2","3","4"],correct:1,
+ correctText:"2 — pouze A-B-C a A-C-B"},
+{cat:2,text:'Zásilku zpozdil právě jeden ze tří dopravců. Vyjádřili se takto — <b>X:</b> „Zpozdil to Y.“ · <b>Y:</b> „Zpozdil to Z.“ · <b>Z:</b> „Já to nezpozdil.“ Víte, že <span class="em">právě jeden z nich lže</span>. Kdo zásilku zpozdil?',
+ options:["X","Y","Z","Nelze jednoznačně určit"],correct:1,
+ correctText:"Y — lže právě Y; výroky X a Z pak sedí (Y zpozdil, Z ne)"},
+{cat:2,text:'Máte <span class="em">9 krabic se šrouby</span>; v jedné chybí část obsahu, je tedy lehčí (jinak jsou k nerozeznání). K dispozici je rovnoramenná váha bez závaží. Kolik <span class="em">nejméně vážení</span> potřebujete, abyste ji s jistotou našli?',
+ options:["2","3","4","8"],correct:0,
+ correctText:"2 — vážit 3 proti 3 (třetí trojice stranou), pak 1 proti 1 z lehčí trojice"},
+{cat:2,text:'Ve firmě platí pravidlo: <span class="em">„Pokud je objednávka nad 100 000 Kč, musí ji schválit ředitel.“</span> Které tvrzení z tohoto pravidla <b>logicky plyne</b>?',
+ options:["Objednávku pod 100 000 Kč ředitel neschvaluje","Když objednávku schválil ředitel, byla nad 100 000 Kč","Když objednávku ředitel neschválil, nebyla nad 100 000 Kč","Neplyne z něj žádné z uvedených tvrzení"],correct:2,
+ correctText:"„Neschválil → nebyla nad 100 000 Kč“ (obměna implikace); zbylá dvě jsou klasické logické chyby"},
+{cat:2,text:'Audit kontroluje pravidlo: <span class="em">„Každá faktura nad 50 000 Kč musí mít objednávku.“</span> Na stole jsou čtyři faktury — u dvou vidíte jen částku, u dvou jen to, zda mají objednávku: <b>(1)</b> faktura na 80 000 Kč, <b>(2)</b> faktura na 30 000 Kč, <b>(3)</b> faktura s objednávkou, <b>(4)</b> faktura bez objednávky. Ověření skrytého údaje stojí čas. Které <span class="em">dvě</span> faktury je <b>nutné</b> ověřit?',
+ options:["1 a 3","1 a 4","2 a 4","1 a 2"],correct:1,
+ correctText:"1 a 4 — jen ty mohou pravidlo porušit; faktura s objednávkou (3) ho porušit nemůže"},
+/* --- Rozhodování a optimalizace --- */
+{cat:3,text:'U dodavatele A jste složili <span class="em">nevratnou zálohu 20 000 Kč</span>; do dokončení zakázky zbývá doplatit <span class="em">80 000 Kč</span>. Dodavatel B nabídl totéž zboží kompletně za <span class="em">85 000 Kč</span>. Co je ekonomicky nejvýhodnější?',
+ options:["Přejít k B — celkově je levnější","Dokončit u A — od této chvíle zaplatíme méně","Vyjde to úplně stejně","Nelze rozhodnout bez výše zálohy u B"],correct:1,
+ correctText:"dokončit u A — záloha je utopený náklad; rozhoduje 80 000 vs. 85 000"},
+{cat:3,text:'Dodavatel S dodá spolehlivě za <span class="em">100 000 Kč</span>. Dodavatel L je levnější — <span class="em">90 000 Kč</span> — ale s pravděpodobností <span class="em">20 %</span> dodá pozdě, což nás vyjde na dalších <span class="em">40 000 Kč</span> (prostoje výroby). Který dodavatel má nižší <b>očekávaný</b> náklad?',
+ options:["S — spolehlivost vždy vyhrává","L — v průměru o 2 000 Kč","L — v průměru o 10 000 Kč","Očekávané náklady jsou stejné"],correct:1,
+ correctText:"L: 90 000 + 0,2 × 40 000 = 98 000 Kč, tedy o 2 000 Kč méně"},
+{cat:3,text:'Balicí linka má tři kroky za sebou: navažování <span class="em">40 ks/h</span> → balení <span class="em">30 ks/h</span> → etiketování <span class="em">60 ks/h</span>. Brigádník zdvojnásobí výkon právě jednoho kroku. Kterého, aby linka zrychlila nejvíce?',
+ options:["Navažování","Balení","Etiketování","Je to jedno — přidá vždy stejně"],correct:1,
+ correctText:"balení — je úzkým hrdlem (30 ks/h); linka pak pojede 40 ks/h, jinde se nezmění nic"},
+{cat:3,text:'Vlastní rozvoz stojí <span class="em">18 000 Kč měsíčně</span> (fix) plus <span class="em">25 Kč na zásilku</span>. Externí dopravce účtuje <span class="em">70 Kč za zásilku</span>. Při kolika zásilkách měsíčně vyjdou obě varianty <b>nastejno</b>?',
+ options:["257","300","400","720"],correct:2,
+ correctText:"400 — 18 000 ÷ (70 − 25)"},
+{cat:3,text:'Kus stojí <span class="em">100 Kč</span>; při odběru <span class="em">od 300 ks</span> dá dodavatel slevu <span class="em">10 % na celou objednávku</span>. Potřebujete <span class="em">280 ks</span>. Jak vyjde objednávka 300 ks proti objednávce 280 ks?',
+ options:["Je o 2 000 Kč dražší","Je o 1 000 Kč levnější — a máme 20 ks navíc","Vyjde úplně stejně","Je o 1 000 Kč dražší"],correct:1,
+ correctText:"300 × 90 = 27 000 Kč vs. 280 × 100 = 28 000 Kč — víc zboží za méně peněz"},
+/* --- Prostor a logistika --- */
+{cat:4,text:'Kamion jede do skladu průměrnou rychlostí <span class="em">60 km/h</span> a stejnou trasou zpět <span class="em">40 km/h</span>. Jaká je jeho průměrná rychlost za celou cestu?',
+ options:["50 km/h","48 km/h","49 km/h","52 km/h"],correct:1,
+ correctText:"48 km/h — na pomalejší úsek padne více času; 2·60·40 ÷ (60+40)"},
+{cat:4,text:'Trubku dlouhou <span class="em">2,9 m</span> potřebujete uložit do skladové klece o rozměrech <span class="em">2,4 × 1,2 × 1,2 m</span>. Vejde se?',
+ options:["Ne — je o půl metru delší než klec","Ano — po úhlopříčce podlahy","Ano — po prostorové úhlopříčce","Jen když ji rozdělíme na dva kusy"],correct:2,
+ correctText:"ano, po prostorové úhlopříčce — √(2,4² + 1,2² + 1,2²) ≈ 2,94 m (podlahová ≈ 2,68 m nestačí)"},
+{cat:4,text:'Kamion uveze nejvýše <span class="em">24 tun</span> nebo <span class="em">33 palet</span> — podle toho, co nastane dříve. Naloženo je <span class="em">15 palet po 900 kg</span>. Kolik palet po <span class="em">400 kg</span> lze ještě přiložit?',
+ options:["26","18","21","24"],correct:1,
+ correctText:"18 — hmotnostně by se vešlo 26 (10,5 t ÷ 400 kg), ale zbývá jen 33 − 15 = 18 paletových míst"},
+/* --- Práce s daty --- */
+{cat:5,text:'Podíl reklamací dvou dodavatelů:<br><b>Dodavatel A</b> — leden: 1 % ze 100 ks · únor: 5 % z 1 000 ks<br><b>Dodavatel B</b> — leden: 2 % z 1 000 ks · únor: 6 % ze 100 ks<br>A byl lepší v lednu i v únoru. Který dodavatel má <b>celkově</b> nižší podíl reklamací?',
+ options:["A — byl lepší v obou měsících, tedy i celkem","B","Oba stejně","Z těchto údajů to nelze spočítat"],correct:1,
+ correctText:"B — A: 51 vad z 1 100 (4,6 %), B: 26 z 1 100 (2,4 %); rozhodují objemy, ne měsíční procenta (Simpsonův paradox)"},
+{cat:5,text:'Na faktuře stojí: <span class="em">1 200 ks × 84,50 Kč = 121 400 Kč</span>. Rychlá kontrola z hlavy, bez kalkulačky — je částka v pořádku?',
+ options:["Ano, souhlasí","Ne — správně je zhruba 101 000 Kč","Ne — správně je zhruba 110 000 Kč","Bez kalkulačky to ověřit nejde"],correct:1,
+ correctText:"≈ 101 400 Kč — 1 200 × 80 = 96 000 a 1 200 × 4,5 = 5 400; faktura je o 20 000 Kč vyšší"},
+];
+
+/* ---------------- stav ---------------- */
+const $=id=>document.getElementById(id);
+const state={i:0,answers:new Array(QUESTIONS.length).fill(null),order:[],name:"",email:"",pos:"",t0:0,left:LIMIT_S,timedOut:false,tick:null,sel:null};
+/* Míchání odpovědí (preference: správná odpověď nesmí být vždy na stejné pozici) */
+function shuffled(n){const a=[...Array(n).keys()];for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+QUESTIONS.forEach((q,k)=>{state.order[k]=shuffled(q.options.length);});
+
+const inviteN=INVITE_TOKEN?inviteName(INVITE_TOKEN):"";
+if(inviteN){$("inName").value=inviteN;}
+if(INVITE_TOKEN){$("rowEmail").classList.add("hid");}
+
+function show(id){["scr-intro","scr-test","scr-result"].forEach(s=>$(s).classList.toggle("hid",s!==id));window.scrollTo(0,0);}
+
+$("btnStart").onclick=()=>{
+  const nm=$("inName").value.trim();
+  const em=$("inEmail").value.trim();
+  if(!nm){alert("Vyplňte prosím jméno.");return;}
+  if(!INVITE_TOKEN&&!/@/.test(em)){alert("Vyplňte prosím platný e-mail.");return;}
+  state.name=nm;state.email=em;state.pos=$("inPos").value.trim();
+  state.t0=Date.now();
+  state.tick=setInterval(tick,250);
+  show("scr-test");render();
+};
+function tick(){
+  const used=(Date.now()-state.t0)/1000;
+  state.left=Math.max(0,LIMIT_S-used);
+  const m=Math.floor(state.left/60),s=Math.floor(state.left%60);
+  const el=$("timer");el.textContent=m+":"+String(s).padStart(2,"0");
+  el.classList.toggle("warn",state.left<180);
+  if(state.left<=0){state.timedOut=true;finish();}
+}
+function render(){
+  const q=QUESTIONS[state.i];state.sel=null;
+  $("qNum").textContent="Úloha "+(state.i+1)+" z "+QUESTIONS.length;
+  $("progBar").style.width=(state.i/QUESTIONS.length*100)+"%";
+  $("qCat").textContent=CATS[q.cat];
+  $("qText").innerHTML=q.text;
+  const box=$("qOpts");box.innerHTML="";
+  state.order[state.i].forEach(oi=>{
+    const b=document.createElement("button");
+    b.type="button";b.className="opt";b.innerHTML=q.options[oi];
+    b.onclick=()=>{state.sel=oi;[...box.children].forEach(x=>x.classList.remove("sel"));b.classList.add("sel");$("btnNext").disabled=false;};
+    box.appendChild(b);
+  });
+  $("btnNext").disabled=true;
+  $("btnNext").textContent=(state.i===QUESTIONS.length-1)?"Dokončit test ✓":"Další →";
+}
+function saveAnswer(oi){
+  const q=QUESTIONS[state.i];
+  state.answers[state.i]=oi==null?null:{idx:oi,ok:oi===q.correct,ansText:q.options[oi].replace(/<[^>]+>/g,"")};
+}
+$("btnNext").onclick=()=>{saveAnswer(state.sel);advance();};
+$("btnSkip").onclick=()=>{saveAnswer(null);advance();};
+function advance(){
+  if(state.i<QUESTIONS.length-1){state.i++;render();}
+  else finish();
+}
+let FINISHED=false;
+function finish(){
+  if(FINISHED)return;FINISHED=true;
+  clearInterval(state.tick);
+  const usedSec=Math.min(LIMIT_S,(Date.now()-state.t0)/1000);
+  let score=0;
+  const per=CATS.map(c=>({c,got:0,tot:0}));
+  QUESTIONS.forEach((q,k)=>{
+    per[q.cat].tot++;
+    const a=state.answers[k];
+    if(a&&a.ok){score++;per[q.cat].got++;}
+  });
+  const pct=Math.round(score/QUESTIONS.length*100);
+  const band=pct>=85?["Výborné logické myšlení","g"]:pct>=65?["Dobré logické myšlení","g"]:pct>=45?["Průměrný výsledek","y"]:["Slabý výsledek","r"];
+  $("resWho").textContent=state.name+(state.pos?(" · "+state.pos):"");
+  $("resScore").textContent=score+" / "+QUESTIONS.length;
+  $("resPct").textContent=pct+" %";
+  const bp=$("resBand");bp.textContent=band[0];bp.className="pill "+band[1];
+  $("resAreas").innerHTML='<div class="note" style="margin-bottom:4px"><b>Úspěšnost podle oblastí</b></div>'+per.map(p=>{
+    const q=p.tot?Math.round(p.got/p.tot*100):0;
+    return '<div style="margin-top:9px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><span>'+p.c+'</span><span class="muted">'+p.got+' / '+p.tot+'</span></div>'+
+      '<div class="bar"><i style="width:'+q+'%;background:'+(q>=70?'#12752f':q>=40?'#c98a00':'#b3261e')+'"></i></div></div>';
+  }).join("");
+  $("resTime").textContent="Čas: "+fmtCas(usedSec)+" z limitu "+fmtCas(LIMIT_S)+(state.timedOut?" — čas vypršel, nezodpovězené úlohy se počítají jako chybné.":".");
+  const payload={
+    email:state.email,kandidat:state.name,name:state.name,pozice:state.pos,
+    datum:new Date().toISOString(),
+    skore:score,otazekCelkem:QUESTIONS.length,procenta:pct,hodnoceni:band[0],
+    casVyprsel:state.timedOut,casPouzityS:Math.round(usedSec),limitS:LIMIT_S,
+    oblasti:per.map(p=>({oblast:p.c,spravne:p.got,celkem:p.tot})),
+    odpovedi:QUESTIONS.map((q,k)=>{const a=state.answers[k];
+      return {otazka:k+1,oblast:CATS[q.cat],spravne:!!(a&&a.ok),
+        odpovedKandidata:a?a.ansText:null,spravnaOdpoved:q.correctText};})
+  };
+  fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(d=>{
+      if(d&&d.blocked){$("resTime").textContent="Test jste nedávno vyplnili — uložen zůstává původní výsledek.";}
+    }).catch(()=>{});
+  show("scr-result");
+}
+function fmtCas(s){s=Math.round(s);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}
+</script>
+</body>
+</html>

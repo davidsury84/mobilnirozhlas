@@ -160,6 +160,7 @@ const GRIT_FILE = path.join(ROOT, 'grit.html');              // test houževnato
 const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracovní spokojenosti (JSS)
 const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
 const VYKRESY_FILE = path.join(ROOT, 'vykresy.html');        // test čtení strojírenských výkresů (praktický, 15 otázek)
+const LOGIKA_FILE = path.join(ROOT, 'logika.html');          // test logického myšlení pro nábor nákupčí/logistik (20 úloh)
 const ABROLL_FILE = path.join(ROOT, 'abroll-skoleni.html');  // interaktivní školení ABROLL + závěrečný test
 const PRODUKTY_FILE = path.join(ROOT, 'produkty-skoleni.html'); // interaktivní školení Produkty (znalosti obchodníků) + závěrečný test
 const PRUMYSL_FILE = path.join(ROOT, 'prumysl-skoleni.html'); // interaktivní školení Průmysl (obchodník: skladování, Li-Ion, ADR) + závěrečný test
@@ -178,6 +179,7 @@ const GRIT_F   = path.join(DATA_DIR, 'grit-results.json');   // výsledky testu 
 const JSS_F    = path.join(DATA_DIR, 'jss-results.json');    // výsledky dotazníku pracovní spokojenosti
 const TW44_F   = path.join(DATA_DIR, 'tw44-results.json');   // výsledky testu kognitivní zátěže (neanonymní)
 const VYKRESY_F = path.join(DATA_DIR, 'vykresy-results.json'); // výsledky testu čtení výkresů (zaměstnanci i uchazeči)
+const LOGIKA_F = path.join(DATA_DIR, 'logika-results.json'); // výsledky testu logického myšlení (nábor nákupčí/logistik)
 const ABROLL_F = path.join(DATA_DIR, 'abroll-results.json'); // výsledky testu ABROLL (max 3 pokusy na osobu)
 const PRODUKTY_F = path.join(DATA_DIR, 'produkty-results.json'); // výsledky testu znalosti produktů (max 3 pokusy na osobu)
 const PRUMYSL_F = path.join(DATA_DIR, 'prumysl-results.json'); // výsledky testu Průmysl (obchodník) — max 3 pokusy na osobu
@@ -728,6 +730,7 @@ function mySurveys(email) {
     { id: 'jss',  title: 'Dotazník pracovní spokojenosti (JSS)', desc: '36 otázek · 9 oblastí pracovní spokojenosti', mins: 8, file: JSS_F },
     { id: 'tw44', title: 'Test kognitivní zátěže (TW44)', desc: 'krátké subtesty pozornosti a paměti', mins: 6, file: TW44_F },
     { id: 'vykresy', title: 'Test čtení výkresů', desc: '15 otázek · praktické čtení strojírenské výkresové dokumentace', mins: 10, file: VYKRESY_F },
+    { id: 'logika', title: 'Test logického myšlení (nákup a logistika)', desc: '20 úloh · odhady, dedukce, rozhodování — kreativní logika', mins: 30, file: LOGIKA_F },
   ];
   return DEFS.map(d => {
     const rec = readJson(d.file, []).find(r => (r.email || '').toLowerCase() === email);
@@ -837,6 +840,43 @@ function recordVykresy(a) {
   logActivity('survey', { email, name }, 'Test čtení výkresů');
   return rec;
 }
+// Uloží (upsert dle e-mailu) výsledek testu logického myšlení — stejný tvar záznamu jako test výkresů.
+function recordLogika(a) {
+  const email = (a.email || '').toLowerCase();
+  const s2 = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s2.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || a.kandidat || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s2.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const celkem = Math.max(1, Math.round(Number(a.otazekCelkem) || 20));
+  const skore = Math.max(0, Math.min(celkem, Math.round(Number(a.skore) || 0)));
+  const procenta = Math.max(0, Math.min(100, Math.round((a.procenta != null && isFinite(a.procenta)) ? Number(a.procenta) : skore / celkem * 100)));
+  const rec = { email, name, dept,
+    pozice: String(a.pozice || '').slice(0, 80),
+    skore, otazekCelkem: celkem, procenta,
+    hodnoceni: String(a.hodnoceni || LOGIKA_HODNOCENI[logikaPasmo(procenta)]).slice(0, 60),
+    casVyprsel: !!a.casVyprsel,
+    casPouzityS: Math.max(0, Math.round(Number(a.casPouzityS) || 0)),
+    limitS: Math.max(0, Math.round(Number(a.limitS) || 0)),
+    oblasti: (Array.isArray(a.oblasti) ? a.oblasti : []).slice(0, 12).map(o => ({
+      oblast: String((o || {}).oblast || '').slice(0, 60),
+      spravne: Math.max(0, Math.round(Number((o || {}).spravne) || 0)),
+      celkem: Math.max(0, Math.round(Number((o || {}).celkem) || 0)) })),
+    odpovedi: (Array.isArray(a.odpovedi) ? a.odpovedi : []).slice(0, 40).map(o => ({
+      otazka: Math.round(Number((o || {}).otazka) || 0),
+      oblast: String((o || {}).oblast || '').slice(0, 60),
+      spravne: !!(o || {}).spravne,
+      odpovedKandidata: (o || {}).odpovedKandidata == null ? null : String((o || {}).odpovedKandidata).slice(0, 200),
+      spravnaOdpoved: String((o || {}).spravnaOdpoved || '').slice(0, 200) })),
+    ts: Date.now() };
+  const results = readJson(LOGIKA_F, []);
+  const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0 && results[i].ts && Date.now() < nextFillAt(results[i].ts)) return { blocked: true, nextAt: nextFillAt(results[i].ts) };
+  if (i >= 0) results[i] = rec; else results.push(rec);
+  writeJson(LOGIKA_F, results);
+  logActivity('survey', { email, name }, 'Test logického myšlení (nákup a logistika)');
+  return rec;
+}
 /* ---- Hodnocení venkovního mobiliáře (katalog WeiDu) — veřejný obrázkový průzkum ----
    Fotky: assets/mobiliar/<kód>.jpg (např. ob-001), kódy odpovídají katalogu (ob-001 = WD-OB-001).
    Respondent vybírá z šestic fotek 2 nejhezčí: 1 = vybráno, 0 = zobrazeno/nevybráno.
@@ -878,7 +918,7 @@ function recordMobiliar(b) {
   return { ok: true, ulozeno: Object.keys(rec.votes).length };
 }
 /* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
-const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)', vykresy: 'Test čtení výkresů' };
+const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)', vykresy: 'Test čtení výkresů', logika: 'Test logického myšlení (nákup a logistika)' };
 /* Test čtení výkresů — pásma dle procent (stejná hranice jako v testu samotném) */
 function vykresyPasmo(p) { return p >= 90 ? 'vyborna' : p >= 70 ? 'dobra' : p >= 50 ? 'zakladni' : 'nedostatecna'; }
 const VYKRESY_HODNOCENI = { vyborna: 'Výborná úroveň', dobra: 'Dobrá úroveň', zakladni: 'Základní orientace', nedostatecna: 'Nedostatečná úroveň' };
@@ -887,6 +927,15 @@ const VYKRESY_DOPORUCENI = {
   dobra: 'Drobné mezery, běžnou výrobní dokumentaci zvládne. Doporučujeme krátké zaškolení na firemní standardy kreslení.',
   zakladni: 'Ve výkresech se orientuje jen částečně. Jednodušší úkoly zvládne pod dohledem; před samostatnou prací doporučujeme školení čtení výkresů.',
   nedostatecna: 'Čtení výkresů zatím neovládá. Pro práci podle výkresové dokumentace je nutné důkladné zaškolení.',
+};
+/* Test logického myšlení — pásma (těžký test, hranice níž než u výkresů) */
+function logikaPasmo(p) { return p >= 85 ? 'vyborne' : p >= 65 ? 'dobre' : p >= 45 ? 'prumer' : 'slabe'; }
+const LOGIKA_HODNOCENI = { vyborne: 'Výborné logické myšlení', dobre: 'Dobré logické myšlení', prumer: 'Průměrný výsledek', slabe: 'Slabý výsledek' };
+const LOGIKA_DOPORUCENI = {
+  vyborne: 'Kandidát řeší i neznámé úlohy samostatně a přesně — přesně profil „pálí mu to". Silný adept na pozici nákupčí/logistik; doporučujeme pokračovat pohovorem nad reálným nákupním případem.',
+  dobre: 'Solidní úsudek, chyby spíš v návalu než v principu. Vhodný kandidát; u pohovoru prověřte oblasti s nejnižší úspěšností.',
+  prumer: 'Zvládá přímočaré úlohy, u chytáků a víceúrovňové logiky chybuje. Zvažte podle ostatních kritérií — pro seniorní nákupní roli spíše slabší.',
+  slabe: 'Logické myšlení pod úrovní potřebnou pro samostatnou nákupní/logistickou roli. Nedoporučujeme pokračovat jen na základě sympatie z pohovoru.',
 };
 function vykresyFmtCas(sec) { sec = Math.max(0, Math.round(sec || 0)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
 // Pracovní pásma dle skóre 1–5 (publikované normy neexistují — percentil je jen orientační).
@@ -986,6 +1035,20 @@ function surveyVysledekRadky(kind, rec) {
       ['Upozornění', 'Orientační výsledek — doporučujeme doplnit krátkým pohovorem nad reálným firemním výkresem.']);
     return r;
   }
+  if (kind === 'logika') {
+    const r = [
+      ['Výsledek', rec.skore + ' / ' + rec.otazekCelkem + ' správně (' + rec.procenta + ' %)'],
+      ['Hodnocení', rec.hodnoceni || LOGIKA_HODNOCENI[logikaPasmo(rec.procenta)]],
+    ];
+    if (rec.pozice) r.push(['Pozice', rec.pozice]);
+    r.push(['Čas', vykresyFmtCas(rec.casPouzityS) + ' / limit ' + vykresyFmtCas(rec.limitS) + (rec.casVyprsel ? ' — čas vypršel (nezodpovězené = chybné)' : '')]);
+    (rec.oblasti || []).forEach(o => r.push(['Oblast — ' + o.oblast, o.spravne + ' / ' + o.celkem]));
+    const chyby = (rec.odpovedi || []).filter(o => !o.spravne);
+    if (chyby.length) r.push(['Chybné úlohy', chyby.map(o => 'č. ' + o.otazka + ' (' + o.oblast + ')').join(' · ')]);
+    r.push(['Doporučení', LOGIKA_DOPORUCENI[logikaPasmo(rec.procenta)]],
+      ['Upozornění', 'Test měří úsudek, ne znalosti. Doporučujeme projít 1–2 chybné úlohy na pohovoru — zajímá nás, JAK kandidát přemýšlel.']);
+    return r;
+  }
   const su = tw44UspesnostSrv(rec); const ix = rec.indices || {};
   const r = [['Varianta', rec.variant || '—'], ['Nalezené cíle', String(su.found)], ['Úspěšnost hledání', su.pct + ' %']];
   tw44Interpretace(ix).forEach(t => r.push(['Index', t]));
@@ -1034,7 +1097,7 @@ function surveyReportHtml(kind, rec, poznamka) {
     '<p style="margin-top:16px;font-size:12px;color:#77796f">Interní podklad HR — ELKOPLAST CZ. Doplňková informace ze sebehodnocení, nikoli samostatné selekční kritérium. Plný interaktivní detail: intranet.elkoplast.cz → Průzkumy.</p></div></div>';
 }
 function surveyRec(kind, email) {
-  const f = kind === 'jss' ? JSS_F : kind === 'tw44' ? TW44_F : kind === 'vykresy' ? VYKRESY_F : GRIT_F;
+  const f = kind === 'jss' ? JSS_F : kind === 'tw44' ? TW44_F : kind === 'vykresy' ? VYKRESY_F : kind === 'logika' ? LOGIKA_F : GRIT_F;
   return readJson(f, []).find(r => (r.email || '').toLowerCase() === String(email || '').toLowerCase());
 }
 
@@ -2423,7 +2486,7 @@ const server = http.createServer(async (req, res) => {
 
   // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
   const invite = inviteVerify(u.query.i || '');
-  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/vykresy', '/vykresy.html', '/api/grit', '/api/jss', '/api/tw44', '/api/vykresy'];
+  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/vykresy', '/vykresy.html', '/logika', '/logika.html', '/api/grit', '/api/jss', '/api/tw44', '/api/vykresy', '/api/logika'];
   const inviteOk = !!(invite && INVITE_ROUTES.indexOf(p) >= 0);
   // Veřejné cesty modulu Smlouvy (mimo SSO závoru): potvrzení termínu tokenem + Resend webhook.
   const smlouvyPublic = p.startsWith('/smlouvy/potvrdit') || p === '/api/smlouvy/webhook/resend';
@@ -2527,7 +2590,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // chráněné cesty (správa)
-  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results', '/api/mobiliar-results'];
+  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results', '/api/logika-results', '/api/mobiliar-results'];
   if (PROTECTED.indexOf(p) >= 0 && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
@@ -2626,6 +2689,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/vykresy' || p === '/vykresy.html') {
       if (!fs.existsSync(VYKRESY_FILE)) return send(res, 404, '<h1>Chybí vykresy.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(VYKRESY_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    if (p === '/logika' || p === '/logika.html') {
+      if (!fs.existsSync(LOGIKA_FILE)) return send(res, 404, '<h1>Chybí logika.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(LOGIKA_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     // Veřejné hodnocení venkovního mobiliáře — přihlášenému zaměstnanci předvybere roli obchodníka.
     if (p === '/mobiliar' || p === '/mobiliar.html') {
@@ -2777,6 +2844,8 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/vykresy' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordVykresy(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('vykresy', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, skore: rec.skore, procenta: rec.procenta }, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/vykresy-results' && req.method === 'GET') return send(res, 200, readJson(VYKRESY_F, []));
+    if (p === '/api/logika' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); if (invite) { b.email = invite.e; b.name = invite.n; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const rec = recordLogika(b); if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' }); poslatHrVysledek('logika', rec); return send(res, 200, { ok: true, name: rec.name, dept: rec.dept, skore: rec.skore, procenta: rec.procenta }, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/logika-results' && req.method === 'GET') return send(res, 200, readJson(LOGIKA_F, []));
 
     // Hodnocení mobiliáře: příjem hlasů (veřejné, upsert dle rid) + výsledky pro admin.
     if (p === '/api/mobiliar/vote' && req.method === 'POST') {
@@ -2818,7 +2887,7 @@ const server = http.createServer(async (req, res) => {
       if (!emailConfigured()) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
       const b = JSON.parse(await readBody(req));
       const kind = (b.kind || '').toLowerCase();
-      if (['grit', 'jss', 'tw44', 'vykresy'].indexOf(kind) < 0) return send(res, 400, { error: 'Neznámý typ testu.' });
+      if (['grit', 'jss', 'tw44', 'vykresy', 'logika'].indexOf(kind) < 0) return send(res, 400, { error: 'Neznámý typ testu.' });
       const to = String(b.to || '').trim();
       if (to.indexOf('@') < 0) return send(res, 400, { error: 'Neplatný e-mail příjemce.' });
       const rec = surveyRec(kind, b.email);
