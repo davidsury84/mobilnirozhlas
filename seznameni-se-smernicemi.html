@@ -6485,7 +6485,7 @@ const PRUZKUMY_DEFS=[
   {kind:'jss',     typ:'pruzkum', sendId:'survey-jss',     nazev:'Dotazník pracovní spokojenosti (JSS)', popis:'36 výroků · 9 oblastí pracovní spokojenosti'},
   {kind:'tw44',    typ:'pruzkum', sendId:'survey-tw44',    nazev:'Test kognitivní zátěže (TW44)',        popis:'vyhledávání v tabulce 10×10 · výkon pod časovým tlakem'},
   {kind:'vykresy', typ:'pruzkum', sendId:'survey-vykresy', nazev:'Test čtení výkresů',                   popis:'15 otázek · praktické čtení výkresové dokumentace'},
-  {kind:'logika',  typ:'pruzkum', sendId:'survey-logika',  nazev:'Test logického myšlení (nákup a logistika)', popis:'20 těžkých úloh · odhady, dedukce, rozhodování — kreativita, ne znalosti'},
+  {kind:'logika',  typ:'pruzkum', sendId:'survey-logika',  nazev:'Test logického myšlení (nákup a logistika)', popis:'25 těžkých úloh · odhady, dedukce, rozhodování, řízení zásob — kreativita, ne znalosti'},
   {kind:'mobiliar', typ:'pruzkum', nazev:'Hodnocení mobiliáře (WeiDu)', popis:'z každé šestice fotek 2 nejhezčí — lavičky, stoly, koše, lehátka, květináče · anonymní veřejný odkaz /mobiliar'},
   {kind:'abroll',        typ:'skoleni', nazev:'Školení ABROLL',        popis:'kódování ABROLL kontejnerů · závěrečný test, max 3 pokusy'},
   {kind:'prumysl',       typ:'skoleni', nazev:'Školení Průmysl',       popis:'skladování, Li-Ion, ADR · závěrečný test, max 3 pokusy'},
@@ -7137,7 +7137,7 @@ async function vykresyBlockHtml(){
 /* ---- Test logického myšlení (nábor nákupčí/logistik) — klon obsluhy testu výkresů ---- */
 let LOGIKA_RESULTS=[];
 let LOGIKA_ASSIGN={all:true,cats:[]};
-const LOGIKA_OBLASTI=["Procenta a ceny","Odhad a čísla","Logická dedukce","Rozhodování a optimalizace","Prostor a logistika","Práce s daty"];
+const LOGIKA_OBLASTI=["Procenta a ceny","Odhad a čísla","Logická dedukce","Rozhodování a optimalizace","Prostor a logistika","Práce s daty","Řízení zásob a objednávání"];
 function logikaAcksMap(){ const m={}; (LOGIKA_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
 function logikaAssignAll(on){ LOGIKA_ASSIGN.all=on; const w=document.getElementById("logCatWrap"); if(w) w.style.opacity=on?.4:1; }
 function logikaReadCats(){ LOGIKA_ASSIGN.cats=[...document.querySelectorAll(".logcat:checked")].map(c=>c.value); }
@@ -7174,9 +7174,9 @@ async function logikaBlockHtml(){
     '<div class="spread" style="margin-bottom:8px"><strong>Test logického myšlení (nákup a logistika)</strong>'+
       '<div class="inline-actions"><button class="btn ghost sm" onclick="copyLogikaLinks()">Zkopírovat odkazy</button>'+
       '<button class="btn sm" onclick="openSendModal(\'survey-logika\')">Rozeslat</button></div></div>'+
-    '<div class="muted" style="font-size:13px;margin-bottom:12px">20 úloh · 6 oblastí · limit 30 minut · neanonymní · osobní odkaz e-mailem — primárně pro nábor na pozice nákupčí a logistik.</div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">25 úloh · 7 oblastí · limit 35 minut · neanonymní · osobní odkaz e-mailem — primárně pro nábor na pozice nákupčí a logistik.</div>'+
     '<div style="background:var(--green-soft);border:1px solid #cfe9d8;border-radius:10px;padding:14px 16px;margin-bottom:12px;font-size:14px;line-height:1.55">'+
-      '<strong>O čem to je:</strong> Těžký test <strong>úsudku, ne znalostí</strong> — žádné definice ani vzorce k memorování. Kandidát řeší chytáky s procenty a maržemi, odhady z hlavy, logickou dedukci (kdo lže, co plyne z pravidla, které doklady auditovat), rozhodovací situace (utopené náklady, očekávaný náklad rizika, úzké hrdlo linky, slevové prahy) a prostorové i datové úlohy (nakládka kamionu, Simpsonův paradox u reklamací). Možnosti odpovědí se každému míchají náhodně.'+
+      '<strong>O čem to je:</strong> Těžký test <strong>úsudku, ne znalostí</strong> — žádné definice ani vzorce k memorování. Kandidát řeší chytáky s procenty a maržemi, odhady z hlavy, logickou dedukci (kdo lže, co plyne z pravidla, které doklady auditovat), rozhodovací situace (utopené náklady, očekávaný náklad rizika, úzké hrdlo linky, slevové prahy) a prostorové i datové úlohy (nakládka kamionu, Simpsonův paradox u reklamací) a <strong>řízení zásob z praxe našeho e-shopu</strong> (oversold se zbožím na cestě, jednorázová obecní zakázka vs. běžný prodej, sezónní pauza vs. mrtvá položka, náběh sezóny, pohyby skladu z denních snímků). Možnosti odpovědí se každému míchají náhodně.'+
       '<div class="muted" style="margin-top:6px;font-size:13px">Hodnocení: ≥ 85 % výborné · 65–84 % dobré · 45–64 % průměr · &lt; 45 % slabé. Po vypršení limitu se test sám odešle (nezodpovězené = chybné). Kandidát správné odpovědi nevidí — plný rozbor je jen tady a v e-mailu pro HR.</div>'+
     '</div>'+
     '<label class="field" style="margin-bottom:4px"><span>Komu rozeslat — oddělení</span>'+

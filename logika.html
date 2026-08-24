@@ -48,7 +48,7 @@ label b{font-size:13px}
   <div id="scr-intro" class="card">
     <h1>🧩 Test logického myšlení</h1>
     <p class="muted" style="margin:0 0 14px">pro pozice nákupčí a logistik · ELKOPLAST CZ</p>
-    <p>Test má <b>20 úloh</b> a limit <b>30 minut</b>. Nezkouší naučené vzorce ani definice — zkoumá, jak přemýšlíte:
+    <p>Test má <b>25 úloh</b> a limit <b>35 minut</b>. Nezkouší naučené vzorce ani definice — zkoumá, jak přemýšlíte:
     odhady, práci s čísly z hlavy, logické vyvozování a rozhodování v situacích z nákupu a logistiky.</p>
     <ul style="margin:0 0 14px;padding-left:20px;font-size:14px;line-height:1.7">
       <li>Každá úloha má <b>právě jednu správnou odpověď</b> ze čtyř možností.</li>
@@ -69,7 +69,7 @@ label b{font-size:13px}
   <div id="scr-test" class="card hid">
     <div class="top">
       <div class="muted" id="qNum" style="font-weight:700"></div>
-      <div class="timer" id="timer">30:00</div>
+      <div class="timer" id="timer">35:00</div>
     </div>
     <div class="prog"><i id="progBar" style="width:0%"></i></div>
     <div class="qcat" id="qCat"></div>
@@ -112,10 +112,10 @@ function inviteName(tok){
 }
 const API=INVITE_TOKEN?("/api/logika?i="+encodeURIComponent(INVITE_TOKEN)):"/api/logika";
 
-const LIMIT_S=30*60;
-const CATS=["Procenta a ceny","Odhad a čísla","Logická dedukce","Rozhodování a optimalizace","Prostor a logistika","Práce s daty"];
+const LIMIT_S=35*60;
+const CATS=["Procenta a ceny","Odhad a čísla","Logická dedukce","Rozhodování a optimalizace","Prostor a logistika","Práce s daty","Řízení zásob a objednávání"];
 
-/* 20 úloh. correct = index správné možnosti v PŮVODNÍM pořadí; možnosti se při
+/* 25 úloh. correct = index správné možnosti v PŮVODNÍM pořadí; možnosti se při
    zobrazení míchají (Fisher–Yates), takže správná odpověď není vždy na stejné pozici. */
 const QUESTIONS=[
 /* --- Procenta a ceny --- */
@@ -184,6 +184,22 @@ const QUESTIONS=[
 {cat:5,text:'Na faktuře stojí: <span class="em">1 200 ks × 84,50 Kč = 121 400 Kč</span>. Rychlá kontrola z hlavy, bez kalkulačky — je částka v pořádku?',
  options:["Ano, souhlasí","Ne — správně je zhruba 101 000 Kč","Ne — správně je zhruba 110 000 Kč","Bez kalkulačky to ověřit nejde"],correct:1,
  correctText:"≈ 101 400 Kč — 1 200 × 80 = 96 000 a 1 200 × 4,5 = 5 400; faktura je o 20 000 Kč vyšší"},
+/* --- Řízení zásob a objednávání (reálné situace z e-shopu) --- */
+{cat:6,text:'Položka e-shopu: skladem <span class="em">8 ks</span>, zákazníci mají rezervováno <span class="em">12 ks</span>, u dodavatele je na cestě <span class="em">10 ks</span>. Prodává se ~6 ks měsíčně, dodací lhůta je 1 měsíc a chcete mít zásobu na <span class="em">3 měsíce prodeje (18 ks)</span>. Kolik objednat?',
+ options:["22 ks","12 ks","18 ks","4 ks"],correct:1,
+ correctText:"12 ks — pozice = (8 − 12) + 10 na cestě = 6 ks; objednat 18 − 6. Kdo zapomene na zboží na cestě, objedná 22 a přeskladní"},
+{cat:6,text:'Prakticky celý roční prodej položky padne do <span class="em">června až srpna</span>. Dodavatel má dodací lhůtu <span class="em">3 měsíce</span>. Kdy nejpozději musíte objednat, aby zboží stihlo pokrýt špičku od začátku června?',
+ options:["Začátkem června","Začátkem května","Začátkem března","Stačí v dubnu"],correct:2,
+ correctText:"začátkem března — červen minus 3 měsíce lhůty; sezónní zboží se objednává s předstihem o dodací lhůtu"},
+{cat:6,text:'Roční prodej položky je <span class="em">573 ks</span> — ale <span class="em">300 ks</span> z toho byla jediná obecní zakázka v září; běžně se prodává ~25 ks měsíčně. Sklad je nula. Jak nastavit objednávání na příští měsíce?',
+ options:["Podle průměru 573 ÷ 12 ≈ 48 ks měsíčně","Podle běžného prodeje ~25 ks měsíčně; velkou zakázku řešit zvlášť, až přijde","Předzásobit se na září 300 ks — zakázka se může opakovat","Neobjednávat nic — položka je mrtvá"],correct:1,
+ correctText:"podle běžného prodeje ~25 ks/měs — jednorázový extrém nesmí nafouknout skladovou zásobu; 300ks zakázka se objednává až proti konkrétní objednávce"},
+{cat:6,text:'Sklad sledujete jen z ranních snímků. Včera: sklad <span class="em">100 ks</span>, u dodavatele objednáno <span class="em">40 ks</span>. Dnes: sklad <span class="em">115 ks</span>, objednáno <span class="em">10 ks</span>. Kolik kusů se včera vydalo zákazníkům?',
+ options:["0 — sklad přece vzrostl","15 ks","30 ks","45 ks"],correct:1,
+ correctText:"15 ks — dorazilo 40 − 10 = 30 ks (pokles „objednáno“), ale sklad vzrostl jen o 15; zbytek musel odejít. Růst skladu neznamená, že se neprodávalo"},
+{cat:6,text:'Dvě položky nemají <span class="em">od března do srpna</span> jediný prodej. <b>Nádoba na zimní posyp</b> historicky prodává říjen–únor; <b>plastový kontejner</b> se historicky prodával rovnoměrně celý rok. Co z toho plyne?',
+ options:["Obě jsou mrtvé — vyřadit ze sortimentu","U obou je vše v pořádku — půl roku bez prodeje nic neznamená","Posyp je v pořádku (mimo sezónu, objednat před zimou); kontejner je varovný signál — ověřit, proč přestal","Posyp je problém; kontejner je v pořádku"],correct:2,
+ correctText:"ticho se posuzuje proti VLASTNÍ sezóně položky: posyp v létě mlčí právem, celoroční kontejner, který umlkl, je signál (konec sortimentu / ztracený zákazník)"},
 ];
 
 /* ---------------- stav ---------------- */
