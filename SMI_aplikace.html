@@ -1015,8 +1015,14 @@ function reprice(it){
   it.targetPrice=null; it.stepsToTarget=null;
   if(rep>base*1.004&&P.krok>0){
     const target=rep;
-    const kroku=Math.max(1,Math.ceil(Math.log(target/base)/Math.log(1+P.krok)));
-    rep=Math.min(target,base*(1+P.krok));
+    let step=base*(1+P.krok);
+    // POJISTKA: plynulost nikdy nesmí držet cenu POD novou nákupní cenou — pod náklad
+    // se neprodává ani během náběhu. První krok skočí minimálně na L×k_inf, vyhlazuje
+    // se jen marže nad ní.
+    if(L!=null&&step<L*kinf){ step=Math.min(target,L*kinf); method+=' · skok na nákupní'; }
+    rep=Math.min(target,step);
+    const zbyva=target/rep;
+    const kroku=1+(zbyva>1.004?Math.ceil(Math.log(zbyva)/Math.log(1+P.krok)):0);
     if(kroku>1){ it.targetPrice=target; it.stepsToTarget=kroku;
       method+=' · plynule: teď +'+Math.round((rep/base-1)*100)+' %, cíl '+fmt(target,1)+' Kč za '+kroku+' měs.'; }
   }
