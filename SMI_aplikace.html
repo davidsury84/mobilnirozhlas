@@ -365,6 +365,39 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     </div>
     <div class="pane" id="pane-model">
       <div class="note">Editovatelný náhled listu „SMI model". Sloupce <b>✎ Sleva %</b>, <b>✎ Nová nákupní cena (C_last)</b> a <b>✎ Nová cena</b> uprav přímo v tabulce, nebo hromadně přes panel níže. Ruční úpravy jsou zvýrazněné a přenesou se do exportu.</div>
+      <details class="settings" style="margin:0 0 12px">
+        <summary>📘 Co je SMI model a jak funguje (detailní popis)</summary>
+        <div style="margin-top:10px;font-size:13.5px;line-height:1.65;max-width:1000px">
+
+        <p style="margin:0 0 10px"><b>SMI model je jádro celé aplikace</b> — tabulka, kde má každá položka sortimentu (1 066 SKU z kvartálního přehledu „obrat plasty") jeden řádek a kde se potkávají všechny výpočty: klasifikace zásoby, doporučená sleva (markdown) a nová prodejní cena. Všechny ostatní záložky ve skupině Ceny jsou jen filtrované pohledy na tento model: <b>Nové ceny</b> = položky se změnou ceny, <b>Mrtvé zásoby</b> = položky s klasifikací stárnoucí/mrtvá, <b>Chyby</b> = položky s podezřelými daty. Co tady upravíš, propíše se všude — i do exportovaného Excelu.</p>
+
+        <p style="margin:0 0 6px"><b>1) Odkud bere data.</b> Prodejní historie po měsících, stav skladu (Sklad ks) a hodnota zásoby v nákladových cenách (Hodnota Kč) jdou z „obrat plasty" (klouzavých 12 měsíců z ERP). Reálné prodejní ceny jdou z exportu e-shopu (🛒; položky mimo e-shop mají odhad ~). Novou nákupní cenu <b>C_last</b> zadáváš ručně — je to tvůj vstup „za kolik budu nakupovat příště" (např. po ohlášeném zdražení dodavatele).</p>
+
+        <p style="margin:0 0 6px"><b>2) Klasifikace každé položky.</b> Model se dívá na dvě věci a bere HORŠÍ z nich:</p>
+        <table style="border-collapse:collapse;font-size:12.5px;margin:0 0 8px"><tr style="color:var(--mut)"><th style="text-align:left;padding:2px 12px 2px 0">Kategorie</th><th style="text-align:left;padding:2px 12px 2px 0">Obrátka (měsíců bez prodeje)</th><th style="text-align:left;padding:2px 0">Krytí (měsíců zásoby = sklad ÷ ø měsíční prodej)</th></tr>
+        <tr><td style="padding:2px 12px 2px 0">Zdravá obrátka</td><td>&lt; 4</td><td>&lt; 12</td></tr>
+        <tr><td style="padding:2px 12px 2px 0">Pomalá obrátka</td><td>4–6</td><td>12–23</td></tr>
+        <tr><td style="padding:2px 12px 2px 0">Stárnoucí zásoba</td><td>7–9</td><td>24–47</td></tr>
+        <tr><td style="padding:2px 12px 2px 0">Mrtvá zásoba</td><td>≥ 10</td><td>≥ 48</td></tr></table>
+        <p style="margin:0 0 6px" class="muted">Měsíce bez prodeje se počítají od konce datového okna (ne od dneška) — položka v sezónní pauze se nepočítá špatně. Druhé kritérium (krytí) chytá „přeskladněno": i položka, která občas prodá, může mít zásobu na 5 let.</p>
+
+        <p style="margin:0 0 6px"><b>3) Priorita a ICC.</b> <b>Priorita A</b> = mrtvá + hodnota ≥ 50 000 Kč (řeš hned), <b>B</b> = stárnoucí + ≥ 10 000 Kč, <b>C</b> = ostatní pomalé. <b>Roční ICC</b> (inventory carrying cost) = hodnota zásoby × sazba držení (kapitál 8 %/rok + skladové náklady) — kolik tě ročně stojí, že ta položka jen leží.</p>
+
+        <p style="margin:0 0 6px"><b>4) Markdown (sleva).</b> Podle závažnosti model navrhne slevu: pomalá obrátka <b>15 %</b>, stárnoucí a mrtvá <b>25 %</b> (strop). Sleva se počítá z <b>reálné prodejní ceny e-shopu</b> (🛒), ne z nákladové hodnoty. Náhradní díly se plošně neslevňují (kategorie ND — individuální odprodej). „Objemová sleva" = levná položka s velkým skladem (≥ 100 ks, ≤ 500 Kč/ks) — tam dává smysl množstevní akce místo plošné slevy.</p>
+
+        <p style="margin:0 0 6px"><b>5) Přecenění (NIFO) — sloupec Nová cena/ks a Metoda.</b> Když zadáš C_last (novou nákupní), model spočítá cílovou cenu = <b>C_last × k_inf × (1 + marže 30 %)</b> a rozhodne:</p>
+        <ul style="margin:0 0 8px;padding-left:20px">
+          <li><b>Drží</b> — růst je pod prahem (dead band 2 %): cena se nemění, drobné výkyvy nákupu se nepřenášejí.</li>
+          <li><b>NIFO – cíl nová cena</b> — pomalá obrátka: cílem je rovnou nová cena (zásobu doprodáš za cenu odpovídající příštímu nákupu).</li>
+          <li><b>Vyhlazení (w)</b> — zdravá obrátka: cíl = vážený průměr staré a nové (w = 0,7 → 70 % váhy na nové).</li>
+        </ul>
+        <p style="margin:0 0 6px">K cíli se nejde skokem, ale <b>křivkou zdražení</b> (Parametry modelu): <b>plynulá</b> = max 5 %/měsíc, <b>agresivní</b> = první krok spolkne 60 % mezery, zbytek dojede. Metoda vždy ukáže plán („teď +5 %, cíl 615 Kč za 5 měs."). Dvě pojistky: cena nikdy nezůstane <b>pod novou nákupní</b> (skok na nákupní hned) a sleva u ne-mrtvých položek má <b>dno na úrovni nové nákupní</b>; jen mrtvá zásoba smí pod nákup (likvidace je levnější než držet).</p>
+
+        <p style="margin:0 0 6px"><b>6) Ruční zásahy.</b> Sloupce se symbolem ✎ můžeš přepsat: <b>Sleva %</b> (přebije modelovou), <b>C_last</b> (spustí přecenění), <b>Nová cena</b> (přebije všechno). Přepsané buňky jsou zvýrazněné; hromadný panel dole umí nastavit slevu/cenu pro celý filtr najednou. Model nikdy tvůj zásah tiše nepřepočítá — ruční hodnota platí, dokud ji nesmažeš.</p>
+
+        <p style="margin:0"><b>7) Kam to teče.</b> Tlačítko „Vygenerovat Excel" vytvoří kopii tvého vstupního souboru + listy <b>SMI model</b> (přesně tahle tabulka vč. ručních úprav), <b>Souhrn</b> (KPI + grafy), <b>Kontrola chyb</b> a <b>Parametry</b>. Stejná čísla jedou i do e-mailového reportu „Co zlevnit" a snímky se ukládají do Historie, takže je vidět, jak se markdown vyvíjí mezi kvartály.</p>
+        </div>
+      </details>
       <div class="toolbar"><input type="text" id="modelSearch" placeholder="Hledat položku…" style="min-width:240px"></div>
       <div class="bulkbar">
         <b>Hromadná úprava:</b>
