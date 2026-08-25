@@ -320,6 +320,7 @@ function mount(host) {
   const saveNew = m => { try { fs.writeFileSync(NEW_F, JSON.stringify(m, null, 2)); } catch (_) {} };
   // Důkaz, že položka „žije": měla pohyb, někdo si ji objednal, nebo je objednaná u dodavatele.
   function isNewActive(r, mv) {
+    if (specOf(r.sk)) return false;   // dropship/doprodej neni "nova polozka k objednani"
     // Musi mit platnou nakupni cenu — bez ni to neni zbozi k objednani, ale sluzba
     // („Doprava realizovana cizimi vozidly") nebo nedokoncena kmenova karta.
     if (!((r.unitCost || 0) > 0 || (r.unitPrice || 0) > 0)) return false;
@@ -362,6 +363,26 @@ function mount(host) {
   const onlyActive = rows => { const k = activeKeys(); if (!k.size) return rows || []; const nk = newKeys();
     return (rows || []).filter(r => { const key = r.sk + '-' + r.reg; return k.has(key) || nk.has(key); }); };
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
+  // SK rady, ktere se NENAKUPUJI na sklad (info od nakupu 2026-08-26). Drzet v synchronu
+  // s kopii SPEC_SK v SMI_aplikace.html!
+  //   dropship = zbozi jde primo od dodavatele k zakaznikovi, nikdy se nenaskladnuje
+  //   doprodej = zasoba se vyprodava, nove objednavky se nezakladaji (markdown ano)
+  const SPEC_SK = {
+    '326': { typ: 'dropship', pozn: 'Lanitplast / Lifetime' },
+    '318': { typ: 'dropship', pozn: 'Happyend' },
+    '341': { typ: 'dropship', pozn: 'Profiba' },
+    '376': { typ: 'dropship', pozn: 'TBA' },
+    '192': { typ: 'dropship', pozn: 'Kovobel (v přehledech dříve Lenaerts)' },
+    '403': { typ: 'dropship', pozn: 'Aspera' },
+    '387': { typ: 'dropship', pozn: 'BinBin (NL) — jen na zakázky' },
+    '405': { typ: 'dropship', pozn: 'Diakonie' },
+    '317': { typ: 'dropship', pozn: 'Cervic (ES) — přímo na zakázky od dodavatele' },
+    '369': { typ: 'dropship', pozn: 'Dukin (SI) — napřímo k zákazníkovi' },
+    '364': { typ: 'doprodej', pozn: 'Gardena — leží přes rok, vyprodat' },
+    '388': { typ: 'doprodej', pozn: 'Portimpex — na zkoušku, špatná kvalita, doprodej' },
+  };
+  const specOf = sk => SPEC_SK[String(sk || '').trim()] || null;
+
   // Plny snimek skladu = soubor pokryva aspon polovinu aktivniho sortimentu. Castecne exporty
   // (20260804.xlsx: 364 radku, jen oversold polozky se zapornym skladem) nesmi do bilance ani
   // do pohybu — rozdil proti nim vyrobi fantomovy vydej v milionech (« extrem 5,18 M z 4. 8. »).
@@ -555,6 +576,15 @@ function mount(host) {
     return r;
   }
   function computeOrderRow(x, sales, P, m0) {
+    // Dropshipping / doprodej: tyto SK se na sklad NEOBJEDNAVAJI — zadne doporuceni,
+    // zadne utichle, zadny forward-buy. Prodeje mit mohou (jdou primo od dodavatele).
+    const spec = specOf(x.sk);
+    if (spec) {
+      const Dsp = sales ? sales.reduce((s2, v) => s2 + (v || 0), 0) : 0;
+      return { D: Dsp, rec: 0, status: spec.typ === 'dropship' ? '🚚 dropshipping — nenaskladňuje se' : '🏷 doprodej — neobjednávat',
+        ramp: false, fwd: null, value: 0, coverAfter: 0, spec,
+        utichla: false, vyrazeno: false, dec: null, silentM: 0, utichlaKs: 0, utichlaVal: 0, lastSale: '', pattern: null, missed: 0 };
+    }
     // Nová položka bez kvartální historie: poptávku odhadneme z pozorované denní spotřeby
     // (denní snímky skladu) — plochý průměr, dokud se neobjeví v kvartálním reportu.
     let novaPolozka = false;
@@ -714,7 +744,7 @@ function mount(host) {
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
     const scored = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) }));
-    let list = scored.filter(r => r.o.rec > 0 || r.x.avail < 0);
+    let list = scored.filter(r => r.o.rec > 0 || (r.x.avail < 0 && !r.o.spec));
     // Utichle: hlasime jen ty, ktere by model JINAK objednal — ostatni jsou jen sum.
     // Stejný filtr jako collectUtichle() — rozhodnuté položky se už nepřipomínají.
     const utichle = scored.filter(r => r.o.utichla && r.o.utichlaKs > 0 && !r.o.dec).sort((a, b) => b.o.utichlaVal - a.o.utichlaVal);
@@ -760,6 +790,7 @@ function mount(host) {
         '🔕 <b>' + fmt(utichle.length) + ' položek utichlo</b> (neprodávají 5+ měsíců) — model by je objednal za <b>' + kc(utichleVal) + '</b>, ' +
         'ale <b>nejsou v tomto seznamu</b>. Řeší je samostatný report <i>„Utichlé položky — rozhodnout o vyřazení / potvrzení"</i>.</div>';
     }
+    const specN = scored.filter(r => r.o.spec).length;
     // Souhrn predzasobeni pred zdrazenim — at je v e-mailu videt, kolik se koupi navic a proc.
     let fwdHtml = '';
     const fwdItems = list.filter(r => r.o.fwd);
@@ -780,7 +811,7 @@ function mount(host) {
       ['Co s tím', 'Podklad pro objednávky u dodavatelů. V aplikaci lze u každého dodavatele <b>předat objednávku nákupčímu</b> (modul Požadavky nákupu) nebo stáhnout Excel.']
     ]) +
       '<div style="background:#e7f0fb;border:1px solid #c9dcf0;border-radius:10px;padding:12px 14px;margin:0 0 14px">' +
-      '<b>' + fmt(list.length) + '</b> položek k objednání · celkem <b>' + fmt(totKs) + ' ks</b> (~' + kc(totVal) + ') · <b>' + fmt(oversold) + '</b> oversold (rezervace > sklad). Data ERP: ' + esc(obj.date || obj.source || '') + '.</div>';
+      '<b>' + fmt(list.length) + '</b> položek k objednání · celkem <b>' + fmt(totKs) + ' ks</b> (~' + kc(totVal) + ') · <b>' + fmt(oversold) + '</b> oversold (rezervace > sklad)' + (specN ? ' · <b>' + fmt(specN) + '</b> dropshipping/doprodej (neobjednává se)' : '') + '. Data ERP: ' + esc(obj.date || obj.source || '') + '.</div>';
     sups.forEach(g => {
       body += '<h3 style="margin:16px 0 4px;font-size:15px">' + esc(g.sup) + ' <span style="color:#8a938a;font-weight:400;font-size:13px">· ' + g.items.length + ' pol. · ' + kc(g.val) + '</span></h3>' +
         '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
@@ -976,7 +1007,7 @@ function mount(host) {
       const rows = (o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
       try { detectNew(o.rows); } catch (_) {}
       json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup(),
-        noveKlice: Object.keys(loadNew()), rozhodnuti: loadDec(), platnostM: DEC_PLATNOST_M }));
+        noveKlice: Object.keys(loadNew()), rozhodnuti: loadDec(), platnostM: DEC_PLATNOST_M, specialSk: SPEC_SK }));
       return true;
     }
     // Prodejní ceny e-shopu (export Shop.CZ feedu, commitnutý v kořeni jako eshop-ceny.json).

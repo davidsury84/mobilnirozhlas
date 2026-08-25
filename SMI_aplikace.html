@@ -968,6 +968,28 @@ function applyPeriodTags(){
   }
 }
 
+// SK řady, které se NENAKUPUJÍ na sklad (info od nákupu 2026-08-26). Držet v synchronu
+// s kopií SPEC_SK v nakup-report/index.js!
+//   dropship = zboží jde přímo od dodavatele k zákazníkovi, nikdy se nenaskladňuje
+//   doprodej = zásoba se vyprodává, nové objednávky se nezakládají (markdown ano)
+const SPEC_SK={
+  '326':{typ:'dropship',pozn:'Lanitplast / Lifetime'},
+  '318':{typ:'dropship',pozn:'Happyend'},
+  '341':{typ:'dropship',pozn:'Profiba'},
+  '376':{typ:'dropship',pozn:'TBA'},
+  '192':{typ:'dropship',pozn:'Kovobel (v přehledech dříve Lenaerts)'},
+  '403':{typ:'dropship',pozn:'Aspera'},
+  '387':{typ:'dropship',pozn:'BinBin (NL) — jen na zakázky'},
+  '405':{typ:'dropship',pozn:'Diakonie'},
+  '317':{typ:'dropship',pozn:'Cervic (ES) — přímo na zakázky od dodavatele'},
+  '369':{typ:'dropship',pozn:'Dukin (SI) — napřímo k zákazníkovi'},
+  '364':{typ:'doprodej',pozn:'Gardena — leží přes rok, vyprodat'},
+  '388':{typ:'doprodej',pozn:'Portimpex — na zkoušku, špatná kvalita, doprodej'},
+};
+function specOf(sk){return SPEC_SK[String(sk||'').trim()]||null;}
+function specBadge(sk){const s=specOf(sk);if(!s)return '';
+  return ' <span title="'+esc(s.pozn)+'" style="cursor:help">'+(s.typ==='dropship'?'\u{1F69A}':'\u{1F3F7}')+'</span>';}
+
 // ---- prodejní ceny z e-shopu (export Shop.CZ feedu, servíruje intranet) ----
 // Markdown a přecenění se počítá z REÁLNÉ prodejní ceny e-shopu. Průměrná skladová
 // hodnota (unitPrice = BB/BA) je NÁKUPNÍ základ — sleva z ní počítaná je nesmysl;
@@ -1203,7 +1225,7 @@ function renderPrice(){
       :`<span class="muted" title="Položka není na e-shopu — odhad z průměrné skladové (nákupní) hodnoty">~ ${fmt(r.unitPrice,1)}</span>`;
     const mrz=(r.eshopPrice!=null&&r.unitPrice)?(r.eshopPrice-r.unitPrice)/r.eshopPrice:null;
     const mrzCell=mrz==null?'—':`<span${mrz<0?' class="sev-err" title="Prodává se POD nákupní cenou"':''}>${Math.round(mrz*100)} %</span>`;
-    return `<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${cenaCell}</td><td class="num">${mrzCell}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num"><b>${fmt(r.newPrice,1)}</b></td><td class="num ${cls}">${a} ${d==null?'—':fmt(Math.abs(d),1)}</td><td>${esc(r.action)}</td></tr>`;}).join('')+`</tbody>`;
+    return `<tr><td>${esc(r.name)}${specBadge(r.sk)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${cenaCell}</td><td class="num">${mrzCell}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num"><b>${fmt(r.newPrice,1)}</b></td><td class="num ${cls}">${a} ${d==null?'—':fmt(Math.abs(d),1)}</td><td>${esc(r.action)}</td></tr>`;}).join('')+`</tbody>`;
 }
 function renderDead(){
   const q=$('#deadSearch').value.toLowerCase(),f=$('#deadFilter').value;
@@ -1212,14 +1234,14 @@ function renderDead(){
   rows=rows.filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q));
   const o={A:0,B:1,C:2,'-':3};rows.sort((a,b)=>o[a.prio]-o[b.prio]||(b.BB||0)-(a.BB||0));
   $('#deadTbl').innerHTML=`<thead><tr><th>Priorita</th><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Měs. bez prodeje</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th class="num">Roční ICC</th><th class="num">Sleva</th><th class="num">Cena → nová</th><th>Akce</th></tr></thead><tbody>`+
-    rows.map(r=>`<tr><td>${prioPill(r.prio)}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${fmt(r.iccCost)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${r.eshopPrice!=null?`<span class="eshop-src" title="Reálná prodejní cena z e-shopu">🛒 ${fmt(r.eshopPrice,1)}</span>`:`<span class="muted" title="Není na e-shopu — odhad z nákladové hodnoty">~ ${fmt(r.unitPrice,1)}</span>`} → <b>${fmt(r.newPrice,1)}</b></td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
+    rows.map(r=>`<tr><td>${prioPill(r.prio)}</td><td>${esc(r.name)}${specBadge(r.sk)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${fmt(r.iccCost)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${r.eshopPrice!=null?`<span class="eshop-src" title="Reálná prodejní cena z e-shopu">🛒 ${fmt(r.eshopPrice,1)}</span>`:`<span class="muted" title="Není na e-shopu — odhad z nákladové hodnoty">~ ${fmt(r.unitPrice,1)}</span>`} → <b>${fmt(r.newPrice,1)}</b></td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
   if(!rows.length)$('#deadTbl').innerHTML+='<tbody><tr><td colspan="11" class="muted" style="padding:18px">Žádné položky.</td></tr></tbody>';
 }
 function renderAll(){
   const q=$('#allSearch').value.toLowerCase();
   let rows=ROWS.filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q)||String(r.sk||'').includes(q));
   $('#allTbl').innerHTML=`<thead><tr><th>SK</th><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Bez prodeje</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th>Priorita</th><th class="num">Sleva</th><th class="num">Nová cena</th><th>Akce</th></tr></thead><tbody>`+
-    rows.slice(0,2000).map(r=>`<tr><td class="muted">${r.sk??''}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td>${prioPill(r.prio)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${fmt(r.newPrice,1)}</td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
+    rows.slice(0,2000).map(r=>`<tr><td class="muted">${r.sk??''}</td><td>${esc(r.name)}${specBadge(r.sk)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td>${prioPill(r.prio)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${fmt(r.newPrice,1)}</td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
 }
 function renderModel(){
   const q=$('#modelSearch').value.toLowerCase();
@@ -2216,6 +2238,14 @@ async function utRozhodni(key,stav){
   }catch(e){alert('Nepovedlo se uložit: '+e.message);}
 }
 function objComputeOrder(x,sales,P,m0,sea,dem){
+  // Dropshipping / doprodej: neobjednává se na sklad — žádné doporučení, utichlé ani forward-buy.
+  const spec=specOf(x.sk);
+  if(spec){
+    const Dsp=sales?sales.reduce((s,v)=>s+(v||0),0):0;
+    return {D:Dsp,rec:0,status:spec.typ==='dropship'?'\u{1F69A} Dropshipping — nenaskladňuje se':'\u{1F3F7} Doprodej — neobjednávat',
+      ramp:false,nova:false,fwd:null,value:0,windowDem:0,coverAfter:0,spec,
+      utichla:false,vyrazeno:false,dec:null,silentM:0,utichlaKs:0,utichlaVal:0,lastSale:'',pattern:null};
+  }
   // Nova polozka (neni v kvartalnim prehledu): poptavka z pozorovane denni spotreby, min. 10 dnu,
   // a opatrnejsi kryti — lhuta + 1 mesic misto + 2.
   let nova=false;
@@ -2405,10 +2435,10 @@ async function renderObjednavky(){
 function objDraw(){
   const rows=(OBJ_DATA&&OBJ_DATA.rows)||[];
   const q=($('#objSearch').value||'').toLowerCase().trim(),sup=$('#objSup').value,only=$('#objOnly').checked;
-  let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||(x.avail||0)<0));
-  const toOrder=rows.filter(x=>x._o.rec>0),oversold=rows.filter(x=>(x.avail||0)<0);
+  let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||((x.avail||0)<0&&!x._o.spec)));
+  const toOrder=rows.filter(x=>x._o.rec>0),oversold=rows.filter(x=>(x.avail||0)<0&&!x._o.spec),specRows=rows.filter(x=>x._o.spec);
   const totVal=toOrder.reduce((s,x)=>s+x._o.value,0),supsOrder=new Set(toOrder.map(x=>x.skupina)).size;
-  $('#objKpis').innerHTML=[['',fmt(rows.length),'Položek v ERP'],['warn',fmt(toOrder.length),'K objednání'],['err',fmt(oversold.length),'Oversold (K dispo < 0)'],['',fmt(totVal)+' Kč','Hodnota objednávek'],['',fmt(supsOrder),'Dodavatelů']]
+  $('#objKpis').innerHTML=[['',fmt(rows.length),'Položek v ERP'],['warn',fmt(toOrder.length),'K objednání'],['err',fmt(oversold.length),'Oversold (K dispo < 0)'],['',fmt(specRows.length),'Dropship / doprodej'],['',fmt(totVal)+' Kč','Hodnota objednávek'],['',fmt(supsOrder),'Dodavatelů']]
     .map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
   // Utichlé položky — model by je objednal, ale v prodejní historii už dlouho mlčí. Na ověření.
   const utichle=rows.filter(x=>x._o&&x._o.utichla&&x._o.utichlaKs>0&&!x._o.dec).sort((a,b)=>b._o.utichlaVal-a._o.utichlaVal);
