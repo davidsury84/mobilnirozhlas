@@ -371,7 +371,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
         <p style="margin:0 0 10px"><b>SMI model je jádro celé aplikace</b> — tabulka, kde má každá položka sortimentu (1 066 SKU z kvartálního přehledu „obrat plasty") jeden řádek a kde se potkávají všechny výpočty: klasifikace zásoby, doporučená sleva (markdown) a nová prodejní cena. Všechny ostatní záložky ve skupině Ceny jsou jen filtrované pohledy na tento model: <b>Nové ceny</b> = položky se změnou ceny, <b>Mrtvé zásoby</b> = položky s klasifikací stárnoucí/mrtvá, <b>Chyby</b> = položky s podezřelými daty. Co tady upravíš, propíše se všude — i do exportovaného Excelu.</p>
 
-        <p style="margin:0 0 6px"><b>1) Odkud bere data.</b> Prodejní historie po měsících, stav skladu (Sklad ks) a hodnota zásoby v nákladových cenách (Hodnota Kč) jdou z „obrat plasty" (klouzavých 12 měsíců z ERP). Reálné prodejní ceny jdou z exportu e-shopu (🛒; položky mimo e-shop mají odhad ~). Novou nákupní cenu <b>C_last</b> zadáváš ručně — je to tvůj vstup „za kolik budu nakupovat příště" (např. po ohlášeném zdražení dodavatele).</p>
+        <p style="margin:0 0 6px"><b>1) Odkud bere data.</b> Prodejní historie po měsících, stav skladu (Sklad ks) a hodnota zásoby v nákladových cenách (Hodnota Kč) jdou z „obrat plasty" (klouzavých 12 měsíců z ERP). Reálné prodejní ceny jdou z exportu e-shopu (🛒; položky mimo e-shop mají odhad ~). Novou nákupní cenu <b>C_last</b> zadáváš ručně — je to tvůj vstup „za kolik budu nakupovat příště" (např. po ohlášeném zdražení dodavatele). <b>Sklad ks a Hodnota Kč jedou živě z denního ERP exportu</b> (zelený badge nahoře ukazuje datum) — doprodaná položka tedy z mrtvých zásob zmizí hned, ne až s příštím kvartálem; položky mimo denní export zůstávají na kvartálním stavu.</p>
 
         <p style="margin:0 0 6px"><b>2) Klasifikace každé položky.</b> Model se dívá na dvě věci a bere HORŠÍ z nich:</p>
         <table style="border-collapse:collapse;font-size:12.5px;margin:0 0 8px"><tr style="color:var(--mut)"><th style="text-align:left;padding:2px 12px 2px 0">Kategorie</th><th style="text-align:left;padding:2px 12px 2px 0">Obrátka (měsíců bez prodeje)</th><th style="text-align:left;padding:2px 0">Krytí (měsíců zásoby = sklad ÷ ø měsíční prodej)</th></tr>
@@ -1075,6 +1075,15 @@ function recalc(){
     for(let k=0;k<12;k++){const ci2=((_anchor-k)%12+12)%12;if(it.sales[ci2]!=null&&it.sales[ci2]>0){_lastMo=ci2+1;break;}_gap++;}
     it.lastMonth=_lastMo;it.monthsNoSale=_lastMo===0?12:_gap;
     // Dlouhodobý horizont: krytí zásobou = měsíce zásoby (stav ÷ ø měsíční prodej). 240 ks při 2/rok = ~1458 měs = přeskladněno.
+    // ZIVY SKLAD: kdyz je polozka v dennim ERP exportu, Sklad ks (AZ) a Hodnota Kc (BB)
+    // jedou zivě (BB = zivy pocet × prumerna kvartalni cena/ks; fallback denni landed cena).
+    // Prodejni historie a prumerna cena zustavaji kvartalni. Originaly drzime v it._q,
+    // aby byl prepocet idempotentni (recalc bezi opakovane).
+    if(it._q==null)it._q={AZ:it.AZ,BB:it.BB};
+    const _lv=(LIVE_STOCK&&LIVE_STOCK.map)?LIVE_STOCK.map[String(it.sk)+'-'+String(it.reg)]:null;
+    const _unitQ=(it._q.BB&&it.BA)?it._q.BB/it.BA:null;
+    if(_lv){ it.AZ=_lv.stock; it.BB=_lv.stock*(_unitQ!=null?_unitQ:(_lv.cost||0)); it.liveStock=true; }
+    else { it.AZ=it._q.AZ; it.BB=it._q.BB; it.liveStock=false; }
     const _annual=it.sales.reduce((s,v)=>s+(v>0?v:0),0), _mps=_annual/12;
     it.coverMonths=(it.AZ==null||it.AZ<=0)?0:(_mps>0?it.AZ/_mps:Infinity);
     it.nd=isND(it.name);
@@ -1092,7 +1101,7 @@ function recalc(){
     else if(_sev>=2&&it.BB>=10000)it.prio='B';
     else if(_sev>=1)it.prio='C';else it.prio='-';
     it.iccCost=(it.AZ==null||it.AZ<=0)?0:(it.BB||0)*P.icc;
-    it.unitPrice=(it.BB&&it.BA)?it.BB/it.BA:(it.BD&&it.BC?it.BD/it.BC:null);
+    it.unitPrice=(it._q.BB&&it.BA)?it._q.BB/it.BA:(it.BD&&it.BC?it.BD/it.BC:null);   // prumerna cena/ks z kvartalu (zivy BB by ji zkreslil)
     it.realPrice=(it.BD&&it.BC)?it.BD/it.BC:null;
     const _er=eshopRec(it);
     it.eshopPrice=_er&&_er.prodejniBezDph>0?_er.prodejniBezDph:null;
@@ -1203,8 +1212,12 @@ async function ensureModelSup(){
   MODEL_SUP_LOADING=true;
   try{
     let rows=(OBJ_DATA&&(OBJ_DATA.allRows||OBJ_DATA.rows))||null;
-    if(!rows){const r=await fetch('/api/nakup-report/objednavky',{cache:'no-store'});const d=await r.json();rows=d.rows||[];}
-    MODEL_SUP={};rows.forEach(x=>{MODEL_SUP[String(x.sk)+'-'+String(x.reg)]=x.skupina||'';});
+    let liveDate=(OBJ_DATA&&OBJ_DATA.date)||'';
+    if(!rows){const r=await fetch('/api/nakup-report/objednavky',{cache:'no-store'});const d=await r.json();rows=d.rows||[];liveDate=d.date||'';}
+    MODEL_SUP={};LIVE_STOCK={map:{},date:liveDate};
+    rows.forEach(x=>{const k=String(x.sk)+'-'+String(x.reg);MODEL_SUP[k]=x.skupina||'';
+      LIVE_STOCK.map[k]={stock:+x.stock||0,cost:(x.unitCost>0?x.unitCost:(+x.unitPrice||0))};});
+
     const sel=$('#modelSup');
     if(sel){
       const sups=[...new Set(ROWS.map(r=>MODEL_SUP[String(r.sk)+'-'+String(r.reg)]||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b,'cs'));
@@ -1213,8 +1226,21 @@ async function ensureModelSup(){
         +'<option value="__bez__">— mimo denní export —</option>';
       sel.onchange=renderModel;
     }
+    // Zivy sklad je nacteny → prepocitat cely model a ukazat badge se zdrojem.
+    if(ROWS.length){try{recalc();renderErr();renderPrice();renderDead();renderModel();renderSouhrn();}catch(e){}}
+    liveStockBadge();
   }catch(e){}
   MODEL_SUP_LOADING=false;
+}
+let LIVE_STOCK=null;
+function liveStockBadge(){
+  const b0=document.getElementById('eshopBadge'); if(!b0)return;
+  let b=document.getElementById('liveBadge');
+  if(!b){b=document.createElement('span');b.id='liveBadge';
+    b.style.cssText='margin-left:10px;background:#e9f6ec;border:1px solid #bfe0c8;border-radius:8px;padding:3px 10px;font-size:12px;color:#12561f';
+    b0.after(b);}
+  const n=ROWS.filter(r=>r.liveStock).length;
+  b.innerHTML='📦 Sklad: <b>živě z denního exportu '+esc((LIVE_STOCK&&LIVE_STOCK.date)||'?')+'</b> · '+n+' z '+ROWS.length+' položek <span class="muted">(zbytek k závěru kvartálu)</span>';
 }
 function renderModel(){
   const q=$('#modelSearch').value.toLowerCase();
@@ -3566,6 +3592,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   }
   try{ await histInit(); }catch(e){}   // historie ze serveru (sdílená) + případná migrace z prohlížeče
   try{ loadEshopCeny(); }catch(e){}    // prodejní ceny z exportu e-shopu (markdown počítá z nich, ne z nákupních)
+  try{ ensureModelSup(); }catch(e){}   // živý sklad + skupiny z denního ERP exportu (model je promítne hned)
   try{ renderVyvojEshop(); }catch(e){}  // první záložka = přehled vývoje e-shopu
 });
 </script>
