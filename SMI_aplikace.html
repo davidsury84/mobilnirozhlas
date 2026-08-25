@@ -398,7 +398,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <p style="margin:0"><b>7) Kam to teče.</b> Tlačítko „Vygenerovat Excel" vytvoří kopii tvého vstupního souboru + listy <b>SMI model</b> (přesně tahle tabulka vč. ručních úprav), <b>Souhrn</b> (KPI + grafy), <b>Kontrola chyb</b> a <b>Parametry</b>. Stejná čísla jedou i do e-mailového reportu „Co zlevnit" a snímky se ukládají do Historie, takže je vidět, jak se markdown vyvíjí mezi kvartály.</p>
         </div>
       </details>
-      <div class="toolbar"><input type="text" id="modelSearch" placeholder="Hledat položku…" style="min-width:240px"></div>
+      <div class="toolbar"><input type="text" id="modelSearch" placeholder="Hledat položku…" style="min-width:240px"><select id="modelSup" title="Skupina výrobků = dodavatel z denního ERP exportu"><option value="">Všechny skupiny</option></select></div>
       <div class="bulkbar">
         <b>Hromadná úprava:</b>
         <select id="bulkAction">
@@ -1195,9 +1195,35 @@ function renderDead(){
     rows.map(r=>`<tr><td>${prioPill(r.prio)}</td><td>${esc(r.name)}${specBadge(r.sk)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${fmt(r.iccCost)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${r.eshopPrice!=null?`<span class="eshop-src" title="Reálná prodejní cena z e-shopu">🛒 ${fmt(r.eshopPrice,1)}</span>`:`<span class="muted" title="Není na e-shopu — odhad z nákladové hodnoty">~ ${fmt(r.unitPrice,1)}</span>`} → <b>${fmt(r.newPrice,1)}</b></td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
   if(!rows.length)$('#deadTbl').innerHTML+='<tbody><tr><td colspan="11" class="muted" style="padding:18px">Žádné položky.</td></tr></tbody>';
 }
+// Skupiny vyrobku (dodavatele) pro filtr v SMI modelu — z denniho ERP exportu (sk-reg → skupina).
+// Nacita se lazy pri prvnim otevreni zalozky; polozky mimo denni export = "— mimo denní export —".
+let MODEL_SUP=null,MODEL_SUP_LOADING=false;
+async function ensureModelSup(){
+  if(MODEL_SUP||MODEL_SUP_LOADING)return;
+  MODEL_SUP_LOADING=true;
+  try{
+    let rows=(OBJ_DATA&&(OBJ_DATA.allRows||OBJ_DATA.rows))||null;
+    if(!rows){const r=await fetch('/api/nakup-report/objednavky',{cache:'no-store'});const d=await r.json();rows=d.rows||[];}
+    MODEL_SUP={};rows.forEach(x=>{MODEL_SUP[String(x.sk)+'-'+String(x.reg)]=x.skupina||'';});
+    const sel=$('#modelSup');
+    if(sel){
+      const sups=[...new Set(ROWS.map(r=>MODEL_SUP[String(r.sk)+'-'+String(r.reg)]||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b,'cs'));
+      sel.innerHTML='<option value="">Všechny skupiny ('+ROWS.length+')</option>'
+        +sups.map(s=>'<option>'+esc(s)+'</option>').join('')
+        +'<option value="__bez__">— mimo denní export —</option>';
+      sel.onchange=renderModel;
+    }
+  }catch(e){}
+  MODEL_SUP_LOADING=false;
+}
 function renderModel(){
   const q=$('#modelSearch').value.toLowerCase();
   let rows=ROWS.map((r,i)=>({r,i})).filter(o=>(o.r.name||'').toLowerCase().includes(q)||String(o.r.ident||'').includes(q)||String(o.r.sk||'').includes(q));
+  const supSel=($('#modelSup')||{}).value||'';
+  if(supSel&&MODEL_SUP){
+    rows=rows.filter(o=>{const g=MODEL_SUP[String(o.r.sk)+'-'+String(o.r.reg)]||'';
+      return supSel==='__bez__'?!g:g===supSel;});
+  }
   const head=['SK','Identifikátor','Název 1','Posl. měsíc','Měs. bez prodeje','Kategorie','Sklad ks','Hodnota Kč','✎ Sleva %','Akce','Priorita','Roční ICC (Kč)','Komentář','✎ C_last','w','Marže','✎ Nová cena/ks','Metoda přecenění'];
   $('#modelTbl').innerHTML=`<thead><tr>${head.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`+
     rows.slice(0,1500).map(o=>{const r=o.r;const dOv=r.discOv!=null,pOv=r.priceOv!=null;
@@ -1275,7 +1301,7 @@ function renderParam(){
     `<span class="muted">Náklady skladu a kapitálovou sazbu zadáš v záložce 📦 Optimalizace nákupu (předvyplněno z reálných dat – doplňkové/skladové náklady 2025). „Odhad ročního ICC" položky = průměrná hodnota zásoby (Kč) × ICC. Tutéž sazbu používá i Optimalizace nákupu (efektivní sazba držení).</span>`;
 }
 const PANE_TBL={chyby:'errTbl',ceny:'priceTbl',mrtve:'deadTbl',model:'modelTbl',elko:'elkoTbl',seg:'csSalesTbl'};
-$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='vyvojeshop')renderVyvojEshop();if(pane==='historie'){renderHistory();refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='objednavky')renderObjednavky();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
+$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='model')ensureModelSup();if(pane==='vyvojeshop')renderVyvojEshop();if(pane==='historie'){renderHistory();refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='objednavky')renderObjednavky();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
 const _bulkBtn=$('#bulkApply');if(_bulkBtn)_bulkBtn.onclick=bulkApply;
 
 /* ===== Požadavek nákupčímu — E-shop žádá o objednání N kusů (→ intranet /api/pozadavky) ===== */
