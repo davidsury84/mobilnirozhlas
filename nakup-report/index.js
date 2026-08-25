@@ -35,7 +35,7 @@ function mount(host) {
     return Object.values(g).map(x => {
       const ls = x.leads.slice().sort((a, b) => a - b), med = ls.length ? ls[Math.floor(ls.length / 2)] : 0;
       const s = saved[x.supplier] || {};
-      return { supplier: x.supplier, items: x.items, erpLead: med, stockVal: Math.round(x.stockVal), lead: (s.lead != null ? s.lead : null), shipCost: (s.shipCost != null ? s.shipCost : null), origin: s.origin || '' };
+      return { supplier: x.supplier, items: x.items, erpLead: med, stockVal: Math.round(x.stockVal), lead: (s.lead != null ? s.lead : null), shipCost: (s.shipCost != null ? s.shipCost : null), origin: s.origin || '', zdrazeniPct: (s.zdrazeniPct != null ? s.zdrazeniPct : null), zdrazeniOd: s.zdrazeniOd || null };
     }).sort((a, b) => b.stockVal - a.stockVal);
   }
 
@@ -297,7 +297,7 @@ function mount(host) {
       lead: +c.lead || 30, slow: +c.slow || 4, aging: +c.aging || 7, dead: +c.dead || 10,
       covslow: +c.covslow || 12, covaging: +c.covaging || 24, covdead: +c.covdead || 48,
       d1: c.d1 != null ? +c.d1 : 0.15, d2: c.d2 != null ? +c.d2 : 0.25,
-      cover: +c.cover || 2, Z: +c.Z || 1.65, MOQ: +c.MOQ || 1, topN: +c.topN || 40
+      cover: +c.cover || 2, Z: +c.Z || 1.65, MOQ: +c.MOQ || 1, holdM: (c.holdM != null ? +c.holdM : 2), topN: +c.topN || 40
     };
   }
   function saveCfg(c) { try { fs.writeFileSync(CFG_F, JSON.stringify(c, null, 2)); } catch (e) { console.error('[nakup-report] zápis config:', e.message); } }
@@ -594,6 +594,26 @@ function mount(host) {
     // Vyjimky: oversold (zakaznici uz maji rezervovano -> poptavka je realna a objednavka povinna),
     // nova polozka (nema kvartalni historii, jede z dennich pohybu) a polozka, ktera se hybe
     // v DENNICH pohybech — ta je ziva bez ohledu na to, co rika starsi kvartalni report.
+    // Predzasobeni pred ohlasenym zdrazenim dodavatele (dotaznik): aktivace <=3 mesice pred datem,
+    // navic zasoba na E = min(6, zdrazeni% / drzeni%/mes) mesicu po zdrazeni (drzeni default 2 %/mes).
+    let fwd = null;
+    const supC = loadSup()[x.skupina];
+    if (supC && +supC.zdrazeniPct > 0 && supC.zdrazeniOd && D > 0 && (x.avail || 0) >= 0) {
+      const mUntil = (new Date(supC.zdrazeniOd) - Date.now()) / 2592000000;
+      if (mUntil > 0 && mUntil <= 3) {
+        const holdMes = (P.holdM != null ? P.holdM : 2);
+        const E = Math.min(6, Math.max(0, +supC.zdrazeniPct / Math.max(0.1, holdMes)));
+        if (mUntil + E > windowM) {
+          const fwdNeed = Math.round(sd(mUntil + E) - position);
+          if (fwdNeed > rec) {
+            const navic = fwdNeed - rec;
+            rec = fwdNeed;
+            status = '💰 předzásobit před zdražením +' + supC.zdrazeniPct + ' % (od ' + supC.zdrazeniOd + ')';
+            fwd = { pct: +supC.zdrazeniPct, od: supC.zdrazeniOd, navic, uspora: Math.round(navic * ((x.unitCost > 0 ? x.unitCost : (x.unitPrice || 0))) * supC.zdrazeniPct / 100) };
+          }
+        }
+      }
+    }
     const mvE = movesCached()[x.sk + '-' + x.reg];
     const silentM = novaPolozka ? 0 : monthsSilent(sales);
     const dec = decFor(x.sk + '-' + x.reg);
@@ -610,7 +630,7 @@ function mount(host) {
     if (vyrazeno) { utichlaKs = rec; rec = 0; status = 'vyřazeno (rozhodnutí nákupu)'; }
     else if (utichla) { utichlaKs = rec; rec = 0; status = 'utichlo — rozhodnout'; }
     const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, dem, m0);
-    return { D, rec, status, ramp, value: unitC * rec, coverAfter,
+    return { D, rec, status, ramp, fwd, value: unitC * rec, coverAfter,
       utichla, vyrazeno, dec: dec || null, silentM, utichlaKs, utichlaVal: unitC * utichlaKs,
       lastSale: (utichla || vyrazeno) ? lastSaleTxt(sales) : '',
       pattern: (utichla || vyrazeno) ? salesPattern(sales) : null, missed };
@@ -620,7 +640,7 @@ function mount(host) {
   function collectUtichle(cfg) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
-    const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1 };
+    const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
     const out = onlyActive(obj.rows)
       .map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) }))
       // Rozhodnuté položky už do seznamu nepatří: 'vyrazeno' je vyřízené, 'potvrzeno' vypne
@@ -692,7 +712,7 @@ function mount(host) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
     try { detectNew(obj.rows); } catch (_) {}   // NEJDRIV detekce novych, at se dostanou i do doporuceni
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
-    const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1 };
+    const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
     const scored = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) }));
     let list = scored.filter(r => r.o.rec > 0 || r.x.avail < 0);
     // Utichle: hlasime jen ty, ktere by model JINAK objednal — ostatni jsou jen sum.
@@ -740,7 +760,18 @@ function mount(host) {
         '🔕 <b>' + fmt(utichle.length) + ' položek utichlo</b> (neprodávají 5+ měsíců) — model by je objednal za <b>' + kc(utichleVal) + '</b>, ' +
         'ale <b>nejsou v tomto seznamu</b>. Řeší je samostatný report <i>„Utichlé položky — rozhodnout o vyřazení / potvrzení"</i>.</div>';
     }
-    let body = noveHtml + utichleHtml + explainBox([
+    // Souhrn predzasobeni pred zdrazenim — at je v e-mailu videt, kolik se koupi navic a proc.
+    let fwdHtml = '';
+    const fwdItems = list.filter(r => r.o.fwd);
+    if (fwdItems.length) {
+      const navicVal = fwdItems.reduce((s2, r) => s2 + r.o.fwd.navic * ((r.x.unitCost > 0 ? r.x.unitCost : (r.x.unitPrice || 0))), 0);
+      const uspora = fwdItems.reduce((s2, r) => s2 + r.o.fwd.uspora, 0);
+      fwdHtml = '<div style="background:#e9f6ec;border:1px solid #bfe0c8;border-radius:10px;padding:12px 14px;margin:0 0 16px">' +
+        '<b>💰 ' + fmt(fwdItems.length) + ' položek se předzásobuje před ohlášeným zdražením</b> — nákup navíc za ' + kc(navicVal) +
+        ' při starých cenách, odhad úspory <b>' + kc(uspora) + '</b>. Zdražení je zadané v dotazníku dodavatelů (procento + od kdy); ' +
+        'nakupuje se navíc jen tolik, kolik se vyplatí proti nákladu na držení zásoby.</div>';
+    }
+    let body = noveHtml + fwdHtml + utichleHtml + explainBox([
       ['Co to je', 'Seznam <b>co objednat u dodavatelů</b>, spočítaný z aktuálního stavu skladu (ERP) a historie prodejů. Seskupeno <b>podle dodavatele</b> a seřazeno podle hodnoty objednávky.'],
       ['Jak počítáme „Objednat"', 'Cílem je mít na skladě zásobu na <b>dodací lhůtu + ' + (cfg.cover || 2) + ' měsíce</b>. Objednat = tato cílová poptávka − (co je <i>k dispozici</i> + co už je <i>objednáno</i>). Poptávka je <b>sezónní</b> (počítá se dopředu od aktuálního měsíce) a <b>robustní</b> — jednorázové výkyvy (velká jednorázová zakázka) se do ní nezapočítávají.'],
       ['Zvláštní případy', '<b style="color:#b23">Oversold</b> (červeně) = zákazníci mají rezervováno víc, než je skladem → objednávka je <b>povinná</b> (vykrytí objednávek). <b>Náběh sezóny</b> = předzásobení na nadcházející špičku s předstihem o dodací lhůtu. Řídce prodávané položky jedou na plochém průměru (ne na falešné špičce).'],
@@ -759,7 +790,7 @@ function mount(host) {
         g.items.map(r => '<tr' + (r.x.avail < 0 ? ' style="background:#fbeaea"' : '') + '><td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.sk + '-' + r.x.reg) + '</td>' +
           '<td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.nazev) + '</td>' +
           cellR(fmt(r.x.stock)) + cellR((r.x.avail < 0 ? '<b style="color:#b23">' : '') + fmt(r.x.avail) + (r.x.avail < 0 ? '</b>' : '')) + cellR(fmt(r.x.onOrder)) + cellR(fmt(r.x.lead)) + cellR(fmt(r.o.D)) +
-          cellR('<b>' + fmt(r.o.rec) + '</b>') + cellR(covTxt(r.o.coverAfter)) + cellR(r.o.value ? kc(r.o.value) : '—') + '</tr>').join('') + '</tbody></table>';
+          cellR((r.o.fwd ? '<span title="Předzásobení před zdražením +' + r.o.fwd.pct + ' % od ' + r.o.fwd.od + ' (+' + fmt(r.o.fwd.navic) + ' ks navíc)">💰</span> ' : '') + '<b>' + fmt(r.o.rec) + '</b>') + cellR(covTxt(r.o.coverAfter)) + cellR(r.o.value ? kc(r.o.value) : '—') + '</tr>').join('') + '</tbody></table>';
     });
     return { subject: 'Objednávkový report (ERP) — co objednat · ' + (obj.date || ''), html: wrap('Co objednat (ERP × prodeje)', 'Položky pod bodem objednání, seskupené dle dodavatele', body, obj.date || obj.source || '—'), count: list.length, totVal, utichle: utichle.length, utichleVal };
   }
@@ -1066,6 +1097,8 @@ function mount(host) {
           if (v.lead !== '' && v.lead != null && isFinite(+v.lead)) e.lead = Math.max(0, Math.round(+v.lead));
           if (v.shipCost !== '' && v.shipCost != null && isFinite(+v.shipCost)) e.shipCost = Math.max(0, Math.round(+v.shipCost));
           if (v.origin) e.origin = String(v.origin).slice(0, 40);
+          if (v.zdrazeniPct !== '' && v.zdrazeniPct != null && isFinite(+v.zdrazeniPct) && +v.zdrazeniPct > 0) e.zdrazeniPct = Math.min(100, Math.round(+v.zdrazeniPct));
+          if (v.zdrazeniOd && /^\d{4}-\d{2}-\d{2}$/.test(String(v.zdrazeniOd))) e.zdrazeniOd = String(v.zdrazeniOd);
           if (Object.keys(e).length) cur[k] = e; else delete cur[k];
         });
         saveSup(cur);
