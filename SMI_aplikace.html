@@ -166,6 +166,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .grp{background:rgba(14,138,67,.10);font-weight:600}
   .tot{background:rgba(14,138,67,.16);font-weight:700}
 .eshop-src{background:#fff7e6;border-radius:5px;padding:1px 5px;white-space:nowrap}
+.tabgrp{align-self:center;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:0 2px 0 12px;font-weight:800;white-space:nowrap}
 </style>
 <script>
 /* Napojení na barevný motiv intranetu (sdílený localStorage, stejná doména) */
@@ -269,23 +270,21 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     </div>
 
     <div class="tabs">
-      <div class="tab active" data-pane="vyvojeshop">📊 Vývoj e-shopu</div>
-      <div class="tab" data-pane="chyby">🚩 Chyby <span class="badge" id="b_err">0</span></div>
-      <div class="tab" data-pane="ceny">💲 Nové ceny <span class="badge" id="b_price">0</span></div>
-      <div class="tab" data-pane="meva">🏷 MEVA <span class="badge" id="b_meva">–</span></div>
-      <div class="tab" data-pane="mrtve">☠ Mrtvé zásoby <span class="badge" id="b_dead">0</span></div>
-      <div class="tab" data-pane="vse">📋 Vše <span class="badge" id="b_all">0</span></div>
-      <div class="tab" data-pane="model">📄 List: SMI model</div>
-      <div class="tab" data-pane="souhrn">📄 List: Souhrn</div>
-      <div class="tab" data-pane="param">📄 List: Parametry</div>
-      <div class="tab" data-pane="historie">📈 Historie</div>
-      <div class="tab" data-pane="vyvoj">🔎 Vývoj položky</div>
-      <div class="tab" data-pane="seg">📊 Segmentační analýza</div>
-      <div class="tab" data-pane="pokryti">🗓 Měsíční pokrytí</div>
-      <div class="tab" data-pane="elko">🛒 Elkoplast</div>
+      <span class="tabgrp">Provoz</span><div class="tab active" data-pane="vyvojeshop">📊 Vývoj e-shopu</div>
       <div class="tab" data-pane="objednavky">📦 Optimalizace nákupu</div>
-      <div class="tab" data-pane="eanalyza">📈 Analýza prodejů e-shopu</div>
-      <div class="tab" data-pane="fulfillment">📐 Sklad. prostor (fulfillment)</div>
+      <span class="tabgrp">Ceny</span><div class="tab" data-pane="ceny">💲 Nové ceny <span class="badge" id="b_price">0</span></div>
+      <div class="tab" data-pane="mrtve">☠ Mrtvé zásoby <span class="badge" id="b_dead">0</span></div>
+      <div class="tab" data-pane="meva">🏷 MEVA (konkurence) <span class="badge" id="b_meva">–</span></div>
+      <div class="tab" data-pane="chyby">🚩 Chyby <span class="badge" id="b_err">0</span></div>
+      <span class="tabgrp">Analýzy</span><div class="tab" data-pane="eanalyza">📈 Prodeje e-shopu 2020–26</div>
+      <div class="tab" data-pane="seg">📊 Segmentace</div>
+      <div class="tab" data-pane="pokryti">🗓 Měsíční pokrytí</div>
+      <div class="tab" data-pane="fulfillment">📐 Fulfillment</div>
+      <div class="tab" data-pane="historie">📈 Historie &amp; vývoj položky</div>
+      <span class="tabgrp">Model &amp; data</span><div class="tab" data-pane="model">📋 SMI model — vše <span class="badge" id="b_all">0</span></div>
+      <div class="tab" data-pane="souhrn">📄 Souhrn</div>
+      <div class="tab" data-pane="param">📄 Parametry</div>
+      <div class="tab" data-pane="elko">🖼 Obrázky z e-shopu</div>
       <div class="tab" data-pane="navod">📖 Návod</div>
     </div>
 
@@ -363,10 +362,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <select id="deadFilter"><option value="">Stárnoucí + mrtvá</option><option value="dead">Jen mrtvá</option><option value="A">Jen priorita A</option></select>
       </div>
       <div class="tblwrap"><table id="deadTbl"></table></div>
-    </div>
-    <div class="pane" id="pane-vse">
-      <div class="toolbar"><input type="text" id="allSearch" placeholder="Hledat položku…" style="min-width:240px"></div>
-      <div class="tblwrap"><table id="allTbl"></table></div>
     </div>
     <div class="pane" id="pane-model">
       <div class="note">Editovatelný náhled listu „SMI model". Sloupce <b>✎ Sleva %</b>, <b>✎ Nová nákupní cena (C_last)</b> a <b>✎ Nová cena</b> uprav přímo v tabulce, nebo hromadně přes panel níže. Ruční úpravy jsou zvýrazněné a přenesou se do exportu.</div>
@@ -559,8 +554,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="charts"><div class="card"><h3>Počet SKU v čase</h3><canvas id="histCntChart" height="150"></canvas></div>
         <div class="card"><h3>Hodnota a roční ICC mrtvých zásob (Kč)</h3><canvas id="histValChart" height="150"></canvas></div></div>
       <div class="tblwrap" style="margin-top:14px"><table id="histTbl"></table></div>
-    </div>
-    <div class="pane" id="pane-vyvoj">
+    <hr style="border:0;border-top:1px solid var(--line);margin:22px 0 14px">
+      <h3 style="margin:0 0 6px;font-size:15px">🔎 Vývoj položky</h3>
       <div class="note">Vývoj ceny u jednotlivé položky napříč uloženými snímky. Vyber položku podle názvu nebo identifikátoru — uvidíš stávající i novou cenu v čase.</div>
       <div class="period-tag" data-period="sales" style="font-size:12px;color:var(--mut);margin:2px 0 8px;font-weight:600"></div>
       <div class="toolbar"><input type="text" id="itemInput" list="itemList" placeholder="Název nebo identifikátor položky…" style="min-width:360px"><datalist id="itemList"></datalist></div>
@@ -577,76 +572,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <b id="elkoCount" class="muted"></b>
       </div>
       <div class="tblwrap"><table id="elkoTbl"></table></div>
-    </div>
-    <div class="pane" id="pane-nakup">
-      <div class="note">Optimalizace nákupu „co a kolik objednat" pro nákupčího. Objednává <b>štíhle a včas</b>: doporučené množství pokryje poptávku jen na <b>dodací lhůtu + cílové pokrytí</b> měsíců dopředu <b>od aktuálního měsíce</b> — sezónně. Co se teď (ani v nejbližším okně) neprodává, <b>nedoporučí objednat</b> (stav „Mimo sezónu"), aby nevznikaly ležáky. Nepředzásobuje na rok dopředu.</div>
-      <div class="period-tag" data-period="stock" style="font-size:12px;color:var(--mut);margin:2px 0 8px;font-weight:600"></div>
-      <div class="bulkbar">
-        <b>Parametry:</b>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Dodací lhůta [dní]<input type="number" id="nkLead" value="30" style="width:74px"></label>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Úroveň obsluhy<select id="nkSL"><option value="1.28">90 %</option><option value="1.65" selected>95 %</option><option value="2.05">98 %</option><option value="2.33">99 %</option></select></label>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Náklady na obj. [Kč]<input type="number" id="nkS" value="500" style="width:80px"></label>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Kapitálová sazba [%/rok]<input type="number" id="nkCap" value="8" style="width:74px"></label>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Roční náklady skladu (nájem+provoz) [Kč]<input type="number" id="nkWh" value="2713886" style="width:100px"></label>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)" title="Na kolik měsíců dopředu (od aktuálního měsíce) chceme mít zásobu. Menší = štíhlejší sklad, méně ležáků.">Cílové pokrytí [měs.]<input type="number" id="nkHorizon" value="2" min="0.5" step="0.5" style="width:80px"></label>
-        <label style="display:flex;flex-direction:column;font-size:11px;color:var(--mut)">Min. obj. množství<input type="number" id="nkMOQ" value="1" style="width:74px"></label>
-        <button class="btn" id="nkApply">Přepočítat</button>
-      </div>
-      <details class="settings" style="margin:0 0 12px">
-        <summary>ℹ️ Co znamenají parametry a jak je nastavit</summary>
-        <div style="margin-top:10px;font-size:13px;line-height:1.75;color:var(--txt)">
-          <p style="margin:4px 0"><b>Dodací lhůta [dní]</b> — za kolik dní dorazí objednávka od dodavatele. Delší lhůta → vyšší <b>bod objednání</b> a větší pojistná zásoba (musíš objednávat dříve a držet víc).</p>
-          <p style="margin:4px 0"><b>Úroveň obsluhy</b> — jak často chceš mít zboží skladem, když ho zákazník chce. 95 % = připouštíš, že 5 % situací skončí nedostatkem. Vyšší úroveň → větší <b>pojistná zásoba</b>.</p>
-          <p style="margin:4px 0"><b>Náklady na objednávku [Kč]</b> — fixní náklad na jednu objednávku (administrativa, doprava, příjem). Vyšší náklad → appka doporučí objednávat <b>větší dávky méně často</b> (vyšší EOQ).</p>
-          <p style="margin:4px 0"><b>Kapitálová sazba [%/rok]</b> — kolik tě stojí peníze vázané v zásobách (úrok, náklady financování). Vstupuje do efektivní sazby držení.</p>
-          <p style="margin:4px 0"><b>Roční náklady skladu (nájem+provoz) [Kč]</b> — celkové roční náklady skladu (nájem, energie, obsluha, pojištění). Appka je rozpočítá na hodnotu zásob a přičte ke kapitálové sazbě → vznikne <b>efektivní sazba držení</b> (zobrazená pod tabulkou), která určuje EOQ i hranici, kdy se vyplatí předzásobit. <b>Předvyplněno z reálných dat</b> (doplňkové/skladové náklady 2025 = 2 713 886 Kč; při hodnotě zásob ~20,8 mil. Kč → sazba skladu ~13 %, efektivní držení ~21 %).</p>
-          <p style="margin:4px 0"><b>Cílové pokrytí [měs.]</b> — na kolik měsíců dopředu (od aktuálního měsíce) chceme mít zásobu. <b>Menší = štíhlejší sklad a méně ležáků</b>, ale častější objednávky. Doporučené množství pokryje jen <b>dodací lhůtu + toto pokrytí</b> — nikdy ne celý rok.</p>
-          <p style="margin:4px 0"><b>Min. obj. množství</b> — minimální objednací množství dodavatele (MOQ). Doporučené množství nikdy neklesne pod tuto hodnotu.</p>
-          <p style="margin:8px 0 2px;color:var(--mut)"><b>Jak appka rozhoduje (proti ležákům):</b> spočítá <b>sezónní poptávku od TEĎ</b> za dodací lhůtu + cílové pokrytí. <b>Objednat teď</b> = zásoba ≤ bod objednání (dorovná na cílovou zásobu = poptávka v okně + pojistná). <b>Mimo sezónu</b> = v nejbližším okně se prakticky neprodává → neobjednávat (objedná se až před sezónou). <b>Brzy</b> / <b>OK</b> / <b>Nenakupovat</b> (bez ročního prodeje). Po změně parametrů klikni na <b>Přepočítat</b>.</p>
-          <p style="margin:8px 0 2px;color:var(--mut)"><b>Vysvětlení sloupců:</b></p>
-          <p style="margin:2px 0"><b>Roční prodej</b> — kolik kusů se prodalo za 12 měsíců.</p>
-          <p style="margin:2px 0"><b>Sez. index (teď)</b> — sezónnost aktuálního měsíce: 1,0× = průměr, &gt;1 = sezóna, &lt;1 = mimo sezónu.</p>
-          <p style="margin:2px 0"><b>Poptávka (okno)</b> — očekávaná sezónní poptávka za dodací lhůtu + cílové pokrytí od aktuálního měsíce. Tohle je základ objednávky.</p>
-          <p style="margin:2px 0"><b>Bod obj. (ROP)</b> — hladina zásoby, při které je třeba objednat, aby zboží nedošlo během dodací lhůty (poptávka za lhůtu + pojistná zásoba).</p>
-          <p style="margin:2px 0"><b>Cíl. zásoba</b> — na kolik se dorovná po objednávce (poptávka v okně + pojistná). Doporučeno obj. = Cíl. zásoba − Skladem.</p>
-          <p style="margin:2px 0"><b>Doporučeno obj.</b> — kolik kusů objednat teď, aby zásoba pokryla nejbližší okno (ne víc → bez ležáků).</p>
-          <p style="margin:2px 0"><b>Stav</b> — Objednat teď / Brzy / Mimo sezónu / OK / Nenakupovat.</p>
-          <p style="margin:8px 0 2px;color:var(--mut)"><b>Filtrování:</b> v hlavičce každého sloupce je filtr (rozbalovací u textových sloupců, číselné porovnání u čísel — např. <code>&gt;100</code>). „Objemová sleva" je hodnota ve sloupci <b>Akce</b> (ne Kategorie) — najdeš ji ve filtrech sloupce Akce v záložkách Nové ceny, Mrtvé zásoby, SMI model a Vše.</p>
-        </div>
-      </details>
-
-      <details class="settings" style="margin:0 0 12px">
-        <summary>🏷 Dodací lhůty a MOQ per skupina (SK) — přepis výchozích hodnot</summary>
-        <div style="margin-top:10px">
-          <p class="muted" style="font-size:12px;margin:0 0 8px">Prázdné = dědí výchozí (globální nahoře). Vyplněné platí pro celou skupinu SK. U konkrétní položky lze přepsat v detailní tabulce dole (sloupce Lhůta / MOQ). Ukládá se v prohlížeči — pro přenos na jiný počítač použij export/import.</p>
-          <div class="toolbar" style="margin:0 0 10px;gap:8px;flex-wrap:wrap;align-items:center">
-            <button class="btn ghost" type="button" style="padding:6px 12px;font-size:12px" onclick="nkExportOv()" title="Uloží přepisy (skupiny i položky) do souboru JSON">⬇ Export nastavení</button>
-            <label class="btn ghost" style="padding:6px 12px;font-size:12px;cursor:pointer" title="Načte přepisy ze souboru JSON — přepíše aktuální">⬆ Import nastavení<input type="file" accept="application/json,.json" onchange="nkImportOv(this)" style="display:none"></label>
-            <button class="btn ghost" type="button" style="padding:6px 12px;font-size:12px" onclick="nkClearOv()" title="Smaže všechny přepisy — vše se vrátí na výchozí">🗑 Vyčistit přepisy</button>
-            <span id="nkOvInfo" class="muted" style="font-size:12px"></span>
-          </div>
-          <div class="tblwrap" style="max-height:340px"><table id="nkGroupsTbl"></table></div>
-        </div>
-      </details>
-      <div class="toolbar">
-        <input type="text" id="nkSearch" placeholder="Hledat položku…" style="min-width:240px">
-        <select id="nkFilter"><option value="">Vše</option><option value="now">Objednat teď</option><option value="soon">Brzy</option><option value="season">Mimo sezónu</option><option value="ok">OK</option><option value="no">Nenakupovat</option></select>
-        <span style="flex:1"></span>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)">Doba nákupu [měs.]<input type="number" id="nkHorizon2" value="3" min="1" max="24" style="width:64px"></label>
-        <button class="btn" id="nkReport">📋 Sestava k nákupu</button>
-      </div>
-      <div style="margin:0 0 10px"><b id="nkCount" class="muted"></b></div>
-      <div id="nkOrderPanel" style="margin:0 0 16px">
-        <div class="kpis" id="nkOrderKpis"></div>
-        <div class="card" style="margin-top:10px">
-          <div class="spread" style="flex-wrap:wrap;gap:8px"><h3 style="margin:0">🛒 Objednací seznam — co a kolik objednat teď</h3>
-            <span class="muted" style="font-size:12px">Jen položky se stavem <b>Objednat teď</b> (zásoba pod bodem objednání a prodávají se v nejbližším okně). Detailní výpočet je v tabulce níže.</span></div>
-          <div class="tblwrap" style="max-height:460px"><table id="nkOrderTbl"></table></div>
-        </div>
-      </div>
-      <details class="settings"><summary>🔬 Detailní tabulka (ROP, EOQ, obrátka, sezónnost…)</summary>
-        <div class="tblwrap" style="margin-top:10px"><table id="nkTbl"></table></div>
-      </details>
     </div>
     <div class="pane" id="pane-objednavky">
       <div class="note">Optimalizace objednávek: <b>ERP skladová pozice</b> (<b id="objDate">—</b>) × <b>poptávka z prodejů</b>. Z ERP: sklad, <b>K dispo</b> (sklad − nevykryté obj. zákazníků), objednáno u dodavatele, <b>dodací lhůta per položka</b>, nákupní cena. Poptávku bereme z prodejů (obrat plasty, sezónně). <b>Objednat = sezónní poptávka za (dodací lhůta + cíl. pokrytí) − (K dispo + Objednáno)</b>, jen když je pozice pod bodem objednání. Oversold (K dispo &lt; 0) = kritické.</div>
@@ -1014,7 +939,7 @@ async function loadEshopCeny(){
       b.innerHTML='🛒 Prodejní ceny: <b>'+esc(ESHOP_META)+'</b>'+(ROWS.length?(' · spárováno '+sparovano+' z '+ROWS.length):''); b.style.display=''; }
     else { b.innerHTML='🛒 Prodejní ceny e-shopu nenačteny — „nová cena" je jen odhad z nákladové hodnoty (~)'; b.style.display=''; }
   }
-  if(ROWS.length){ try{ recalc(); renderErr();renderPrice();renderDead();renderAll();renderModel();renderSouhrn(); }catch(e){} }
+  if(ROWS.length){ try{ recalc(); renderErr();renderPrice();renderDead();renderModel();renderSouhrn(); }catch(e){} }
 }
 // ---- model ----
 function reprice(it){
@@ -1092,7 +1017,7 @@ function bulkApply(){
     else if(act==='reset'){it.discOv=null;it.priceOv=null;}
     computeRow(it);
   }
-  renderModel();renderSouhrn();renderPrice();renderDead();renderAll();
+  renderModel();renderSouhrn();renderPrice();renderDead();
   toast('Hromadná úprava: '+targets.length+' položek');
 }
 function refreshModelRow(i,fromPrice){
@@ -1195,7 +1120,7 @@ function render(){
   $('#b_price').textContent=ROWS.filter(r=>r.priceDelta&&Math.abs(r.priceDelta)>0.005).length;
   $('#b_dead').textContent=ROWS.filter(r=>r.cat==='Mrtvá zásoba'||r.cat==='Stárnoucí zásoba').length;
   $('#b_all').textContent=ROWS.length;
-  renderErr();renderPrice();renderDead();renderAll();renderModel();renderSouhrn();renderParam();try{if(typeof renderElko==="function")renderElko();}catch(e){console.error("elko",e);}try{tableTools();}catch(e){}
+  renderErr();renderPrice();renderDead();renderModel();renderSouhrn();renderParam();try{if(typeof renderElko==="function")renderElko();}catch(e){console.error("elko",e);}try{tableTools();}catch(e){}
 }
 function drawCharts(){
   const counts=catCounts();
@@ -1237,19 +1162,14 @@ function renderDead(){
     rows.map(r=>`<tr><td>${prioPill(r.prio)}</td><td>${esc(r.name)}${specBadge(r.sk)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td class="num">${fmt(r.iccCost)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${r.eshopPrice!=null?`<span class="eshop-src" title="Reálná prodejní cena z e-shopu">🛒 ${fmt(r.eshopPrice,1)}</span>`:`<span class="muted" title="Není na e-shopu — odhad z nákladové hodnoty">~ ${fmt(r.unitPrice,1)}</span>`} → <b>${fmt(r.newPrice,1)}</b></td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
   if(!rows.length)$('#deadTbl').innerHTML+='<tbody><tr><td colspan="11" class="muted" style="padding:18px">Žádné položky.</td></tr></tbody>';
 }
-function renderAll(){
-  const q=$('#allSearch').value.toLowerCase();
-  let rows=ROWS.filter(r=>(r.name||'').toLowerCase().includes(q)||String(r.ident||'').includes(q)||String(r.sk||'').includes(q));
-  $('#allTbl').innerHTML=`<thead><tr><th>SK</th><th>Položka</th><th>Identifikátor</th><th>Kategorie</th><th class="num">Bez prodeje</th><th class="num">Sklad ks</th><th class="num">Hodnota Kč</th><th>Priorita</th><th class="num">Sleva</th><th class="num">Nová cena</th><th>Akce</th></tr></thead><tbody>`+
-    rows.slice(0,2000).map(r=>`<tr><td class="muted">${r.sk??''}</td><td>${esc(r.name)}${specBadge(r.sk)}</td><td class="muted">${esc(r.ident)}</td><td>${catPill(r.cat)}</td><td class="num">${r.monthsNoSale}</td><td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td><td>${prioPill(r.prio)}</td><td class="num">${r.disc?pct(r.disc):'—'}</td><td class="num">${fmt(r.newPrice,1)}</td><td>${esc(r.action)}</td></tr>`).join('')+`</tbody>`;
-}
 function renderModel(){
   const q=$('#modelSearch').value.toLowerCase();
   let rows=ROWS.map((r,i)=>({r,i})).filter(o=>(o.r.name||'').toLowerCase().includes(q)||String(o.r.ident||'').includes(q)||String(o.r.sk||'').includes(q));
-  const head=['SK','Identifikátor','Název 1','Posl. měsíc','Měs. bez prodeje','Kategorie','✎ Sleva %','Akce','Priorita','Roční ICC (Kč)','Komentář','✎ C_last','w','Marže','✎ Nová cena/ks','Metoda přecenění'];
+  const head=['SK','Identifikátor','Název 1','Posl. měsíc','Měs. bez prodeje','Kategorie','Sklad ks','Hodnota Kč','✎ Sleva %','Akce','Priorita','Roční ICC (Kč)','Komentář','✎ C_last','w','Marže','✎ Nová cena/ks','Metoda přecenění'];
   $('#modelTbl').innerHTML=`<thead><tr>${head.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`+
     rows.slice(0,1500).map(o=>{const r=o.r;const dOv=r.discOv!=null,pOv=r.priceOv!=null;
     return `<tr><td class="muted">${esc(r.sk)}</td><td class="muted">${esc(r.ident)}</td><td>${esc(r.name)}</td><td class="num">${r.lastMonth||'—'}</td><td class="num">${r.monthsNoSale}</td><td>${catPill(r.cat)}</td>`+
+    `<td class="num">${fmt(r.AZ)}</td><td class="num">${fmt(r.BB)}</td>`+
     `<td class="num"><input type="number" step="1" min="0" max="100" class="edcell edisc${dOv?' ovr':''}" data-i="${o.i}" value="${Math.round((r.disc||0)*100)}"></td>`+
     `<td id="ac-${o.i}">${esc(r.action)}</td><td>${prioPill(r.prio)}</td><td class="num">${fmt(r.iccCost)}</td><td class="muted">${esc(r.comment)}</td>`+
     `<td class="num"><input type="number" step="0.01" class="edcell clast" data-i="${o.i}" value="${r.cLast!=null?r.cLast:''}" placeholder="—"></td>`+
@@ -1321,8 +1241,8 @@ function renderParam(){
     `ICC = ${pct(cap)} <span class="muted">(kapitál)</span> + ${fmt(Math.round(wh))} Kč ÷ ${fmt(Math.round(totBB))} Kč = ${pct(cap)} + ${pct(whRate)} <span class="muted">(sklad)</span> = <b style="color:var(--ok)">${pct(P.icc)} ročně</b>.<br>`+
     `<span class="muted">Náklady skladu a kapitálovou sazbu zadáš v záložce 📦 Optimalizace nákupu (předvyplněno z reálných dat – doplňkové/skladové náklady 2025). „Odhad ročního ICC" položky = průměrná hodnota zásoby (Kč) × ICC. Tutéž sazbu používá i Optimalizace nákupu (efektivní sazba držení).</span>`;
 }
-const PANE_TBL={chyby:'errTbl',ceny:'priceTbl',mrtve:'deadTbl',vse:'allTbl',model:'modelTbl',elko:'elkoTbl',nakup:'nkTbl',seg:'csSalesTbl'};
-$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='vyvojeshop')renderVyvojEshop();if(pane==='historie')renderHistory();if(pane==='vyvoj'){refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='nakup')renderNakup();if(pane==='objednavky')renderObjednavky();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
+const PANE_TBL={chyby:'errTbl',ceny:'priceTbl',mrtve:'deadTbl',model:'modelTbl',elko:'elkoTbl',seg:'csSalesTbl'};
+$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='vyvojeshop')renderVyvojEshop();if(pane==='historie'){renderHistory();refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='objednavky')renderObjednavky();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
 const _bulkBtn=$('#bulkApply');if(_bulkBtn)_bulkBtn.onclick=bulkApply;
 
 /* ===== Požadavek nákupčímu — E-shop žádá o objednání N kusů (→ intranet /api/pozadavky) ===== */
@@ -1659,11 +1579,11 @@ function condFormat(table){
     if(cls)tr.classList.add(cls);
   }
 }
-['renderErr','renderPrice','renderDead','renderAll','renderModel','renderElko','renderNakup','renderCrossSales'].forEach(fn=>{const map={renderErr:'errTbl',renderPrice:'priceTbl',renderDead:'deadTbl',renderAll:'allTbl',renderModel:'modelTbl',renderElko:'elkoTbl',renderNakup:'nkTbl',renderCrossSales:'csSalesTbl'};const orig=window[fn];if(typeof orig==='function')window[fn]=function(){const r=orig.apply(this,arguments);const el=document.getElementById(map[fn]);if(el){addColumnFilters(el);condFormat(el);}return r;};});
+['renderErr','renderPrice','renderDead','renderModel','renderElko','renderCrossSales'].forEach(fn=>{const map={renderErr:'errTbl',renderPrice:'priceTbl',renderDead:'deadTbl',renderAll:'allTbl',renderModel:'modelTbl',renderElko:'elkoTbl',renderNakup:'nkTbl',renderCrossSales:'csSalesTbl'};const orig=window[fn];if(typeof orig==='function')window[fn]=function(){const r=orig.apply(this,arguments);const el=document.getElementById(map[fn]);if(el){addColumnFilters(el);condFormat(el);}return r;};});
 ['errSearch','errFilter'].forEach(id=>$('#'+id).oninput=renderErr);
 ['priceSearch','priceFilter'].forEach(id=>$('#'+id).oninput=renderPrice);
 ['deadSearch','deadFilter'].forEach(id=>$('#'+id).oninput=renderDead);
-$('#allSearch').oninput=renderAll;$('#modelSearch').oninput=renderModel;$('#recalc').onclick=recalc;
+$('#modelSearch').oninput=renderModel;$('#recalc').onclick=recalc;
 
 // ================= EXPORT: kopie + nové listy =================
 $('#exportBtn').onclick=async()=>{
@@ -1950,12 +1870,15 @@ function nkResolveMOQ(r){const id=String(r.ident||'').trim();if(id&&NK_OV.i[id]&
 function nkOvSource(r,key){const id=String(r.ident||'').trim();if(id&&NK_OV.i[id]&&NK_OV.i[id][key]>0)return 'položka';const g=NK_OV.g[r.sk];if(g&&g[key]>0)return 'skupina';return 'výchozí';}
 
 function nkParams(){
+  // Vstupy zily v legacy panelu "nakup" (bez zalozky, 2026-08 odstranen) — hodnoty byly
+  // vzdy vychozi; ted natvrdo, bez zavislosti na DOM. ICC 8 %/rok, pokryti 2 mesice.
   const totVal=ROWS.reduce((s,r)=>s+(r.BB||0),0);
-  const cap=(+$('#nkCap').value||0)/100, wh=+$('#nkWh').value||0;
+  const g=(id,dflt)=>{const e=$('#'+id);return e?(+e.value||dflt):dflt;};
+  const cap=g('nkCap',8)/100, wh=g('nkWh',0);
   const whRate=totVal>0?wh/totVal:0;
-  NK_PARAMS={L:+$('#nkLead').value||30,Z:+$('#nkSL').value||1.65,S:+$('#nkS').value||500,
+  NK_PARAMS={L:g('nkLead',30),Z:g('nkSL',1.65),S:g('nkS',500),
     cap,wh,whRate,effHold:cap+whRate,
-    cover:Math.max(0.5,+$('#nkHorizon').value||2),MOQ:Math.max(1,+$('#nkMOQ').value||1),totVal};
+    cover:Math.max(0.5,g('nkHorizon',2)),MOQ:Math.max(1,g('nkMOQ',1)),totVal};
   return NK_PARAMS;
 }
 function nkSeasonDemand(sales,start,months){let s=0;for(let k=0;k<Math.ceil(months);k++){const fr=Math.min(1,months-k);s+=(sales[(start+k)%12]||0)*fr;}return s;}
