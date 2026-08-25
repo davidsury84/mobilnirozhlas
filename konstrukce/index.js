@@ -35,6 +35,10 @@ try { ABR_KODY = JSON.parse(fs.readFileSync(path.join(__dirname, 'abr-kody.json'
 // Ilustrační obrázky typů natahování (CAD rendery z alba) — kod → soubor.
 let NATAH_IMG = {};
 try { NATAH_IMG = JSON.parse(fs.readFileSync(path.join(__dirname, 'natah-img', 'map.json'), 'utf8')); } catch (_) {}
+// Standardní výkresy řad ABR (JPG náhledy 1. stran z PRODUCTS/ABROLLCONTAINERS)
+// — klíč „ABR-TYP-rozměry-plechy" → {f: soubor, zdroj: původní PDF}.
+let VYKRESY_STD = {};
+try { VYKRESY_STD = JSON.parse(fs.readFileSync(path.join(__dirname, 'vykresy-std', 'map.json'), 'utf8')); } catch (_) {}
 // Per-řadové standardy a opce dle LISTŮ oficiální tabulky „Typová řada ABR
 // kontejnerů" (abr-rady.json) — každá řada (ABR-DSD, ABR-AFS…) má vlastní list
 // s jinými std/opce. Řady bez listu jedou na globálním číselníku.
@@ -171,6 +175,20 @@ function genKodAbr(z) {
     parts.push(kd.replace(/\//g, '_'));
   }
   return parts.join('-');
+}
+
+// Najde reálný standardní výkres řady (PRODUCTS/ABROLLCONTAINERS) pro zakázku
+// dle typu + vnitřních rozměrů + plechů — např. ABR-DSD-6500x2300x1500-53.
+function vykresStdFor(z) {
+  if (familyOf(z.typKey) !== 'abroll') return null;
+  const dq = z.dotaznik || {};
+  const hodn = v => (v == null) ? '' : (typeof v === 'string' ? v : String(v.hodnota || ''));
+  const roz = hodn(dq.rozmery).replace(/\s+/g, '').replace(/[×X]/g, 'x').toLowerCase();
+  const ple = (hodn(dq.provedeni).match(/(\d)\s*\/\s*(\d)/) || []);
+  if (!roz || !ple[1]) return null;
+  const base = 'ABR-' + String(z.typKey || '').toUpperCase() + '-' + roz + '-' + ple[1] + ple[2];
+  const hit = VYKRESY_STD[base];
+  return hit ? { f: hit.f, nazev: base, zdroj: hit.zdroj || '' } : null;
 }
 
 // ---- Dotazník CITY — uzavřené městské abroll kontejnery (hákový nosič) ------
@@ -1264,6 +1282,16 @@ function mount(host) {
 
     try {
       if (p === '/api/konstrukce/katalog' && req.method === 'GET') { json(res, 200, { polozky: KATALOG_ABR }); return true; }
+      if (p === '/api/konstrukce/vykres-std' && req.method === 'GET') {
+        // standardní výkres řady ABR (JPG náhled) — jen soubory z map.json
+        const f = String((u.query || {}).f || '');
+        const ok = Object.values(VYKRESY_STD).some(v => v.f === f);
+        if (!ok) { json(res, 404, { chyba: 'Neznámý výkres.' }); return true; }
+        const fp = path.join(__dirname, 'vykresy-std', f);
+        if (!fs.existsSync(fp)) { json(res, 404, { chyba: 'Neznámý výkres.' }); return true; }
+        res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
+        res.end(fs.readFileSync(fp)); return true;
+      }
       if (p === '/api/konstrukce/natah-img' && req.method === 'GET') {
         // ilustrace natahování — jen soubory fNN.jpg z natah-img/ (žádné cesty)
         const f = String((u.query || {}).f || '');
@@ -1414,6 +1442,7 @@ function mount(host) {
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
       cvzHelios: z.cvzHelios || '',   // číslo výrobní zakázky z Heliosu (26C-001 apod.), ručně
       kodAbr: z.kodAbr || '',         // celkový kód kontejneru dle katalogu ABR (varianta B)
+      vykresStd: vykresStdFor(z),     // reálný standardní výkres řady (JPG), je-li pro rozměry k dispozici
       prilohy: (z.prilohy || []).map((p, i) => ({ i, name: p.name, at: p.at, author: empName(p.author) })),
 
       params: z.params || {}, dotaznik: z.dotaznik || null, artNo: z.artNo || '',
