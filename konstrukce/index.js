@@ -88,7 +88,7 @@ function dotaznikAbroll(rada) {
   const prov = cfg.provedeni || {};
   const rozmery = { k: 'rozmery', label: 'Vnitřní rozměry v mm (délka × šířka × výška)', type: 'text' };
   if (cfg.rozmeryHint) rozmery.hint = cfg.rozmeryHint;
-  return [
+  return rozsirDotaznik([
     { title: 'Základní údaje', fields: [
       rozmery,
       { k: 'provedeni', label: 'Provedení — tloušťky plechů dno/bočnice', std: prov.std || '5/3', opce: (Array.isArray(prov.opce) ? prov.opce : ['4/3', '3/3']).join(' / ') },
@@ -127,7 +127,7 @@ function dotaznikAbroll(rada) {
       { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano', opceVstup: { placeholder: 'počet výztuh', unit: 'ks', num: true } },
       { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
     ] },
-  ];
+  ]);
 }
 
 // ---- Generátor celkového kódu kontejneru ABR (varianta B) -------------------
@@ -431,6 +431,35 @@ const SEED_STREDISKA = [
   { key: 'chomutov', label: 'Chomutov', reditelEmail: '' },
   { key: 'polsko', label: 'Polsko', reditelEmail: '' },
 ];
+
+// ---- Společná pole všech dotazníků (2026-08, dle zpětné vazby obchodu) ------
+// Důležitá upozornění (volný text — např. výjimka z polepů Contract, otvory pro
+// odtok vody dle výkresu zákazníka), speciální polepy s cenou a ceny dle
+// objednávky pro fakturaci po dodání. Přikládání PDF/obrázků řeší z.prilohy.
+const POLE_DOPLNKY_EXTRA = [
+  { k: 'upozorneni', label: 'Důležitá upozornění pro konstrukci a výrobu', type: 'textarea', hint: 'např. „výjimečně BEZ polepů Contract" · „otvory pro odtok vody uprostřed podlahových příčníků dle přiloženého výkresu zákazníka"' },
+  { k: 'polepy', label: 'Speciální polepy — popis a umístění (např. všechny 4 strany)', type: 'text' },
+  { k: 'polepyCena', label: 'Cena speciálních polepů (Kč bez DPH)', type: 'number' },
+];
+const SEKCE_FAKTURACE = { title: 'Ceny dle objednávky (pro fakturaci po dodání)', fields: [
+  { k: 'cenaKontejner', label: 'Cena za kus (Kč bez DPH)', type: 'number' },
+  { k: 'cenaDoprava', label: 'Cena dopravy (Kč bez DPH)', type: 'number' },
+  { k: 'cenaPrislusenstvi', label: 'Cena plachty / příslušenství (Kč bez DPH)', type: 'number' },
+] };
+// Rozšíří dotazník o společná pole (upozornění/polepy do Doplňků + sekce
+// Fakturace na konec). ABROLL prochází přes dotaznikAbroll(), statické
+// dotazníky (CITY/MULDA/SLD/VANY/BOXY/SU) rozšíříme hned zde.
+function rozsirDotaznik(dq) {
+  if (dq._rozsireno) return dq;
+  Object.defineProperty(dq, '_rozsireno', { value: true, enumerable: false });
+  const dop = dq.find(s => /^Doplňky/.test(s.title || ''));
+  const extra = POLE_DOPLNKY_EXTRA.map(f => Object.assign({}, f));
+  if (dop) dop.fields.unshift(...extra);
+  else dq.push({ title: 'Doplňky', fields: extra });
+  dq.push({ title: SEKCE_FAKTURACE.title, fields: SEKCE_FAKTURACE.fields.map(f => Object.assign({}, f)) });
+  return dq;
+}
+[DOTAZNIK_CITY, DOTAZNIK_MULDA, DOTAZNIK_SLD, DOTAZNIK_VANY, DOTAZNIK_BOXY, DOTAZNIK_SU].forEach(rozsirDotaznik);
 
 // ---- Výchozí číselník typů výrobku (seed) — řady ABROLL kontejnerů ---------
 // 6 řad z ceníku ABR-XXX; všechny sdílí dotazník provedení (ABR-DSD) a výchozí lhůty.
@@ -1385,6 +1414,7 @@ function mount(host) {
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
       cvzHelios: z.cvzHelios || '',   // číslo výrobní zakázky z Heliosu (26C-001 apod.), ručně
       kodAbr: z.kodAbr || '',         // celkový kód kontejneru dle katalogu ABR (varianta B)
+      prilohy: (z.prilohy || []).map((p, i) => ({ i, name: p.name, at: p.at, author: empName(p.author) })),
 
       params: z.params || {}, dotaznik: z.dotaznik || null, artNo: z.artNo || '',
       stav: z.stav, stavLabel: STAV[z.stav].label, onTurn: STAV[z.stav].onTurn,
@@ -1420,7 +1450,7 @@ function mount(host) {
         const hodnota = String(a.hodnota == null ? '' : a.hodnota).slice(0, 300);
         if (hodnota) out[f.k] = { volba, hodnota };
       } else {
-        const v = String(a).slice(0, 500).trim(); if (v) out[f.k] = v;
+        const v = String(a).slice(0, f.type === 'textarea' ? 4000 : 500).trim(); if (v) out[f.k] = v;
       }
     }));
     return Object.keys(out).length ? out : null;
@@ -1463,6 +1493,14 @@ function mount(host) {
     };
     if (jeObj) z.cisloObj = cislo;   // přímá objednávka: jediné číslo VYK (žádné NAB)
     z.kodAbr = genKodAbr(z);         // celkový kód kontejneru dle katalogu ABR (jen ABROLL řady)
+    // přílohy od obchodníka už při zadání (výkres zákazníka — např. otvory pro odtok vody)
+    if (Array.isArray(b.prilohy) && b.prilohy.length) {
+      z.prilohy = [];
+      for (const p of b.prilohy.slice(0, 5)) {
+        const sp = saveFile(z.id, p && p.name, p && p.dataUrl, 'priloha');
+        if (!sp.chyba) z.prilohy.push({ name: sp.name, path: sp.path, at: now, author: me.email });
+      }
+    }
     // Přímá objednávka: závod vybraný rovnou při zadání → přeskočí krok ředitele výroby.
     let startStav = 'prideleni';
     if (jeObj) {
@@ -1528,6 +1566,21 @@ function mount(host) {
     const d = load();
     const z = d.zakazky.find(x => x.id === b.id);
     if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
+    // Příloha od obchodníka (PDF/obrázek — např. výkres zákazníka s otvory pro odtok vody).
+    if (b.kind === 'priloha') {
+      const smiPril = me.isAdmin || me.role === 'sef' || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email);
+      if (!smiPril) { json(res, 403, { chyba: 'Přílohy vkládá obchodník zakázky (nebo šéf konstrukce).' }); return true; }
+      if ((z.prilohy || []).length >= 10) { json(res, 400, { chyba: 'Maximálně 10 příloh na zakázku.' }); return true; }
+      const sp = saveFile(z.id, b.name, b.dataUrl, 'priloha');
+      if (sp.chyba) { json(res, 400, { chyba: sp.chyba }); return true; }
+      if (!Array.isArray(z.prilohy)) z.prilohy = [];
+      z.prilohy.push({ name: sp.name, path: sp.path, at: Date.now(), author: me.email });
+      audit(z, me.email, 'Vložena příloha', sp.name);
+      if (z.assignedTo) notify(d, z.assignedTo, 'K zakázce ' + (z.cisloObj || z.cislo) + ' přibyla příloha: ' + sp.name + '.', z.id);
+      save(d);
+      json(res, 200, { ok: true, prilohy: z.prilohy.length });
+      return true;
+    }
     if (!(me.isAdmin || (me.role === 'konstrukter' && (z.assignedTo || '').toLowerCase() === me.email))) { json(res, 403, { chyba: 'Nahrávat smí jen přiřazený konstruktér.' }); return true; }
     // Výrobní dokumentace — samostatný dokument vkládaný po schválení klientem (nepatří k verzím pro klienta).
     if (b.kind === 'vyrobni') {
@@ -2233,7 +2286,7 @@ function mount(host) {
   // ======================================================================
   //  Soubory
   // ======================================================================
-  const ALLOWED_EXT = { pdf: ['pdf'], cad: ['dwg', 'dxf', 'step', 'stp', 'igs', 'iges', 'sldprt', 'sldasm', 'ipt', 'iam', 'prt', 'x_t', 'catpart', 'zip', 'pdf'], vyrobni: ['pdf', 'dwg', 'dxf', 'step', 'stp', 'zip', 'xlsx', 'xls', 'docx', 'doc', 'sldprt', 'sldasm', 'ipt', 'iam', 'prt', 'x_t', 'catpart'] };
+  const ALLOWED_EXT = { pdf: ['pdf'], cad: ['dwg', 'dxf', 'step', 'stp', 'igs', 'iges', 'sldprt', 'sldasm', 'ipt', 'iam', 'prt', 'x_t', 'catpart', 'zip', 'pdf'], vyrobni: ['pdf', 'dwg', 'dxf', 'step', 'stp', 'zip', 'xlsx', 'xls', 'docx', 'doc', 'sldprt', 'sldasm', 'ipt', 'iam', 'prt', 'x_t', 'catpart'], priloha: ['pdf', 'png', 'jpg', 'jpeg'] };
   function saveFile(zakId, name, dataUrl, kind) {
     const safeName = String(name || 'soubor').replace(/[^\w.\- ]+/g, '_').slice(0, 120);
     const ext = (safeName.split('.').pop() || '').toLowerCase();
@@ -2261,6 +2314,16 @@ function mount(host) {
     const d = load();
     const z = d.zakazky.find(x => x.id === query.id);
     if (!z) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Nenalezeno'); return true; }
+    if (query.kind === 'priloha') {
+      // příloha od obchodníka (výkres zákazníka apod.) — dle indexu
+      const p = (z.prilohy || [])[parseInt(query.i, 10) || 0];
+      const f = p && safePath(p.path);
+      if (!f || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Příloha chybí'); return true; }
+      const ext = (p.name.split('.').pop() || '').toLowerCase();
+      const ct = ext === 'pdf' ? 'application/pdf' : (ext === 'png' ? 'image/png' : 'image/jpeg');
+      res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'no-store', 'Content-Disposition': 'inline; filename="' + encodeURIComponent(p.name) + '"' });
+      res.end(fs.readFileSync(f)); return true;
+    }
     if (query.kind === 'vyrobni') {
       const meta = z.vyrobniDok;
       const f = meta && safePath(meta.path);

@@ -2354,7 +2354,7 @@ function renderDrawer(z){
       '</div>'+
       actionsFor(z)+
       pdfPanel(z)+
-      dotaznikView(z)+'<div id="drwArch"></div>'+params+vers+
+      prilohyBlock(z)+dotaznikView(z)+'<div id="drwArch"></div>'+params+vers+
       linkBox(z)+
       comments+audit+
       delBox(z)+
@@ -2446,6 +2446,28 @@ function stepFlow(z){
   if(cur==='zamitnuto')h+='<div style="margin:-4px 0 8px;color:var(--red);font-size:13px;font-weight:600">✕ Zamítnuto / storno</div>';
   return h;
 }
+/* ---- přílohy od obchodníka (výkresy zákazníka, podklady) ---- */
+function prilohyBlock(z){
+  var can=ME.isAdmin||ME.role==='sef'||(ME.role==='obchodnik'&&z.obchodnikEmail===ME.email);
+  var list=(z.prilohy||[]);
+  if(!list.length&&!can)return '';
+  var h='<div class="sec">Přílohy (podklady od zákazníka)</div><div class="card">';
+  if(list.length)h+=list.map(function(p){
+    return '<div class="row" style="justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">'+
+      '<span>📎 <a href="/api/konstrukce/soubor?id='+z.id+'&kind=priloha&i='+p.i+'" target="_blank" style="font-weight:700">'+esc(p.name)+'</a></span>'+
+      '<span class="muted" style="font-size:11.5px;white-space:nowrap">'+esc(p.author||'')+' · '+fdate(p.at)+'</span></div>';
+  }).join('');
+  else h+='<p class="muted" style="margin:0">Zatím žádné přílohy.</p>';
+  if(can)h+='<div class="actions" style="margin-top:8px"><label class="btn ghost sm" style="cursor:pointer">+ Přidat přílohu (PDF / obrázek)<input type="file" accept=".pdf,.png,.jpg,.jpeg" style="display:none" onchange="prilUpload(\''+z.id+'\',this)"></label></div>';
+  return h+'</div>';
+}
+function prilUpload(id,inp){
+  var f=inp.files&&inp.files[0];if(!f)return;
+  if(f.size>15e6){alert('Soubor je příliš velký (max 15 MB).');inp.value='';return}
+  var r=new FileReader();
+  r.onload=function(){api('/upload','POST',{id:id,kind:'priloha',name:f.name,dataUrl:r.result}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}reloadData()});};
+  r.readAsDataURL(f);
+}
 function pdfPanel(z){
   var cv=z.currentVersion;
   if(!cv||!cv.hasPdf)return '<div class="sec">Náhled výkresu</div><div class="card"><p class="muted" style="margin:0">Zatím není nahrané PDF výkresu.</p></div>';
@@ -2473,17 +2495,35 @@ function dotaznikView(z){
   if(!t||!t.dotaznik)return '';
   var h='<div class="sec">Zadání (dotazník provedení)</div>';
   if(z.kodAbr)h+='<div class="card" style="background:#f2f7ee;padding:10px 12px"><b>Kód dle katalogu ABR:</b> <code style="font-weight:800">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')">⧉ Kopírovat</button><div class="muted" style="font-size:11.5px;margin-top:3px">Vypisují se jen odchylky od standardu ELKOPLAST; NE se vynechává; žebřík se uvádí od výšky 1500 mm.</div></div>';
+  // Důležitá upozornění — výrazně nahoře, ať je konstrukce ani výroba nepřehlédne
+  if(typeof z.dotaznik.upozorneni==='string'&&z.dotaznik.upozorneni.trim())
+    h+='<div class="card" style="background:#fff3e0;border-color:#e0a93f;padding:10px 12px;margin-top:8px"><b>⚠️ Důležitá upozornění pro konstrukci a výrobu</b><div style="white-space:pre-wrap;margin-top:5px">'+esc(z.dotaznik.upozorneni)+'</div></div>';
   var _sv=svgAbr(abrSpecFromDot(z));
   if(_sv)h+='<div class="card" style="background:#fff;padding:8px 10px;margin-top:8px;overflow-x:auto">'+_sv+'<div class="muted" style="font-size:11px;margin-top:2px">Schematická vizualizace z dotazníku — orientační proporce, ne výkres.</div></div>';
   t.dotaznik.forEach(function(sec){
     var rows='';
     (sec.fields||[]).forEach(function(f){
       var a=z.dotaznik[f.k];if(a==null)return;
+      if(f.k==='upozorneni')return;   // zobrazeno výrazně nahoře
       if(typeof a==='object'){var bd=a.volba==='standard'?'s':(a.volba==='opce'?'o':'p');var bl=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek');var disp=a.hodnota||'';if(a.detail){var u=(f.opceVstup&&f.opceVstup.unit)?(' '+f.opceVstup.unit):'';disp+=(disp?' · ':'')+a.detail+u;}rows+='<b>'+esc(f.label)+'</b><span>'+esc(disp)+' <span class="bd '+bd+'">'+bl+'</span></span>';}
       else rows+='<b>'+esc(f.label)+'</b><span>'+esc(a)+'</span>';
     });
     if(rows)h+='<div class="dqsec" style="margin-top:10px">'+esc(sec.title)+'</div><div class="dqview">'+rows+'</div>';
   });
+  // souhrn k fakturaci (cena/ks × počet + polepy + doprava + příslušenství)
+  var num=function(v){var n=parseFloat(String(v==null?'':v).replace(/\s/g,'').replace(',','.'));return isFinite(n)?n:0};
+  var ks=num(z.dotaznik.pocet)||1, cKs=num(z.dotaznik.cenaKontejner);
+  var cPol=num(z.dotaznik.polepyCena), cDop=num(z.dotaznik.cenaDoprava), cPri=num(z.dotaznik.cenaPrislusenstvi);
+  if(cKs||cPol||cDop||cPri){
+    var celkem=cKs*ks+cPol+cDop+cPri;
+    var fmt=function(n){return n.toLocaleString('cs-CZ')+' Kč'};
+    h+='<div class="card" style="background:#f2f7ee;padding:10px 12px;margin-top:10px"><b>K fakturaci po dodání (bez DPH)</b><div class="kv" style="margin-top:6px">'+
+      (cKs?('<b>Kontejner'+(ks>1?' ('+ks+' ks × '+fmt(cKs)+')':'')+'</b><span>'+fmt(cKs*ks)+'</span>'):'')+
+      (cPol?('<b>Speciální polepy</b><span>'+fmt(cPol)+'</span>'):'')+
+      (cDop?('<b>Doprava</b><span>'+fmt(cDop)+'</span>'):'')+
+      (cPri?('<b>Plachta / příslušenství</b><span>'+fmt(cPri)+'</span>'):'')+
+      '<b>Celkem</b><span style="font-weight:800">'+fmt(celkem)+'</span></div></div>';
+  }
   return h;
 }
 function semaforText(z){if(isTerminal(z.stav)||z.stav==='schvaleno'||!z.deadline)return '';if(z.semafor==='red')return ' <span style="color:var(--red);font-weight:700">· po termínu</span>';if(z.semafor==='amber')return ' <span style="color:var(--amber);font-weight:700">· blíží se</span>';return ''}
@@ -2672,7 +2712,27 @@ function askTermin(id){var t=prompt('Nový termín (RRRR-MM-DD):');if(!t)return;
 
 /* ---- nová zakázka ---- */
 /* --- překlady dotazníku (CZ zdroj → EN/DE/PL); neznámé texty zůstanou CZ --- */
-var DQ_LANG=(typeof K_LANG!=='undefined'&&K_LANG!=='cz')?K_LANG:'cs', DQ_PREFILL=null, DQ_ART='', KAT=null;
+var DQ_LANG=(typeof K_LANG!=='undefined'&&K_LANG!=='cz')?K_LANG:'cs', DQ_PREFILL=null, DQ_ART='', KAT=null, DQ_PRIL=[];
+/* ---- přílohy k zadání (PDF/obrázky od zákazníka) ---- */
+function dqPrilAdd(inp){
+  var files=[].slice.call(inp.files||[]);
+  files.forEach(function(f){
+    if(DQ_PRIL.length>=5){alert(tr('Maximálně 5 příloh.'));return}
+    if(f.size>15e6){alert(f.name+': '+tr('soubor je příliš velký (max 15 MB).'));return}
+    var r=new FileReader();
+    r.onload=function(){DQ_PRIL.push({name:f.name,dataUrl:r.result});dqPrilRender();};
+    r.readAsDataURL(f);
+  });
+  inp.value='';
+}
+function dqPrilDel(i){DQ_PRIL.splice(i,1);dqPrilRender();}
+function dqPrilRender(){
+  var el=document.getElementById('dqPrilList');if(!el)return;
+  el.innerHTML=DQ_PRIL.map(function(p,i){
+    var kb=Math.round((p.dataUrl.length*0.75)/1024);
+    return '<div class="row" style="gap:8px;padding:4px 0;border-bottom:1px dashed var(--line)"><span>📎 <b>'+esc(p.name)+'</b> <span class="muted" style="font-size:11.5px">'+(kb>1024?((kb/1024).toFixed(1)+' MB'):(kb+' kB'))+'</span></span><button type="button" class="btn ghost sm" onclick="dqPrilDel('+i+')">×</button></div>';
+  }).join('');
+}
 function ensureKat(cb){ if(KAT){cb&&cb();return;} fetch('/api/konstrukce/katalog',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){KAT=j.polozky||[];cb&&cb();}).catch(function(){KAT=[];cb&&cb();}); }
 function artReset(){DQ_ART='';var i=document.getElementById('artInput');if(i)i.value='';var f=document.getElementById('artInfo');if(f)f.innerHTML='';artClose();}
 function artLookup(inp){
@@ -2975,6 +3035,7 @@ function tselPick(key){
 function openNew(state){
   if(!state)DQ_ART='';
   state=state||{};DQ_PREFILL=state.dot||null;
+  DQ_PRIL=[];   // přílohy (PDF/obrázky) k novému zadání
   ensureKat();
   var head=state.head||{};
   var typeSel=buildTypeSelect(state);
@@ -2997,6 +3058,10 @@ function openNew(state){
         '<div style="position:relative"><input id="artInput" autocomplete="off" value="'+esc(DQ_ART||'')+'" placeholder="'+esc(tr('hledat dle kódu, rozměru, objemu…'))+'" oninput="artLookup(this)" onfocus="artLookup(this)" onblur="setTimeout(artClose,180)"><div class="art-dd" style="display:none"></div></div>'+
         '<div id="artInfo" class="art-info"></div></div>'+
       '<div id="paramBox"></div>'+
+      '<div class="dqsec2">'+esc(tr('Přílohy — výkresy a podklady od zákazníka'))+'</div>'+
+      '<div style="margin:4px 0 2px"><input type="file" id="dqPrilInp" accept=".pdf,.png,.jpg,.jpeg" multiple onchange="dqPrilAdd(this)">'+
+      '<div class="dq-hint" style="margin-top:3px">'+esc(tr('PDF nebo obrázek — např. výkres s umístěním otvorů pro odtok vody. Max 5 souborů, 15 MB/soubor.'))+'</div>'+
+      '<div id="dqPrilList" style="margin-top:6px"></div></div>'+
       '<div class="dq-extra" id="dqExtra" style="display:none">'+
         '<div class="dq-svgbox" id="dqSvg"></div>'+
         '<div id="dqArchWrap"><div class="dqsec2">'+esc(tr('Podobné výkresy v archivu (Bruntál)'))+'</div><div id="dqArch"></div></div>'+
@@ -3179,6 +3244,10 @@ function renderDotaznik(){
             '<div class="ral-row"><input type="color" class="ral-pick" id="ralPick_'+f.k+'" value="'+(r0?r0.hex:'#8a8a8a')+'" title="'+esc(tr('Vybrat barvu (kukátko / pipeta)'))+'" oninput="ralColorInput(\''+f.k+'\',this)"><span class="ral-cur" id="ralCur_'+f.k+'">'+(r0?('<b style="color:'+r0.hex+';filter:brightness(.75)">'+esc(r0.c)+'</b> · '+esc(r0.n)):'<span class="muted">'+esc(tr('vyberte odstín'))+'</span>')+'</span><span class="muted" style="font-size:11.5px;margin-left:auto">'+esc(tr('nejbližší RAL'))+'</span></div>'+
             ralTB(f.k)+
             '<input id="dq_'+f.k+'" class="txt" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('RAL a další poznámky…'))+'" oninput="ralMark(\''+f.k+'\')"></div></div>';
+        } else if(f.type==='textarea'){
+          h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg" style="flex-direction:column;align-items:stretch;gap:3px">'+
+            '<textarea id="dq_'+f.k+'" class="txt" rows="3" style="resize:vertical;min-height:64px;font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px" placeholder="…">'+esc(typeof a==='string'?a:'')+'</textarea>'+
+            (f.hint?'<div class="dq-hint">'+esc(tr(f.hint))+'</div>':'')+'</div></div>';
         } else {
           h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg"'+(f.hint?' style="flex-direction:column;align-items:stretch;gap:2px"':'')+'><input id="dq_'+f.k+'" class="txt" '+(f.type==='number'?'type="number" inputmode="decimal"':'')+' value="'+esc(typeof a==='string'?a:'')+'" placeholder="…">'+(f.hint?'<div class="dq-hint">'+esc(tr(f.hint))+'</div>':'')+'</div></div>';
         }
@@ -3211,7 +3280,8 @@ function createZak(){
     document.querySelectorAll('#paramBox input[data-lbl]').forEach(function(inp){if(inp.value.trim())params[inp.getAttribute('data-lbl')]=inp.value.trim()});
   }
   var b={typKey:(document.getElementById('nTyp')||{}).value,zakaznik:(document.getElementById('nZak')||{}).value,kontakt:(document.getElementById('nKontakt')||{}).value,kontaktEmail:(document.getElementById('nMail')||{}).value,cisloPoptavky:(document.getElementById('nPopt')||{}).value,pozadovanyTermin:(document.getElementById('nTerm')||{}).value,params:params,dotaznik:dot,artNo:DQ_ART,
-    rezim:(MODE==='nabidka'?'nabidka':'objednavka'),stredisko:(document.getElementById('nZavod')||{}).value||''};
+    rezim:(MODE==='nabidka'?'nabidka':'objednavka'),stredisko:(document.getElementById('nZavod')||{}).value||'',
+    prilohy:DQ_PRIL};
   if(!b.zakaznik.trim()){document.getElementById('nErr').textContent=tr('Vyplňte zákazníka.');return}
   api('/zakazka','POST',b).then(function(o){
     if(!o.ok){document.getElementById('nErr').textContent=o.j.chyba||'Chyba.';return}
