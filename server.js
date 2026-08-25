@@ -748,7 +748,7 @@ function mySurveys(email) {
     { id: 'jss',  title: 'Dotazník pracovní spokojenosti (JSS)', desc: '36 otázek · 9 oblastí pracovní spokojenosti', mins: 8, file: JSS_F },
     { id: 'tw44', title: 'Test kognitivní zátěže (TW44)', desc: 'krátké subtesty pozornosti a paměti', mins: 6, file: TW44_F },
     { id: 'vykresy', title: 'Test čtení výkresů', desc: '15 otázek · praktické čtení strojírenské výkresové dokumentace', mins: 10, file: VYKRESY_F },
-    { id: 'logika', title: 'Test logického myšlení (nákup a logistika)', desc: '28 úloh · odhady, dedukce, rozhodování, řízení zásob — kreativní logika', mins: 40, file: LOGIKA_F },
+    { id: 'logika', title: 'Test logického myšlení (nákup a logistika)', desc: '29 úloh · odhady, dedukce, rozhodování, řízení zásob — kreativní logika', mins: 40, file: LOGIKA_F },
   ];
   return DEFS.map(d => {
     const rec = readJson(d.file, []).find(r => (r.email || '').toLowerCase() === email);
@@ -866,7 +866,7 @@ function recordLogika(a) {
   const name = emp ? (emp.name || email) : (a.name || a.kandidat || email);
   let dept = '—';
   if (emp && emp.cats && emp.cats.length) { const c = (s2.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
-  const celkem = Math.max(1, Math.round(Number(a.otazekCelkem) || 28));
+  const celkem = Math.max(1, Math.round(Number(a.otazekCelkem) || 29));
   const skore = Math.max(0, Math.min(celkem, Math.round(Number(a.skore) || 0)));
   const procenta = Math.max(0, Math.min(100, Math.round((a.procenta != null && isFinite(a.procenta)) ? Number(a.procenta) : skore / celkem * 100)));
   const rec = { email, name, dept,

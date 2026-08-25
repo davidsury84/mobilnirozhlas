@@ -345,6 +345,18 @@
    ],
    "correct": 2,
    "correctText": "od 24 palet — 23 × 600 = 13 800 Kč (dokládka ještě levnější), 24 × 600 = 14 400 > 14 000. Paušál vs. cena za jednotku se láme na 14 000 ÷ 600 ≈ 23,3"
+  },
+  {
+   "cat": 6,
+   "text": "Systém řízení zásob hlásí u položky <span class=\"em\">kritický stav</span>: sklad 0 ks, zákazníci mají objednáno 15 ks — doporučuje okamžitě nakoupit na sklad. Pak zjistíte, že položka se prodává <span class=\"em\">dropshippingem</span>: zboží posílá dodavatel přímo zákazníkovi, na náš sklad nikdy nejde. Co je správná reakce?",
+   "options": [
+    "Objednat 15 ks na sklad co nejdříve — objednávky zákazníků se musí vykrýt",
+    "Nic nenakupovat — sklad 0 je u dropshippingu normální stav a objednávky vykrývá dodavatel; hlídat je třeba jeho spolehlivost, ne náš sklad",
+    "Objednat aspoň část na sklad pro jistotu",
+    "Zvýšit pojistnou zásobu položky"
+   ],
+   "correct": 1,
+   "correctText": "nic nenakupovat — dropshipping nemá skladovou zásobu z principu, signály skladové optimalizace (oversold, bod objednání, pojistná zásoba) se na něj nevztahují. Nákupčí musí poznat, KTERÝ model položka má, jinak plní sklad zbožím, které tudy vůbec nemá téct; hlídá se dodací spolehlivost dodavatele"
   }
  ]
 }
