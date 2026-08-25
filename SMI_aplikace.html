@@ -245,7 +245,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <label>Váha vyhlazení w <span class="unit">[bezrozměrné, 0–1]</span><input type="number" step="0.05" id="s_w" value="0.70"></label>
         <label>Inflační koeficient k_inf <span class="unit">[index, 1,05 = +5 %]</span><input type="number" step="0.01" id="s_kinf" value="1.00"></label>
         <label>Práh přecenění (dead band) <span class="unit">[index, 1,02 = +2 %]</span><input type="number" step="0.01" id="s_thr" value="1.02"></label>
-        <label>Max. krok zdražení / měsíc <span class="unit">[%, plynulá křivka; 0 = skokem]</span><input type="number" step="1" min="0" max="50" id="s_krok" value="5"></label>
+        <label>Max. krok zdražení / měsíc <span class="unit">[%, 0 = skokem]</span><input type="number" step="1" min="0" max="50" id="s_krok" value="5"></label>
+        <label>Křivka zdražení <span class="unit">[plynulá = rovnoměrné kroky · agresivní = velký první krok, zbytek dojede]</span><select id="s_kurve"><option value="plynula">plynulá</option><option value="agresivni">agresivní (front-loaded)</option></select></label>
+        <label>První krok agresivní křivky <span class="unit">[% mezery k cíli, jen pro agresivní]</span><input type="number" step="5" min="10" max="100" id="s_front" value="60"></label>
       </div>
       <div style="margin-top:12px"><button class="btn" id="recalc">Přepočítat</button></div>
     </details>
@@ -1015,16 +1017,21 @@ function reprice(it){
   it.targetPrice=null; it.stepsToTarget=null;
   if(rep>base*1.004&&P.krok>0){
     const target=rep;
-    let step=base*(1+P.krok);
-    // POJISTKA: plynulost nikdy nesmí držet cenu POD novou nákupní cenou — pod náklad
-    // se neprodává ani během náběhu. První krok skočí minimálně na L×k_inf, vyhlazuje
-    // se jen marže nad ní.
+    // Dvě strategie tempa: „plynulá" = rovnoměrné kroky max P.krok/měs (šetrná ke srovnávačům,
+    // ale nechává marži na stole déle); „agresivní" (front-loaded) = první krok spolkne
+    // P.front (default 60 %) mezery k cíli — jeden viditelný, komunikovatelný pohyb — a zbytek
+    // dojede plynule. Výzkum ji favorizuje u B2B s veřejným krytím (inflace, index oceli).
+    let step=(P.kurve==='agresivni')?(base+(target-base)*P.front):(base*(1+P.krok));
+    if(P.kurve==='agresivni')step=Math.max(step,base*(1+P.krok));
+    // POJISTKA (obě strategie): cena nesmí zůstat POD novou nákupní — první krok skočí
+    // minimálně na L×k_inf, vyhlazuje se jen marže nad ní.
     if(L!=null&&step<L*kinf){ step=Math.min(target,L*kinf); method+=' · skok na nákupní'; }
     rep=Math.min(target,step);
     const zbyva=target/rep;
     const kroku=1+(zbyva>1.004?Math.ceil(Math.log(zbyva)/Math.log(1+P.krok)):0);
     if(kroku>1){ it.targetPrice=target; it.stepsToTarget=kroku;
-      method+=' · plynule: teď +'+Math.round((rep/base-1)*100)+' %, cíl '+fmt(target,1)+' Kč za '+kroku+' měs.'; }
+      method+=(P.kurve==='agresivni'?' · agresivně':' · plynule')+': teď +'+Math.round((rep/base-1)*100)+' %, cíl '+fmt(target,1)+' Kč za '+kroku+' měs.'; }
+    else if(P.kurve==='agresivni'&&rep>base*1.004){ method+=' · agresivně: teď +'+Math.round((rep/base-1)*100)+' %'; }
   }
   let np=rep;
   if(it.disc>0){
@@ -1079,7 +1086,7 @@ function recalc(){
   const _wh=$('#nkWh')?(+$('#nkWh').value||0):0;
   const _effICC=_cap+(_totBB>0?_wh/_totBB:0);
   const _ie=$('#s_icc');if(_ie){_ie.value=_effICC.toFixed(3);_ie.readOnly=true;}
-  P={slow:+$('#s_slow').value,aging:+$('#s_aging').value,dead:+$('#s_dead').value,d1:+$('#s_d1').value,d2:+$('#s_d2').value,icc:_effICC,marg:+$('#s_marg').value,w:+$('#s_w').value,kinf:+$('#s_kinf').value,thr:+$('#s_thr').value,krok:Math.max(0,+(($('#s_krok')||{}).value||5))/100,covslow:+(($('#s_covslow')||{}).value||12),covaging:+(($('#s_covaging')||{}).value||24),covdead:+(($('#s_covdead')||{}).value||48)};
+  P={slow:+$('#s_slow').value,aging:+$('#s_aging').value,dead:+$('#s_dead').value,d1:+$('#s_d1').value,d2:+$('#s_d2').value,icc:_effICC,marg:+$('#s_marg').value,w:+$('#s_w').value,kinf:+$('#s_kinf').value,thr:+$('#s_thr').value,krok:Math.max(0,+(($('#s_krok')||{}).value||5))/100,kurve:(($('#s_kurve')||{}).value||'plynula'),front:Math.min(1,Math.max(.1,+(($('#s_front')||{}).value||60)/100)),covslow:+(($('#s_covslow')||{}).value||12),covaging:+(($('#s_covaging')||{}).value||24),covdead:+(($('#s_covdead')||{}).value||48)};
   const isND=n=>/náhradní díly/i.test(n||'');
   for(const it of ROWS){
     // sales je v kalendářním pořadí; nejnovější měsíc okna = COL.anchorMonthIdx → počítáme od něj zpět
