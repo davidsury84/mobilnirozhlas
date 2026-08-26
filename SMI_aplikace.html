@@ -407,6 +407,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <option value="sleva-add">Sleva % + hodnota</option>
           <option value="price-set">Nová cena = hodnota</option>
           <option value="price-pct">Nová cena × (1 + hodnota %)</option>
+          <option value="clast-pct">C_last = nákupní × (1 + hodnota %) — zdražení dodavatele</option>
+          <option value="clast-set">C_last = hodnota</option>
           <option value="reset">Reset úprav (zpět na model)</option>
         </select>
         <input type="number" id="bulkValue" placeholder="hodnota" style="width:110px">
@@ -1056,9 +1058,19 @@ function bulkApply(){
     else if(act==='sleva-add')it.discOv=Math.max(0,Math.min(100,Math.round((it.disc||0)*100)+val))/100;
     else if(act==='price-set')it.priceOv=val;
     else if(act==='price-pct'){const base=it.newPrice!=null?it.newPrice:it.unitPrice;if(base!=null)it.priceOv=Math.round(base*(1+val/100)*100)/100;}
-    else if(act==='reset'){it.discOv=null;it.priceOv=null;}
+    else if(act==='clast-pct'){
+      // Zdrazeni: nova nakupni = soucasna nakupni × (1+%). Zaklad = ziva landed cena z denniho
+      // exportu, fallback prumerna kvartalni cena/ks. Dropship/doprodej se preskakuje.
+      if(!specOf(it.sk)){
+        const _b=(LIVE_STOCK&&LIVE_STOCK.map&&LIVE_STOCK.map[String(it.sk)+'-'+String(it.reg)]&&LIVE_STOCK.map[String(it.sk)+'-'+String(it.reg)].cost)||it.unitPrice;
+        if(_b>0){it.cLast=Math.round(_b*(1+val/100)*100)/100;it.cLastDrv=false;}
+      }
+    }
+    else if(act==='clast-set'){ if(!specOf(it.sk)&&val>0){it.cLast=val;it.cLastDrv=false;} }
+    else if(act==='reset'){it.discOv=null;it.priceOv=null;it.cLast=null;it.cLastDrv=false;}
     computeRow(it);
   }
+  if(act==='reset'){try{recalc();}catch(e){}}   // po resetu se vrati i C_last odvozeny z dodavatele
   renderModel();renderSouhrn();renderPrice();renderDead();
   toast('Hromadná úprava: '+targets.length+' položek');
 }
