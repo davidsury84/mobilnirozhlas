@@ -7,7 +7,7 @@ function buildPublished(d, ctx){
   const aud=(ctx.audience||[]).map(e=>({email:e.email,name:e.name}));
   let apiB=(ctx.apiUrl||"").replace(/\/+$/,"");
   if(!apiB && ctx.baseUrl){ try{ apiB=new URL(ctx.baseUrl).origin; }catch(e){} }
-  const DATA={id:d.id,title:d.title,html:d.html,pdf:(d.pdf||""),pdfName:(d.pdfName||""),hr:(ctx.hrEmail||""),api:apiB,aud:aud};
+  const DATA={id:d.id,title:d.title,html:d.html,pdf:(d.pdf||""),pdfName:(d.pdfName||""),pdfOrient:(d.pdfOrient||""),hr:(ctx.hrEmail||""),api:apiB,aud:aud};
   const dataStr=JSON.stringify(DATA).replace(/<\//g,'<\\/');
   const css=`*{box-sizing:border-box}
 body{margin:0;background:#f3f2ee;color:#1c1d1a;font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.5}
@@ -17,6 +17,8 @@ header .lg{width:32px;height:32px;border-radius:8px;background:#2d7a52;display:g
 header h1{font-size:16px;margin:0;font-weight:700}
 header small{display:block;font-size:11px;color:#a9aaa3;text-transform:uppercase;letter-spacing:.04em}
 main{max-width:880px;margin:0 auto;padding:26px 22px 80px}
+main.w-portrait{max-width:1040px}
+main.w-landscape{max-width:1500px}
 .ident{background:#fff;border:1px solid #dcdbd4;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:14px}
 .ident label{display:block;font-size:12px;font-weight:600;color:#5a5d57;margin-bottom:5px;text-transform:uppercase}
 .ident input{width:100%;max-width:360px;padding:9px 11px;border:1px solid #c3c2b8;border-radius:8px;font-size:14px;font-family:inherit}
@@ -32,7 +34,9 @@ main{max-width:880px;margin:0 auto;padding:26px 22px 80px}
 .pdfbox .pb-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .pdfbox .pb-h b{font-family:"IBM Plex Sans";font-size:15px}
 .pdfbox .pb-h a{margin-left:auto;background:#2d7a52;color:#fff;text-decoration:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:"IBM Plex Sans"}
-.pdfbox iframe{width:100%;height:78vh;min-height:460px;border:1px solid #e2e1da;border-radius:8px;background:#f7f6f2;display:block}
+.pdfbox iframe{width:100%;height:82vh;min-height:460px;border:1px solid #e2e1da;border-radius:8px;background:#f7f6f2;display:block}
+main.w-landscape .pdfbox iframe{height:68vh;min-height:420px}
+.pdfbox .pb-h .pb-or{font-family:"IBM Plex Sans";font-size:11.5px;font-weight:600;color:#5a5d57;background:#eef3ef;border-radius:999px;padding:2px 9px}
 .pdfbox .pb-note{font-size:12.5px;color:#5a5d57;margin-top:8px;font-family:"IBM Plex Sans"}
 .doc img{max-width:100%;height:auto}
 .ack{margin:24px 0 0;background:#fff;border:2px solid #2d7a52;border-radius:10px;padding:22px 26px}
@@ -94,7 +98,10 @@ function init(){
   if(DATA.pdf){
     var nm=DATA.pdfName||"dokument.pdf";
     var box=document.createElement("div"); box.className="pdfbox";
+    var or=DATA.pdfOrient==="landscape"?"landscape":"portrait";
+    document.querySelector("main").className="w-"+or;
     box.innerHTML='<div class="pb-h"><b>&#128196; '+nm.replace(/[<>&]/g,"")+'</b>'+
+      '<span class="pb-or">'+(or==="landscape"?"na šířku":"na výšku")+'</span>'+
       '<a href="'+DATA.pdf+'" target="_blank" rel="noopener" download>Stáhnout PDF</a></div>'+
       '<iframe src="'+DATA.pdf+'#view=FitH" title="PDF"></iframe>'+
       '<div class="pb-note">Pokud se dokument nezobrazí, otevřete ho tlačítkem „Stáhnout PDF“.</div>';

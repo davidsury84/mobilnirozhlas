@@ -1387,6 +1387,20 @@ function saveDataUrlImage(dataUrl) {
   fs.writeFileSync(path.join(UPLOADS_DIR, fn), buf);
   return '/uploads/' + fn;
 }
+// Orientace PDF podle prvního /MediaBox (+ /Rotate). Vrací 'landscape' | 'portrait' | '' (nezjištěno).
+function pdfOrientation(buf) {
+  try {
+    const head = buf.slice(0, Math.min(buf.length, 500000)).toString('latin1');
+    const m = /\/MediaBox\s*\[\s*(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s*\]/.exec(head);
+    if (!m) return '';
+    let w = Math.abs(parseFloat(m[3]) - parseFloat(m[1]));
+    let h = Math.abs(parseFloat(m[4]) - parseFloat(m[2]));
+    const r = /\/Rotate\s+(-?\d+)/.exec(head);
+    if (r) { const deg = ((parseInt(r[1], 10) % 360) + 360) % 360; if (deg === 90 || deg === 270) { const t = w; w = h; h = t; } }
+    if (!w || !h) return '';
+    return w > h * 1.03 ? 'landscape' : 'portrait';
+  } catch (_) { return ''; }
+}
 // Uloží PDF z data URL do UPLOADS_DIR a vrátí veřejnou cestu /uploads/<jméno>.pdf.
 function saveDataUrlPdf(dataUrl) {
   const m = /^data:application\/pdf;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
@@ -2902,7 +2916,9 @@ const server = http.createServer(async (req, res) => {
       try {
         const url = saveDataUrlPdf(b.dataUrl);
         if (!url) return send(res, 400, { error: 'Nahrajte prosím soubor ve formátu PDF.' });
-        return send(res, 200, { ok: true, url, name: String(b.name || '').slice(0, 200) });
+        let orient = '';
+        try { orient = pdfOrientation(fs.readFileSync(path.join(UPLOADS_DIR, url.slice(9)))); } catch (_) {}
+        return send(res, 200, { ok: true, url, name: String(b.name || '').slice(0, 200), orient });
       } catch (e) { return send(res, 400, { error: e.message || 'Nahrání selhalo.' }); }
     }
 

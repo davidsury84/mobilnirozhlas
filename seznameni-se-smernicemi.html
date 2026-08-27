@@ -328,6 +328,9 @@ svg.org-lines .org-link .del path{stroke:#b3261e;stroke-width:1.9;stroke-linecap
 
 /* ---------- Reading mode ---------- */
 .read-shell{max-width:880px;margin:0 auto}
+.read-shell.wide-portrait{max-width:1040px}
+.read-shell.wide-landscape{max-width:1500px}
+.read-shell.wide-portrait .doc-paper,.read-shell.wide-landscape .doc-paper{max-width:none}
 .read-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
 .ack-box{
   max-width:820px;margin:26px auto 0;background:linear-gradient(180deg,var(--green-soft),#fff 70%);border:2px solid var(--green-2);
@@ -367,9 +370,9 @@ svg.org-lines .org-link .del path{stroke:#b3261e;stroke-width:1.9;stroke-linecap
 .cat-chip button:hover{color:var(--red)}
 
 /* ---------- Intranet zaměstnanců (#muj) ---------- */
-.mj-shell{display:flex;max-width:1320px;margin:0 auto;align-items:flex-start;gap:6px}
+.mj-shell{display:flex;max-width:1600px;margin:0 auto;align-items:flex-start;gap:6px}
 .mj-side{width:64px;flex:none;padding:16px 8px;position:sticky;top:69px;align-self:flex-start;z-index:25}
-.mj-main{flex:1;min-width:0;padding:26px 26px 80px;max-width:1120px}
+.mj-main{flex:1;min-width:0;padding:26px 26px 80px;max-width:1400px}
 .mj-main.mj-full{max-width:none;padding:0}
 .mj-nav{display:flex;flex-direction:column;gap:3px;border:1px solid transparent;border-radius:14px;transition:box-shadow .16s}
 .mj-side:hover .mj-nav{position:absolute;top:0;left:0;width:236px;background:var(--paper);border-color:var(--line);box-shadow:var(--shadow-lg);padding:10px;z-index:40;max-height:calc(100vh - 84px);overflow-y:auto;overscroll-behavior:contain}
@@ -5023,7 +5026,13 @@ function openDirectiveModal(id){
       <input type="file" id="dPdfFile" accept="application/pdf,.pdf" onchange="dirPdfUpload(this)">
     </label>
     <div id="dPdfInfo">${dirPdfInfoHtml(d)}</div>
-    <div class="hint">Můžeš nahrát <strong>jen PDF</strong> bez wordu — směrnice pak bude tvořená přílohou. Max 8 MB.</div>
+    <label class="field" style="margin-top:8px"><span>Orientace dokumentu</span>
+      <select id="dPdfOrient">
+        <option value="">Automaticky (podle souboru)</option>
+        <option value="portrait" ${d&&d.pdfOrient==='portrait'?'selected':''}>Na výšku</option>
+        <option value="landscape" ${d&&d.pdfOrient==='landscape'?'selected':''}>Na šířku (organigramy, plakáty)</option>
+      </select></label>
+    <div class="hint">Můžeš nahrát <strong>jen PDF</strong> bez wordu — směrnice pak bude tvořená přílohou. Max 8 MB. Dokument <strong>na šířku</strong> se zobrazí v širší stránce, aby byl čitelný.</div>
     <div id="docPreviewWrap" style="${pendingHtml?'':'display:none'}">
       <div class="spread" style="margin-bottom:6px"><span style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase">Náhled · klikni a uprav</span>
         <div class="inline-actions" style="gap:4px">
@@ -5137,8 +5146,10 @@ async function dirPdfUpload(inp){
     const j=await r.json();
     if(!r.ok||j.error) throw new Error(j.error||'Nahrání selhalo.');
     pendingPdf=j.url; pendingPdfName=j.name||f.name;
+    const os=document.getElementById('dPdfOrient');
+    if(os && j.orient){ os.value=j.orient; }      // předvyplní zjištěnou orientaci, jde přepsat
     dirPdfRefresh(null);
-    toast('PDF nahráno');
+    toast(j.orient==='landscape'?'PDF nahráno — rozpoznáno na šířku':(j.orient==='portrait'?'PDF nahráno — rozpoznáno na výšku':'PDF nahráno'));
   }catch(e){ alert(e.message||'Nahrání selhalo.'); dirPdfRefresh(null); }
   inp.value='';
 }
@@ -5148,6 +5159,7 @@ function saveDirective(id){
   const pdfUrl=(pendingPdf!==null?pendingPdf:((id&&DB.directives.find(x=>x.id===id)||{}).pdf||''));
   const pdfNm=(pendingPdfName!==null?pendingPdfName:((id&&DB.directives.find(x=>x.id===id)||{}).pdfName||''));
   if(!pendingHtml && !pdfUrl){ alert("Nahraj dokument (.docx) nebo přílohu PDF."); return; }
+  const pdfOr=(document.getElementById("dPdfOrient")&&document.getElementById("dPdfOrient").value)||'';
   const all=document.getElementById("dAll").checked;
   const cats=[...document.querySelectorAll(".dcat:checked")].map(c=>c.value);
   const tags=(document.getElementById("dTags").value||"").split(",").map(s=>s.trim()).filter(Boolean);
@@ -5156,10 +5168,10 @@ function saveDirective(id){
   if(id){
     const d=DB.directives.find(x=>x.id===id);
     d.title=title; d.html=pendingHtml||''; d.assignAll=all; d.assignCats=cats; d.assignTags=tags; d.kategorie=kat;
-    d.pdf=pdfUrl||''; d.pdfName=pdfNm||'';
+    d.pdf=pdfUrl||''; d.pdfName=pdfNm||''; d.pdfOrient=pdfOr||'';
   } else {
     did=uid();
-    DB.directives.push({id:did,title,html:pendingHtml||'',pdf:pdfUrl||'',pdfName:pdfNm||'',createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,kategorie:kat,verze:1,acks:{}});
+    DB.directives.push({id:did,title,html:pendingHtml||'',pdf:pdfUrl||'',pdfName:pdfNm||'',pdfOrient:pdfOr||'',createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,kategorie:kat,verze:1,acks:{}});
   }
   save(); closeModal(); renderDirectives();
   toast(id?"Směrnice upravena":"Směrnice uložena");
@@ -8657,7 +8669,7 @@ function buildPublished(d){
   const aud=audienceOf(d).map(e=>({email:e.email,name:e.name}));
   let apiB=(DB.settings.apiUrl||"").replace(/\/+$/,"");
   if(!apiB && DB.settings.baseUrl){ try{ apiB=new URL(DB.settings.baseUrl).origin; }catch(e){} }
-  const DATA={id:d.id,title:d.title,html:d.html,pdf:(d.pdf||""),pdfName:(d.pdfName||""),hr:(DB.settings.hrEmail||""),api:apiB,aud:aud};
+  const DATA={id:d.id,title:d.title,html:d.html,pdf:(d.pdf||""),pdfName:(d.pdfName||""),pdfOrient:(d.pdfOrient||""),hr:(DB.settings.hrEmail||""),api:apiB,aud:aud};
   const dataStr=JSON.stringify(DATA).replace(/<\//g,'<\\/');
   const css=`*{box-sizing:border-box}
 body{margin:0;background:#f3f2ee;color:#1c1d1a;font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.5}
@@ -8667,6 +8679,8 @@ header .lg{width:32px;height:32px;border-radius:8px;background:#2d7a52;display:g
 header h1{font-size:16px;margin:0;font-weight:700}
 header small{display:block;font-size:11px;color:#a9aaa3;text-transform:uppercase;letter-spacing:.04em}
 main{max-width:880px;margin:0 auto;padding:26px 22px 80px}
+main.w-portrait{max-width:1040px}
+main.w-landscape{max-width:1500px}
 .ident{background:#fff;border:1px solid #dcdbd4;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:14px}
 .ident label{display:block;font-size:12px;font-weight:600;color:#5a5d57;margin-bottom:5px;text-transform:uppercase}
 .ident input{width:100%;max-width:360px;padding:9px 11px;border:1px solid #c3c2b8;border-radius:8px;font-size:14px;font-family:inherit}
@@ -8682,7 +8696,9 @@ main{max-width:880px;margin:0 auto;padding:26px 22px 80px}
 .pdfbox .pb-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .pdfbox .pb-h b{font-family:"IBM Plex Sans";font-size:15px}
 .pdfbox .pb-h a{margin-left:auto;background:#2d7a52;color:#fff;text-decoration:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:"IBM Plex Sans"}
-.pdfbox iframe{width:100%;height:78vh;min-height:460px;border:1px solid #e2e1da;border-radius:8px;background:#f7f6f2;display:block}
+.pdfbox iframe{width:100%;height:82vh;min-height:460px;border:1px solid #e2e1da;border-radius:8px;background:#f7f6f2;display:block}
+main.w-landscape .pdfbox iframe{height:68vh;min-height:420px}
+.pdfbox .pb-h .pb-or{font-family:"IBM Plex Sans";font-size:11.5px;font-weight:600;color:#5a5d57;background:#eef3ef;border-radius:999px;padding:2px 9px}
 .pdfbox .pb-note{font-size:12.5px;color:#5a5d57;margin-top:8px;font-family:"IBM Plex Sans"}
 .doc img{max-width:100%;height:auto}
 .ack{margin:24px 0 0;background:#fff;border:2px solid #2d7a52;border-radius:10px;padding:22px 26px}
@@ -8744,7 +8760,10 @@ function init(){
   if(DATA.pdf){
     var nm=(DATA.pdfName||"dokument.pdf").replace(/[<>&]/g,"");
     var box=document.createElement("div"); box.className="pdfbox";
+    var or=DATA.pdfOrient==="landscape"?"landscape":"portrait";
+    document.querySelector("main").className="w-"+or;
     box.innerHTML='<div class="pb-h"><b>&#128196; '+nm+'</b>'+
+      '<span class="pb-or">'+(or==="landscape"?"na šířku":"na výšku")+'</span>'+
       '<a href="'+DATA.pdf+'" target="_blank" rel="noopener" download>Stáhnout PDF</a></div>'+
       '<iframe src="'+DATA.pdf+'#view=FitH" title="PDF"></iframe>'+
       '<div class="pb-note">Pokud se dokument nezobrazí, otevřete ho tlačítkem „Stáhnout PDF“.</div>';
@@ -8787,10 +8806,13 @@ function showReader(id, preset){
   const bar=document.getElementById("readerIdField");
   if(!d){ document.getElementById("readerDoc").innerHTML='<p>Směrnice nenalezena.</p>'; document.getElementById("ackBox").innerHTML=""; bar.innerHTML=""; return; }
   document.getElementById("readBrand").textContent=d.title;
+  const naSirku=(d.pdfOrient==='landscape');
+  const shell=document.querySelector('#reader .read-shell');
+  if(shell) shell.className='read-shell'+(d.pdf?(naSirku?' wide-landscape':' wide-portrait'):'');
   document.getElementById("readerDoc").innerHTML=(d.html||'')+
-    (d.pdf?('<div style="margin-top:14px"><div class="spread" style="margin-bottom:8px"><b style="font-size:14px">📄 '+esc(d.pdfName||'Příloha PDF')+'</b>'+
+    (d.pdf?('<div style="margin-top:14px"><div class="spread" style="margin-bottom:8px"><b style="font-size:14px">📄 '+esc(d.pdfName||'Příloha PDF')+' <span class="pill">'+(naSirku?'na šířku':'na výšku')+'</span></b>'+
       '<a class="btn ghost sm" href="'+esc(d.pdf)+'" target="_blank" rel="noopener" download>Stáhnout PDF</a></div>'+
-      '<iframe src="'+esc(d.pdf)+'#view=FitH" style="width:100%;height:70vh;min-height:420px;border:1px solid var(--line);border-radius:10px;background:#f7f7f4" title="PDF"></iframe></div>'):'');
+      '<iframe src="'+esc(d.pdf)+'#view=FitH" style="width:100%;height:'+(naSirku?'68vh':'82vh')+';min-height:420px;border:1px solid var(--line);border-radius:10px;background:#f7f7f4" title="PDF"></iframe></div>'):'');
   r.dataset.dirId=id;
   if(preset){
     const emp=DB.employees.find(e=>e.email.toLowerCase()===preset.toLowerCase());
