@@ -3760,7 +3760,7 @@ const server = http.createServer(async (req, res) => {
       const ver = (d.versions || []).find(x => Number(x.v) === v) || (d.versions || [])[(d.versions || []).length - 1];
       if (!ver) return send(res, 404, { error: 'Verze nenalezena.' });
       const email = e ? e.email : '';
-      return send(res, 200, { id: d.id, title: d.title, kind: d.kind || 'dokument', v: ver.v, note: ver.note || '', html: ver.html || '', requireAck: d.requireAck !== false, acked: email ? libAcked(d.id, ver.v, email) : false });
+      return send(res, 200, { id: d.id, title: d.title, kind: d.kind || 'dokument', v: ver.v, note: ver.note || '', html: ver.html || '', pdf: ver.pdf || '', pdfName: ver.pdfName || '', pdfOrient: ver.pdfOrient || '', requireAck: d.requireAck !== false, acked: email ? libAcked(d.id, ver.v, email) : false });
     }
     if (p === '/api/library-ack' && req.method === 'POST') {
       const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });

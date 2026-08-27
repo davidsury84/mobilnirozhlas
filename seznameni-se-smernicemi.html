@@ -799,7 +799,8 @@ img.pv-thumb{background:#fff}
 .pv-lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#1b1f23;font-size:30px;line-height:1;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 .pv-lb-nav.prev{left:-8px}.pv-lb-nav.next{right:-8px}
 @media(max-width:620px){.pv-lb-nav.prev{left:4px}.pv-lb-nav.next{right:4px}}
-.read-shell-mj{max-width:880px;margin:0 auto}
+.read-shell-mj{max-width:1040px;margin:0 auto}
+.read-shell-mj.wide{max-width:1500px}
 .ack-card{margin-top:20px;background:linear-gradient(180deg,var(--green-soft),#fff 75%);border:2px solid var(--green-2);border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow)}
 .ack-card.done{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--green-soft)}
 .ack-card .chk span{font-size:15px;line-height:1.55}
@@ -4339,14 +4340,21 @@ async function openLibDoc(id, v){
   catch(e){ body.innerHTML='<div class="card pad"><p>Chyba načítání dokumentu.</p></div>'; return; }
   if(doc.error){ body.innerHTML='<div class="card pad"><p>'+esc(doc.error)+'</p></div>'; return; }
   const backF = MUJ.libFolder ? "'"+MUJ.libFolder+"'" : "null";
-  let h = '<div class="read-shell-mj">'+
+  let h = '<div class="read-shell-mj'+(doc.pdf&&doc.pdfOrient==='landscape'?' wide':'')+'">'+
     '<div class="crumb"><a onclick="showLibrary(null)">'+mujIcon(MUJ_IC.book)+' Knihovna</a><span class="sep">›</span><span class="cur">'+esc(doc.title)+'</span></div>'+
     '<div class="read-bar no-print"><button class="btn ghost sm" onclick="showLibrary('+backF+')">← Zpět</button>'+
     '<button class="btn ghost sm" onclick="window.print()">Tisk / PDF</button></div>'+
     '<h2 style="margin:0 0 3px">'+esc(doc.title)+' <span class="muted" style="font-size:14px;font-weight:400">verze '+doc.v+'</span></h2>';
   if(doc.note) h+='<p class="muted" style="margin:0 0 16px">'+esc(doc.note)+'</p>';
   else h+='<div style="height:14px"></div>';
-  h+='<div class="doc-paper" style="padding:36px 42px;max-width:none;margin:0">'+doc.html+'</div>';
+  if(doc.html) h+='<div class="doc-paper" style="padding:36px 42px;max-width:none;margin:0">'+doc.html+'</div>';
+  if(doc.pdf){
+    const naSirku=(doc.pdfOrient==='landscape');
+    h+='<div style="margin-top:'+(doc.html?'16px':'0')+'"><div class="spread" style="margin-bottom:8px">'+
+      '<b style="font-size:14px">📄 '+esc(doc.pdfName||'Příloha PDF')+' <span class="pill">'+(naSirku?'na šířku':'na výšku')+'</span></b>'+
+      '<a class="btn ghost sm" href="'+esc(doc.pdf)+'" target="_blank" rel="noopener" download>Stáhnout PDF</a></div>'+
+      '<iframe src="'+esc(doc.pdf)+'#view=FitH" style="width:100%;height:'+(naSirku?'68vh':'82vh')+';min-height:420px;border:1px solid var(--line);border-radius:10px;background:#f7f7f4" title="PDF"></iframe></div>';
+  }
   if(doc.requireAck){
     h+= doc.acked
       ? '<div class="ack-card done"><span class="pill green">✓ Tuto verzi jste již potvrdil(a)</span></div>'
@@ -5278,7 +5286,7 @@ async function libEditObsah(id){ await openLibDocModal(id); libNactiObsah(id); }
 async function openLibDocModal(id){
   await ensureLib(); if(!LIBDB) return;
   const d = id? LIBDB.docs.find(x=>x.id===id) : null;
-  pendingHtml=null; libNewVer=false;
+  pendingHtml=null; libNewVer=false; libPendingPdf=null; libPendingPdfName=null;
   const folderSel = d? (d.folderId||"") : (LIBADMIN.folder||"");
   const catChecks = DB.categories.map(c=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0"><input type="checkbox" class="lcat" value="'+c.id+'" '+(d&&(d.assignCats||[]).includes(c.id)?'checked':'')+'> '+esc(c.name)+'</label>').join("") || '<span class="muted">Nejprve přidej kategorie v záložce Zaměstnanci.</span>';
   document.getElementById("modalTitle").textContent = d? "Upravit dokument" : "Nový dokument";
@@ -5298,6 +5306,15 @@ async function openLibDocModal(id){
         '<button type="button" class="btn ghost sm" onclick="docCmd(\'insertUnorderedList\')">•</button>'+
         '<button type="button" class="btn ghost sm" onclick="docCleanWord()">⌫W</button></div></div>'+
       '<div id="docPreview" class="doc-paper" contenteditable="true" spellcheck="true" oninput="pendingHtml=this.innerHTML" style="padding:24px 28px;max-height:340px;overflow:auto;margin:0 0 12px;font-size:14px;outline:none"></div></div>'+
+    '<label class="field" style="margin-top:6px"><span>Příloha PDF <span class="muted" style="font-weight:400;text-transform:none">(např. organigram, formulář — zobrazí se rovnou v dokumentu)</span></span>'+
+      '<input type="file" id="lPdfFile" accept="application/pdf,.pdf" onchange="libPdfUpload(this)"></label>'+
+    '<div id="lPdfInfo">'+libPdfInfoHtml(d)+'</div>'+
+    '<label class="field" style="margin-top:8px"><span>Orientace PDF</span><select id="lPdfOrient">'+
+      '<option value="">Automaticky (podle souboru)</option>'+
+      '<option value="portrait"'+(libCurPdfOrient(d)==='portrait'?' selected':'')+'>Na výšku</option>'+
+      '<option value="landscape"'+(libCurPdfOrient(d)==='landscape'?' selected':'')+'>Na šířku (organigramy, plakáty)</option>'+
+      '</select></label>'+
+    '<div class="hint">Dokument může být tvořený <strong>jen PDF</strong> — word nahrávat nemusíš. Max 8 MB. Nahrání PDF založí novou verzi.</div>'+
     '<label class="field"><span>Poznámka k verzi (volitelné)</span><input type="text" id="lNote" placeholder="např. aktualizace 2026"></label>'+
     '<label style="display:inline-flex;gap:8px;align-items:center;margin:0 0 12px"><input type="checkbox" id="lReq" '+((!d||d.requireAck!==false)?'checked':'')+'> Vyžadovat potvrzení seznámení</label>'+
     '<label class="field"><span>Komu je určen</span><label style="display:inline-flex;gap:6px;align-items:center;margin:0 0 10px"><input type="checkbox" id="lAll" '+((!d||d.assignAll)?'checked':'')+' onchange="document.getElementById(\'lcatWrap\').style.opacity=this.checked?.4:1"> Všem zaměstnancům</label></label>'+
@@ -5310,6 +5327,38 @@ async function openLibDocModal(id){
     '<button class="btn" onclick="saveLibDoc(\''+(id||'')+'\')">Uložit dokument</button>';
   showModal();
 }
+/* ---- Příloha PDF u dokumentu knihovny (verze může být i jen PDF) ---- */
+let libPendingPdf=null, libPendingPdfName=null;
+function libCurVerObj(d){ if(!d||!Array.isArray(d.versions)||!d.versions.length) return null; const v=curVer(d); return d.versions.find(x=>Number(x.v)===Number(v))||d.versions[d.versions.length-1]; }
+function libCurPdfOrient(d){ const ver=libCurVerObj(d); return (ver&&ver.pdfOrient)||''; }
+function libPdfInfoHtml(d){
+  const ver=libCurVerObj(d);
+  const url=(libPendingPdf!==null?libPendingPdf:((ver&&ver.pdf)||''));
+  const nm=(libPendingPdfName!==null?libPendingPdfName:((ver&&ver.pdfName)||''));
+  if(!url) return '<p class="muted" style="margin:2px 0 0;font-size:13px">Zatím bez přílohy.</p>';
+  return '<div class="spread" style="margin:4px 0 0;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg-2)">'+
+    '<span style="font-size:13.5px">📄 <b>'+esc(nm||'dokument.pdf')+'</b> <a href="'+esc(url)+'" target="_blank" rel="noopener" style="margin-left:6px;font-size:12.5px">otevřít</a></span>'+
+    '<button type="button" class="btn ghost sm" onclick="libPdfRemove()">Odebrat</button></div>';
+}
+function libPdfRefresh(){ const box=document.getElementById('lPdfInfo'); if(box) box.innerHTML=libPdfInfoHtml(null); }
+function libPdfRemove(){ libPendingPdf=''; libPendingPdfName=''; libNewVer=true; libPdfRefresh(); }
+async function libPdfUpload(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  if(!/pdf$/i.test(f.type||'')&&!/\.pdf$/i.test(f.name||'')){ alert('Nahrajte prosím soubor PDF.'); inp.value=''; return; }
+  if(f.size>8e6){ alert('PDF je příliš velké (max 8 MB).'); inp.value=''; return; }
+  const box=document.getElementById('lPdfInfo'); if(box) box.innerHTML='<p class="muted" style="margin:2px 0 0;font-size:13px">Nahrávám…</p>';
+  try{
+    const dataUrl=await new Promise((ok,bad)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=()=>bad(new Error('Soubor se nepodařilo načíst.')); r.readAsDataURL(f); });
+    const r=await fetch('/api/smernice/pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,name:f.name})});
+    const j=await r.json();
+    if(!r.ok||j.error) throw new Error(j.error||'Nahrání selhalo.');
+    libPendingPdf=j.url; libPendingPdfName=j.name||f.name; libNewVer=true;
+    const os=document.getElementById('lPdfOrient'); if(os && j.orient) os.value=j.orient;
+    libPdfRefresh();
+    toast(j.orient==='landscape'?'PDF nahráno — rozpoznáno na šířku':(j.orient==='portrait'?'PDF nahráno — rozpoznáno na výšku':'PDF nahráno'));
+  }catch(e){ alert(e.message||'Nahrání selhalo.'); libPdfRefresh(); }
+  inp.value='';
+}
 async function saveLibDoc(id){
   const title=document.getElementById("lTitle").value.trim();
   if(!title){ alert("Zadej název dokumentu."); return; }
@@ -5320,13 +5369,24 @@ async function saveLibDoc(id){
   const cats=[...document.querySelectorAll(".lcat:checked")].map(c=>c.value);
   const tags=(document.getElementById("lTags").value||"").split(",").map(s=>s.trim()).filter(Boolean);
   const note=document.getElementById("lNote").value.trim();
+  const pdfOr=(document.getElementById("lPdfOrient")&&document.getElementById("lPdfOrient").value)||'';
   if(id){
     const d=LIBDB.docs.find(x=>x.id===id); if(!d) return;
     d.title=title; d.kind=kind; d.folderId=folderId; d.requireAck=requireAck; d.assignAll=all; d.assignCats=cats; d.assignTags=tags;
-    if(libNewVer && pendingHtml){ const nv=curVer(d)+1; d.versions=d.versions||[]; d.versions.push({v:nv,html:pendingHtml,note,ts:Date.now()}); d.cur=nv; }
+    const prev=libCurVerObj(d)||{};
+    const pdfUrl=(libPendingPdf!==null?libPendingPdf:(prev.pdf||''));
+    const pdfNm=(libPendingPdfName!==null?libPendingPdfName:(prev.pdfName||''));
+    // nová verze vznikne při novém obsahu nebo změně přílohy; jinak se jen doladí orientace
+    if(libNewVer && (pendingHtml || pdfUrl)){
+      const nv=curVer(d)+1; d.versions=d.versions||[];
+      d.versions.push({v:nv,html:(pendingHtml||(pendingHtml===null?(prev.html||''):'')),pdf:pdfUrl,pdfName:pdfNm,pdfOrient:pdfOr,note,ts:Date.now()});
+      d.cur=nv;
+    } else if(prev && prev.pdf && prev.pdfOrient!==pdfOr){ prev.pdfOrient=pdfOr; }
   } else {
-    if(!pendingHtml){ alert("Nahraj dokument."); return; }
-    LIBDB.docs.push({id:uid(),title,kind,folderId,requireAck,assignAll:all,assignCats:cats,assignTags:tags,cur:1,versions:[{v:1,html:pendingHtml,note,ts:Date.now()}]});
+    const pdfUrl=(libPendingPdf||'');
+    if(!pendingHtml && !pdfUrl){ alert("Nahraj dokument (.docx) nebo přílohu PDF."); return; }
+    LIBDB.docs.push({id:uid(),title,kind,folderId,requireAck,assignAll:all,assignCats:cats,assignTags:tags,cur:1,
+      versions:[{v:1,html:pendingHtml||'',pdf:pdfUrl,pdfName:(libPendingPdfName||''),pdfOrient:pdfOr,note,ts:Date.now()}]});
   }
   await saveLibrary(); closeModal(); renderLibAdmin();
   toast(id?"Dokument uložen":"Dokument přidán");
