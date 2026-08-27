@@ -1944,8 +1944,8 @@ const OBCHOD_SLOUPCE = [
   { key: 'pm', label: 'Garant (odpovědný PM)' },
   { key: 'zastup', label: 'Náhradní garant 1 (zástup)' },
   { key: 'nahradnik', label: 'Náhradní garant 2' },
-  { key: 'garantSk', label: 'Garant SK' },
-  { key: 'garantPl', label: 'Garant PL' },
+  { key: 'garantSk', label: 'Slovensko' },
+  { key: 'garantPl', label: 'Polsko' },
   { key: 'pokryti', label: 'Stav pokrytí' },
   { key: 'poznamka', label: 'Poznámka' }
 ];
@@ -2055,7 +2055,7 @@ function garantiTokenOk(tok) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 const GARANT_ZEME = ['SK', 'PL', 'CZ', 'jiná'];
-const GARANT_STAVY = ['nový', 'přijatý', 'zamítnutý'];
+const GARANT_STAVY = ['zapsáno', 'smazáno'];
 // Skupiny produktů pro veřejnou stránku = sekce webu + jejich kategorie (z živé tabulky).
 function garantiSkupiny() {
   const rows = readObchod().rows, out = [];
@@ -2600,7 +2600,7 @@ const server = http.createServer(async (req, res) => {
   const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext') || (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') || (p === '/api/kontejnery/list-ext' && req.method === 'GET') || (p === '/api/kontejnery/update-ext' && req.method === 'POST') || (p === '/api/kontejnery/potvrdit-ext' && req.method === 'POST');
   const libraryIngestPublic = (p === '/api/library/ingest-ext' && req.method === 'POST');
   // Veřejná stránka garantů (odkaz s tokenem pro kolegy ze SK/PL) + její API.
-  const garantiPublic = p.indexOf('/garanti/') === 0 || p.indexOf('/api/garanti/verejne') === 0 || (p === '/api/garanti/navrh' && req.method === 'POST');   // Bearer SSO_SHARED_SECRET (vkládání dokumentů přes chat)
+  const garantiPublic = p.indexOf('/garanti/') === 0 || p.indexOf('/api/garanti/verejne') === 0 || (p === '/api/garanti/zapis' && req.method === 'POST');   // Bearer SSO_SHARED_SECRET (vkládání dokumentů přes chat)
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
   // Veřejné cesty hodnocení mobiliáře (obrázkový průzkum pro obchodníky i zákazníky): stránka + fotky + hlasy.
@@ -3300,32 +3300,37 @@ const server = http.createServer(async (req, res) => {
         pocetNavrhu: readGaranti().navrhy.length
       }, { 'Cache-Control': 'no-store' });
     }
-    if (p === '/api/garanti/navrh' && req.method === 'POST') {
+    // Zápis jména přímo do sloupce Slovensko / Polsko z veřejné stránky (bez přihlášení, na token).
+    if (p === '/api/garanti/zapis' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
       if (!garantiTokenOk(b.t)) return send(res, 403, { error: 'Odkaz už neplatí.' });
-      if (b.web) return send(res, 200, { ok: true });   // honeypot
       const txt = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
-      const jmeno = txt(b.jmeno, 120), autor = txt(b.autor, 120);
-      if (!jmeno) return send(res, 400, { error: 'Vyplňte prosím jméno navrhovaného garanta.' });
-      if (!autor) return send(res, 400, { error: 'Vyplňte prosím, kdo návrh podává.' });
+      const zeme = txt(b.zeme, 4) === 'PL' ? 'PL' : 'SK';
+      const key = zeme === 'PL' ? 'garantPl' : 'garantSk';
+      const jmeno = txt(b.jmeno, 120), kdo = txt(b.kdo, 120);
+      const t = readObchod();
+      const row = t.rows.find(r => r.id === txt(b.rowId, 60));
+      if (!row) return send(res, 404, { error: 'Řádek nenalezen — obnovte prosím stránku.' });
+      const puvodni = String(row[key] || '');
+      if (puvodni === jmeno) return send(res, 200, { ok: true, beze_zmeny: true });
+      row[key] = jmeno;
+      writeObchod(t.rows);
       const d = readGaranti();
-      const rec = {
-        id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        ts: new Date().toISOString(),
-        zeme: GARANT_ZEME.indexOf(txt(b.zeme, 10)) >= 0 ? txt(b.zeme, 10) : 'SK',
-        rowId: txt(b.rowId, 60), sekce: txt(b.sekce, 200), kategorie: txt(b.kategorie, 300),
-        jmeno, email: txt(b.email, 160), poznamka: txt(b.poznamka, 2000),
-        autor, autorEmail: txt(b.autorEmail, 160), stav: 'nový'
-      };
-      d.navrhy.unshift(rec); writeGaranti(d);
+      d.navrhy.unshift({
+        id: 'z' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        ts: new Date().toISOString(), zeme, rowId: row.id, sekce: row.sekce || '', kategorie: row.kategorie || '',
+        jmeno, puvodni, autor: kdo, stav: jmeno ? 'zapsáno' : 'smazáno'
+      });
+      writeGaranti(d);
       try {
         Promise.resolve(deliver({
-          to: SUPERADMIN, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet — garanti', subject: 'Návrh garanta (' + rec.zeme + '): ' + (rec.kategorie || rec.sekce || '—'),
-          html: '<p><b>' + esc(rec.autor) + '</b> navrhuje garanta za <b>' + esc(rec.zeme) + '</b>.</p>' +
-            '<p>Skupina / kategorie: <b>' + esc(rec.kategorie || rec.sekce || '—') + '</b><br>' +
-            'Navržený člověk: <b>' + esc(rec.jmeno) + '</b>' + (rec.email ? ' (' + esc(rec.email) + ')' : '') + '</p>' +
-            (rec.poznamka ? '<p>Poznámka: ' + esc(rec.poznamka) + '</p>' : '') +
-            '<p>Návrh najdete v intranetu → Obchod → Garanti SK/PL.</p>'
+          to: SUPERADMIN, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet — garanti',
+          subject: 'Garanti ' + zeme + ': ' + (row.kategorie || '—') + ' → ' + (jmeno || '(smazáno)'),
+          html: '<p>Na veřejné stránce garantů byl upraven sloupec <b>' + (zeme === 'PL' ? 'Polsko' : 'Slovensko') + '</b>.</p>' +
+            '<p>Kategorie: <b>' + esc(row.kategorie || '—') + '</b><br>' +
+            'Nově: <b>' + esc(jmeno || '(prázdné)') + '</b>' + (puvodni ? ' (dřív: ' + esc(puvodni) + ')' : '') + '</p>' +
+            (kdo ? '<p>Zapsal: ' + esc(kdo) + '</p>' : '') +
+            '<p>Přehled je v intranetu → Obchod → Garanti SK/PL.</p>'
         })).catch(e => console.warn('[garanti] notifikace neodešla:', (e && e.message) || e));
       } catch (_) {}
       return send(res, 200, { ok: true });
@@ -3349,24 +3354,8 @@ const server = http.createServer(async (req, res) => {
       let d = garantiEnsureToken();
       if (b.akce === 'novyToken') { d.token = crypto.randomBytes(16).toString('hex'); d = writeGaranti(d); }
       else if (b.akce === 'zapnout') { d.enabled = !!b.hodnota; d = writeGaranti(d); }
-      else if (b.akce === 'stav' || b.akce === 'smazat' || b.akce === 'prijmout') {
-        const n = d.navrhy.find(x => x.id === b.id);
-        if (!n) return send(res, 404, { error: 'Návrh nenalezen.' });
-        if (b.akce === 'smazat') d.navrhy = d.navrhy.filter(x => x.id !== b.id);
-        else if (b.akce === 'stav') n.stav = GARANT_STAVY.indexOf(String(b.stav)) >= 0 ? String(b.stav) : n.stav;
-        else {
-          // Přijmout = zapsat jméno do sloupce Garant SK / PL u dané kategorie
-          const t = readObchod(); const row = t.rows.find(r => r.id === n.rowId) ||
-            t.rows.find(r => obchodNorm(r.kategorie) === obchodNorm(n.kategorie));
-          if (!row) return send(res, 404, { error: 'Kategorie už v tabulce není — přiřaďte ručně.' });
-          const key = n.zeme === 'PL' ? 'garantPl' : (n.zeme === 'SK' ? 'garantSk' : null);
-          if (!key) return send(res, 400, { error: 'Přijmout lze jen návrh za SK nebo PL.' });
-          row[key] = n.jmeno;
-          writeObchod(t.rows);
-          n.stav = 'přijatý';
-        }
-        d = writeGaranti(d);
-      }
+      else if (b.akce === 'smazat') { d.navrhy = d.navrhy.filter(x => x.id !== b.id); d = writeGaranti(d); }
+      else if (b.akce === 'vymazatHistorii') { d.navrhy = []; d = writeGaranti(d); }
       return send(res, 200, { ok: true, enabled: d.enabled, token: d.token, url: garantiBaseUrl() + '/garanti/' + d.token, navrhy: d.navrhy, stavy: GARANT_STAVY, canEdit: true });
     }
 

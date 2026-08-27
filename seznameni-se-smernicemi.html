@@ -2201,14 +2201,8 @@ async function garPost(payload){
 }
 function garNovyOdkaz(){ if(!confirm('Vytvořit nový odkaz? Ten stávající okamžitě přestane fungovat.')) return; garPost({akce:'novyToken'}); }
 function garZapnout(on){ garPost({akce:'zapnout',hodnota:!!on}); }
-function garStav(id,stav){ garPost({akce:'stav',id:id,stav:stav}); }
-function garSmazat(id){ if(!confirm('Smazat tento návrh?')) return; garPost({akce:'smazat',id:id}); }
-async function garPrijmout(id){
-  const n=((GARANTI_DATA&&GARANTI_DATA.navrhy)||[]).find(x=>x.id===id); if(!n) return;
-  if(!confirm('Zapsat „'+n.jmeno+'" jako garanta '+n.zeme+' u kategorie „'+(n.kategorie||'—')+'"?')) return;
-  await garPost({akce:'prijmout',id:id});
-  OBCHOD_DATA=null;   // tabulka se změnila — načte se znovu
-}
+function garSmazat(id){ if(!confirm('Smazat tento záznam z historie? (v tabulce zůstane)')) return; garPost({akce:'smazat',id:id}); }
+function garVymazatHistorii(){ if(!confirm('Vymazat celou historii zápisů? Jména v tabulce zůstanou.')) return; garPost({akce:'vymazatHistorii'}); }
 function garKopiruj(url){
   try{ navigator.clipboard.writeText(url); toast('Odkaz zkopírován'); }
   catch(e){ prompt('Zkopírujte odkaz:',url); }
@@ -2218,7 +2212,7 @@ function garHtml(){
   let h='<div class="card pad" style="margin-bottom:16px">'+
     '<div class="spread" style="margin-bottom:6px"><strong>Veřejný odkaz pro kolegy ze SK a PL</strong>'+
     (d.canEdit?'<label class="obx-ved" style="font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" '+(d.enabled?'checked':'')+' onchange="garZapnout(this.checked)" style="width:16px;height:16px"> stránka je zapnutá</label>':'')+'</div>'+
-    '<p class="muted" style="margin:0 0 10px;font-size:13px">Stránka je veřejná — kdo má odkaz, dostane se na ni bez přihlášení do intranetu. Najde tam popis role garanta, aktuální rozdělení a formulář, kterým navrhne člověka za svou zemi.</p>';
+    '<p class="muted" style="margin:0 0 10px;font-size:13px">Stránka je veřejná — kdo má odkaz, dostane se na ni bez přihlášení do intranetu. Najde tam popis role garanta a tabulku, do jejíchž sloupců <b>Slovensko</b> a <b>Polsko</b> rovnou zapíše jméno. Zápis se okamžitě promítne do tabulky rozdělení.</p>';
   if(d.canEdit && d.url){
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
       '<input readonly value="'+esc(d.url)+'" onclick="this.select()" style="flex:1;min-width:280px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px;background:var(--bg-2)">'+
@@ -2229,25 +2223,21 @@ function garHtml(){
   } else if(!d.canEdit){ h+='<p class="muted" style="margin:0;font-size:13px">Odkaz vidí a spravuje jen správce.</p>'; }
   h+='</div>';
 
-  h+='<div class="dash-sec">Návrhy garantů ('+navrhy.length+')</div>';
-  if(!navrhy.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné návrhy. Pošlete kolegům odkaz výše.</p></div>'; return h; }
+  h+='<div class="dash-sec" style="display:flex;align-items:center;gap:10px">Historie zápisů ('+navrhy.length+')'+
+    (d.canEdit&&navrhy.length?'<button class="btn ghost sm" type="button" style="margin-left:auto" onclick="garVymazatHistorii()">Vymazat historii</button>':'')+'</div>';
+  if(!navrhy.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím nikdo nic nedoplnil. Pošlete kolegům odkaz výše — píší přímo do sloupců Slovensko a Polsko v záložce „Podle kategorií".</p></div>'; return h; }
   h+='<div class="ob-wrap"><table class="ob-table"><thead><tr>'+
-    '<th>Přišlo</th><th>Země</th><th>Kategorie / skupina</th><th>Navržený garant</th><th>Zdůvodnění</th><th>Podal</th><th>Stav</th><th></th></tr></thead><tbody>';
+    '<th>Kdy</th><th>Země</th><th>Kategorie</th><th>Zapsané jméno</th><th>Dřív</th><th>Doplnil</th><th></th></tr></thead><tbody>';
   navrhy.forEach(n=>{
     const dt=(function(){ try{ return new Date(n.ts).toLocaleDateString('cs-CZ')+' '+new Date(n.ts).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } })();
-    const stavCls=n.stav==='přijatý'?'ob-risk-lo':(n.stav==='zamítnutý'?'ob-risk-hi':'ob-risk-mid');
     h+='<tr>'+
       '<td style="white-space:nowrap">'+esc(dt)+'</td>'+
-      '<td><b>'+esc(n.zeme||'')+'</b></td>'+
+      '<td><b>'+esc(n.zeme==='PL'?'Polsko':'Slovensko')+'</b></td>'+
       '<td><b>'+esc(n.kategorie||'—')+'</b>'+(n.sekce?'<div class="muted" style="font-size:12px">'+esc(n.sekce)+'</div>':'')+'</td>'+
-      '<td><b>'+esc(n.jmeno||'')+'</b>'+(n.email?'<div style="font-size:12px"><a href="mailto:'+esc(n.email)+'">'+esc(n.email)+'</a></div>':'')+'</td>'+
-      '<td style="max-width:280px">'+esc(n.poznamka||'')+'</td>'+
-      '<td>'+esc(n.autor||'')+(n.autorEmail?'<div style="font-size:12px"><a href="mailto:'+esc(n.autorEmail)+'">'+esc(n.autorEmail)+'</a></div>':'')+'</td>'+
-      '<td><span class="ob-risk '+stavCls+'">'+esc(n.stav||'nový')+'</span></td>'+
-      '<td style="white-space:nowrap">'+(d.canEdit?
-        ((n.stav!=='přijatý'&&(n.zeme==='SK'||n.zeme==='PL'))?'<button class="btn sm" type="button" onclick="garPrijmout(\''+n.id+'\')" title="Zapsat do tabulky jako garanta '+esc(n.zeme)+'">✓ Přijmout</button> ':'')+
-        (n.stav!=='zamítnutý'?'<button class="btn ghost sm" type="button" onclick="garStav(\''+n.id+'\',\'zamítnutý\')">Zamítnout</button> ':'')+
-        '<button class="btn ghost sm" type="button" onclick="garSmazat(\''+n.id+'\')" title="Smazat návrh">×</button>':'')+'</td>'+
+      '<td>'+(n.jmeno?'<b>'+esc(n.jmeno)+'</b>':'<span class="muted">(smazáno)</span>')+'</td>'+
+      '<td class="muted">'+esc(n.puvodni||'')+'</td>'+
+      '<td>'+esc(n.autor||'—')+'</td>'+
+      '<td style="white-space:nowrap">'+(d.canEdit?'<button class="btn ghost sm" type="button" onclick="garSmazat(\''+n.id+'\')" title="Smazat z historie">×</button>':'')+'</td>'+
       '</tr>';
   });
   h+='</tbody></table></div>';

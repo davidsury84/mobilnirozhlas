@@ -42,6 +42,12 @@
   @media(max-width:640px){.row2{grid-template-columns:1fr}}
   .ok{background:var(--green-soft);border:1px solid #bcdcbe;color:var(--green-d);border-radius:12px;padding:14px 16px;font-weight:600}
   .err{background:#fdecea;border:1px solid #f5c6c2;color:#b3261e;border-radius:12px;padding:11px 14px;margin-bottom:12px;display:none}
+  .gin{border:1px solid transparent;background:#fbfdfa;border-radius:8px;padding:6px 9px;font-size:14px;width:100%}
+  .gin:hover{border-color:var(--line-s)}
+  .gin:focus{border-color:var(--green-2);background:#fff;outline:none}
+  .gin.saving{opacity:.6}
+  .gin.saved{border-color:var(--green-2);background:var(--green-soft)}
+  .gin.bad{border-color:#e2a29c;background:#fdecea}
   .hp{position:absolute;left:-9999px}
   footer{border-top:1px solid var(--line);padding:18px 0 40px;color:var(--soft);font-size:13px}
 </style>
@@ -51,7 +57,7 @@
   <div class="wrap">
     <span class="eyebrow">ELKOPLAST CZ · produktoví garanti</span>
     <h1>Garanti produktů — návrhy za Slovensko a Polsko</h1>
-    <p>V rámci ČR máme navržené role garantů, kteří připravují aktivity (školení a další) a celkově zastřešují svůj produkt. Vnímáme vysokou odbornost kolegů ze Slovenska a Polska — proto budeme rádi, když nám navrhnete lidi na konkrétní produkty (skupiny) i za vás. V duchu <em>víc hlav víc ví</em>.</p>
+    <p>V rámci ČR máme navržené role garantů, kteří připravují aktivity (školení a další) a celkově zastřešují svůj produkt. Vnímáme vysokou odbornost kolegů ze Slovenska a Polska — proto budeme rádi, když nám v tabulce níže doplníte lidi na konkrétní produkty (skupiny) i za vás. V duchu <em>víc hlav víc ví</em>.</p>
   </div>
 </header>
 <main class="wrap">
@@ -71,33 +77,9 @@
   </div>
 
   <div class="card">
-    <h2>Navrhnout garanta</h2>
-    <p class="muted">Vyberte produktovou skupinu a napište, koho za svou zemi navrhujete. Můžete poslat i více návrhů — formulář se po odeslání znovu vyprázdní.</p>
-    <div id="formWrap" style="margin-top:14px">
-      <form id="f">
-        <div class="row2">
-          <div class="field"><label for="zeme">Za kterou zemi navrhujete? *</label><select id="zeme"></select></div>
-          <div class="field"><label for="skupina">Produktová skupina *</label><select id="skupina"></select></div>
-        </div>
-        <div class="field"><label for="kategorie">Konkrétní produkt / kategorie</label><select id="kategorie"></select></div>
-        <div class="row2">
-          <div class="field"><label for="jmeno">Koho navrhujete (jméno a příjmení) *</label><input id="jmeno" maxlength="120" autocomplete="off"></div>
-          <div class="field"><label for="email">Jeho e-mail</label><input id="email" type="email" maxlength="160" autocomplete="off"></div>
-        </div>
-        <div class="field"><label for="poznamka">Proč právě on? (zkušenosti, reference)</label><textarea id="poznamka" rows="3" maxlength="2000"></textarea></div>
-        <div class="row2">
-          <div class="field"><label for="autor">Kdo návrh podává *</label><input id="autor" maxlength="120" autocomplete="off"></div>
-          <div class="field"><label for="autorEmail">Váš e-mail</label><input id="autorEmail" type="email" maxlength="160" autocomplete="off"></div>
-        </div>
-        <div class="hp"><label>Nevyplňujte<input id="web" tabindex="-1" autocomplete="off"></label></div>
-        <button class="btn" type="submit" id="send">Odeslat návrh</button>
-      </form>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Aktuální rozdělení garantů</h2>
-    <p class="muted">Přehled produktových skupin a jejich garantů v ČR. Sloupce SK a PL doplňujeme právě z vašich návrhů.</p>
+    <h2>Rozdělení garantů — doplňte Slovensko a Polsko</h2>
+    <p class="muted">V tabulce jsou produktové skupiny a jejich garanti v ČR. Do sloupců <b>Slovensko</b> a <b>Polsko</b> rovnou napište jméno kolegy, kterého za svou zemi navrhujete. <b>Změny se ukládají samy</b> — nic se neodesílá.</p>
+    <div class="field" style="max-width:340px;margin-top:12px"><label for="kdo">Vaše jméno (ať víme, kdo doplnil)</label><input id="kdo" maxlength="120" autocomplete="off" placeholder="Jméno a příjmení"></div>
     <div id="tab"><p class="muted" style="margin-top:12px">Načítám…</p></div>
   </div>
 </main>
@@ -107,60 +89,55 @@
 var TOK=(location.pathname.split('/').filter(Boolean).pop()||'');
 var DATA=null;
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function showErr(m){var e=document.getElementById('err');e.textContent=m;e.style.display='block';window.scrollTo(0,0);}
-function opt(v,t){var o=document.createElement('option');o.value=v;o.textContent=t;return o;}
+function showErr(m){var e=document.getElementById('err');e.textContent=m;e.style.display='block';}
+function kdo(){var e=document.getElementById('kdo');return e?e.value.trim():'';}
+try{ var ulozene=localStorage.getItem('garanti_kdo'); if(ulozene) document.getElementById('kdo').value=ulozene; }catch(e){}
 
-function fillSkupiny(){
-  var sz=document.getElementById('zeme'); (DATA.zeme||['SK','PL']).forEach(function(z){ sz.appendChild(opt(z,z==='SK'?'Slovensko':(z==='PL'?'Polsko':z))); });
-  var ss=document.getElementById('skupina');
-  (DATA.skupiny||[]).forEach(function(g,i){ ss.appendChild(opt(String(i),g.sekce)); });
-  ss.addEventListener('change',fillKategorie); fillKategorie();
-}
-function fillKategorie(){
-  var g=(DATA.skupiny||[])[+document.getElementById('skupina').value]||{polozky:[]};
-  var sk=document.getElementById('kategorie'); sk.innerHTML='';
-  sk.appendChild(opt('','— celá skupina (bez konkrétní kategorie) —'));
-  (g.polozky||[]).forEach(function(p){ sk.appendChild(opt(p.id,p.kategorie)); });
-}
 function tabulka(){
   var h='';
   (DATA.skupiny||[]).forEach(function(g){
-    h+='<div class="sek">'+esc(g.sekce)+'</div><div class="tw"><table><thead><tr><th>Kategorie</th><th>Garant ČR</th><th>Zástup ČR</th><th>Garant SK</th><th>Garant PL</th></tr></thead><tbody>';
+    h+='<div class="sek">'+esc(g.sekce)+'</div><div class="tw"><table><thead><tr><th style="min-width:200px">Kategorie</th><th>Garant ČR</th><th>Zástup ČR</th><th style="min-width:170px">Slovensko</th><th style="min-width:170px">Polsko</th></tr></thead><tbody>';
     g.polozky.forEach(function(p){
-      var t=function(v){return v&&String(v).trim()&&v!=='—'?'<span class="tag">'+esc(v)+'</span>':'<span class="tag none">zatím nikdo</span>';};
-      h+='<tr><td><b>'+esc(p.kategorie)+'</b></td><td>'+(p.pm?esc(p.pm):'<span class="tag none">—</span>')+'</td><td>'+(p.zastup?esc(p.zastup):'')+'</td><td>'+t(p.garantSk)+'</td><td>'+t(p.garantPl)+'</td></tr>';
+      var inp=function(zeme,val){
+        return '<input class="gin" data-row="'+esc(p.id)+'" data-zeme="'+zeme+'" value="'+esc(val||'')+'" maxlength="120" autocomplete="off" placeholder="jméno…">';
+      };
+      h+='<tr><td><b>'+esc(p.kategorie)+'</b></td>'+
+        '<td>'+(p.pm?esc(p.pm):'<span class="tag none">—</span>')+'</td>'+
+        '<td>'+esc(p.zastup||'')+'</td>'+
+        '<td>'+inp('SK',p.garantSk)+'</td>'+
+        '<td>'+inp('PL',p.garantPl)+'</td></tr>';
     });
     h+='</tbody></table></div>';
   });
   document.getElementById('tab').innerHTML=h||'<p class="muted">Zatím tu nic není.</p>';
+  document.querySelectorAll('.gin').forEach(function(i){
+    i.dataset.puvodni=i.value;
+    i.addEventListener('change',function(){ uloz(i); });
+    i.addEventListener('blur',function(){ uloz(i); });
+    i.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); i.blur(); } });
+  });
 }
-function val(id){var e=document.getElementById(id);return e?e.value.trim():'';}
-document.getElementById('f').addEventListener('submit',function(ev){
-  ev.preventDefault();
-  document.getElementById('err').style.display='none';
-  if(!val('jmeno')){ showErr('Vyplňte prosím jméno navrhovaného garanta.'); return; }
-  if(!val('autor')){ showErr('Vyplňte prosím, kdo návrh podává.'); return; }
-  var g=(DATA.skupiny||[])[+val('skupina')]||{};
-  var katId=val('kategorie');
-  var kat=''; (g.polozky||[]).forEach(function(p){ if(p.id===katId) kat=p.kategorie; });
-  var btn=document.getElementById('send'); btn.disabled=true; btn.textContent='Odesílám…';
-  fetch('/api/garanti/navrh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    t:TOK, zeme:val('zeme'), rowId:katId, sekce:g.sekce||'', kategorie:kat,
-    jmeno:val('jmeno'), email:val('email'), poznamka:val('poznamka'),
-    autor:val('autor'), autorEmail:val('autorEmail'), web:val('web')
+function uloz(inp){
+  if(inp.value===inp.dataset.puvodni) return;
+  var hodnota=inp.value.trim();
+  inp.classList.add('saving');
+  try{ localStorage.setItem('garanti_kdo',kdo()); }catch(e){}
+  fetch('/api/garanti/zapis',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    t:TOK, rowId:inp.dataset.row, zeme:inp.dataset.zeme, jmeno:hodnota, kdo:kdo()
   })}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
   .then(function(res){
-    btn.disabled=false; btn.textContent='Odeslat návrh';
-    if(!res.ok||res.j.error){ showErr(res.j.error||'Odeslání se nezdařilo.'); return; }
-    document.getElementById('formWrap').innerHTML='<div class="ok">✓ Děkujeme, návrh jsme přijali.<div style="font-weight:400;font-size:14px;margin-top:6px">Ozveme se, jakmile ho projdeme. <button class="btn sm" style="margin-left:8px" onclick="location.reload()">Poslat další návrh</button></div></div>';
-    window.scrollTo(0,0);
-  }).catch(function(e){ btn.disabled=false; btn.textContent='Odeslat návrh'; showErr('Spojení selhalo: '+e.message); });
-});
+    inp.classList.remove('saving');
+    if(!res.ok||res.j.error){ inp.classList.add('bad'); showErr(res.j.error||'Uložení se nezdařilo.'); return; }
+    inp.classList.remove('bad'); inp.dataset.puvodni=hodnota; inp.value=hodnota;
+    inp.classList.add('saved'); setTimeout(function(){ inp.classList.remove('saved'); },1400);
+    document.getElementById('err').style.display='none';
+  }).catch(function(e){ inp.classList.remove('saving'); inp.classList.add('bad'); showErr('Spojení selhalo: '+e.message); });
+}
 fetch('/api/garanti/verejne?t='+encodeURIComponent(TOK),{cache:'no-store'})
   .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
   .then(function(res){
     if(!res.ok||res.j.error){ document.querySelector('main').innerHTML='<div class="card"><h2>Odkaz neplatí</h2><p class="muted">'+esc(res.j.error||'Tento odkaz už není platný.')+' Napište prosím na <a href="mailto:david.sury@elkoplast.cz">david.sury@elkoplast.cz</a> o nový.</p></div>'; return; }
-    DATA=res.j; fillSkupiny(); tabulka();
+    DATA=res.j; tabulka();
   }).catch(function(){ showErr('Nepodařilo se načíst data.'); });
 </script>
 </body>
