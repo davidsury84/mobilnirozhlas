@@ -1404,21 +1404,14 @@ function mount(host) {
     return true;
   }
 
-  // ---- /data: role-filtrovaný přehled --------------------------------------
+  // ---- /data: přehled je pro všechny stejný --------------------------------
   function apiData(req, res) {
     const me = roleOf(req);
     const d = load();
-    // který stav „vidím"? admin/šéf/ředitel = vše; obchodník = své zakázky; konstruktér = přiřazené.
-    const canSeeAll = me.isAdmin || me.role === 'sef' || me.role === 'reditel' || me.role === 'vykonny-reditel';
-    let list = d.zakazky.slice();
-    if (!canSeeAll) {
-      if (me.role === 'obchodnik') list = list.filter(z => (z.obchodnikEmail || '').toLowerCase() === me.email);
-      else if (me.role === 'konstrukter') list = list.filter(z => (z.assignedTo || '').toLowerCase() === me.email);
-      else if (me.role === 'vyrobni-reditel') {
-        const myObl = (d.strediska || []).filter(s => (s.reditelEmail || '').toLowerCase() === me.email).map(s => s.key);
-        list = list.filter(z => myObl.includes(z.strediskoKey));  // zakázky přiřazené do jeho závodu
-      } else list = [];
-    }
+    // Přehledy vidí VŠICHNI s přístupem k modulu kompletní (kdo co zadal a kde
+    // to je) — role řídí jen akce, ne viditelnost. Osobní pohled řeší filtry
+    // na dashboardu („Na tahu u mě", filtr dle obchodníka).
+    const list = d.zakazky.slice();
     // sečti hodiny z evidence práce podle zakázky (přičtou se k odpracováno)
     d._tsMap = {}; d.timesheet.forEach(t => { if (t.zakId) d._tsMap[t.zakId] = (d._tsMap[t.zakId] || 0) + (t.hours || 0); });
     const view = list.map(z => publicShape(d, z, me)).sort((a, b) => b.createdAt - a.createdAt);

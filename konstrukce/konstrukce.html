@@ -1146,6 +1146,8 @@ document.addEventListener('DOMContentLoaded', function(){ kLangBar(); kObserve()
 
 var D=null, ME=null, FILTER='dash', SEL=null, DASHF='active';
 function setDashF(k){DASHF=k;renderMain();}
+var DASHOBCH='';
+function setDashObch(v){DASHOBCH=v;renderMain();}
 var TS={from:null,to:null,user:'',data:null,editing:null};
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fdate(ts){if(!ts)return'—';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'+d.getUTCFullYear()}
@@ -1376,13 +1378,18 @@ function renderDash(m){
   var nAmb=active.filter(function(x){return x.semafor==='amber'||x.stav==='podklady'}).length;
   var nMine=active.filter(function(x){return x.responsible===ME.email}).length;
   var shown=active.filter(function(x){ if(DASHF==='red')return x.semafor==='red'; if(DASHF==='amber')return x.semafor==='amber'||x.stav==='podklady'; if(DASHF==='mine')return x.responsible===ME.email; return true; });
+  // filtr dle obchodníka (přehled je pro všechny stejný — tady si každý vybere „svého")
+  if(DASHOBCH)shown=shown.filter(function(x){return x.obchodnikEmail===DASHOBCH});
+  var obchMap={};active.forEach(function(x){if(x.obchodnikEmail)obchMap[x.obchodnikEmail]=x.obchodnikName||x.obchodnikEmail});
+  var obchSel='<select class="dfilt" style="max-width:230px" onchange="setDashObch(this.value)"><option value="">Obchodník: všichni</option>'+
+    Object.keys(obchMap).sort(function(a,b){return obchMap[a].localeCompare(obchMap[b],'cs')}).map(function(em){return '<option value="'+esc(em)+'"'+(DASHOBCH===em?' selected':'')+'>'+esc(obchMap[em])+' ('+active.filter(function(x){return x.obchodnikEmail===em}).length+')</option>'}).join('')+'</select>';
   var fbtn=function(k,lab,n){return '<button class="dfilt'+(DASHF===k?' act':'')+'" onclick="setDashF(\''+k+'\')">'+lab+' <b>'+n+'</b></button>';};
   h+='<div class="sec">Aktivní zakázky</div>'+
-    '<div class="dfilts">'+fbtn('active','Vše',active.length)+fbtn('red','🔴 Po termínu',nRed)+fbtn('amber','🟠 Blíží se / pozastavené',nAmb)+fbtn('mine','Na tahu u mě',nMine)+'</div>';
+    '<div class="dfilts">'+fbtn('active','Vše',active.length)+fbtn('red','🔴 Po termínu',nRed)+fbtn('amber','🟠 Blíží se / pozastavené',nAmb)+fbtn('mine','Na tahu u mě',nMine)+obchSel+'</div>';
   if(!shown.length)h+='<div class="empty">Žádné zakázky v tomto filtru.</div>';
   else h+=shown.map(function(x){ var pi=problemInfo(x); var cc=pi?pi.cls:'';
     return '<div class="ot-item'+(cc?' '+cc:'')+'" onclick="openDrawer(\''+x.id+'\')">'+
-      '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span><b>'+esc(x.cisloZobraz||x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span></div>'+
+      '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span><b>'+esc(x.cisloZobraz||x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span><span class="muted" style="margin-left:auto;font-size:12px">zadal '+esc(x.obchodnikName||'—')+'</span></div>'+
       (pi?'<div class="ot-prob '+pi.cls+'">'+pi.text+'</div>':'')+
       orderTrack(x)+'</div>';}).join('');
   h+='<div class="kpi">'+
