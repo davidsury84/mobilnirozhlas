@@ -2503,15 +2503,20 @@ function dotaznikView(z){
   if(typeof z.dotaznik.upozorneni==='string'&&z.dotaznik.upozorneni.trim())
     h+='<div class="card" style="background:#fff3e0;border-color:#e0a93f;padding:10px 12px;margin-top:8px"><b>⚠️ Důležitá upozornění pro konstrukci a výrobu</b><div style="white-space:pre-wrap;margin-top:5px">'+esc(z.dotaznik.upozorneni)+'</div></div>';
   if(z.vykresStd&&z.vykresStd.f){
-    // reálný standardní výkres řady (z PRODUCTS/ABROLLCONTAINERS) — nahrazuje schéma
+    // reálný standardní výkres řady (z PRODUCTS/ABROLLCONTAINERS) — nahrazuje schéma;
+    // nejblizsi = přesné rozměry v archivu nejsou, ukazuje se nejbližší varianta s výpisem rozdílů
     var vsu='/api/konstrukce/vykres-std?f='+encodeURIComponent(z.vykresStd.f);
-    h+='<div class="card" style="background:#fff;padding:8px 10px;margin-top:8px">'+
+    var nb=z.vykresStd.nejblizsi;
+    h+='<div class="card" style="background:#fff;padding:8px 10px;margin-top:8px'+(nb?';border-color:#e0a93f':'')+'">'+
       '<a href="'+vsu+'" target="_blank" title="Otevřít v plné velikosti"><img src="'+vsu+'" alt="'+esc(z.vykresStd.nazev)+'" style="width:100%;height:auto;border-radius:6px"></a>'+
-      '<div class="row" style="justify-content:space-between;margin-top:4px;gap:8px;flex-wrap:wrap"><span class="muted" style="font-size:11.5px">Standardní výkres řady <b>'+esc(z.vykresStd.nazev)+'</b>'+(z.vykresStd.zdroj?(' · zdroj '+esc(z.vykresStd.zdroj)):'')+'</span>'+
+      '<div class="row" style="justify-content:space-between;margin-top:4px;gap:8px;flex-wrap:wrap">'+
+      (nb
+        ?'<span style="font-size:11.5px;color:#8a5a12">⚠️ <b>Nejbližší standardní výkres '+esc(z.vykresStd.nazev)+'</b> — zakázka se liší: '+esc(nb)+'. Jen pro orientaci, ne výkres této zakázky.'+(z.vykresStd.zdroj?(' · zdroj '+esc(z.vykresStd.zdroj)):'')+'</span>'
+        :'<span class="muted" style="font-size:11.5px">Standardní výkres řady <b>'+esc(z.vykresStd.nazev)+'</b>'+(z.vykresStd.zdroj?(' · zdroj '+esc(z.vykresStd.zdroj)):'')+'</span>')+
       '<a class="btn ghost sm" href="'+vsu+'" target="_blank">Otevřít</a></div></div>';
   } else {
   var _sv=svgAbr(abrSpecFromDot(z));
-  if(_sv)h+='<div class="card" style="background:#fff;padding:8px 10px;margin-top:8px;overflow-x:auto">'+_sv+'<div class="muted" style="font-size:11px;margin-top:2px">Schematická vizualizace z dotazníku — orientační proporce, ne výkres (pro tyto rozměry není v archivu standardní výkres).</div></div>';
+  if(_sv)h+='<div class="card" style="background:#fff;padding:8px 10px;margin-top:8px;overflow-x:auto">'+_sv+'<div class="muted" style="font-size:11px;margin-top:2px">Schematická vizualizace z dotazníku — orientační proporce, ne výkres (pro tyto rozměry není v archivu standardní výkres ani blízká varianta).</div></div>';
   }
   t.dotaznik.forEach(function(sec){
     var rows='';
@@ -3509,8 +3514,15 @@ function seedDemo(mode){
   });
 }
 function saveCvz(id){var v=(document.getElementById('cvzInp')||{}).value||'';api('/cvz','POST',{id:id,cvz:v}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return}reloadData();})}
-function setRole(email,role){api('/admin/role','POST',{email:email,role:role}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
-function setFond(email,fond){api('/admin/fond','POST',{email:email,fond:fond}).then(function(){reloadData()})}
+// Krátké potvrzení uloženého nastavení (změny se ukládají hned, bez tlačítka)
+function toastUlozeno(msg){
+  var t=document.getElementById('toastUl');
+  if(!t){t=document.createElement('div');t.id='toastUl';t.style.cssText='position:fixed;right:18px;bottom:18px;background:#1f7a2e;color:#fff;font-weight:700;font-size:13px;padding:9px 16px;border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.22);z-index:9999;opacity:0;transition:opacity .18s';document.body.appendChild(t);}
+  t.textContent=msg||'✓ Uloženo';t.style.opacity='1';
+  clearTimeout(t._h);t._h=setTimeout(function(){t.style.opacity='0'},1600);
+}
+function setRole(email,role){api('/admin/role','POST',{email:email,role:role}).then(function(o){if(!o.ok){alert(o.j.chyba);return}toastUlozeno();reloadData()})}
+function setFond(email,fond){api('/admin/fond','POST',{email:email,fond:fond}).then(function(){toastUlozeno('✓ Fond uložen');reloadData()})}
 function personPicker(id,sel,onchange,placeholder){
   var emps=(D.employees||[]).slice();
   if(sel&&!emps.some(function(e){return e.email===sel}))emps.unshift({email:sel,name:sel});
@@ -3567,10 +3579,10 @@ function groupChecks(p){
 function saveKonstrGroups(email){
   var wrap=document.querySelector('.kgrp[data-kemail="'+email+'"]'); if(!wrap)return;
   var groups=[].slice.call(wrap.querySelectorAll('input[type=checkbox]:checked')).map(function(c){return c.getAttribute('data-fam')});
-  api('/admin/konstrukter-groups','POST',{email:email,groups:groups}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return} reloadData();});
+  api('/admin/konstrukter-groups','POST',{email:email,groups:groups}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba');return} toastUlozeno('✓ Skupiny uloženy');reloadData();});
 }
 function addRolePerson(role,email){if(!email)return;setRole(email,role)}
-function setReditel(key,selId){var email=(document.getElementById(selId)||{}).value||'';api('/admin/stredisko','POST',{key:key,reditel:email}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
+function setReditel(key,selId){var email=(document.getElementById(selId)||{}).value||'';api('/admin/stredisko','POST',{key:key,reditel:email}).then(function(o){if(!o.ok){alert(o.j.chyba);return}toastUlozeno();reloadData()})}
 function editTyp(key){
   var t=(D.types||[]).find(function(x){return x.key===key})||{key:'',name:'',normohodiny:8,revizeNh:2,lhutaZkresleniDays:3,lhutaRevizeDays:2,lhutaPrideleniDays:1,lhutaKontrolaDays:1,lhutaObchodnikDays:1,lhutaKlientDays:5,linkValidDays:30,internalCheck:true,params:[]};
   var m=document.getElementById('modal');
