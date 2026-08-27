@@ -4828,6 +4828,12 @@ function toast(msg){
 function dirKategorie(){
   if(!DB.settings) DB.settings={};
   if(!Array.isArray(DB.settings.dirKategorie)) DB.settings.dirKategorie=["Směrnice Zlín"];  // výchozí kategorie
+  // Jednorázově doplníme kategorii pro organigramy (žádost 2026-08-27).
+  if(!DB.settings._katOrganigramy){
+    DB.settings._katOrganigramy=1;
+    if(DB.settings.dirKategorie.indexOf("Organigramy společnosti")<0) DB.settings.dirKategorie.push("Organigramy společnosti");
+    try{ save(); }catch(e){}
+  }
   return DB.settings.dirKategorie;
 }
 function renderDirKat(){
@@ -4991,6 +4997,7 @@ let pendingHtml=null;
 function openDirectiveModal(id){
   const d = id? DB.directives.find(x=>x.id===id) : null;
   pendingHtml = d? d.html : null;
+  pendingPdf = null; pendingPdfName = null;
   document.getElementById("modalTitle").textContent = d? "Upravit směrnici" : "Nová směrnice";
   const catChecks = DB.categories.map(c=>`
     <label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0">
@@ -5011,6 +5018,12 @@ function openDirectiveModal(id){
       <input type="file" id="docFile" accept=".docx,.html,.htm,.txt" onchange="parseDoc(this)">
     </label>
     <div class="hint">Nahraj <strong>.docx</strong> (Word) — aplikace ho převede, nastyluje a vyčistí. Lze i .html / .txt. Pak text můžeš **přímo upravovat** v náhledu níže.</div>
+
+    <label class="field" style="margin-top:12px"><span>Příloha PDF <span class="muted" style="font-weight:400;text-transform:none">(např. organigram — zaměstnanci ho uvidí rovnou ve stránce)</span></span>
+      <input type="file" id="dPdfFile" accept="application/pdf,.pdf" onchange="dirPdfUpload(this)">
+    </label>
+    <div id="dPdfInfo">${dirPdfInfoHtml(d)}</div>
+    <div class="hint">Můžeš nahrát <strong>jen PDF</strong> bez wordu — směrnice pak bude tvořená přílohou. Max 8 MB.</div>
     <div id="docPreviewWrap" style="${pendingHtml?'':'display:none'}">
       <div class="spread" style="margin-bottom:6px"><span style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase">Náhled · klikni a uprav</span>
         <div class="inline-actions" style="gap:4px">
@@ -5098,10 +5111,43 @@ async function parseDoc(input){
   }
 }
 
+/* ---- Příloha PDF u směrnice (např. organigram) ---- */
+let pendingPdf=null, pendingPdfName=null;
+function dirPdfInfoHtml(d){
+  const url=(pendingPdf!==null?pendingPdf:(d&&d.pdf)||''), nm=(pendingPdfName!==null?pendingPdfName:(d&&d.pdfName)||'');
+  if(!url) return '<p class="muted" style="margin:2px 0 0;font-size:13px">Zatím bez přílohy.</p>';
+  return '<div class="spread" style="margin:4px 0 0;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg-2)">'+
+    '<span style="font-size:13.5px">📄 <b>'+esc(nm||'dokument.pdf')+'</b> <a href="'+esc(url)+'" target="_blank" rel="noopener" style="margin-left:6px;font-size:12.5px">otevřít</a></span>'+
+    '<button type="button" class="btn ghost sm" onclick="dirPdfRemove()">Odebrat</button></div>';
+}
+function dirPdfRefresh(id){
+  const box=document.getElementById('dPdfInfo'); if(!box) return;
+  const d=id?DB.directives.find(x=>x.id===id):null;
+  box.innerHTML=dirPdfInfoHtml(d);
+}
+function dirPdfRemove(){ pendingPdf=''; pendingPdfName=''; dirPdfRefresh(null); }
+async function dirPdfUpload(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  if(!/pdf$/i.test(f.type||'')&&!/\.pdf$/i.test(f.name||'')){ alert('Nahrajte prosím soubor PDF.'); inp.value=''; return; }
+  if(f.size>8e6){ alert('PDF je příliš velké (max 8 MB).'); inp.value=''; return; }
+  const box=document.getElementById('dPdfInfo'); if(box) box.innerHTML='<p class="muted" style="margin:2px 0 0;font-size:13px">Nahrávám…</p>';
+  try{
+    const dataUrl=await new Promise((ok,bad)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=()=>bad(new Error('Soubor se nepodařilo načíst.')); r.readAsDataURL(f); });
+    const r=await fetch('/api/smernice/pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,name:f.name})});
+    const j=await r.json();
+    if(!r.ok||j.error) throw new Error(j.error||'Nahrání selhalo.');
+    pendingPdf=j.url; pendingPdfName=j.name||f.name;
+    dirPdfRefresh(null);
+    toast('PDF nahráno');
+  }catch(e){ alert(e.message||'Nahrání selhalo.'); dirPdfRefresh(null); }
+  inp.value='';
+}
 function saveDirective(id){
   const title=document.getElementById("dTitle").value.trim();
   if(!title){ alert("Zadej název směrnice."); return; }
-  if(!pendingHtml){ alert("Nahraj dokument."); return; }
+  const pdfUrl=(pendingPdf!==null?pendingPdf:((id&&DB.directives.find(x=>x.id===id)||{}).pdf||''));
+  const pdfNm=(pendingPdfName!==null?pendingPdfName:((id&&DB.directives.find(x=>x.id===id)||{}).pdfName||''));
+  if(!pendingHtml && !pdfUrl){ alert("Nahraj dokument (.docx) nebo přílohu PDF."); return; }
   const all=document.getElementById("dAll").checked;
   const cats=[...document.querySelectorAll(".dcat:checked")].map(c=>c.value);
   const tags=(document.getElementById("dTags").value||"").split(",").map(s=>s.trim()).filter(Boolean);
@@ -5109,10 +5155,11 @@ function saveDirective(id){
   let did=id;
   if(id){
     const d=DB.directives.find(x=>x.id===id);
-    d.title=title; d.html=pendingHtml; d.assignAll=all; d.assignCats=cats; d.assignTags=tags; d.kategorie=kat;
+    d.title=title; d.html=pendingHtml||''; d.assignAll=all; d.assignCats=cats; d.assignTags=tags; d.kategorie=kat;
+    d.pdf=pdfUrl||''; d.pdfName=pdfNm||'';
   } else {
     did=uid();
-    DB.directives.push({id:did,title,html:pendingHtml,createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,kategorie:kat,verze:1,acks:{}});
+    DB.directives.push({id:did,title,html:pendingHtml||'',pdf:pdfUrl||'',pdfName:pdfNm||'',createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,kategorie:kat,verze:1,acks:{}});
   }
   save(); closeModal(); renderDirectives();
   toast(id?"Směrnice upravena":"Směrnice uložena");
@@ -8610,7 +8657,7 @@ function buildPublished(d){
   const aud=audienceOf(d).map(e=>({email:e.email,name:e.name}));
   let apiB=(DB.settings.apiUrl||"").replace(/\/+$/,"");
   if(!apiB && DB.settings.baseUrl){ try{ apiB=new URL(DB.settings.baseUrl).origin; }catch(e){} }
-  const DATA={id:d.id,title:d.title,html:d.html,hr:(DB.settings.hrEmail||""),api:apiB,aud:aud};
+  const DATA={id:d.id,title:d.title,html:d.html,pdf:(d.pdf||""),pdfName:(d.pdfName||""),hr:(DB.settings.hrEmail||""),api:apiB,aud:aud};
   const dataStr=JSON.stringify(DATA).replace(/<\//g,'<\\/');
   const css=`*{box-sizing:border-box}
 body{margin:0;background:#f3f2ee;color:#1c1d1a;font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.5}
@@ -8631,6 +8678,12 @@ main{max-width:880px;margin:0 auto;padding:26px 22px 80px}
 .doc ul,.doc ol{padding-left:1.5em}
 .doc table{border-collapse:collapse;width:100%;margin:1em 0;font-family:"IBM Plex Sans";font-size:14px}
 .doc th,.doc td{border:1px solid #c3c2b8;padding:8px 10px;text-align:left}.doc th{background:#faf9f6}
+.pdfbox{background:#fff;border:1px solid #dcdbd4;border-radius:10px;box-shadow:0 8px 24px rgba(28,29,26,.06);padding:14px 16px;margin-bottom:18px}
+.pdfbox .pb-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.pdfbox .pb-h b{font-family:"IBM Plex Sans";font-size:15px}
+.pdfbox .pb-h a{margin-left:auto;background:#2d7a52;color:#fff;text-decoration:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:"IBM Plex Sans"}
+.pdfbox iframe{width:100%;height:78vh;min-height:460px;border:1px solid #e2e1da;border-radius:8px;background:#f7f6f2;display:block}
+.pdfbox .pb-note{font-size:12.5px;color:#5a5d57;margin-top:8px;font-family:"IBM Plex Sans"}
 .doc img{max-width:100%;height:auto}
 .ack{margin:24px 0 0;background:#fff;border:2px solid #2d7a52;border-radius:10px;padding:22px 26px}
 .ack.done{border-color:#1f5d3f;background:#e6f1ea}
@@ -8684,7 +8737,21 @@ function mailtoFallback(p){
   var body="Potvrzuji seznámení se směrnicí: "+DATA.title+nl+"Jméno: "+p.name+nl+"E-mail: "+p.email+nl+"Datum: "+new Date(p.ts).toLocaleString("cs-CZ")+nl+nl+"[strojový kód – neměňte]"+nl+token+nl;
   location.href="mailto:"+encodeURIComponent(DATA.hr)+"?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
 }
-function init(){ document.getElementById("hd").textContent=DATA.title; document.title=DATA.title; document.getElementById("doc").innerHTML=DATA.html; render(); }
+function init(){
+  document.getElementById("hd").textContent=DATA.title; document.title=DATA.title;
+  var doc=document.getElementById("doc");
+  if(DATA.html){ doc.innerHTML=DATA.html; } else { doc.style.display="none"; }
+  if(DATA.pdf){
+    var nm=(DATA.pdfName||"dokument.pdf").replace(/[<>&]/g,"");
+    var box=document.createElement("div"); box.className="pdfbox";
+    box.innerHTML='<div class="pb-h"><b>&#128196; '+nm+'</b>'+
+      '<a href="'+DATA.pdf+'" target="_blank" rel="noopener" download>Stáhnout PDF</a></div>'+
+      '<iframe src="'+DATA.pdf+'#view=FitH" title="PDF"></iframe>'+
+      '<div class="pb-note">Pokud se dokument nezobrazí, otevřete ho tlačítkem „Stáhnout PDF“.</div>';
+    doc.parentNode.insertBefore(box, doc.nextSibling);
+  }
+  render();
+}
 window.addEventListener("load",init);`;
   return '<!doctype html>\n<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n'+
     '<title>'+esc(d.title)+'</title>\n'+
@@ -8720,7 +8787,10 @@ function showReader(id, preset){
   const bar=document.getElementById("readerIdField");
   if(!d){ document.getElementById("readerDoc").innerHTML='<p>Směrnice nenalezena.</p>'; document.getElementById("ackBox").innerHTML=""; bar.innerHTML=""; return; }
   document.getElementById("readBrand").textContent=d.title;
-  document.getElementById("readerDoc").innerHTML=d.html;
+  document.getElementById("readerDoc").innerHTML=(d.html||'')+
+    (d.pdf?('<div style="margin-top:14px"><div class="spread" style="margin-bottom:8px"><b style="font-size:14px">📄 '+esc(d.pdfName||'Příloha PDF')+'</b>'+
+      '<a class="btn ghost sm" href="'+esc(d.pdf)+'" target="_blank" rel="noopener" download>Stáhnout PDF</a></div>'+
+      '<iframe src="'+esc(d.pdf)+'#view=FitH" style="width:100%;height:70vh;min-height:420px;border:1px solid var(--line);border-radius:10px;background:#f7f7f4" title="PDF"></iframe></div>'):'');
   r.dataset.dirId=id;
   if(preset){
     const emp=DB.employees.find(e=>e.email.toLowerCase()===preset.toLowerCase());

@@ -7,7 +7,7 @@ function buildPublished(d, ctx){
   const aud=(ctx.audience||[]).map(e=>({email:e.email,name:e.name}));
   let apiB=(ctx.apiUrl||"").replace(/\/+$/,"");
   if(!apiB && ctx.baseUrl){ try{ apiB=new URL(ctx.baseUrl).origin; }catch(e){} }
-  const DATA={id:d.id,title:d.title,html:d.html,hr:(ctx.hrEmail||""),api:apiB,aud:aud};
+  const DATA={id:d.id,title:d.title,html:d.html,pdf:(d.pdf||""),pdfName:(d.pdfName||""),hr:(ctx.hrEmail||""),api:apiB,aud:aud};
   const dataStr=JSON.stringify(DATA).replace(/<\//g,'<\\/');
   const css=`*{box-sizing:border-box}
 body{margin:0;background:#f3f2ee;color:#1c1d1a;font-family:"IBM Plex Sans",system-ui,sans-serif;line-height:1.5}
@@ -28,6 +28,12 @@ main{max-width:880px;margin:0 auto;padding:26px 22px 80px}
 .doc ul,.doc ol{padding-left:1.5em}
 .doc table{border-collapse:collapse;width:100%;margin:1em 0;font-family:"IBM Plex Sans";font-size:14px}
 .doc th,.doc td{border:1px solid #c3c2b8;padding:8px 10px;text-align:left}.doc th{background:#faf9f6}
+.pdfbox{background:#fff;border:1px solid #dcdbd4;border-radius:10px;box-shadow:0 8px 24px rgba(28,29,26,.06);padding:14px 16px;margin-bottom:18px}
+.pdfbox .pb-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.pdfbox .pb-h b{font-family:"IBM Plex Sans";font-size:15px}
+.pdfbox .pb-h a{margin-left:auto;background:#2d7a52;color:#fff;text-decoration:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:"IBM Plex Sans"}
+.pdfbox iframe{width:100%;height:78vh;min-height:460px;border:1px solid #e2e1da;border-radius:8px;background:#f7f6f2;display:block}
+.pdfbox .pb-note{font-size:12.5px;color:#5a5d57;margin-top:8px;font-family:"IBM Plex Sans"}
 .doc img{max-width:100%;height:auto}
 .ack{margin:24px 0 0;background:#fff;border:2px solid #2d7a52;border-radius:10px;padding:22px 26px}
 .ack.done{border-color:#1f5d3f;background:#e6f1ea}
@@ -81,7 +87,21 @@ function mailtoFallback(p){
   var body="Potvrzuji seznámení se směrnicí: "+DATA.title+nl+"Jméno: "+p.name+nl+"E-mail: "+p.email+nl+"Datum: "+new Date(p.ts).toLocaleString("cs-CZ")+nl+nl+"[strojový kód – neměňte]"+nl+token+nl;
   location.href="mailto:"+encodeURIComponent(DATA.hr)+"?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
 }
-function init(){ document.getElementById("hd").textContent=DATA.title; document.title=DATA.title; document.getElementById("doc").innerHTML=DATA.html; render(); }
+function init(){
+  document.getElementById("hd").textContent=DATA.title; document.title=DATA.title;
+  var doc=document.getElementById("doc");
+  if(DATA.html){ doc.innerHTML=DATA.html; } else { doc.style.display="none"; }
+  if(DATA.pdf){
+    var nm=DATA.pdfName||"dokument.pdf";
+    var box=document.createElement("div"); box.className="pdfbox";
+    box.innerHTML='<div class="pb-h"><b>&#128196; '+nm.replace(/[<>&]/g,"")+'</b>'+
+      '<a href="'+DATA.pdf+'" target="_blank" rel="noopener" download>Stáhnout PDF</a></div>'+
+      '<iframe src="'+DATA.pdf+'#view=FitH" title="PDF"></iframe>'+
+      '<div class="pb-note">Pokud se dokument nezobrazí, otevřete ho tlačítkem „Stáhnout PDF“.</div>';
+    doc.parentNode.insertBefore(box, doc.nextSibling);
+  }
+  render();
+}
 window.addEventListener("load",init);`;
   return '<!doctype html>\n<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n'+
     '<title>'+esc(d.title)+'</title>\n'+

@@ -1387,6 +1387,18 @@ function saveDataUrlImage(dataUrl) {
   fs.writeFileSync(path.join(UPLOADS_DIR, fn), buf);
   return '/uploads/' + fn;
 }
+// Uloží PDF z data URL do UPLOADS_DIR a vrátí veřejnou cestu /uploads/<jméno>.pdf.
+function saveDataUrlPdf(dataUrl) {
+  const m = /^data:application\/pdf;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
+  if (!m) return null;
+  const buf = Buffer.from(m[1], 'base64');
+  if (!buf.length) return null;
+  if (buf.length > 8e6) throw new Error('PDF je příliš velké (max 8 MB).');
+  if (buf.slice(0, 5).toString('latin1') !== '%PDF-') throw new Error('Soubor není platné PDF.');
+  const fn = crypto.randomBytes(8).toString('hex') + '.pdf';
+  fs.writeFileSync(path.join(UPLOADS_DIR, fn), buf);
+  return '/uploads/' + fn;
+}
 function deleteUpload(pub) { if (pub && pub.indexOf('/uploads/') === 0) { try { fs.unlinkSync(path.join(UPLOADS_DIR, pub.slice(9).replace(/[^a-zA-Z0-9._-]/g, ''))); } catch (_) {} } }
 
 /* ============================================================
@@ -2865,7 +2877,7 @@ const server = http.createServer(async (req, res) => {
       const f = path.join(UPLOADS_DIR, rel);
       if (!f.startsWith(UPLOADS_DIR + path.sep) || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
       const ext = path.extname(f).toLowerCase();
-      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
+      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.pdf': 'application/pdf' };
       const uhdrs = { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' };
       if (ext === '.svg') uhdrs['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
       res.writeHead(200, uhdrs);
@@ -2883,6 +2895,17 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/activity' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); const log = readJson(ACTLOG_F, []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 200); return send(res, 200, { events: log }); }
     if (p === '/api/invites' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, { invites: readInvites() }); }
     if (p === '/api/state' && req.method === 'GET') return send(res, 200, getState());
+    // Příloha směrnice: nahrání PDF (jen správce). Vrací veřejnou cestu, kterou si klient uloží k směrnici.
+    if (p === '/api/smernice/pdf' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nahrávat může jen správce.' });
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Soubor je moc velký nebo poškozený (max 8 MB).' }); }
+      try {
+        const url = saveDataUrlPdf(b.dataUrl);
+        if (!url) return send(res, 400, { error: 'Nahrajte prosím soubor ve formátu PDF.' });
+        return send(res, 200, { ok: true, url, name: String(b.name || '').slice(0, 200) });
+      } catch (e) { return send(res, 400, { error: e.message || 'Nahrání selhalo.' }); }
+    }
+
     if (p === '/api/state' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeJson(STATE_F, { categories: b.categories || [], employees: b.employees || [], directives: b.directives || [], profiles: b.profiles || [], candidates: b.candidates || [], settings: b.settings || {} }); return send(res, 200, { ok: true }); }
     if (p === '/api/config' && req.method === 'GET') return send(res, 200, configStatus());
     if (p === '/api/config' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); writeConfig({ host: (b.host || '').trim(), port: Number(b.port) || 587, secure: !!b.secure, user: (b.user || '').trim(), pass: b.pass, fromName: (b.fromName || '').trim() }); return send(res, 200, { ok: true, status: configStatus() }); }
@@ -2913,7 +2936,7 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(f)) {
         // Stránka zatím nebyla publikována (správce jen uložil) → vygenerovat na serveru z aktuálního stavu.
         const s = getState(); const d = (s.directives || []).find(x => String(x.id) === id);
-        if (!d || !d.html) return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+        if (!d || (!d.html && !d.pdf)) return send(res, 404, '<h1>Směrnice nenalezena</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
         try {
           const { buildPublished } = require('./smernice-pub');
           const aud = (s.employees || []).filter(e => assignedTo(d, e)).map(e => ({ email: e.email, name: e.name }));
