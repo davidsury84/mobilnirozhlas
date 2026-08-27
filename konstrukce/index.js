@@ -43,21 +43,37 @@ try { VYKRESY_STD = JSON.parse(fs.readFileSync(path.join(__dirname, 'vykresy-std
 // ---- Brandovaná HTML šablona interních e-mailů (+ proklik na zakázku) -------
 // info: {stitek, stitekBarva, cislo, zakaznik, krok, termin, natahu, url}.
 // Používá se pro interní notifikace; e-maily klientům zůstávají prostý text.
+// POZOR: layout výhradně tabulkami s bgcolor + inline styly — Outlook (Word
+// engine) ignoruje pozadí/padding na <div>, e-mail by přišel „bílý".
 function mailSablona(text, info) {
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const radek = (l, v) => v ? ('<tr><td style="padding:4px 14px 4px 0;color:#5b6b60;font-size:13px;white-space:nowrap;vertical-align:top">' + esc(l) + '</td><td style="padding:4px 0;font-size:13.5px;color:#1c2b21"><b>' + esc(v) + '</b></td></tr>') : '';
   info = info || {};
-  return '<div style="margin:0;padding:22px 10px;background:#eef2ec;font-family:Segoe UI,Arial,Helvetica,sans-serif">' +
-    '<div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #dfe6dd">' +
-      '<div style="background:#1f7a2e;color:#ffffff;padding:14px 22px;font-size:15px;font-weight:700;letter-spacing:.3px">ELKOPLAST · Intranet — Konstrukce</div>' +
-      (info.stitek ? ('<div style="background:' + (info.stitekBarva || '#c62828') + ';color:#ffffff;padding:7px 22px;font-size:12.5px;font-weight:700;letter-spacing:.5px">' + esc(info.stitek) + '</div>') : '') +
-      '<div style="padding:20px 22px 8px;font-size:14.5px;line-height:1.6;color:#233a2a">' + esc(text).replace(/\n/g, '<br>') + '</div>' +
-      (info.cislo ? ('<div style="margin:10px 22px 4px;padding:12px 16px;background:#f4f8f2;border:1px solid #e2eadf;border-radius:10px"><table cellpadding="0" cellspacing="0" style="border-collapse:collapse">' +
-        radek('Zakázka', info.cislo) + radek('Zákazník', info.zakaznik) + radek('Aktuální krok', info.krok) + radek('Termín', info.termin) + radek('Na tahu', info.natahu) +
-      '</table></div>') : '') +
-      (info.url ? ('<div style="padding:16px 22px 6px"><a href="' + esc(info.url) + '" style="display:inline-block;background:#1f7a2e;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 26px;border-radius:9px">Otevřít zakázku v intranetu &rarr;</a></div>') : '') +
-      '<div style="padding:12px 22px 18px;color:#8a978c;font-size:11.5px">Automatická zpráva intranetu ELKOPLAST — modul Konstrukce.</div>' +
-    '</div></div>';
+  const FONT = 'font-family:Segoe UI,Arial,Helvetica,sans-serif;';
+  const radek = (l, v) => v ? ('<tr><td width="130" style="' + FONT + 'padding:5px 14px 5px 0;color:#5b6b60;font-size:13px;vertical-align:top">' + esc(l) + '</td><td style="' + FONT + 'padding:5px 0;font-size:13.5px;color:#1c2b21;font-weight:bold">' + esc(v) + '</td></tr>') : '';
+  const vnitrek =
+    // hlavička
+    '<tr><td bgcolor="#1f7a2e" style="' + FONT + 'background-color:#1f7a2e;color:#ffffff;padding:14px 22px;font-size:15px;font-weight:bold;letter-spacing:.3px">ELKOPLAST &middot; Intranet &mdash; Konstrukce</td></tr>' +
+    // štítek (eskalace)
+    (info.stitek ? ('<tr><td bgcolor="' + (info.stitekBarva || '#c62828') + '" style="' + FONT + 'background-color:' + (info.stitekBarva || '#c62828') + ';color:#ffffff;padding:7px 22px;font-size:12.5px;font-weight:bold;letter-spacing:.5px">' + esc(info.stitek) + '</td></tr>') : '') +
+    // text zprávy
+    '<tr><td style="' + FONT + 'padding:20px 22px 8px;font-size:14.5px;line-height:1.6;color:#233a2a">' + esc(text).replace(/\n/g, '<br>') + '</td></tr>' +
+    // info box zakázky
+    (info.cislo ? ('<tr><td style="padding:10px 22px 4px">' +
+      '<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f8f2" style="background-color:#f4f8f2;border:1px solid #e2eadf"><tr><td style="padding:12px 16px">' +
+        '<table cellpadding="0" cellspacing="0" border="0">' +
+          radek('Zakázka', info.cislo) + radek('Zákazník', info.zakaznik) + radek('Aktuální krok', info.krok) + radek('Termín', info.termin) + radek('Na tahu', info.natahu) +
+        '</table>' +
+      '</td></tr></table></td></tr>') : '') +
+    // CTA tlačítko (bulletproof: tabulka s bgcolor)
+    (info.url ? ('<tr><td style="padding:16px 22px 6px">' +
+      '<table cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#1f7a2e" style="background-color:#1f7a2e;border-radius:9px">' +
+        '<a href="' + esc(info.url) + '" target="_blank" style="' + FONT + 'display:inline-block;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 26px">Otev&#345;&iacute;t zak&aacute;zku v intranetu &rarr;</a>' +
+      '</td></tr></table></td></tr>') : '') +
+    // patička
+    '<tr><td style="' + FONT + 'padding:12px 22px 18px;color:#8a978c;font-size:11.5px">Automatick&aacute; zpr&aacute;va intranetu ELKOPLAST &mdash; modul Konstrukce.</td></tr>';
+  return '<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef2ec" style="background-color:#eef2ec"><tr><td align="center" style="padding:22px 10px">' +
+    '<table width="620" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;max-width:620px;width:100%;border:1px solid #dfe6dd">' + vnitrek + '</table>' +
+  '</td></tr></table>';
 }
 // Per-řadové standardy a opce dle LISTŮ oficiální tabulky „Typová řada ABR
 // kontejnerů" (abr-rady.json) — každá řada (ABR-DSD, ABR-AFS…) má vlastní list
