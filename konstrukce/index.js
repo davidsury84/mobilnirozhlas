@@ -39,6 +39,26 @@ try { NATAH_IMG = JSON.parse(fs.readFileSync(path.join(__dirname, 'natah-img', '
 // — klíč „ABR-TYP-rozměry-plechy" → {f: soubor, zdroj: původní PDF}.
 let VYKRESY_STD = {};
 try { VYKRESY_STD = JSON.parse(fs.readFileSync(path.join(__dirname, 'vykresy-std', 'map.json'), 'utf8')); } catch (_) {}
+
+// ---- Brandovaná HTML šablona interních e-mailů (+ proklik na zakázku) -------
+// info: {stitek, stitekBarva, cislo, zakaznik, krok, termin, natahu, url}.
+// Používá se pro interní notifikace; e-maily klientům zůstávají prostý text.
+function mailSablona(text, info) {
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const radek = (l, v) => v ? ('<tr><td style="padding:4px 14px 4px 0;color:#5b6b60;font-size:13px;white-space:nowrap;vertical-align:top">' + esc(l) + '</td><td style="padding:4px 0;font-size:13.5px;color:#1c2b21"><b>' + esc(v) + '</b></td></tr>') : '';
+  info = info || {};
+  return '<div style="margin:0;padding:22px 10px;background:#eef2ec;font-family:Segoe UI,Arial,Helvetica,sans-serif">' +
+    '<div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #dfe6dd">' +
+      '<div style="background:#1f7a2e;color:#ffffff;padding:14px 22px;font-size:15px;font-weight:700;letter-spacing:.3px">ELKOPLAST · Intranet — Konstrukce</div>' +
+      (info.stitek ? ('<div style="background:' + (info.stitekBarva || '#c62828') + ';color:#ffffff;padding:7px 22px;font-size:12.5px;font-weight:700;letter-spacing:.5px">' + esc(info.stitek) + '</div>') : '') +
+      '<div style="padding:20px 22px 8px;font-size:14.5px;line-height:1.6;color:#233a2a">' + esc(text).replace(/\n/g, '<br>') + '</div>' +
+      (info.cislo ? ('<div style="margin:10px 22px 4px;padding:12px 16px;background:#f4f8f2;border:1px solid #e2eadf;border-radius:10px"><table cellpadding="0" cellspacing="0" style="border-collapse:collapse">' +
+        radek('Zakázka', info.cislo) + radek('Zákazník', info.zakaznik) + radek('Aktuální krok', info.krok) + radek('Termín', info.termin) + radek('Na tahu', info.natahu) +
+      '</table></div>') : '') +
+      (info.url ? ('<div style="padding:16px 22px 6px"><a href="' + esc(info.url) + '" style="display:inline-block;background:#1f7a2e;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 26px;border-radius:9px">Otevřít zakázku v intranetu &rarr;</a></div>') : '') +
+      '<div style="padding:12px 22px 18px;color:#8a978c;font-size:11.5px">Automatická zpráva intranetu ELKOPLAST — modul Konstrukce.</div>' +
+    '</div></div>';
+}
 // Per-řadové standardy a opce dle LISTŮ oficiální tabulky „Typová řada ABR
 // kontejnerů" (abr-rady.json) — každá řada (ABR-DSD, ABR-AFS…) má vlastní list
 // s jinými std/opce. Řady bez listu jedou na globálním číselníku.
@@ -829,10 +849,31 @@ function mount(host) {
     d.notif.unshift({ id: 'n' + crypto.randomBytes(5).toString('hex'), email: email.toLowerCase(), text, zakId: zakId || null, at: Date.now(), read: false });
     if (d.notif.length > 500) d.notif.length = 500;
   }
-  async function mail(to, subject, text, html) {
+  // Základ veřejné adresy intranetu (pro odkazy v e-mailech, i mimo HTTP požadavek).
+  function appBase() { return String((host.mailFrom && host.mailFrom.publicUrl) || 'https://intranet.elkoplast.cz').replace(/\/+$/, ''); }
+  // Přímý odkaz na zakázku: query ?z=<id> přežije i případné přihlášení (hash ne).
+  function zakUrl(z) { return appBase() + '/konstrukce?' + ((z.rezim !== 'objednavka') ? 'zadani&' : '') + 'z=' + encodeURIComponent(z.id); }
+  // Info box zakázky do e-mailové šablony (číslo, zákazník, krok, termín, na tahu).
+  function zakInfo(z, extra) {
+    const st = STAV[z.stav] || {};
+    return Object.assign({
+      cislo: z.cisloObj || z.cislo, zakaznik: z.zakaznik, krok: st.label || '',
+      termin: (z.deadline && !st.terminal) ? fmtDate(z.deadline) : '',
+      natahu: empName(responsibleEmail(z)) || '', url: zakUrl(z),
+    }, extra || {});
+  }
+  // mail(to, subject, text[, z[, extra]]) — se zakázkou pošle brandované HTML
+  // s info boxem a tlačítkem na zakázku; 4. parametr jako string = hotové HTML
+  // (digest); bez zakázky prostý text v jednoduchém HTML (e-maily klientům).
+  async function mail(to, subject, text, z, extra) {
     if (!to || !host.deliver || !host.mailFrom || !host.mailFrom.user) return;
+    let html;
+    if (typeof z === 'string' && z) html = z;
+    else if (z && z.id) html = mailSablona(text, zakInfo(z, extra));
+    else if (extra) html = mailSablona(text, extra);
+    else html = mailHtml(text);
     try {
-      await host.deliver({ to, fromAddr: host.mailFrom.user, fromName: host.mailFrom.name || 'Intranet – konstrukce', subject, text, html: html || mailHtml(text) });
+      await host.deliver({ to, fromAddr: host.mailFrom.user, fromName: host.mailFrom.name || 'Intranet – konstrukce', subject, text, html });
     } catch (e) { console.warn('[konstrukce] e-mail se nepodařilo odeslat (' + to + '): ' + e.message); }
   }
   function mailHtml(text) {
@@ -1556,12 +1597,12 @@ function mount(host) {
       // objednávka bez určeného závodu → na tahu ředitel výroby
       employeesWithRole('vykonny-reditel').forEach(em => { notify(d, em, 'Nová objednávka ' + cislo + ' (' + zakaznik + ') — vyberte výrobní závod.', z.id); });
       save(d);
-      for (const em of employeesWithRole('vykonny-reditel')) mail(em, 'Nová objednávka · výběr závodu · ' + cislo, 'Obchodník ' + me.name + ' založil novou objednávku.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + '\n\nVyberte prosím výrobní závod v intranetu → Zadání do výroby – konstrukce.');
+      for (const em of employeesWithRole('vykonny-reditel')) mail(em, 'Nová objednávka · výběr závodu · ' + cislo, 'Obchodník ' + me.name + ' založil novou objednávku.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + '\n\nVyberte prosím výrobní závod v intranetu → Zadání do výroby – konstrukce.', z);
     } else {
       employeesWithRole('sef').forEach(em => { notify(d, em, 'Nová ' + co + ' ' + cislo + ' (' + zakaznik + ') — přidělte konstruktéra.', z.id); });
       save(d);
       // e-mail šéfovi konstrukce (první krok = přidělení konstruktéra)
-      for (const em of employeesWithRole('sef')) mail(em, 'Nová ' + co + ' · přidělení konstruktéra · ' + cislo, 'Obchodník ' + me.name + ' založil novou ' + (jeObj ? 'objednávku' : 'nabídku') + '.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + (z.strediskoName ? '\nZávod: ' + z.strediskoName : '') + '\n\nPřidělte prosím konstruktéra v intranetu → ' + (jeObj ? 'Zadání do výroby – konstrukce' : 'Nabídka – konstrukce') + '.');
+      for (const em of employeesWithRole('sef')) mail(em, 'Nová ' + co + ' · přidělení konstruktéra · ' + cislo, 'Obchodník ' + me.name + ' založil novou ' + (jeObj ? 'objednávku' : 'nabídku') + '.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + (z.strediskoName ? '\nZávod: ' + z.strediskoName : '') + '\n\nPřidělte prosím konstruktéra v intranetu → ' + (jeObj ? 'Zadání do výroby – konstrukce' : 'Nabídka – konstrukce') + '.', z);
     }
     json(res, 200, { ok: true, id: z.id, cislo, warn });
     return true;
@@ -1671,7 +1712,7 @@ function mount(host) {
         audit(z, me.email, 'Zkreslení hotovo', 'verze v' + draft.v);
         enterState(d, z, t.internalCheck ? 'kontrola' : 'obchodnik');
         if (t.internalCheck) employeesWithRole('sef').forEach(em => notify(d, em, 'Výkres ' + z.cislo + ' je zkreslený a čeká na interní kontrolu.', z.id));
-        else { notify(d, z.obchodnikEmail, 'Výkres ' + z.cislo + ' je připraven k potvrzení.', z.id); mail(z.obchodnikEmail, 'Výkres zkreslen · ' + z.cislo, 'Výkres ' + z.cislo + ' (' + z.zakaznik + ') je zkreslený a čeká na vaše potvrzení.'); }
+        else { notify(d, z.obchodnikEmail, 'Výkres ' + z.cislo + ' je připraven k potvrzení.', z.id); mail(z.obchodnikEmail, 'Výkres zkreslen · ' + z.cislo, 'Výkres ' + z.cislo + ' (' + z.zakaznik + ') je zkreslený a čeká na vaše potvrzení.', z); }
         break;
       }
       case 'kontrola-ok': { // šéf → u obchodníka
@@ -1680,7 +1721,7 @@ function mount(host) {
         audit(z, me.email, 'Interní kontrola OK', note);
         enterState(d, z, 'obchodnik');
         notify(d, z.obchodnikEmail, 'Výkres ' + z.cislo + ' prošel kontrolou a čeká na vaše potvrzení.', z.id);
-        mail(z.obchodnikEmail, 'Výkres zkreslen a zkontrolován · ' + z.cislo, 'Výkres ' + z.cislo + ' (' + z.zakaznik + ') prošel interní kontrolou a čeká na vaše potvrzení v intranetu → Konstrukce.');
+        mail(z.obchodnikEmail, 'Výkres zkreslen a zkontrolován · ' + z.cislo, 'Výkres ' + z.cislo + ' (' + z.zakaznik + ') prošel interní kontrolou a čeká na vaše potvrzení v intranetu → Konstrukce.', z);
         break;
       }
       case 'kontrola-vrat': { // šéf → zpět konstruktérovi
@@ -1797,7 +1838,7 @@ function mount(host) {
           if (z.assignedTo) notify(d, z.assignedTo, 'Objednávka ' + (z.cisloObj || z.cislo) + ' — závod ' + s.label + ', vložte výrobní dokumentaci.', z.id);
           employeesWithRole('sef').forEach(em => notify(d, em, 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') → závod ' + s.label + '.', z.id));
         } else {
-          employeesWithRole('sef').forEach(em => { notify(d, em, 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') — závod ' + s.label + ', přidělte konstruktéra.', z.id); mail(em, 'Objednávka · přidělení konstruktéra · ' + (z.cisloObj || z.cislo), 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') dostala závod ' + s.label + '.\nPřidělte prosím konstruktéra v intranetu → Zadání do výroby – konstrukce.'); });
+          employeesWithRole('sef').forEach(em => { notify(d, em, 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') — závod ' + s.label + ', přidělte konstruktéra.', z.id); mail(em, 'Objednávka · přidělení konstruktéra · ' + (z.cisloObj || z.cislo), 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') dostala závod ' + s.label + '.\nPřidělte prosím konstruktéra v intranetu → Zadání do výroby – konstrukce.', z); });
         }
         break;
       }
@@ -1821,7 +1862,7 @@ function mount(host) {
         audit(z, me.email, 'Vložena výrobní dokumentace → do výroby', (z.strediskoName ? 'závod ' + z.strediskoName : ''));
         notify(d, z.obchodnikEmail, 'Zakázka ' + z.cislo + ' má výrobní dokumentaci a jde do výroby (' + (z.strediskoName || '') + ').', z.id);
         const dir = z.strediskoKey ? oblastReditel(d, z.strediskoKey) : '';
-        if (dir) { notify(d, dir, 'Do výroby (' + z.strediskoName + ') přišla zakázka ' + z.cislo + ' s výrobní dokumentací.', z.id); mail(dir, 'Do výroby · ' + z.cislo + ' · ' + z.strediskoName, 'Zakázka ' + z.cislo + ' (' + z.zakaznik + ') má vloženou výrobní dokumentaci a jde do výroby ve vašem závodě ' + z.strediskoName + '.'); }
+        if (dir) { notify(d, dir, 'Do výroby (' + z.strediskoName + ') přišla zakázka ' + z.cislo + ' s výrobní dokumentací.', z.id); mail(dir, 'Do výroby · ' + z.cislo + ' · ' + z.strediskoName, 'Zakázka ' + z.cislo + ' (' + z.zakaznik + ') má vloženou výrobní dokumentaci a jde do výroby ve vašem závodě ' + z.strediskoName + '.', z); }
         break;
       }
       default: err = 'Neznámá akce „' + action + '".';
@@ -1836,7 +1877,7 @@ function mount(host) {
       gedge.notify.forEach(role => employeesWithRole(role).forEach(em => {
         if (!em || seen[em]) return; seen[em] = true;
         notify(d, em, 'Zakázka ' + z.cislo + ' — ' + co + ' (nyní: ' + stLbl + ').', z.id);
-        mail(em, 'Konstrukce · ' + z.cislo + ' · ' + co, 'Zakázka ' + z.cislo + ' (' + z.zakaznik + '): ' + co + '.\nAktuální krok: ' + stLbl + '.');
+        mail(em, 'Konstrukce · ' + z.cislo + ' · ' + co, 'Zakázka ' + z.cislo + ' (' + z.zakaznik + '): ' + co + '.\nAktuální krok: ' + stLbl + '.', z);
       }));
     }
     save(d);
@@ -2266,14 +2307,14 @@ function mount(host) {
         notify(d, z.obchodnikEmail, 'Klient SCHVÁLIL výkres objednávky ' + (z.cisloObj || z.cislo) + '.', z.id);
         if (z.assignedTo) notify(d, z.assignedTo, 'Výkres ' + (z.cisloObj || z.cislo) + ' schválen klientem — vypracujte výrobní dokumentaci.', z.id);
         save(d);
-        mail(z.obchodnikEmail, 'Klient schválil výkres · ' + (z.cisloObj || z.cislo), 'Klient ' + name + ' schválil výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') dne ' + fmtDateTime(Date.now()) + '.\nKonstrukce nyní vypracuje výrobní dokumentaci.');
+        mail(z.obchodnikEmail, 'Klient schválil výkres · ' + (z.cisloObj || z.cislo), 'Klient ' + name + ' schválil výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') dne ' + fmtDateTime(Date.now()) + '.\nKonstrukce nyní vypracuje výrobní dokumentaci.', z);
         if (z.assignedTo) mail(z.assignedTo, 'Schváleno klientem · ' + (z.cisloObj || z.cislo), 'Výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') je schválen klientem. Vypracujte a vložte výrobní dokumentaci.');
       } else {
         audit(z, name + ' (klient)', 'Klient potvrdil nabídku', 'verze v' + (cur ? cur.v : '?') + ', IP ' + ip);
         toObjednavka(d, z, name + ' (klient)');   // nabídka → předání do objednávek (výběr závodu)
         notify(d, z.obchodnikEmail, 'Klient POTVRDIL nabídku ' + z.cislo + ' → objednávka ' + (z.cisloObj || '') + '.', z.id);
         save(d);
-        mail(z.obchodnikEmail, 'Klient potvrdil nabídku · ' + z.cislo, 'Klient ' + name + ' potvrdil nabídku ' + z.cislo + ' (' + z.zakaznik + ') dne ' + fmtDateTime(Date.now()) + '.\nVznikla objednávka ' + (z.cisloObj || '') + ' — výkonný ředitel nyní vybere výrobní závod a konstrukce vloží výrobní dokumentaci.');
+        mail(z.obchodnikEmail, 'Klient potvrdil nabídku · ' + z.cislo, 'Klient ' + name + ' potvrdil nabídku ' + z.cislo + ' (' + z.zakaznik + ') dne ' + fmtDateTime(Date.now()) + '.\nVznikla objednávka ' + (z.cisloObj || '') + ' — výkonný ředitel nyní vybere výrobní závod a konstrukce vloží výrobní dokumentaci.', z);
       }
     } else if (action === 'zamitnout') {
       const duvod = String(b.duvod || '').trim().slice(0, 1500);
@@ -2286,7 +2327,7 @@ function mount(host) {
       audit(z, (name || 'klient') + ' (klient)', 'Klient zamítl', duvod + ' — IP ' + ip);
       notify(d, z.obchodnikEmail, 'Klient ZAMÍTL výkres ' + z.cislo + '. Řešte další postup.', z.id);
       save(d);
-      mail(z.obchodnikEmail, 'Klient zamítl výkres · ' + z.cislo, 'Klient ' + (name || '') + ' zamítl výkres ' + z.cislo + '.\nDůvod: ' + duvod + '\n\nDomluvte se zákazníkem na dalším postupu.');
+      mail(z.obchodnikEmail, 'Klient zamítl výkres · ' + z.cislo, 'Klient ' + (name || '') + ' zamítl výkres ' + z.cislo + '.\nDůvod: ' + duvod + '\n\nDomluvte se zákazníkem na dalším postupu.', z);
     } else if (action === 'pripominky') {
       const text = String(b.text || '').trim().slice(0, 3000);
       if (!text) { json(res, 400, { chyba: 'Napište prosím připomínky.' }); return true; }
@@ -2304,7 +2345,7 @@ function mount(host) {
       if (z.assignedTo) notify(d, z.assignedTo, 'Revize v' + nv.v + ' u výkresu ' + z.cislo + ' — zapracujte připomínky klienta.', z.id);
       employeesWithRole('sef').forEach(em => notify(d, em, 'Revize u ' + z.cislo + ' (připomínky klienta).', z.id));
       save(d);
-      mail(z.obchodnikEmail, 'Klient poslal připomínky · ' + z.cislo, 'Klient ' + (name || '') + ' poslal připomínky k výkresu ' + z.cislo + '.\n\n' + text + '\n\nByla založena revize v' + nv.v + '.');
+      mail(z.obchodnikEmail, 'Klient poslal připomínky · ' + z.cislo, 'Klient ' + (name || '') + ' poslal připomínky k výkresu ' + z.cislo + '.\n\n' + text + '\n\nByla založena revize v' + nv.v + '.', z);
     } else {
       json(res, 400, { chyba: 'Neznámá akce.' }); return true;
     }
@@ -2410,7 +2451,7 @@ function mount(host) {
         if (remind2 > 0 && bdays >= remind2 && !z.esc.klient10) {
           z.esc.klient10 = true; changed = true;
           notify(d, z.obchodnikEmail, 'ÚKOL: Klient nereaguje ' + remind2 + ' prac. dnů na ' + z.cislo + ' — kontaktujte ho telefonicky.', z.id);
-          mail(z.obchodnikEmail, 'Klient nereaguje ' + remind2 + ' dnů · ' + z.cislo, 'Klient nereaguje na náhled výkresu ' + z.cislo + ' už ' + remind2 + ' pracovních dnů. Kontaktujte ho prosím telefonicky.');
+          mail(z.obchodnikEmail, 'Klient nereaguje ' + remind2 + ' dnů · ' + z.cislo, 'Klient nereaguje na náhled výkresu ' + z.cislo + ' už ' + remind2 + ' pracovních dnů. Kontaktujte ho prosím telefonicky.', z);
         }
         continue;
       }
@@ -2434,7 +2475,7 @@ function mount(host) {
           komu.forEach(em => notify(d, em, 'PO TERMÍNU: krok „' + st.label + '" u ' + z.cislo + ' překročil termín.', z.id));
           if (cfg.overdueEmail !== false) {
             const text = 'Zakázka ' + z.cislo + ' (' + z.zakaznik + ') překročila termín kroku „' + st.label + '" (' + fmtDate(z.deadline) + ').\nOdpovědná osoba: ' + (empName(resp) || '—') + '.';
-            komu.forEach(em => mail(em, 'Po termínu · ' + z.cislo, text));
+            komu.forEach(em => mail(em, 'Po termínu · ' + (z.cisloObj || z.cislo), text, z, { stitek: 'PO TERMÍNU', stitekBarva: '#c62828' }));
           }
         }
         // --- D+1 a dále: denní souhrn řediteli ---

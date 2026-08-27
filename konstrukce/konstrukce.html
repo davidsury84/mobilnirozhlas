@@ -1173,13 +1173,17 @@ function reloadData(){
     if(SEL){var z=D.zakazky.find(function(x){return x.id===SEL});if(z)renderDrawer(z);}
     // vstup z Obchodu: /konstrukce#zadani&new otevře rovnou novou nabídku (jeden tok)
     if(!ZADANI_OPENED && /(^|[#&])new\b/.test(location.hash) && canCreate() && MODE==='nabidka'){ZADANI_OPENED=true;openNew();}
+    // přímý odkaz z e-mailu: ?z=<id> (nebo #z=…) otevře detail zakázky
+    if(!Z_OPENED){var zm=(location.search+location.hash).match(/[?&#]z=([A-Za-z0-9]+)/);
+      if(zm){Z_OPENED=true;var zz=D.zakazky.find(function(x){return x.id===zm[1]});if(zz)openDrawer(zz.id);}}
   });
 }
-var ZADANI_OPENED=false;
+var ZADANI_OPENED=false, Z_OPENED=false;
 
 /* ---- levý filtr ---- */
 // Režim pohledu: 'nabidka' = „Nabídka – konstrukce" (#zadani), 'vyroba' = „Zadání do výroby – konstrukce"
-var MODE=(/(^|[#&])zadani/.test(location.hash))?'nabidka':'vyroba';
+// Režim čteme z hash i query (?zadani&z=… v odkazech z e-mailů přežije SSO přihlášení)
+var MODE=(/(^|[#&?])zadani/.test(location.hash+location.search))?'nabidka':'vyroba';
 function inMode(x){ return MODE==='nabidka' ? (x.rezim!=='objednavka') : (x.rezim==='objednavka'); }
 function baseSet(){ return D.zakazky.filter(inMode); }
 function counts(){
