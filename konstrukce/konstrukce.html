@@ -1234,7 +1234,7 @@ function renderSide(){
   if(MODE!=='nabidka'&&(ME.isAdmin||ME.role==='sef')){h+='<div class="grp">Konstrukce</div>';h+='<button class="chip'+(FILTER==='kapacity'?' act':'')+'" onclick="setFilter(\'kapacity\')"><span>Kapacity</span></button>';}
   if(MODE!=='nabidka'&&(ME.isAdmin||ME.role==='reditel')){h+='<button class="chip'+(FILTER==='kpi'?' act':'')+'" onclick="setFilter(\'kpi\')"><span>KPI ředitele</span></button>';}
   if(MODE!=='nabidka'&&(ME.isAdmin||ME.role==='konstrukter'||ME.role==='sef'||ME.role==='reditel')){h+='<div class="grp">Evidence</div>';h+='<button class="chip'+(FILTER==='evidence'?' act':'')+'" onclick="setFilter(\'evidence\')"><span>Evidence práce</span></button>';}
-  if(MODE!=='nabidka'&&ME.isAdmin){h+='<div class="grp">Správa</div>';h+='<button class="chip'+(FILTER==='nastaveni'?' act':'')+'" onclick="setFilter(\'nastaveni\')"><span>Role a číselník</span></button>';h+='<button class="chip'+(FILTER==='platno'?' act':'')+'" onclick="setFilter(\'platno\')"><span>🧩 Pravidlo toku (plátno)</span></button>';}
+  if(MODE!=='nabidka'&&(ME.isAdmin||ME.role==='sef')){h+='<div class="grp">Správa</div>';h+='<button class="chip'+(FILTER==='nastaveni'?' act':'')+'" onclick="setFilter(\'nastaveni\')"><span>Role a číselník</span></button>';if(ME.isAdmin)h+='<button class="chip'+(FILTER==='platno'?' act':'')+'" onclick="setFilter(\'platno\')"><span>🧩 Pravidlo toku (plátno)</span></button>';}
   document.getElementById('side').innerHTML=h;
 }
 var NAVHIST=[];
@@ -3442,8 +3442,10 @@ function tsDelete(id){if(!confirm('Smazat záznam?'))return;api('/timesheet/dele
 
 /* ---- nastavení (admin) ---- */
 function renderNastaveni(m){
-  var h='<div class="head"><h2>Nastavení konstrukce</h2></div>';
-  h+=setupCard();
+  // Šéf konstrukce spravuje jen lidi (role/fond/skupiny); zbytek administrace vidí pouze správce.
+  var jeAdmin=ME.isAdmin;
+  var h='<div class="head"><h2>'+(jeAdmin?'Nastavení konstrukce':'Role a konstruktéři')+'</h2></div>';
+  if(jeAdmin)h+=setupCard();
   var R=D.roles||{sef:[],konstrukter:[],obchodnik:[],reditel:[]};
   R['vykonny-reditel']=R['vykonny-reditel']||[];
   // — role s výběrem konkrétních osob z databáze —
@@ -3453,6 +3455,7 @@ function renderNastaveni(m){
   h+=roleCard('Konstruktéři','konstrukter',R.konstrukter,'Zpracovávají přidělené výkresy. U každého nastavte týdenní fond hodin a skupiny výrobků, které dělá (MULDA/CITY apod. tak dostanou své konstruktéry). Při přidělování se nabídnou jen konstruktéři dané skupiny.',true,true);
   h+=roleCard('Obchodníci','obchodnik',R.obchodnik,'Zadávají požadavky, potvrzují výkresy a odesílají náhledy klientům. Všichni s přístupem k modulu Obchod (a lidé z „Rozdělení obchodníků") mají zadávání do konstrukce implicitně — níže přidáváš jen výjimky navíc.',false,false,obchodniciTable());
   h+=roleCard('Ředitel (přehledy / KPI)','reditel',R.reditel,'Přístup jen pro čtení k reportům a KPI; příjemce eskalací.',false);
+  if(!jeAdmin){m.innerHTML=h;return}   // šéf konstrukce končí u rolí — číselníky/reset jen správce
   // — výrobní oblasti + jejich ředitelé —
   h+='<div class="sec">Výroba — oblasti a výrobní ředitelé</div><div class="card"><p class="muted" style="margin-top:0">Každá výrobní oblast má svého ředitele (konkrétní osoba z databáze). Schválená zakázka se předává do vybrané oblasti a je na tahu její výrobní ředitel.</p>';
   (D.strediska||[]).forEach(function(s){

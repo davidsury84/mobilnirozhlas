@@ -1431,10 +1431,10 @@ function mount(host) {
       strediska: (d.strediska || []).map(s => ({ key: s.key, label: s.label, reditelEmail: s.reditelEmail || '', reditelName: s.reditelEmail ? empName(s.reditelEmail) : '' })),
       adresy: (d.adresy || []).slice().sort((a, b) => a.localeCompare(b, 'cs')),
       natahImg: NATAH_IMG,                             // kod natahování → soubor ilustrace (natah-img/)
-      roles: (me.isAdmin) ? roleAssignments(d) : undefined,
-      employees: (me.isAdmin) ? adminEmployees() : undefined,
+      roles: (me.isAdmin || me.role === 'sef') ? roleAssignments(d) : undefined,
+      employees: (me.isAdmin || me.role === 'sef') ? adminEmployees() : undefined,
       // jmenovitý přehled implicitních obchodníků (modul Obchod / EXP / Rozdělení) — pro kartu Obchodníci
-      obchodniciImplicit: (me.isAdmin && host.obchodniciList)
+      obchodniciImplicit: ((me.isAdmin || me.role === 'sef') && host.obchodniciList)
         ? host.obchodniciList().map(o => ({ email: o.email, name: empName(o.email), zdroje: o.zdroje }))
             .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'))
         : undefined,
@@ -2053,8 +2053,12 @@ function mount(host) {
   }
 
   // ---- admin: role / fond / číselník ---------------------------------------
+  // Správu rolí a konstruktérů (lidé v „Role a číselník") smí kromě správce
+  // i šéf konstrukce — vedoucí si spravuje své lidi sám. Zbytek administrace
+  // (číselníky, střediska, reset dat, plátno, rozesílky) zůstává jen správci.
+  function smiSpravovatRole(req) { return host.isAdmin(req) || roleOf(req).role === 'sef'; }
   async function apiAdminRole(req, res) {
-    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    if (!smiSpravovatRole(req)) { json(res, 403, { chyba: 'Role spravuje správce nebo šéf konstrukce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
     const email = String(b.email || '').toLowerCase().trim();
     const role = String(b.role || '').trim();
@@ -2068,7 +2072,7 @@ function mount(host) {
     return true;
   }
   async function apiAdminFond(req, res) {
-    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    if (!smiSpravovatRole(req)) { json(res, 403, { chyba: 'Fond spravuje správce nebo šéf konstrukce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
     const email = String(b.email || '').toLowerCase().trim();
     const h = parseInt(b.fond, 10);
@@ -2080,7 +2084,7 @@ function mount(host) {
   }
   // Skupiny výrobků, které konstruktér zpracovává (prázdné = všechny).
   async function apiAdminKonstrGroups(req, res) {
-    if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+    if (!smiSpravovatRole(req)) { json(res, 403, { chyba: 'Skupiny spravuje správce nebo šéf konstrukce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
     const email = String(b.email || '').toLowerCase().trim();
     if (!email) { json(res, 400, { chyba: 'Chybí e-mail.' }); return true; }
