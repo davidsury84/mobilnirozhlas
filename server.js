@@ -214,7 +214,8 @@ const CENMON_F  = path.join(DATA_DIR, 'cenmon.json');     // cenový monitoring:
 const INVITES_F = path.join(DATA_DIR, 'invites.json');    // stav pozvánek dle e-mailu: {invitedAt, acceptedAt, lastLoginAt}
 const UKOLY_F   = path.join(DATA_DIR, 'smernice-ukoly.json'); // úkoly vyplývající ze směrnic (záložka „Úkoly ze směrnic")
 const KOVOKALK_F = path.join(DATA_DIR, 'kovo-kalkulace.json'); // Kalkulace KOVO: parametry (s historií změn) + výrobky
-const OBCHOD_F   = path.join(DATA_DIR, 'obchod-zastupitelnost.json'); // Obchod: rozdělení obchodníků / zastupitelnost PM (editovatelná tabulka)
+const OBCHOD_F   = path.join(DATA_DIR, 'obchod-zastupitelnost.json');
+const GARANTI_F  = path.join(DATA_DIR, 'garanti-navrhy.json'); // návrhy garantů ze SK/PL z veřejné stránky + nastavení veřejného odkazu // Obchod: rozdělení obchodníků / zastupitelnost PM (editovatelná tabulka)
 const PREKLAD_LEADY_F = path.join(DATA_DIR, 'preklad-leady.json'); // Obchod → Leady: kontakty z veřejné kalkulačky překladiště (lead-gen)
 const AKTUALITY_F = path.join(DATA_DIR, 'aktuality.json');    // aktuality (novinky) na intranetu: {posts:[{id,title,body,image,author,authorEmail,ts,likes:{email:ts}}]}
 const SITE_F      = path.join(DATA_DIR, 'site.json');         // nastavení vzhledu intranetu (např. vlastní hero banner)
@@ -1943,6 +1944,8 @@ const OBCHOD_SLOUPCE = [
   { key: 'pm', label: 'Garant (odpovědný PM)' },
   { key: 'zastup', label: 'Náhradní garant 1 (zástup)' },
   { key: 'nahradnik', label: 'Náhradní garant 2' },
+  { key: 'garantSk', label: 'Garant SK' },
+  { key: 'garantPl', label: 'Garant PL' },
   { key: 'pokryti', label: 'Stav pokrytí' },
   { key: 'poznamka', label: 'Poznámka' }
 ];
@@ -2010,7 +2013,9 @@ const OBCHOD_SEED_ROWS = [
   ['Skladování', 'Výklopné kontejnery', '', 'J. Beránek', 'Průmysl', '', 'Pokryto', 'Návrh: J. Beránek'],
   ['', 'Květináče', '', 'nutné obsadit', 'nutné obsadit', '', '', '']
 ];
-const OBCHOD_SEED = OBCHOD_SEED_ROWS.map((r, i) => { const o = { id: 'k' + (i + 1) }; OBCHOD_SLOUPCE.forEach((c, j) => { o[c.key] = r[j] || ''; }); return o; });
+// Pořadí hodnot v seedu odpovídá původnímu listu (bez garantů SK/PL — ty se doplňují až v intranetu).
+const OBCHOD_SEED_KEYS = ['sekce', 'kategorie', 'stitek', 'pm', 'zastup', 'nahradnik', 'pokryti', 'poznamka'];
+const OBCHOD_SEED = OBCHOD_SEED_ROWS.map((r, i) => { const o = { id: 'k' + (i + 1) }; OBCHOD_SLOUPCE.forEach(c => { o[c.key] = ''; }); OBCHOD_SEED_KEYS.forEach((k, j) => { o[k] = r[j] || ''; }); return o; });
 // Řádky tabulky (z datového souboru, jinak seed).
 function readObchod() {
   const saved = readJson(OBCHOD_F, null);
@@ -2027,6 +2032,43 @@ function writeObchod(rows) {
   }).filter(r => KEYS.some(k => r[k].trim()));
   writeJson(OBCHOD_F, { rows: clean });
   return { rows: clean };
+}
+/* ---------- Garanti: veřejná stránka pro kolegy ze SK/PL + jejich návrhy ----------
+   Veřejný odkaz /garanti/<token> (token je náhodný, uložený v datech; admin ho může vygenerovat
+   znovu nebo stránku vypnout). Kolegové bez přihlášení do intranetu vidí přehled garantů
+   a mohou navrhnout člověka za svou zemi ke konkrétní produktové skupině. */
+function garantiBaseUrl() { return String(CFG.publicUrl || process.env.PUBLIC_URL || 'https://intranet.elkoplast.cz').replace(/\/$/, ''); }
+function readGaranti() {
+  const d = readJson(GARANTI_F, null) || {};
+  return { token: d.token || '', enabled: d.enabled !== false, navrhy: Array.isArray(d.navrhy) ? d.navrhy : [] };
+}
+function writeGaranti(d) { writeJson(GARANTI_F, { token: d.token || '', enabled: d.enabled !== false, navrhy: (d.navrhy || []).slice(0, 2000) }); return readGaranti(); }
+function garantiEnsureToken() {
+  const d = readGaranti();
+  if (!d.token) { d.token = crypto.randomBytes(16).toString('hex'); writeGaranti(d); return readGaranti(); }
+  return d;
+}
+function garantiTokenOk(tok) {
+  const d = readGaranti();
+  if (!d.enabled || !d.token || !tok) return false;
+  const a = Buffer.from(String(tok)), b = Buffer.from(d.token);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+const GARANT_ZEME = ['SK', 'PL', 'CZ', 'jiná'];
+const GARANT_STAVY = ['nový', 'přijatý', 'zamítnutý'];
+// Skupiny produktů pro veřejnou stránku = sekce webu + jejich kategorie (z živé tabulky).
+function garantiSkupiny() {
+  const rows = readObchod().rows, out = [];
+  rows.forEach(r => {
+    const sekce = String(r.sekce || '').trim() || 'Ostatní';
+    let g = out.find(x => x.sekce === sekce);
+    if (!g) { g = { sekce, polozky: [] }; out.push(g); }
+    g.polozky.push({
+      id: r.id, kategorie: r.kategorie || '', pm: r.pm || '', zastup: r.zastup || '',
+      garantSk: r.garantSk || '', garantPl: r.garantPl || ''
+    });
+  });
+  return out;
 }
 // Normalizace jména (bez diakritiky/velikosti) pro párování na zaměstnance.
 function obchodNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
@@ -2556,7 +2598,9 @@ const server = http.createServer(async (req, res) => {
   const prekladPublic = p === '/preklad' || p === '/preklad.html' || (p === '/api/preklad-lead' && req.method === 'POST');
   // Server-to-server cesty modulu Lodní kontejnery (Bearer = SSO tajemství) z aplikace lodni-kontejnery.
   const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext') || (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') || (p === '/api/kontejnery/list-ext' && req.method === 'GET') || (p === '/api/kontejnery/update-ext' && req.method === 'POST') || (p === '/api/kontejnery/potvrdit-ext' && req.method === 'POST');
-  const libraryIngestPublic = (p === '/api/library/ingest-ext' && req.method === 'POST');   // Bearer SSO_SHARED_SECRET (vkládání dokumentů přes chat)
+  const libraryIngestPublic = (p === '/api/library/ingest-ext' && req.method === 'POST');
+  // Veřejná stránka garantů (odkaz s tokenem pro kolegy ze SK/PL) + její API.
+  const garantiPublic = p.indexOf('/garanti/') === 0 || p.indexOf('/api/garanti/verejne') === 0 || (p === '/api/garanti/navrh' && req.method === 'POST');   // Bearer SSO_SHARED_SECRET (vkládání dokumentů přes chat)
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
   // Veřejné cesty hodnocení mobiliáře (obrázkový průzkum pro obchodníky i zákazníky): stránka + fotky + hlasy.
@@ -2564,6 +2608,17 @@ const server = http.createServer(async (req, res) => {
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
+
+  // Veřejná stránka „Garanti produktů" — /garanti/<token>, bez přihlášení.
+  if (p.indexOf('/garanti/') === 0 && req.method === 'GET') {
+    const tok = p.split('/')[2] || '';
+    if (!garantiTokenOk(tok)) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<meta charset="utf-8"><p style="font:16px system-ui;padding:40px">Tento odkaz už neplatí.</p>'); }
+    return fs.readFile(path.join(ROOT, 'garanti.html'), (e, d) => {
+      if (e) { res.writeHead(404); return res.end('Chybí garanti.html'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      res.end(d);
+    });
+  }
 
   // Starý odkaz /kontejnery → přesměruj na samostatnou aplikaci (klientský web). Veřejné, mimo závoru.
   if (p === '/kontejnery' && req.method === 'GET') { const t = LODAKY_APP_URL || 'https://lodak.elkoplast.cz'; res.writeHead(302, { 'Location': t + (u.hash || '') }); return res.end(); }
@@ -2625,7 +2680,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !libraryIngestPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !libraryIngestPublic && !garantiPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -3236,6 +3291,85 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- Obchod: rozdělení obchodníků / zastupitelnost PM (editovatelná tabulka, párováno na živou DB) ----
+    // ---- Garanti: veřejná stránka (bez přihlášení, na token) ----
+    if (p.indexOf('/api/garanti/verejne') === 0 && req.method === 'GET') {
+      const tok = (u.query && u.query.t) || '';
+      if (!garantiTokenOk(tok)) return send(res, 403, { error: 'Odkaz už neplatí. Vyžádejte si prosím nový.' });
+      return send(res, 200, {
+        skupiny: garantiSkupiny(), zeme: GARANT_ZEME,
+        pocetNavrhu: readGaranti().navrhy.length
+      }, { 'Cache-Control': 'no-store' });
+    }
+    if (p === '/api/garanti/navrh' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      if (!garantiTokenOk(b.t)) return send(res, 403, { error: 'Odkaz už neplatí.' });
+      if (b.web) return send(res, 200, { ok: true });   // honeypot
+      const txt = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+      const jmeno = txt(b.jmeno, 120), autor = txt(b.autor, 120);
+      if (!jmeno) return send(res, 400, { error: 'Vyplňte prosím jméno navrhovaného garanta.' });
+      if (!autor) return send(res, 400, { error: 'Vyplňte prosím, kdo návrh podává.' });
+      const d = readGaranti();
+      const rec = {
+        id: 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        ts: new Date().toISOString(),
+        zeme: GARANT_ZEME.indexOf(txt(b.zeme, 10)) >= 0 ? txt(b.zeme, 10) : 'SK',
+        rowId: txt(b.rowId, 60), sekce: txt(b.sekce, 200), kategorie: txt(b.kategorie, 300),
+        jmeno, email: txt(b.email, 160), poznamka: txt(b.poznamka, 2000),
+        autor, autorEmail: txt(b.autorEmail, 160), stav: 'nový'
+      };
+      d.navrhy.unshift(rec); writeGaranti(d);
+      try {
+        Promise.resolve(deliver({
+          to: SUPERADMIN, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet — garanti', subject: 'Návrh garanta (' + rec.zeme + '): ' + (rec.kategorie || rec.sekce || '—'),
+          html: '<p><b>' + esc(rec.autor) + '</b> navrhuje garanta za <b>' + esc(rec.zeme) + '</b>.</p>' +
+            '<p>Skupina / kategorie: <b>' + esc(rec.kategorie || rec.sekce || '—') + '</b><br>' +
+            'Navržený člověk: <b>' + esc(rec.jmeno) + '</b>' + (rec.email ? ' (' + esc(rec.email) + ')' : '') + '</p>' +
+            (rec.poznamka ? '<p>Poznámka: ' + esc(rec.poznamka) + '</p>' : '') +
+            '<p>Návrh najdete v intranetu → Obchod → Garanti SK/PL.</p>'
+        })).catch(e => console.warn('[garanti] notifikace neodešla:', (e && e.message) || e));
+      } catch (_) {}
+      return send(res, 200, { ok: true });
+    }
+
+    // ---- Garanti: správa z intranetu (modul obchod / správce) ----
+    if (p === '/api/garanti' && req.method === 'GET') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      if (!isAdmin(req) && employeeModules(e.email).indexOf('obchod') < 0) return send(res, 403, { error: 'K modulu Obchod nemáte přístup.' });
+      const d = isAdmin(req) ? garantiEnsureToken() : readGaranti();
+      return send(res, 200, {
+        enabled: d.enabled, token: isAdmin(req) ? d.token : '',
+        url: (isAdmin(req) && d.token) ? (garantiBaseUrl() + '/garanti/' + d.token) : '',
+        navrhy: d.navrhy, stavy: GARANT_STAVY, canEdit: isAdmin(req)
+      }, { 'Cache-Control': 'no-store' });
+    }
+    if (p === '/api/garanti' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Spravovat může jen správce.' });
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      let d = garantiEnsureToken();
+      if (b.akce === 'novyToken') { d.token = crypto.randomBytes(16).toString('hex'); d = writeGaranti(d); }
+      else if (b.akce === 'zapnout') { d.enabled = !!b.hodnota; d = writeGaranti(d); }
+      else if (b.akce === 'stav' || b.akce === 'smazat' || b.akce === 'prijmout') {
+        const n = d.navrhy.find(x => x.id === b.id);
+        if (!n) return send(res, 404, { error: 'Návrh nenalezen.' });
+        if (b.akce === 'smazat') d.navrhy = d.navrhy.filter(x => x.id !== b.id);
+        else if (b.akce === 'stav') n.stav = GARANT_STAVY.indexOf(String(b.stav)) >= 0 ? String(b.stav) : n.stav;
+        else {
+          // Přijmout = zapsat jméno do sloupce Garant SK / PL u dané kategorie
+          const t = readObchod(); const row = t.rows.find(r => r.id === n.rowId) ||
+            t.rows.find(r => obchodNorm(r.kategorie) === obchodNorm(n.kategorie));
+          if (!row) return send(res, 404, { error: 'Kategorie už v tabulce není — přiřaďte ručně.' });
+          const key = n.zeme === 'PL' ? 'garantPl' : (n.zeme === 'SK' ? 'garantSk' : null);
+          if (!key) return send(res, 400, { error: 'Přijmout lze jen návrh za SK nebo PL.' });
+          row[key] = n.jmeno;
+          writeObchod(t.rows);
+          n.stav = 'přijatý';
+        }
+        d = writeGaranti(d);
+      }
+      return send(res, 200, { ok: true, enabled: d.enabled, token: d.token, url: garantiBaseUrl() + '/garanti/' + d.token, navrhy: d.navrhy, stavy: GARANT_STAVY, canEdit: true });
+    }
+
     if (p === '/api/obchod' && req.method === 'GET') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });

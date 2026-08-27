@@ -2068,7 +2068,7 @@ async function showObchod(tab){
 }
 function obHero(){ return '<div class="dash-hero"><h2>Obchod — rozdělení obchodníků</h2><p>Rozdělení kategorií webu mezi obchodníky (produktové manažery). Stav pokrytí vyhodnocujeme z dat: vlastník + záloha = pokryto. Obchodníci jsou propojeni na živou databázi zaměstnanců včetně kontaktu.</p></div>'; }
 function obTabs(){
-  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků'],['nahradnici','Náhradníci'],['leady','Leady z kalkulačky']];
+  const t=[['kategorie','Podle kategorií'],['obchodnici','Podle obchodníků'],['nahradnici','Náhradníci'],['garanti','Garanti SK/PL'],['leady','Leady z kalkulačky']];
   return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="pl-tabs" style="flex:1">'+t.map(x=>'<button class="pl-tab'+(x[0]===OBCHOD_TAB?' active':'')+'" type="button" onclick="showObchod(\''+x[0]+'\')">'+esc(x[1])+'</button>').join('')+'</div>'+
     '<button class="btn ghost sm" type="button" onclick="obExportXlsx()" title="Stáhne sešit Excel se všemi pohledy">⬇ Excel (XLSX)</button>'+
     '<button class="btn ghost sm" type="button" onclick="obExportPdf()" title="Otevře tiskový náhled — uložte jako PDF nebo vytiskněte">📄 Sdílet PDF</button></div>';
@@ -2160,6 +2160,10 @@ function obRender(){
   const body=document.getElementById("mujBody"), d=OBCHOD_DATA;
   if(OBCHOD_TAB==="obchodnici"){ body.innerHTML=obHero()+obTabs()+obObchodniciHtml(); window.scrollTo(0,0); return; }
   if(OBCHOD_TAB==="nahradnici"){ body.innerHTML=obHero()+obTabs()+obNahradniciHtml(); window.scrollTo(0,0); return; }
+  if(OBCHOD_TAB==="garanti"){
+    if(!GARANTI_DATA){ body.innerHTML=obHero()+obTabs()+'<p class="muted" style="margin:16px 4px">Načítám návrhy garantů…</p>'; garLoad(); return; }
+    body.innerHTML=obHero()+obTabs()+garHtml(); window.scrollTo(0,0); return;
+  }
   if(OBCHOD_TAB==="leady"){
     if(!LEADY_DATA){ body.innerHTML=obHero()+obTabs()+'<p class="muted" style="margin:16px 4px">Načítám leady…</p>'; loadLeady(); return; }
     body.innerHTML=obHero()+obTabs()+obLeadyHtml(); window.scrollTo(0,0); return;
@@ -2179,6 +2183,75 @@ function obRender(){
   }).join('')+'</tr>').join('');
   body.innerHTML=obHero()+obTabs()+obChartsHtml(rows)+note+'<div class="ob-wrap"><table class="ob-table">'+head+'<tbody>'+bodyRows+'</tbody></table></div>';
   window.scrollTo(0,0);
+}
+/* ---- Garanti SK/PL: veřejný odkaz pro kolegy + jejich návrhy ---- */
+let GARANTI_DATA=null;
+async function garLoad(){
+  try{ const r=await fetch('/api/garanti',{cache:'no-store'}); GARANTI_DATA=await r.json(); }
+  catch(e){ GARANTI_DATA={navrhy:[],error:'Nepodařilo se načíst.'}; }
+  if(OBCHOD_TAB==='garanti') obRender();
+}
+async function garPost(payload){
+  try{
+    const r=await fetch('/api/garanti',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Chyba'); return; }
+    GARANTI_DATA=j; obRender();
+  }catch(e){ toast('Chyba spojení'); }
+}
+function garNovyOdkaz(){ if(!confirm('Vytvořit nový odkaz? Ten stávající okamžitě přestane fungovat.')) return; garPost({akce:'novyToken'}); }
+function garZapnout(on){ garPost({akce:'zapnout',hodnota:!!on}); }
+function garStav(id,stav){ garPost({akce:'stav',id:id,stav:stav}); }
+function garSmazat(id){ if(!confirm('Smazat tento návrh?')) return; garPost({akce:'smazat',id:id}); }
+async function garPrijmout(id){
+  const n=((GARANTI_DATA&&GARANTI_DATA.navrhy)||[]).find(x=>x.id===id); if(!n) return;
+  if(!confirm('Zapsat „'+n.jmeno+'" jako garanta '+n.zeme+' u kategorie „'+(n.kategorie||'—')+'"?')) return;
+  await garPost({akce:'prijmout',id:id});
+  OBCHOD_DATA=null;   // tabulka se změnila — načte se znovu
+}
+function garKopiruj(url){
+  try{ navigator.clipboard.writeText(url); toast('Odkaz zkopírován'); }
+  catch(e){ prompt('Zkopírujte odkaz:',url); }
+}
+function garHtml(){
+  const d=GARANTI_DATA||{}, navrhy=d.navrhy||[];
+  let h='<div class="card pad" style="margin-bottom:16px">'+
+    '<div class="spread" style="margin-bottom:6px"><strong>Veřejný odkaz pro kolegy ze SK a PL</strong>'+
+    (d.canEdit?'<label class="obx-ved" style="font-size:13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" '+(d.enabled?'checked':'')+' onchange="garZapnout(this.checked)" style="width:16px;height:16px"> stránka je zapnutá</label>':'')+'</div>'+
+    '<p class="muted" style="margin:0 0 10px;font-size:13px">Stránka je veřejná — kdo má odkaz, dostane se na ni bez přihlášení do intranetu. Najde tam popis role garanta, aktuální rozdělení a formulář, kterým navrhne člověka za svou zemi.</p>';
+  if(d.canEdit && d.url){
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+      '<input readonly value="'+esc(d.url)+'" onclick="this.select()" style="flex:1;min-width:280px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px;background:var(--bg-2)">'+
+      '<button class="btn sm" type="button" onclick="garKopiruj(\''+esc(d.url)+'\')">Kopírovat</button>'+
+      '<a class="btn ghost sm" href="'+esc(d.url)+'" target="_blank" rel="noopener">Otevřít</a>'+
+      '<button class="btn ghost sm" type="button" onclick="garNovyOdkaz()" title="Zneplatní stávající odkaz">Nový odkaz</button></div>';
+    if(!d.enabled) h+='<p class="muted" style="margin:8px 0 0;font-size:12.5px;color:#b3261e">Stránka je vypnutá — odkaz zatím nikomu nefunguje.</p>';
+  } else if(!d.canEdit){ h+='<p class="muted" style="margin:0;font-size:13px">Odkaz vidí a spravuje jen správce.</p>'; }
+  h+='</div>';
+
+  h+='<div class="dash-sec">Návrhy garantů ('+navrhy.length+')</div>';
+  if(!navrhy.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné návrhy. Pošlete kolegům odkaz výše.</p></div>'; return h; }
+  h+='<div class="ob-wrap"><table class="ob-table"><thead><tr>'+
+    '<th>Přišlo</th><th>Země</th><th>Kategorie / skupina</th><th>Navržený garant</th><th>Zdůvodnění</th><th>Podal</th><th>Stav</th><th></th></tr></thead><tbody>';
+  navrhy.forEach(n=>{
+    const dt=(function(){ try{ return new Date(n.ts).toLocaleDateString('cs-CZ')+' '+new Date(n.ts).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } })();
+    const stavCls=n.stav==='přijatý'?'ob-risk-lo':(n.stav==='zamítnutý'?'ob-risk-hi':'ob-risk-mid');
+    h+='<tr>'+
+      '<td style="white-space:nowrap">'+esc(dt)+'</td>'+
+      '<td><b>'+esc(n.zeme||'')+'</b></td>'+
+      '<td><b>'+esc(n.kategorie||'—')+'</b>'+(n.sekce?'<div class="muted" style="font-size:12px">'+esc(n.sekce)+'</div>':'')+'</td>'+
+      '<td><b>'+esc(n.jmeno||'')+'</b>'+(n.email?'<div style="font-size:12px"><a href="mailto:'+esc(n.email)+'">'+esc(n.email)+'</a></div>':'')+'</td>'+
+      '<td style="max-width:280px">'+esc(n.poznamka||'')+'</td>'+
+      '<td>'+esc(n.autor||'')+(n.autorEmail?'<div style="font-size:12px"><a href="mailto:'+esc(n.autorEmail)+'">'+esc(n.autorEmail)+'</a></div>':'')+'</td>'+
+      '<td><span class="ob-risk '+stavCls+'">'+esc(n.stav||'nový')+'</span></td>'+
+      '<td style="white-space:nowrap">'+(d.canEdit?
+        ((n.stav!=='přijatý'&&(n.zeme==='SK'||n.zeme==='PL'))?'<button class="btn sm" type="button" onclick="garPrijmout(\''+n.id+'\')" title="Zapsat do tabulky jako garanta '+esc(n.zeme)+'">✓ Přijmout</button> ':'')+
+        (n.stav!=='zamítnutý'?'<button class="btn ghost sm" type="button" onclick="garStav(\''+n.id+'\',\'zamítnutý\')">Zamítnout</button> ':'')+
+        '<button class="btn ghost sm" type="button" onclick="garSmazat(\''+n.id+'\')" title="Smazat návrh">×</button>':'')+'</td>'+
+      '</tr>';
+  });
+  h+='</tbody></table></div>';
+  return h;
 }
 // Druhý pohled: karta na obchodníka + jeho atributy a kontakt.
 function obObchodniciHtml(){
