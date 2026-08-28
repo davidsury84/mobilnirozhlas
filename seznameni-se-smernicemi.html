@@ -882,6 +882,7 @@ img.pv-thumb{background:#fff}
       </div>
       <div class="inline-actions">
         <button class="btn ghost" onclick="newLibFolder()">+ Nová složka</button>
+        <button class="btn ghost" onclick="openLibBulkModal()" title="Nahrát více souborů najednou (PDF, Word, HTML, TXT)">⬆ Hromadně nahrát</button>
         <button class="btn" onclick="openLibDocModal()">+ Nový dokument</button>
       </div>
     </div>
@@ -5283,6 +5284,104 @@ function libNactiObsah(id){
   prev.focus();
 }
 async function libEditObsah(id){ await openLibDocModal(id); libNactiObsah(id); }
+/* ---- Hromadné nahrání souborů do knihovny ----
+   Z každého vybraného souboru vznikne jeden dokument (název = jméno souboru).
+   PDF se přiloží jako příloha, .docx/.html/.txt se převedou na obsah.
+   Soubor se stejným názvem ve stejné složce = nová verze. */
+let LIBBULK={files:[],running:false};
+async function openLibBulkModal(){
+  await ensureLib(); if(!LIBDB) return;
+  LIBBULK={files:[],running:false};
+  const folderSel=LIBADMIN.folder||"";
+  document.getElementById("modalTitle").textContent="Hromadné nahrání do knihovny";
+  document.getElementById("modalBody").innerHTML=
+    '<label class="field"><span>Soubory <span class="muted" style="font-weight:400;text-transform:none">(PDF, Word .docx, .html, .txt — vyber jich klidně víc)</span></span>'+
+      '<input type="file" id="bFiles" multiple accept=".pdf,.docx,.html,.htm,.txt" onchange="libBulkPick(this)"></label>'+
+    '<div id="bList"><p class="muted" style="margin:2px 0 0;font-size:13px">Zatím nevybrán žádný soubor.</p></div>'+
+    '<div class="row" style="margin-top:12px"><label class="field" style="flex:1;min-width:200px"><span>Složka</span><select id="bFolder">'+libFolderOptions(folderSel)+'</select></label>'+
+      '<label class="field" style="flex:1;min-width:200px"><span>Typ / popisek (společný)</span><input type="text" id="bKind" placeholder="např. formulář, organigram"></label></div>'+
+    '<label style="display:inline-flex;gap:8px;align-items:center;margin:0 0 10px"><input type="checkbox" id="bReq"> Vyžadovat potvrzení seznámení</label>'+
+    '<label class="field"><span>Komu jsou určeny</span><label style="display:inline-flex;gap:6px;align-items:center;margin:0 0 10px">'+
+      '<input type="checkbox" id="bAll" checked onchange="document.getElementById(\'bcatWrap\').style.opacity=this.checked?.4:1"> Všem zaměstnancům</label></label>'+
+    '<div id="bcatWrap" style="opacity:.4">'+
+      (DB.categories.map(c=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0"><input type="checkbox" class="bcat" value="'+c.id+'"> '+esc(c.name)+'</label>').join("") || '<span class="muted">Žádné kategorie.</span>')+'</div>'+
+    '<div class="hint">Název dokumentu se vezme z názvu souboru. Když už dokument se stejným názvem ve složce existuje, přidá se jako <b>nová verze</b>. Každý soubor max 8 MB.</div>'+
+    '<div id="bProgress" style="margin-top:10px"></div>';
+  document.getElementById("modalFoot").innerHTML=
+    '<button class="btn ghost" onclick="closeModal()">Zavřít</button>'+
+    '<button class="btn" id="bGo" onclick="libBulkRun()" disabled>Nahrát vybrané</button>';
+  showModal();
+}
+function libBulkNazev(name){ return String(name||'').replace(/\.[^.]+$/,'').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim() || 'Dokument'; }
+function libBulkPick(inp){
+  LIBBULK.files=[...(inp.files||[])];
+  const box=document.getElementById('bList'), go=document.getElementById('bGo');
+  if(!LIBBULK.files.length){ box.innerHTML='<p class="muted" style="margin:2px 0 0;font-size:13px">Zatím nevybrán žádný soubor.</p>'; if(go) go.disabled=true; return; }
+  const velke=LIBBULK.files.filter(f=>f.size>8e6);
+  box.innerHTML='<div style="margin:6px 0 0;border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
+    LIBBULK.files.map((f,i)=>'<div class="spread" style="padding:7px 12px;border-bottom:1px solid var(--line);font-size:13px" id="brow'+i+'">'+
+      '<span>'+(/\.pdf$/i.test(f.name)?'📄':'📝')+' '+esc(libBulkNazev(f.name))+' <span class="muted" style="font-size:11.5px">'+esc(f.name)+' · '+Math.round(f.size/1024)+' kB</span></span>'+
+      '<span class="muted" id="bst'+i+'">'+(f.size>8e6?'⚠ moc velké':'čeká')+'</span></div>').join('')+'</div>'+
+    (velke.length?'<p class="muted" style="margin:8px 0 0;font-size:12.5px;color:#b3261e">'+velke.length+' soubor(ů) přesahuje 8 MB — ty se přeskočí.</p>':'');
+  if(go) go.disabled=false;
+}
+function libBulkStav(i,txt,barva){ const el=document.getElementById('bst'+i); if(el){ el.textContent=txt; el.style.color=barva||''; } }
+async function libBulkJedenSoubor(f){
+  // Vrací {html, pdf, pdfName, pdfOrient}
+  if(/\.pdf$/i.test(f.name)){
+    const dataUrl=await new Promise((ok,bad)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=()=>bad(new Error('Soubor se nepodařilo načíst.')); r.readAsDataURL(f); });
+    const r=await fetch('/api/smernice/pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,name:f.name})});
+    const j=await r.json();
+    if(!r.ok||j.error) throw new Error(j.error||'Nahrání selhalo.');
+    return {html:'',pdf:j.url,pdfName:j.name||f.name,pdfOrient:j.orient||''};
+  }
+  if(/\.docx$/i.test(f.name)){
+    if(typeof mammoth==="undefined") throw new Error('Knihovna pro Word není načtena.');
+    const res=await mammoth.convertToHtml({arrayBuffer:await f.arrayBuffer()});
+    return {html:cleanDocHtml(res.value),pdf:'',pdfName:'',pdfOrient:''};
+  }
+  const txt=await f.text();
+  const html=/\.html?$/i.test(f.name)? cleanDocHtml(txt) : '<p>'+esc(txt).replace(/\n\n+/g,'</p><p>').replace(/\n/g,'<br>')+'</p>';
+  return {html,pdf:'',pdfName:'',pdfOrient:''};
+}
+async function libBulkRun(){
+  if(LIBBULK.running || !LIBBULK.files.length) return;
+  LIBBULK.running=true;
+  const go=document.getElementById('bGo'); if(go){ go.disabled=true; go.textContent='Nahrávám…'; }
+  const folderId=document.getElementById('bFolder').value||null;
+  const kind=document.getElementById('bKind').value.trim();
+  const requireAck=document.getElementById('bReq').checked;
+  const all=document.getElementById('bAll').checked;
+  const cats=[...document.querySelectorAll('.bcat:checked')].map(c=>c.value);
+  let nove=0, verze=0, chyby=0;
+  for(let i=0;i<LIBBULK.files.length;i++){
+    const f=LIBBULK.files[i];
+    if(f.size>8e6){ libBulkStav(i,'přeskočeno (>8 MB)','#b3261e'); chyby++; continue; }
+    libBulkStav(i,'nahrávám…');
+    try{
+      const obsah=await libBulkJedenSoubor(f);
+      const title=libBulkNazev(f.name);
+      const stav=LIBDB.docs.find(d=>(d.folderId||null)===(folderId||null) && (d.title||'').trim().toLowerCase()===title.toLowerCase());
+      if(stav){
+        const nv=curVer(stav)+1; stav.versions=stav.versions||[];
+        stav.versions.push({v:nv,html:obsah.html,pdf:obsah.pdf,pdfName:obsah.pdfName,pdfOrient:obsah.pdfOrient,note:'hromadné nahrání',ts:Date.now()});
+        stav.cur=nv; if(kind) stav.kind=kind;
+        libBulkStav(i,'✓ nová verze v'+nv,'var(--green-d)'); verze++;
+      } else {
+        LIBDB.docs.push({id:uid(),title,kind,folderId,requireAck,assignAll:all,assignCats:cats,assignTags:[],cur:1,
+          versions:[{v:1,html:obsah.html,pdf:obsah.pdf,pdfName:obsah.pdfName,pdfOrient:obsah.pdfOrient,note:'hromadné nahrání',ts:Date.now()}]});
+        libBulkStav(i,'✓ přidáno','var(--green-d)'); nove++;
+      }
+    }catch(e){ libBulkStav(i,'✕ '+(e.message||'chyba'),'#b3261e'); chyby++; }
+  }
+  await saveLibrary();
+  LIBBULK.running=false;
+  if(go){ go.textContent='Nahrát vybrané'; go.disabled=true; }
+  const sum=document.getElementById('bProgress');
+  if(sum) sum.innerHTML='<div class="card pad" style="padding:10px 14px"><b>Hotovo.</b> Přidáno: '+nove+' · nových verzí: '+verze+(chyby?(' · nepodařilo se: '+chyby):'')+'</div>';
+  renderLibAdmin(folderId);
+  toast('Nahráno: '+(nove+verze)+' dokumentů');
+}
 async function openLibDocModal(id){
   await ensureLib(); if(!LIBDB) return;
   const d = id? LIBDB.docs.find(x=>x.id===id) : null;
