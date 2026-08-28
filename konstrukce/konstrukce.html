@@ -199,6 +199,9 @@ select.dq2-opt{width:100%;max-width:560px}
 .capbar{flex:1;height:9px;background:#eceff1;border-radius:6px;overflow:hidden}
 .capbar i{display:block;height:100%;border-radius:6px}
 .notifpop{position:absolute;right:16px;top:54px;width:min(380px,92vw);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.16);z-index:30;max-height:70vh;overflow:auto;display:none}
+.nabinfo{display:flex;gap:10px;align-items:flex-start;background:#e8f0fb;border-bottom:1px solid #c9d9ef;color:#1c3a5e;padding:10px 18px;font-size:13.5px;line-height:1.5}
+.nabinfo .ni-ic{font-size:17px;line-height:1.3}
+.nabinfo b{color:#123054}
 .notifpop.open{display:block}
 .notifpop .n{padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px}
 .notifpop .n.unread{background:#f1f8f2}
@@ -421,6 +424,13 @@ select.dq2-opt{width:100%;max-width:560px}
   <button class="iconbtn" onclick="reloadData()" title="Obnovit">⟳</button>
 </div>
 <div class="notifpop" id="notifpop"></div>
+
+<!-- vysvětlení nabídkové aplikace (jen režim Nabídka – konstrukce) -->
+<div class="nabinfo" id="nabInfo" style="display:none">
+  <span class="ni-ic">📝</span>
+  <span><b>Nabídková aplikace.</b> Připravujete zde obchodní nabídky a výkresy pro <b>potenciální zákazníky</b> — nic odsud nejde do výroby, slouží to čistě jako nabídka pro klienta.
+  Teprve když klient nabídku potvrdí (odkazem, nebo ji obchodník potvrdí ručně), zakázka se automaticky předá do aplikace <b>„Zadání do výroby – konstrukce"</b>.</span>
+</div>
 
 <div class="wrap">
   <div class="side" id="side"></div>
@@ -1186,6 +1196,8 @@ var ZADANI_OPENED=false, Z_OPENED=false;
 // Režim pohledu: 'nabidka' = „Nabídka – konstrukce" (#zadani), 'vyroba' = „Zadání do výroby – konstrukce"
 // Režim čteme z hash i query (?zadani&z=… v odkazech z e-mailů přežije SSO přihlášení)
 var MODE=(/(^|[#&?])zadani/.test(location.hash+location.search))?'nabidka':'vyroba';
+// vysvětlující pruh nabídkové aplikace (nic nejde do výroby — čistě nabídka pro potenciální klienty)
+(function(){var ni=document.getElementById('nabInfo');if(ni)ni.style.display=(MODE==='nabidka')?'':'none';})();
 function inMode(x){ return MODE==='nabidka' ? (x.rezim!=='objednavka') : (x.rezim==='objednavka'); }
 function baseSet(){ return D.zakazky.filter(inMode); }
 function counts(){
