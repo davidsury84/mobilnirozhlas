@@ -2516,7 +2516,8 @@ function dotaznikView(z){
   if(!z.dotaznik||!Object.keys(z.dotaznik).length)return '';
   var t=(D.types||[]).find(function(x){return x.key===z.typKey});
   if(!t||!t.dotaznik)return '';
-  var h='<div class="sec">Zadání (dotazník provedení)</div>';
+  var h='<div class="sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Zadání (dotazník provedení)'+
+    '<button class="btn sm" onclick="copyProtokol(\''+z.id+'\')" title="Zkopíruje celé zadání jako text — vložíte Ctrl+V např. do Heliosu">⧉ Kopírovat protokol (Ctrl+V do Heliosu)</button></div>';
   if(z.kodAbr)h+='<div class="card" style="background:#f2f7ee;padding:10px 12px"><b>Kód dle katalogu ABR:</b> <code style="font-weight:800">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')">⧉ Kopírovat</button><div class="muted" style="font-size:11.5px;margin-top:3px">Vypisují se jen odchylky od standardu ELKOPLAST; NE se vynechává; žebřík se uvádí od výšky 1500 mm.</div></div>';
   // Důležitá upozornění — výrazně nahoře, ať je konstrukce ani výroba nepřehlédne
   if(typeof z.dotaznik.upozorneni==='string'&&z.dotaznik.upozorneni.trim())
@@ -2743,6 +2744,48 @@ function sendClient(id){
 }
 function copyLink(url){var full=location.origin+url;navigator.clipboard&&navigator.clipboard.writeText(full);prompt('Odkaz pro klienta (Ctrl+C):',full)}
 function copyTxt(t){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t);}else{prompt('Zkopírujte (Ctrl+C):',t)}}
+/* ---- textový protokol zadání (Ctrl+C → Ctrl+V do Heliosu) ---- */
+function protokolText(z){
+  var t=(D.types||[]).find(function(x){return x.key===z.typKey})||{};
+  var L=[];
+  L.push('PROTOKOL ZADÁNÍ — '+(z.cisloZobraz||z.cislo)+(z.rezim==='objednavka'&&z.zNabidky?(' (z nabídky '+z.cislo+')'):''));
+  L.push('Zákazník: '+(z.zakaznik||'')+(z.kontakt?(' · '+z.kontakt):'')+(z.kontaktEmail?(' · '+z.kontaktEmail):''));
+  L.push('Typ výrobku: '+(z.typName||''));
+  if(z.kodAbr)L.push('Kód ABR: '+z.kodAbr);
+  if(z.cvzHelios)L.push('Č. výrobní zakázky (Helios): '+z.cvzHelios);
+  if(z.strediskoName)L.push('Výrobní závod: '+z.strediskoName);
+  L.push('Obchodník: '+(z.obchodnikName||'')+' · zadáno '+fdate(z.createdAt));
+  (t.dotaznik||[]).forEach(function(sec){
+    var rows=[];
+    (sec.fields||[]).forEach(function(f){
+      var a=z.dotaznik&&z.dotaznik[f.k]; if(a==null)return;
+      if(typeof a==='object'){
+        var tag=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek zákazníka');
+        var disp=a.hodnota||'';
+        if(a.detail){var u=(f.opceVstup&&f.opceVstup.unit)?(' '+f.opceVstup.unit):'';disp+=(disp?' · ':'')+a.detail+u;}
+        rows.push(f.label+': '+disp+'  ['+tag+']');
+      } else rows.push(f.label+': '+a);
+    });
+    if(rows.length){L.push('');L.push(String(sec.title||'').toUpperCase());rows.forEach(function(r){L.push(r)});}
+  });
+  if(z.prilohy&&z.prilohy.length){L.push('');L.push('PŘÍLOHY');z.prilohy.forEach(function(p){L.push(p.name+' ('+(p.author||'')+', '+fdate(p.at)+')')});}
+  L.push('');
+  L.push('Vygenerováno intranetem ELKOPLAST · '+new Date().toLocaleDateString('cs-CZ')+' · '+(z.cisloZobraz||z.cislo));
+  return L.join('\n');
+}
+function copyProtokol(id){
+  var z=D.zakazky.find(function(x){return x.id===id}); if(!z)return;
+  var txt=protokolText(z);
+  var done=function(){toastUlozeno('✓ Protokol zkopírován — vložte Ctrl+V')};
+  var fallback=function(){
+    var ta=document.createElement('textarea');ta.value=txt;ta.style.cssText='position:fixed;left:-9999px';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');done();}catch(e){alert('Kopírování se nepovedlo — text:\n\n'+txt.slice(0,800))}
+    ta.remove();
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,fallback);
+  else fallback();
+}
 function askStorno(id){var d=prompt('Důvod storna:');if(!d)return;api('/stav','POST',{id:id,action:'storno',note:d}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function askHold(id){var d=prompt('Na jaké podklady se čeká? (důvod)');if(!d)return;api('/stav','POST',{id:id,action:'hold',note:d}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function askTermin(id){var t=prompt('Nový termín (RRRR-MM-DD):');if(!t)return;var d=prompt('Zdůvodnění změny termínu:');if(!d)return;api('/termin','POST',{id:id,deadline:t,duvod:d}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
