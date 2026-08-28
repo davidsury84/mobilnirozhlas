@@ -2899,10 +2899,24 @@ function renderNakupOrder(){
 (function(){const b=$('#nkApply');if(b)b.onclick=()=>{recalc();renderNakup();};})();
 
 // ===== VYHLEDÁVÁNÍ A EXPORT TABULEK =====
-const TBL_NAMES={errTbl:'Chyby',priceTbl:'Nove_ceny',deadTbl:'Mrtve_zasoby',allTbl:'Vse',modelTbl:'SMI_model',paramTbl:'Parametry',histTbl:'Historie',itemHistTbl:'Vyvoj_polozky',elkoTbl:'Elkoplast',nkTbl:'Optimalizace_nakupu'};
+const TBL_NAMES={errTbl:'Chyby',priceTbl:'Nove_ceny',deadTbl:'Mrtve_zasoby',modelTbl:'SMI_model',paramTbl:'Parametry',histTbl:'Historie',itemHistTbl:'Vyvoj_polozky',elkoTbl:'Obrazky_eshop',objTbl:'Optimalizace_nakupu'};
 const TT_HAS_SEARCH={errTbl:1,priceTbl:1,deadTbl:1,allTbl:1,modelTbl:1,elkoTbl:1,nkTbl:1,csSalesTbl:1};
 function ttCellText(c){const inp=c.querySelector('input,select');if(inp)return inp.value;return (c.textContent||'').trim();}
-function ttMatrix(tb,visibleOnly){const out=[];const th=tb.tHead;if(th&&th.rows.length)out.push([...th.rows[0].cells].map(ttCellText));const b=tb.tBodies[0];if(b)for(const tr of b.rows){if(visibleOnly&&tr.style.display==='none')continue;out.push([...tr.cells].map(ttCellText));}return out;}
+function ttMatrix(tb,visibleOnly){
+  const out=[];const th=tb.tHead;
+  if(th&&th.rows.length){
+    // Vicepatrove hlavicky (skupinovy radek se colspan + radek s nazvy sloupcu, napr. Optimalizace
+    // nakupu): pro export bereme POSLEDNI radek theadu = jeden nazev na sloupec. Colspan rozbalime,
+    // aby v Excelu nezustal zadny sloupec bezejmenny (drive se bral prvni radek → jen 6 skupin).
+    const hr=th.rows[th.rows.length-1];const head=[];
+    [...hr.cells].forEach(c=>{const t=ttCellText(c);const span=+c.colSpan||1;
+      for(let k=0;k<span;k++)head.push(span>1?(t+' '+(k+1)):t);});
+    out.push(head);
+  }
+  const b=tb.tBodies[0];
+  if(b)for(const tr of b.rows){if(visibleOnly&&tr.style.display==='none')continue;out.push([...tr.cells].map(ttCellText));}
+  return out;
+}
 function ttDownload(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 function ttName(tb){if(tb.id&&TBL_NAMES[tb.id])return TBL_NAMES[tb.id];const wrap=tb.closest('.tblwrap');let prev=wrap&&wrap.previousElementSibling;while(prev&&prev.classList&&prev.classList.contains('ttbar'))prev=prev.previousElementSibling;if(prev&&/^H[1-4]$/.test(prev.tagName))return prev.textContent.replace(/[^A-Za-z0-9ÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž ]+/g,'').trim().replace(/\s+/g,'_').slice(0,28);const pane=tb.closest('.pane');return (pane?pane.id.replace('pane-',''):'tabulka');}
 const EXCEL_CATFILL={'Zdravá obrátka':'FFE2EFDA','Pomalá obrátka':'FFDDEBF7','Stárnoucí zásoba':'FFFFF2CC','Mrtvá zásoba':'FFFCE4D6','Není skladem':'FFEDEDED'};
@@ -2951,7 +2965,6 @@ async function exportAllTables(){
   const btn=$('#exportAllBtn');if(btn){btn.disabled=true;var old=btn.textContent;btn.textContent='Generuji…';}
   try{
     try{if(typeof renderElko==='function')renderElko();}catch(e){}
-    try{if(typeof renderNakup==='function')renderNakup();}catch(e){}
     try{if(typeof renderHistory==='function')renderHistory();}catch(e){}
     tableTools();
     const wb=new ExcelJS.Workbook();const seen={};
