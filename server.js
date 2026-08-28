@@ -168,6 +168,7 @@ const LOXXER_SKOLENI_FILE = path.join(ROOT, 'loxxer-skoleni.html'); // interakti
 const ACTS_SKOLENI_FILE = path.join(ROOT, 'acts-skoleni.html'); // interaktivní školení ACTS (železniční abroll kontejnery) + závěrečný test
 const VYKRESY_SKOLENI_FILE = path.join(ROOT, 'vykresy-skoleni.html'); // interaktivní školení Čtení technických výkresů (ČSN/ISO) + závěrečný test
 const SVAROVANI_SKOLENI_FILE = path.join(ROOT, 'svarovani-skoleni.html'); // průvodce svařováním: hodnocení svarů (ISO 5817), fotogalerie vad, QC + závěrečný test
+const ZENTEX_SKOLENI_FILE = path.join(ROOT, 'zentex-skoleni.html'); // interaktivní školení ZENTEX (lisovací kontejnery — výběr vhodného lisu) + závěrečný test (20 z 50 otázek)
 const KONCEPT_FILE = path.join(ROOT, 'intranet-koncept.html'); // náhledový koncept redesignu intranetu (SharePoint hub)
 const PUB_DIR  = path.join(DATA_DIR, 'published');
 const STATE_F  = path.join(DATA_DIR, 'state.json');
@@ -189,6 +190,7 @@ const LOXXER_SKOLENI_F = path.join(DATA_DIR, 'loxxer-skoleni-results.json'); // 
 const ACTS_SKOLENI_F = path.join(DATA_DIR, 'acts-skoleni-results.json'); // výsledky testu ACTS (železniční abroll kontejnery) — max 3 pokusy na osobu
 const VYKRESY_SKOLENI_F = path.join(DATA_DIR, 'vykresy-skoleni-results.json'); // výsledky testu školení Čtení výkresů — max 3 pokusy na osobu
 const SVAROVANI_SKOLENI_F = path.join(DATA_DIR, 'svarovani-skoleni-results.json'); // výsledky testu školení Průvodce svařováním — max 3 pokusy na osobu
+const ZENTEX_SKOLENI_F = path.join(DATA_DIR, 'zentex-skoleni-results.json'); // výsledky testu školení ZENTEX (lisovací kontejnery) — max 3 pokusy na osobu
 const MOBILIAR_FILE = path.join(ROOT, 'mobiliar.html');      // veřejné obrázkové hodnocení venkovního mobiliáře (katalog WeiDu)
 const MOBILIAR_F = path.join(DATA_DIR, 'mobiliar-hlasovani.json'); // hlasy hodnocení mobiliáře — upsert dle rid (anonymní id prohlížeče)
 // Veřejná sběrná doména pro ZÁKAZNICKÉ průzkumy (alias na tuto app, bez „intranet" v adrese).
@@ -1296,6 +1298,36 @@ function recordActsSkoleni(a) {
   writeJson(ACTS_SKOLENI_F, results);
   logActivity('acts-skoleni', { email, name }, 'Test ACTS · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, ACTS_SKOLENI_MAX - rec.attempts.length), passed };
+}
+// Školení ZENTEX (lisovací kontejnery — výběr vhodného lisu) – závěrečný test 20 z 50 otázek. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
+const ZENTEX_SKOLENI_MAX = 3;
+function zentexSkoleniStatus(email) {
+  email = (email || '').toLowerCase();
+  const rec = readJson(ZENTEX_SKOLENI_F, []).find(r => (r.email || '').toLowerCase() === email);
+  const attempts = (rec && Array.isArray(rec.attempts)) ? rec.attempts : [];
+  const best = attempts.reduce((m, a) => Math.max(m, a.pct || 0), 0);
+  return { attemptsUsed: attempts.length, attemptsLeft: Math.max(0, ZENTEX_SKOLENI_MAX - attempts.length), best, passed: attempts.some(a => a.passed) };
+}
+function recordZentexSkoleni(a) {
+  const email = (a.email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const total = Math.max(0, Math.round(Number(a.total) || 0));
+  const correct = Math.max(0, Math.min(total, Math.round(Number(a.correct) || 0)));
+  const pct = Math.max(0, Math.min(100, Math.round(Number(a.pct) || 0)));
+  const passed = pct >= 80;
+  const results = readJson(ZENTEX_SKOLENI_F, []);
+  let rec = results.find(r => (r.email || '').toLowerCase() === email);
+  if (!rec) { rec = { email, name, dept, attempts: [] }; results.push(rec); }
+  rec.name = name; rec.dept = dept; if (!Array.isArray(rec.attempts)) rec.attempts = [];
+  if (rec.attempts.length >= ZENTEX_SKOLENI_MAX) { writeJson(ZENTEX_SKOLENI_F, results); return { blocked: true, attemptsUsed: rec.attempts.length }; }
+  rec.attempts.push({ correct, total, pct, passed, ts: Date.now() });
+  writeJson(ZENTEX_SKOLENI_F, results);
+  logActivity('zentex-skoleni', { email, name }, 'Test ZENTEX · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
+  return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, ZENTEX_SKOLENI_MAX - rec.attempts.length), passed };
 }
 // Školení Čtení technických výkresů (ČSN/ISO) – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
 const VYKRESY_SKOLENI_MAX = 3;
@@ -3199,6 +3231,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/acts-skoleni' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, actsSkoleniStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/acts-skoleni' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordActsSkoleni(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/acts-skoleni-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(ACTS_SKOLENI_F, [])); }
+    if (p === '/api/zentex-skoleni' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, zentexSkoleniStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/zentex-skoleni' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordZentexSkoleni(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/zentex-skoleni-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(ZENTEX_SKOLENI_F, [])); }
     // Školení Čtení technických výkresů: GET = stav pokusů dané osoby, POST = odeslání pokusu (max 3)
     if (p === '/api/vykresy-skoleni' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, vykresySkoleniStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/vykresy-skoleni' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordVykresySkoleni(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
@@ -3361,6 +3396,7 @@ const server = http.createServer(async (req, res) => {
         acts: 'ACTS — železniční abroll kontejnery',
         'vykresy-skoleni': 'Čtení technických výkresů (ČSN/ISO)',
         svarovani: 'Průvodce svařováním — hodnocení svarů (ISO 5817)',
+        zentex: 'ZENTEX — lisovací kontejnery (výběr vhodného lisu)',
       };
       const nazev = SKOLENI_NAZVY[String(b.skoleni || '')];
       if (!nazev) return send(res, 400, { error: 'Neznámé školení.' });
@@ -4012,6 +4048,12 @@ const server = http.createServer(async (req, res) => {
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Průvodce svařováním je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(SVAROVANI_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí svarovani-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(SVAROVANI_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    if (p === '/zentex-skoleni-app') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení ZENTEX je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!fs.existsSync(ZENTEX_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí zentex-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(ZENTEX_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----
