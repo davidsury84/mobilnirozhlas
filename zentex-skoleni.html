@@ -197,6 +197,26 @@ td.cross{color:#b7bdb4}
 .zxpop{position:fixed;left:24px;bottom:84px;z-index:96;background:#1b1f23;color:#fff;border-radius:999px;padding:9px 16px;font-weight:800;font-size:.88rem;opacity:0;transform:translateY(8px);transition:.3s;pointer-events:none;max-width:70vw}
 .zxpop.show{opacity:1;transform:translateY(0)}
 #zxConfetti{position:fixed;inset:0;pointer-events:none;z-index:200}
+/* ===== Postupné kapitoly: vidíš jen jednu, další se odemkne po splnění ===== */
+body.paged .sec{display:none}
+body.paged .sec.zx-active{display:block;margin-top:10px}
+body.paged:not(.zx-map) .hero{display:none}
+.zx-chapbar{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:10px 14px;margin:0 0 20px}
+.zx-chapbar .t{flex:1;font-weight:800;font-size:.95rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zx-chapbar .n{color:var(--muted);font-size:.8rem;font-weight:800;white-space:nowrap}
+.zx-chapbar button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 13px;font-weight:800;color:#2b4257;white-space:nowrap}
+.zx-chapbar button:hover{background:var(--zx-soft)}
+.zx-nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:22px;padding:16px 18px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.zx-nav .mid{flex:1;text-align:center;color:var(--muted);font-size:.85rem;font-weight:700;min-width:110px}
+.zx-nav .nav-prev{border:1px solid var(--line);background:#fff;border-radius:999px;padding:11px 18px;font-weight:800;color:#2b4257}
+.zx-nav .nav-prev:hover{background:var(--zx-soft)}
+.zx-nav .nav-next{border:0;background:var(--green);color:#fff;border-radius:999px;padding:12px 22px;font-weight:900}
+.zx-nav .nav-next.locked{background:#eef1ee;color:#8b958d}
+.zx-nav .nav-next.golden{background:linear-gradient(135deg,var(--zx),#3f8ed0)}
+.toc a.locked{opacity:.5;cursor:not-allowed}
+.toc a .lock{margin-left:auto;font-size:.78rem}
+.toc a.done .lock{display:none}
+.zx-startbtn{margin-top:18px;font-size:1rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -211,7 +231,7 @@ td.cross{color:#b7bdb4}
     <h2>Prodáváme méně odvozů, ne plech</h2>
     <p><b>ZENTEX</b> (P.U.E. Zentex, Kalisz, Polsko — <a href="https://www.zentex.pl/en/" target="_blank" rel="noopener" style="color:var(--zx);font-weight:700">zentex.pl</a>) je evropský výrobce <b>lisovacích kontejnerů</b>: mobilních lisů 5–24 m³, stacionárních lisů KPHS s výměnnými kontejnery PC a vyklápěčů nádob. ELKOPLAST tuto techniku dodává zákazníkům v ČR a SR — prodejem i pronájmem. Lisovací kontejner spojuje <b>lis a přepravní kontejner v jednom</b>: odpad se stlačí přímo v nádobě, ve které pak odjede k odběrateli nebo na koncovku. Zákazník tak platí za odvoz plného, ne poloprázdného kontejneru.</p>
     <p>Toto školení tě provede celým sortimentem a hlavně tím, <b>jak vybrat správný lis</b>: podle materiálu, podle svozové techniky, podle prostoru a podle provozu zákazníka. Najdeš tu parametry všech řad, srovnávací tabulky, rozhodovací strom, argumentář proti námitkám a odpovědi na nejčastější dotazy, které ti zákazníci položí. Na konci je závěrečný test — dostaneš <b>20 náhodně vylosovaných otázek z 50</b>, i pořadí odpovědí se míchá.</p>
-    <p><b>Studuj hravě:</b> školení je interaktivní — odškrtávej lekce, sbírej body a odznaky (panel vlevo dole), počítej úspory v kalkulačce, projdi si průvodce výběrem lisu, zahraj si třídicí hru „Kam s tím?" a simulátor „Poraď zákazníkovi" s náhodnými zákazníky. Postup se ti ukládá, můžeš se kdykoli vrátit.</p>
+    <p><b>Studuj hravě:</b> školení je interaktivní — odškrtávej lekce, sbírej body a odznaky (panel vlevo dole), počítej úspory v kalkulačce, projdi si průvodce výběrem lisu, zahraj si třídicí hru „Kam s tím?" a simulátor „Poraď zákazníkovi" s náhodnými zákazníky. Postup se ti ukládá, můžeš se kdykoli vrátit. <b>Kapitoly procházíš po jedné a další se odemkne až po splnění té aktuální</b> — splněné si můžeš kdykoli zpětně prohlížet.</p>
     <p class="claim">„Dobře zvolený lis se zákazníkovi zaplatí sám — špatně zvolený se vrací na naše náklady."</p>
     <div class="badge-row">
       <span class="badge"><strong>27</strong>&nbsp;lekcí (~100 normostran)</span>
@@ -2300,6 +2320,80 @@ async function finishQuiz(){
       }catch(e){}
     };
   }
+  /* --- postupné kapitoly: zobrazená je vždy jen jedna, další se odemkne po splnění té aktuální --- */
+  var TOTAL=28;
+  var mqBySec={}; MINIQ.forEach(function(m){ (mqBySec[m.sec]=mqBySec[m.sec]||[]).push(m.id); });
+  function quizPending(n){ return !((mqBySec['s'+n]||[]).every(function(q){ return (G.mq[q]||{}).solved; })); }
+  function chapComplete(n){ if(n<1||n>27) return false; return !!G.done['s'+n] && !quizPending(n); }
+  function unlockedMax(){ for(var i=1;i<=27;i++) if(!chapComplete(i)) return i; return 28; }
+  function secTitle(n){ var h=document.querySelector('#s'+n+' .sec-h h3'); return h?h.textContent.trim():('Kapitola '+n); }
+  document.body.classList.add('paged');
+  var cur=0;
+  for(var cn=1;cn<=TOTAL;cn++)(function(n){
+    var sec=document.getElementById('s'+n); if(!sec) return;
+    var top=document.createElement('div'); top.className='zx-chapbar';
+    top.innerHTML='<button data-zx="map">☰ Obsah kurzu</button><div class="t">'+secTitle(n)+'</div><div class="n">kapitola '+n+' / '+TOTAL+'</div>';
+    sec.insertBefore(top, sec.firstChild);
+    var nav=document.createElement('div'); nav.className='zx-nav'; sec.appendChild(nav);
+  })(cn);
+  function pageNavRefresh(){
+    if(cur<1) return;
+    var nav=document.querySelector('#s'+cur+' .zx-nav'); if(!nav) return;
+    var h='<button class="nav-prev" data-zx="prev">'+(cur===1?'☰ Obsah kurzu':'← Předchozí kapitola')+'</button><div class="mid">kapitola '+cur+' z '+TOTAL+'</div>';
+    if(cur===28){ h+='<div class="mid" style="flex:none;font-weight:900;color:var(--green-d)">🏁 Tady kurz končí — hodně štěstí u testu!</div>'; }
+    else if(chapComplete(cur)){ h+='<button class="nav-next'+(cur===27?' golden':'')+'" data-zx="next">'+(cur===27?'Pokračovat na závěrečný test →':'Další kapitola →')+'</button>'; }
+    else if(quizPending(cur)){ h+='<button class="nav-next locked" data-zx="quiz">⚡ Nejdřív vyřeš rychlou kontrolu v této kapitole</button>'; }
+    else { h+='<button class="nav-next" data-zx="finish">✓ Splnit kapitolu a pokračovat →</button>'; }
+    nav.innerHTML=h;
+  }
+  function decorateToc(){
+    var maxN=unlockedMax();
+    for(var i=1;i<=TOTAL;i++){ var a=tocMap['s'+i]; if(!a) continue;
+      var locked=i>maxN && !(i===28&&maxN===28);
+      a.classList.toggle('locked',locked);
+      var lk=a.querySelector('.lock');
+      if(locked){ if(!lk){ lk=document.createElement('span'); lk.className='lock'; lk.textContent='🔒'; a.appendChild(lk); } }
+      else if(lk){ lk.remove(); }
+    }
+  }
+  var heroEl=document.querySelector('.hero');
+  var startBtn=document.createElement('button'); startBtn.className='btn zx-startbtn';
+  if(heroEl) heroEl.appendChild(startBtn);
+  function heroStartRefresh(){
+    var m=unlockedMax();
+    if(m===28){ startBtn.textContent=G.testPassed?'🏆 Test máš splněný — otevřít znovu':'🏁 Všech 27 kapitol splněno — otevřít závěrečný test'; }
+    else if(doneCount()===0&&m===1){ startBtn.textContent='▶ Začít 1. kapitolou: '+secTitle(1); }
+    else { startBtn.textContent='▶ Pokračovat kapitolou '+m+': '+secTitle(m); }
+    startBtn.onclick=function(){ showChapter(m,true); };
+  }
+  function showChapter(n,fromUser){
+    var maxN=unlockedMax();
+    if(n>maxN){ if(fromUser) pop('🔒 Kapitola je zatím zamčená — nejdřív splň kapitolu '+maxN+'.'); n=maxN; }
+    if(n<0) n=0;
+    cur=n; G.chapter=n; save();
+    document.body.classList.toggle('zx-map', n===0);
+    for(var i=1;i<=TOTAL;i++){ var s=document.getElementById('s'+i); if(s) s.classList.toggle('zx-active', i===n); }
+    pageNavRefresh(); decorateToc(); heroStartRefresh();
+    window.scrollTo(0,0);
+  }
+  document.addEventListener('click',function(e){
+    var el=e.target.closest?e.target.closest('[data-zx]'):null;
+    if(el){ var k=el.getAttribute('data-zx');
+      if(k==='map'){ showChapter(0,true); }
+      else if(k==='prev'){ showChapter(cur-1,true); }
+      else if(k==='next'){ if(cur===27&&unlockedMax()===28){ pop('🏁 Závěrečný test odemčen!'); burst(70); } showChapter(cur+1,true); }
+      else if(k==='finish'){ var b=document.querySelector('#s'+cur+' .sec-done button'); if(b&&!b.classList.contains('on')) b.click();
+        var was=cur; setTimeout(function(){ if(was===27&&unlockedMax()===28){ pop('🏁 Závěrečný test odemčen!'); burst(90); } showChapter(was+1,true); },160); }
+      else if(k==='quiz'){ var mq=document.querySelector('#s'+cur+' .mq'); if(mq){ mq.scrollIntoView({block:'center'}); setTimeout(function(){ pop('⚡ Vyřeš rychlou kontrolu — pak se odemkne další kapitola.'); },300); } }
+      return;
+    }
+    var a=e.target.closest?e.target.closest('a[href^="#s"]'):null;
+    if(a){ var m2=(a.getAttribute('href')||'').match(/^#s(\d+)$/); if(m2){ e.preventDefault(); showChapter(+m2[1],true); return; } }
+    if(e.target.closest && (e.target.closest('.sec-done')||e.target.closest('.mq'))){ setTimeout(function(){ pageNavRefresh(); decorateToc(); heroStartRefresh(); },120); }
+  });
+  var testBackBtn=document.querySelector('#s28 button.ghost');
+  if(testBackBtn){ testBackBtn.textContent='☰ Obsah kurzu'; testBackBtn.onclick=function(){ showChapter(0,true); }; }
+  showChapter(Math.min((typeof G.chapter==='number'?G.chapter:0), unlockedMax()), false);
   renderWidget();
 })();
 </script>
