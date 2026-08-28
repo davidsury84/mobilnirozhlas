@@ -856,6 +856,7 @@ img.pv-thumb{background:#fff}
         <h2>Směrnice</h2>
         <p>Nahraj dokument, aplikace ho nastyluje. Zaměstnanci pak potvrdí seznámení.</p>
       </div>
+      <button class="btn ghost" onclick="openDirBulkModal()" title="Nahrát více souborů najednou (PDF, Word, HTML, TXT)">⬆ Hromadně nahrát</button>
       <button class="btn" onclick="openDirectiveModal()">+ Nová směrnice</button>
     </div>
     <div class="card pad" style="margin-bottom:18px">
@@ -5006,6 +5007,93 @@ function openStaraVerze(id,v){
 
 /* ---------- Modal směrnice ---------- */
 let pendingHtml=null;
+/* ---- Hromadné nahrání směrnic ----
+   Z každého souboru vznikne jedna směrnice (název = jméno souboru), PDF se přiloží,
+   .docx/.html/.txt se převedou na obsah. Vše se rovnou publikuje (stránka /s/…). */
+let DIRBULK={files:[],running:false};
+function openDirBulkModal(){
+  DIRBULK={files:[],running:false};
+  const kats=dirKategorie();
+  document.getElementById("modalTitle").textContent="Hromadné nahrání směrnic";
+  document.getElementById("modalBody").innerHTML=
+    '<label class="field"><span>Soubory <span class="muted" style="font-weight:400;text-transform:none">(PDF, Word .docx, .html, .txt — vyber jich klidně víc)</span></span>'+
+      '<input type="file" id="dbFiles" multiple accept=".pdf,.docx,.html,.htm,.txt" onchange="dirBulkPick(this)"></label>'+
+    '<div id="dbList"><p class="muted" style="margin:2px 0 0;font-size:13px">Zatím nevybrán žádný soubor.</p></div>'+
+    '<label class="field" style="margin-top:12px"><span>Kategorie (skupina směrnic)</span><select id="dbKat">'+
+      '<option value="">— bez kategorie —</option>'+kats.map(k=>'<option value="'+esc(k)+'">'+esc(k)+'</option>').join('')+'</select></label>'+
+    '<label class="field"><span>Komu jsou určeny</span><label style="display:inline-flex;gap:6px;align-items:center;margin:0 0 10px">'+
+      '<input type="checkbox" id="dbAll" checked onchange="document.getElementById(\'dbcatWrap\').style.opacity=this.checked?.4:1"> Všem zaměstnancům</label></label>'+
+    '<div id="dbcatWrap" style="opacity:.4">'+
+      (DB.categories.map(c=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0"><input type="checkbox" class="dbcat" value="'+c.id+'"> '+esc(c.name)+'</label>').join("") || '<span class="muted">Žádné kategorie.</span>')+'</div>'+
+    '<label class="field" style="margin-top:10px"><span>Jen pro tagy <span class="muted" style="font-weight:400;text-transform:none">(nepovinné, společné pro celou dávku)</span></span>'+
+      '<input type="text" id="dbTags" list="dbTagList" placeholder="např. Bruntál">'+
+      '<datalist id="dbTagList">'+allTags().map(t=>'<option value="'+esc(t)+'">').join('')+'</datalist></label>'+
+    '<label style="display:inline-flex;gap:8px;align-items:center;margin:0 0 8px"><input type="checkbox" id="dbPrepsat"> Přepsat směrnici stejného názvu <span class="muted" style="font-size:12.5px">(zvýší verzi a vyžádá si nové potvrzení)</span></label>'+
+    '<div class="hint">Název směrnice se vezme z názvu souboru. Bez zaškrtnutí se soubor se stejným názvem přeskočí. Každý soubor max 8 MB. Vše se rovnou publikuje.</div>'+
+    '<div id="dbProgress" style="margin-top:10px"></div>';
+  document.getElementById("modalFoot").innerHTML=
+    '<button class="btn ghost" onclick="closeModal()">Zavřít</button>'+
+    '<button class="btn" id="dbGo" onclick="dirBulkRun()" disabled>Nahrát vybrané</button>';
+  showModal();
+}
+function dirBulkPick(inp){
+  DIRBULK.files=[...(inp.files||[])];
+  const box=document.getElementById('dbList'), go=document.getElementById('dbGo');
+  if(!DIRBULK.files.length){ box.innerHTML='<p class="muted" style="margin:2px 0 0;font-size:13px">Zatím nevybrán žádný soubor.</p>'; if(go) go.disabled=true; return; }
+  const velke=DIRBULK.files.filter(f=>f.size>8e6);
+  box.innerHTML='<div style="margin:6px 0 0;border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
+    DIRBULK.files.map((f,i)=>'<div class="spread" style="padding:7px 12px;border-bottom:1px solid var(--line);font-size:13px">'+
+      '<span>'+(/\.pdf$/i.test(f.name)?'📄':'📝')+' '+esc(libBulkNazev(f.name))+' <span class="muted" style="font-size:11.5px">'+esc(f.name)+' · '+Math.round(f.size/1024)+' kB</span></span>'+
+      '<span class="muted" id="dbst'+i+'">'+(f.size>8e6?'⚠ moc velké':'čeká')+'</span></div>').join('')+'</div>'+
+    (velke.length?'<p class="muted" style="margin:8px 0 0;font-size:12.5px;color:#b3261e">'+velke.length+' soubor(ů) přesahuje 8 MB — ty se přeskočí.</p>':'');
+  if(go) go.disabled=false;
+}
+function dirBulkStav(i,txt,barva){ const el=document.getElementById('dbst'+i); if(el){ el.textContent=txt; el.style.color=barva||''; } }
+async function dirBulkRun(){
+  if(DIRBULK.running || !DIRBULK.files.length) return;
+  DIRBULK.running=true;
+  const go=document.getElementById('dbGo'); if(go){ go.disabled=true; go.textContent='Nahrávám…'; }
+  const kat=document.getElementById('dbKat').value||null;
+  const all=document.getElementById('dbAll').checked;
+  const cats=[...document.querySelectorAll('.dbcat:checked')].map(c=>c.value);
+  const tags=(document.getElementById('dbTags').value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const prepsat=document.getElementById('dbPrepsat').checked;
+  let nove=0, prepsano=0, preskoceno=0, chyby=0; const publikovat=[];
+  for(let i=0;i<DIRBULK.files.length;i++){
+    const f=DIRBULK.files[i];
+    if(f.size>8e6){ dirBulkStav(i,'přeskočeno (>8 MB)','#b3261e'); chyby++; continue; }
+    const title=libBulkNazev(f.name);
+    const stav=DB.directives.find(d=>(d.title||'').trim().toLowerCase()===title.toLowerCase());
+    if(stav && !prepsat){ dirBulkStav(i,'přeskočeno — už existuje','#8a6d1f'); preskoceno++; continue; }
+    dirBulkStav(i,'nahrávám…');
+    try{
+      const obsah=await libBulkJedenSoubor(f);   // {html,pdf,pdfName,pdfOrient}
+      if(stav){
+        stav.html=obsah.html; stav.pdf=obsah.pdf; stav.pdfName=obsah.pdfName; stav.pdfOrient=obsah.pdfOrient;
+        stav.kategorie=kat; stav.verze=(Number(stav.verze)||1)+1; stav.acks={};
+        publikovat.push(stav.id); dirBulkStav(i,'✓ přepsáno (verze '+stav.verze+')','var(--green-d)'); prepsano++;
+      } else {
+        const did=uid();
+        DB.directives.push({id:did,title,html:obsah.html,pdf:obsah.pdf,pdfName:obsah.pdfName,pdfOrient:obsah.pdfOrient,
+          createdAt:Date.now(),assignAll:all,assignCats:cats,assignTags:tags,kategorie:kat,verze:1,acks:{}});
+        publikovat.push(did); dirBulkStav(i,'✓ přidáno','var(--green-d)'); nove++;
+      }
+    }catch(e){ dirBulkStav(i,'✕ '+(e.message||'chyba'),'#b3261e'); chyby++; }
+  }
+  save();
+  // publikace stránek /s/… (postupně, ať server nezahltíme)
+  let pubChyb=0;
+  for(const id of publikovat){ try{ await ensurePublished(id); }catch(e){ pubChyb++; } }
+  DIRBULK.running=false;
+  if(go){ go.textContent='Nahrát vybrané'; go.disabled=true; }
+  const sum=document.getElementById('dbProgress');
+  if(sum) sum.innerHTML='<div class="card pad" style="padding:10px 14px"><b>Hotovo.</b> Přidáno: '+nove+
+    (prepsano?(' · přepsáno: '+prepsano):'')+(preskoceno?(' · přeskočeno (existuje): '+preskoceno):'')+
+    (chyby?(' · nepodařilo se: '+chyby):'')+(pubChyb?(' · nepublikováno: '+pubChyb):'')+
+    '</div>';
+  renderDirectives();
+  toast('Nahráno: '+(nove+prepsano)+' směrnic');
+}
 function openDirectiveModal(id){
   const d = id? DB.directives.find(x=>x.id===id) : null;
   pendingHtml = d? d.html : null;
