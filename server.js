@@ -1928,15 +1928,138 @@ function buildTelefon() {
   return { groups, odkazy: TELEFON_ODKAZY, total };
 }
 
+/* Import firemního telefonního seznamu (2026-08-27): [číslo, středisko, jméno].
+   Jména jsou většinou ve tvaru „Příjmení Jméno"; párujeme na zaměstnance oběma směry.
+   Co se nespáruje (řidič, skladník, vrátnice…), jde do settings.telefonExtra. */
+const TELEFON_IMPORT_2026 = [
+  ['+420 608 660 420', 'Zlín-100', 'Krajča Tomáš'],
+  ['+420 608 660 421', 'Zlín-100', 'Pšeja Petr'],
+  ['+420 608 660 423', 'Zlín-100', 'Janča Petr'],
+  ['+420 608 660 425', 'Zlín-100', 'Vlčková Alena'],
+  ['+420 608 957 667', 'Zlín-100', 'Szczotka Robin'],
+  ['+420 773 498 038', 'Zlín-100', 'Burša Tomáš'],
+  ['+420 773 576 610', 'Zlín-100', 'Beránek Josef'],
+  ['+420 773 576 613', 'Zlín-100', 'Mokrejš Jan'],
+  ['+420 773 772 517', 'Zlín-100', 'Žalčík Vladimír'],
+  ['+420 775 760 820', 'Zlín-100', 'Janata Pavel'],
+  ['+420 775 760 822', 'Zlín-100', 'Tomaštíková Jana'],
+  ['+420 775 760 840', 'Zlín-100', 'Janíková Simona'],
+  ['+420 776 636 805', 'Zlín-100', 'Šimová Jarmila'],
+  ['+420 777 660 427', 'Zlín-100', 'Kuchařová-Faltýnková Hana'],
+  ['+420 777 660 434', 'Zlín-100', 'Šmídová Suzan'],
+  ['+420 777 660 435', 'Zlín-100', 'Pospíšil Lukáš'],
+  ['+420 778 400 021', 'Zlín-100', 'Šiška Milan'],
+  ['+420 778 403 338', 'Zlín-100', 'Kiedroň Roman'],
+  ['+420 778 411 662', 'Zlín-100', 'Šibal Petr'],
+  ['+420 608 660 424', 'Výroba-200.20', 'Varga Peter'],
+  ['+420 775 295 300', 'Výroba-200.20', 'Brada - řidič'],
+  ['+420 775 295 304', 'Výroba-200.20', 'řidič'],
+  ['+420 775 295 306', 'Výroba-200.20', 'skladník'],
+  ['+420 775 295 307', 'Výroba-200.20', 'Mádrová Michaela'],
+  ['+420 775 295 308', 'Výroba-200.20', 'Zbořilová Kamila'],
+  ['+420 775 295 310', 'Výroba-200.20', 'Vykopal Petr - elektrikář'],
+  ['+420 775 295 311', 'Výroba-200.20', 'Dáni Josef - řidič'],
+  ['+420 775 760 824', 'Výroba-200.20', 'Sovadina Ladislav-externí konstuktér'],
+  ['+420 775 760 833', 'Výroba-200.20', 'Kolář David - řidič'],
+  ['+420 775 866 950', 'Výroba-200.20', 'Červenka Martin'],
+  ['+420 775 866 951', 'Výroba-200.20', 'destař'],
+  ['+420 776 844 924', 'Výroba-200.20', 'Vrátnice'],
+  ['+420 777 479 059', 'Výroba-200.20', 'Krautwurst František'],
+  ['+420 777 479 476', 'Výroba-200.20', 'Slaný Jiří'],
+  ['+420 777 660 429', 'Výroba-200.20', 'Mádr Tomáš'],
+  ['+420 777 660 430', 'Výroba-200.20', 'Faulhammer Jaromír'],
+  ['+420 777 660 431', 'Výroba-200.20', 'Metelková Pavla'],
+  ['+420 777 660 439', 'Výroba-200.20', 'Strachota Jan'],
+  ['+420 777 760 851', 'Výroba-200.20', 'Metelka Michal'],
+  ['+420 777 760 858', 'Výroba-200.20', 'Mádr Martin'],
+  ['+420 773 498 039', 'Slušovice-700.10', 'Krajča L. Samsung'],
+  ['+420 777 770 641', 'Slušovice-700.10', 'Krajča Ladislav Nokia'],
+  ['+420 777 770 643', 'Slušovice-700.10', 'Bobál Radim'],
+  ['+420 777 770 644', 'Slušovice-700.10', 'Halaška Miroslav'],
+  ['+420 777 779 520', 'Slušovice-700.10', 'Tomšů Jaroslav'],
+  ['+420 775 295 299', 'ROTO-250', 'Bravenec Petr'],
+  ['+420 777 760 855', 'ROTO-250', 'Sláma Zdeněk'],
+  ['+420 775 295 313', 'Plasty-200.10', 'Michenková Lada'],
+  ['+420 775 866 949', 'Plasty-200.10', 'Melichárek Petr'],
+  ['+420 777 760 857', 'Plasty-200.10', 'Michenka Stanislav'],
+  ['+420 773 576 608', 'GVS-260', 'Vozka Miroslav'],
+  ['+420 775 295 097', 'GVS-260', 'Kumpán Milan'],
+  ['+420 775 760 826', 'GVS-260', 'Vršecký Luboš'],
+  ['+420 775 760 837', 'GVS-260', 'Kakaš Petr'],
+  ['+420 775 866 948', 'GVS-260', 'Trešlová Lenka'],
+  ['+420 777 705 459', 'GVS-260', 'Steidl Josef'],
+  ['+420 777 760 853', 'GVS-260', 'Bidlo Marek'],
+  ['+420 608 660 422', 'Doprava-200.30', 'Semotán Pavel'],
+  ['+420 773 576 609', 'Doprava-200.30', 'Krajíček František'],
+  ['+420 773 576 612', 'Doprava-200.30', 'Křivák Aleš'],
+  ['+420 775 295 096', 'Doprava-200.30', 'Nožička Josef'],
+  ['+420 775 295 098', 'Doprava-200.30', 'Zifčák František'],
+  ['+420 775 295 099', 'Doprava-200.30', 'Krywda Bohuslav'],
+  ['+420 775 295 301', 'Doprava-200.30', 'Fiedler  Jan - řidič'],
+  ['+420 775 295 305', 'Doprava-200.30', 'Pechalová Kamila'],
+  ['+420 775 295 314', 'Doprava-200.30', 'Duhajská Magda'],
+  ['+420 775 295 315', 'Doprava-200.30', 'Bína Zbyněk'],
+  ['+420 775 760 825', 'Doprava-200.30', 'Vlček Lukáš'],
+  ['+420 775 760 834', 'Doprava-200.30', 'Šulc Vlastimil'],
+  ['+420 775 760 836', 'Doprava-200.30', 'Tunkl Eduard'],
+  ['+420 775 760 839', 'Doprava-200.30', 'Pojsl Radovan'],
+  ['+420 775 866 946', 'Doprava-200.30', 'Charvát Milan'],
+  ['+420 775 866 947', 'Doprava-200.30', 'Gilg René'],
+  ['+420 777 660 432', 'Doprava-200.30', 'Fidler Dušan'],
+  ['+420 777 660 433', 'Doprava-200.30', 'Lešniowski Václav'],
+  ['+420 777 660 437', 'Doprava-200.30', 'Čech Jaromír'],
+  ['+420 777 760 852', 'Doprava-200.30', 'Semotánová Jana'],
+  ['+420 777 760 854', 'Doprava-200.30', 'Kutálek Petr'],
+  ['+420 777 760 856', 'Doprava-200.30', 'Raida Petr'],
+  ['+420 777 760 859', 'Doprava-200.30', 'Duhonský Josef'],
+  ['+420 775 304 851', 'Zlín-100', 'David Surý'],
+];
+// Jednorázová migrace (2026-08-27): naplnění telefonů/středisek z importu výše.
+(function () {
+  try {
+    const s = readJson(STATE_F, null);
+    if (!s || !Array.isArray(s.employees)) return;
+    s.settings = s.settings || {};
+    if (s.settings._telefonImport20260827) return;
+    s.settings._telefonImport20260827 = 1;
+    if (!Array.isArray(s.settings.telefonExtra)) s.settings.telefonExtra = [];
+    const norm = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const klic = x => norm(x).split(' ').filter(Boolean).sort().join(' ');   // pořadí jméno/příjmení nerozhoduje
+    const mapa = {};
+    s.employees.forEach(e => { const k = klic(e.name); if (k && !mapa[k]) mapa[k] = e; });
+    let spar = 0, extra = 0;
+    TELEFON_IMPORT_2026.forEach(r => {
+      const [tel, stredisko, jmeno] = r;
+      const e = mapa[klic(jmeno)];
+      if (e) {
+        e.telefon = tel;
+        if (!String(e.stredisko || '').trim()) e.stredisko = stredisko;
+        spar++;
+      } else {
+        // duplicity: stejné číslo NEBO stejné jméno už v „dalších kontaktech" → jen doplníme
+        const cis = tel.replace(/\D/g, '');
+        const uz = s.settings.telefonExtra.find(x => String(x.phone || '').replace(/\D/g, '') === cis || (klic(x.name) && klic(x.name) === klic(jmeno)));
+        if (uz) { uz.phone = tel; if (!String(uz.stredisko || '').trim()) uz.stredisko = stredisko; }
+        else { s.settings.telefonExtra.push({ stredisko, role: '', name: jmeno, email: '', phone: tel }); extra++; }
+      }
+    });
+    writeJson(STATE_F, s);
+    console.log('[telefon] import 2026-08-27: ' + spar + ' spárováno se zaměstnanci, ' + extra + ' jako další kontakty');
+  } catch (e) { console.warn('[telefon] import selhal:', e.message); }
+})();
+
 // Jednorázová migrace (2026-08-14): sloučení telefonního seznamu se zaměstnanci.
 // Snapshot TELEFON_SKUPINY se propíše do polí zaměstnanců (telefon, pozice; středisko jen když chybí)
 // párováním podle e-mailu. Nespárované kontakty (sdílené schránky ap.) → settings.telefonExtra.
 (function () {
   try {
     const s = readJson(STATE_F, null);
-    if (!s || !Array.isArray(s.employees) || s._telefonMerge20260814) return;
-    s._telefonMerge20260814 = true;
+    if (!s || !Array.isArray(s.employees)) return;
     s.settings = s.settings || {};
+    // Pozor: příznak musí být v settings — /api/state ukládá jen známé klíče a top-level příznak by zahodil
+    // (kvůli tomu se migrace dřív pouštěla po každém restartu a duplikovala kontakty).
+    if (s._telefonMerge20260814 || s.settings._telefonMerge20260814) { s.settings._telefonMerge20260814 = 1; writeJson(STATE_F, s); return; }
+    s.settings._telefonMerge20260814 = 1;
     const extra = [];
     let sparovano = 0;
     TELEFON_SKUPINY.forEach(g => (g.lide || []).forEach(r => {
@@ -1957,6 +2080,30 @@ function buildTelefon() {
     console.log('[migrace] telefonní seznam sloučen se zaměstnanci: ' + sparovano + ' spárováno, ' + extra.length + ' mimo zaměstnance (telefonExtra).');
   } catch (err) { console.error('[migrace] telefon merge:', err.message); }
 })();
+
+// Úklid duplicit v „dalších kontaktech" (vznikly opakovaným během staré migrace).
+(function () {
+  try {
+    const s = readJson(STATE_F, null);
+    if (!s) return;
+    s.settings = s.settings || {};
+    if (s.settings._telefonDedup20260827) return;
+    s.settings._telefonDedup20260827 = 1;
+    const list = Array.isArray(s.settings.telefonExtra) ? s.settings.telefonExtra : [];
+    const videno = new Set(), out = [];
+    list.forEach(x => {
+      const k = String(x && x.name || '').trim().toLowerCase() + '|' + String(x && x.phone || '').replace(/\D/g, '');
+      if (k === '|') return;
+      if (videno.has(k)) return;
+      videno.add(k); out.push(x);
+    });
+    const smazano = list.length - out.length;
+    s.settings.telefonExtra = out;
+    writeJson(STATE_F, s);
+    if (smazano) console.log('[telefon] úklid duplicit: odebráno ' + smazano + ' opakovaných kontaktů (zbylo ' + out.length + ')');
+  } catch (e) { console.warn('[telefon] úklid duplicit selhal:', e.message); }
+})();
+
 
 
 /* ---------- Obchod: rozdělení obchodníků / zastupitelnost produktových manažerů ----------
