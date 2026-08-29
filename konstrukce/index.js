@@ -816,14 +816,14 @@ function mount(host) {
     // Všichni ze Zlína (středisko v Organizaci obsahuje „Zlín") — hook ze serveru.
     if (host.jeZlin && host.jeZlin(email)) return true;
     const d = load();
-    return !!d.roles[email] || isVyrobniReditel(d, email);
+    return rolesArr(d.roles[email]).length > 0 || isVyrobniReditel(d, email);
   }
   // Má e-mail přístup díky roli v modulu (konstruktér, šéf…)? — pro server
   // (automatické zobrazení dlaždic v intranetu bez ručního přidělování Přístupů).
   function hasAccess(email) {
     email = String(email || '').toLowerCase(); if (!email) return false;
     const d = load();
-    return !!d.roles[email] || isVyrobniReditel(d, email);
+    return rolesArr(d.roles[email]).length > 0 || isVyrobniReditel(d, email);
   }
   // Efektivní role uživatele: admin vidí vše; jinak z číselníku rolí, případně
   // odvozeně „vyrobni-reditel", je-li ředitelem některé výrobní oblasti.
@@ -832,11 +832,11 @@ function mount(host) {
     const isAdm = host.isAdmin(req);
     const email = e ? (e.email || '').toLowerCase() : '';
     const d = load();
-    let r = email ? (d.roles[email] || '') : '';
-    if (!r && email && isVyrobniReditel(d, email)) r = 'vyrobni-reditel';
+    let roles = email ? rolesArr(d.roles[email]).slice() : [];
+    if (!roles.length && email && isVyrobniReditel(d, email)) roles = ['vyrobni-reditel'];
     // Obchodníci (přístup k modulu Obchod nebo v „Rozdělení obchodníků") mají roli obchodník implicitně.
-    if (!r && email && host.isObchodnik && host.isObchodnik(email)) r = 'obchodnik';
-    return { email, name: e ? e.name : '', isAdmin: isAdm, role: r };
+    if (!roles.length && email && host.isObchodnik && host.isObchodnik(email)) roles = ['obchodnik'];
+    return { email, name: e ? e.name : '', isAdmin: isAdm, role: roles[0] || '', roles };
   }
   // Seznam zaměstnanců intranetu pro výběr osob k rolím (jen pro admina).
   // Celé jméno „Jméno Příjmení". Když adresář má jen křestní jméno (nebo nic),
@@ -863,10 +863,15 @@ function mount(host) {
       return displayName(m && m.name, email);
     } catch (_) { return email; }
   }
+  // Jeden člověk může mít víc rolí (např. Andrey = šéf konstrukce + konstruktér).
+  // d.roles[email] je řetězec (jedna role) nebo pole rolí — rolesArr sjednocuje.
+  function rolesArr(v) { return Array.isArray(v) ? v : (v ? [v] : []); }
   function employeesWithRole(role) {
     const d = load();
-    return Object.keys(d.roles).filter(em => d.roles[em] === role);
+    return Object.keys(d.roles).filter(em => rolesArr(d.roles[em]).includes(role));
   }
+  // Má uživatel roli? (me z roleOf — nese pole roles; admin má práva všude jinde explicitně)
+  function ma(me, role) { return !!(me && me.roles && me.roles.indexOf(role) >= 0); }
 
   // ---- notifikace a e-maily ------------------------------------------------
   function notify(d, email, text, zakId) {
@@ -1428,11 +1433,11 @@ function mount(host) {
 
     // kapacitní přehled konstruktérů (pro šéfa/admin)
     let kapacita = null;
-    if (me.isAdmin || me.role === 'sef') kapacita = capacityOverview(d);
+    if (me.isAdmin || ma(me, 'sef')) kapacita = capacityOverview(d);
 
     const myNotif = d.notif.filter(n => n.email === me.email);
     json(res, 200, {
-      me: { email: me.email, name: me.name || empName(me.email), isAdmin: me.isAdmin, role: me.role || (me.isAdmin ? 'admin' : '') },
+      me: { email: me.email, name: me.name || empName(me.email), isAdmin: me.isAdmin, role: me.role || (me.isAdmin ? 'admin' : ''), roles: me.roles || [] },
       zakazky: view,
       types: d.types,
       kapacita,
@@ -1441,10 +1446,10 @@ function mount(host) {
       strediska: (d.strediska || []).map(s => ({ key: s.key, label: s.label, reditelEmail: s.reditelEmail || '', reditelName: s.reditelEmail ? empName(s.reditelEmail) : '' })),
       adresy: (d.adresy || []).slice().sort((a, b) => a.localeCompare(b, 'cs')),
       natahImg: NATAH_IMG,                             // kod natahování → soubor ilustrace (natah-img/)
-      roles: (me.isAdmin || me.role === 'sef') ? roleAssignments(d) : undefined,
-      employees: (me.isAdmin || me.role === 'sef') ? adminEmployees() : undefined,
+      roles: (me.isAdmin || ma(me, 'sef')) ? roleAssignments(d) : undefined,
+      employees: (me.isAdmin || ma(me, 'sef')) ? adminEmployees() : undefined,
       // jmenovitý přehled implicitních obchodníků (modul Obchod / EXP / Rozdělení) — pro kartu Obchodníci
-      obchodniciImplicit: ((me.isAdmin || me.role === 'sef') && host.obchodniciList)
+      obchodniciImplicit: ((me.isAdmin || ma(me, 'sef')) && host.obchodniciList)
         ? host.obchodniciList().map(o => ({ email: o.email, name: empName(o.email), zdroje: o.zdroje }))
             .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'))
         : undefined,
@@ -1478,7 +1483,7 @@ function mount(host) {
   }
   // Přiřazení osob k rolím pro roli-centrickou administraci (role → seznam lidí).
   function roleAssignments(d) {
-    const by = (role) => Object.keys(d.roles).filter(em => d.roles[em] === role)
+    const by = (role) => Object.keys(d.roles).filter(em => rolesArr(d.roles[em]).includes(role))
       .map(em => ({ email: em, name: empName(em), fond: d.fond[em] || null, groups: (d.konstrukterGroups[em] || []) }))
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'));
     return { sef: by('sef'), konstrukter: by('konstrukter'), obchodnik: by('obchodnik'), reditel: by('reditel'), 'vykonny-reditel': by('vykonny-reditel') };
@@ -1552,7 +1557,7 @@ function mount(host) {
   // — závod se určí hned a krok výběru závodu ředitelem výroby se přeskočí.
   async function apiCreate(req, res) {
     const me = roleOf(req);
-    if (!(me.isAdmin || me.role === 'obchodnik')) { json(res, 403, { chyba: 'Zadávat požadavky smí jen obchodník.' }); return true; }
+    if (!(me.isAdmin || ma(me, 'obchodnik'))) { json(res, 403, { chyba: 'Zadávat požadavky smí jen obchodník.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
     const zakaznik = String(b.zakaznik || '').trim();
     if (!zakaznik) { json(res, 400, { chyba: 'Vyplňte zákazníka.' }); return true; }
@@ -1630,7 +1635,7 @@ function mount(host) {
   // ---- přidělení konstruktéra (šéf) ----------------------------------------
   async function apiAssign(req, res) {
     const me = roleOf(req);
-    if (!(me.isAdmin || me.role === 'sef')) { json(res, 403, { chyba: 'Přidělovat smí jen šéf konstrukce.' }); return true; }
+    if (!(me.isAdmin || ma(me, 'sef'))) { json(res, 403, { chyba: 'Přidělovat smí jen šéf konstrukce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
     const d = load();
     const z = d.zakazky.find(x => x.id === b.id);
@@ -1657,7 +1662,7 @@ function mount(host) {
     if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
     // Příloha od obchodníka (PDF/obrázek — např. výkres zákazníka s otvory pro odtok vody).
     if (b.kind === 'priloha') {
-      const smiPril = me.isAdmin || me.role === 'sef' || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email);
+      const smiPril = me.isAdmin || ma(me, 'sef') || (ma(me, 'obchodnik') && (z.obchodnikEmail || '').toLowerCase() === me.email);
       if (!smiPril) { json(res, 403, { chyba: 'Přílohy vkládá obchodník zakázky (nebo šéf konstrukce).' }); return true; }
       if ((z.prilohy || []).length >= 10) { json(res, 400, { chyba: 'Maximálně 10 příloh na zakázku.' }); return true; }
       const sp = saveFile(z.id, b.name, b.dataUrl, 'priloha');
@@ -1670,7 +1675,7 @@ function mount(host) {
       json(res, 200, { ok: true, prilohy: z.prilohy.length });
       return true;
     }
-    if (!(me.isAdmin || (me.role === 'konstrukter' && (z.assignedTo || '').toLowerCase() === me.email))) { json(res, 403, { chyba: 'Nahrávat smí jen přiřazený konstruktér.' }); return true; }
+    if (!(me.isAdmin || (ma(me, 'konstrukter') && (z.assignedTo || '').toLowerCase() === me.email))) { json(res, 403, { chyba: 'Nahrávat smí jen přiřazený konstruktér.' }); return true; }
     // Výrobní dokumentace — samostatný dokument vkládaný po schválení klientem (nepatří k verzím pro klienta).
     if (b.kind === 'vyrobni') {
       if (z.stav !== 'schvaleno') { json(res, 400, { chyba: 'Výrobní dokumentaci lze vložit až po schválení klientem.' }); return true; }
@@ -1706,10 +1711,10 @@ function mount(host) {
     if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
     const action = String(b.action || '');
     const note = String(b.note || '').slice(0, 1000);
-    const isSef = me.isAdmin || me.role === 'sef';
-    const isObch = me.isAdmin || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email) || (me.role === 'obchodnik' && isSef);
-    const isKon = me.isAdmin || (me.role === 'konstrukter' && (z.assignedTo || '').toLowerCase() === me.email);
-    const isVykonny = me.isAdmin || me.role === 'vykonny-reditel';       // výkonný ředitel výroby (rozděluje do závodů)
+    const isSef = me.isAdmin || ma(me, 'sef');
+    const isObch = me.isAdmin || (ma(me, 'obchodnik') && (z.obchodnikEmail || '').toLowerCase() === me.email) || (ma(me, 'obchodnik') && isSef);
+    const isKon = me.isAdmin || (ma(me, 'konstrukter') && (z.assignedTo || '').toLowerCase() === me.email);
+    const isVykonny = me.isAdmin || ma(me, 'vykonny-reditel');       // výkonný ředitel výroby (rozděluje do závodů)
     let err = null;
 
     // Brána řízená pravidlem (grafem): akce je dostupná jen tam, kde v aktuálním
@@ -1818,7 +1823,7 @@ function mount(host) {
         break;
       }
       case 'storno': { // zamítnutí/storno interně (obchodník/ředitel)
-        if (!(me.isAdmin || me.role === 'obchodnik' || me.role === 'reditel')) { err = 'Stornovat smí obchodník nebo ředitel.'; break; }
+        if (!(me.isAdmin || ma(me, 'obchodnik') || ma(me, 'reditel'))) { err = 'Stornovat smí obchodník nebo ředitel.'; break; }
         if (!note) { err = 'Uveďte důvod storna.'; break; }
         stopTimer(z, me.email);
         if (z.link) z.link.active = false;
@@ -1943,7 +1948,7 @@ function mount(host) {
     const d = load();
     const z = d.zakazky.find(x => x.id === b.id);
     if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
-    if (!(me.isAdmin || (me.role === 'konstrukter' && (z.assignedTo || '').toLowerCase() === me.email))) { json(res, 403, { chyba: 'Timer ovládá přiřazený konstruktér.' }); return true; }
+    if (!(me.isAdmin || (ma(me, 'konstrukter') && (z.assignedTo || '').toLowerCase() === me.email))) { json(res, 403, { chyba: 'Timer ovládá přiřazený konstruktér.' }); return true; }
     if (b.action === 'start') {
       // zastav případný běžící timer téhož uživatele na jiné zakázce
       d.zakazky.forEach(x => { if (x.activeTimer && x.activeTimer.user === me.email) stopTimer(x, me.email); });
@@ -1987,7 +1992,7 @@ function mount(host) {
     const d = load();
     const z = d.zakazky.find(x => x.id === b.id);
     if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
-    if (!(me.isAdmin || me.role === 'sef' || me.role === 'vykonny-reditel' || me.role === 'vyrobni-reditel' || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email))) {
+    if (!(me.isAdmin || ma(me, 'sef') || ma(me, 'vykonny-reditel') || ma(me, 'vyrobni-reditel') || (ma(me, 'obchodnik') && (z.obchodnikEmail || '').toLowerCase() === me.email))) {
       json(res, 403, { chyba: 'Číslo výrobní zakázky zapisuje šéf konstrukce, obchodník zakázky nebo výrobní/výkonný ředitel.' }); return true;
     }
     const cvz = String(b.cvz || '').trim().slice(0, 40);
@@ -2009,7 +2014,7 @@ function mount(host) {
     const d = load();
     const z = d.zakazky.find(x => x.id === b.id);
     if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
-    const smi = me.isAdmin || me.role === 'sef' || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email);
+    const smi = me.isAdmin || ma(me, 'sef') || (ma(me, 'obchodnik') && (z.obchodnikEmail || '').toLowerCase() === me.email);
     if (!smi) { json(res, 403, { chyba: 'Zakázku smaže správce, šéf konstrukce nebo obchodník své zakázky.' }); return true; }
     if (String(b.potvrzeni || '').trim().toLowerCase() !== 'smazat') { json(res, 400, { chyba: 'Potvrzení nesouhlasí — napište „smazat".' }); return true; }
     if (!Array.isArray(d.smazane)) d.smazane = [];
@@ -2042,7 +2047,7 @@ function mount(host) {
     if (!reason) { json(res, 400, { chyba: 'Změnu termínu je nutné zdůvodnit.' }); return true; }
     const newTs = b.deadline ? new Date(String(b.deadline).slice(0, 10) + 'T23:59:59Z').getTime() : null;
     if (!newTs || isNaN(newTs)) { json(res, 400, { chyba: 'Neplatný termín.' }); return true; }
-    const canObch = me.isAdmin || (me.role === 'obchodnik' && (z.obchodnikEmail || '').toLowerCase() === me.email) || me.role === 'sef';
+    const canObch = me.isAdmin || (ma(me, 'obchodnik') && (z.obchodnikEmail || '').toLowerCase() === me.email) || ma(me, 'sef');
     if (!canObch) { json(res, 403, { chyba: 'Termín běžící zakázky mění obchodník (konstruktér jen se souhlasem obchodníka).' }); return true; }
     const old = z.deadline;
     z.deadline = newTs;
@@ -2067,16 +2072,27 @@ function mount(host) {
   // Správu rolí a konstruktérů (lidé v „Role a číselník") smí kromě správce
   // i šéf konstrukce — vedoucí si spravuje své lidi sám. Zbytek administrace
   // (číselníky, střediska, reset dat, plátno, rozesílky) zůstává jen správci.
-  function smiSpravovatRole(req) { return host.isAdmin(req) || roleOf(req).role === 'sef'; }
+  function smiSpravovatRole(req) { return host.isAdmin(req) || ma(roleOf(req), 'sef'); }
   async function apiAdminRole(req, res) {
     if (!smiSpravovatRole(req)) { json(res, 403, { chyba: 'Role spravuje správce nebo šéf konstrukce.' }); return true; }
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
     const email = String(b.email || '').toLowerCase().trim();
     const role = String(b.role || '').trim();
+    const add = String(b.add || '').trim();
+    const remove = String(b.remove || '').trim();
     if (!email) { json(res, 400, { chyba: 'Chybí e-mail.' }); return true; }
+    const OK = ['obchodnik', 'sef', 'konstrukter', 'reditel', 'vykonny-reditel'];
     const d = load();
-    if (!role) delete d.roles[email];
-    else if (['obchodnik', 'sef', 'konstrukter', 'reditel', 'vykonny-reditel'].includes(role)) d.roles[email] = role;
+    if (add) {            // přidat roli (člověk může mít víc rolí najednou)
+      if (!OK.includes(add)) { json(res, 400, { chyba: 'Neplatná role.' }); return true; }
+      const cur = rolesArr(d.roles[email]);
+      if (!cur.includes(add)) cur.push(add);
+      d.roles[email] = cur.length === 1 ? cur[0] : cur;
+    } else if (remove) {  // odebrat jen konkrétní roli, ostatní zůstávají
+      const cur = rolesArr(d.roles[email]).filter(r => r !== remove);
+      if (cur.length) d.roles[email] = cur.length === 1 ? cur[0] : cur; else delete d.roles[email];
+    } else if (!role) delete d.roles[email];
+    else if (OK.includes(role)) d.roles[email] = role;
     else { json(res, 400, { chyba: 'Neplatná role.' }); return true; }
     save(d);
     json(res, 200, { ok: true, roles: roleAssignments(d) });
@@ -2585,7 +2601,7 @@ function mount(host) {
   // ======================================================================
   //  Evidence práce (timesheet) — denní zápis hodin po činnostech (kap. 8)
   // ======================================================================
-  function tsCanSeeAll(me) { return me.isAdmin || me.role === 'sef' || me.role === 'reditel'; }
+  function tsCanSeeAll(me) { return me.isAdmin || ma(me, 'sef') || ma(me, 'reditel'); }
   function activityLabel(d, key, fallback) { const a = d.activities.find(x => x.key === key); return a ? a.label : (fallback || key || ''); }
   function activityKind(d, key) { const a = d.activities.find(x => x.key === key); return a ? a.kind : 'rezie'; }
 
