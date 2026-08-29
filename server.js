@@ -153,6 +153,7 @@ const FREELO_API_KEY = process.env.FREELO_API_KEY || ''; // modul Freelo: API kl
 const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativně lokální soubor
 // Dovolená: úložiště žádostí + (volitelně) zápis do sdíleného Google kalendáře přes service account
 const VAC_F = path.join(DATA_DIR, 'vacation.json');
+const VACREP_F = path.join(DATA_DIR, 'vacation-report.json'); // měsíční report čerpání dovolené (příjemci, den, historie)
 const VACATION_CALENDAR_ID = process.env.VACATION_CALENDAR_ID || '';       // ID sdíleného kalendáře „Dovolené"
 const GOOGLE_SA_CLIENT_EMAIL = process.env.GOOGLE_SA_CLIENT_EMAIL || '';   // client_email ze service-account JSON
 const GOOGLE_SA_PRIVATE_KEY = (process.env.GOOGLE_SA_PRIVATE_KEY || '').replace(/\\n/g, '\n'); // private_key (PEM; \n → nové řádky)
@@ -1796,6 +1797,108 @@ function approverFor(emp, emps) {
   return sa || { email: SUPERADMIN, name: 'David Surý' };
 }
 
+/* ---------- Měsíční report čerpání dovolené ----------
+   Jednou za měsíc (výchozí 1. den) jde přehled za předchozí měsíc: kdo dovolenou čerpal
+   (schválené žádosti), co je zatím jen schváleno dopředu a jaké je aktuální konto.
+   Příjemce lze přidávat/odebírat v Rozesílkách. */
+const VACREP_DEFAULT_TO = ['jana.pankova@elkoplast.cz'];
+function vacRepCfg() {
+  const d = readJson(VACREP_F, null) || {};
+  return {
+    to: Array.isArray(d.to) && d.to.length ? d.to : VACREP_DEFAULT_TO.slice(),
+    day: Math.max(1, Math.min(28, Number(d.day) || 1)),
+    enabled: d.enabled !== false,
+    lastSentMonth: d.lastSentMonth || '', lastSentAt: d.lastSentAt || null
+  };
+}
+function vacRepWrite(patch) { const cur = vacRepCfg(); writeJson(VACREP_F, Object.assign(cur, patch || {})); return vacRepCfg(); }
+// Pracovní dny žádosti, které spadají do zadaného měsíce (žádost může přesahovat přes měsíce).
+function vacDaysInMonth(r, y, m) {
+  const a = new Date(r.from + 'T00:00:00'), b = new Date(r.to + 'T00:00:00');
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return 0;
+  let n = 0;
+  for (const d = new Date(a); d <= b; d.setDate(d.getDate() + 1)) {
+    if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+    const w = d.getDay(); if (w !== 0 && w !== 6) n++;
+  }
+  if (r.halfDay && n > 0 && n === workingDays(r.from, r.to, false)) n -= 0.5;   // půlden jen když je celá žádost v měsíci
+  return n;
+}
+// Data pro report i pro přehled v intranetu: kdo měl v daném měsíci dovolenou.
+function vacMonthData(y, m) {
+  const emps = getState().employees || [];
+  const rok = new Date().getFullYear();
+  const rows = readVac().requests
+    .filter(r => r.status === 'approved' || r.status === 'pending')
+    .map(r => ({ r, dny: vacDaysInMonth(r, y, m) }))
+    .filter(x => x.dny > 0)
+    .map(x => {
+      const e = emps.find(z => (z.email || '').toLowerCase() === (x.r.empEmail || '').toLowerCase());
+      const email = (x.r.empEmail || '').toLowerCase();
+      const narok = e ? vacEntitlement(e) : 20;
+      const cerpano = vacUsed(email, rok);
+      return {
+        name: x.r.empName || (e ? e.name : email), email, stredisko: e ? (e.stredisko || '') : '',
+        from: x.r.from, to: x.r.to, dny: x.dny, stav: x.r.status, halfDay: !!x.r.halfDay,
+        narok, cerpanoRok: cerpano, zbyvaRok: Math.round((narok - cerpano) * 10) / 10
+      };
+    })
+    .sort((a, b) => (a.stredisko || 'ZZZ').localeCompare(b.stredisko || 'ZZZ', 'cs') || (a.name || '').localeCompare(b.name || '', 'cs') || a.from.localeCompare(b.from));
+  const celkem = Math.round(rows.reduce((n, x) => n + x.dny, 0) * 10) / 10;
+  const lidi = new Set(rows.map(x => x.email)).size;
+  return { rows, celkem, lidi, rok };
+}
+const VAC_MESICE = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+function buildVacReportHtml(y, m) {
+  const d = vacMonthData(y, m);
+  const nadpis = VAC_MESICE[m] + ' ' + y;
+  const cell = (t, extra) => '<td style="padding:7px 9px;border-bottom:1px solid #e6e9e4;' + (extra || '') + '">' + t + '</td>';
+  let h = '<div style="font-family:system-ui,Arial,sans-serif;color:#16211a;line-height:1.55">' +
+    '<h2 style="margin:0 0 4px;font-size:19px">Čerpání dovolené — ' + nadpis + '</h2>' +
+    '<p style="margin:0 0 16px;color:#5b6b60;font-size:14px">Celkem <b>' + d.celkem + '</b> dní u <b>' + d.lidi + '</b> zaměstnanců. ' +
+    'Sloupec „Stav" rozlišuje již schválené čerpání a dosud neschválené žádosti. Konto je stav k dnešnímu dni za rok ' + d.rok + '.</p>';
+  if (!d.rows.length) { h += '<p style="color:#5b6b60">V tomto měsíci nikdo dovolenou nečerpal.</p></div>'; return h; }
+  h += '<table style="width:100%;border-collapse:collapse;font-size:13.5px">' +
+    '<thead><tr style="background:#f1f5f0;text-align:left">' +
+    ['Zaměstnanec', 'Středisko', 'Termín', 'Dní v měsíci', 'Stav', 'Nárok ' + d.rok, 'Čerpáno ' + d.rok, 'Zbývá']
+      .map(t => '<th style="padding:7px 9px;border-bottom:2px solid #d7e0d5">' + t + '</th>').join('') + '</tr></thead><tbody>';
+  d.rows.forEach(r => {
+    const stav = r.stav === 'approved'
+      ? '<span style="color:#1f5e22;font-weight:600">schváleno</span>'
+      : '<span style="color:#8a6d1f;font-weight:600">čeká na schválení</span>';
+    h += '<tr>' + cell('<b>' + esc(r.name) + '</b>') + cell(esc(r.stredisko || '—')) +
+      cell(r.from + ' – ' + r.to + (r.halfDay ? ' (půlden)' : '')) + cell('<b>' + r.dny + '</b>') + cell(stav) +
+      cell(String(r.narok)) + cell(String(r.cerpanoRok)) + cell('<b>' + r.zbyvaRok + '</b>') + '</tr>';
+  });
+  h += '</tbody></table><p style="margin-top:16px;color:#8a938a;font-size:12px">Automatický přehled z intranetu ELKOPLAST · dovolená se schvaluje v modulu Dovolená.</p></div>';
+  return h;
+}
+async function sendVacReport(y, m, prijemci) {
+  const cfg = vacRepCfg();
+  const to = (prijemci && prijemci.length ? prijemci : cfg.to).filter(Boolean);
+  if (!to.length) throw new Error('Není nastaven příjemce.');
+  const html = buildVacReportHtml(y, m);
+  const subject = 'Čerpání dovolené — ' + VAC_MESICE[m] + ' ' + y;
+  for (const adr of to) {
+    await deliver({ to: adr, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST', subject, html, text: subject });
+  }
+  return to;
+}
+async function maybeSendVacReport() {
+  try {
+    const cfg = vacRepCfg();
+    if (!cfg.enabled || reportDisabled('dovolena-mesicni')) return;
+    if (!emailConfigured()) return;
+    const now = new Date();
+    if (now.getDate() < cfg.day) return;
+    if (cfg.lastSentMonth === ymKey(now)) return;
+    const p = new Date(now.getFullYear(), now.getMonth() - 1, 1);   // report za předchozí měsíc
+    const to = await sendVacReport(p.getFullYear(), p.getMonth());
+    vacRepWrite({ lastSentMonth: ymKey(now), lastSentAt: now.toISOString() });
+    console.log('[dovolená] měsíční report odeslán na ' + to.join(', '));
+  } catch (e) { console.warn('[dovolená] měsíční report selhal: ' + e.message); }
+}
+
 /* ---------- Google Calendar (service account, bez závislostí) ---------- */
 function calendarConfigured() { return !!(VACATION_CALENDAR_ID && GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }
 
@@ -2965,6 +3068,14 @@ const server = http.createServer(async (req, res) => {
         const st = readJson(REPORT_F, {});
         out.push({ key: 'smernice-mesicni', module: 'Směrnice', name: 'Měsíční vyhodnocení seznámení se směrnicemi', to: [reportRecipient()], enabled: reportEnabled() && emailConfigured(), schedule: 'měsíčně (' + reportDay() + '. den)', lastAt: st.lastSentAt || null, preview: null, readOnly: true, configHint: 'nastavuje se v proměnných prostředí (REPORT_EMAIL / REPORT_DAY / REPORT_ENABLED); tady lze jen zrušit odesílání' });
       } catch (_) {}
+      // Jádro intranetu: měsíční přehled čerpání dovolené (příjemce lze měnit tady).
+      try {
+        const vc = vacRepCfg();
+        out.push({ key: 'dovolena-mesicni', module: 'Dovolená', name: 'Měsíční přehled čerpání dovolené', to: vc.to,
+          enabled: vc.enabled && emailConfigured(), schedule: 'měsíčně (' + vc.day + '. den, za předchozí měsíc)',
+          lastAt: vc.lastSentAt || null, den: vc.day, preview: '/api/vacation/report-preview', readOnly: false,
+          configHint: 'kdo v měsíci čerpal dovolenou, co je schválené dopředu a jaké má kdo konto' });
+      } catch (_) {}
       for (const m of mods) { if (m && typeof m.reports === 'function') { try { const rs = m.reports() || []; rs.forEach(r => out.push(r)); } catch (_) {} } }
       // Centrální vypínač: zrušené rozesílky jsou vypnuté bez ohledu na nastavení modulu.
       const off = rozesilkyOff();
@@ -2978,6 +3089,18 @@ const server = http.createServer(async (req, res) => {
       let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
       const key = String(b.key || '').trim();
       if (!key) return send(res, 400, { error: 'Chybí klíč rozesílky.' });
+      // Měsíční přehled dovolené je v jádru — obsloužíme ho tady.
+      if (key === 'dovolena-mesicni') {
+        const patch = {};
+        if (Array.isArray(b.to)) patch.to = b.to.map(x => String(x || '').trim().toLowerCase()).filter(x => x.indexOf('@') > 0);
+        if (b.den != null || b.day != null) patch.day = Math.max(1, Math.min(28, Number(b.den != null ? b.den : b.day) || 1));
+        if (b.enabled != null) patch.enabled = !!b.enabled;
+        const vc = vacRepWrite(patch);
+        const off = rozesilkyOff();
+        if (b.enabled === true && off[key]) { delete off[key]; rozesilkyOffWrite(off); }
+        else if (b.enabled === false) { off[key] = true; rozesilkyOffWrite(off); }
+        return send(res, 200, { ok: true, report: { key, module: 'Dovolená', name: 'Měsíční přehled čerpání dovolené', to: vc.to, enabled: vc.enabled, den: vc.day, schedule: 'měsíčně (' + vc.day + '. den, za předchozí měsíc)' } });
+      }
       const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod, qoolingMod];
       for (const m of mods) {
         if (!m || typeof m.setReport !== 'function') continue;
@@ -3918,6 +4041,50 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     // ---- Dovolená: přehled všech + konto (admin) ----
+    // Náhled měsíčního reportu (správce) + ruční odeslání
+    if (p === '/api/vacation/report-preview' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      const now = new Date();
+      const ym = String(u.query.ym || '');
+      let y, m;
+      if (/^\d{4}-\d{2}$/.test(ym)) { y = Number(ym.slice(0, 4)); m = Number(ym.slice(5, 7)) - 1; }
+      else { const p0 = new Date(now.getFullYear(), now.getMonth() - 1, 1); y = p0.getFullYear(); m = p0.getMonth(); }
+      return send(res, 200, buildVacReportHtml(y, m), { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+    if (p === '/api/vacation/report-send' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) {}
+      const now = new Date();
+      const ym = String(b.ym || '');
+      let y, m;
+      if (/^\d{4}-\d{2}$/.test(ym)) { y = Number(ym.slice(0, 4)); m = Number(ym.slice(5, 7)) - 1; }
+      else { const p0 = new Date(now.getFullYear(), now.getMonth() - 1, 1); y = p0.getFullYear(); m = p0.getMonth(); }
+      try { const to = await sendVacReport(y, m, Array.isArray(b.to) ? b.to : null); return send(res, 200, { ok: true, to }); }
+      catch (e) { return send(res, 500, { error: e.message }); }
+    }
+    // Přehled čerpání dovolené za měsíc (pro intranet). Zaměstnanec vidí sebe,
+    // schvalovatel svůj tým, správce všechny.
+    if (p === '/api/vacation/mesic' && req.method === 'GET') {
+      const e = empSession(req); if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const now = new Date();
+      const ym = String(u.query.ym || '');
+      let y = now.getFullYear(), m = now.getMonth();
+      if (/^\d{4}-\d{2}$/.test(ym)) { y = Number(ym.slice(0, 4)); m = Number(ym.slice(5, 7)) - 1; }
+      const d = vacMonthData(y, m);
+      const admin = isAdmin(req);
+      const eml = e ? (e.email || '').toLowerCase() : '';
+      let rows = d.rows, rozsah = 'vse';
+      if (!admin) {
+        const emps = getState().employees || [];
+        const me = emps.find(x => (x.email || '').toLowerCase() === eml);
+        const tym = new Set(emps.filter(x => me && x.managerId === me.id).map(x => (x.email || '').toLowerCase()));
+        const jeSchvalovatel = tym.size > 0;
+        rows = d.rows.filter(r => r.email === eml || tym.has(r.email));
+        rozsah = jeSchvalovatel ? 'tym' : 'ja';
+      }
+      const celkem = Math.round(rows.reduce((n, x) => n + x.dny, 0) * 10) / 10;
+      return send(res, 200, { ym: y + '-' + String(m + 1).padStart(2, '0'), mesic: VAC_MESICE[m] + ' ' + y, rows, celkem, lidi: new Set(rows.map(r => r.email)).size, rozsah }, { 'Cache-Control': 'no-store' });
+    }
     if (p === '/api/vacation/all' && req.method === 'GET') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const emps = getState().employees || []; const year = new Date().getFullYear();
@@ -4311,6 +4478,7 @@ if (require.main === module) {
     // měsíční vyhodnocení – kontrola při startu a pak periodicky (každých 6 h)
     maybeSendMonthlyReport();
     setInterval(maybeSendMonthlyReport, 6 * 3600 * 1000);
+    maybeSendVacReport(); setInterval(maybeSendVacReport, 6 * 3600 * 1000);   // měsíční přehled čerpání dovolené
     // Reporty nákupu — kontrola při startu a pak KAŽDOU HODINU (kvůli ranní bilanci; guardy 1×/den, 1×/týden, 1×/14 dní)
     if (nakupReportMod) {
       nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 3600 * 1000);

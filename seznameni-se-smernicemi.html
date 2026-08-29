@@ -1653,6 +1653,17 @@ const MJ_L10N = {
   'Chyba': ['Error','Fehler','Błąd','Помилка','Eroare'],
   'Opravdu zrušit tuto žádost?': ['Really cancel this request?','Diesen Antrag wirklich stornieren?','Na pewno anulować ten wniosek?','Справді скасувати цю заявку?','Sigur anulați această cerere?'],
   'Zrušeno': ['Cancelled','Storniert','Anulowano','Скасовано','Anulat'],
+  'Čerpání dovolené v měsíci': ['Vacation taken this month','Urlaub im Monat','Wykorzystanie urlopu w miesiącu','Використання відпустки за місяць','Concediu în luna'],
+  'celá firma': ['whole company','ganze Firma','cała firma','вся компанія','toată firma'],
+  'můj tým': ['my team','mein Team','mój zespół','моя команда','echipa mea'],
+  'moje dovolená': ['my vacation','mein Urlaub','mój urlop','моя відпустка','concediul meu'],
+  'lidí': ['people','Personen','osób','осіб','persoane'],
+  'V tomto měsíci nikdo dovolenou nečerpal.': ['Nobody took vacation this month.','In diesem Monat hat niemand Urlaub genommen.','W tym miesiącu nikt nie korzystał z urlopu.','Цього місяця ніхто не брав відпустку.','Nimeni nu a avut concediu în această lună.'],
+  'Zaměstnanec': ['Employee','Mitarbeiter','Pracownik','Працівник','Angajat'],
+  'Středisko': ['Department','Abteilung','Dział','Підрозділ','Departament'],
+  'Termín': ['Dates','Zeitraum','Termin','Період','Perioadă'],
+  'Dní': ['Days','Tage','Dni','Днів','Zile'],
+  'Stav': ['Status','Status','Status','Статус','Stare'],
   // — modul Školení —
   '__skolIntro': ['Interactive trainings and their final tests. For each one you can see your test status (pass mark 80 %, max 3 attempts).','Interaktive Schulungen mit Abschlusstests. Bei jeder sehen Sie Ihren Teststatus (Bestehensgrenze 80 %, max. 3 Versuche).','Interaktywne szkolenia i ich testy końcowe. Przy każdym widzisz stan swojego testu (próg zaliczenia 80 %, maks. 3 próby).','Інтерактивні навчання та підсумкові тести. Біля кожного видно стан вашого тесту (поріг 80 %, макс. 3 спроби).','Instruiri interactive și testele lor finale. La fiecare vedeți starea testului dvs. (prag 80 %, max. 3 încercări).'],
   'Dostupná školení': ['Available trainings','Verfügbare Schulungen','Dostępne szkolenia','Доступні навчання','Instruiri disponibile'],
@@ -3857,6 +3868,9 @@ async function showDovolena(){
     team.members.forEach(m=> h+=vacTeamBar(m));
   }
 
+  // Přehled čerpání v měsíci (kdo měl kdy dovolenou)
+  h+='<div class="dash-sec">'+mjT('Čerpání dovolené v měsíci')+'</div><div id="vacMesic" class="card pad"><p class="muted" style="margin:0">'+mjT('Načítám…')+'</p></div>';
+
   // Nová žádost
   h+='<div class="dash-sec">'+mjT('Nová žádost')+'</div><div class="card pad">'+
     '<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">'+
@@ -3881,6 +3895,38 @@ async function showDovolena(){
   });
 
   body.innerHTML=h; window.scrollTo(0,0);
+  vacMesicLoad(VAC_YM||null);
+}
+/* ---- Přehled čerpání dovolené za měsíc (kdo a kolik dní) ---- */
+let VAC_YM=null;
+function vacYmPosun(k){
+  const z=(VAC_YM||(new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'))).split('-');
+  const d=new Date(Number(z[0]), Number(z[1])-1+k, 1);
+  vacMesicLoad(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+}
+async function vacMesicLoad(ym){
+  const box=document.getElementById('vacMesic'); if(!box) return;
+  try{
+    const r=await fetch('/api/vacation/mesic'+(ym?('?ym='+encodeURIComponent(ym)):''),{cache:'no-store'});
+    const d=await r.json();
+    if(d.error){ box.innerHTML='<p class="muted" style="margin:0">'+esc(d.error)+'</p>'; return; }
+    VAC_YM=d.ym;
+    const popis = d.rozsah==='vse' ? mjT('celá firma') : (d.rozsah==='tym' ? mjT('můj tým') : mjT('moje dovolená'));
+    let h='<div class="spread" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">'+
+      '<div style="display:flex;align-items:center;gap:8px"><button class="btn ghost sm" onclick="vacYmPosun(-1)">‹</button>'+
+      '<b style="font-size:15px">'+esc(d.mesic)+'</b><button class="btn ghost sm" onclick="vacYmPosun(1)">›</button></div>'+
+      '<span class="muted" style="font-size:13px">'+esc(popis)+' · <b>'+d.celkem+'</b> '+(MJ_LANG==='cz'?'dní':mjT('__days'))+' · <b>'+d.lidi+'</b> '+mjT('lidí')+'</span></div>';
+    if(!d.rows.length){ h+='<p class="muted" style="margin:0">'+mjT('V tomto měsíci nikdo dovolenou nečerpal.')+'</p>'; box.innerHTML=h; return; }
+    h+='<div class="matrix-wrap"><table class="matrix"><thead><tr><th>'+mjT('Zaměstnanec')+'</th><th>'+mjT('Středisko')+'</th><th>'+mjT('Termín')+'</th><th>'+mjT('Dní')+'</th><th>'+mjT('Stav')+'</th><th>'+mjT('Zbývá')+'</th></tr></thead><tbody>';
+    d.rows.forEach(r=>{
+      const stav = r.stav==='approved' ? '<span class="pill green">'+mjT('✓ Schváleno')+'</span>' : '<span class="pill amber">'+mjT('○ Čeká na schválení')+'</span>';
+      h+='<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(r.stredisko||'—')+'</td>'+
+        '<td style="white-space:nowrap">'+vacFmt(r.from)+' – '+vacFmt(r.to)+(r.halfDay?' <span class="muted">('+mjT('půlden')+')</span>':'')+'</td>'+
+        '<td><b>'+r.dny+'</b></td><td>'+stav+'</td><td>'+r.zbyvaRok+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+    box.innerHTML=h;
+  }catch(e){ box.innerHTML='<p class="muted" style="margin:0">'+mjT('Nepodařilo se načíst data dovolené.')+'</p>'; }
 }
 // Grafické konto dovolené – prstencový graf (nárok = celý prstenec, čerpáno + čekající = vyplněná část, zůstatek = zbytek).
 function vacKontoCard(my){
