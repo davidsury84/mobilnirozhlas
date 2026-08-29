@@ -1892,6 +1892,13 @@ async function maybeSendVacReport() {
     const now = new Date();
     if (now.getDate() < cfg.day) return;
     if (cfg.lastSentMonth === ymKey(now)) return;
+    // První běh (nebo po ztrátě dat) uprostřed měsíce: jen si poznamenáme měsíc a pošleme až příště,
+    // ať nikomu nepřistane starý přehled v nečekanou dobu.
+    if (!cfg.lastSentMonth && now.getDate() > cfg.day + 2) {
+      vacRepWrite({ lastSentMonth: ymKey(now) });
+      console.log('[dovolená] první běh uprostřed měsíce — report se pošle až ' + cfg.day + '. dne příštího měsíce');
+      return;
+    }
     const p = new Date(now.getFullYear(), now.getMonth() - 1, 1);   // report za předchozí měsíc
     const to = await sendVacReport(p.getFullYear(), p.getMonth());
     vacRepWrite({ lastSentMonth: ymKey(now), lastSentAt: now.toISOString() });
