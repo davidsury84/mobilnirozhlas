@@ -2336,6 +2336,28 @@ function isObchodnikEmail(email) {
   try { const mods = employeeModules(email) || []; if (mods.some(m => OBCHOD_MODULE_KEYS.indexOf(m) >= 0)) return true; } catch (_) {}
   return obchodniciEmailSet().has(email);
 }
+// Je zaměstnanec „ze Zlína"? — středisko v Organizaci obsahuje „Zlín"
+// (Zlín-100, Zlín (centrála), Centrála Zlín + Správa…). Slouží k automatickému
+// přístupu do modulu Konstrukce pro celou centrálu.
+function jeZlinEmail(email) {
+  email = (email || '').toLowerCase(); if (!email) return false;
+  try {
+    const s = readJson(STATE_F, { employees: [] });
+    const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+    return !!(e && /zl[ií]n/i.test(String(e.stredisko || '')));
+  } catch (_) { return false; }
+}
+// Automatický přístup ke Konstrukci (dlaždice v intranetu i vstup do modulu):
+// explicitní modul v Přístupech, obchodníci, všichni ze Zlína, nebo role
+// v modulu (přiřazený konstruktér, šéf, ředitelé…).
+function maKonstrukciEmail(email) {
+  email = (email || '').toLowerCase(); if (!email) return false;
+  try { if ((employeeModules(email) || []).includes('konstrukce')) return true; } catch (_) {}
+  if (isObchodnikEmail(email)) return true;
+  if (jeZlinEmail(email)) return true;
+  try { if (konstrukceMod && konstrukceMod.hasAccess && konstrukceMod.hasAccess(email)) return true; } catch (_) {}
+  return false;
+}
 // Jmenovitý přehled implicitních obchodníků (pro admin sekci Konstrukce → Role):
 // projde zaměstnance s modulem obchod/obchodexp + osoby z Rozdělení obchodníků.
 function obchodniciPrehled() {
@@ -2674,6 +2696,7 @@ try {
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
     isObchodnik: isObchodnikEmail,
     obchodniciList: obchodniciPrehled,
+    jeZlin: jeZlinEmail,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – konstrukce', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
     // Archiv výkresů: čtení sdíleného Disku výroby Bruntál přes service account
@@ -3676,7 +3699,13 @@ const server = http.createServer(async (req, res) => {
       const isLisy = !!(mobilniLisyMod && mobilniLisyMod.isHandler && mobilniLisyMod.isHandler(e.email));
       // Nepřečtené aktuality — pro oznámení „je tam něco nového" na přehledu.
       const aktualityNew = (readJson(AKTUALITY_F, { posts: [] }).posts || []).filter(x => !(x.reads && x.reads[eml])).length;
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: employeeModules(e.email), surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, aktualityNew: aktualityNew, heroImage: (readJson(SITE_F, {}).heroImage) || null });
+      // moduly uživatele + automatický přístup ke Konstrukci (obchodníci, Zlín, role v modulu)
+      const modsUser = (employeeModules(e.email) || []).slice();
+      if (maKonstrukciEmail(e.email)) {
+        if (!modsUser.includes('konstrukce')) modsUser.push('konstrukce');
+        if (!modsUser.includes('zadanikonstrukce')) modsUser.push('zadanikonstrukce');
+      }
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: modsUser, surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, aktualityNew: aktualityNew, heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 
     // ---- Aktuality (novinky na intranetu) ----

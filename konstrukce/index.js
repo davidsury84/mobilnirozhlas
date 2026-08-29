@@ -813,6 +813,15 @@ function mount(host) {
     } catch (_) {}
     // Obchodníci (modul Obchod / Obchod EXP nebo „Rozdělení obchodníků") mají zadávání implicitně.
     if (host.isObchodnik && host.isObchodnik(email)) return true;
+    // Všichni ze Zlína (středisko v Organizaci obsahuje „Zlín") — hook ze serveru.
+    if (host.jeZlin && host.jeZlin(email)) return true;
+    const d = load();
+    return !!d.roles[email] || isVyrobniReditel(d, email);
+  }
+  // Má e-mail přístup díky roli v modulu (konstruktér, šéf…)? — pro server
+  // (automatické zobrazení dlaždic v intranetu bez ručního přidělování Přístupů).
+  function hasAccess(email) {
+    email = String(email || '').toLowerCase(); if (!email) return false;
     const d = load();
     return !!d.roles[email] || isVyrobniReditel(d, email);
   }
@@ -1004,6 +1013,7 @@ function mount(host) {
     if (z.rezim === 'objednavka') return;
     z.rezim = 'objednavka';
     z.zNabidky = true;   // vznikla předáním z nabídky (výkres schválen) — přeskočí kreslení
+    z.objAt = Date.now();   // od kdy běží upomínky na doplnění ČVZ (Helios)
     if (!z.cisloObj) { d.seq = (typeof d.seq === 'number' ? d.seq : 0) + 1; z.cisloObj = 'VYK-' + new Date().getUTCFullYear() + '-' + String(d.seq).padStart(4, '0'); }
     if (z.link) z.link.active = false;
     enterState(d, z, 'zavod');
@@ -1570,7 +1580,7 @@ function mount(host) {
       stav: 'prideleni', versions: [], comments: [], timeEntries: [], activeTimer: null,
       assignedTo: '', link: null, revisionCount: 0, audit: [],
     };
-    if (jeObj) z.cisloObj = cislo;   // přímá objednávka: jediné číslo VYK (žádné NAB)
+    if (jeObj) { z.cisloObj = cislo; z.objAt = now; }   // přímá objednávka: jediné číslo VYK (žádné NAB)
     z.kodAbr = genKodAbr(z);         // celkový kód kontejneru dle katalogu ABR (jen ABROLL řady)
     // přílohy od obchodníka už při zadání (výkres zákazníka — např. otvory pro odtok vody)
     if (Array.isArray(b.prilohy) && b.prilohy.length) {
@@ -1983,6 +1993,7 @@ function mount(host) {
     const cvz = String(b.cvz || '').trim().slice(0, 40);
     const old = z.cvzHelios || '';
     z.cvzHelios = cvz;
+    if (cvz) delete z.cvzRem;   // doplněno → upomínky ČVZ končí (při smazání běží znovu od 1)
     audit(z, me.email, 'Č. výrobní zakázky (Helios)', (old ? (old + ' → ') : '') + (cvz || '(smazáno)'));
     save(d);
     json(res, 200, { ok: true, cvz });
@@ -2443,6 +2454,24 @@ function mount(host) {
     const cfg = (d.settings && d.settings.notif) || DEFAULT_NOTIF;
     const warnFrac = Math.min(1, Math.max(0, (Number(cfg.warnPct) || 80) / 100));
     const remind1 = Number(cfg.clientRemind1) || 0, remind2 = Number(cfg.clientRemind2) || 0;
+    // --- upomínka obchodníkovi: objednávka bez Č. výrobní zakázky (Helios) ---
+    // Samostatný průchod (hlavní smyčka přeskakuje schvaleno/dokonceno, kde ČVZ
+    // chybí nejčastěji). 1. upomínka den po vzniku objednávky, pak každé
+    // 2 pracovní dny, strop 5 pokusů (vzor plánovače rozesílek).
+    for (const z of d.zakazky) {
+      if (z.rezim !== 'objednavka' || z.cvzHelios || z.stav === 'zamitnuto' || !z.obchodnikEmail) continue;
+      const od = z.objAt || z.createdAt || 0; if (!od) continue;
+      const rem = z.cvzRem || { n: 0, last: 0 };
+      if (rem.n >= 5) continue;
+      if (businessDaysBetween(od, now) < 1) continue;
+      if (rem.last && businessDaysBetween(rem.last, now) < 2) continue;
+      rem.n += 1; rem.last = now; z.cvzRem = rem; changed = true;
+      const cis = z.cisloObj || z.cislo;
+      notify(d, z.obchodnikEmail, 'Objednávka ' + cis + ' nemá vyplněné č. výrobní zakázky (Helios) — doplňte ho v detailu zakázky.', z.id);
+      mail(z.obchodnikEmail, 'Doplňte č. výrobní zakázky (Helios) · ' + cis,
+        'Objednávka ' + cis + ' (' + z.zakaznik + ') nemá vyplněné Číslo výrobní zakázky z Heliosu.\nZadejte objednávku do Heliosu a přidělené číslo (např. 26C-001) vepište v detailu zakázky do pole „Č. výrobní zakázky (Helios)".\n\nUpomínka ' + rem.n + ' z 5 — po doplnění čísla upomínky skončí.',
+        z, { stitek: 'CHYBÍ Č. VÝROBNÍ ZAKÁZKY (HELIOS)', stitekBarva: '#c98500' });
+    }
     for (const z of d.zakazky) {
       const st = STAV[z.stav];
       if (!st || st.terminal || st.hold || st.noSemafor) continue;
@@ -2764,7 +2793,7 @@ function mount(host) {
     const d = load(); const cfg = (d.settings && d.settings.notif) || DEFAULT_NOTIF || {};
     return [{ key: 'konstrukce-eskalace', module: 'Konstrukce', name: 'Eskalace a připomínky zakázek (klient nereaguje, po termínu)', to: ['obchodník / konstruktér / klient dle zakázky'], enabled: true, schedule: 'kontrola každých 6 h (připomínky po ' + (cfg.clientRemind1 || 5) + ' a ' + (cfg.clientRemind2 || 10) + ' prac. dnech)', lastAt: null, preview: null, configHint: 'Konstrukce → SET-UP → notifikace' }];
   }
-  return { handle, tick, reports };
+  return { handle, tick, reports, hasAccess };
 }
 
 // Veřejná stránka náhledu (samostatná, bez závislostí na intranetu).
