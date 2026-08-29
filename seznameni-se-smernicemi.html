@@ -3846,27 +3846,9 @@ async function showDovolena(){
 
   // Konto – grafické (prstencový graf)
   h+=vacKontoCard(my);
-  if(my.approver) h+='<p class="muted" style="margin:-6px 0 16px">'+mjT('Tvou dovolenou schvaluje:')+' <strong>'+esc(my.approver.name||my.approver.email)+'</strong></p>';
+  if(my.approver) h+='<p class="muted" style="margin:-6px 0 16px">'+mjT('Tvou dovolenou schvaluje:')+' <strong>'+esc(my.approver.name||my.approver.email)+'</strong>'+
+    (my.approverDuvod?' <span style="font-size:12px">— '+esc(my.approverDuvod)+'</span>':'')+'</p>';
   else h+='<p class="muted" style="margin:-6px 0 16px">'+mjT('Nemáš přiřazeného nadřízeného — žádost vyřídí administrátor.')+'</p>';
-
-  // Sekce ke schválení
-  if(pend){
-    h+='<div class="dash-sec">'+mjT('Ke schválení')+(pend.requests.length?' ('+pend.requests.length+')':'')+'</div>';
-    if(!pend.requests.length){ h+='<div class="card pad"><span class="pill green">'+mjT('✓ Hotovo')+'</span> <span class="muted">'+mjT('Žádné žádosti ke schválení.')+'</span></div>'; }
-    else pend.requests.forEach(r=>{
-      h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.cal)+'</div><div>'+
-        '<div class="li-t">'+esc(r.empName||r.empEmail)+' · '+vacFmt(r.from)+' – '+vacFmt(r.to)+'</div>'+
-        '<div class="muted" style="font-size:12px;margin-top:2px">'+vacDny(r.days)+(r.halfDay?' · '+mjT('půlden'):'')+(r.note?' · '+esc(r.note):'')+'</div></div></div>'+
-        '<div style="display:flex;gap:8px"><button class="btn sm" onclick="vacDecide(\''+r.id+'\',\'approve\')">'+mjT('Schválit')+'</button>'+
-        '<button class="btn ghost sm" onclick="vacDecide(\''+r.id+'\',\'reject\')">'+mjT('Zamítnout')+'</button></div></div>';
-    });
-  }
-
-  // Konto týmu (zaměstnanci, které schvaluji) – jeden pruh na osobu: čerpáno / zažádáno / zbývá
-  if(team && team.members && team.members.length){
-    h+='<div class="dash-sec">'+mjT('Konto dovolené mého týmu')+' '+team.year+'</div>';
-    team.members.forEach(m=> h+=vacTeamBar(m));
-  }
 
   // Přehled čerpání v měsíci (kdo měl kdy dovolenou)
   h+='<div class="dash-sec">'+mjT('Čerpání dovolené v měsíci')+'</div><div id="vacMesic" class="card pad"><p class="muted" style="margin:0">'+mjT('Načítám…')+'</p></div>';
@@ -3893,6 +3875,25 @@ async function showDovolena(){
       '<div style="display:flex;align-items:center;gap:10px"><span class="pill '+st[1]+'">'+mjT(st[0])+'</span>'+
       (canCancel?'<button class="btn ghost sm" onclick="vacCancel(\''+r.id+'\')">'+mjT('Zrušit')+'</button>':'')+'</div></div>';
   });
+
+  // Sekce ke schválení
+  if(pend){
+    h+='<div class="dash-sec">'+mjT('Ke schválení')+(pend.requests.length?' ('+pend.requests.length+')':'')+'</div>';
+    if(!pend.requests.length){ h+='<div class="card pad"><span class="pill green">'+mjT('✓ Hotovo')+'</span> <span class="muted">'+mjT('Žádné žádosti ke schválení.')+'</span></div>'; }
+    else pend.requests.forEach(r=>{
+      h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.cal)+'</div><div>'+
+        '<div class="li-t">'+esc(r.empName||r.empEmail)+' · '+vacFmt(r.from)+' – '+vacFmt(r.to)+'</div>'+
+        '<div class="muted" style="font-size:12px;margin-top:2px">'+vacDny(r.days)+(r.halfDay?' · '+mjT('půlden'):'')+(r.note?' · '+esc(r.note):'')+'</div></div></div>'+
+        '<div style="display:flex;gap:8px"><button class="btn sm" onclick="vacDecide(\''+r.id+'\',\'approve\')">'+mjT('Schválit')+'</button>'+
+        '<button class="btn ghost sm" onclick="vacDecide(\''+r.id+'\',\'reject\')">'+mjT('Zamítnout')+'</button></div></div>';
+    });
+  }
+
+  // Konto týmu (zaměstnanci, které schvaluji) – jeden pruh na osobu: čerpáno / zažádáno / zbývá
+  if(team && team.members && team.members.length){
+    h+='<div class="dash-sec">'+mjT('Konto dovolené mého týmu')+' '+team.year+'</div>';
+    team.members.forEach(m=> h+=vacTeamBar(m));
+  }
 
   body.innerHTML=h; window.scrollTo(0,0);
   vacMesicLoad(VAC_YM||null);

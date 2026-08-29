@@ -1790,11 +1790,21 @@ function approverFor(emp, emps) {
   if (!emp) return null;
   if (emp.noApproval) return null; // jen evidence dovolené (importovaní bez e-maily) – neschvaluje se
   if (emp.managerId) { const m = emps.find(x => x.id === emp.managerId); if (m && m.email) return m; }
-  if (emp.stredisko) { const d = emps.find(x => x.vedouci && (x.stredisko || '') === emp.stredisko && x.id !== emp.id); if (d) return d; }
-  // Bez přiřazeného vedoucího schvaluje superadmin (SUPERADMIN) – kromě jeho vlastní žádosti.
+  // Superadmin nikomu nepodléhá — kontrola musí být DŘÍV než odvození ze střediska,
+  // jinak by mu středisko přiřadilo náhodného vedoucího.
   if ((emp.email || '').toLowerCase() === SUPERADMIN) return null;
+  if (emp.stredisko) { const d = emps.find(x => x.vedouci && x.email && (x.stredisko || '') === emp.stredisko && x.id !== emp.id); if (d) return d; }
   const sa = emps.find(x => (x.email || '').toLowerCase() === SUPERADMIN);
   return sa || { email: SUPERADMIN, name: 'David Surý' };
+}
+// Proč právě tento schvalovatel — vysvětlení pro intranet.
+function approverDuvod(emp, emps) {
+  emps = emps || (getState().employees || []);
+  if (!emp || emp.noApproval) return '';
+  if (emp.managerId && emps.find(x => x.id === emp.managerId && x.email)) return 'přímý nadřízený z Organizace';
+  if ((emp.email || '').toLowerCase() === SUPERADMIN) return '';
+  if (emp.stredisko && emps.find(x => x.vedouci && x.email && (x.stredisko || '') === emp.stredisko && x.id !== emp.id)) return 'vedoucí střediska ' + emp.stredisko + ' (nemáš přiřazeného přímého nadřízeného)';
+  return 'administrátor (nemáš přiřazeného nadřízeného ani vedoucího střediska)';
 }
 
 /* ---------- Měsíční report čerpání dovolené ----------
@@ -2061,7 +2071,9 @@ function buildTelefon() {
   const extra = (s.settings && Array.isArray(s.settings.telefonExtra)) ? s.settings.telefonExtra : [];
   const byStr = {};
   const add = (stredisko, rec) => { const k = String(stredisko || '').trim() || 'Ostatní'; (byStr[k] = byStr[k] || []).push(rec); };
-  emps.forEach(e => add(e.stredisko, { role: String(e.pozice || '').trim(), name: e.name || e.email || '', email: (e.email || '').trim(), phone: String(e.telefon || '').trim() }));
+  // Telefonní seznam řadí podle telStredisko (účetní kód z firemního seznamu);
+  // organizační stredisko se použije, jen když telefonní chybí.
+  emps.forEach(e => add(e.telStredisko || e.stredisko, { role: String(e.pozice || '').trim(), name: e.name || e.email || '', email: (e.email || '').trim(), phone: String(e.telefon || '').trim() }));
   extra.forEach(x => { if (x && (x.name || x.phone || x.email)) add(x.stredisko, { role: String(x.role || '').trim(), name: x.name || '', email: (x.email || '').trim(), phone: String(x.phone || '').trim() }); });
   const groups = Object.keys(byStr)
     .sort((a, b) => (a === 'Ostatní') - (b === 'Ostatní') || a.localeCompare(b, 'cs'))
@@ -2175,7 +2187,7 @@ const TELEFON_IMPORT_2026 = [
       const e = mapa[klic(jmeno)];
       if (e) {
         e.telefon = tel;
-        if (!String(e.stredisko || '').trim()) e.stredisko = stredisko;
+        e.telStredisko = stredisko;      // účetní kód jen pro telefonní seznam — nesmí ovlivnit organizaci
         spar++;
       } else {
         // duplicity: stejné číslo NEBO stejné jméno už v „dalších kontaktech" → jen doplníme
@@ -2221,6 +2233,30 @@ const TELEFON_IMPORT_2026 = [
     writeJson(STATE_F, s);
     console.log('[migrace] telefonní seznam sloučen se zaměstnanci: ' + sparovano + ' spárováno, ' + extra.length + ' mimo zaměstnance (telefonExtra).');
   } catch (err) { console.error('[migrace] telefon merge:', err.message); }
+})();
+
+/* Naprava (2026-08-27): import telefonu omylem zapsal ucetni kod strediska (Zlin-100, Doprava-200.30...)
+   do organizacniho pole stredisko, ze ktereho se odvozuje schvalovatel dovolene.
+   Kody presuneme do telStredisko a organizacni stredisko vratime na puvodni (prazdne). */
+(function () {
+  try {
+    const s = readJson(STATE_F, null);
+    if (!s || !Array.isArray(s.employees)) return;
+    s.settings = s.settings || {};
+    if (s.settings._telStredNaprava20260827) return;
+    s.settings._telStredNaprava20260827 = 1;
+    const kody = new Set(TELEFON_IMPORT_2026.map(r => r[1]));
+    let opraveno = 0;
+    s.employees.forEach(e => {
+      if (e && e.stredisko && kody.has(e.stredisko)) {
+        if (!e.telStredisko) e.telStredisko = e.stredisko;
+        e.stredisko = '';
+        opraveno++;
+      }
+    });
+    writeJson(STATE_F, s);
+    if (opraveno) console.log('[telefon] naprava stredisek: u ' + opraveno + ' lidi presunut ucetni kod do telefonniho seznamu');
+  } catch (e) { console.warn('[telefon] naprava stredisek selhala:', e.message); }
 })();
 
 // Úklid duplicit v „dalších kontaktech" (vznikly opakovaným během staré migrace).
@@ -3975,7 +4011,7 @@ const server = http.createServer(async (req, res) => {
       const year = new Date().getFullYear();
       const ent = vacEntitlement(me), used = Math.round(((Number(me.vacUsedInit) || 0) + vacUsed(e.email, year)) * 10) / 10;
       const mine = readVac().requests.filter(r => (r.empEmail || '').toLowerCase() === e.email.toLowerCase()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      return send(res, 200, { year, entitlement: ent, used, balance: Math.round((ent - used) * 10) / 10, approver: ap ? { name: ap.name, email: ap.email } : null, requests: mine });
+      return send(res, 200, { year, entitlement: ent, used, balance: Math.round((ent - used) * 10) / 10, approver: ap ? { name: ap.name, email: ap.email } : null, approverDuvod: ap ? approverDuvod(me, emps) : '', requests: mine });
     }
     if (p === '/api/vacation/request' && req.method === 'POST') {
       const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
