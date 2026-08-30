@@ -5672,6 +5672,58 @@ function accessGrouped(){
   if(rest.length) grouped.push(["Ostatní",rest]);
   return grouped;
 }
+/* ---- Přístup z ostatních firemních domén (elkoplast.de / sk / ro …) ---- */
+let PDOM=null;
+async function pdomLoad(){
+  try{ const r=await fetch('/api/pristup-domeny',{cache:'no-store'}); PDOM=await r.json(); }catch(e){ PDOM={error:'Nepodařilo se načíst.'}; }
+  pdomRender();
+}
+async function pdomAkce(akce,email){
+  try{
+    const r=await fetch('/api/pristup-domeny',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({akce,email})});
+    const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Chyba'); return; }
+    if(j.povoleni) PDOM.povoleni=j.povoleni;
+    if(j.zadosti) PDOM.zadosti=j.zadosti;
+    pdomRender();
+    toast(akce==='schvalit'||akce==='povolit'?'Přístup povolen':'Uloženo');
+  }catch(e){ toast('Chyba spojení'); }
+}
+function pdomPridat(){
+  const inp=document.getElementById('pdomNovy'); const v=(inp&&inp.value||'').trim();
+  if(!v){ return; }
+  pdomAkce('povolit',v); if(inp) inp.value='';
+}
+function pdomRender(){
+  const box=document.getElementById('pdomBox'); if(!box) return;
+  const d=PDOM||{};
+  if(d.error){ box.innerHTML='<p class="muted" style="margin:0">'+esc(d.error)+'</p>'; return; }
+  const zad=(d.zadosti||[]).filter(z=>z.stav==='čeká');
+  let h='<p class="muted" style="margin:0 0 10px;font-size:13px">Účty z <b>'+esc(d.hlavni||'elkoplast.cz')+'</b> se přihlásí rovnou. Adresy z ostatních firemních domén ('+
+    esc((d.domeny||[]).join(', '))+') pustí systém dovnitř až po tvém schválení — do té doby se jen založí žádost a přijde ti e-mail.</p>';
+  h+='<div class="row" style="margin-bottom:12px"><input type="email" id="pdomNovy" placeholder="jmeno.prijmeni@elkoplast.de" style="max-width:300px">'+
+    '<button class="btn sm" onclick="pdomPridat()">Povolit přístup</button></div>';
+  h+='<div style="font-weight:700;font-size:13px;margin:6px 0 6px">Čeká na schválení ('+zad.length+')</div>';
+  if(!zad.length) h+='<p class="muted" style="margin:0 0 12px;font-size:13px">Žádná nevyřízená žádost.</p>';
+  else{
+    h+='<div class="matrix-wrap" style="margin-bottom:12px"><table class="matrix"><thead><tr><th>E-mail</th><th>Jméno</th><th>Pokusů</th><th>Naposledy</th><th></th></tr></thead><tbody>';
+    zad.forEach(z=>{
+      let kdy=''; try{ kdy=new Date(z.posledni||z.ts).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){}
+      h+='<tr><td><b>'+esc(z.email)+'</b></td><td>'+esc(z.name||'')+'</td><td>'+(z.pokusy||1)+'</td><td class="muted">'+esc(kdy)+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn sm" onclick="pdomAkce(\'schvalit\',\''+esc(z.email)+'\')">✓ Povolit</button> '+
+        '<button class="btn ghost sm" onclick="pdomAkce(\'zamitnout\',\''+esc(z.email)+'\')">Zamítnout</button></td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  const pov=d.povoleni||[];
+  h+='<div style="font-weight:700;font-size:13px;margin:6px 0 6px">Povolené adresy mimo hlavní doménu ('+pov.length+')</div>';
+  if(!pov.length) h+='<p class="muted" style="margin:0;font-size:13px">Zatím žádná.</p>';
+  else{
+    h+='<div class="matrix-wrap"><table class="matrix"><tbody>'+pov.map(e=>'<tr><td><b>'+esc(e)+'</b></td>'+
+      '<td style="text-align:right"><button class="btn danger sm" onclick="pdomAkce(\'odebrat\',\''+esc(e)+'\')" title="Odebrat přístup">✕</button></td></tr>').join('')+'</tbody></table></div>';
+  }
+  box.innerHTML=h;
+}
 function renderAccess(){
   const box=document.getElementById("accessMatrix");
   if(!DB.employees.length){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Nejprve přidej zaměstnance v záložce Zaměstnanci.</p></div>'; return; }
@@ -5685,7 +5737,10 @@ function renderAccess(){
     '<input type="search" id="accessSearch" placeholder="Hledat zaměstnance…" value="'+esc(ACCESS_FILTER)+'" style="max-width:260px" oninput="ACCESS_FILTER=this.value;renderAccess();">'+
     '<span class="muted" style="font-size:13px">'+emps.length+' z '+DB.employees.length+' zaměstnanců</span></div></div>';
   h+= ACCESS_VIEW==="moduly" ? accessModulyHtml(emps) : accessMatrixHtml(emps);
+  h+='<div class="card pad" style="margin-top:16px"><strong>🌍 Přístup z ostatních firemních domén</strong>'+
+    '<div id="pdomBox" style="margin-top:8px"><p class="muted" style="margin:0">Načítám…</p></div></div>';
   box.innerHTML=h;
+  pdomLoad();
   if(wasSearch){ const s=document.getElementById("accessSearch"); if(s){ s.focus(); try{ s.setSelectionRange(s.value.length,s.value.length); }catch(_){} } }
 }
 /* Pohled „Podle modulů": vyber sekci → lidi přiřazuješ klikáním na jména */

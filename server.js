@@ -153,7 +153,8 @@ const FREELO_API_KEY = process.env.FREELO_API_KEY || ''; // modul Freelo: API kl
 const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativně lokální soubor
 // Dovolená: úložiště žádostí + (volitelně) zápis do sdíleného Google kalendáře přes service account
 const VAC_F = path.join(DATA_DIR, 'vacation.json');
-const VACREP_F = path.join(DATA_DIR, 'vacation-report.json'); // měsíční report čerpání dovolené (příjemci, den, historie)
+const VACREP_F = path.join(DATA_DIR, 'vacation-report.json');
+const AUTHDOM_F = path.join(DATA_DIR, 'auth-domeny.json'); // přístup z ostatních firemních domén (schvaluje správce) // měsíční report čerpání dovolené (příjemci, den, historie)
 const VACATION_CALENDAR_ID = process.env.VACATION_CALENDAR_ID || '';       // ID sdíleného kalendáře „Dovolené"
 const GOOGLE_SA_CLIENT_EMAIL = process.env.GOOGLE_SA_CLIENT_EMAIL || '';   // client_email ze service-account JSON
 const GOOGLE_SA_PRIVATE_KEY = (process.env.GOOGLE_SA_PRIVATE_KEY || '').replace(/\\n/g, '\n'); // private_key (PEM; \n → nové řádky)
@@ -671,6 +672,51 @@ function recordAck(a) {
   if (!acks.find(x => x.dirId === a.dirId && x.email === email)) { acks.push({ dirId: a.dirId, dirTitle: a.dirTitle || '', email, name: a.name || email, ts: a.ts || Date.now() }); writeJson(ACKS_F, acks); }
 }
 // Najde zaměstnance podle e-mailu; pokud chybí, automaticky ho založí (SSO první přihlášení).
+/* ---------- Přístup z ostatních firemních domén (elkoplast.de / sk / ro …) ----------
+   Hlavní doména (ALLOWED_HD) se pouští automaticky. Ostatní firemní domény smí dovnitř,
+   až když konkrétní adresu schválí správce; do té doby se založí žádost a přijde upozornění. */
+const AUTH_DOMENY_DEFAULT = ['elkoplast.de', 'elkoplast.sk', 'elkoplast.ro', 'elkoplast.pl', 'elkoplast.eu', 'elkoplast.fr', 'elkoplast.nl'];
+const AUTH_POVOLENI_SEED = ['petr.barna@elkoplast.de'];   // předschváleno na žádost správce (2026-08-27)
+function authDomCfg() {
+  const d = readJson(AUTHDOM_F, null) || {};
+  return {
+    domeny: Array.isArray(d.domeny) && d.domeny.length ? d.domeny : AUTH_DOMENY_DEFAULT.slice(),
+    povoleni: Array.isArray(d.povoleni) ? d.povoleni : AUTH_POVOLENI_SEED.slice(),
+    zadosti: Array.isArray(d.zadosti) ? d.zadosti : []
+  };
+}
+function authDomWrite(cfg) { writeJson(AUTHDOM_F, { domeny: cfg.domeny, povoleni: cfg.povoleni, zadosti: (cfg.zadosti || []).slice(0, 500) }); return authDomCfg(); }
+function authDomain(email) { return String(email || '').toLowerCase().split('@')[1] || ''; }
+function authHlavniDomena() { return (GOOGLE.hd || 'elkoplast.cz').toLowerCase(); }
+// '' = smí dovnitř, 'ceka' = žádost čeká na schválení, 'cizi' = doména mimo firmu
+function authStav(email) {
+  email = String(email || '').toLowerCase();
+  const dom = authDomain(email);
+  if (!dom) return 'cizi';
+  if (dom === authHlavniDomena()) return '';
+  const cfg = authDomCfg();
+  if (cfg.domeny.indexOf(dom) < 0) return 'cizi';
+  return cfg.povoleni.map(x => String(x).toLowerCase()).indexOf(email) >= 0 ? '' : 'ceka';
+}
+// Zaznamená žádost o přístup a upozorní správce (jen jednou za adresu).
+function authZadost(email, name) {
+  email = String(email || '').toLowerCase();
+  const cfg = authDomCfg();
+  let z = cfg.zadosti.find(x => String(x.email || '').toLowerCase() === email);
+  if (z) { z.pokusy = (z.pokusy || 1) + 1; z.posledni = new Date().toISOString(); authDomWrite(cfg); return z; }
+  z = { email, name: name || '', ts: new Date().toISOString(), posledni: new Date().toISOString(), pokusy: 1, stav: 'čeká' };
+  cfg.zadosti.unshift(z); authDomWrite(cfg);
+  try {
+    Promise.resolve(deliver({
+      to: SUPERADMIN, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST',
+      subject: 'Žádost o přístup do intranetu: ' + email,
+      html: '<p><b>' + esc(name || email) + '</b> (' + esc(email) + ') se pokusil přihlásit do intranetu.</p>' +
+        '<p>Adresa je z firemní domény <b>' + esc(authDomain(email)) + '</b>, která vyžaduje schválení správcem.</p>' +
+        '<p>Schválit můžete v intranetu → Správa → Přístupy → „Přístup z ostatních domén“.</p>'
+    })).catch(() => {});
+  } catch (_) {}
+  return z;
+}
 function ensureEmployee(email, name) {
   email = (email || '').toLowerCase();
   const s = readJson(STATE_F, { categories: [], employees: [], directives: [], profiles: [] });
@@ -4107,6 +4153,60 @@ const server = http.createServer(async (req, res) => {
     }
     // Přehled čerpání dovolené za měsíc (pro intranet). Zaměstnanec vidí sebe,
     // schvalovatel svůj tým, správce všechny.
+    // ---- Přístup z ostatních firemních domén: přehled a schvalování (jen správce) ----
+    if (p === '/api/pristup-domeny' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      const cfg = authDomCfg();
+      return send(res, 200, { hlavni: authHlavniDomena(), domeny: cfg.domeny, povoleni: cfg.povoleni, zadosti: cfg.zadosti }, { 'Cache-Control': 'no-store' });
+    }
+    if (p === '/api/pristup-domeny' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const cfg = authDomCfg();
+      const eml = String(b.email || '').trim().toLowerCase();
+      if (b.akce === 'schvalit' || b.akce === 'povolit') {
+        if (eml.indexOf('@') < 1) return send(res, 400, { error: 'Zadejte platnou e-mailovou adresu.' });
+        const dom = authDomain(eml);
+        if (dom === authHlavniDomena()) return send(res, 400, { error: 'Adresa z hlavní domény se schvalovat nemusí — přihlásí se rovnou.' });
+        if (cfg.domeny.indexOf(dom) < 0) cfg.domeny.push(dom);   // schválením adresy rovnou povolíme i doménu
+        if (cfg.povoleni.map(x => x.toLowerCase()).indexOf(eml) < 0) cfg.povoleni.push(eml);
+        const z = cfg.zadosti.find(x => String(x.email || '').toLowerCase() === eml);
+        if (z) z.stav = 'schváleno';
+        authDomWrite(cfg);
+        // ať má rovnou kartu zaměstnance (jinak vznikne až prvním přihlášením)
+        try { ensureEmployee(eml, (z && z.name) || ''); } catch (_) {}
+        try {
+          Promise.resolve(deliver({ to: eml, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST',
+            subject: 'Přístup do intranetu ELKOPLAST je povolen',
+            html: '<p>Dobrý den,</p><p>váš účet <b>' + esc(eml) + '</b> byl schválen pro přihlášení do firemního intranetu.</p>' +
+              '<p><a href="' + esc(garantiBaseUrl()) + '/" style="background:#2f7d32;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Přihlásit se přes Google</a></p>' })).catch(() => {});
+        } catch (_) {}
+        return send(res, 200, { ok: true, povoleni: authDomCfg().povoleni, zadosti: authDomCfg().zadosti });
+      }
+      if (b.akce === 'odebrat') {
+        cfg.povoleni = cfg.povoleni.filter(x => String(x).toLowerCase() !== eml);
+        authDomWrite(cfg);
+        return send(res, 200, { ok: true, povoleni: authDomCfg().povoleni, zadosti: authDomCfg().zadosti });
+      }
+      if (b.akce === 'zamitnout') {
+        const z = cfg.zadosti.find(x => String(x.email || '').toLowerCase() === eml);
+        if (z) z.stav = 'zamítnuto';
+        cfg.povoleni = cfg.povoleni.filter(x => String(x).toLowerCase() !== eml);
+        authDomWrite(cfg);
+        return send(res, 200, { ok: true, povoleni: authDomCfg().povoleni, zadosti: authDomCfg().zadosti });
+      }
+      if (b.akce === 'smazatZadost') {
+        cfg.zadosti = cfg.zadosti.filter(x => String(x.email || '').toLowerCase() !== eml);
+        authDomWrite(cfg);
+        return send(res, 200, { ok: true, povoleni: authDomCfg().povoleni, zadosti: authDomCfg().zadosti });
+      }
+      if (b.akce === 'domeny' && Array.isArray(b.domeny)) {
+        cfg.domeny = b.domeny.map(x => String(x || '').trim().toLowerCase().replace(/^@/, '')).filter(Boolean);
+        authDomWrite(cfg);
+        return send(res, 200, { ok: true, domeny: authDomCfg().domeny });
+      }
+      return send(res, 400, { error: 'Neznámá akce.' });
+    }
     if (p === '/api/vacation/mesic' && req.method === 'GET') {
       const e = empSession(req); if (!e && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const now = new Date();
@@ -4194,7 +4294,8 @@ const server = http.createServer(async (req, res) => {
       const state = crypto.randomBytes(16).toString('hex');
       const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
       const params = new URLSearchParams({ client_id: GOOGLE.clientId, redirect_uri: baseUrl(req) + '/auth/google/callback', response_type: 'code', scope: 'openid email profile', state, access_type: 'online', prompt: 'select_account' });
-      if (GOOGLE.hd) params.set('hd', GOOGLE.hd);
+      // hd (nápověda pro výběr účtu) záměrně neposíláme — kolegové z elkoplast.de/sk/ro se musí
+      // dostat na obrazovku výběru účtu; doménu i schválení kontrolujeme sami v callbacku.
       // Volitelný návrat po přihlášení — jen bezpečné interní cesty /sso/... (proti open-redirectu)
       const nextPath = /^\/sso\/[a-z0-9-]+$/.test(u.query.next || '') ? u.query.next : '';
       const cookies = ['sm_oauth=' + state + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=600' + secure];
@@ -4215,9 +4316,19 @@ const server = http.createServer(async (req, res) => {
         if (['accounts.google.com', 'https://accounts.google.com'].indexOf(pl.iss) < 0) throw new Error('Neplatný vydavatel tokenu.');
         if (pl.exp && (Date.now() / 1000) > pl.exp) throw new Error('Token vypršel.');
         if (pl.email_verified === false) throw new Error('E-mail účtu není ověřený.');
-        if (GOOGLE.hd && pl.hd !== GOOGLE.hd) throw new Error('Účet není z povolené firemní domény (' + GOOGLE.hd + ').');
         const email = (pl.email || '').toLowerCase();
         if (!email) throw new Error('Token neobsahuje e-mail.');
+        const stav = authStav(email);
+        if (stav === 'cizi') throw new Error('Účet není z firemní domény ELKOPLAST.');
+        if (stav === 'ceka') {
+          authZadost(email, pl.name || '');
+          return send(res, 200, '<!doctype html><meta charset="utf-8"><title>Čeká na schválení</title>' +
+            '<div style="font-family:system-ui,Arial,sans-serif;max-width:520px;margin:60px auto;padding:26px 28px;border:1px solid #e2e8e0;border-radius:14px;line-height:1.6">' +
+            '<h1 style="font-size:20px;margin:0 0 8px">Žádost o přístup jsme přijali</h1>' +
+            '<p style="color:#5b6b60;margin:0 0 10px">Účet <b>' + esc(email) + '</b> je z domény, kterou schvaluje správce intranetu. Dali jsme mu vědět — jakmile přístup povolí, stačí se přihlásit znovu.</p>' +
+            '<p style="margin:0"><a href="/" style="color:#2f7d32">Zpět na úvod</a></p></div>',
+            { 'Content-Type': 'text/html; charset=utf-8' });
+        }
         const emp = ensureEmployee(email, pl.name || email);
         markLogin(emp.email, emp.name, 'Google');
         const sess = empSign({ email: emp.email, name: emp.name });
