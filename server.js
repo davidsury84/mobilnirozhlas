@@ -1811,6 +1811,29 @@ function workingDays(from, to, halfDay) {
   return n;
 }
 
+/* Celé jméno pro dovolenou. Google i starší importy uložily do žádosti jen křestní jméno
+   nebo jméno bez diakritiky — správné celé jméno má vždy databáze zaměstnanců. */
+function vacNorm(x) { return String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function vacPlneJmeno(name, email, emps) {
+  emps = emps || (getState().employees || []);
+  const eml = String(email || '').toLowerCase();
+  // 1) podle e-mailu (nejspolehlivější)
+  if (eml) { const e = emps.find(x => (x.email || '').toLowerCase() === eml); if (e && e.name && !needsSurname(e.name)) return e.name; }
+  const raw = String(name || '').trim();
+  if (raw) {
+    const k = vacNorm(raw), kSort = k.split(' ').sort().join(' ');
+    // 2) shoda celého jména bez ohledu na diakritiku a pořadí (Simona Janeckova → Simona Janečková)
+    const shoda = emps.find(x => { const n = vacNorm(x.name); return n && (n === k || n.split(' ').sort().join(' ') === kSort); });
+    if (shoda && shoda.name) return shoda.name;
+    // 3) jen křestní jméno → doplníme příjmení, pokud takové jméno má v databázi právě jeden člověk
+    if (needsSurname(raw)) {
+      const kand = emps.filter(x => { const n = vacNorm(x.name).split(' '); return n.length > 1 && n[0] === k; });
+      if (kand.length === 1 && kand[0].name) return kand[0].name;
+    }
+  }
+  // 4) poslední záchrana: příjmení z e-mailu
+  return displayName(raw, eml) || raw || eml;
+}
 // Roční nárok zaměstnance (default 20 dní, když není nastaveno).
 function vacEntitlement(emp) { const n = Number(emp && emp.vacDays); return isFinite(n) && n > 0 ? n : 20; }
 
@@ -1853,6 +1876,27 @@ function approverDuvod(emp, emps) {
   return 'administrátor (nemáš přiřazeného nadřízeného ani vedoucího střediska)';
 }
 
+/* Jednorázová oprava (2026-08-27): u starších žádostí bylo uložené jen křestní jméno
+   nebo jméno bez diakritiky. Přepíšeme je na celé jméno z databáze zaměstnanců. */
+(function () {
+  try {
+    const st = readJson(STATE_F, null);
+    if (!st || !Array.isArray(st.employees)) return;
+    st.settings = st.settings || {};
+    if (st.settings._vacJmena20260827) return;
+    st.settings._vacJmena20260827 = 1;
+    const v = readJson(VAC_F, { requests: [] });
+    let opraveno = 0;
+    (v.requests || []).forEach(r => {
+      const plne = vacPlneJmeno(r.empName, r.empEmail, st.employees);
+      if (plne && plne !== r.empName) { r.empName = plne; opraveno++; }
+    });
+    if (opraveno) writeJson(VAC_F, v);
+    writeJson(STATE_F, st);
+    if (opraveno) console.log('[dovolená] doplněna celá jména u ' + opraveno + ' žádostí');
+  } catch (e) { console.warn('[dovolená] oprava jmen selhala:', e.message); }
+})();
+
 /* ---------- Měsíční report čerpání dovolené ----------
    Jednou za měsíc (výchozí 1. den) jde přehled za předchozí měsíc: kdo dovolenou čerpal
    (schválené žádosti), co je zatím jen schváleno dopředu a jaké je aktuální konto.
@@ -1894,7 +1938,7 @@ function vacMonthData(y, m) {
       const narok = e ? vacEntitlement(e) : 20;
       const cerpano = vacUsed(email, rok);
       return {
-        name: x.r.empName || (e ? e.name : email), email, stredisko: e ? (e.stredisko || '') : '',
+        name: vacPlneJmeno(x.r.empName, email, emps), email, stredisko: e ? (e.stredisko || '') : '',
         from: x.r.from, to: x.r.to, dny: x.dny, stav: x.r.status, halfDay: !!x.r.halfDay,
         narok, cerpanoRok: cerpano, zbyvaRok: Math.round((narok - cerpano) * 10) / 10
       };
@@ -4069,7 +4113,7 @@ const server = http.createServer(async (req, res) => {
       const me = emps.find(x => (x.email || '').toLowerCase() === e.email.toLowerCase()) || { email: e.email, name: e.name };
       const ap = approverFor(me, emps);
       const v = readVac();
-      const rq = { id: 'v' + crypto.randomBytes(6).toString('hex'), empEmail: e.email, empName: e.name, approverEmail: ap ? ap.email : '', from: b.from, to: b.to, halfDay: !!b.halfDay, days, type: b.type || 'dovolena', note: (b.note || '').slice(0, 500), status: 'pending', createdAt: Date.now() };
+      const rq = { id: 'v' + crypto.randomBytes(6).toString('hex'), empEmail: e.email, empName: vacPlneJmeno(e.name, e.email, emps), approverEmail: ap ? ap.email : '', from: b.from, to: b.to, halfDay: !!b.halfDay, days, type: b.type || 'dovolena', note: (b.note || '').slice(0, 500), status: 'pending', createdAt: Date.now() };
       v.requests.push(rq); writeVac(v);
       // Komu poslat notifikaci: přiřazenému schvalovateli; když žádného nemá, administrátorům (+ superadmin), kteří žádost vyřídí.
       let recips;
@@ -4084,7 +4128,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/vacation/pending' && req.method === 'GET') {
       const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
       const admin = isAdmin(req);
-      const list = readVac().requests.filter(r => r.status === 'pending' && (admin || (r.approverEmail || '').toLowerCase() === e.email.toLowerCase())).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      const empsAll = getState().employees || [];
+      const list = readVac().requests.filter(r => r.status === 'pending' && (admin || (r.approverEmail || '').toLowerCase() === e.email.toLowerCase()))
+        .map(r => Object.assign({}, r, { empName: vacPlneJmeno(r.empName, r.empEmail, empsAll) }))
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
       return send(res, 200, { admin, requests: list });
     }
     // ---- Dovolená: konto zaměstnanců, které daný vedoucí schvaluje (jeho tým) ----
@@ -4232,7 +4279,10 @@ const server = http.createServer(async (req, res) => {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const emps = getState().employees || []; const year = new Date().getFullYear();
       const konto = emps.map(x => { const ent = vacEntitlement(x); const used = Math.round(((Number(x.vacUsedInit) || 0) + vacUsed(x.email, year)) * 10) / 10; return { name: x.name, email: x.email, stredisko: x.stredisko || '', entitlement: ent, used, balance: Math.round((ent - used) * 10) / 10 }; });
-      return send(res, 200, { year, konto, requests: readVac().requests.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)) });
+      const empsAll2 = getState().employees || [];
+      return send(res, 200, { year, konto, requests: readVac().requests
+        .map(r => Object.assign({}, r, { empName: vacPlneJmeno(r.empName, r.empEmail, empsAll2) }))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)) });
     }
 
     // ---- knihovna: správa (admin) ----
