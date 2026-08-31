@@ -5704,10 +5704,8 @@ async function pdomAkce(akce,email){
     const r=await fetch('/api/pristup-domeny',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({akce,email})});
     const j=await r.json();
     if(!r.ok||j.error){ toast(j.error||'Chyba'); return; }
-    if(j.povoleni) PDOM.povoleni=j.povoleni;
-    if(j.zadosti) PDOM.zadosti=j.zadosti;
-    pdomRender();
     toast(akce==='schvalit'||akce==='povolit'?'Přístup povolen':'Uloženo');
+    await pdomLoad();
   }catch(e){ toast('Chyba spojení'); }
 }
 function pdomPridat(){
@@ -5740,8 +5738,14 @@ function pdomRender(){
   h+='<div style="font-weight:700;font-size:13px;margin:6px 0 6px">Povolené adresy mimo hlavní doménu ('+pov.length+')</div>';
   if(!pov.length) h+='<p class="muted" style="margin:0;font-size:13px">Zatím žádná.</p>';
   else{
-    h+='<div class="matrix-wrap"><table class="matrix"><tbody>'+pov.map(e=>'<tr><td><b>'+esc(e)+'</b></td>'+
-      '<td style="text-align:right"><button class="btn danger sm" onclick="pdomAkce(\'odebrat\',\''+esc(e)+'\')" title="Odebrat přístup">✕</button></td></tr>').join('')+'</tbody></table></div>';
+    const dt=v=>{ if(!v) return '<span class="muted">—</span>'; try{ return new Date(v).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } };
+    h+='<div class="matrix-wrap"><table class="matrix"><thead><tr><th>E-mail</th><th>Jméno</th><th>Poprvé přihlášen</th><th>Naposledy</th><th></th></tr></thead><tbody>'+
+      pov.map(o=>{ const em=(typeof o==='string')?o:o.email; const r=(typeof o==='string')?{}:o;
+        return '<tr><td><b>'+esc(em)+'</b></td><td>'+esc(r.name||'')+'</td>'+
+        '<td class="muted">'+(r.prvni?dt(r.prvni):'<span class="pill amber">zatím nepřihlášen</span>')+'</td>'+
+        '<td class="muted">'+dt(r.posledni)+'</td>'+
+        '<td style="text-align:right"><button class="btn danger sm" onclick="pdomAkce(\'odebrat\',\''+esc(em)+'\')" title="Odebrat přístup">✕</button></td></tr>';
+      }).join('')+'</tbody></table></div>';
   }
   box.innerHTML=h;
 }

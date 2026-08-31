@@ -381,6 +381,7 @@ function markLogin(email, name, via) {
   m[email] = r; writeJson(INVITES_F, m);
   logActivity('login', { email, name: name || email }, via || '');
   if (firstAccept && r.invitedAt) logActivity('invite-accepted', { email, name: name || email }, '');
+  return { prvni: firstAccept };
 }
 
 /* ---------- bezpečnost / přihlášení ---------- */
@@ -4240,7 +4241,14 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/pristup-domeny' && req.method === 'GET') {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
       const cfg = authDomCfg();
-      return send(res, 200, { hlavni: authHlavniDomena(), domeny: cfg.domeny, povoleni: cfg.povoleni, zadosti: cfg.zadosti }, { 'Cache-Control': 'no-store' });
+      const inv = readInvites();
+      const emps = getState().employees || [];
+      const povoleni = cfg.povoleni.map(e => {
+        const k = String(e).toLowerCase(), r = inv[k] || {};
+        const emp = emps.find(x => (x.email || '').toLowerCase() === k);
+        return { email: e, name: (emp && emp.name) || r.name || '', prvni: r.acceptedAt || null, posledni: r.lastLoginAt || null };
+      });
+      return send(res, 200, { hlavni: authHlavniDomena(), domeny: cfg.domeny, povoleni, zadosti: cfg.zadosti }, { 'Cache-Control': 'no-store' });
     }
     if (p === '/api/pristup-domeny' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
@@ -4264,24 +4272,24 @@ const server = http.createServer(async (req, res) => {
             html: '<p>Dobrý den,</p><p>váš účet <b>' + esc(eml) + '</b> byl schválen pro přihlášení do firemního intranetu.</p>' +
               '<p><a href="' + esc(garantiBaseUrl()) + '/" style="background:#2f7d32;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Přihlásit se přes Google</a></p>' })).catch(() => {});
         } catch (_) {}
-        return send(res, 200, { ok: true, povoleni: authDomCfg().povoleni, zadosti: authDomCfg().zadosti });
+        return send(res, 200, { ok: true, reload: true });
       }
       if (b.akce === 'odebrat') {
         cfg.povoleni = cfg.povoleni.filter(x => String(x).toLowerCase() !== eml);
         authDomWrite(cfg);
-        return send(res, 200, { ok: true, povoleni: authDomCfg().povoleni, zadosti: authDomCfg().zadosti });
+        return send(res, 200, { ok: true, reload: true });
       }
       if (b.akce === 'zamitnout') {
         const z = cfg.zadosti.find(x => String(x.email || '').toLowerCase() === eml);
         if (z) z.stav = 'zamítnuto';
         cfg.povoleni = cfg.povoleni.filter(x => String(x).toLowerCase() !== eml);
         authDomWrite(cfg);
-        return send(res, 200, { ok: true, povoleni: authDomCfg().povoleni, zadosti: authDomCfg().zadosti });
+        return send(res, 200, { ok: true, reload: true });
       }
       if (b.akce === 'smazatZadost') {
         cfg.zadosti = cfg.zadosti.filter(x => String(x.email || '').toLowerCase() !== eml);
         authDomWrite(cfg);
-        return send(res, 200, { ok: true, povoleni: authDomCfg().povoleni, zadosti: authDomCfg().zadosti });
+        return send(res, 200, { ok: true, reload: true });
       }
       if (b.akce === 'domeny' && Array.isArray(b.domeny)) {
         cfg.domeny = b.domeny.map(x => String(x || '').trim().toLowerCase().replace(/^@/, '')).filter(Boolean);
@@ -4416,7 +4424,20 @@ const server = http.createServer(async (req, res) => {
             { 'Content-Type': 'text/html; charset=utf-8' });
         }
         const emp = ensureEmployee(email, pl.name || email);
-        markLogin(emp.email, emp.name, 'Google');
+        const ml = markLogin(emp.email, emp.name, 'Google') || {};
+        // Účet z jiné firemní domény: dej správci vědět, že se poprvé přihlásil
+        // (u předschválených adres žádná žádost nevzniká, tak by o tom jinak nevěděl).
+        if (ml.prvni && authDomain(email) !== authHlavniDomena()) {
+          try {
+            Promise.resolve(deliver({
+              to: SUPERADMIN, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST',
+              subject: 'První přihlášení do intranetu: ' + email,
+              html: '<p><b>' + esc(emp.name || email) + '</b> (' + esc(email) + ') se právě poprvé přihlásil do intranetu.</p>' +
+                '<p>Doména <b>' + esc(authDomain(email)) + '</b> — přístup byl schválen dřív.</p>' +
+                '<p>Moduly mu nastavíte ve Správa → Přístupy.</p>'
+            })).catch(() => {});
+          } catch (_) {}
+        }
         const sess = empSign({ email: emp.email, name: emp.name });
         const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
         const nx = cookieVal(req, 'sm_next');
