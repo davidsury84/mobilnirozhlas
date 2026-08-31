@@ -1354,6 +1354,15 @@ function mount(host) {
 
     try {
       if (p === '/api/konstrukce/katalog' && req.method === 'GET') { json(res, 200, { polozky: KATALOG_ABR }); return true; }
+      if (p === '/api/konstrukce/kody-l10n' && req.method === 'GET') {
+        // překlady popisů katalogu ABR (en/de/pl/ua/ro) — načítá se až při přepnutí jazyka
+        try {
+          const raw = fs.readFileSync(path.join(__dirname, 'abr-kody-l10n.json'), 'utf8');
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=3600' });
+          res.end(raw);
+        } catch (_) { json(res, 200, {}); }
+        return true;
+      }
       if (p === '/api/konstrukce/vykres-std' && req.method === 'GET') {
         // standardní výkres řady ABR (JPG náhled) — jen soubory z map.json
         const f = String((u.query || {}).f || '');
