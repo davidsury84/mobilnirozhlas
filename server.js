@@ -154,7 +154,8 @@ const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativ
 // Dovolená: úložiště žádostí + (volitelně) zápis do sdíleného Google kalendáře přes service account
 const VAC_F = path.join(DATA_DIR, 'vacation.json');
 const VACREP_F = path.join(DATA_DIR, 'vacation-report.json');
-const SKOLPOZ_F = path.join(DATA_DIR, 'skoleni-pozvanky.json'); // kdo byl pozván ke školení a do kdy ho má splnit
+const SKOLPOZ_F = path.join(DATA_DIR, 'skoleni-pozvanky.json');
+const SKOLPLAN_F = path.join(DATA_DIR, 'skoleni-plany.json'); // plány školení po dnech (série kurzů s rozestupem) // kdo byl pozván ke školení a do kdy ho má splnit
 const AUTHDOM_F = path.join(DATA_DIR, 'auth-domeny.json'); // přístup z ostatních firemních domén (schvaluje správce) // měsíční report čerpání dovolené (příjemci, den, historie)
 const VACATION_CALENDAR_ID = process.env.VACATION_CALENDAR_ID || '';       // ID sdíleného kalendáře „Dovolené"
 const GOOGLE_SA_CLIENT_EMAIL = process.env.GOOGLE_SA_CLIENT_EMAIL || '';   // client_email ze service-account JSON
@@ -775,6 +776,94 @@ function skolPozMoje(email) {
       dnyDoTerminu: Math.ceil((x.termin - ted) / den), poLhute: ted > x.termin
     }))
     .sort((a, b) => a.termin - b.termin);
+}
+/* ---------- Plány školení (série kurzů po dnech) ----------
+   Správce zvolí datum startu, pořadí školení a rozestup ve dnech. Systém pak
+   v daný den rozešle pozvánku na další školení a v poslední den lhůty pošle
+   připomínku „dnes je potřeba školení dokončit“. */
+function skolPlanRead() { const d = readJson(SKOLPLAN_F, null) || {}; return { plany: Array.isArray(d.plany) ? d.plany : [] }; }
+function skolPlanWrite(d) { writeJson(SKOLPLAN_F, { plany: (d.plany || []).slice(0, 200) }); return skolPlanRead(); }
+function skolISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function skolDenPlus(datum, dni) { const d = new Date(String(datum) + 'T00:00:00'); d.setDate(d.getDate() + (Number(dni) || 0)); return skolISO(d); }   // místní datum, ne UTC (jinak posun o den)
+function skolDnesISO() { return skolISO(new Date()); }
+// Kroky plánu i s vypočítaným datem odeslání a termínem splnění.
+function skolPlanKroky(pl) {
+  const rozestup = Math.max(1, Number(pl.rozestup) || 2);
+  const lhuta = Math.max(1, Number(pl.lhuta) || rozestup);
+  return (pl.kurzy || []).map((kurz, i) => {
+    const datum = skolDenPlus(pl.start, i * rozestup);
+    return {
+      kurz, nazev: SKOLENI_NAZVY[kurz] || kurz, poradi: i + 1, datum,
+      termin: skolDenPlus(datum, lhuta),
+      odeslano: (pl.odeslano || {})[kurz] || null
+    };
+  });
+}
+// Stav plnění: pro každý krok kdo splnil a kdo ne.
+function skolPlanStav(pl) {
+  const kroky = skolPlanKroky(pl);
+  const ucastnici = (pl.ucastnici || []).map(e => String(e || '').toLowerCase());
+  return kroky.map(k => {
+    const splnili = ucastnici.filter(e => skolSplneno(e, k.kurz));
+    return Object.assign({}, k, { splnilo: splnili.length, celkem: ucastnici.length, nesplnili: ucastnici.filter(e => splnili.indexOf(e) < 0) });
+  });
+}
+// Odešle pozvánku na jeden kurz účastníkům plánu (a založí jim povinnost s termínem).
+async function skolPlanPosli(pl, krok) {
+  const nazev = SKOLENI_NAZVY[krok.kurz]; if (!nazev) return 0;
+  const link = (CFG.publicUrl || process.env.PUBLIC_URL || 'https://intranet.elkoplast.cz').replace(/\/$/, '') + '/#modul=skoleni';
+  const terminTxt = new Date(krok.termin + 'T00:00:00').toLocaleDateString('cs-CZ');
+  let sent = 0;
+  for (const to of (pl.ucastnici || [])) {
+    if (skolSplneno(to, krok.kurz)) continue;
+    const text = 'Dobrý den,\n\nv rámci plánu školení „' + (pl.nazev || 'Plán školení') + '“ je na řadě:\n\n  ' + nazev + '\n\n'
+      + 'Školení je potřeba dokončit nejpozději ' + terminTxt + '.\n\n'
+      + 'Otevřete ho v intranetu v sekci Školení:\n' + link + '\n\nDěkujeme.\nIntranet ELKOPLAST';
+    try {
+      await deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST', subject: 'Školení na řadě: ' + nazev, text, html: toHtml(text, '') });
+      sent++;
+    } catch (e) { console.warn('[skoleni-plan] e-mail ' + to + ': ' + e.message); }
+    // povinnost s termínem podle plánu (přepíše výchozí týdenní lhůtu)
+    try {
+      skolPozAdd(to, krok.kurz, 'plán ' + (pl.nazev || ''));
+      const d = skolPozRead(); const z = d.items.find(x => x.email === String(to).toLowerCase() && x.kurz === krok.kurz);
+      if (z) { z.termin = new Date(krok.termin + 'T23:59:59').getTime(); z.plan = pl.id; skolPozWrite(d); }
+    } catch (_) {}
+  }
+  return sent;
+}
+// Denní běh: rozeslat kroky, které jsou na řadě, a připomenout poslední den lhůty.
+async function skolPlanyTick() {
+  try {
+    if (!emailConfigured()) return;
+    if (reportDisabled('skoleni-plany')) return;
+    const dnes = skolDnesISO();
+    const data = skolPlanRead(); let zmena = false;
+    for (const pl of data.plany) {
+      if (pl.pozastaveno) continue;
+      pl.odeslano = pl.odeslano || {}; pl.pripomenuto = pl.pripomenuto || {};
+      for (const krok of skolPlanKroky(pl)) {
+        // 1) je čas rozeslat další školení v pořadí?
+        if (!pl.odeslano[krok.kurz] && krok.datum <= dnes) {
+          const n = await skolPlanPosli(pl, krok);
+          pl.odeslano[krok.kurz] = new Date().toISOString(); zmena = true;
+          console.log('[skoleni-plan] „' + (pl.nazev || pl.id) + '“ — rozesláno ' + krok.nazev + ' (' + n + ' lidí)');
+        }
+        // 2) poslední den lhůty → připomínka těm, kdo ještě nesplnili
+        if (pl.odeslano[krok.kurz] && krok.termin === dnes && pl.pripomenuto[krok.kurz] !== dnes) {
+          const nesplnili = (pl.ucastnici || []).filter(e => !skolSplneno(e, krok.kurz));
+          for (const to of nesplnili) {
+            const text = 'Dobrý den,\n\ndnes je poslední den na dokončení školení:\n\n  ' + krok.nazev + '\n\n'
+              + 'Prosím dokončete ho ještě dnes v intranetu v sekci Školení.\n\nDěkujeme.\nIntranet ELKOPLAST';
+            try { await deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST', subject: 'Dnes je poslední den: ' + krok.nazev, text, html: toHtml(text, '') }); } catch (_) {}
+          }
+          pl.pripomenuto[krok.kurz] = dnes; zmena = true;
+          if (nesplnili.length) console.log('[skoleni-plan] připomínka posledního dne: ' + krok.nazev + ' (' + nesplnili.length + ' lidí)');
+        }
+      }
+    }
+    if (zmena) skolPlanWrite(data);
+  } catch (e) { console.warn('[skoleni-plan] běh selhal: ' + e.message); }
 }
 function ensureEmployee(email, name) {
   email = (email || '').toLowerCase();
@@ -3290,6 +3379,14 @@ const server = http.createServer(async (req, res) => {
         const st = readJson(REPORT_F, {});
         out.push({ key: 'smernice-mesicni', module: 'Směrnice', name: 'Měsíční vyhodnocení seznámení se směrnicemi', to: [reportRecipient()], enabled: reportEnabled() && emailConfigured(), schedule: 'měsíčně (' + reportDay() + '. den)', lastAt: st.lastSentAt || null, preview: null, readOnly: true, configHint: 'nastavuje se v proměnných prostředí (REPORT_EMAIL / REPORT_DAY / REPORT_ENABLED); tady lze jen zrušit odesílání' });
       } catch (_) {}
+      // Jádro intranetu: plány školení (rozesílají se samy podle data v plánu).
+      try {
+        const pl = skolPlanRead().plany.filter(x => !x.pozastaveno);
+        out.push({ key: 'skoleni-plany', module: 'Školení', name: 'Plány školení (rozesílání kurzů po dnech)',
+          to: [...new Set(pl.flatMap(x => x.ucastnici || []))], enabled: pl.length > 0 && emailConfigured(),
+          schedule: pl.length ? (pl.length + ' aktivních plánů — dle data v plánu') : 'žádný aktivní plán',
+          lastAt: null, readOnly: true, configHint: 'plány se zakládají ve Správě → Průzkumy → Plány školení; tady lze rozesílání zrušit' });
+      } catch (_) {}
       // Jádro intranetu: měsíční přehled čerpání dovolené (příjemce lze měnit tady).
       try {
         const vc = vacRepCfg();
@@ -3754,6 +3851,58 @@ const server = http.createServer(async (req, res) => {
       const list = (s.employees || []).filter(x => x && x.email).map(x => ({ email: x.email, name: x.name || x.email }))
         .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'));
       return send(res, 200, { lide: list });
+    }
+    // ---- Plány školení (série kurzů po dnech) ----
+    if (p === '/api/skoleni/plany' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen správce.' });
+      const d = skolPlanRead();
+      const out = d.plany.map(pl => Object.assign({}, pl, { kroky: skolPlanStav(pl), dnes: skolDnesISO() }));
+      return send(res, 200, { plany: out, kurzy: Object.keys(SKOLENI_NAZVY).map(k => ({ kurz: k, nazev: SKOLENI_NAZVY[k] })), dnes: skolDnesISO() }, { 'Cache-Control': 'no-store' });
+    }
+    if (p === '/api/skoleni/plany' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen správce.' });
+      let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const d = skolPlanRead();
+      const me = empSession(req) || { email: '', name: 'správce' };
+      if (b.akce === 'smazat') {
+        d.plany = d.plany.filter(x => x.id !== b.id); skolPlanWrite(d);
+        return send(res, 200, { ok: true });
+      }
+      if (b.akce === 'pozastavit') {
+        const pl = d.plany.find(x => x.id === b.id); if (!pl) return send(res, 404, { error: 'Plán nenalezen.' });
+        pl.pozastaveno = !!b.hodnota; skolPlanWrite(d);
+        return send(res, 200, { ok: true, pozastaveno: pl.pozastaveno });
+      }
+      if (b.akce === 'poslatTed') {   // ruční odeslání dalšího kroku (bez čekání na datum)
+        const pl = d.plany.find(x => x.id === b.id); if (!pl) return send(res, 404, { error: 'Plán nenalezen.' });
+        const krok = skolPlanKroky(pl).find(k => k.kurz === b.kurz);
+        if (!krok) return send(res, 404, { error: 'Krok nenalezen.' });
+        const n = await skolPlanPosli(pl, krok);
+        pl.odeslano = pl.odeslano || {}; pl.odeslano[krok.kurz] = new Date().toISOString();
+        skolPlanWrite(d);
+        return send(res, 200, { ok: true, odeslano: n });
+      }
+      // vytvoření / úprava
+      const kurzy = (Array.isArray(b.kurzy) ? b.kurzy : []).map(x => String(x || '')).filter(k => SKOLENI_NAZVY[k]);
+      const ucastnici = (Array.isArray(b.ucastnici) ? b.ucastnici : []).map(x => String(x || '').trim().toLowerCase()).filter(x => x.indexOf('@') > 0);
+      if (!kurzy.length) return send(res, 400, { error: 'Vyberte alespoň jedno školení.' });
+      if (!ucastnici.length) return send(res, 400, { error: 'Vyberte alespoň jednoho účastníka.' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.start || ''))) return send(res, 400, { error: 'Zadejte datum zahájení.' });
+      const zaznam = {
+        id: b.id || ('pl' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)),
+        nazev: String(b.nazev || '').trim().slice(0, 200) || 'Plán školení',
+        start: String(b.start), rozestup: Math.max(1, Math.min(60, Number(b.rozestup) || 2)),
+        lhuta: Math.max(1, Math.min(60, Number(b.lhuta) || Number(b.rozestup) || 2)),
+        kurzy, ucastnici, pozastaveno: !!b.pozastaveno,
+        vytvoril: me.name || me.email, ts: Date.now()
+      };
+      const i = d.plany.findIndex(x => x.id === zaznam.id);
+      if (i >= 0) { zaznam.odeslano = d.plany[i].odeslano || {}; zaznam.pripomenuto = d.plany[i].pripomenuto || {}; d.plany[i] = zaznam; }
+      else { zaznam.odeslano = {}; zaznam.pripomenuto = {}; d.plany.unshift(zaznam); }
+      skolPlanWrite(d);
+      // co je podle data už na řadě, rozešli hned
+      skolPlanyTick().catch(() => {});
+      return send(res, 200, { ok: true, plan: zaznam });
     }
     if (p === '/api/skoleni/pozvat' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Jen správce.' });
@@ -4796,6 +4945,7 @@ if (require.main === module) {
     maybeSendMonthlyReport();
     setInterval(maybeSendMonthlyReport, 6 * 3600 * 1000);
     maybeSendVacReport(); setInterval(maybeSendVacReport, 6 * 3600 * 1000);   // měsíční přehled čerpání dovolené
+    skolPlanyTick(); setInterval(skolPlanyTick, 6 * 3600 * 1000);            // plány školení po dnech
     // Reporty nákupu — kontrola při startu a pak KAŽDOU HODINU (kvůli ranní bilanci; guardy 1×/den, 1×/týden, 1×/14 dní)
     if (nakupReportMod) {
       nakupReportMod.tick(); setInterval(() => nakupReportMod.tick(), 3600 * 1000);

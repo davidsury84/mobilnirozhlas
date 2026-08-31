@@ -1069,6 +1069,7 @@ img.pv-thumb{background:#fff}
       <h2>Průzkumy a testy</h2>
       <p>Přehled všech dotazníků, testů a závěrečných testů školení — počty vyplnění, průměrné výsledky a stavy. Kliknutím na řádek otevřeš administraci konkrétního testu (výsledky podle oddělení, detaily, rozeslání, export).</p>
     </div>
+    <div id="skplanBox" style="margin-bottom:18px"></div>
     <div id="gritAdmin"></div>
   </section>
 
@@ -7121,7 +7122,96 @@ const PRUZKUMY_DEFS=[
   {kind:'zentex', typ:'skoleni', nazev:'Školení ZENTEX', popis:'lisovací kontejnery — výběr vhodného lisu · závěrečný test 20 náhodných otázek z 50, max 3 pokusy'},
   {kind:'tridici-linky', typ:'skoleni', nazev:'Školení Třídicí linky', popis:'technologie, trh a ekonomika dotřídění · 12 kapitol · závěrečný test 24 náhodných otázek z 60, max 3 pokusy'},
 ];
-async function renderGritAdmin(){ PRUZKUMY_DETAIL=null; await renderPruzkumyPrehled(); }
+/* ---------- Plány školení: série kurzů po dnech ---------- */
+let SKPLAN=null, SKPLAN_FORM=false;
+async function skplanLoad(){
+  try{ const r=await fetch('/api/skoleni/plany',{cache:'no-store'}); SKPLAN=await r.json(); }
+  catch(e){ SKPLAN={plany:[],kurzy:[],error:'Nepodařilo se načíst.'} }
+  skplanRender();
+}
+async function skplanPost(payload){
+  try{
+    const r=await fetch('/api/skoleni/plany',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Chyba'); return false; }
+    await skplanLoad(); return true;
+  }catch(e){ toast('Chyba spojení'); return false; }
+}
+function skplanNovy(){ SKPLAN_FORM=true; skplanRender(); }
+function skplanZrusForm(){ SKPLAN_FORM=false; skplanRender(); }
+function skplanUlozit(){
+  const kurzy=[...document.querySelectorAll('.skplanKurz:checked')].map(c=>c.value);
+  const ucastnici=[...document.querySelectorAll('.skplanUc:checked')].map(c=>c.value);
+  const p={ nazev:document.getElementById('skplanNazev').value.trim(),
+    start:document.getElementById('skplanStart').value,
+    rozestup:Number(document.getElementById('skplanRozestup').value)||2,
+    lhuta:Number(document.getElementById('skplanLhuta').value)||0,
+    kurzy, ucastnici };
+  if(!p.start){ alert('Vyber datum zahájení.'); return; }
+  if(!kurzy.length){ alert('Vyber alespoň jedno školení.'); return; }
+  if(!ucastnici.length){ alert('Vyber alespoň jednoho účastníka.'); return; }
+  skplanPost(p).then(ok=>{ if(ok){ SKPLAN_FORM=false; skplanRender(); toast('Plán uložen — co je na řadě, rozešle se hned'); } });
+}
+function skplanUcFiltr(v){
+  const q=(v||'').toLowerCase();
+  document.querySelectorAll('#skplanUcList label').forEach(l=>{ l.style.display = !q || l.textContent.toLowerCase().indexOf(q)>=0 ? '' : 'none'; });
+}
+function skplanUcVse(on){ document.querySelectorAll('#skplanUcList label').forEach(l=>{ if(l.style.display!=='none'){ const c=l.querySelector('input'); if(c) c.checked=on; } }); }
+function skplanFormHtml(){
+  const kurzy=(SKPLAN&&SKPLAN.kurzy)||[];
+  const dnes=new Date(); const zitra=new Date(dnes.getTime()+86400000).toISOString().slice(0,10);
+  const emps=DB.employees.filter(e=>e.email).sort((a,b)=>(a.name||'').localeCompare(b.name||'','cs'));
+  return '<div class="card pad" style="margin-bottom:14px;border-left:4px solid var(--green-2)">'+
+    '<strong>Nový plán školení</strong>'+
+    '<p class="muted" style="margin:4px 0 12px;font-size:13px">Vyber datum zahájení, školení v pořadí a rozestup. První školení se rozešle v den zahájení, každé další po zvoleném počtu dní. Systém sám připomene poslední den lhůty.</p>'+
+    '<div class="row"><label class="field" style="flex:2;min-width:220px"><span>Název plánu</span><input type="text" id="skplanNazev" placeholder="např. Nástup obchodníka"></label>'+
+    '<label class="field" style="flex:1;min-width:150px"><span>Zahájení (1. den)</span><input type="date" id="skplanStart" value="'+zitra+'"></label>'+
+    '<label class="field" style="flex:1;min-width:130px"><span>Rozestup (dní)</span><input type="number" id="skplanRozestup" min="1" max="60" value="2"></label>'+
+    '<label class="field" style="flex:1;min-width:150px"><span>Lhůta na splnění (dní)</span><input type="number" id="skplanLhuta" min="1" max="60" value="2" title="Kolik dní má člověk na dokončení každého školení"></label></div>'+
+    '<div class="field"><span>Školení v pořadí</span><div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px">'+
+      kurzy.map(k=>'<label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" class="skplanKurz" value="'+esc(k.kurz)+'"> '+esc(k.nazev)+'</label>').join('')+
+    '</div><p class="muted" style="margin:5px 0 0;font-size:12px">Pořadí = pořadí v seznamu výše.</p></div>'+
+    '<div class="field"><span>Účastníci</span>'+
+      '<div class="row" style="margin:6px 0"><input type="search" placeholder="Hledat zaměstnance…" oninput="skplanUcFiltr(this.value)" style="max-width:260px">'+
+      '<button class="btn ghost sm" type="button" onclick="skplanUcVse(true)">Vybrat zobrazené</button>'+
+      '<button class="btn ghost sm" type="button" onclick="skplanUcVse(false)">Zrušit výběr</button></div>'+
+      '<div id="skplanUcList" style="display:flex;flex-direction:column;gap:3px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px">'+
+      emps.map(e=>'<label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" class="skplanUc" value="'+esc(e.email)+'"> '+esc(e.name||e.email)+' <span class="muted" style="font-size:12px">'+esc(e.email)+'</span></label>').join('')+
+    '</div></div>'+
+    '<div class="inline-actions" style="margin-top:10px"><button class="btn" onclick="skplanUlozit()">Vytvořit plán</button>'+
+    '<button class="btn ghost" onclick="skplanZrusForm()">Zrušit</button></div></div>';
+}
+function skplanRender(){
+  const box=document.getElementById('skplanBox'); if(!box) return;
+  const d=SKPLAN||{};
+  let h='<div class="spread" style="margin-bottom:8px"><strong>📅 Plány školení (série po dnech)</strong>'+
+    (SKPLAN_FORM?'':'<button class="btn sm" onclick="skplanNovy()">+ Nový plán</button>')+'</div>';
+  if(d.error){ box.innerHTML=h+'<p class="muted" style="margin:0">'+esc(d.error)+'</p>'; return; }
+  if(SKPLAN_FORM) h+=skplanFormHtml();
+  const plany=d.plany||[];
+  if(!plany.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádný plán. Tlačítkem „+ Nový plán" nastavíš datum zahájení, školení a rozestup — rozesílání pak běží samo.</p></div>'; box.innerHTML=h; return; }
+  plany.forEach(pl=>{
+    const hotovo=(pl.kroky||[]).filter(k=>k.odeslano).length;
+    h+='<div class="card pad" style="margin-bottom:12px"><div class="spread" style="flex-wrap:wrap;gap:8px">'+
+      '<div><strong>'+esc(pl.nazev)+'</strong>'+(pl.pozastaveno?' <span class="pill red">pozastaveno</span>':'')+
+      '<div class="muted" style="font-size:12.5px;margin-top:2px">zahájení '+esc(pl.start)+' · rozestup '+pl.rozestup+' dní · lhůta '+pl.lhuta+' dní · '+
+      (pl.ucastnici||[]).length+' účastníků · rozesláno '+hotovo+'/'+(pl.kroky||[]).length+'</div></div>'+
+      '<div class="inline-actions">'+
+        '<button class="btn ghost sm" onclick="skplanPost({akce:\'pozastavit\',id:\''+pl.id+'\',hodnota:'+(pl.pozastaveno?'false':'true')+'})">'+(pl.pozastaveno?'▶ Obnovit':'⏸ Pozastavit')+'</button>'+
+        '<button class="btn danger sm" onclick="if(confirm(\'Smazat plán?\'))skplanPost({akce:\'smazat\',id:\''+pl.id+'\'})">Smazat</button></div></div>'+
+      '<div class="matrix-wrap" style="margin-top:10px"><table class="matrix"><thead><tr><th>#</th><th>Školení</th><th>Rozešle se</th><th>Termín splnění</th><th>Stav</th><th>Splnilo</th><th></th></tr></thead><tbody>';
+    (pl.kroky||[]).forEach(k=>{
+      const stav = k.odeslano ? '<span class="pill green">odesláno</span>'
+        : (k.datum<=(d.dnes||'') ? '<span class="pill amber">čeká na rozeslání</span>' : '<span class="pill">naplánováno</span>');
+      h+='<tr><td>'+k.poradi+'</td><td><b>'+esc(k.nazev)+'</b></td><td>'+esc(k.datum)+'</td><td>'+esc(k.termin)+'</td><td>'+stav+'</td>'+
+        '<td>'+k.splnilo+'/'+k.celkem+'</td>'+
+        '<td>'+(k.odeslano?'':'<button class="btn ghost sm" onclick="skplanPost({akce:\'poslatTed\',id:\''+pl.id+'\',kurz:\''+k.kurz+'\'})" title="Rozeslat hned, bez čekání na datum">Poslat teď</button>')+'</td></tr>';
+    });
+    h+='</tbody></table></div></div>';
+  });
+  box.innerHTML=h;
+}
+async function renderGritAdmin(){ PRUZKUMY_DETAIL=null; await renderPruzkumyPrehled(); skplanLoad(); }
 /* statistika školicího testu (model attempts[], hranice 80 %, max 3 pokusy) */
 function skolStaty(res,maxPokusu){
   maxPokusu=maxPokusu||3;
