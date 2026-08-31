@@ -154,6 +154,7 @@ const SVOZ_ESA_FILE = path.join(ROOT, 'kalkulacka-svoz-esa.html'); // alternativ
 // Dovolená: úložiště žádostí + (volitelně) zápis do sdíleného Google kalendáře přes service account
 const VAC_F = path.join(DATA_DIR, 'vacation.json');
 const VACREP_F = path.join(DATA_DIR, 'vacation-report.json');
+const SKOLPOZ_F = path.join(DATA_DIR, 'skoleni-pozvanky.json'); // kdo byl pozván ke školení a do kdy ho má splnit
 const AUTHDOM_F = path.join(DATA_DIR, 'auth-domeny.json'); // přístup z ostatních firemních domén (schvaluje správce) // měsíční report čerpání dovolené (příjemci, den, historie)
 const VACATION_CALENDAR_ID = process.env.VACATION_CALENDAR_ID || '';       // ID sdíleného kalendáře „Dovolené"
 const GOOGLE_SA_CLIENT_EMAIL = process.env.GOOGLE_SA_CLIENT_EMAIL || '';   // client_email ze service-account JSON
@@ -719,6 +720,61 @@ function authZadost(email, name) {
     })).catch(() => {});
   } catch (_) {}
   return z;
+}
+/* ---------- Pozvánky ke školení: povinnost splnit do týdne ----------
+   Správce pozve → uloží se termín (7 dní). Zaměstnanec vidí v sekci Školení
+   upozornění s datem; po splnění testu pozvánka mizí. */
+const SKOL_LHUTA_DNI = 7;
+const SKOLENI_NAZVY = {
+  prumysl: 'Průmysl — obchodník segmentu Skladování',
+  loxxer: 'LOXXER — protipožární skříně na Li-Ion baterie',
+  kovo: 'Produkty KOVO — kovové výrobky',
+  roto: 'Produkty ROTO — plastové výrobky',
+  abroll: 'ABROLL — kódování a konfigurace',
+  acts: 'ACTS — železniční abroll kontejnery',
+  'vykresy-skoleni': 'Čtení technických výkresů (ČSN/ISO)',
+  svarovani: 'Průvodce svařováním — hodnocení svarů (ISO 5817)',
+  zentex: 'ZENTEX — lisovací kontejnery (výběr vhodného lisu)',
+  'tridici-linky': 'Třídicí linky — technologie, trh a ekonomika dotřídění',
+};
+function skolPozRead() { const d = readJson(SKOLPOZ_F, null) || {}; return { items: Array.isArray(d.items) ? d.items : [] }; }
+function skolPozWrite(d) { writeJson(SKOLPOZ_F, { items: (d.items || []).slice(0, 5000) }); return skolPozRead(); }
+function skolPozAdd(email, kurz, kdo) {
+  email = String(email || '').toLowerCase(); if (!email || !SKOLENI_NAZVY[kurz]) return;
+  const d = skolPozRead();
+  const ted = Date.now();
+  const termin = ted + SKOL_LHUTA_DNI * 24 * 3600 * 1000;
+  const stav = d.items.find(x => x.email === email && x.kurz === kurz);
+  if (stav) { stav.ts = ted; stav.termin = termin; stav.kdo = kdo || stav.kdo || ''; }
+  else d.items.push({ email, kurz, ts: ted, termin, kdo: kdo || '' });
+  skolPozWrite(d);
+}
+// Splněná školení daného e-mailu (aby pozvánka po absolvování zmizela).
+function skolSplneno(email, kurz) {
+  try {
+    if (kurz === 'abroll') return !!abrollStatus(email).passed;
+    if (kurz === 'kovo' || kurz === 'roto') return !!produktyStatus(email, kurz).passed;
+    if (kurz === 'prumysl') return !!prumyslStatus(email).passed;
+    if (kurz === 'loxxer') return !!loxxerSkoleniStatus(email).passed;
+    if (kurz === 'acts') return !!actsSkoleniStatus(email).passed;
+    if (kurz === 'vykresy-skoleni') return !!vykresySkoleniStatus(email).passed;
+    if (kurz === 'svarovani') return !!svarovaniSkoleniStatus(email).passed;
+    if (kurz === 'zentex') return !!zentexSkoleniStatus(email).passed;
+    if (kurz === 'tridici-linky') return !!tridiciSkoleniStatus(email).passed;
+  } catch (_) {}
+  return false;
+}
+// Otevřené pozvánky zaměstnance (nesplněné) + kolik dní zbývá.
+function skolPozMoje(email) {
+  email = String(email || '').toLowerCase(); if (!email) return [];
+  const den = 24 * 3600 * 1000, ted = Date.now();
+  return skolPozRead().items
+    .filter(x => x.email === email && !skolSplneno(email, x.kurz))
+    .map(x => ({
+      kurz: x.kurz, nazev: SKOLENI_NAZVY[x.kurz] || x.kurz, ts: x.ts, termin: x.termin,
+      dnyDoTerminu: Math.ceil((x.termin - ted) / den), poLhute: ted > x.termin
+    }))
+    .sort((a, b) => a.termin - b.termin);
 }
 function ensureEmployee(email, name) {
   email = (email || '').toLowerCase();
@@ -3702,18 +3758,6 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/skoleni/pozvat' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Jen správce.' });
       let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
-      const SKOLENI_NAZVY = {
-        prumysl: 'Průmysl — obchodník segmentu Skladování',
-        loxxer: 'LOXXER — protipožární skříně na Li-Ion baterie',
-        kovo: 'Produkty KOVO — kovové výrobky',
-        roto: 'Produkty ROTO — plastové výrobky',
-        abroll: 'ABROLL — kódování a konfigurace',
-        acts: 'ACTS — železniční abroll kontejnery',
-        'vykresy-skoleni': 'Čtení technických výkresů (ČSN/ISO)',
-        svarovani: 'Průvodce svařováním — hodnocení svarů (ISO 5817)',
-        zentex: 'ZENTEX — lisovací kontejnery (výběr vhodného lisu)',
-        'tridici-linky': 'Třídicí linky — technologie, trh a ekonomika dotřídění',
-      };
       const nazev = SKOLENI_NAZVY[String(b.skoleni || '')];
       if (!nazev) return send(res, 400, { error: 'Neznámé školení.' });
       const emails = (Array.isArray(b.emails) ? b.emails : []).map(e => String(e || '').trim().toLowerCase()).filter(e => /^[^@\s]+@[^@\s]+$/.test(e));
@@ -3724,13 +3768,19 @@ const server = http.createServer(async (req, res) => {
       const me = empSession(req) || { email: '', name: 'správce' };
       const text = 'Dobrý den,\n\nzveme vás k absolvování školení v intranetu ELKOPLAST:\n\n  ' + nazev + '\n\n'
         + (poznamka ? 'Poznámka od správce: ' + poznamka + '\n\n' : '')
+        + 'Školení prosím absolvujte do ' + SKOL_LHUTA_DNI + ' dnů, tedy nejpozději '
+        + new Date(Date.now() + SKOL_LHUTA_DNI * 24 * 3600 * 1000).toLocaleDateString('cs-CZ') + '.\n\n'
         + 'Školení otevřete v intranetu v sekci Školení:\n' + link + '\n\n'
         + (String(b.skoleni) === 'svarovani'
           ? 'Na konci školení je jednorázový závěrečný test — hranice splnění 80 %, jediný pokus.\n\nDěkujeme.\nIntranet ELKOPLAST'
           : 'Na konci školení je závěrečný test — hranice splnění 80 %, max. 3 pokusy.\n\nDěkujeme.\nIntranet ELKOPLAST');
       const chyby = []; let sent = 0;
       for (const to of emails) {
-        try { await deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST', subject: 'Pozvánka ke školení: ' + nazev, text, html: toHtml(text, '') }); sent++; }
+        try {
+          await deliver({ to, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST', subject: 'Pozvánka ke školení: ' + nazev, text, html: toHtml(text, '') });
+          skolPozAdd(to, String(b.skoleni), me.name || me.email);   // termín splnění pro upozornění v intranetu
+          sent++;
+        }
         catch (e) { chyby.push(to + ': ' + String(e.message || e)); }
       }
       logActivity('skoleni-pozvanka', { email: me.email, name: me.name }, 'Pozvánka ke školení „' + nazev + '" → ' + sent + '/' + emails.length + ' příjemců' + (chyby.length ? ' (chyby: ' + chyby.length + ')' : ''));
@@ -3998,7 +4048,7 @@ const server = http.createServer(async (req, res) => {
         if (!modsUser.includes('konstrukce')) modsUser.push('konstrukce');
         if (!modsUser.includes('zadanikonstrukce')) modsUser.push('zadanikonstrukce');
       }
-      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: modsUser, surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, aktualityNew: aktualityNew, heroImage: (readJson(SITE_F, {}).heroImage) || null });
+      return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: modsUser, surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), skolPozvanky: skolPozMoje(e.email), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, aktualityNew: aktualityNew, heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 
     // ---- Aktuality (novinky na intranetu) ----

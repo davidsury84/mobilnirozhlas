@@ -1669,6 +1669,15 @@ const MJ_L10N = {
   'lidí': ['people','Personen','osób','осіб','persoane'],
   'V tomto měsíci nikdo dovolenou nečerpal.': ['Nobody took vacation this month.','In diesem Monat hat niemand Urlaub genommen.','W tym miesiącu nikt nie korzystał z urlopu.','Цього місяця ніхто не брав відпустку.','Nimeni nu a avut concediu în această lună.'],
   'Zaměstnanec': ['Employee','Mitarbeiter','Pracownik','Працівник','Angajat'],
+  'Byl(a) jste pozván(a) ke školení': ['You have been invited to training','Sie wurden zu einer Schulung eingeladen','Zostałeś zaproszony na szkolenie','Вас запросили на навчання','Ați fost invitat la instruire'],
+  'Máte nesplněné školení po termínu': ['Overdue training','Überfällige Schulung','Zaległe szkolenie','Прострочене навчання','Instruire restantă'],
+  'Školení je potřeba absolvovat do jednoho týdne od pozvánky.': ['The training must be completed within one week of the invitation.','Die Schulung ist innerhalb einer Woche nach der Einladung zu absolvieren.','Szkolenie należy ukończyć w ciągu tygodnia od zaproszenia.','Навчання потрібно пройти протягом тижня від запрошення.','Instruirea trebuie finalizată în termen de o săptămână de la invitație.'],
+  'po termínu': ['overdue','überfällig','po terminie','прострочено','restant'],
+  'do': ['by','bis','do','до','până la'],
+  'povinné do': ['required by','Pflicht bis','wymagane do','обов’язково до','obligatoriu până la'],
+  'povinné — po termínu': ['required — overdue','Pflicht — überfällig','wymagane — po terminie','обов’язково — прострочено','obligatoriu — restant'],
+  'Pozvánka od správce': ['Invitation from the administrator','Einladung vom Administrator','Zaproszenie od administratora','Запрошення від адміністратора','Invitație de la administrator'],
+  'Termín už uplynul': ['The deadline has passed','Die Frist ist abgelaufen','Termin minął','Термін минув','Termenul a expirat'],
   'Středisko': ['Department','Abteilung','Dział','Підрозділ','Departament'],
   'Termín': ['Dates','Zeitraum','Termin','Період','Perioadă'],
   'Dní': ['Days','Tage','Dni','Днів','Zile'],
@@ -3115,59 +3124,86 @@ async function showSkoleni(){
   if(!sst.passed && (sst.attemptsUsed||0)>=1){ sb.badge='<span class="pill red">✕ '+mjT('Nesplněno')+' ('+(sst.best||0)+' %)</span>'; sb.label=mjT('Prohlédnout'); }
   // Správce může kohokoli pozvat k absolvování (e-mailová pozvánka) — u všech školení.
   const inv=(key,nazev)=>MUJ.admin?'<button class="btn ghost sm" title="Pozvat zaměstnance k absolvování" onclick="skolPozvat(\''+key+'\',\''+nazev.replace(/'/g,"\\'")+'\')">✉ Pozvat</button>':'';
+  // Štítek „povinné do …" u školení, ke kterému jsem byl pozván
+  const pov=(key)=>{ const z=skolPozvankaPro(key); if(!z) return '';
+    return z.poLhute
+      ? '<span class="pill red" title="'+mjT('Termín už uplynul')+'">'+mjT('povinné — po termínu')+'</span> '
+      : '<span class="pill amber" title="'+mjT('Pozvánka od správce')+'">'+mjT('povinné do')+' '+skolDatum(z.termin)+'</span> '; };
   let h='<div class="dash-hero"><h2>'+mjT('Školení')+'</h2><p>'+(MJ_LANG==='cz'?'Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).':mjT('__skolIntro'))+(MUJ.admin?' Jako správce můžete tlačítkem „✉ Pozvat" poslat komukoli e-mailovou pozvánku k absolvování.':'')+'</p></div>';
+  h+=skolPozvankyHtml();
   h+='<div class="dash-sec">'+mjT('Dostupná školení')+'</div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('Průmysl — obchodník segmentu Skladování')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('Produktové kategorie skladování, Li-Ion baterie (rizika a příležitost), požární předpisy a ADR přeprava + závěrečný test')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+pb.badge+inv('prumysl','Průmysl — obchodník segmentu Skladování')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('prumysl')+pb.badge+inv('prumysl','Průmysl — obchodník segmentu Skladování')+
      '<button class="btn sm" onclick="openPrumysl()">'+pb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('LOXXER — protipožární skříně na Li-Ion baterie')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('Rizika li-ion baterií a thermal runaway, certifikace VDMA 24994, celé portfolio LOXXER, výběr řešení, sektory a argumentář — 29 lekcí + závěrečný test')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+lb.badge+inv('loxxer','LOXXER — protipožární skříně na Li-Ion baterie')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('loxxer')+lb.badge+inv('loxxer','LOXXER — protipožární skříně na Li-Ion baterie')+
      '<button class="btn sm" onclick="openLoxxerSkoleni()">'+lb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('Produkty KOVO — kovové výrobky')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('Ocelové kontejnery, muldy, nádoby na separovaný sběr, záchytné vany a boxy + závěrečný test')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+kb.badge+inv('kovo','Produkty KOVO — kovové výrobky')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('kovo')+kb.badge+inv('kovo','Produkty KOVO — kovové výrobky')+
      '<button class="btn sm" onclick="openProdukty(\'kovo\')">'+kb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('Produkty ROTO — plastové výrobky')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('Plastové nádrže na kapaliny, odpadové hospodářství, dům a zahrada, zimní údržba a skladování + závěrečný test')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+rb.badge+inv('roto','Produkty ROTO — plastové výrobky')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('roto')+rb.badge+inv('roto','Produkty ROTO — plastové výrobky')+
      '<button class="btn sm" onclick="openProdukty(\'roto\')">'+rb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('ABROLL — kódování a konfigurace')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('Interaktivní výuka názvů a konfigurace kontejnerů ABROLL + závěrečný test')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+badge+inv('abroll','ABROLL — kódování a konfigurace')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('abroll')+badge+inv('abroll','ABROLL — kódování a konfigurace')+
      '<button class="btn sm" onclick="openAbroll()">'+btnLabel+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('ACTS — železniční abroll kontejnery')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('Kombinovaná doprava silnice–železnice: princip překládky, konstrukce ACTS kontejneru, kódování ABR-ACTS a argumentář + závěrečný test')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+ab.badge+inv('acts','ACTS — železniční abroll kontejnery')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('acts')+ab.badge+inv('acts','ACTS — železniční abroll kontejnery')+
      '<button class="btn sm" onclick="openActsSkoleni()">'+ab.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('Čtení technických výkresů (ČSN/ISO)')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('5 výukových celků · 18 lekcí podle ČSN a ISO: od čar, pohledů a řezů přes kóty, tolerance a GPS až po svary, plechy, materiály a kusovník; závěrečný test ve vlastní záložce')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+vb.badge+inv('vykresy-skoleni','Čtení technických výkresů (ČSN/ISO)')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('vykresy-skoleni')+vb.badge+inv('vykresy-skoleni','Čtení technických výkresů (ČSN/ISO)')+
      '<button class="btn sm" onclick="openVykresySkoleni()">'+vb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('Průvodce svařováním — hodnocení svarů (ISO 5817)')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('Fotogalerie skutečných vad s QC rozhodnutími, katalog vad dle ISO 5817, výukové lekce a procvičování na fotkách + jednorázový závěrečný test (jediný pokus)')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+sb.badge+inv('svarovani','Průvodce svařováním — hodnocení svarů (ISO 5817)')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('svarovani')+sb.badge+inv('svarovani','Průvodce svařováním — hodnocení svarů (ISO 5817)')+
      '<button class="btn sm" onclick="openSvarovaniSkoleni()">'+sb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('ZENTEX — lisovací kontejnery (výběr vhodného lisu)')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('27 lekcí (~100 normostran) + interaktivní prvky: průvodce výběrem lisu, kalkulačka úspor, hry a odznaky · závěrečný test (20 náhodných otázek z 50)')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+zb.badge+inv('zentex','ZENTEX — lisovací kontejnery (výběr vhodného lisu)')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('zentex')+zb.badge+inv('zentex','ZENTEX — lisovací kontejnery (výběr vhodného lisu)')+
      '<button class="btn sm" onclick="openZentexSkoleni()">'+zb.label+'</button></div></div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
      '<div class="li-t">'+mjT('Třídicí linky — technologie, trh a ekonomika')+'</div>'+
      '<div class="muted" style="font-size:12px;margin-top:2px">'+mjT('12 kapitol (~129 normostran): legislativa, materiálové toky, anatomie linky, drtiče, síta a balistika, magnety a ECS, optické třídění, AI a roboti, recyklace plastů, výrobci, ekonomika a provoz · interaktivní kalkulačka linky, průvodce návrhem sestavy, hry a odznaky · závěrečný test (24 náhodných otázek z 60)')+'</div></div></div>'+
-     '<div style="display:flex;align-items:center;gap:10px">'+tb.badge+inv('tridici-linky','Třídicí linky — technologie, trh a ekonomika dotřídění')+
+     '<div style="display:flex;align-items:center;gap:10px">'+pov('tridici-linky')+tb.badge+inv('tridici-linky','Třídicí linky — technologie, trh a ekonomika dotřídění')+
      '<button class="btn sm" onclick="openTridiciSkoleni()">'+tb.label+'</button></div></div>';
   body.innerHTML=h; window.scrollTo(0,0);
+}
+/* Pozvánky ke školení: povinnost absolvovat do týdne (zobrazí se, dokud není splněno) */
+function skolPozvanky(){ return (MUJ.data&&MUJ.data.skolPozvanky)||[]; }
+function skolPozvankaPro(kurz){ return skolPozvanky().find(x=>x.kurz===kurz)||null; }
+function skolDatum(ts){ try{ return new Date(ts).toLocaleDateString(({cz:'cs-CZ',en:'en-GB',de:'de-DE',pl:'pl-PL',ua:'uk-UA',ro:'ro-RO'})[MJ_LANG]||'cs-CZ'); }catch(e){ return ''; } }
+function skolPozvankyHtml(){
+  const p=skolPozvanky(); if(!p.length) return '';
+  const poLhute=p.filter(x=>x.poLhute).length;
+  const barva=poLhute?'#b3261e':'#8a6d1f';
+  const pozadi=poLhute?'#fdecea':'#fff8e6';
+  let h='<div class="card pad" style="margin:0 0 16px;border-left:4px solid '+barva+';background:'+pozadi+'">'+
+    '<strong style="color:'+barva+'">'+(poLhute?mjT('Máte nesplněné školení po termínu'):mjT('Byl(a) jste pozván(a) ke školení'))+'</strong>'+
+    '<p class="muted" style="margin:6px 0 10px;font-size:13.5px">'+mjT('Školení je potřeba absolvovat do jednoho týdne od pozvánky.')+'</p>';
+  p.forEach(x=>{
+    const zbyva = x.poLhute
+      ? '<span class="pill red">'+mjT('po termínu')+' ('+skolDatum(x.termin)+')</span>'
+      : '<span class="pill amber">'+mjT('do')+' '+skolDatum(x.termin)+' · '+mjT('zbývá')+' '+Math.max(0,x.dnyDoTerminu)+' '+(MJ_LANG==='cz'?plural(Math.max(0,x.dnyDoTerminu),'den','dny','dní'):mjT('__days'))+'</span>';
+    h+='<div class="spread" style="padding:7px 0;border-top:1px solid rgba(0,0,0,.06)"><span style="font-size:13.5px"><b>'+esc(x.nazev)+'</b></span>'+zbyva+'</div>';
+  });
+  h+='</div>';
+  return h;
 }
 function openSvarovaniSkoleni(){
   MUJ.view="skoleni"; renderSidebar();
