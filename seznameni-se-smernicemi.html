@@ -835,6 +835,7 @@ img.pv-thumb{background:#fff}
       <button data-view="candidates">Uchazeči</button>
       <button data-view="access">Přístupy</button>
       <button data-view="org">Organizační struktura</button>
+      <button data-view="telefon">Telefonní seznam</button>
       <button data-view="adaptace">Adaptace</button>
       <button data-view="reklamace">Reklamace</button>
       <button data-view="stats">Statistiky</button>
@@ -960,6 +961,14 @@ img.pv-thumb{background:#fff}
   </section>
 
   <!-- ===== Organizační struktura ===== -->
+  <section id="view-telefon" class="view">
+    <div class="view-head">
+      <h2>Telefonní seznam</h2>
+      <p>Jeden editovatelný list všech firemních čísel. Řádky zaměstnanců se ukládají do jejich karty (telefon, středisko, pozice), ostatní jsou kontakty mimo zaměstnance (vrátnice, řidiči, sdílená čísla). Zaměstnanci vidí seznam v modulu Telefonní seznam.</p>
+    </div>
+    <div id="telefonAdmin"></div>
+  </section>
+
   <section id="view-org" class="view">
     <div class="view-head">
       <h2>Organizační struktura</h2>
@@ -4673,6 +4682,7 @@ document.getElementById("tabs").addEventListener("click", e=>{
   if(v==="library") renderLibAdmin(null);
   if(v==="access") renderAccess();
   if(v==="org") renderOrg();
+  if(v==="telefon") renderTelefonAdmin();
   if(v==="adaptace"){ const f=document.getElementById("adaptaceAdminFrame"); if(f && !f.src) f.src="/adaptace?admin=1"; }
   if(v==="reklamace"){ const f=document.getElementById("reklamaceAdminFrame"); if(f && !f.src) f.src="/reklamace"; }
   if(v==="grit") renderGritAdmin();
@@ -5948,7 +5958,9 @@ function renderOrg(){
   h+='</tbody></table></div>';
   // Kontakty do telefonního seznamu MIMO zaměstnance (sdílené schránky, výroba, externí čísla).
   const tx=telExtra();
-  h+=telListHtml();
+  h+='<div class="card pad" style="margin-top:18px"><div class="spread" style="gap:10px;flex-wrap:wrap">'+
+    '<div><strong>📞 Telefonní seznam</strong><p class="muted" style="margin:4px 0 0;font-size:13px">Celý seznam čísel se edituje ve vlastní záložce — telefon, středisko i pozice se ukládají do karet zaměstnanců.</p></div>'+
+    '<button class="btn sm" onclick="document.querySelector(\'#tabs button[data-view=telefon]\').click()">Otevřít telefonní seznam</button></div></div>';
   box.innerHTML=h;
   renderOrgCanvas();
   renderOrgTree();
@@ -6486,6 +6498,10 @@ function telBodyHtml(){
       '<td class="muted" style="font-size:12px">'+(r.typ==='emp'?(esc(r.email||'')+' <span class="pill" style="font-size:10px">zaměstnanec</span>'):'<span class="pill" style="font-size:10px">extra kontakt</span>')+'</td>'+
       '<td><button class="btn danger sm" onclick="telDel(\''+r.typ+'\',\''+key+'\')" title="'+(r.typ==='emp'?'Vymazat telefon (zaměstnanec zůstane)':'Odebrat kontakt')+'">✕</button></td></tr>';
   }).join('');
+}
+function renderTelefonAdmin(){
+  const box=document.getElementById('telefonAdmin'); if(!box) return;
+  box.innerHTML=telListHtml();
 }
 function telListHtml(){
   const n=telRadky().length;
@@ -9439,7 +9455,11 @@ function closeModal(){ document.getElementById("overlay").classList.remove("show
 document.getElementById("overlay").addEventListener("click",e=>{ if(e.target.id==="overlay") closeModal(); });
 
 /* ---------- Render all ---------- */
-function renderAll(){ renderDirectives(); renderEmployees(); renderStats(); }
+function renderAll(){ renderDirectives(); renderEmployees(); renderStats();
+  // záložky, které se otevřely z URL ještě před načtením dat, je potřeba překreslit
+  const tel=document.getElementById('view-telefon');
+  if(tel && tel.classList.contains('active') && typeof renderTelefonAdmin==='function') renderTelefonAdmin();
+}
 
 /* ---------- Init ---------- */
 /* ---------- Barevné motivy (volba si pamatuje prohlížeč) ---------- */
