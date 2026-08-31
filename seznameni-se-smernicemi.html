@@ -1670,6 +1670,7 @@ const MJ_L10N = {
   'lidí': ['people','Personen','osób','осіб','persoane'],
   'V tomto měsíci nikdo dovolenou nečerpal.': ['Nobody took vacation this month.','In diesem Monat hat niemand Urlaub genommen.','W tym miesiącu nikt nie korzystał z urlopu.','Цього місяця ніхто не брав відпустку.','Nimeni nu a avut concediu în această lună.'],
   'Zaměstnanec': ['Employee','Mitarbeiter','Pracownik','Працівник','Angajat'],
+  'Z vašich modulů': ['From your modules','Aus Ihren Modulen','Z Twoich modułów','З ваших модулів','Din modulele dvs.'],
   'Byl(a) jste pozván(a) ke školení': ['You have been invited to training','Sie wurden zu einer Schulung eingeladen','Zostałeś zaproszony na szkolenie','Вас запросили на навчання','Ați fost invitat la instruire'],
   'Máte nesplněné školení po termínu': ['Overdue training','Überfällige Schulung','Zaległe szkolenie','Прострочене навчання','Instruire restantă'],
   'Školení je potřeba absolvovat do jednoho týdne od pozvánky.': ['The training must be completed within one week of the invitation.','Die Schulung ist innerhalb einer Woche nach der Einladung zu absolvieren.','Szkolenie należy ukończyć w ciągu tygodnia od zaproszenia.','Навчання потрібно пройти протягом тижня від запрошення.','Instruirea trebuie finalizată în termen de o săptămână de la invitație.'],
@@ -4134,6 +4135,8 @@ function showDashboard(){
   let mainH = '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>'+mjT('Aktuality')+(aktN>0?' <span style="background:#e0a400;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;vertical-align:2px">'+aktN+' '+mjT('NOVÉ')+'</span>':'')+'</h3>'+
     (canPostAkt?'<button class="btn sm" type="button" onclick="aktNew()">+ Přidat</button>':'')+
     '</div><div class="webpart-body" id="aktBody"><div class="muted">Načítám aktuality…</div></div></section>';
+  mainH += '<section class="webpart" id="notifWrap" style="display:none"><div class="webpart-head"><h3>'+mjT('Z vašich modulů')+'</h3>'+
+    '<span class="pill green" id="notifPocet"></span></div><div class="webpart-body" id="notifBody"></div></section>';
   mainH += '<div class="dash-sec">'+mjT('K vyřízení')+'</div>';
   if(pend.length){
     pend.forEach(p=> mainH+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(p.icon)+'</div><div><div class="li-t">'+esc(p.t)+'</div>'+
@@ -4194,6 +4197,27 @@ function showDashboard(){
   loadAktuality();
   loadProdukty();
   loadBilanceWidget();
+  loadNotifikace();
+}
+/* ---------- Notifikace z modulů (konstrukce, poptávky, dovolená, školení…) ---------- */
+const NOTIF_IC={gear:'gear',ticket:'ticket',cal:'cal',school:'school',shield:'shield',file:'file'};
+async function loadNotifikace(){
+  const wrap=document.getElementById('notifWrap'); if(!wrap) return;
+  let d={items:[]};
+  try{ d=await (await fetch('/api/notifikace',{cache:'no-store'})).json(); }catch(e){ return; }
+  const it=(d.items)||[];
+  if(!it.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  const p=document.getElementById('notifPocet'); if(p) p.textContent=it.length;
+  const body=document.getElementById('notifBody');
+  body.innerHTML=it.map(x=>{
+    const ic=MUJ_IC[NOTIF_IC[x.ikona]||'file']||MUJ_IC.file;
+    return '<div class="li-item" style="'+(x.urgent?'border-left:3px solid #b3261e;':'')+'">'+
+      '<div class="li-left"><div class="li-ic">'+mujIcon(ic)+'</div><div>'+
+      '<div class="li-t">'+esc(x.text)+'</div>'+
+      '<div class="muted" style="font-size:12px;margin-top:2px"><b>'+esc(x.modulNazev)+'</b>'+(x.sub?' · '+esc(x.sub):'')+'</div></div></div>'+
+      '<button class="btn sm'+(x.urgent?'':' ghost')+'" onclick="mjGo(\''+x.modul+'\')">'+mjT('Otevřít')+'</button></div>';
+  }).join('');
 }
 // ---------- Bilance skladu e-shop (home widget, jen pro přístup k modulu eshop) ----------
 function bilKc(n){ n=+n||0; const a=Math.abs(n); if(a>=1e6) return (Math.round(n/1e5)/10).toLocaleString('cs-CZ')+' mil.'; if(a>=1e3) return Math.round(n/1e3).toLocaleString('cs-CZ')+' tis.'; return Math.round(n).toLocaleString('cs-CZ'); }

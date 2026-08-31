@@ -865,6 +865,101 @@ async function skolPlanyTick() {
     if (zmena) skolPlanWrite(data);
   } catch (e) { console.warn('[skoleni-plan] běh selhal: ' + e.message); }
 }
+/* ---------- Notifikace z modulů na hlavní stránku ----------
+   Každý vidí jen to, co se týká jeho: konstruktér svoje výkresy, obchodník svoje
+   poptávky, nákupčí požadavky… Čte se přímo z datových souborů modulů, aby to
+   fungovalo bez ohledu na to, který modul je zrovna namontovaný. */
+function plural(n, a, b, c) { n = Number(n) || 0; return n === 1 ? a : (n >= 2 && n <= 4 ? b : c); }
+const KONSTR_STAVY = {
+  novy: 'Nová zakázka', prideleni: 'Přidělení konstruktéra', prace: 'Obchodní výkres',
+  kontrola: 'Interní kontrola', revize: 'Revize', obchodnik: 'Schválení obchodníkem',
+  klient: 'Schválení klientem', podklady: 'Výrobní podklady', schvaleno: 'Schváleno', dokonceno: 'Dokončeno'
+};
+const KONSTR_HOTOVO = ['schvaleno', 'dokonceno', 'zamitnuto', 'zruseno'];
+function notifKonstrukce(email, mods, admin) {
+  const out = [];
+  if (!(admin || mods.indexOf('konstrukce') >= 0 || isObchodnikEmail(email))) return out;
+  const d = readJson(path.join(DATA_DIR, 'konstrukce.json'), null); if (!d || !Array.isArray(d.zakazky)) return out;
+  const ted = Date.now();
+  d.zakazky.forEach(z => {
+    if (KONSTR_HOTOVO.indexOf(z.stav) >= 0) return;
+    const jaKonstrukter = (z.assignedTo || '').toLowerCase() === email;
+    const jaObchodnik = (z.obchodnikEmail || '').toLowerCase() === email && z.stav === 'obchodnik';
+    if (!jaKonstrukter && !jaObchodnik) return;
+    const poTerminu = z.deadline && ted > Number(z.deadline);
+    out.push({
+      modul: 'konstrukce', modulNazev: 'Konstrukce', ikona: 'gear',
+      text: (z.cislo || 'Výkres') + ' — ' + (KONSTR_STAVY[z.stav] || z.stav),
+      sub: (z.zakaznik ? z.zakaznik + ' · ' : '') + (jaObchodnik ? 'čeká na vaše schválení' : 'máte na starost')
+        + (z.deadline ? ' · termín ' + new Date(Number(z.deadline)).toLocaleDateString('cs-CZ') : ''),
+      urgent: !!poTerminu
+    });
+  });
+  return out;
+}
+function notifPoptavky(email, mods, admin) {
+  const out = [];
+  const d = readJson(path.join(DATA_DIR, 'kontejnery-poptavky.json'), null); if (!d || !Array.isArray(d.items)) return out;
+  const otevrene = ['nova', 'vresenu', 'ozvat'];
+  d.items.forEach(x => {
+    const ob = ((x.obchodnik && x.obchodnik.email) || '').toLowerCase();
+    if (ob !== email) return;
+    if (otevrene.indexOf(x.stav) < 0) return;
+    const stari = x.createdAt ? Math.floor((Date.now() - Number(x.createdAt)) / 86400000) : 0;
+    out.push({
+      modul: 'poptavky', modulNazev: 'Poptávky', ikona: 'ticket',
+      text: 'Poptávka #' + (x.cislo || '') + ' — ' + (x.firma || x.jmeno || 'klient'),
+      sub: (x.mesto ? x.mesto + ' · ' : '') + (x.stav === 'nova' ? 'nová, čeká na ozvání' : 'rozpracovaná') + (stari ? ' · ' + stari + ' dní' : ''),
+      urgent: x.stav === 'nova' && stari >= 1
+    });
+  });
+  return out;
+}
+function notifReklamace(email, mods, admin) {
+  const out = [];
+  if (!(admin || mods.indexOf('reklamace') >= 0)) return out;
+  const d = readJson(path.join(DATA_DIR, 'reklamace.json'), null); if (!d || !Array.isArray(d.cases)) return out;
+  const otevrene = d.cases.filter(c => c && c.stav && ['nova', 'nové', 'nová', 'otevrena', 'v-reseni'].indexOf(String(c.stav).toLowerCase()) >= 0);
+  if (otevrene.length) out.push({
+    modul: 'reklamace', modulNazev: 'Reklamace', ikona: 'shield',
+    text: otevrene.length + ' ' + plural(otevrene.length, 'nevyřízená reklamace', 'nevyřízené reklamace', 'nevyřízených reklamací'),
+    sub: 'čekají na zpracování', urgent: false
+  });
+  return out;
+}
+function notifDovolena(email, mods, admin) {
+  const out = [];
+  const ceka = readVac().requests.filter(r => r.status === 'pending' && (r.approverEmail || '').toLowerCase() === email);
+  if (ceka.length) out.push({
+    modul: 'dovolena', modulNazev: 'Dovolená', ikona: 'cal',
+    text: ceka.length + ' ' + plural(ceka.length, 'žádost o dovolenou', 'žádosti o dovolenou', 'žádostí o dovolenou') + ' ke schválení',
+    sub: ceka.slice(0, 3).map(r => vacPlneJmeno(r.empName, r.empEmail) + ' (' + r.from + ')').join(', '), urgent: false
+  });
+  return out;
+}
+function notifSkoleni(email) {
+  return skolPozMoje(email).map(z => ({
+    modul: 'skoleni', modulNazev: 'Školení', ikona: 'school',
+    text: z.nazev,
+    sub: z.poLhute ? 'termín uplynul — dokončete co nejdřív'
+      : (z.dnyDoTerminu <= 0 ? 'dnes je poslední den' : 'dokončit do ' + new Date(z.termin).toLocaleDateString('cs-CZ') + ' (zbývá ' + z.dnyDoTerminu + ' ' + plural(z.dnyDoTerminu, 'den', 'dny', 'dní') + ')'),
+    urgent: z.poLhute || z.dnyDoTerminu <= 0
+  }));
+}
+// Vše dohromady pro daného člověka.
+function buildNotifikace(email) {
+  email = String(email || '').toLowerCase(); if (!email) return [];
+  let mods = [], admin = false;
+  try { mods = employeeModules(email) || []; } catch (_) {}
+  try { admin = isAdminEmp(email); } catch (_) {}
+  let out = [];
+  try { out = out.concat(notifSkoleni(email)); } catch (_) {}
+  try { out = out.concat(notifKonstrukce(email, mods, admin)); } catch (_) {}
+  try { out = out.concat(notifPoptavky(email, mods, admin)); } catch (_) {}
+  try { out = out.concat(notifDovolena(email, mods, admin)); } catch (_) {}
+  try { out = out.concat(notifReklamace(email, mods, admin)); } catch (_) {}
+  return out.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0)).slice(0, 25);
+}
 function ensureEmployee(email, name) {
   email = (email || '').toLowerCase();
   const s = readJson(STATE_F, { categories: [], employees: [], directives: [], profiles: [] });
@@ -3853,6 +3948,10 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { lide: list });
     }
     // ---- Plány školení (série kurzů po dnech) ----
+    if (p === '/api/notifikace' && req.method === 'GET') {
+      const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      return send(res, 200, { items: buildNotifikace(e.email) }, { 'Cache-Control': 'no-store' });
+    }
     if (p === '/api/skoleni/plany' && req.method === 'GET') {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen správce.' });
       const d = skolPlanRead();
