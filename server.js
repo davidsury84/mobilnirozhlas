@@ -800,8 +800,8 @@ function mySurveys(email) {
     { id: 'grit', title: 'Test houževnatosti (Grit)', desc: '10 otázek · vytrvalost a dlouhodobá vášeň pro cíle', mins: 3, file: GRIT_F },
     { id: 'jss',  title: 'Dotazník pracovní spokojenosti (JSS)', desc: '36 otázek · 9 oblastí pracovní spokojenosti', mins: 8, file: JSS_F },
     { id: 'tw44', title: 'Test kognitivní zátěže (TW44)', desc: 'krátké subtesty pozornosti a paměti', mins: 6, file: TW44_F },
-    { id: 'vykresy', title: 'Test čtení výkresů', desc: '15 otázek · praktické čtení strojírenské výkresové dokumentace', mins: 10, file: VYKRESY_F },
-    { id: 'logika', title: 'Test logického myšlení (nákup a logistika)', desc: '29 úloh · odhady, dedukce, rozhodování, řízení zásob — kreativní logika', mins: 40, file: LOGIKA_F },
+    // Náborové testy (čtení výkresů, logika) se zaměstnancům v Průzkumech nenabízejí —
+    // uchazeči je dostávají odkazem s tokenem (/vykresy, /logika) a správce je vidí v Průzkumech.
   ];
   return DEFS.map(d => {
     const rec = readJson(d.file, []).find(r => (r.email || '').toLowerCase() === email);
