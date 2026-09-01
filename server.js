@@ -2174,7 +2174,10 @@ function approverDuvod(emp, emps) {
    Jednou za měsíc (výchozí 1. den) jde přehled za předchozí měsíc: kdo dovolenou čerpal
    (schválené žádosti), co je zatím jen schváleno dopředu a jaké je aktuální konto.
    Příjemce lze přidávat/odebírat v Rozesílkách. */
-const VACREP_DEFAULT_TO = ['jana.pankova@elkoplast.cz'];
+const VACREP_DEFAULT_TO = ['jana.pankova@elkoplast.cz', 'ivana.krejci@elkoplast.cz'];
+// Jednorázové doplnění příjemců (2026-09-01) — u už založené rozesílky se sada příjemců nepřepisuje,
+// takže nové adresy doplníme sem; dál se spravují v Rozesílkách.
+const VACREP_DOPLNIT = ['ivana.krejci@elkoplast.cz'];
 function vacRepCfg() {
   const d = readJson(VACREP_F, null) || {};
   return {
@@ -2185,6 +2188,17 @@ function vacRepCfg() {
   };
 }
 function vacRepWrite(patch) { const cur = vacRepCfg(); writeJson(VACREP_F, Object.assign(cur, patch || {})); return vacRepCfg(); }
+(function () {   // doplnění příjemců proběhne jednou
+  try {
+    const d = readJson(VACREP_F, null);
+    if (!d || d._doplneni20260901) return;
+    const to = Array.isArray(d.to) ? d.to.slice() : VACREP_DEFAULT_TO.slice();
+    let pridano = 0;
+    VACREP_DOPLNIT.forEach(e => { if (to.map(x => String(x).toLowerCase()).indexOf(e) < 0) { to.push(e); pridano++; } });
+    writeJson(VACREP_F, Object.assign({}, d, { to, _doplneni20260901: 1 }));
+    if (pridano) console.log('[dovolená] do měsíčního reportu doplněno ' + pridano + ' příjemců: ' + to.join(', '));
+  } catch (e) { console.warn('[dovolená] doplnění příjemců selhalo:', e.message); }
+})();
 // Pracovní dny žádosti, které spadají do zadaného měsíce (žádost může přesahovat přes měsíce).
 function vacDaysInMonth(r, y, m) {
   const a = new Date(r.from + 'T00:00:00'), b = new Date(r.to + 'T00:00:00');
