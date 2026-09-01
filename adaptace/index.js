@@ -82,7 +82,7 @@ function mount(host) {
       if (p === '/api/adaptace/guest' && req.method === 'GET') {
         const a = M.assignment.byHash(u.query.hash || '');
         if (!a) { json(res, 404, { chyba: 'Neplatný odkaz.' }); return true; }
-        json(res, 200, { ...a, tasks: M.progress.forAssignment(a.id) }); return true;
+        json(res, 200, { ...a, tasks: obohatOTesty(M.progress.forAssignment(a.id), a.emp_email) }); return true;
       }
       // guest: plnění úkolu přes hash (jen nováčkovy brány, ne mentor)
       if (p === '/api/adaptace/guest-flag' && req.method === 'POST') {
@@ -141,14 +141,14 @@ function mount(host) {
       // ---- ZAMĚSTNANEC: moje adaptace ------------------------------
       if (p === '/api/adaptace/my' && req.method === 'GET') {
         if (!me) { json(res, 401, { chyba: 'Nepřihlášeno.' }); return true; }
-        const list = M.assignment.forEmployee(me).map((a) => ({ ...a, tasks: M.progress.forAssignment(a.id) }));
+        const list = M.assignment.forEmployee(me).map((a) => ({ ...a, tasks: obohatOTesty(M.progress.forAssignment(a.id), a.emp_email) }));
         json(res, 200, list); return true;
       }
 
       // ---- MENTOR: moji svěřenci -----------------------------------
       if (p === '/api/adaptace/mentees' && req.method === 'GET') {
         if (!me) { json(res, 401, { chyba: 'Nepřihlášeno.' }); return true; }
-        const list = M.assignment.forMentor(me).map((a) => ({ ...a, tasks: M.progress.forAssignment(a.id) }));
+        const list = M.assignment.forMentor(me).map((a) => ({ ...a, tasks: obohatOTesty(M.progress.forAssignment(a.id), a.emp_email) }));
         json(res, 200, list); return true;
       }
 
@@ -291,7 +291,7 @@ function mount(host) {
       if (p === '/api/adaptace/assignment' && req.method === 'GET') {
         const a = M.assignment.getById(Number(u.query.id));
         if (!a) { json(res, 404, { chyba: 'Nenalezeno.' }); return true; }
-        json(res, 200, { ...a, tasks: M.progress.forAssignment(a.id) }); return true;
+        json(res, 200, { ...a, tasks: obohatOTesty(M.progress.forAssignment(a.id), a.emp_email) }); return true;
       }
     } catch (e) { json(res, 500, { chyba: e.message }); return true; }
 
@@ -301,6 +301,22 @@ function mount(host) {
   async function tick() {
     try { await engine.tick(M, { deliver: host.deliver, baseUrl: host.publicBaseUrl || '' }); }
     catch (e) { console.error('[adaptace] tick chyba:', e.message); }
+  }
+
+  // K úkolům, které odkazují na školení, doplní výsledek závěrečného testu.
+  function obohatOTesty(tasks, email) {
+    if (!Array.isArray(tasks) || !host.skolVysledek || !email) return tasks;
+    return tasks.map((t) => {
+      let kurz = '';
+      try {
+        const l = JSON.parse(t.links_json || '[]')[0];
+        const m = /kurz=([a-z0-9-]+)/i.exec((l && l.url) || '');
+        kurz = m ? m[1] : '';
+      } catch (_) { /* bez odkazu */ }
+      if (!kurz) return t;
+      try { return { ...t, skoleni: host.skolVysledek(String(email).toLowerCase(), kurz) }; }
+      catch (_) { return t; }
+    });
   }
 
   /* Školicí úkoly z adaptačních scénářů — aby se plnění propsalo do výpisu školení.

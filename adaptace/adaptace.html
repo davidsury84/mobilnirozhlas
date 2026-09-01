@@ -438,6 +438,20 @@ async function viewMentor(){
 }
 
 /* ---- společný render seznamu úkolů po fázích ---- */
+/* Výsledek závěrečného testu u úkolu, který je školením (doplňuje server). */
+function testHtml(sk){
+  if(!sk) return '';
+  const barvy={ 'splněno':['#e6f4ea','#1f5e22'], 'nesplněno':['#fdecea','#b3261e'], 'rozpracováno':['#fff8e6','#8a6d1f'], 'nezahájeno':['#f2f4f1','#5b6b60'] };
+  const c=barvy[sk.stav]||barvy['nezahájeno'];
+  const ikona={ 'splněno':'✓','nesplněno':'✕','rozpracováno':'◐','nezahájeno':'○' }[sk.stav]||'○';
+  let detail;
+  if(sk.stav==='nezahájeno') detail='test zatím nespuštěn';
+  else if(sk.stav==='splněno') detail='úspěšnost <b>'+sk.nejlepsi+' %</b> · '+sk.pokusy+' z '+sk.maxPokusu+' '+(sk.pokusy===1?'pokusu':'pokusů');
+  else if(sk.stav==='nesplněno') detail='nejlepší <b>'+sk.nejlepsi+' %</b> · vyčerpáno '+sk.pokusy+' z '+sk.maxPokusu+' pokusů (hranice 80 %)';
+  else detail='nejlepší zatím <b>'+sk.nejlepsi+' %</b> · '+sk.pokusy+' z '+sk.maxPokusu+' pokusů';
+  return '<div style="margin-top:6px;display:inline-flex;align-items:center;gap:7px;background:'+c[0]+';color:'+c[1]+
+    ';border-radius:8px;padding:4px 10px;font-size:12.5px"><b>'+ikona+' Závěrečný test: '+sk.stav+'</b><span style="opacity:.85">'+detail+'</span></div>';
+}
 function renderTaskList(tasks, mode){
   mode = mode||{};
   let html='', lastPhase=null;
@@ -456,6 +470,7 @@ function renderTaskList(tasks, mode){
     html+=`<div class="task"><div class="row">
       <div style="flex:1;min-width:180px"><strong>${esc(t.label)}</strong>
         ${t.description?`<div class="mut sm" style="margin-top:2px">${esc(t.description)}</div>`:''}
+        ${testHtml(t.skoleni)}
         ${linksHtml(t.links_json)}${mapHtml(t.addresses_json)}</div>
       <span class="pill ${st.cls}">${st.txt}</span>
       <div class="row" style="gap:6px">${actions}</div>

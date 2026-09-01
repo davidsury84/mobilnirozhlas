@@ -771,6 +771,31 @@ function skolZAdaptace(email) {
     return adaptaceMod.skoleniStavy(email).filter(x => x.kurz && SKOLENI_NAZVY[x.kurz]);
   } catch (_) { return []; }
 }
+// Výsledek závěrečného testu daného školení (pro detail adaptace i výpisy).
+function skolVysledek(email, kurz) {
+  email = String(email || '').toLowerCase();
+  const prazdny = { kurz, nazev: SKOLENI_NAZVY[kurz] || kurz, pokusy: 0, maxPokusu: kurz === 'svarovani' ? 1 : 3, nejlepsi: 0, splnil: false, stav: 'nezahájeno' };
+  if (!email || !SKOLENI_NAZVY[kurz]) return prazdny;
+  let st = null;
+  try {
+    if (kurz === 'abroll') st = abrollStatus(email);
+    else if (kurz === 'kovo' || kurz === 'roto') st = produktyStatus(email, kurz);
+    else if (kurz === 'prumysl') st = prumyslStatus(email);
+    else if (kurz === 'loxxer') st = loxxerSkoleniStatus(email);
+    else if (kurz === 'acts') st = actsSkoleniStatus(email);
+    else if (kurz === 'vykresy-skoleni') st = vykresySkoleniStatus(email);
+    else if (kurz === 'svarovani') st = svarovaniSkoleniStatus(email);
+    else if (kurz === 'zentex') st = zentexSkoleniStatus(email);
+    else if (kurz === 'tridici-linky') st = tridiciSkoleniStatus(email);
+  } catch (_) {}
+  if (!st) return prazdny;
+  const pokusy = Number(st.attemptsUsed) || 0, nejlepsi = Number(st.best) || 0;
+  const max = prazdny.maxPokusu;
+  return {
+    kurz, nazev: prazdny.nazev, pokusy, maxPokusu: max, nejlepsi, splnil: !!st.passed,
+    stav: st.passed ? 'splněno' : (pokusy >= max ? 'nesplněno' : (pokusy > 0 ? 'rozpracováno' : 'nezahájeno'))
+  };
+}
 // Otevřené povinnosti zaměstnance (pozvánky + adaptační scénáře) + kolik dní zbývá.
 function skolPozMoje(email) {
   email = String(email || '').toLowerCase(); if (!email) return [];
@@ -3126,6 +3151,7 @@ let adaptaceMod = null;
 try {
   adaptaceMod = require('./adaptace').mount({
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, ensureEmployee,
+    skolVysledek,                       // výsledky závěrečných testů školení (detail adaptace)
     dataDir: DATA_DIR,
     publicBaseUrl: (CFG.publicUrl || process.env.PUBLIC_URL || ''),
   });
