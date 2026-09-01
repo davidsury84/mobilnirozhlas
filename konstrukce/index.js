@@ -224,7 +224,36 @@ function vykresStdFor(z) {
   if (!roz || !ple[1]) return null;
   const base = 'ABR-' + String(z.typKey || '').toUpperCase() + '-' + roz + '-' + ple[1] + ple[2];
   const hit = VYKRESY_STD[base];
-  return hit ? { f: hit.f, nazev: base, zdroj: hit.zdroj || '' } : null;
+  if (hit) return { f: hit.f, nazev: base, zdroj: hit.zdroj || '' };
+  // Přesná shoda není → nejbližší výkres STEJNÉ řady (přednost stejným plechům,
+  // součet odchylek rozměrů max 600 mm — dál už by výkres spíš mátl než pomohl).
+  const rm = roz.match(/^(\d{3,4})x(\d{3,4})(?:_\d{3,4})?x(\d{3,4})/);
+  if (!rm) return null;
+  const L = +rm[1], W = +rm[2], H = +rm[3];
+  const pref = 'ABR-' + String(z.typKey || '').toUpperCase() + '-';
+  let best = null;
+  for (const key of Object.keys(VYKRESY_STD)) {
+    if (!key.startsWith(pref)) continue;
+    const km = key.slice(pref.length).match(/^(\d{3,4})x(\d{3,4})(?:_(\d{3,4}))?x(\d{3,4})-(\d)(\d)$/);
+    if (!km) continue;
+    const dL = Math.abs(+km[1] - L);
+    const dW = Math.min(Math.abs(+km[2] - W), km[3] ? Math.abs(+km[3] - W) : Infinity);
+    const dH = Math.abs(+km[4] - H);
+    const dist = dL + dW + dH;
+    if (dist > 600) continue;
+    const stejnePlechy = (km[5] + '/' + km[6]) === (ple[1] + '/' + ple[2]);
+    const rank = (stejnePlechy ? 0 : 1e6) + dist;
+    if (!best || rank < best.rank || (rank === best.rank && key < best.key)) best = { key, rank, km, dL, dW, dH, stejnePlechy };
+  }
+  if (!best) return null;
+  const bh = VYKRESY_STD[best.key];
+  const dif = [];
+  if (best.dL) dif.push('délka ' + L + ' → ' + best.km[1]);
+  if (best.dW) dif.push('šířka ' + W + ' → ' + best.km[2] + (best.km[3] ? '/' + best.km[3] : ''));
+  if (best.dH) dif.push('výška ' + H + ' → ' + best.km[4]);
+  if (!best.stejnePlechy) dif.push('plechy ' + ple[1] + '/' + ple[2] + ' → ' + best.km[5] + '/' + best.km[6]);
+  if (!dif.length) return { f: bh.f, nazev: best.key, zdroj: bh.zdroj || '' };
+  return { f: bh.f, nazev: best.key, zdroj: bh.zdroj || '', nejblizsi: dif.join(' · ') };
 }
 
 // ---- Dotazník CITY — uzavřené městské abroll kontejnery (hákový nosič) ------
