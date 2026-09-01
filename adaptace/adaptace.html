@@ -138,7 +138,9 @@ async function viewScenare(){
   const list = await api('/api/adaptace/scenarios');
   $('#view').innerHTML = `
     <div class="row" style="margin-bottom:12px"><h2>Scénáře adaptace</h2><div class="sp"></div>
+      <button class="btn ghost" onclick="skolScenarForm()">🎓 Scénář ze školení</button>
       <button class="btn" onclick="editScenario()">+ Nový scénář</button></div>
+    <div id="skolScenarBox"></div>
     ${list.length? list.map(s=>`
       <div class="card"><div class="row">
         <div><h3>${esc(s.label)} ${s.active?'':'<span class="mut sm">(neaktivní)</span>'}</h3>
@@ -147,6 +149,56 @@ async function viewScenare(){
         <button class="btn ghost mini" onclick="editScenario(${s.id})">Upravit obsah</button>
         <button class="btn del mini" onclick="delScenario(${s.id})">Smazat</button>
       </div></div>`).join('') : '<div class="empty">Zatím žádné scénáře. Vytvořte první.</div>'}`;
+}
+/* Scénář poskládaný ze školení intranetu: vyber kurzy, rozestup a lhůtu.
+   Vznikne běžný scénář adaptace — dál se přiřazuje a hlídá stejně jako ostatní. */
+const SKOLENI_SEZNAM = [
+  ['prumysl','Průmysl — obchodník segmentu Skladování'],
+  ['loxxer','LOXXER — protipožární skříně na Li-Ion baterie'],
+  ['kovo','Produkty KOVO — kovové výrobky'],
+  ['roto','Produkty ROTO — plastové výrobky'],
+  ['abroll','ABROLL — kódování a konfigurace'],
+  ['acts','ACTS — železniční abroll kontejnery'],
+  ['vykresy-skoleni','Čtení technických výkresů (ČSN/ISO)'],
+  ['svarovani','Průvodce svařováním — hodnocení svarů (ISO 5817)'],
+  ['zentex','ZENTEX — lisovací kontejnery (výběr vhodného lisu)'],
+  ['tridici-linky','Třídicí linky — technologie, trh a ekonomika dotřídění'],
+];
+const SKOL_URL = { 'kovo':'/#modul=skoleni&kurz=kovo','roto':'/#modul=skoleni&kurz=roto',
+  'abroll':'/#modul=skoleni&kurz=abroll','prumysl':'/#modul=skoleni&kurz=prumysl',
+  'loxxer':'/#modul=skoleni&kurz=loxxer','acts':'/#modul=skoleni&kurz=acts',
+  'vykresy-skoleni':'/#modul=skoleni&kurz=vykresy','svarovani':'/#modul=skoleni&kurz=svarovani' };
+function skolScenarZavri(){ const b=$('#skolScenarBox'); if(b) b.innerHTML=''; }
+function skolScenarForm(){
+  const b=$('#skolScenarBox'); if(!b) return;
+  b.innerHTML = '<div class="card" style="border-left:4px solid #2d6cdf">'+
+    '<h3 style="margin-top:0">Scénář ze školení</h3>'+
+    '<p class="mut sm">Vyber kurzy v pořadí, jak mají jít po sobě. Z každého vznikne jeden úkol s termínem — první do „lhůty", každý další posunutý o rozestup. Termíny pak hlídá adaptace stejně jako u ostatních scénářů (upozornění 7 dní předem, den předem, v den termínu i po něm).</p>'+
+    '<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">'+
+      '<label style="flex:2;min-width:220px">Název scénáře<br><input id="skolLabel" placeholder="např. Školicí plán nového obchodníka" style="width:100%"></label>'+
+      '<label style="flex:1;min-width:120px">Rozestup (dní)<br><input id="skolRozestup" type="number" min="1" max="60" value="2" style="width:100%"></label>'+
+      '<label style="flex:1;min-width:150px">Lhůta na 1. kurz (dní)<br><input id="skolLhuta" type="number" min="1" max="60" value="2" style="width:100%"></label>'+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;gap:5px;max-height:260px;overflow:auto;border:1px solid #e3e6ea;border-radius:8px;padding:10px">'+
+      SKOLENI_SEZNAM.map(function(k){ return '<label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" class="skolK" value="'+k[0]+'" data-nazev="'+esc(k[1])+'"> '+esc(k[1])+'</label>'; }).join('')+
+    '</div>'+
+    '<div class="row" style="margin-top:12px;gap:8px">'+
+      '<button class="btn" onclick="skolScenarUloz()">Vytvořit scénář</button>'+
+      '<button class="btn ghost" onclick="skolScenarZavri()">Zrušit</button>'+
+    '</div></div>';
+}
+async function skolScenarUloz(){
+  const vyber=[].slice.call(document.querySelectorAll('.skolK:checked')).map(function(c){
+    return { kurz:c.value, nazev:c.dataset.nazev, url:SKOL_URL[c.value]||'/#modul=skoleni' }; });
+  if(!vyber.length){ alert('Vyber alespoň jedno školení.'); return; }
+  const label=($('#skolLabel').value||'').trim()||'Školicí plán';
+  const rozestup=Number($('#skolRozestup').value)||2, lhuta=Number($('#skolLhuta').value)||rozestup;
+  try{
+    const r=await api('/api/adaptace/scenar-ze-skoleni',{method:'POST',body:JSON.stringify({label:label,kurzy:vyber,rozestup:rozestup,lhuta:lhuta})});
+    skolScenarZavri();
+    await viewScenare();
+    alert('Scénář „'+label+'" vytvořen ('+(r.kroku||vyber.length)+' školení). Přiřaď ho lidem v záložce Adaptace.');
+  }catch(e){ alert('Nepodařilo se vytvořit: '+(e.message||e)); }
 }
 function editScenario(id){
   if (!id) return modal(`<h2>Nový scénář</h2>

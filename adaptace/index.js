@@ -220,6 +220,29 @@ function mount(host) {
         if (p === '/api/adaptace/scenario-create') { json(res, 201, M.scenario.create(b, by)); return true; }
         if (p === '/api/adaptace/scenario-update') { json(res, 200, M.scenario.update(id, b)); return true; }
         if (p === '/api/adaptace/scenario-delete') { M.scenario.remove(id); json(res, 200, { ok: true }); return true; }
+        // Scénář poskládaný ze školení: jedno školení = jeden úkol, termíny po dnech.
+        // b: { label, kurzy:[{kurz,nazev,url}], rozestup, lhuta, kategorie }
+        if (p === '/api/adaptace/scenar-ze-skoleni') {
+          const kurzy = Array.isArray(b.kurzy) ? b.kurzy.filter((k) => k && k.nazev) : [];
+          if (!kurzy.length) { json(res, 400, { chyba: 'Vyberte alespoň jedno školení.' }); return true; }
+          const rozestup = Math.max(1, Math.min(60, Number(b.rozestup) || 2));
+          const lhuta = Math.max(1, Math.min(60, Number(b.lhuta) || rozestup));
+          const sc = M.scenario.create({ label: String(b.label || 'Školicí plán').slice(0, 200), category: b.kategorie || 'Školení', active: 1 }, by);
+          const ph = M.phase.create({ scenario_id: sc.id, label: 'Školení', description: 'Kurzy v pořadí, každý s vlastním termínem.', position: 0 });
+          kurzy.forEach((k, i) => {
+            M.task.create({
+              phase_id: ph.id,
+              label: String(k.nazev).slice(0, 200),
+              description: 'Absolvujte školení v intranetu a dokončete závěrečný test.',
+              needs_understanding: 1, email_employee: 1,
+              deadline_days: i * rozestup + lhuta,     // 1. kurz do „lhuta“ dnů, další po rozestupu
+              links_json: JSON.stringify([{ label: 'Otevřít školení', url: k.url || '/#modul=skoleni' }]),
+              position: i,
+            });
+          });
+          json(res, 201, { ok: true, scenario: sc, kroku: kurzy.length });
+          return true;
+        }
         // fáze
         if (p === '/api/adaptace/phase-create') { json(res, 201, M.phase.create(b)); return true; }
         if (p === '/api/adaptace/phase-update') { json(res, 200, M.phase.update(id, b)); return true; }
