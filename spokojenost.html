@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dotazník spokojenosti — shop.elkoplast.cz</title>
+<meta property="og:title" content="Pomozte nám zlepšit shop.elkoplast.cz">
+<meta property="og:description" content="Krátký anonymní dotazník — zhruba 5 minut, převážně klikací.">
+<meta name="robots" content="noindex">
+<style>
+  :root{
+    --bg:#f2f5f1; --paper:#ffffff; --paper-soft:#f8faf7;
+    --ink:#111713; --ink-soft:#5d675f; --muted:#8a948c;
+    --line:#dce4dc; --line-strong:#b9c8bc;
+    --green:#0e8a43; --green-2:#18a957; --green-d:#08612d; --green-soft:#e3f3e9;
+    --bad:#d03b3b; --r:16px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  [hidden]{display:none !important}
+  html{color-scheme:light}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); line-height:1.5; -webkit-font-smoothing:antialiased; min-height:100svh}
+  header.app{background:var(--paper); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:40}
+  .app-in{max-width:720px; margin:0 auto; padding:10px 16px; display:flex; align-items:center; gap:14px}
+  .brand{line-height:1.15}
+  .brand b{font-size:14px; letter-spacing:.05em; color:var(--green-d)}
+  .brand span{display:block; font-size:9.5px; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); font-weight:600}
+  .head-prog{flex:1; text-align:right; font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--ink-soft)}
+  .head-prog small{display:block; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.1em; color:var(--green)}
+  .pbar{height:4px; background:var(--line)}
+  .pbar i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--green),var(--green-2)); transition:width .3s ease}
+  main{max-width:720px; margin:0 auto; padding:22px 16px 64px}
+  .screen{display:none}
+  .screen.active{display:block; animation:fade .22s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+  .card{background:var(--paper); border:1px solid var(--line); border-radius:var(--r); padding:24px; box-shadow:0 1px 2px rgba(17,23,19,.05)}
+  h1{font-size:25px; line-height:1.22; letter-spacing:-.01em; margin-bottom:10px}
+  .lead{color:var(--ink-soft); font-size:15px; white-space:pre-line}
+  .hint{color:var(--muted); font-size:12.5px}
+  .btn{display:inline-block; padding:13px 22px; font-size:16px; font-weight:700; font-family:inherit; cursor:pointer; border:none; border-radius:12px; background:var(--green); color:#fff}
+  .btn:hover{background:var(--green-d)}
+  .btn:disabled{background:var(--line-strong); cursor:not-allowed}
+  .btn.ghost{background:transparent; color:var(--green-d); border:1.5px solid var(--line-strong); font-weight:600}
+  .btn.ghost:hover{border-color:var(--green); background:var(--green-soft)}
+  .btn.sm{padding:8px 14px; font-size:13.5px; border-radius:10px}
+  .resume{display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--green-soft); border:1.5px solid var(--green); border-radius:12px; padding:13px 15px; margin:16px 0}
+  .resume b{color:var(--green-d)}
+
+  /* otázka */
+  .q-sekce{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.12em; color:var(--green); margin-bottom:6px}
+  .q-text{font-size:19px; font-weight:700; line-height:1.35; margin-bottom:4px}
+  .q-pozn{color:var(--muted); font-size:13px; margin-bottom:6px}
+  .q-obr{margin:12px 0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff}
+  .q-obr img{display:block; width:100%; height:auto}
+  .opts{display:grid; gap:8px; margin-top:14px}
+  .opt{display:flex; align-items:flex-start; gap:11px; padding:12px 14px; cursor:pointer; text-align:left;
+    border:1.5px solid var(--line-strong); border-radius:12px; background:var(--paper); font-family:inherit; font-size:15px; line-height:1.4; width:100%}
+  .opt:hover{border-color:var(--green-2)}
+  .opt.sel{background:var(--green-soft); border-color:var(--green); font-weight:600}
+  .opt .box{flex:none; width:20px; height:20px; margin-top:1px; border:2px solid var(--line-strong); border-radius:50%; position:relative}
+  .opt.multi .box{border-radius:6px}
+  .opt.sel .box{border-color:var(--green); background:var(--green)}
+  .opt.sel .box::after{content:"✓"; position:absolute; inset:0; color:#fff; font-size:13px; font-weight:800; line-height:17px; text-align:center}
+  .skala{display:flex; gap:7px; margin-top:16px; flex-wrap:wrap}
+  .skala button{flex:1; min-width:44px; max-width:86px; padding:13px 4px; font-size:17px; font-weight:800; font-family:inherit; cursor:pointer;
+    border:1.5px solid var(--line-strong); border-radius:12px; background:var(--paper); color:var(--ink)}
+  .skala button:hover{border-color:var(--green); background:var(--green-soft)}
+  .skala button.sel{background:var(--green); border-color:var(--green); color:#fff}
+  .skala.s11 button{min-width:38px; padding:11px 2px; font-size:15px}
+  .skala-popisy{display:flex; justify-content:space-between; margin-top:6px}
+  .skala-popisy span{font-size:11.5px; color:var(--muted)}
+  .nehodnotim{margin-top:10px}
+  .kat-radek{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  .kat-radek:last-child{border-bottom:none}
+  .kat-radek .nazev{flex:1 1 180px; font-size:14.5px; font-weight:600}
+  .kat-radek .skala{margin-top:0; flex:0 0 auto}
+  .kat-radek .skala button{min-width:38px; max-width:44px; padding:9px 2px; font-size:14px}
+  textarea.inp, input.inp{width:100%; padding:11px 13px; font-size:15px; font-family:inherit; border:1px solid var(--line-strong); border-radius:10px; background:var(--paper); margin-top:12px}
+  textarea.inp{min-height:96px; resize:vertical}
+  .inp:focus{outline:2px solid var(--green-2); outline-offset:1px; border-color:var(--green-2)}
+  .q-nav{display:flex; align-items:center; justify-content:space-between; margin-top:18px; gap:10px}
+  .navlink{background:none; border:none; font-family:inherit; font-size:14px; color:var(--ink-soft); cursor:pointer; padding:8px 10px; border-radius:8px}
+  .navlink:hover{background:var(--paper); color:var(--ink)}
+  .navlink:disabled{opacity:.35; cursor:default}
+  .done-emoji{font-size:52px; text-align:center; margin-bottom:6px}
+  .center{text-align:center}
+  .savenote{position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:60; background:var(--ink); color:#fff; font-size:12.5px; padding:7px 14px; border-radius:999px; opacity:0; transition:opacity .25s ease; pointer-events:none}
+  .savenote.show{opacity:.92}
+</style>
+</head>
+<body>
+<header class="app">
+  <div class="app-in">
+    <div class="brand"><b>ELKOPLAST CZ</b><span>shop.elkoplast.cz · dotazník spokojenosti</span></div>
+    <div class="head-prog" id="headProg" hidden><small id="headSekce"></small><span id="headN"></span></div>
+  </div>
+  <div class="pbar"><i id="pbarFill"></i></div>
+</header>
+
+<main>
+  <section class="screen active" id="scrIntro"><div class="card" id="introBox"><p class="hint">Načítám dotazník…</p></div></section>
+  <section class="screen" id="scrQ">
+    <div class="card" id="qBox"></div>
+    <div class="q-nav">
+      <button class="navlink" id="btnBack">← Zpět</button>
+      <span class="hint" id="qPovinna"></span>
+      <button class="btn sm" id="btnDalsi" hidden>Pokračovat →</button>
+    </div>
+  </section>
+  <section class="screen" id="scrDone">
+    <div class="card center">
+      <div class="done-emoji">🙏</div>
+      <h1 style="margin-bottom:6px">Děkujeme!</h1>
+      <p class="lead" id="doneText" style="text-align:center"></p>
+      <p class="hint" style="margin-top:18px">Okno teď můžete zavřít.</p>
+    </div>
+  </section>
+</main>
+<div class="savenote" id="saveNote">Uloženo ✓</div>
+
+<script>
+'use strict';
+var LS_KEY = 'spokojenostDotaznik1';
+var $ = function(id){ return document.getElementById(id); };
+var DEF = null;
+
+var S = load() || fresh();
+function fresh(){
+  var rid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g,'').slice(0,24)
+          : ('r' + Date.now().toString(36) + Math.random().toString(36).slice(2,12));
+  return { rid:rid, odpovedi:{}, email:'', cur:'', started:false, hotovo:false };
+}
+function load(){ try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); return (d && d.rid) ? d : null; }catch(_){ return null; } }
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(_){ } }
+
+/* ---------- synchronizace ---------- */
+var syncTimer=null, unsynced=0;
+function payload(){ return JSON.stringify({ rid:S.rid, odpovedi:S.odpovedi, email:S.email, hotovo:S.hotovo }); }
+function syncNow(){ clearTimeout(syncTimer); syncTimer=null;
+  if (!Object.keys(S.odpovedi).length) return;
+  fetch('/api/spokojenost/odpoved',{method:'POST',headers:{'Content-Type':'application/json'},body:payload(),keepalive:true})
+    .then(function(r){ if(r.ok){ unsynced=0; flashSaved(); } }).catch(function(){});
+}
+function syncSoon(){ unsynced=unsynced||Date.now(); clearTimeout(syncTimer); syncTimer=setTimeout(syncNow,2500); }
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='hidden' && unsynced && navigator.sendBeacon)
+    { navigator.sendBeacon('/api/spokojenost/odpoved', new Blob([payload()],{type:'application/json'})); unsynced=0; }
+});
+var savedTimer=null;
+function flashSaved(){ var n=$('saveNote'); n.classList.add('show'); clearTimeout(savedTimer); savedTimer=setTimeout(function(){n.classList.remove('show');},1200); }
+
+/* ---------- viditelné otázky dle větvení ---------- */
+function jeKupujici(){
+  var f = DEF.filtr || {}; var o = S.odpovedi[f.otazka];
+  if (!o || typeof o.v !== 'string') return null;
+  return (f.kupujici || []).indexOf(o.v) >= 0;
+}
+function katSeznam(q){ /* kategorie zvolené v otázce kategorieZ (pro kategorie-skala) */
+  var zdroj = S.odpovedi[q.kategorieZ]; var zdrojQ = najdiOtazku(q.kategorieZ);
+  if (!zdroj || !Array.isArray(zdroj.v) || !zdrojQ) return [];
+  var out = [];
+  zdroj.v.forEach(function(k){
+    if (k === '__jine') { out.push({ k:'__jine', t:(zdroj.txt ? zdroj.txt : 'jiné zboží') }); return; }
+    var m = (zdrojQ.moznosti||[]).filter(function(x){ return x.k===k; })[0];
+    if (m) out.push({ k:k, t:m.t });
+  });
+  return out;
+}
+function najdiOtazku(id){ var r=null; DEF.sekce.forEach(function(s){ s.otazky.forEach(function(q){ if(q.id===id) r=q; }); }); return r; }
+function sekceOtazky(){
+  var kup = jeKupujici(); var out = [];
+  DEF.sekce.forEach(function(s){
+    if (s.jen==='kupujici' && kup!==true) return;
+    if (s.jen==='nekupujici' && kup!==false) return;
+    s.otazky.forEach(function(q){
+      if (q.aktivni===false) return;
+      if (q.typ==='kategorie-skala' && !katSeznam(q).length) return;   /* není co hodnotit */
+      out.push({ q:q, sekce:s });
+    });
+  });
+  return out;
+}
+
+/* ---------- úvod ---------- */
+function renderIntro(){
+  var u = DEF.uvod || {};
+  var vidim = sekceOtazky().length;
+  var h = '<h1>' + esc(u.nadpis||DEF.nazev||'Dotazník') + '</h1>' +
+    '<p class="lead">' + esc(u.text||'') + '</p>' +
+    '<p class="hint" style="margin-top:10px">' + vidim + ' otázek, převážně klikacích · zhruba 5 minut · odpovědi se průběžně ukládají</p>';
+  var zodp = Object.keys(S.odpovedi).length;
+  if (S.started && zodp && !S.hotovo)
+    h += '<div class="resume"><span>Máte rozpracovaný dotazník — <b>' + zodp + '</b> zodpovězených otázek.</span>' +
+         '<button class="btn sm" id="btnResume">Pokračovat</button><button class="btn ghost sm" id="btnRestart">Začít znovu</button></div>';
+  h += '<div style="margin-top:20px"><button class="btn" id="btnStart">' + (S.started&&zodp?'Vyplnit od začátku':'Začít') + '</button></div>';
+  $('introBox').innerHTML = h;
+  if ($('btnResume')) $('btnResume').onclick = function(){ show('scrQ'); renderQ(); };
+  if ($('btnRestart')) $('btnRestart').onclick = function(){ if(confirm('Smazat rozpracované odpovědi a začít znovu?')){ S=fresh(); save(); renderIntro(); } };
+  $('btnStart').onclick = function(){
+    if (S.started && zodp && !confirm('Začít od začátku a smazat dosavadní odpovědi?')) return;
+    if (S.started && zodp) { S=fresh(); }
+    S.started = true; S.cur = ''; save();
+    show('scrQ'); renderQ();
+  };
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function show(id){ ['scrIntro','scrQ','scrDone'].forEach(function(s){ $(s).classList.toggle('active', s===id); }); window.scrollTo(0,0); }
+
+/* ---------- render otázky ---------- */
+var TMP = {};   /* rozpracovaný stav aktuální otázky (výběry před potvrzením) */
+function curIndex(list){ for (var i=0;i<list.length;i++) if (list[i].q.id===S.cur) return i; return -1; }
+function renderQ(){
+  var list = sekceOtazky();
+  if (!list.length){ dokoncit(); return; }
+  var i = curIndex(list);
+  if (i < 0){ /* najdi první nezodpovězenou */
+    i = 0;
+    for (var j=0;j<list.length;j++){ if (!(list[j].q.id in S.odpovedi)) { i=j; break; } i = j; if (j===list.length-1 && (list[j].q.id in S.odpovedi)) { dokoncit(); return; } }
+    S.cur = list[i].q.id; save();
+  }
+  var poz = list[i], q = poz.q;
+  TMP = JSON.parse(JSON.stringify(S.odpovedi[q.id] || {}));
+  $('headProg').hidden = false;
+  $('headSekce').textContent = poz.sekce.nazev;
+  $('headN').textContent = (i+1) + ' / ' + list.length;
+  $('pbarFill').style.width = Math.round(i/list.length*100) + '%';
+  var h = '<div class="q-sekce">' + esc(poz.sekce.nazev) + '</div>' +
+          '<div class="q-text">' + esc(q.text) + '</div>' +
+          (q.pozn ? '<div class="q-pozn">' + esc(q.pozn) + '</div>' : '');
+  if (q.obrazek) h += '<div class="q-obr"><img src="' + esc(q.obrazek) + '" alt=""></div>';
+  if (q.typ==='vyber' || q.typ==='vice') h += htmlMoznosti(q);
+  else if (q.typ==='skala') h += htmlSkala(q);
+  else if (q.typ==='kategorie-skala') h += htmlKategorie(q);
+  else if (q.typ==='text') h += '<textarea class="inp" id="inpText" placeholder="Vaše odpověď…">' + esc(TMP.txt||'') + '</textarea>';
+  $('qBox').innerHTML = h;
+  zapojOtazku(q);
+  $('btnBack').disabled = i===0;
+  $('btnBack').onclick = function(){ if(i>0){ S.cur = list[i-1].q.id; save(); renderQ(); } };
+  aktualizujDalsi(q);
+}
+function htmlMoznosti(q){
+  var multi = q.typ==='vice';
+  var sel = multi ? (Array.isArray(TMP.v)?TMP.v:[]) : TMP.v;
+  var h = '<div class="opts">';
+  (q.moznosti||[]).forEach(function(m){
+    var on = multi ? sel.indexOf(m.k)>=0 : sel===m.k;
+    h += '<button type="button" class="opt' + (multi?' multi':'') + (on?' sel':'') + '" data-k="' + esc(m.k) + '"><span class="box"></span><span>' + esc(m.t) + '</span></button>';
+  });
+  if (q.jine){
+    var on = multi ? sel.indexOf('__jine')>=0 : sel==='__jine';
+    h += '<button type="button" class="opt' + (multi?' multi':'') + (on?' sel':'') + '" data-k="__jine"><span class="box"></span><span>jiné — doplňte</span></button>';
+  }
+  h += '</div>';
+  h += '<input class="inp" id="inpJine" placeholder="Doplňte prosím…" maxlength="300" style="display:' + (jineVybrano(q)?'block':'none') + '" value="' + esc(TMP.txt||'') + '">';
+  if (q.email) h += '<input class="inp" id="inpEmail" type="email" placeholder="vas@email.cz" maxlength="120" style="display:' + (emailZobrazit(q)?'block':'none') + '" value="' + esc(S.email||'') + '">' +
+                    '<p class="hint" id="emailPozn" style="margin-top:6px;display:' + (emailZobrazit(q)?'block':'none') + '">' + esc(q.emailText||'Váš e-mail:') + '</p>';
+  return h;
+}
+function htmlSkala(q){
+  var min = q.min==null?1:q.min, max = q.max==null?5:q.max;
+  var h = '<div class="skala' + ((max-min)>=9?' s11':'') + '">';
+  for (var v=min; v<=max; v++) h += '<button type="button" data-v="' + v + '"' + (TMP.v===v?' class="sel"':'') + '>' + v + '</button>';
+  h += '</div>';
+  h += '<div class="skala-popisy"><span>' + esc(q.popisMin||'') + '</span><span>' + esc(q.popisMax||'') + '</span></div>';
+  if (q.nehodnotim) h += '<div class="nehodnotim"><button type="button" class="btn ghost sm" id="btnNehodnotim"' + (TMP.v===-1?' style="background:var(--green-soft);border-color:var(--green)"':'') + '>' + esc(q.nehodnotim) + '</button></div>';
+  if (q.doplnekText) h += '<p class="hint" style="margin-top:14px">' + esc(q.doplnekText) + '</p><textarea class="inp" id="inpDoplnek" style="margin-top:6px;min-height:64px">' + esc(TMP.txt||'') + '</textarea>';
+  return h;
+}
+function htmlKategorie(q){
+  var min = q.min==null?1:q.min, max = q.max==null?5:q.max;
+  var v = (TMP.v && typeof TMP.v==='object' && !Array.isArray(TMP.v)) ? TMP.v : {};
+  var h = '';
+  katSeznam(q).forEach(function(kat){
+    h += '<div class="kat-radek" data-kat="' + esc(kat.k) + '"><span class="nazev">' + esc(kat.t) + '</span><div class="skala">';
+    for (var x=min; x<=max; x++) h += '<button type="button" data-v="' + x + '"' + (v[kat.k]===x?' class="sel"':'') + '>' + x + '</button>';
+    h += '</div></div>';
+  });
+  h += '<div class="skala-popisy"><span>' + esc(q.popisMin||'') + '</span><span>' + esc(q.popisMax||'') + '</span></div>';
+  return h;
+}
+function jineVybrano(q){ return q.jine && (q.typ==='vice' ? (Array.isArray(TMP.v)&&TMP.v.indexOf('__jine')>=0) : TMP.v==='__jine'); }
+function emailZobrazit(q){ return q.email && typeof TMP.v==='string' && q.email.indexOf(TMP.v)>=0; }
+
+function zapojOtazku(q){
+  if (q.typ==='vyber' || q.typ==='vice'){
+    $('qBox').querySelectorAll('.opt').forEach(function(b){
+      b.onclick = function(){
+        var k = b.dataset.k;
+        if (q.typ==='vice'){
+          var arr = Array.isArray(TMP.v)?TMP.v.slice():[];
+          var ix = arr.indexOf(k);
+          if (ix>=0) arr.splice(ix,1); else arr.push(k);
+          TMP.v = arr; b.classList.toggle('sel');
+          if ($('inpJine')) $('inpJine').style.display = jineVybrano(q)?'block':'none';
+          aktualizujDalsi(q);
+        } else {
+          TMP.v = k;
+          $('qBox').querySelectorAll('.opt').forEach(function(x){ x.classList.toggle('sel', x===b); });
+          if ($('inpJine')) $('inpJine').style.display = jineVybrano(q)?'block':'none';
+          if ($('inpEmail')){ $('inpEmail').style.display = emailZobrazit(q)?'block':'none'; $('emailPozn').style.display = emailZobrazit(q)?'block':'none'; }
+          if (!jineVybrano(q) && !emailZobrazit(q)) setTimeout(function(){ potvrd(q); }, 180);
+          else aktualizujDalsi(q);
+        }
+      };
+    });
+    if ($('inpJine')) $('inpJine').oninput = function(){ TMP.txt = $('inpJine').value; };
+    if ($('inpEmail')) $('inpEmail').oninput = function(){ S.email = $('inpEmail').value.trim(); };
+  }
+  else if (q.typ==='skala'){
+    $('qBox').querySelectorAll('.skala button').forEach(function(b){
+      b.onclick = function(){
+        TMP.v = +b.dataset.v;
+        $('qBox').querySelectorAll('.skala button').forEach(function(x){ x.classList.toggle('sel', x===b); });
+        if (!q.doplnekText) setTimeout(function(){ potvrd(q); }, 180); else aktualizujDalsi(q);
+      };
+    });
+    if ($('btnNehodnotim')) $('btnNehodnotim').onclick = function(){ TMP.v = -1; delete TMP.txt; potvrd(q); };
+    if ($('inpDoplnek')) $('inpDoplnek').oninput = function(){ TMP.txt = $('inpDoplnek').value; };
+  }
+  else if (q.typ==='kategorie-skala'){
+    $('qBox').querySelectorAll('.kat-radek').forEach(function(r){
+      r.querySelectorAll('.skala button').forEach(function(b){
+        b.onclick = function(){
+          var v = (TMP.v && typeof TMP.v==='object' && !Array.isArray(TMP.v)) ? TMP.v : {};
+          v[r.dataset.kat] = +b.dataset.v; TMP.v = v;
+          r.querySelectorAll('.skala button').forEach(function(x){ x.classList.toggle('sel', x===b); });
+          aktualizujDalsi(q);
+          if (hotovaKategorie(q)) setTimeout(function(){ potvrd(q); }, 220);
+        };
+      });
+    });
+  }
+  else if (q.typ==='text'){
+    $('inpText').oninput = function(){ TMP.txt = $('inpText').value; };
+  }
+}
+function hotovaKategorie(q){
+  var v = (TMP.v && typeof TMP.v==='object' && !Array.isArray(TMP.v)) ? TMP.v : {};
+  return katSeznam(q).every(function(k){ return typeof v[k.k]==='number'; });
+}
+function pripraveno(q){
+  if (q.typ==='vyber') return typeof TMP.v==='string';
+  if (q.typ==='vice') return true;                       /* i „nic z toho" je odpověď */
+  if (q.typ==='skala') return typeof TMP.v==='number';
+  if (q.typ==='kategorie-skala') return hotovaKategorie(q);
+  return true;                                           /* text je vždy nepovinný */
+}
+function aktualizujDalsi(q){
+  var autoAdvance = (q.typ==='vyber' && !jineVybrano(q) && !emailZobrazit(q)) || (q.typ==='skala' && !q.doplnekText);
+  var d = $('btnDalsi');
+  d.hidden = autoAdvance && q.typ!=='vice' && q.typ!=='text' && q.typ!=='kategorie-skala';
+  d.disabled = !pripraveno(q) || (q.povinna && q.typ==='vyber' && typeof TMP.v!=='string');
+  d.textContent = (q.typ==='text' && !(TMP.txt||'').trim()) ? 'Přeskočit →' : 'Pokračovat →';
+  d.onclick = function(){ potvrd(q); };
+  $('qPovinna').textContent = q.povinna ? 'povinná otázka' : '';
+}
+function potvrd(q){
+  if (!pripraveno(q)) return;
+  var ulozit = {};
+  if (TMP.v !== undefined) ulozit.v = TMP.v;
+  if ((TMP.txt||'').trim()) ulozit.txt = TMP.txt.trim();
+  if (q.typ==='text' && !ulozit.txt) ulozit = { txt:'' };   /* přeskočená otevřená otázka */
+  S.odpovedi[q.id] = ulozit;
+  /* posun na další viditelnou otázku (větvení se přepočítá) */
+  var list = sekceOtazky();
+  var i = curIndex(list);
+  if (i < 0 || i >= list.length-1){
+    /* poslední — ověř, jestli po přepočtu nepřibyly další (např. po q3) */
+    var dalsi = list.filter(function(x){ return !(x.q.id in S.odpovedi); });
+    if (dalsi.length){ S.cur = dalsi[0].q.id; save(); syncSoon(); renderQ(); return; }
+    save(); dokoncit(); return;
+  }
+  S.cur = list[i+1].q.id;
+  save(); syncSoon(); renderQ();
+}
+function dokoncit(){
+  S.hotovo = true; save(); syncNow();
+  $('headProg').hidden = true; $('pbarFill').style.width = '100%';
+  $('doneText').textContent = DEF.podekovani || 'Děkujeme za Váš čas!';
+  show('scrDone');
+}
+
+/* ---------- start ---------- */
+fetch('/api/spokojenost/dotaznik', { cache:'no-store' })
+  .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+  .then(function(d){ DEF = d; if (S.hotovo){ show('scrDone'); $('doneText').textContent = DEF.podekovani||'Děkujeme!'; $('headProg').hidden=true; } else renderIntro(); })
+  .catch(function(){ $('introBox').innerHTML = '<p class="lead">Dotazník se nepodařilo načíst. <button class="btn sm" onclick="location.reload()">Zkusit znovu</button></p>'; });
+</script>
+</body>
+</html>

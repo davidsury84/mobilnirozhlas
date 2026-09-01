@@ -206,8 +206,13 @@ const SURVEY_PUBLIC_URL = process.env.SURVEY_PUBLIC_URL || ('https://' + SURVEY_
 // Registr průzkumů na sběrné doméně: neuhodnutelná cesta (slug) → HTML soubor průzkumu.
 // Odkaz funguje jen s přesným slugem; kořen domény ukazuje neutrální rozcestník bez odkazů na průzkumy.
 const MOBILIAR_SLUG = process.env.MOBILIAR_SLUG || 'mobiliar-mqvsx02utcemzm';
-const SURVEY_SLUGS = { [MOBILIAR_SLUG]: () => MOBILIAR_FILE };
-const MOBILIAR_PUBLIC_URL = SURVEY_PUBLIC_URL + '/' + MOBILIAR_SLUG;   // sběrný odkaz zobrazovaný v adminu
+const SPOKOJENOST_FILE = path.join(ROOT, 'spokojenost.html');            // dotazník spokojenosti zákazníků shop.elkoplast.cz
+const SPOKOJENOST_SLUG = process.env.SPOKOJENOST_SLUG || 'spokojenost-ofwx7q5f2pdf91';
+const SPOKOJENOST_DEF_F = path.join(DATA_DIR, 'spokojenost-dotaznik.json');  // definice otázek — editovatelná v adminu
+const SPOKOJENOST_F = path.join(DATA_DIR, 'spokojenost-odpovedi.json');      // odpovědi respondentů (upsert dle rid)
+const SURVEY_SLUGS = { [MOBILIAR_SLUG]: () => MOBILIAR_FILE, [SPOKOJENOST_SLUG]: () => SPOKOJENOST_FILE };
+const MOBILIAR_PUBLIC_URL = SURVEY_PUBLIC_URL + '/' + MOBILIAR_SLUG;         // sběrné odkazy zobrazované v adminu
+const SPOKOJENOST_PUBLIC_URL = SURVEY_PUBLIC_URL + '/' + SPOKOJENOST_SLUG;
 // Neutrální stránka kořene sběrné domény (nic neprozrazuje, nikam dál nevede).
 const SURVEY_LANDING = '<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex"><title>ELKOPLAST — zákaznické průzkumy</title></head>' +
   '<body style="margin:0;min-height:100svh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,\'Segoe UI\',Roboto,Arial,sans-serif;background:#f2f5f1;color:#111713">' +
@@ -1202,6 +1207,153 @@ function recordMobiliar(b) {
   writeJson(MOBILIAR_F, all);
   if (novy) logActivity('mobiliar', { email: '', name: 'anonym' }, 'Hodnocení mobiliáře: nový respondent (' + rec.role + ')');
   return { ok: true, ulozeno: Object.keys(rec.votes).length };
+}
+
+/* ---- Dotazník spokojenosti zákazníků shop.elkoplast.cz (NPS/CSAT/CES/Heureka) ----
+   Definice otázek je v data/spokojenost-dotaznik.json a EDITUJE SE V ADMINU (Průzkumy → detail).
+   Větvení: filtr q3 — kdo nenakoupil, vyplní sekci B a přeskočí sekce „jen: kupujici".
+   Typy otázek: vyber (1 z N, jine=volný dopis), vice (více možností), skala (min..max, volitelně
+   nehodnotim + doplnekText), text (otevřená), kategorie-skala (škála pro každou kategorii zvolenou
+   v otázce kategorieZ). email:[klíče] u vyber = po zvolení klíče se zobrazí pole na e-mail. */
+const SPOKOJENOST_SEED = {
+  verze: 1,
+  nazev: 'Dotazník spokojenosti zákazníků — shop.elkoplast.cz',
+  uvod: {
+    nadpis: 'Pomozte nám zlepšit shop.elkoplast.cz',
+    text: 'Vážená paní, vážený pane,\nzáleží nám na tom, aby se Vám na shop.elkoplast.cz dobře nakupovalo. Budeme rádi, když nám věnujete zhruba 5 minut — Vaše odpovědi nám pomohou zlepšit nabídku, termíny dodání i služby.\nDotazník je anonymní. E-mail vyplňujete pouze v případě, že se chcete zapojit do testování našich novinek.\nDěkujeme! Tým ELKOPLAST CZ',
+  },
+  podekovani: 'Děkujeme za Váš čas! Vaše odpovědi nám pomohou zlepšit nabídku, termíny dodání i služby na shop.elkoplast.cz.',
+  filtr: { otazka: 'q3', kupujici: ['a', 'b'] },
+  sekce: [
+    { id: 'A', nazev: 'Pár slov o vás', jen: 'vsichni', otazky: [
+      { id: 'q1', typ: 'vyber', povinna: true, text: 'V jaké roli náš e-shop navštěvujete?', moznosti: [
+        { k: 'a', t: 'obec / město / příspěvková organizace' }, { k: 'b', t: 'technické služby / svozová společnost' },
+        { k: 'c', t: 'firma nebo podnikatel' }, { k: 'd', t: 'soukromá osoba' }], jine: true },
+      { id: 'q2', typ: 'vyber', text: 'Jak jste se o shop.elkoplast.cz dozvěděl/a?', moznosti: [
+        { k: 'a', t: 'internetový vyhledávač (Google, Seznam)' }, { k: 'b', t: 'srovnávač zboží (Heureka, Zboží.cz)' },
+        { k: 'c', t: 'doporučení kolegy nebo známého' }, { k: 'd', t: 'obchodní zástupce ELKOPLAST' },
+        { k: 'e', t: 'veletrh, výstava nebo jiná akce' }, { k: 'f', t: 'reklama na internetu' }], jine: true },
+      { id: 'q3', typ: 'vyber', povinna: true, text: 'Nakoupil/a jste již na shop.elkoplast.cz?', moznosti: [
+        { k: 'a', t: 'ano, opakovaně' }, { k: 'b', t: 'ano, jednou' }, { k: 'c', t: 'ne, zatím jsem nenakoupil/a' }] },
+    ]},
+    { id: 'B', nazev: 'Co vám zatím bránilo v nákupu', jen: 'nekupujici', otazky: [
+      { id: 'q4', typ: 'vice', text: 'Co Vám zatím v nákupu zabránilo?', moznosti: [
+        { k: 'a', t: 'nenašel/nenašla jsem hledaný produkt' }, { k: 'b', t: 'cena zboží byla vyšší než jinde' },
+        { k: 'c', t: 'cena nebo podmínky dopravy' }, { k: 'd', t: 'chyběly mi informace o produktu' },
+        { k: 'e', t: 'zatím jen porovnávám nabídky' }, { k: 'f', t: 'nakoupil/a jsem u jiného dodavatele' },
+        { k: 'g', t: 'technické potíže na webu' }, { k: 'h', t: 'čekám na schválení nákupu v naší organizaci' }], jine: true },
+      { id: 'q5', typ: 'text', text: 'Co by Vás přesvědčilo u nás nakoupit?' },
+    ]},
+    { id: 'C', nazev: 'Web a vyhledávání produktů', jen: 'vsichni', otazky: [
+      { id: 'q6', typ: 'skala', min: 1, max: 5, obrazek: '/pruzkum-foto/eshop.jpg', text: 'Jak hodnotíte celkovou přehlednost e-shopu a orientaci na něm?', popisMin: 'nepřehledný', popisMax: 'velmi přehledný' },
+      { id: 'q7', typ: 'skala', min: 1, max: 5, text: 'Jak hodnotíte šíři nabídky (množství zboží)?', popisMin: 'nedostatečná', popisMax: 'výborná' },
+      { id: 'q8', typ: 'skala', min: 1, max: 5, text: 'Jak snadné pro Vás bylo najít produkt, který jste hledal/a?', popisMin: 'velmi obtížné', popisMax: 'velmi snadné' },
+      { id: 'q9', typ: 'skala', min: 1, max: 5, text: 'Jsou pro Vás informace u produktů dostatečné (popisy, fotografie, technické parametry, dokumenty ke stažení)?', popisMin: 'nedostatečné', popisMax: 'zcela dostatečné', doplnekText: 'Pokud Vám nějaká informace chyběla, napište prosím jaká:' },
+    ]},
+    { id: 'D', nazev: 'Objednávka a dodání', jen: 'kupujici', otazky: [
+      { id: 'q10', typ: 'vice', text: 'Které způsoby platby Vám na shop.elkoplast.cz chybí?', moznosti: [
+        { k: 'a', t: 'platba kartou online' }, { k: 'b', t: 'rychlý bankovní převod / QR platba' },
+        { k: 'c', t: 'Google Pay / Apple Pay' }, { k: 'd', t: 'platba na fakturu se splatností' },
+        { k: 'e', t: 'nákup na splátky či leasing' }, { k: 'f', t: 'dobírka' },
+        { k: 'g', t: 'žádný — současné možnosti mi vyhovují' }], jine: true },
+      { id: 'q11', typ: 'vyber', text: 'Jaká nejdelší doba dodání je pro Vás u tohoto typu zboží ještě přijatelná?', moznosti: [
+        { k: 'a', t: 'do 3 pracovních dnů' }, { k: 'b', t: 'do 1 týdne' }, { k: 'c', t: 'do 2 týdnů' },
+        { k: 'd', t: 'do 1 měsíce' }, { k: 'e', t: 'déle — na termínu mi tolik nezáleží' }] },
+      { id: 'q12', typ: 'skala', min: 1, max: 5, text: 'Jak jste spokojen/a s rychlostí dodání vaší objednávky?', popisMin: 'velmi nespokojen/a', popisMax: 'velmi spokojen/a' },
+      { id: 'q13', typ: 'vyber', text: 'Bylo zboží dodáno v termínu, který jsme při objednávce avizovali?', moznosti: [
+        { k: 'a', t: 'ano' }, { k: 'b', t: 'ne, se zpožděním do 3 pracovních dnů' },
+        { k: 'c', t: 'ne, se zpožděním delším než 3 pracovní dny' }, { k: 'd', t: 'nevzpomínám si' }] },
+      { id: 'q14', typ: 'vyber', text: 'Dorazilo zboží v pořádku a kompletní?', moznosti: [
+        { k: 'a', t: 'ano' }, { k: 'b', t: 'ne, zboží bylo poškozené' }, { k: 'c', t: 'ne, zásilka nebyla kompletní' }], jine: true },
+      { id: 'q15', typ: 'skala', min: 1, max: 5, text: 'Jak hodnotíte informování o průběhu objednávky (potvrzení, expedice, sledování zásilky)?', popisMin: 'velmi špatné', popisMax: 'výborné' },
+    ]},
+    { id: 'E', nazev: 'Zboží a ceny', jen: 'kupujici', otazky: [
+      { id: 'q16', typ: 'vice', text: 'Kterých kategorií se Váš nákup týkal?', moznosti: [
+        { k: 'a', t: 'odpadové hospodářství (nádoby, kontejnery, koše)' }, { k: 'b', t: 'nádrže na vodu a kapaliny' },
+        { k: 'c', t: 'dům a zahrada' }, { k: 'd', t: 'zimní údržba' }, { k: 'e', t: 'skladování a manipulační technika' },
+        { k: 'f', t: 'nádrže a výdejní sestavy na naftu' }, { k: 'g', t: 'elektromobilita' },
+        { k: 'h', t: 'městský mobiliář' }, { k: 'i', t: 'dílenské vybavení' }], jine: true },
+      { id: 'q17', typ: 'kategorie-skala', kategorieZ: 'q16', min: 1, max: 5, text: 'Jak hodnotíte kvalitu zakoupeného zboží?', pozn: 'Ohodnoťte každou kategorii, které se Váš nákup týkal.', popisMin: 'velmi špatná', popisMax: 'výborná' },
+      { id: 'q18', typ: 'skala', min: 1, max: 5, text: 'Jak hodnotíte poměr kvality a ceny?', popisMin: 'velmi špatný', popisMax: 'výborný' },
+    ]},
+    { id: 'F', nazev: 'Sortiment', jen: 'vsichni', otazky: [
+      { id: 'q19', typ: 'vyber', text: 'Našel/našla jste v naší nabídce vše, co jste potřeboval/a?', moznosti: [
+        { k: 'a', t: 'ano' }, { k: 'b', t: 'převážně ano' }, { k: 'c', t: 'ne' }] },
+      { id: 'q20', typ: 'text', text: 'Jaké produkty nebo kategorie Vám v naší nabídce chybí?' },
+    ]},
+    { id: 'G', nazev: 'Komunikace a služby', jen: 'vsichni', otazky: [
+      { id: 'q21', typ: 'skala', min: 1, max: 5, text: 'Pokud jste komunikoval/a s naším týmem (telefon, e-mail, poptávkový formulář), jak hodnotíte ochotu a odbornost?', popisMin: 'velmi špatné', popisMax: 'výborné', nehodnotim: 's týmem jsem nekomunikoval/a' },
+      { id: 'q22', typ: 'skala', min: 1, max: 5, text: 'Pokud jste řešil/a vrácení zboží nebo reklamaci, jak jste spokojen/a s jejím vyřízením?', popisMin: 'velmi nespokojen/a', popisMax: 'velmi spokojen/a', nehodnotim: 'vrácení ani reklamaci jsem neřešil/a' },
+    ]},
+    { id: 'H', nazev: 'Celkové hodnocení a novinky', jen: 'vsichni', otazky: [
+      { id: 'q23', typ: 'skala', min: 1, max: 5, text: 'Jak jste celkově spokojen/a s shop.elkoplast.cz?', popisMin: 'velmi nespokojen/a', popisMax: 'velmi spokojen/a' },
+      { id: 'q24', typ: 'skala', min: 0, max: 10, text: 'Jak pravděpodobné je, že byste shop.elkoplast.cz doporučil/a kolegům, známým nebo obchodním partnerům?', popisMin: 'rozhodně nedoporučil/a', popisMax: 'rozhodně doporučil/a' },
+      { id: 'q25', typ: 'text', text: 'Co je hlavním důvodem Vašeho hodnocení v předchozí otázce?' },
+      { id: 'q26', typ: 'vice', text: 'Které z následujících novinek nebo služeb byste na shop.elkoplast.cz uvítal/a?', moznosti: [
+        { k: 'a', t: 'věrnostní program nebo množstevní slevy' }, { k: 'b', t: 'rychlejší doprava' },
+        { k: 'c', t: 'více způsobů platby' }, { k: 'd', t: 'montáž a instalace u zákazníka' },
+        { k: 'e', t: 'technické poradenství, návody a videa' }, { k: 'f', t: 'katalogy a technické listy ke stažení' },
+        { k: 'g', t: 'konfigurátor produktů (rozměry, barvy, potisk)' }, { k: 'h', t: 'možnost pronájmu místo nákupu' },
+        { k: 'i', t: 'odběr novinek a akčních nabídek e-mailem' }], jine: true },
+      { id: 'q27', typ: 'vice', text: 'Připravujeme rozšíření sortimentu. O které z těchto produktů byste měl/a zájem?', moznosti: [
+        { k: 'a', t: 'městský mobiliář — lavičky, odpadkové koše, květináče' }, { k: 'b', t: 'protipožární skříně na lithiové baterie' },
+        { k: 'c', t: 'lodní a skladové kontejnery' }, { k: 'd', t: 'mobilní lisovací kontejnery' },
+        { k: 'e', t: 'překladiště odpadu' }], jine: true },
+      { id: 'q28', typ: 'vyber', text: 'Vyvíjíme nové produkty a rádi je dáváme vyzkoušet svým zákazníkům. Měl/a byste zájem zapojit se do testování novinek?', moznosti: [
+        { k: 'a', t: 'ano, mám zájem' }, { k: 'b', t: 'možná, podle typu produktu' }, { k: 'c', t: 'ne' }],
+        email: ['a', 'b'], emailText: 'Váš e-mail (použijeme jen k pozvánce na testování):' },
+      { id: 'q29', typ: 'text', text: 'Máte pro nás jakýkoli další vzkaz, nápad nebo návrh na zlepšení?' },
+    ]},
+  ],
+};
+function spokojenostDef() { const d = readJson(SPOKOJENOST_DEF_F, null); return (d && Array.isArray(d.sekce) && d.sekce.length) ? d : SPOKOJENOST_SEED; }
+// Uložení upravené definice z adminu — minimální validace tvaru, verze se zvedá na serveru.
+function spokojenostUlozDef(b) {
+  if (!b || !Array.isArray(b.sekce) || !b.sekce.length) return { error: 'Neplatná definice dotazníku.' };
+  const idcka = new Set();
+  for (const s of b.sekce) {
+    if (!s || !Array.isArray(s.otazky)) return { error: 'Sekce bez otázek.' };
+    for (const q of s.otazky) {
+      if (!q || !/^q\d{1,3}$/.test(String(q.id || '')) || !q.typ) return { error: 'Otázka bez id/typu.' };
+      if (idcka.has(q.id)) return { error: 'Duplicitní id otázky: ' + q.id };
+      idcka.add(q.id);
+    }
+  }
+  const stara = spokojenostDef();
+  b.verze = (stara.verze || 0) + 1;
+  writeJson(SPOKOJENOST_DEF_F, b);
+  return { ok: true, verze: b.verze };
+}
+// Odpovědi: upsert dle rid; hodnoty se jen slučují (menší payload nesmí smazat už uložené).
+function recordSpokojenost(b) {
+  const rid = String(b.rid || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40);
+  if (rid.length < 8) return { error: 'Neplatné id respondenta.' };
+  const cistyText = v => String(v == null ? '' : v).slice(0, 2000);
+  const odpIn = (b.odpovedi && typeof b.odpovedi === 'object') ? b.odpovedi : {};
+  const odp = {};
+  for (const qid of Object.keys(odpIn)) {
+    if (!/^q\d{1,3}$/.test(qid)) continue;
+    const o = odpIn[qid]; if (o == null || typeof o !== 'object') continue;
+    const cln = {};
+    if (typeof o.v === 'string') cln.v = o.v.slice(0, 40);
+    else if (typeof o.v === 'number' && isFinite(o.v)) cln.v = Math.max(-1, Math.min(10, Math.round(o.v)));
+    else if (Array.isArray(o.v)) cln.v = o.v.map(x => String(x).slice(0, 40)).slice(0, 30);
+    else if (o.v && typeof o.v === 'object') { cln.v = {}; for (const k of Object.keys(o.v).slice(0, 30)) { const n = Math.round(+o.v[k]); if (n >= 0 && n <= 10) cln.v[String(k).slice(0, 40)] = n; } }
+    if (o.txt) cln.txt = cistyText(o.txt);
+    if (cln.v !== undefined || cln.txt) odp[qid] = cln;
+  }
+  const all = readJson(SPOKOJENOST_F, []);
+  let rec = all.find(r => r.rid === rid);
+  const novy = !rec;
+  if (!rec) { rec = { rid, createdAt: Date.now() }; all.push(rec); }
+  rec.odpovedi = Object.assign({}, rec.odpovedi || {}, odp);
+  if (typeof b.email === 'string') rec.email = b.email.slice(0, 120);
+  if (b.hotovo === true) rec.hotovo = true;
+  rec.defVerze = spokojenostDef().verze || 1;
+  rec.ts = Date.now();
+  writeJson(SPOKOJENOST_F, all);
+  if (novy) logActivity('spokojenost', { email: '', name: 'anonym' }, 'Dotazník spokojenosti: nový respondent');
+  return { ok: true, ulozeno: Object.keys(rec.odpovedi).length };
 }
 /* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
 const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)', vykresy: 'Test čtení výkresů', logika: 'Test logického myšlení (nákup a logistika)' };
@@ -3284,7 +3436,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/' || p === '/index.html')
       return send(res, 200, SURVEY_LANDING, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
-    const surveyOk = p.indexOf('/mobiliar-foto/') === 0 || (p === '/api/mobiliar/vote' && req.method === 'POST') || p === '/healthz' || p === '/api/version';
+    const surveyOk = p.indexOf('/mobiliar-foto/') === 0 || (p === '/api/mobiliar/vote' && req.method === 'POST')
+      || p.indexOf('/pruzkum-foto/') === 0 || (p === '/api/spokojenost/dotaznik' && req.method === 'GET') || (p === '/api/spokojenost/odpoved' && req.method === 'POST')
+      || p === '/healthz' || p === '/api/version';
     if (!surveyOk) { res.writeHead(302, { 'Location': '/' }); return res.end(); }
   }
 
@@ -3311,6 +3465,8 @@ const server = http.createServer(async (req, res) => {
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
   // Veřejné cesty hodnocení mobiliáře (obrázkový průzkum pro obchodníky i zákazníky): stránka + fotky + hlasy.
   const mobiliarPublic = p === '/mobiliar' || p === '/mobiliar.html' || p.indexOf('/mobiliar-foto/') === 0 || (p === '/api/mobiliar/vote' && req.method === 'POST');
+  // Veřejné cesty dotazníku spokojenosti (shop.elkoplast.cz): stránka + definice otázek + odpovědi + obrázky.
+  const spokojenostPublic = p === '/spokojenost' || p === '/spokojenost.html' || p.indexOf('/pruzkum-foto/') === 0 || (p === '/api/spokojenost/dotaznik' && req.method === 'GET') || (p === '/api/spokojenost/odpoved' && req.method === 'POST');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
@@ -3386,7 +3542,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !libraryIngestPublic && !garantiPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !spokojenostPublic && !libraryIngestPublic && !garantiPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -3407,7 +3563,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // chráněné cesty (správa)
-  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results', '/api/logika-results', '/api/mobiliar-results'];
+  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results', '/api/logika-results', '/api/mobiliar-results', '/api/spokojenost-results'];
   if (PROTECTED.indexOf(p) >= 0 && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
@@ -3549,6 +3705,21 @@ const server = http.createServer(async (req, res) => {
       const f = path.join(ROOT, 'assets', 'mobiliar', rel);
       if (!rel.endsWith('.jpg') || rel.indexOf('..') >= 0 || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
       res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=604800' });
+      return res.end(fs.readFileSync(f));
+    }
+    // Dotazník spokojenosti zákazníků — stránka (interní náhled; zákazníci chodí přes slug na sběrné doméně).
+    if (p === '/spokojenost' || p === '/spokojenost.html') {
+      if (!fs.existsSync(SPOKOJENOST_FILE)) return send(res, 404, '<h1>Chybí spokojenost.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(SPOKOJENOST_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    // Obrázky průzkumů (assets/pruzkum) — veřejná cesta (printscreen e-shopu v dotazníku apod.).
+    if (p.indexOf('/pruzkum-foto/') === 0) {
+      const rel = p.slice('/pruzkum-foto/'.length).replace(/[^a-z0-9.-]/g, '');
+      const f = path.join(ROOT, 'assets', 'pruzkum', rel);
+      const CT = { '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
+      const ext = path.extname(rel);
+      if (!CT[ext] || rel.indexOf('..') >= 0 || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
+      res.writeHead(200, { 'Content-Type': CT[ext], 'Cache-Control': 'public, max-age=604800' });
       return res.end(fs.readFileSync(f));
     }
     if (p === '/koncept' || p === '/koncept.html') {
@@ -3734,6 +3905,24 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' });
     }
     if (p === '/api/mobiliar-results' && req.method === 'GET') return send(res, 200, { kategorie: MOBILIAR_KATEGORIE, zaznamy: readJson(MOBILIAR_F, []), verejnyOdkaz: MOBILIAR_PUBLIC_URL });
+
+    // Dotazník spokojenosti: definice otázek (veřejná), příjem odpovědí (veřejný), výsledky + úprava (admin).
+    if (p === '/api/spokojenost/dotaznik' && req.method === 'GET') return send(res, 200, spokojenostDef(), { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
+    if (p === '/api/spokojenost/odpoved' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const r = recordSpokojenost(b);
+      if (r.error) return send(res, 400, r);
+      return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' });
+    }
+    if (p === '/api/spokojenost-results' && req.method === 'GET') return send(res, 200, { def: spokojenostDef(), zaznamy: readJson(SPOKOJENOST_F, []), verejnyOdkaz: SPOKOJENOST_PUBLIC_URL });
+    if (p === '/api/spokojenost/dotaznik-uprava' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+      const r = spokojenostUlozDef(b);
+      if (r.error) return send(res, 400, r);
+      logActivity('spokojenost', empSession(req) || { email: '', name: 'správce' }, 'Dotazník spokojenosti: upravena definice (verze ' + r.verze + ')');
+      return send(res, 200, r);
+    }
     // ABROLL test: GET = stav pokusů dané osoby, POST = odeslání pokusu (max 3)
     if (p === '/api/abroll' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, abrollStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/abroll' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordAbroll(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }

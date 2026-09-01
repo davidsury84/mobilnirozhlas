@@ -7152,6 +7152,7 @@ const PRUZKUMY_DEFS=[
   {kind:'vykresy', typ:'pruzkum', sendId:'survey-vykresy', nazev:'Test čtení výkresů',                   popis:'15 otázek · praktické čtení výkresové dokumentace'},
   {kind:'logika',  typ:'pruzkum', sendId:'survey-logika',  nazev:'Test logického myšlení (nákup a logistika)', popis:'29 těžkých úloh · odhady, dedukce, rozhodování, řízení zásob — kreativita, ne znalosti'},
   {kind:'mobiliar', typ:'pruzkum', nazev:'Hodnocení mobiliáře (WeiDu)', popis:'z každé šestice fotek 2 nejhezčí — lavičky, stoly, koše, lehátka, květináče · anonymní veřejný odkaz /mobiliar'},
+  {kind:'spokojenost', typ:'pruzkum', nazev:'Spokojenost zákazníků (shop.elkoplast.cz)', popis:'NPS, CSAT, CES a Heureka standard · větvení kupující/nekupující · otázky editovatelné v adminu · anonymní veřejný odkaz'},
   {kind:'abroll',        typ:'skoleni', nazev:'Školení ABROLL',        popis:'kódování ABROLL kontejnerů · závěrečný test, max 3 pokusy'},
   {kind:'prumysl',       typ:'skoleni', nazev:'Školení Průmysl',       popis:'skladování, Li-Ion, ADR · závěrečný test, max 3 pokusy'},
   {kind:'loxxer',        typ:'skoleni', nazev:'Školení LOXXER',        popis:'protipožární skříně na Li-Ion baterie · závěrečný test, max 3 pokusy'},
@@ -7187,7 +7188,7 @@ function skolStaty(res,maxPokusu){
 async function renderPruzkumyPrehled(){
   const box=document.getElementById("gritAdmin");
   box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám přehled testů…</p></div>';
-  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto','/api/vykresy-skoleni-results','/api/svarovani-skoleni-results','/api/mobiliar-results','/api/logika-results','/api/zentex-skoleni-results','/api/tridici-linky-skoleni-results'];
+  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto','/api/vykresy-skoleni-results','/api/svarovani-skoleni-results','/api/mobiliar-results','/api/logika-results','/api/zentex-skoleni-results','/api/tridici-linky-skoleni-results','/api/spokojenost-results'];
   let neprihlasen=false;
   const data=await Promise.all(eps.map(u=>fetch(u,{cache:'no-store'}).then(r=>{ if(r.status===401){ neprihlasen=true; return []; } return r.json(); }).catch(()=>[])));
   if(neprihlasen){ showLogin(); return; }
@@ -7198,6 +7199,7 @@ async function renderPruzkumyPrehled(){
   LOGIKA_RESULTS=data[13]||[];
   ZENTEX_SKOLENI_RESULTS=data[14]||[];
   TRIDICI_SKOLENI_RESULTS=data[15]||[];
+  SPOK_DATA=(data[16]&&data[16].zaznamy)?data[16]:{def:null,zaznamy:[]};
   const fmtD=ts=>ts?new Date(ts).toLocaleDateString('cs-CZ'):'—';
   const pill=(t,c)=>'<span class="pill '+c+'">'+t+'</span>';
   /* statistiky jednotlivých testů do sloupců: [vyplnilo, Ø výsledek, stav, poslední] */
@@ -7226,6 +7228,10 @@ async function renderPruzkumyPrehled(){
       const ob=res.filter(r=>r.role==='obchodnik').length, za=res.filter(r=>r.role==='zakaznik').length;
       return {n:res.length, vysledek:(zobr?(Math.floor(zobr/6)+' šestic · '+vybr+' výběrů oblíbených'):'zatím bez výběrů'),
         stav:(ob?pill('obchodníci: '+ob,'green'):'')+(za?' '+pill('zákazníci: '+za,'amber'):''), last:Math.max(...res.map(r=>r.ts||0))}; }
+    if(kind==='spokojenost'){ const res=SPOK_DATA.zaznamy||[]; if(!res.length) return {n:0};
+      const hot=res.filter(r=>r.hotovo).length, nps=spokNps(res), csat=spokPrumer(res,'q23');
+      return {n:res.length, vysledek:(nps.n?('NPS '+(nps.score>0?'+':'')+nps.score+(csat.n?' · CSAT Ø '+csat.avg.toFixed(1).replace('.',','):'')):'zatím bez dokončených odpovědí'),
+        stav:(hot?pill('dokončeno: '+hot,'green'):'')+(res.length-hot?' '+pill('rozpracováno: '+(res.length-hot),'amber'):''), last:Math.max(...res.map(r=>r.ts||0))}; }
     const res=kind==='abroll'?ABROLL_RESULTS:kind==='prumysl'?PRUMYSL_RESULTS:kind==='loxxer'?LOXXER_SKOLENI_RESULTS:kind==='acts'?ACTS_SKOLENI_RESULTS:kind==='zentex'?ZENTEX_SKOLENI_RESULTS:kind==='tridici-linky'?TRIDICI_SKOLENI_RESULTS:kind==='produkty-kovo'?PRODUKTY_SKOLENI_RESULTS.kovo:kind==='vykresy-skoleni'?VYKRESY_SKOLENI_RESULTS:kind==='svarovani-skoleni'?SVAROVANI_SKOLENI_RESULTS:PRODUKTY_SKOLENI_RESULTS.roto;
     if(!res.length) return {n:0};
     const st=skolStaty(res, kind==='svarovani-skoleni'?1:3);
@@ -7253,6 +7259,7 @@ async function renderPruzkumyPrehled(){
     const invKey=SKOL_INVITE_MAP[d.kind];
     const akce=(d.sendId?'<button class="btn sm" onclick="event.stopPropagation();openSendModal(\''+d.sendId+'\')">✉ Rozeslat</button> ':'')+
       (d.kind==='mobiliar'?'<button class="btn sm" onclick="event.stopPropagation();mobiliarCopyLink()">🔗 Veřejný odkaz</button> ':'')+
+      (d.kind==='spokojenost'?'<button class="btn sm" onclick="event.stopPropagation();spokCopyLink()">🔗 Veřejný odkaz</button> ':'')+
       (invKey?'<button class="btn sm" onclick="event.stopPropagation();skolPozvat(\''+invKey+'\',\''+esc(d.nazev).replace(/'/g,"\\'")+'\')">✉ Rozeslat</button> ':'')+
       '<button class="btn ghost sm" onclick="event.stopPropagation();openPruzkumDetail(\''+d.kind+'\')">Spravovat →</button>';
     return '<tr data-klik onclick="openPruzkumDetail(\''+d.kind+'\')">'+
@@ -7298,6 +7305,7 @@ async function openPruzkumDetail(kind){
   else if(kind==='vykresy-skoleni') inner=await vykresySkoleniBlockHtml();
   else if(kind==='svarovani-skoleni') inner=await svarovaniSkoleniBlockHtml();
   else if(kind==='mobiliar') inner=await mobiliarBlockHtml();
+  else if(kind==='spokojenost') inner=await spokBlockHtml();
   box.innerHTML=back+inner;
   window.scrollTo(0,0);
 }
@@ -7446,6 +7454,236 @@ function exportMobiliar(){
   const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\r\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const u=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=u; a.download='mobiliar-hodnoceni.csv'; a.click(); URL.revokeObjectURL(u);
+}
+
+/* ---- Dotazník spokojenosti zákazníků (shop.elkoplast.cz) — výsledky + editor otázek ---- */
+let SPOK_DATA={def:null,zaznamy:[]};
+let SPOK_TAB='vysledky';   /* vysledky | editor */
+let SPOK_EDIT=null;        /* pracovní kopie definice v editoru */
+function spokUrl(){ return SPOK_DATA.verejnyOdkaz||(location.origin+'/spokojenost'); }
+function spokCopyLink(){ const url=spokUrl();
+  (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>toast('Odkaz zkopírován: '+url)).catch(()=>prompt('Zkopírujte odkaz:',url)); }
+function spokOtazky(){ const out=[]; ((SPOK_DATA.def||{}).sekce||[]).forEach(s=>s.otazky.forEach(q=>out.push({q,s}))); return out; }
+function spokNps(res){ let prom=0,det=0,n=0;
+  res.forEach(r=>{ const o=(r.odpovedi||{}).q24; if(o&&typeof o.v==='number'&&o.v>=0){ n++; if(o.v>=9)prom++; else if(o.v<=6)det++; } });
+  return {n, prom, det, score:n?Math.round((prom-det)/n*100):0}; }
+function spokPrumer(res,qid){ let n=0,s=0;
+  res.forEach(r=>{ const o=(r.odpovedi||{})[qid]; if(o&&typeof o.v==='number'&&o.v>=0){ n++; s+=o.v; } });
+  return {n, avg:n?s/n:0}; }
+async function spokBlockHtml(){
+  try{ const r=await fetch('/api/spokojenost-results',{cache:'no-store'}); if(r.status===401){ showLogin(); return ''; } SPOK_DATA=await r.json(); }catch(e){ SPOK_DATA={def:null,zaznamy:[]}; }
+  SPOK_TAB='vysledky'; SPOK_EDIT=null;
+  setTimeout(spokRerender,0);
+  return '<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:6px"><strong>Dotazník spokojenosti zákazníků — shop.elkoplast.cz</strong>'+
+      '<div class="inline-actions">'+
+        '<button class="btn ghost sm" id="spokTabV" onclick="spokPrepni(\'vysledky\')">Výsledky</button> '+
+        '<button class="btn ghost sm" id="spokTabE" onclick="spokPrepni(\'editor\')">✎ Upravit dotazník</button> '+
+        '<button class="btn ghost sm" onclick="exportSpok()">⬇ Export (CSV)</button></div></div>'+
+    '<p class="muted" style="font-size:13px;margin:0 0 10px">Anonymní dotazník dle NPS / CSAT / CES / Heureka; kdo nenakoupil, dostane místo dodání a zboží otázky „co zabránilo nákupu". Sběrný odkaz pro zákazníky:</p>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--green-soft);border:1px solid var(--line);border-radius:10px;padding:9px 12px">'+
+      '<code style="font-size:13px;font-weight:700;word-break:break-all">'+esc(spokUrl())+'</code>'+
+      '<button class="btn sm" onclick="spokCopyLink()">🔗 Kopírovat</button></div>'+
+    '</div><div id="spokBox"></div>';
+}
+function spokPrepni(tab){ SPOK_TAB=tab; if(tab==='editor'&&!SPOK_EDIT) SPOK_EDIT=JSON.parse(JSON.stringify(SPOK_DATA.def||{sekce:[]})); spokRerender(); }
+function spokRerender(){
+  const tv=document.getElementById('spokTabV'), te=document.getElementById('spokTabE');
+  if(tv){ tv.className='btn sm '+(SPOK_TAB==='vysledky'?'':'ghost '); te.className='btn sm '+(SPOK_TAB==='editor'?'':'ghost '); }
+  if(SPOK_TAB==='editor') spokRenderEditor(); else spokRenderVysledky();
+}
+/* ---------- výsledky ---------- */
+function spokRenderVysledky(){
+  const box=document.getElementById('spokBox'); if(!box) return;
+  const res=SPOK_DATA.zaznamy||[], fmtD=ts=>ts?new Date(ts).toLocaleString('cs-CZ'):'—';
+  const hot=res.filter(r=>r.hotovo).length, nps=spokNps(res), csat=spokPrumer(res,'q23');
+  const emaily=res.filter(r=>(r.email||'').indexOf('@')>0);
+  let h='<div class="card pad" style="margin-bottom:14px;display:flex;gap:26px;flex-wrap:wrap">'+
+    '<div><div class="muted" style="font-size:12px">Respondentů</div><strong style="font-size:20px">'+res.length+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Dokončeno</div><strong style="font-size:20px">'+hot+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">NPS</div><strong style="font-size:20px">'+(nps.n?((nps.score>0?'+':'')+nps.score):'—')+'</strong>'+(nps.n?'<div class="muted" style="font-size:11px">'+nps.prom+' promotérů · '+nps.det+' kritiků z '+nps.n+'</div>':'')+'</div>'+
+    '<div><div class="muted" style="font-size:12px">Celková spokojenost (CSAT)</div><strong style="font-size:20px">'+(csat.n?csat.avg.toFixed(2).replace('.',',')+' / 5':'—')+'</strong></div>'+
+    '<div><div class="muted" style="font-size:12px">Zájem o testování novinek</div><strong style="font-size:20px">'+emaily.length+'</strong><div class="muted" style="font-size:11px">e-mailů</div></div></div>';
+  if(!res.length){
+    h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné odpovědi. Rozešlete sběrný odkaz výše.</p></div>';
+  }else{
+    ((SPOK_DATA.def||{}).sekce||[]).forEach(s=>{
+      let qh='';
+      s.otazky.forEach(q=>{ if(q.aktivni!==false) qh+=spokVysledekOtazky(q,res); });
+      if(qh) h+='<div class="card pad" style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--green);margin-bottom:10px">'+esc(s.nazev)+(s.jen&&s.jen!=='vsichni'?' <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">· jen '+(s.jen==='kupujici'?'kupující':'nekupující')+'</span>':'')+'</div>'+qh+'</div>';
+    });
+    if(emaily.length){
+      h+='<div class="card pad" style="margin-bottom:14px"><strong style="display:block;margin-bottom:8px">Zájemci o testování novinek ('+emaily.length+')</strong>'+
+        '<div class="matrix-wrap" style="max-height:220px"><table class="grid"><thead><tr><th>E-mail</th><th>Odpověď</th><th>Kdy</th></tr></thead><tbody>'+
+        emaily.map(r=>{ const o=(r.odpovedi||{}).q28||{}; return '<tr><td><strong>'+esc(r.email)+'</strong></td><td>'+esc(o.v==='a'?'ano, mám zájem':o.v==='b'?'možná, podle produktu':'—')+'</td><td class="muted">'+fmtD(r.ts)+'</td></tr>'; }).join('')+
+        '</tbody></table></div></div>';
+    }
+  }
+  box.innerHTML=h;
+}
+function spokVysledekOtazky(q,res){
+  const odp=res.map(r=>(r.odpovedi||{})[q.id]).filter(Boolean);
+  const wrap=(inner,n)=>'<div style="padding:10px 0;border-top:1px solid var(--line)"><div style="font-weight:600;font-size:14px;margin-bottom:7px">'+esc(q.text)+' <span class="muted" style="font-weight:400;font-size:12px">('+n+' odp.)</span></div>'+inner+'</div>';
+  if(q.typ==='vyber'||q.typ==='vice'){
+    const cnt={}; let jine=[];
+    odp.forEach(o=>{ const vs=Array.isArray(o.v)?o.v:(typeof o.v==='string'?[o.v]:[]); vs.forEach(k=>cnt[k]=(cnt[k]||0)+1); if(o.txt) jine.push(o.txt); });
+    const n=odp.filter(o=>o.v!==undefined&&(!Array.isArray(o.v)||o.v.length)).length||odp.length;
+    if(!odp.length) return wrap('<p class="muted" style="font-size:12.5px;margin:0">zatím bez odpovědí</p>',0);
+    const max=Math.max(1,...Object.values(cnt));
+    let inner=(q.moznosti||[]).concat(q.jine?[{k:'__jine',t:'jiné'}]:[]).map(m=>{
+      const c=cnt[m.k]||0;
+      return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="flex:0 0 46%;font-size:12.5px">'+esc(m.t)+'</span>'+
+        '<span style="flex:1;background:var(--green-soft);border-radius:99px;height:14px;overflow:hidden"><span style="display:block;height:100%;width:'+Math.round(c/max*100)+'%;background:var(--green);border-radius:99px"></span></span>'+
+        '<span style="flex:0 0 52px;text-align:right;font-size:12px;font-weight:700">'+c+'×'+(n?' <span class="muted" style="font-weight:400">'+Math.round(c/n*100)+'%</span>':'')+'</span></div>';
+    }).join('');
+    if(jine.length) inner+='<div class="muted" style="font-size:12px;margin-top:6px">jiné: '+jine.map(t=>'„'+esc(t)+'“').join(' · ')+'</div>';
+    return wrap(inner,n);
+  }
+  if(q.typ==='skala'){
+    const min=q.min==null?1:q.min, max=q.max==null?5:q.max;
+    const vals=odp.filter(o=>typeof o.v==='number'&&o.v>=0).map(o=>o.v);
+    const neh=odp.filter(o=>o.v===-1).length;
+    const texty=odp.filter(o=>(o.txt||'').trim()).map(o=>o.txt);
+    if(!vals.length&&!neh) return wrap('<p class="muted" style="font-size:12.5px;margin:0">zatím bez odpovědí</p>',0);
+    const cnt={}; vals.forEach(v=>cnt[v]=(cnt[v]||0)+1);
+    const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0, mx=Math.max(1,...Object.values(cnt),1);
+    let inner='<div style="display:flex;align-items:flex-end;gap:3px;height:34px;max-width:420px">';
+    for(let v=min;v<=max;v++){ const c=cnt[v]||0; inner+='<span title="'+v+': '+c+'×" style="flex:1;background:var(--green);opacity:'+(c?'1':'.15')+';height:'+Math.max(10,Math.round(c/mx*100))+'%;border-radius:3px 3px 0 0"></span>'; }
+    inner+='</div><div style="display:flex;gap:3px;max-width:420px">';
+    for(let v=min;v<=max;v++) inner+='<span style="flex:1;text-align:center;font-size:10.5px;color:var(--ink-soft)">'+v+'</span>';
+    inner+='</div><div style="font-size:13px;margin-top:5px"><strong>Ø '+(vals.length?avg.toFixed(2).replace('.',','):'—')+'</strong>'+(neh?' <span class="muted">· '+neh+'× „'+esc(q.nehodnotim||'nehodnotím')+'“</span>':'')+'</div>';
+    if(texty.length) inner+='<div class="muted" style="font-size:12px;margin-top:5px;max-height:90px;overflow:auto">'+texty.map(t=>'„'+esc(t)+'“').join('<br>')+'</div>';
+    return wrap(inner,vals.length+neh);
+  }
+  if(q.typ==='kategorie-skala'){
+    const zdroj=(SPOK_DATA.def.sekce.flatMap(s=>s.otazky).find(x=>x.id===q.kategorieZ)||{}).moznosti||[];
+    const sums={},ns={};
+    odp.forEach(o=>{ if(o.v&&typeof o.v==='object'&&!Array.isArray(o.v)) Object.entries(o.v).forEach(([k,v])=>{ sums[k]=(sums[k]||0)+v; ns[k]=(ns[k]||0)+1; }); });
+    const keys=Object.keys(ns);
+    if(!keys.length) return wrap('<p class="muted" style="font-size:12.5px;margin:0">zatím bez odpovědí</p>',0);
+    const inner=keys.map(k=>{ const m=zdroj.find(x=>x.k===k); const nazev=m?m.t:(k==='__jine'?'jiné':k);
+      return '<div style="display:flex;gap:8px;font-size:12.5px;margin:3px 0"><span style="flex:0 0 55%">'+esc(nazev)+'</span><strong>Ø '+(sums[k]/ns[k]).toFixed(2).replace('.',',')+'</strong><span class="muted">('+ns[k]+'×)</span></div>'; }).join('');
+    return wrap(inner,odp.length);
+  }
+  /* text */
+  const texty=odp.filter(o=>(o.txt||'').trim()).map(o=>o.txt);
+  if(!texty.length) return wrap('<p class="muted" style="font-size:12.5px;margin:0">zatím bez odpovědí</p>',0);
+  return wrap('<div style="font-size:13px;max-height:170px;overflow:auto">'+texty.map(t=>'<div style="padding:5px 8px;background:var(--paper-soft);border-radius:8px;margin:4px 0">„'+esc(t)+'“</div>').join('')+'</div>',texty.length);
+}
+/* ---------- editor ---------- */
+const SPOK_TYPY={vyber:'výběr 1 možnosti',vice:'více možností',skala:'škála',text:'otevřená odpověď','kategorie-skala':'škála po kategoriích'};
+function spokRenderEditor(){
+  const box=document.getElementById('spokBox'); if(!box) return;
+  const d=SPOK_EDIT;
+  let h='<div class="card pad" style="margin-bottom:14px"><strong style="display:block;margin-bottom:8px">Úvod a texty</strong>'+
+    '<label class="muted" style="font-size:12px">Nadpis<input data-sp="uvod.nadpis" style="display:block;width:100%;margin:3px 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px"></label>'+
+    '<label class="muted" style="font-size:12px">Úvodní text<textarea data-sp="uvod.text" style="display:block;width:100%;min-height:90px;margin:3px 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit"></textarea></label>'+
+    '<label class="muted" style="font-size:12px">Poděkování na závěr<textarea data-sp="podekovani" style="display:block;width:100%;min-height:50px;margin:3px 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit"></textarea></label></div>';
+  (d.sekce||[]).forEach((s,si)=>{
+    h+='<div class="card pad" style="margin-bottom:14px">'+
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'+
+        '<input data-sps="'+si+'.nazev" style="flex:1;min-width:200px;font-weight:700;padding:8px 10px;border:1px solid var(--line);border-radius:8px">'+
+        '<select data-sps="'+si+'.jen" style="padding:7px 9px;border:1px solid var(--line);border-radius:8px">'+
+          '<option value="vsichni">všichni</option><option value="kupujici">jen kupující</option><option value="nekupujici">jen nekupující</option></select>'+
+        '<button class="btn ghost sm" onclick="spokPridatOtazku('+si+')">+ otázka</button></div>';
+    (s.otazky||[]).forEach((q,qi)=>{
+      const moznostiTxt=(q.moznosti||[]).map(m=>m.k+') '+m.t).join('\n');
+      h+='<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:'+(q.aktivni===false?'#f6f6f4':'var(--paper)')+'">'+
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'+
+          '<span class="pill" style="font-size:10.5px">'+q.id+' · '+(SPOK_TYPY[q.typ]||q.typ)+'</span>'+
+          '<label style="font-size:12px;color:var(--ink-soft)"><input type="checkbox" data-spq="'+si+'.'+qi+'.aktivni"'+(q.aktivni!==false?' checked':'')+'> zobrazovat</label>'+
+          (q.typ==='vyber'?'<label style="font-size:12px;color:var(--ink-soft)"><input type="checkbox" data-spq="'+si+'.'+qi+'.povinna"'+(q.povinna?' checked':'')+'> povinná</label>':'')+
+          ((q.typ==='vyber'||q.typ==='vice')?'<label style="font-size:12px;color:var(--ink-soft)"><input type="checkbox" data-spq="'+si+'.'+qi+'.jine"'+(q.jine?' checked':'')+'> + „jiné — doplňte“</label>':'')+
+          '<span style="margin-left:auto;display:flex;gap:4px">'+
+            '<button class="btn ghost sm" title="posunout výš" onclick="spokPosun('+si+','+qi+',-1)">↑</button>'+
+            '<button class="btn ghost sm" title="posunout níž" onclick="spokPosun('+si+','+qi+',1)">↓</button>'+
+            '<button class="btn ghost sm" style="color:var(--red)" onclick="spokSmazat('+si+','+qi+')">✕</button></span></div>'+
+        '<input data-spq="'+si+'.'+qi+'.text" placeholder="Znění otázky" style="display:block;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">'+
+        '<input data-spq="'+si+'.'+qi+'.pozn" placeholder="Poznámka pod otázkou (nepovinné)" style="display:block;width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:13px">'+
+        ((q.typ==='vyber'||q.typ==='vice')?
+          '<textarea data-spq="'+si+'.'+qi+'.__moznosti" placeholder="Jedna možnost na řádek" style="display:block;width:100%;min-height:'+Math.min(200,34+(q.moznosti||[]).length*21)+'px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,monospace;font-size:12.5px">'+esc(moznostiTxt)+'</textarea>'+
+          '<p class="muted" style="font-size:11px;margin:4px 0 0">Písmeno se závorkou na začátku řádku neměňte — páruje uložené odpovědi. Nový řádek = nová možnost (bez písmene, doplní se samo).</p>':'')+
+        (q.typ==='skala'||q.typ==='kategorie-skala'?
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft)">'+
+            '<label>od <input type="number" data-spq="'+si+'.'+qi+'.min" style="width:56px;padding:6px;border:1px solid var(--line);border-radius:8px"></label>'+
+            '<label>do <input type="number" data-spq="'+si+'.'+qi+'.max" style="width:56px;padding:6px;border:1px solid var(--line);border-radius:8px"></label>'+
+            '<label>popis vlevo <input data-spq="'+si+'.'+qi+'.popisMin" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px"></label>'+
+            '<label>popis vpravo <input data-spq="'+si+'.'+qi+'.popisMax" style="width:150px;padding:6px;border:1px solid var(--line);border-radius:8px"></label>'+
+            (q.typ==='skala'?'<label>tlačítko „nehodnotím“ <input data-spq="'+si+'.'+qi+'.nehodnotim" placeholder="prázdné = bez tlačítka" style="width:210px;padding:6px;border:1px solid var(--line);border-radius:8px"></label>'+
+            '<label>doplňující textové pole <input data-spq="'+si+'.'+qi+'.doplnekText" placeholder="prázdné = bez pole" style="width:230px;padding:6px;border:1px solid var(--line);border-radius:8px"></label>':'')+
+          '</div>':'')+
+        '</div>';
+    });
+    h+='</div>';
+  });
+  h+='<div class="card pad" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'+
+    '<button class="btn" onclick="spokUlozit()">💾 Uložit dotazník</button>'+
+    '<button class="btn ghost sm" onclick="SPOK_EDIT=null;spokPrepni(\'vysledky\')">Zahodit změny</button>'+
+    '<span class="muted" style="font-size:12px">Verze '+((SPOK_DATA.def||{}).verze||1)+' · změny se projeví okamžitě, i u rozpracovaných respondentů. Struktura (typy otázek, větvení) zůstává — upravují se texty, možnosti, pořadí a viditelnost.</span></div>';
+  box.innerHTML=h;
+  /* naplnění hodnot + posluchače (bez inline escapování hodnot) */
+  const get=(o,cesta)=>cesta.split('.').reduce((a,k)=>a==null?a:a[k],o);
+  box.querySelectorAll('[data-sp]').forEach(el=>{ el.value=get(d,el.dataset.sp)||''; el.oninput=()=>{ const c=el.dataset.sp.split('.'); let o=d; while(c.length>1){ o[c[0]]=o[c[0]]||{}; o=o[c.shift()]; } o[c[0]]=el.value; }; });
+  box.querySelectorAll('[data-sps]').forEach(el=>{ const [si,f]=el.dataset.sps.split('.'); el.value=d.sekce[+si][f]||(f==='jen'?'vsichni':''); el.oninput=el.onchange=()=>{ d.sekce[+si][f]=el.value; }; });
+  box.querySelectorAll('[data-spq]').forEach(el=>{
+    const [si,qi,f]=el.dataset.spq.split('.'); const q=d.sekce[+si].otazky[+qi];
+    if(f==='__moznosti'){ el.onchange=()=>{ q.moznosti=spokParseMoznosti(el.value,q.moznosti||[]); }; return; }
+    if(el.type==='checkbox'){ el.onchange=()=>{ if(f==='aktivni') q.aktivni=el.checked?true:false; else q[f]=el.checked; }; return; }
+    el.value=(q[f]==null?'':q[f]); el.oninput=()=>{ q[f]=(el.type==='number')?+el.value:el.value; };
+  });
+}
+function spokParseMoznosti(txt,stare){
+  const pouzite=new Set(); const out=[];
+  txt.split('\n').map(r=>r.trim()).filter(Boolean).forEach(r=>{
+    const m=/^([a-z0-9_]{1,12})\)\s*(.*)$/i.exec(r);
+    let k=m?m[1].toLowerCase():null, t=m?m[2]:r;
+    if(!k||pouzite.has(k)){ let i=1; while(pouzite.has('n'+i)||stare.some(x=>x.k==='n'+i)) i++; k='n'+i; }
+    pouzite.add(k); out.push({k,t:t||k});
+  });
+  return out;
+}
+function spokPosun(si,qi,smer){ const arr=SPOK_EDIT.sekce[si].otazky; const j=qi+smer; if(j<0||j>=arr.length) return; const x=arr[qi]; arr[qi]=arr[j]; arr[j]=x; spokRenderEditor(); }
+function spokSmazat(si,qi){ const q=SPOK_EDIT.sekce[si].otazky[qi]; if(!confirm('Smazat otázku „'+q.text+'“? Už sesbírané odpovědi na ni zůstanou v datech, ale přestanou se zobrazovat.')) return; SPOK_EDIT.sekce[si].otazky.splice(qi,1); spokRenderEditor(); }
+function spokPridatOtazku(si){
+  const typ=prompt('Typ otázky: vyber / vice / skala / text','vyber'); if(!typ||!SPOK_TYPY[typ]){ if(typ) toast('Neznámý typ.'); return; }
+  let max=0; SPOK_EDIT.sekce.forEach(s=>s.otazky.forEach(q=>{ const m=/^q(\d+)$/.exec(q.id); if(m) max=Math.max(max,+m[1]); }));
+  const q={id:'q'+(max+1),typ,text:'Nová otázka'};
+  if(typ==='vyber'||typ==='vice'){ q.moznosti=[{k:'a',t:'první možnost'},{k:'b',t:'druhá možnost'}]; }
+  if(typ==='skala'){ q.min=1;q.max=5;q.popisMin='';q.popisMax=''; }
+  SPOK_EDIT.sekce[si].otazky.push(q); spokRenderEditor();
+}
+async function spokUlozit(){
+  try{
+    const r=await fetch('/api/spokojenost/dotaznik-uprava',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(SPOK_EDIT)});
+    const d=await r.json();
+    if(!r.ok||d.error){ toast(d.error||'Uložení selhalo.'); return; }
+    toast('Dotazník uložen (verze '+d.verze+').');
+    const rr=await fetch('/api/spokojenost-results',{cache:'no-store'}); SPOK_DATA=await rr.json();
+    SPOK_EDIT=null; spokPrepni('vysledky');
+  }catch(e){ toast('Uložení selhalo: '+e.message); }
+}
+function exportSpok(){
+  const res=SPOK_DATA.zaznamy||[]; if(!res.length){ toast('Žádná data k exportu.'); return; }
+  const ot=spokOtazky();
+  const rows=[['Respondent','Dokončeno','Poslední aktivita','E-mail'].concat(ot.map(x=>x.q.id+' '+x.q.text))];
+  res.forEach((r,i)=>{
+    const rad=['Respondent '+(i+1), r.hotovo?'ano':'ne', r.ts?new Date(r.ts).toLocaleString('cs-CZ'):'', r.email||''];
+    ot.forEach(x=>{
+      const o=(r.odpovedi||{})[x.q.id]; if(!o){ rad.push(''); return; }
+      let v='';
+      const najdi=k=>{ const m=(x.q.moznosti||[]).find(mm=>mm.k===k); return m?m.t:(k==='__jine'?('jiné: '+(o.txt||'')):k); };
+      if(Array.isArray(o.v)) v=o.v.map(najdi).join(' | ');
+      else if(typeof o.v==='string') v=najdi(o.v);
+      else if(typeof o.v==='number') v=(o.v===-1?(x.q.nehodnotim||'nehodnotím'):String(o.v));
+      else if(o.v&&typeof o.v==='object') v=Object.entries(o.v).map(([k,n])=>najdi(k)+': '+n).join(' | ');
+      if(o.txt&&o.v!=='__jine'&&!(Array.isArray(o.v)&&o.v.indexOf('__jine')>=0)) v=(v?v+' · ':'')+o.txt;
+      rad.push(v);
+    });
+    rows.push(rad);
+  });
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}); const u=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=u; a.download='spokojenost-odpovedi.csv'; a.click(); URL.revokeObjectURL(u);
 }
 /* ---- Školení Čtení technických výkresů — výsledky závěrečného testu ---- */
 let VYKRESY_SKOLENI_RESULTS=[];
