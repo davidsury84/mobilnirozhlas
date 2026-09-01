@@ -303,7 +303,37 @@ function mount(host) {
     catch (e) { console.error('[adaptace] tick chyba:', e.message); }
   }
 
-  return { handle, tick, _models: M };
+  /* Školicí úkoly z adaptačních scénářů — aby se plnění propsalo do výpisu školení.
+     Kurz poznáme z odkazu na úkolu (…#modul=skoleni&kurz=<klíč>). */
+  function skoleniStavy(email) {
+    try {
+      const rows = M.db.prepare(`
+        SELECT a.emp_email, a.emp_name, a.scenario_label, a.start_date,
+               t.label, t.links_json, p.deadline_date, p.complete, p.understood, p.understood_at
+        FROM progress p
+        JOIN task t ON t.id = p.task_id
+        JOIN assignment a ON a.id = p.assignment_id
+        WHERE t.links_json LIKE '%modul=skoleni%'
+          ${email ? 'AND lower(a.emp_email) = ?' : ''}
+      `).all(...(email ? [String(email).toLowerCase()] : []));
+      return rows.map((r) => {
+        let kurz = '';
+        try {
+          const l = JSON.parse(r.links_json || '[]')[0];
+          const m = /kurz=([a-z0-9-]+)/i.exec((l && l.url) || '');
+          kurz = m ? m[1] : '';
+        } catch (_) { /* odkaz bez kurzu */ }
+        return {
+          email: (r.emp_email || '').toLowerCase(), jmeno: r.emp_name || '', kurz,
+          nazev: r.label, scenar: r.scenario_label || '', start: r.start_date || '',
+          termin: r.deadline_date || '', hotovo: !!(r.complete || r.understood),
+          hotovoKdy: r.understood_at || null,
+        };
+      });
+    } catch (e) { return []; }
+  }
+
+  return { handle, tick, skoleniStavy, _models: M };
 }
 
 module.exports = { mount };

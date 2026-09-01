@@ -764,17 +764,35 @@ function skolSplneno(email, kurz) {
   } catch (_) {}
   return false;
 }
-// Otevřené pozvánky zaměstnance (nesplněné) + kolik dní zbývá.
+// Školicí úkoly přiřazené přes adaptační scénář (propisují se do výpisu školení).
+function skolZAdaptace(email) {
+  try {
+    if (!adaptaceMod || typeof adaptaceMod.skoleniStavy !== 'function') return [];
+    return adaptaceMod.skoleniStavy(email).filter(x => x.kurz && SKOLENI_NAZVY[x.kurz]);
+  } catch (_) { return []; }
+}
+// Otevřené povinnosti zaměstnance (pozvánky + adaptační scénáře) + kolik dní zbývá.
 function skolPozMoje(email) {
   email = String(email || '').toLowerCase(); if (!email) return [];
   const den = 24 * 3600 * 1000, ted = Date.now();
-  return skolPozRead().items
+  const out = skolPozRead().items
     .filter(x => x.email === email && !skolSplneno(email, x.kurz))
     .map(x => ({
       kurz: x.kurz, nazev: SKOLENI_NAZVY[x.kurz] || x.kurz, ts: x.ts, termin: x.termin,
-      dnyDoTerminu: Math.ceil((x.termin - ted) / den), poLhute: ted > x.termin
-    }))
-    .sort((a, b) => a.termin - b.termin);
+      dnyDoTerminu: Math.ceil((x.termin - ted) / den), poLhute: ted > x.termin, zdroj: 'pozvánka'
+    }));
+  // z adaptace: co ještě není splněné testem a má termín
+  skolZAdaptace(email).forEach(a => {
+    if (skolSplneno(email, a.kurz)) return;
+    if (out.some(x => x.kurz === a.kurz)) return;          // pozvánka má přednost (dřívější termín)
+    const termin = a.termin ? new Date(a.termin + 'T23:59:59').getTime() : (ted + 7 * den);
+    out.push({
+      kurz: a.kurz, nazev: SKOLENI_NAZVY[a.kurz] || a.nazev, ts: 0, termin,
+      dnyDoTerminu: Math.ceil((termin - ted) / den), poLhute: ted > termin,
+      zdroj: 'adaptace', scenar: a.scenar
+    });
+  });
+  return out.sort((a, b) => a.termin - b.termin);
 }
 /* ---------- Notifikace z modulů na hlavní stránku ----------
    Každý vidí jen to, co se týká jeho: konstruktér svoje výkresy, obchodník svoje
@@ -3863,6 +3881,19 @@ const server = http.createServer(async (req, res) => {
       const list = (s.employees || []).filter(x => x && x.email).map(x => ({ email: x.email, name: x.name || x.email }))
         .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'));
       return send(res, 200, { lide: list });
+    }
+    // Přehled školicích úkolů z adaptačních scénářů (pro výpis školení ve správě)
+    if (p === '/api/skoleni/adaptace' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen správce.' });
+      const rows = skolZAdaptace('');
+      const dle = {};
+      rows.forEach(r => {
+        const k = (dle[r.kurz] = dle[r.kurz] || { kurz: r.kurz, nazev: SKOLENI_NAZVY[r.kurz] || r.nazev, celkem: 0, hotovo: 0, splnilTest: 0, lide: [] });
+        k.celkem++; if (r.hotovo) k.hotovo++;
+        const test = skolSplneno(r.email, r.kurz); if (test) k.splnilTest++;
+        k.lide.push({ email: r.email, jmeno: r.jmeno, scenar: r.scenar, termin: r.termin, hotovo: !!r.hotovo, splnilTest: test });
+      });
+      return send(res, 200, { kurzy: Object.values(dle) }, { 'Cache-Control': 'no-store' });
     }
     if (p === '/api/skoleni/pozvat' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Jen správce.' });

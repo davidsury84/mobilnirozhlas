@@ -1670,6 +1670,7 @@ const MJ_L10N = {
   'V tomto měsíci nikdo dovolenou nečerpal.': ['Nobody took vacation this month.','In diesem Monat hat niemand Urlaub genommen.','W tym miesiącu nikt nie korzystał z urlopu.','Цього місяця ніхто не брав відпустку.','Nimeni nu a avut concediu în această lună.'],
   'Zaměstnanec': ['Employee','Mitarbeiter','Pracownik','Працівник','Angajat'],
   'Z vašich modulů': ['From your modules','Aus Ihren Modulen','Z Twoich modułów','З ваших модулів','Din modulele dvs.'],
+  'z plánu': ['from plan','aus dem Plan','z planu','з плану','din plan'],
   'Byl(a) jste pozván(a) ke školení': ['You have been invited to training','Sie wurden zu einer Schulung eingeladen','Zostałeś zaproszony na szkolenie','Вас запросили на навчання','Ați fost invitat la instruire'],
   'Máte nesplněné školení po termínu': ['Overdue training','Überfällige Schulung','Zaległe szkolenie','Прострочене навчання','Instruire restantă'],
   'Školení je potřeba absolvovat do jednoho týdne od pozvánky.': ['The training must be completed within one week of the invitation.','Die Schulung ist innerhalb einer Woche nach der Einladung zu absolvieren.','Szkolenie należy ukończyć w ciągu tygodnia od zaproszenia.','Навчання потрібно пройти протягом тижня від запрошення.','Instruirea trebuie finalizată în termen de o săptămână de la invitație.'],
@@ -3201,7 +3202,8 @@ function skolPozvankyHtml(){
     const zbyva = x.poLhute
       ? '<span class="pill red">'+mjT('po termínu')+' ('+skolDatum(x.termin)+')</span>'
       : '<span class="pill amber">'+mjT('do')+' '+skolDatum(x.termin)+' · '+mjT('zbývá')+' '+Math.max(0,x.dnyDoTerminu)+' '+(MJ_LANG==='cz'?plural(Math.max(0,x.dnyDoTerminu),'den','dny','dní'):mjT('__days'))+'</span>';
-    h+='<div class="spread" style="padding:7px 0;border-top:1px solid rgba(0,0,0,.06)"><span style="font-size:13.5px"><b>'+esc(x.nazev)+'</b></span>'+zbyva+'</div>';
+    const zdroj = x.zdroj==='adaptace' ? ' <span class="muted" style="font-size:12px">· '+mjT('z plánu')+' '+esc(x.scenar||'adaptace')+'</span>' : '';
+    h+='<div class="spread" style="padding:7px 0;border-top:1px solid rgba(0,0,0,.06)"><span style="font-size:13.5px"><b>'+esc(x.nazev)+'</b>'+zdroj+'</span>'+zbyva+'</div>';
   });
   h+='</div>';
   return h;
@@ -7145,7 +7147,17 @@ const PRUZKUMY_DEFS=[
   {kind:'zentex', typ:'skoleni', nazev:'Školení ZENTEX', popis:'lisovací kontejnery — výběr vhodného lisu · závěrečný test 20 náhodných otázek z 50, max 3 pokusy'},
   {kind:'tridici-linky', typ:'skoleni', nazev:'Školení Třídicí linky', popis:'technologie, trh a ekonomika dotřídění · 12 kapitol · závěrečný test 24 náhodných otázek z 60, max 3 pokusy'},
 ];
-async function renderGritAdmin(){ PRUZKUMY_DETAIL=null; await renderPruzkumyPrehled(); }
+async function renderGritAdmin(){ PRUZKUMY_DETAIL=null; await nactiAdaptSkoleni(); await renderPruzkumyPrehled(); }
+// Stav školicích úkolů z adaptačních scénářů — propisuje se do výpisu školení.
+async function nactiAdaptSkoleni(){
+  try{
+    const r=await fetch('/api/skoleni/adaptace',{cache:'no-store'});
+    if(!r.ok) return;
+    const j=await r.json(); const m={};
+    (j.kurzy||[]).forEach(k=>{ m[k.kurz]=k; });
+    window.__ADAPT_SKOL=m;
+  }catch(e){}
+}
 /* statistika školicího testu (model attempts[], hranice 80 %, max 3 pokusy) */
 function skolStaty(res,maxPokusu){
   maxPokusu=maxPokusu||3;
@@ -7213,6 +7225,13 @@ async function renderPruzkumyPrehled(){
      '<div><div class="muted" style="font-size:12px">Poslední vyplnění</div><strong style="font-size:20px">'+fmtD(posledni)+'</strong></div></div>';
   const sekce=(t,pozn)=>'<tr><td colspan="6" style="background:var(--green-soft);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:700;padding:9px 12px">'+t+(pozn?' <span style="font-weight:400;text-transform:none;letter-spacing:0">· '+pozn+'</span>':'')+'</td></tr>';
   const SKOL_INVITE_MAP={abroll:'abroll',prumysl:'prumysl',loxxer:'loxxer',acts:'acts',zentex:'zentex','tridici-linky':'tridici-linky','produkty-kovo':'kovo','produkty-roto':'roto','vykresy-skoleni':'vykresy-skoleni','svarovani-skoleni':'svarovani'};
+  // Kolik lidí má školení přiřazené přes adaptační scénář a jak jsou na tom
+  const ADAPT=(window.__ADAPT_SKOL||{});
+  const adaptInfo=(invKey)=>{
+    const a=ADAPT[invKey]; if(!a||!a.celkem) return '';
+    return '<div class="muted" style="font-size:12px;margin-top:3px">🎯 z adaptace: <b>'+a.celkem+'</b> přiřazeno · <b>'+a.splnilTest+'</b> splnilo test'+
+      (a.hotovo!==a.splnilTest?' · '+a.hotovo+' odškrtnuto v plánu':'')+'</div>';
+  };
   const radek=d=>{
     const s=statRadku(d.kind);
     const invKey=SKOL_INVITE_MAP[d.kind];
@@ -7221,7 +7240,7 @@ async function renderPruzkumyPrehled(){
       (invKey?'<button class="btn sm" onclick="event.stopPropagation();skolPozvat(\''+invKey+'\',\''+esc(d.nazev).replace(/'/g,"\\'")+'\')">✉ Rozeslat</button> ':'')+
       '<button class="btn ghost sm" onclick="event.stopPropagation();openPruzkumDetail(\''+d.kind+'\')">Spravovat →</button>';
     return '<tr data-klik onclick="openPruzkumDetail(\''+d.kind+'\')">'+
-      '<td><strong>'+esc(d.nazev)+'</strong><br><span class="muted" style="font-size:12px">'+esc(d.popis)+'</span></td>'+
+      '<td><strong>'+esc(d.nazev)+'</strong><br><span class="muted" style="font-size:12px">'+esc(d.popis)+'</span>'+(invKey?adaptInfo(invKey):'')+'</td>'+
       '<td class="num">'+(s.n||'—')+'</td>'+
       '<td style="font-size:13px">'+(s.n?s.vysledek:'<span class="muted">zatím bez výsledků</span>')+'</td>'+
       '<td>'+(s.n?(s.stav||'—'):'—')+'</td>'+
