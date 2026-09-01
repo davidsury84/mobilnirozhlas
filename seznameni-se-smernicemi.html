@@ -6535,16 +6535,32 @@ function telSetIdx(typ,key,pole,val){
   const r = typ==='emp' ? {typ:'emp',id:key} : {typ:'extra',idx:Number(key)};
   telSet(r,pole,val);
 }
+// Překreslí seznam tam, kde je právě zobrazený (vlastní záložka i karta v Organizaci).
+function telRefresh(){
+  const t=document.getElementById('telefonAdmin');
+  if(t && t.offsetParent!==null){ renderTelefonAdmin(); return; }
+  const b=document.getElementById('telBody');
+  if(b){ b.innerHTML=telBodyHtml(); const c=document.getElementById('telPocet'); if(c) c.textContent=telRadky().length; return; }
+  if(typeof renderOrg==='function') renderOrg();
+}
 function telDel(typ,key){
   if(typ==='extra'){
-    if(!confirm('Odebrat tento kontakt ze seznamu?')) return;
-    telExtra().splice(Number(key),1); save(); renderOrg(); return;
+    const x=telExtra()[Number(key)];
+    if(!x) { telRefresh(); return; }
+    if(!confirm('Odebrat kontakt „'+((x.name||x.phone||'bez názvu'))+'" ze seznamu?')) return;
+    telExtra().splice(Number(key),1); save(); telRefresh();
+    if(typeof toast==='function') toast('Kontakt odebrán');
+    return;
   }
-  const e=DB.employees.find(x=>x.id===key); if(!e) return;
-  if(!confirm('Vymazat telefon u „'+(e.name||e.email)+'"? Zaměstnanec v databázi zůstane, jen zmizí z telefonního seznamu.')) return;
-  e.telefon=''; save(); renderOrg();
+  const e=DB.employees.find(x=>x.id===key); if(!e){ telRefresh(); return; }
+  const maPozici=!!String(e.pozice||'').trim();
+  const otazka='Vymazat telefon u „'+(e.name||e.email)+'"?'+
+    (maPozici?'\n\nMá vyplněnou pozici („'+e.pozice+'"), takže v seznamu zůstane bez čísla. Chcete-li ho ze seznamu odstranit úplně, potvrďte a pak smažte i pozici — nebo zrušte a vymažte obě pole přímo v řádku.':'\n\nZ telefonního seznamu tím zmizí; v databázi zaměstnanců zůstává.');
+  if(!confirm(otazka)) return;
+  e.telefon=''; save(); telRefresh();
+  if(typeof toast==='function') toast(maPozici?'Telefon vymazán (v seznamu zůstává pozice)':'Odebráno ze seznamu');
 }
-function telAdd(){ telExtra().unshift({stredisko:'',role:'',name:'',email:'',phone:''}); save(); renderOrg(); }
+function telAdd(){ telExtra().unshift({stredisko:'',role:'',name:'',email:'',phone:''}); save(); telRefresh(); if(typeof toast==='function') toast('Přidán prázdný řádek — vyplňte ho'); }
 function telFiltr(v){ TEL_FILTR=v; const b=document.getElementById('telBody'); if(b) b.innerHTML=telBodyHtml(); const c=document.getElementById('telPocet'); if(c) c.textContent=telRadky().length; }
 function telBodyHtml(){
   const rows=telRadky();
