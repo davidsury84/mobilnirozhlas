@@ -1063,7 +1063,7 @@ var K_L10N = {
 'Maximálně 5 příloh.':['Maximum 5 attachments.','Maximal 5 Anhänge.','Maksymalnie 5 załączników.','Максимум 5 додатків.','Maximum 5 atașamente.'],
 'Soubor je příliš velký (max 15 MB).':['The file is too large (max 15 MB).','Die Datei ist zu groß (max. 15 MB).','Plik jest za duży (maks. 15 MB).','Файл занадто великий (макс. 15 МБ).','Fișierul este prea mare (max. 15 MB).'],
 '⧉ Kopírovat protokol (Ctrl+V do Heliosu)':['⧉ Copy specification (Ctrl+V into Helios)','⧉ Protokoll kopieren (Strg+V in Helios)','⧉ Kopiuj protokół (Ctrl+V do Heliosa)','⧉ Копіювати протокол (Ctrl+V у Helios)','⧉ Copiază protocolul (Ctrl+V în Helios)'],
-'Zkopíruje celé zadání jako text — vložíte Ctrl+V např. do Heliosu':['Copies the whole specification as text — paste with Ctrl+V e.g. into Helios','Kopiert die gesamte Spezifikation als Text — mit Strg+V z. B. in Helios einfügen','Kopiuje całe zadanie jako tekst — wklej Ctrl+V np. do Heliosa','Копіює все завдання як текст — вставте Ctrl+V напр. у Helios','Copiază toată specificația ca text — inserați cu Ctrl+V de ex. în Helios'],
+'Zkopíruje zadání jako text — jen údaje a odchylky od standardu; vložíte Ctrl+V do Heliosu':['Copies the specification as text — only data and deviations from the standard; paste with Ctrl+V into Helios','Kopiert die Spezifikation als Text — nur Daten und Abweichungen vom Standard; mit Strg+V in Helios einfügen','Kopiuje zadanie jako tekst — tylko dane i odstępstwa od standardu; wklej Ctrl+V do Heliosa','Копіює завдання як текст — лише дані та відхилення від стандарту; вставте Ctrl+V у Helios','Copiază specificația ca text — doar datele și abaterile de la standard; inserați cu Ctrl+V în Helios'],
 '✓ Protokol zkopírován — vložte Ctrl+V':['✓ Specification copied — paste with Ctrl+V','✓ Protokoll kopiert — mit Strg+V einfügen','✓ Protokół skopiowany — wklej Ctrl+V','✓ Протокол скопійовано — вставте Ctrl+V','✓ Protocol copiat — inserați cu Ctrl+V'],
 'Kopírovat kód':['Copy code','Code kopieren','Kopiuj kod','Копіювати код','Copiază codul'],
 'Otevřít':['Open','Öffnen','Otwórz','Відкрити','Deschide'],
@@ -2689,7 +2689,7 @@ function dotaznikView(z){
   var t=(D.types||[]).find(function(x){return x.key===z.typKey});
   if(!t||!t.dotaznik)return '';
   var h='<div class="sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Zadání (dotazník provedení)'+
-    '<button class="btn sm" onclick="copyProtokol(\''+z.id+'\')" title="Zkopíruje celé zadání jako text — vložíte Ctrl+V např. do Heliosu">⧉ Kopírovat protokol (Ctrl+V do Heliosu)</button></div>';
+    '<button class="btn sm" onclick="copyProtokol(\''+z.id+'\')" title="Zkopíruje zadání jako text — jen údaje a odchylky od standardu; vložíte Ctrl+V do Heliosu">⧉ Kopírovat protokol (Ctrl+V do Heliosu)</button></div>';
   if(z.kodAbr)h+='<div class="card" style="background:#f2f7ee;padding:10px 12px"><b>Kód dle katalogu ABR:</b> <code style="font-weight:800">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')">⧉ Kopírovat</button><div class="muted" style="font-size:11.5px;margin-top:3px">Vypisují se jen odchylky od standardu ELKOPLAST; NE se vynechává; žebřík se uvádí od výšky 1500 mm.</div></div>';
   // Důležitá upozornění — výrazně nahoře, ať je konstrukce ani výroba nepřehlédne
   if(typeof z.dotaznik.upozorneni==='string'&&z.dotaznik.upozorneni.trim())
@@ -2917,9 +2917,12 @@ function sendClient(id){
 function copyLink(url){var full=location.origin+url;navigator.clipboard&&navigator.clipboard.writeText(full);prompt('Odkaz pro klienta (Ctrl+C):',full)}
 function copyTxt(t){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t);}else{prompt('Zkopírujte (Ctrl+C):',t)}}
 /* ---- textový protokol zadání (Ctrl+C → Ctrl+V do Heliosu) ---- */
-/* Do protokolu se nevypisují položky, které ve standardu prostě nejsou
-   („NE — …", „ne", prázdno) — nenesou informaci a protokol jen nafukují.
-   Když je NE zvolené jako opce/požadavek (tj. odchylka od standardu), zůstává. */
+/* Kopíruje se jen to, co do Heliosu patří: identifikace zakázky, vyplněné
+   údaje (rozměry, počty, ceny, poznámky) a ODCHYLKY od standardu.
+   Nevypisuje se: provedení ve standardu, které už nese kód ABR (f.kod),
+   položky, které ve standardu prostě nejsou („NE — …", „ne", prázdno),
+   ani patička s datem generování. NE zvolené jako opce/požadavek je
+   odchylka od standardu a zůstává. */
 function jeNeStd(v){
   var s=String(v==null?'':v).trim().toLowerCase().replace(/\.$/,'');
   if(!s||s==='—'||s==='-'||s==='–')return true;
@@ -2928,7 +2931,7 @@ function jeNeStd(v){
 }
 function protokolText(z){
   var t=(D.types||[]).find(function(x){return x.key===z.typKey})||{};
-  var L=[],vyn=0;
+  var L=[];
   L.push('PROTOKOL ZADÁNÍ — '+(z.cisloZobraz||z.cislo)+(z.rezim==='objednavka'&&z.zNabidky?(' (z nabídky '+z.cislo+')'):''));
   L.push('Zákazník: '+(z.zakaznik||'')+(z.kontakt?(' · '+z.kontakt):'')+(z.kontaktEmail?(' · '+z.kontaktEmail):''));
   L.push('Typ výrobku: '+(z.typName||''));
@@ -2937,27 +2940,27 @@ function protokolText(z){
   if(z.strediskoName)L.push('Výrobní závod: '+z.strediskoName);
   L.push('Obchodník: '+(z.obchodnikName||'')+' · zadáno '+fdate(z.createdAt));
   (t.dotaznik||[]).forEach(function(sec){
-    var rows=[];
+    var rows=[],vynKod=0;
     (sec.fields||[]).forEach(function(f){
       var a=z.dotaznik&&z.dotaznik[f.k]; if(a==null)return;
       if(typeof a==='object'){
+        var jeStd=(a.volba==='standard'||!a.volba);
+        if(jeStd&&f.kod){vynKod++;return}   // je součástí kódu ABR — nevypisuje se dvakrát
         var tag=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek zákazníka');
         var disp=a.hodnota||'';
         if(a.detail){var u=(f.opceVstup&&f.opceVstup.unit)?(' '+f.opceVstup.unit):'';disp+=(disp?' · ':'')+a.detail+u;}
-        if(!a.detail&&(a.volba==='standard'||!a.volba)&&jeNeStd(disp)){vyn++;return}
-        if(!disp){vyn++;return}
+        if(jeStd&&!a.detail&&jeNeStd(disp))return;   // standard = komponenta prostě není
+        if(!disp)return;
         rows.push(f.label+': '+disp+'  ['+tag+']');
       } else {
-        if(jeNeStd(a)){vyn++;return}
+        if(jeNeStd(a))return;
         rows.push(f.label+': '+a);
       }
     });
+    if(vynKod)rows.push('Ostatní provedení = standard ELKOPLAST'+(z.kodAbr?' (viz kód ABR)':'')+'.');
     if(rows.length){L.push('');L.push(String(sec.title||'').toUpperCase());rows.forEach(function(r){L.push(r)});}
   });
   if(z.prilohy&&z.prilohy.length){L.push('');L.push('PŘÍLOHY');z.prilohy.forEach(function(p){L.push(p.name+' ('+(p.author||'')+', '+fdate(p.at)+')')});}
-  L.push('');
-  if(vyn)L.push('Nevypsáno '+vyn+'× standard bez komponenty („NE") — bez odchylky od standardu.');
-  L.push('Vygenerováno intranetem ELKOPLAST · '+new Date().toLocaleDateString('cs-CZ')+' · '+(z.cisloZobraz||z.cislo));
   return L.join('\n');
 }
 function copyProtokol(id){
