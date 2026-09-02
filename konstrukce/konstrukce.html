@@ -2917,9 +2917,18 @@ function sendClient(id){
 function copyLink(url){var full=location.origin+url;navigator.clipboard&&navigator.clipboard.writeText(full);prompt('Odkaz pro klienta (Ctrl+C):',full)}
 function copyTxt(t){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t);}else{prompt('Zkopírujte (Ctrl+C):',t)}}
 /* ---- textový protokol zadání (Ctrl+C → Ctrl+V do Heliosu) ---- */
+/* Do protokolu se nevypisují položky, které ve standardu prostě nejsou
+   („NE — …", „ne", prázdno) — nenesou informaci a protokol jen nafukují.
+   Když je NE zvolené jako opce/požadavek (tj. odchylka od standardu), zůstává. */
+function jeNeStd(v){
+  var s=String(v==null?'':v).trim().toLowerCase().replace(/\.$/,'');
+  if(!s||s==='—'||s==='-'||s==='–')return true;
+  if(/^ne\s*[—–-]/.test(s))return true;
+  return s==='ne'||s==='není'||s==='nemá'||s==='bez'||s==='žádné'||s==='žádná'||s==='žádný';
+}
 function protokolText(z){
   var t=(D.types||[]).find(function(x){return x.key===z.typKey})||{};
-  var L=[];
+  var L=[],vyn=0;
   L.push('PROTOKOL ZADÁNÍ — '+(z.cisloZobraz||z.cislo)+(z.rezim==='objednavka'&&z.zNabidky?(' (z nabídky '+z.cislo+')'):''));
   L.push('Zákazník: '+(z.zakaznik||'')+(z.kontakt?(' · '+z.kontakt):'')+(z.kontaktEmail?(' · '+z.kontaktEmail):''));
   L.push('Typ výrobku: '+(z.typName||''));
@@ -2935,13 +2944,19 @@ function protokolText(z){
         var tag=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek zákazníka');
         var disp=a.hodnota||'';
         if(a.detail){var u=(f.opceVstup&&f.opceVstup.unit)?(' '+f.opceVstup.unit):'';disp+=(disp?' · ':'')+a.detail+u;}
+        if(!a.detail&&(a.volba==='standard'||!a.volba)&&jeNeStd(disp)){vyn++;return}
+        if(!disp){vyn++;return}
         rows.push(f.label+': '+disp+'  ['+tag+']');
-      } else rows.push(f.label+': '+a);
+      } else {
+        if(jeNeStd(a)){vyn++;return}
+        rows.push(f.label+': '+a);
+      }
     });
     if(rows.length){L.push('');L.push(String(sec.title||'').toUpperCase());rows.forEach(function(r){L.push(r)});}
   });
   if(z.prilohy&&z.prilohy.length){L.push('');L.push('PŘÍLOHY');z.prilohy.forEach(function(p){L.push(p.name+' ('+(p.author||'')+', '+fdate(p.at)+')')});}
   L.push('');
+  if(vyn)L.push('Nevypsáno '+vyn+'× standard bez komponenty („NE") — bez odchylky od standardu.');
   L.push('Vygenerováno intranetem ELKOPLAST · '+new Date().toLocaleDateString('cs-CZ')+' · '+(z.cisloZobraz||z.cislo));
   return L.join('\n');
 }
