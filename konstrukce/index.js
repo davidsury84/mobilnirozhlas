@@ -1424,6 +1424,7 @@ function mount(host) {
       if (p === '/api/konstrukce/komentar' && req.method === 'POST') return apiComment(req, res);
       if (p === '/api/konstrukce/termin' && req.method === 'POST') return apiDeadline(req, res);
       if (p === '/api/konstrukce/cvz' && req.method === 'POST') return apiCvz(req, res);
+      if (p === '/api/konstrukce/zadani' && req.method === 'POST') return apiZadani(req, res);
       if (p === '/api/konstrukce/notif-read' && req.method === 'POST') return apiNotifRead(req, res);
       if (p === '/api/konstrukce/admin/role' && req.method === 'POST') return apiAdminRole(req, res);
       if (p === '/api/konstrukce/admin/fond' && req.method === 'POST') return apiAdminFond(req, res);
@@ -1549,6 +1550,9 @@ function mount(host) {
       prilohy: (z.prilohy || []).map((p, i) => ({ i, name: p.name, at: p.at, author: empName(p.author) })),
 
       params: z.params || {}, dotaznik: z.dotaznik || null, artNo: z.artNo || '',
+      // historie úprav zadání (klient mění objednávku za pochodu) + smí je dělat?
+      zmenyZadani: (z.zmenyZadani || []).map(v => ({ at: v.at, by: empName(v.by), duvod: v.duvod || '', zmeny: v.zmeny || [] })),
+      muzeEditZadani: smiEditZadani(me, z),
       stav: z.stav, stavLabel: STAV[z.stav].label, onTurn: STAV[z.stav].onTurn,
       obchodnikEmail: z.obchodnikEmail, obchodnikName: empName(z.obchodnikEmail),
       assignedTo: z.assignedTo || '', assignedName: z.assignedTo ? empName(z.assignedTo) : '',
@@ -1580,7 +1584,12 @@ function mount(host) {
         // pole typu volba: { volba: standard|opce|pozadavek, hodnota }
         const volba = ['standard', 'opce', 'pozadavek'].includes(a.volba) ? a.volba : 'standard';
         const hodnota = String(a.hodnota == null ? '' : a.hodnota).slice(0, 300);
-        if (hodnota) out[f.k] = { volba, hodnota };
+        if (hodnota) {
+          out[f.k] = { volba, hodnota };
+          // doplňkový vstup u opce (počet výztuh apod.) — bez něj se údaj ztrácel
+          const det = String(a.detail == null ? '' : a.detail).trim().slice(0, 120);
+          if (det) out[f.k].detail = det;
+        }
       } else {
         const v = String(a).slice(0, f.type === 'textarea' ? 4000 : 500).trim(); if (v) out[f.k] = v;
       }
@@ -2040,6 +2049,119 @@ function mount(host) {
     audit(z, me.email, 'Č. výrobní zakázky (Helios)', (old ? (old + ' → ') : '') + (cvz || '(smazáno)'));
     save(d);
     json(res, 200, { ok: true, cvz });
+    return true;
+  }
+
+  // ---- editace zadání po odeslání (klient mění objednávku za pochodu) ------
+  // Zadání jde upravit v každém stavu včetně dokončené objednávky — klient
+  // mění požadavky i po předání do výroby. Stav workflow se úpravou ZÁMĚRNĚ
+  // nemění (o překreslení rozhodne konstrukce); změna se zapíše do historie
+  // (z.zmenyZadani: kdo, kdy, důvod, pole „z → na"), do auditu, přepočítá se
+  // kód ABR a lidé u zakázky dostanou upozornění i e-mail.
+  function smiEditZadani(me, z) {
+    if (!me || !z) return false;
+    const em = (me.email || '').toLowerCase();
+    return !!(me.isAdmin || ma(me, 'sef') || ma(me, 'vykonny-reditel') || ma(me, 'vyrobni-reditel')
+      || (ma(me, 'obchodnik') && (z.obchodnikEmail || '').toLowerCase() === em)
+      || (z.assignedTo || '').toLowerCase() === em);
+  }
+  // Odpověď dotazníku jako text — pro záznam změny „z → na".
+  function dotStr(f, a) {
+    if (a == null) return '';
+    if (typeof a !== 'object') return String(a);
+    let s = String(a.hodnota || '');
+    if (a.detail) s += (s ? ' · ' : '') + a.detail + ((f && f.opceVstup && f.opceVstup.unit) ? (' ' + f.opceVstup.unit) : '');
+    if (!s) return '';
+    return s + ' [' + (a.volba === 'standard' ? 'std' : (a.volba === 'opce' ? 'opce' : 'požadavek zákazníka')) + ']';
+  }
+  function diffDotaznik(t, stary, novy) {
+    const out = [];
+    ((t && t.dotaznik) || []).forEach(sec => (sec.fields || []).forEach(f => {
+      const a = dotStr(f, (stary || {})[f.k]), b = dotStr(f, (novy || {})[f.k]);
+      if (a === b) return;
+      // pole, které dosud nebylo v zadání zapsané (starší zakázka, nově přidaná
+      // položka dotazníku) a teď se uložilo ve standardu = žádná změna pro klienta
+      if (!a && f.std !== undefined && b === dotStr(f, { volba: 'standard', hodnota: f.std })) return;
+      out.push({ k: f.k, label: f.label, z: a, na: b });
+    }));
+    return out;
+  }
+  function sanitizeParams(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const k of Object.keys(raw).slice(0, 60)) {
+      const v = String(raw[k] == null ? '' : raw[k]).trim().slice(0, 500);
+      if (v) out[String(k).slice(0, 120)] = v;
+    }
+    return out;
+  }
+  function diffParams(stary, novy) {
+    const out = [];
+    const keys = Array.from(new Set(Object.keys(stary || {}).concat(Object.keys(novy || {}))));
+    for (const k of keys) {
+      const a = String((stary || {})[k] == null ? '' : (stary || {})[k]);
+      const b = String((novy || {})[k] == null ? '' : (novy || {})[k]);
+      if (a !== b) out.push({ k, label: k, z: a, na: b });
+    }
+    return out;
+  }
+  async function apiZadani(req, res) {
+    const me = roleOf(req);
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load();
+    const z = d.zakazky.find(x => x.id === b.id);
+    if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
+    if (!smiEditZadani(me, z)) {
+      json(res, 403, { chyba: 'Zadání upravuje obchodník zakázky, přidělený konstruktér, šéf konstrukce nebo ředitel.' }); return true;
+    }
+    const duvod = String(b.duvod || '').trim().slice(0, 1000);
+    if (!duvod) { json(res, 400, { chyba: 'Napište důvod změny — co si klient přeje jinak.' }); return true; }
+    const t = typeOf(d, z.typKey);
+    const maDot = !!(t && Array.isArray(t.dotaznik) && t.dotaznik.length);
+    let zmeny;
+    if (maDot) {
+      const novy = sanitizeDotaznik(t, b.dotaznik);
+      zmeny = diffDotaznik(t, z.dotaznik, novy);
+      if (zmeny.length) z.dotaznik = novy;
+    } else {
+      const novy = sanitizeParams(b.params);
+      zmeny = diffParams(z.params, novy);
+      if (zmeny.length) z.params = novy;
+    }
+    if (!zmeny.length) { json(res, 200, { ok: true, zmeny: 0 }); return true; }
+    const now = Date.now();
+    z.kodAbr = genKodAbr(z);   // kódovaná pole se mohla změnit
+    if (!Array.isArray(z.zmenyZadani)) z.zmenyZadani = [];
+    z.zmenyZadani.push({ at: now, by: me.email, duvod, zmeny });
+    if (z.zmenyZadani.length > 100) z.zmenyZadani.shift();
+    audit(z, me.email, 'Změna zadání (' + zmeny.length + '×)', duvod + ' — ' + zmeny.map(x => x.label).join(', '));
+    // nová adresa dodání do číselníku (stejně jako při zadání)
+    const adr = z.dotaznik && typeof z.dotaznik.adresaDodani === 'string' ? z.dotaznik.adresaDodani.trim() : '';
+    if (adr && !d.adresy.some(x => x.toLowerCase() === adr.toLowerCase())) { d.adresy.push(adr); if (d.adresy.length > 800) d.adresy.shift(); }
+    const cis = (z.rezim === 'objednavka' && z.cisloObj) ? z.cisloObj : z.cislo;
+    const komu = new Set();
+    if (z.assignedTo) komu.add(z.assignedTo.toLowerCase());
+    if (z.obchodnikEmail) komu.add(z.obchodnikEmail.toLowerCase());
+    employeesWithRole('sef').forEach(em => komu.add(em.toLowerCase()));
+    if (['zavod', 'schvaleno', 'dokonceno'].includes(z.stav)) {
+      // objednávka už je ve výrobě — musí se to dozvědět i závod
+      employeesWithRole('vykonny-reditel').forEach(em => komu.add(em.toLowerCase()));
+      employeesWithRole('vyrobni-reditel').forEach(em => komu.add(em.toLowerCase()));
+      const s = (d.strediska || []).find(x => x.key === z.strediskoKey);
+      if (s && s.reditelEmail) komu.add(s.reditelEmail.toLowerCase());
+    }
+    komu.delete((me.email || '').toLowerCase());
+    for (const em of komu) notify(d, em, 'Změna zadání ' + cis + ' (' + zmeny.length + '×) — ' + me.name, z.id);
+    save(d);
+    const seznam = zmeny.map(x => '• ' + x.label + ': ' + (x.z || '—') + '  →  ' + (x.na || '—')).join('\n');
+    for (const em of komu) {
+      mail(em, 'Změna zadání · ' + cis,
+        'Zadání zakázky ' + cis + ' (' + z.zakaznik + ') bylo upraveno.\n\nKdo: ' + me.name + '\nDůvod: ' + duvod
+        + '\n\nZměny:\n' + seznam
+        + '\n\nStav zakázky se úpravou nemění. Je-li potřeba překreslit dokumentaci nebo upravit už zadanou výrobní zakázku, domluvte se s konstrukcí.',
+        z, { stitek: 'ZMĚNA ZADÁNÍ', stitekBarva: '#b3261e' });
+    }
+    json(res, 200, { ok: true, zmeny: zmeny.length });
     return true;
   }
 

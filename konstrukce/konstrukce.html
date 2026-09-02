@@ -1064,6 +1064,9 @@ var K_L10N = {
 'Soubor je příliš velký (max 15 MB).':['The file is too large (max 15 MB).','Die Datei ist zu groß (max. 15 MB).','Plik jest za duży (maks. 15 MB).','Файл занадто великий (макс. 15 МБ).','Fișierul este prea mare (max. 15 MB).'],
 '⧉ Kopírovat protokol (Ctrl+V do Heliosu)':['⧉ Copy specification (Ctrl+V into Helios)','⧉ Protokoll kopieren (Strg+V in Helios)','⧉ Kopiuj protokół (Ctrl+V do Heliosa)','⧉ Копіювати протокол (Ctrl+V у Helios)','⧉ Copiază protocolul (Ctrl+V în Helios)'],
 'Zkopíruje zadání jako text — jen údaje a odchylky od standardu; vložíte Ctrl+V do Heliosu':['Copies the specification as text — only data and deviations from the standard; paste with Ctrl+V into Helios','Kopiert die Spezifikation als Text — nur Daten und Abweichungen vom Standard; mit Strg+V in Helios einfügen','Kopiuje zadanie jako tekst — tylko dane i odstępstwa od standardu; wklej Ctrl+V do Heliosa','Копіює завдання як текст — лише дані та відхилення від стандарту; вставте Ctrl+V у Helios','Copiază specificația ca text — doar datele și abaterile de la standard; inserați cu Ctrl+V în Helios'],
+'✎ Upravit zadání':['✎ Edit specification','✎ Spezifikation bearbeiten','✎ Edytuj zadanie','✎ Редагувати завдання','✎ Editează specificația'],
+'Klient mění objednávku za pochodu — úprava se zapíše do historie změn a lidem u zakázky přijde upozornění.':['The customer changes the order while it runs — the edit is written to the change history and everyone on the order is notified.','Der Kunde ändert den Auftrag im laufenden Prozess — die Änderung wird in der Historie festgehalten und alle Beteiligten werden benachrichtigt.','Klient zmienia zamówienie w trakcie realizacji — edycja trafia do historii zmian, a osoby przy zleceniu dostają powiadomienie.','Замовник змінює замовлення на ходу — редагування записується в історію змін, а причетні отримують сповіщення.','Clientul modifică comanda din mers — editarea se scrie în istoricul modificărilor și cei implicați primesc o notificare.'],
+'Změny zadání':['Specification changes','Änderungen der Spezifikation','Zmiany zadania','Зміни завдання','Modificări ale specificației'],
 '✓ Protokol zkopírován — vložte Ctrl+V':['✓ Specification copied — paste with Ctrl+V','✓ Protokoll kopiert — mit Strg+V einfügen','✓ Protokół skopiowany — wklej Ctrl+V','✓ Протокол скопійовано — вставте Ctrl+V','✓ Protocol copiat — inserați cu Ctrl+V'],
 'Kopírovat kód':['Copy code','Code kopieren','Kopiuj kod','Копіювати код','Copiază codul'],
 'Otevřít':['Open','Öffnen','Otwórz','Відкрити','Deschide'],
@@ -2549,7 +2552,7 @@ function renderDrawer(z){
       '</div>'+
       actionsFor(z)+
       pdfPanel(z)+
-      prilohyBlock(z)+dotaznikView(z)+'<div id="drwArch"></div>'+params+vers+
+      prilohyBlock(z)+dotaznikView(z)+zmenyView(z)+'<div id="drwArch"></div>'+params+vers+
       linkBox(z)+
       comments+audit+
       delBox(z)+
@@ -2689,7 +2692,8 @@ function dotaznikView(z){
   var t=(D.types||[]).find(function(x){return x.key===z.typKey});
   if(!t||!t.dotaznik)return '';
   var h='<div class="sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Zadání (dotazník provedení)'+
-    '<button class="btn sm" onclick="copyProtokol(\''+z.id+'\')" title="Zkopíruje zadání jako text — jen údaje a odchylky od standardu; vložíte Ctrl+V do Heliosu">⧉ Kopírovat protokol (Ctrl+V do Heliosu)</button></div>';
+    '<button class="btn sm" onclick="copyProtokol(\''+z.id+'\')" title="Zkopíruje zadání jako text — jen údaje a odchylky od standardu; vložíte Ctrl+V do Heliosu">⧉ Kopírovat protokol (Ctrl+V do Heliosu)</button>'+
+    (z.muzeEditZadani?('<button class="btn ghost sm" onclick="openEditZadani(\''+z.id+'\')" title="Klient mění objednávku za pochodu — úprava se zapíše do historie změn a lidem u zakázky přijde upozornění.">✎ Upravit zadání</button>'):'')+'</div>';
   if(z.kodAbr)h+='<div class="card" style="background:#f2f7ee;padding:10px 12px"><b>Kód dle katalogu ABR:</b> <code style="font-weight:800">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')">⧉ Kopírovat</button><div class="muted" style="font-size:11.5px;margin-top:3px">Vypisují se jen odchylky od standardu ELKOPLAST; NE se vynechává; žebřík se uvádí od výšky 1500 mm.</div></div>';
   // Důležitá upozornění — výrazně nahoře, ať je konstrukce ani výroba nepřehlédne
   if(typeof z.dotaznik.upozorneni==='string'&&z.dotaznik.upozorneni.trim())
@@ -2939,6 +2943,8 @@ function protokolText(z){
   if(z.cvzHelios)L.push('Č. výrobní zakázky (Helios): '+z.cvzHelios);
   if(z.strediskoName)L.push('Výrobní závod: '+z.strediskoName);
   L.push('Obchodník: '+(z.obchodnikName||'')+' · zadáno '+fdate(z.createdAt));
+  if(z.zmenyZadani&&z.zmenyZadani.length){var pz=z.zmenyZadani[z.zmenyZadani.length-1];
+    L.push('POZOR — zadání upraveno '+z.zmenyZadani.length+'× · naposledy '+fdate(pz.at)+' ('+(pz.by||'')+'): '+(pz.duvod||''));}
   (t.dotaznik||[]).forEach(function(sec){
     var rows=[],vynKod=0;
     (sec.fields||[]).forEach(function(f){
@@ -2983,6 +2989,7 @@ function askTermin(id){var t=prompt('Nový termín (RRRR-MM-DD):');if(!t)return;
 /* ---- nová zakázka ---- */
 /* --- překlady dotazníku (CZ zdroj → EN/DE/PL); neznámé texty zůstanou CZ --- */
 var DQ_LANG=(typeof K_LANG!=='undefined'&&K_LANG!=='cz')?K_LANG:'cs', DQ_PREFILL=null, DQ_ART='', KAT=null, DQ_PRIL=[];
+var EDIT_ID=null;   // id zakázky, jejíž ZADÁNÍ se právě upravuje (null = zakládá se nová)
 /* ---- přílohy k zadání (PDF/obrázky od zákazníka) ---- */
 function dqPrilAdd(inp){
   var files=[].slice.call(inp.files||[]);
@@ -3034,6 +3041,13 @@ function artPick(i){
   if(info)info.innerHTML='<span class="art-tag">'+esc(x.rada)+'</span> '+esc(x.rozmery||'')+' · '+(x.objem||'?')+' m³ · '+(x.hmotnost||'?')+' kg · '+esc(x.provedeni)+(x.pcCzk?' · orient. '+x.pcCzk.toLocaleString('cs-CZ')+' Kč / '+(x.pcEur||'?')+' €':'');
 }
 var TR={
+  'Úprava zadání':{en:'Editing the specification',de:'Spezifikation bearbeiten',pl:'Edycja zadania',ua:'Редагування завдання',ro:'Editarea specificației'},
+  'Důvod změny':{en:'Reason for the change',de:'Grund der Änderung',pl:'Powód zmiany',ua:'Причина зміни',ro:'Motivul modificării'},
+  'co si klient přeje jinak…':{en:'what the customer wants changed…',de:'was der Kunde anders wünscht…',pl:'czego klient chce inaczej…',ua:'що замовник хоче інакше…',ro:'ce dorește clientul altfel…'},
+  'Klient mění objednávku za pochodu. Každá změna se zapíše do historie (kdo, kdy, z čeho na co) a lidem u zakázky přijde upozornění. Stav zakázky se úpravou nemění.':{en:'The customer is changing the order while it runs. Every change is written to the history (who, when, from what to what) and everyone on the order is notified. Editing does not change the order status.',de:'Der Kunde ändert den Auftrag im laufenden Prozess. Jede Änderung wird in der Historie festgehalten (wer, wann, von was auf was) und alle Beteiligten werden benachrichtigt. Der Auftragsstatus ändert sich dadurch nicht.',pl:'Klient zmienia zamówienie w trakcie realizacji. Każda zmiana trafia do historii (kto, kiedy, z czego na co), a osoby przy zleceniu dostają powiadomienie. Edycja nie zmienia statusu zlecenia.',ua:'Замовник змінює замовлення на ходу. Кожна зміна записується в історію (хто, коли, з чого на що), а причетні отримують сповіщення. Статус замовлення при цьому не змінюється.',ro:'Clientul modifică comanda din mers. Fiecare modificare se scrie în istoric (cine, când, din ce în ce) și cei implicați primesc o notificare. Starea comenzii nu se schimbă.'},
+  'Uložit změny zadání':{en:'Save specification changes',de:'Änderungen speichern',pl:'Zapisz zmiany zadania',ua:'Зберегти зміни завдання',ro:'Salvează modificările'},
+  'Napište důvod změny — co si klient přeje jinak.':{en:'Enter the reason for the change — what the customer wants changed.',de:'Geben Sie den Grund der Änderung an — was der Kunde anders wünscht.',pl:'Wpisz powód zmiany — czego klient chce inaczej.',ua:'Вкажіть причину зміни — що замовник хоче інакше.',ro:'Scrieți motivul modificării — ce dorește clientul altfel.'},
+  'Zadání se nezměnilo — nebylo co uložit.':{en:'The specification is unchanged — nothing to save.',de:'Die Spezifikation ist unverändert — nichts zu speichern.',pl:'Zadanie się nie zmieniło — nie ma co zapisać.',ua:'Завдання не змінилося — нічого зберігати.',ro:'Specificația nu s-a schimbat — nu este nimic de salvat.'},
   'Nové zadání zakázky do konstrukce':{en:'New engineering order',de:'Neuer Konstruktionsauftrag',pl:'Nowe zlecenie do konstrukcji',ua:'Нове замовлення в конструкцію',ro:'Specificație nouă către proiectare'},
   'Vyplňte dotazník provedení. U parametrů zvolte standard, opci, nebo zapište požadavek zákazníka.':{en:'Fill in the design questionnaire. For each parameter choose standard, option, or enter a customer requirement.',de:'Füllen Sie den Ausführungsfragebogen aus. Wählen Sie Standard, Option, oder tragen Sie einen Kundenwunsch ein.',pl:'Wypełnij ankietę wykonania. Dla parametrów wybierz standard, opcję lub wpisz wymaganie klienta.',ua:'Заповніть анкету виконання. Для параметрів оберіть стандарт, опцію або впишіть вимогу замовника.',ro:'Completați chestionarul de execuție. Pentru parametri alegeți standardul, o opțiune sau scrieți cerința clientului.'},
   'Typ výrobku':{en:'Product type',de:'Produkttyp',pl:'Typ produktu',ua:'Тип виробу',ro:'Tip produs'},
@@ -3235,7 +3249,9 @@ var TR={
 };
 function tr(s){if(DQ_LANG==='cs'||!s)return s;var e=TR[s];return (e&&e[DQ_LANG])||s;}
 function reqTag(){return {cs:'poř.',en:'req.',de:'Wunsch',pl:'wym.'}[DQ_LANG]||'poř.';}
-function langSwitch(l){DQ_PREFILL=collectDot();DQ_LANG=l;var st={typKey:(document.getElementById('nTyp')||{}).value,head:collectHead(),dot:DQ_PREFILL};openNew(st);}
+function langSwitch(l){
+  if(EDIT_ID){var sb=sbirZadani();DQ_LANG=l;openEditZadani(EDIT_ID,{dot:sb.dot,duvod:val('ezDuvod')});return}
+  DQ_PREFILL=collectDot();DQ_LANG=l;var st={typKey:(document.getElementById('nTyp')||{}).value,head:collectHead(),dot:DQ_PREFILL};openNew(st);}
 function collectHead(){return {nPopt:val('nPopt'),nZak:val('nZak'),nKontakt:val('nKontakt'),nMail:val('nMail'),nTerm:val('nTerm')};}
 function val(id){return (document.getElementById(id)||{}).value||'';}
 function collectDot(){
@@ -3303,6 +3319,7 @@ function tselPick(key){
   DQ_PREFILL=null; artReset(); renderDotaznik();   // stejná reakce jako dřív u <select onchange>
 }
 function openNew(state){
+  EDIT_ID=null;
   if(!state)DQ_ART='';
   state=state||{};DQ_PREFILL=state.dot||null;
   DQ_PRIL=[];   // přílohy (PDF/obrázky) k novému zadání
@@ -3537,10 +3554,10 @@ function renderDotaznik(){
   if(pb&&!pb._kodHook){pb._kodHook=1;pb.addEventListener('input',function(){dqKodPreview()});}
   dqKodPreview();
 }
-function createZak(){
-  var t=curType();
-  var params={},dot={};
-  if(t.dotaznik&&t.dotaznik.length){
+/* Sběr vyplněného formuláře — sdílí ho založení zakázky i pozdější úprava zadání. */
+function sbirZadani(){
+  var t=curType(),params={},dot={},maDot=!!(t.dotaznik&&t.dotaznik.length);
+  if(maDot){
     t.dotaznik.forEach(function(sec){(sec.fields||[]).forEach(function(f){
       if(f.std!==undefined){
         var volba=selVolba(f.k);
@@ -3552,6 +3569,10 @@ function createZak(){
   }else{
     document.querySelectorAll('#paramBox input[data-lbl]').forEach(function(inp){if(inp.value.trim())params[inp.getAttribute('data-lbl')]=inp.value.trim()});
   }
+  return {dot:dot,params:params,maDot:maDot};
+}
+function createZak(){
+  var sb=sbirZadani(),params=sb.params,dot=sb.dot;
   var b={typKey:(document.getElementById('nTyp')||{}).value,zakaznik:(document.getElementById('nZak')||{}).value,kontakt:(document.getElementById('nKontakt')||{}).value,kontaktEmail:(document.getElementById('nMail')||{}).value,cisloPoptavky:(document.getElementById('nPopt')||{}).value,pozadovanyTermin:(document.getElementById('nTerm')||{}).value,params:params,dotaznik:dot,artNo:DQ_ART,
     rezim:(MODE==='nabidka'?'nabidka':'objednavka'),stredisko:(document.getElementById('nZavod')||{}).value||'',
     prilohy:DQ_PRIL};
@@ -3560,6 +3581,53 @@ function createZak(){
     if(!o.ok){document.getElementById('nErr').textContent=o.j.chyba||'Chyba.';return}
     closeModal();reloadData();if(o.j.warn)alert(o.j.warn);
   });
+}
+/* ---- úprava už odeslaného zadání (klient mění objednávku za pochodu) ----
+   Otevře stejný dotazník předvyplněný stávajícími odpověďmi. Uložením se
+   rozdíly zapíší do historie změn (kdo, kdy, důvod, pole „z → na") a lidem
+   u zakázky přijde upozornění; stav zakázky se nemění. */
+function openEditZadani(id,state){
+  var z=(D.zakazky||[]).find(function(x){return x.id===id}); if(!z)return;
+  state=state||{};
+  EDIT_ID=id; DQ_PREFILL=state.dot||z.dotaznik||{};
+  var langs=['cs','en','de','pl','ua','ro'].map(function(l){return '<button type="button" class="langb'+(DQ_LANG===l?' act':'')+'" onclick="langSwitch(\''+l+'\')">'+(l==='cs'?'CZ':l.toUpperCase())+'</button>'}).join('');
+  var m=document.getElementById('modal');
+  m.innerHTML='<div class="sheet dqmodal">'+
+    '<div class="dqhead">'+
+      '<div class="row" style="justify-content:space-between;align-items:center;gap:12px"><h3 style="margin:0;font-size:17px">'+esc(tr('Úprava zadání'))+' — '+esc(z.cisloZobraz||z.cislo)+'</h3><div class="langbar">'+langs+'</div></div>'+
+      '<div class="ssobar" style="margin:10px 0 0;align-items:flex-start"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;margin-top:2px"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg><span>'+esc(tr('Klient mění objednávku za pochodu. Každá změna se zapíše do historie (kdo, kdy, z čeho na co) a lidem u zakázky přijde upozornění. Stav zakázky se úpravou nemění.'))+'</span></div>'+
+    '</div>'+
+    '<div class="dqbody">'+
+      '<input type="hidden" id="nTyp" value="'+esc(z.typKey)+'">'+
+      '<div class="dqhg"><div style="grid-column:1/-1"><label>'+esc(tr('Důvod změny'))+' <span class="reqmark">*</span></label>'+
+        '<input id="ezDuvod" value="'+esc(state.duvod||'')+'" placeholder="'+esc(tr('co si klient přeje jinak…'))+'"></div></div>'+
+      '<div id="paramBox"></div>'+
+      '<div class="err" id="nErr"></div>'+
+    '</div>'+
+    '<div class="dqfoot"><div class="dqkod" id="dqKod" style="display:none"></div><span class="cnt" id="dqcount"></span><button class="btn ghost" onclick="closeModal()">'+esc(tr('Zrušit'))+'</button><button class="btn" onclick="saveZadani(\''+id+'\')">'+esc(tr('Uložit změny zadání'))+'</button></div>'+
+  '</div>';
+  m.classList.add('open');renderDotaznik();
+}
+function saveZadani(id){
+  var duvod=val('ezDuvod').trim(),err=document.getElementById('nErr');
+  if(!duvod){err.textContent=tr('Napište důvod změny — co si klient přeje jinak.');return}
+  var sb=sbirZadani();
+  api('/zadani','POST',{id:id,duvod:duvod,dotaznik:sb.dot,params:sb.params}).then(function(o){
+    if(!o.ok){err.textContent=(o.j&&o.j.chyba)||'Chyba.';return}
+    if(!o.j.zmeny){err.textContent=tr('Zadání se nezměnilo — nebylo co uložit.');return}
+    EDIT_ID=null;closeModal();reloadData();
+    toastUlozeno('✓ Změna zadání uložena ('+o.j.zmeny+'×) — lidem u zakázky odešlo upozornění');
+  });
+}
+/* historie úprav zadání v detailu zakázky */
+function zmenyView(z){
+  if(!z.zmenyZadani||!z.zmenyZadani.length)return '';
+  var h='<div class="sec">Změny zadání ('+z.zmenyZadani.length+')</div><div class="tl">';
+  z.zmenyZadani.slice().reverse().forEach(function(v){
+    h+='<div class="it"><div><b>'+esc(v.by||'')+'</b> · '+fdt(v.at)+(v.duvod?(' — '+esc(v.duvod)):'')+'</div>'+
+      '<div class="m">'+(v.zmeny||[]).map(function(x){return esc(x.label)+': '+esc(x.z||'—')+' → <b>'+esc(x.na||'—')+'</b>'}).join('<br>')+'</div></div>';
+  });
+  return h+'</div>';
 }
 var ADR_T=null;
 function adrLookup(inp){
@@ -3588,7 +3656,7 @@ function adrRow(a,kind){
 }
 function adrPick(el){var o=el.closest('.dq2-seg')||el.closest('.dq2');if(!o)return;var inp=o.querySelector('input');if(!inp)return;inp.value=el.getAttribute('data-v');var dd=o.querySelector('.adr-dd');if(dd)dd.style.display='none';}
 function adrClose(){document.querySelectorAll('.adr-dd').forEach(function(d){d.style.display='none'})}
-function closeModal(){document.getElementById('modal').classList.remove('open')}
+function closeModal(){EDIT_ID=null;document.getElementById('modal').classList.remove('open')}
 
 /* ---- evidence práce (timesheet) ---- */
 function monthStart(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'}
