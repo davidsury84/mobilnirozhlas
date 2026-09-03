@@ -1164,6 +1164,9 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'bokorys':['side view','Seitenansicht','widok z boku','вигляд збоку','vedere laterală'],
+'zadní čelo':['rear view','Rückansicht','widok z tyłu','вигляд ззаду','vedere din spate'],
+'UPN 200 + sloupky (kolmé napojení, šířka 2420)':['UPN 200 + posts (perpendicular joint, width 2420)','UPN 200 + Stützen (rechtwinkliger Anschluss, Breite 2420)','UPN 200 + słupki (połączenie prostopadłe, szerokość 2420)','UPN 200 + стійки (перпендикулярне зʼєднання, ширина 2420)','UPN 200 + stâlpi (îmbinare perpendiculară, lățime 2420)'],
 };
 function kT(cz){ if(K_LANG==='cz') return cz; var t=K_L10N[cz]; if(!t) return cz; return t[K_IDX[K_LANG]]||cz; }
 
@@ -1317,6 +1320,9 @@ function kLangSet(v){
   try{ DQ_LANG = (K_LANG==='cz'?'cs':K_LANG); }catch(e){}
   kLangBar();
   try{ if(typeof renderSide==='function') renderSide(); if(typeof renderMain==='function') renderMain(); }catch(e){}
+  /* otevřený dotazník se vykresluje slovníkem TR — musí se překreslit taky,
+     jinak by zůstal v původním jazyce, zatímco okolí je už v novém */
+  try{ if(typeof dqLangRefresh==='function') dqLangRefresh(); }catch(e){}
   kTrAll();
   /* popisy katalogu ABR se dotahují až v cizím jazyce; po načtení přeložit znovu */
   if(K_LANG!=='cz') kAbrLoad(function(){ kTrAll(); });
@@ -3249,9 +3255,23 @@ var TR={
 };
 function tr(s){if(DQ_LANG==='cs'||!s)return s;var e=TR[s];return (e&&e[DQ_LANG])||s;}
 function reqTag(){return {cs:'poř.',en:'req.',de:'Wunsch',pl:'wym.'}[DQ_LANG]||'poř.';}
+/* Překreslí otevřený dotazník do aktuálního DQ_LANG (rozepsané odpovědi zůstávají). */
+function dqLangRefresh(){
+  var mo=document.getElementById('modal');
+  if(!mo||!mo.classList.contains('open'))return;
+  if(EDIT_ID){var sb=sbirZadani();openEditZadani(EDIT_ID,{dot:sb.dot,duvod:val('ezDuvod')});return}
+  if(!document.getElementById('nTyp'))return;   // otevřené jiné modální okno
+  DQ_PREFILL=collectDot();
+  openNew({typKey:val('nTyp'),head:collectHead(),dot:DQ_PREFILL});
+}
+/* Vlajky v dotazníku přepínají jazyk CELÉHO modulu. Dřív měnily jen DQ_LANG,
+   takže dotazník jel podle slovníku TR, ale okolní texty podle K_L10N v jiném
+   jazyce — okno pak bylo míchanice dvou jazyků. Jeden jazyk pro obojí. */
 function langSwitch(l){
-  if(EDIT_ID){var sb=sbirZadani();DQ_LANG=l;openEditZadani(EDIT_ID,{dot:sb.dot,duvod:val('ezDuvod')});return}
-  DQ_PREFILL=collectDot();DQ_LANG=l;var st={typKey:(document.getElementById('nTyp')||{}).value,head:collectHead(),dot:DQ_PREFILL};openNew(st);}
+  var kl=(l==='cs')?'cz':l;
+  if(typeof kLangSet==='function'&&typeof K_LANG!=='undefined'){ kLangSet(kl); return; }
+  DQ_LANG=l; dqLangRefresh();
+}
 function collectHead(){return {nPopt:val('nPopt'),nZak:val('nZak'),nKontakt:val('nKontakt'),nMail:val('nMail'),nTerm:val('nTerm')};}
 function val(id){return (document.getElementById(id)||{}).value||'';}
 function collectDot(){

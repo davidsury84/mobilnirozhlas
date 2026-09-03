@@ -163,7 +163,8 @@ function dotaznikAbroll(rada) {
       abrPole('strecha', 'Střecha / plachta', ov('strecha')),
     ] },
     { title: 'Doplňky (mimo kód)', fields: [
-      { k: 'zadniTramec', label: 'Zadní trámec', std: 'UPN 180', opce: 'UPN 200 + sloupky (kolmé napojení / šířka 2420)' },
+      // pozor: „ / " odděluje jednotlivé volby — uvnitř hodnoty být nesmí (rozpadla by se na dvě)
+      { k: 'zadniTramec', label: 'Zadní trámec', std: 'UPN 180', opce: 'UPN 200 + sloupky (kolmé napojení, šířka 2420)' },
       { k: 'horizontalniVyztuha', label: 'Horizontální výztuha', std: 'ne', opce: 'ano', opceVstup: { placeholder: 'počet výztuh', unit: 'ks', num: true } },
       { k: 'poznamky', label: 'Jiné poznámky vč. barevného odstínu (RAL)', type: 'text', ral: true },
     ] },
