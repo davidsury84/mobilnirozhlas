@@ -7513,9 +7513,10 @@ function spokRenderVysledky(){
       if(qh) h+='<div class="card pad" style="margin-bottom:14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--green);margin-bottom:10px">'+esc(s.nazev)+(s.jen&&s.jen!=='vsichni'?' <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">· jen '+(s.jen==='kupujici'?'kupující':'nekupující')+'</span>':'')+'</div>'+qh+'</div>';
     });
     if(emaily.length){
-      h+='<div class="card pad" style="margin-bottom:14px"><strong style="display:block;margin-bottom:8px">Zájemci o testování novinek ('+emaily.length+')</strong>'+
-        '<div class="matrix-wrap" style="max-height:220px"><table class="grid"><thead><tr><th>E-mail</th><th>Odpověď</th><th>Kdy</th></tr></thead><tbody>'+
-        emaily.map(r=>{ const o=(r.odpovedi||{}).q28||{}; return '<tr><td><strong>'+esc(r.email)+'</strong></td><td>'+esc(o.v==='a'?'ano, mám zájem':o.v==='b'?'možná, podle produktu':'—')+'</td><td class="muted">'+fmtD(r.ts)+'</td></tr>'; }).join('')+
+      const odp=(o)=>o&&o.v==='a'?'ano':o&&o.v==='b'?'možná':'—';
+      h+='<div class="card pad" style="margin-bottom:14px"><strong style="display:block;margin-bottom:8px">Zájemci o testování novinek a prezentace ('+emaily.length+')</strong>'+
+        '<div class="matrix-wrap" style="max-height:220px"><table class="grid"><thead><tr><th>E-mail</th><th>Testování</th><th>Prezentace / natáčení</th><th>Kdy</th></tr></thead><tbody>'+
+        emaily.map(r=>{ const od=r.odpovedi||{}; return '<tr><td><strong>'+esc(r.email)+'</strong></td><td>'+esc(odp(od.q28))+'</td><td>'+esc(odp(od.q32))+'</td><td class="muted">'+fmtD(r.ts)+'</td></tr>'; }).join('')+
         '</tbody></table></div></div>';
     }
   }
@@ -7600,6 +7601,7 @@ function spokRenderEditor(){
             '<button class="btn ghost sm" style="color:var(--red)" onclick="spokSmazat('+si+','+qi+')">✕</button></span></div>'+
         '<input data-spq="'+si+'.'+qi+'.text" placeholder="Znění otázky" style="display:block;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px">'+
         '<input data-spq="'+si+'.'+qi+'.pozn" placeholder="Poznámka pod otázkou (nepovinné)" style="display:block;width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:13px">'+
+        '<input data-spq="'+si+'.'+qi+'.__obrazky" placeholder="Obrázky nad otázkou — URL oddělené mezerou (např. /pruzkum-foto/eshop.jpg)" style="display:block;width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:12px;font-family:ui-monospace,monospace">'+
         ((q.typ==='vyber'||q.typ==='vice')?
           '<textarea data-spq="'+si+'.'+qi+'.__moznosti" placeholder="Jedna možnost na řádek" style="display:block;width:100%;min-height:'+Math.min(200,34+(q.moznosti||[]).length*21)+'px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,monospace;font-size:12.5px">'+esc(moznostiTxt)+'</textarea>'+
           '<p class="muted" style="font-size:11px;margin:4px 0 0">Písmeno se závorkou na začátku řádku neměňte — páruje uložené odpovědi. Nový řádek = nová možnost (bez písmene, doplní se samo).</p>':'')+
@@ -7628,6 +7630,8 @@ function spokRenderEditor(){
   box.querySelectorAll('[data-spq]').forEach(el=>{
     const [si,qi,f]=el.dataset.spq.split('.'); const q=d.sekce[+si].otazky[+qi];
     if(f==='__moznosti'){ el.onchange=()=>{ q.moznosti=spokParseMoznosti(el.value,q.moznosti||[]); }; return; }
+    if(f==='__obrazky'){ el.value=(q.obrazky||(q.obrazek?[q.obrazek]:[])).join(' ');
+      el.onchange=()=>{ const urls=el.value.split(/[\s,]+/).filter(Boolean).slice(0,6); if(urls.length){ q.obrazky=urls; } else { delete q.obrazky; } delete q.obrazek; }; return; }
     if(el.type==='checkbox'){ el.onchange=()=>{ if(f==='aktivni') q.aktivni=el.checked?true:false; else q[f]=el.checked; }; return; }
     el.value=(q[f]==null?'':q[f]); el.oninput=()=>{ q[f]=(el.type==='number')?+el.value:el.value; };
   });

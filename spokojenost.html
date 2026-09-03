@@ -232,7 +232,8 @@ function renderQ(){
   var h = '<div class="q-sekce">' + esc(poz.sekce.nazev) + '</div>' +
           '<div class="q-text">' + esc(q.text) + '</div>' +
           (q.pozn ? '<div class="q-pozn">' + esc(q.pozn) + '</div>' : '');
-  if (q.obrazek) h += '<div class="q-obr"><img src="' + esc(q.obrazek) + '" alt=""></div>';
+  var obrazky = Array.isArray(q.obrazky) ? q.obrazky : (q.obrazek ? [q.obrazek] : []);
+  obrazky.forEach(function(u){ h += '<div class="q-obr"><img src="' + esc(u) + '" alt="" loading="lazy"></div>'; });
   if (q.typ==='vyber' || q.typ==='vice') h += htmlMoznosti(q);
   else if (q.typ==='skala') h += htmlSkala(q);
   else if (q.typ==='kategorie-skala') h += htmlKategorie(q);

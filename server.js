@@ -1245,16 +1245,18 @@ const SPOKOJENOST_SEED = {
       { id: 'q5', typ: 'text', text: 'Co by Vás přesvědčilo u nás nakoupit?' },
     ]},
     { id: 'C', nazev: 'Web a vyhledávání produktů', jen: 'vsichni', otazky: [
-      { id: 'q6', typ: 'skala', min: 1, max: 5, obrazek: '/pruzkum-foto/eshop.jpg', text: 'Jak hodnotíte celkovou přehlednost e-shopu a orientaci na něm?', popisMin: '😕 nepřehledný', popisMax: '🤩 velmi přehledný' },
-      { id: 'q7', typ: 'skala', min: 1, max: 5, text: 'Jak hodnotíte šíři nabídky (množství zboží)?', popisMin: '😕 nedostatečná', popisMax: '😊 výborná' },
+      { id: 'q6', typ: 'skala', min: 1, max: 5, obrazky: ['/pruzkum-foto/eshop.jpg', '/pruzkum-foto/eshop-vypis.jpg'], pozn: 'Pro připomenutí — takhle vypadá úvodní stránka a výpis produktů:', text: 'Jak hodnotíte celkovou přehlednost e-shopu a orientaci na něm?', popisMin: '😕 nepřehledný', popisMax: '🤩 velmi přehledný' },
+      { id: 'q7', typ: 'skala', min: 1, max: 5, obrazky: ['/pruzkum-foto/eshop-kategorie.jpg'], pozn: 'Ukázka jedné z hlavních kategorií a jejích podkategorií:', text: 'Jak hodnotíte šíři nabídky (množství zboží)?', popisMin: '😕 nedostatečná', popisMax: '😊 výborná' },
       { id: 'q8', typ: 'skala', min: 1, max: 5, text: 'Jak snadné pro Vás bylo najít produkt, který jste hledal/a?', popisMin: '😖 velmi obtížné', popisMax: '😊 velmi snadné' },
-      { id: 'q9', typ: 'skala', min: 1, max: 5, text: 'Jsou pro Vás informace u produktů dostatečné (popisy, fotografie, technické parametry, dokumenty ke stažení)?', popisMin: '😕 nedostatečné', popisMax: '😊 zcela dostatečné', doplnekText: 'Pokud Vám nějaká informace chyběla, napište prosím jaká:' },
+      { id: 'q9', typ: 'skala', min: 1, max: 5, obrazky: ['/pruzkum-foto/eshop-detail.jpg'], pozn: 'Ukázka detailu produktu (plastová euro přepravka):', text: 'Jsou pro Vás informace u produktů dostatečné (popisy, fotografie, technické parametry, dokumenty ke stažení)?', popisMin: '😕 nedostatečné', popisMax: '😊 zcela dostatečné', doplnekText: 'Pokud Vám nějaká informace chyběla, napište prosím jaká:' },
     ]},
     { id: 'D', nazev: 'Objednávka a dodání', jen: 'kupujici', otazky: [
-      { id: 'q10', typ: 'vice', text: 'Které způsoby platby Vám na shop.elkoplast.cz chybí?', moznosti: [
-        { k: 'a', t: 'platba kartou online' }, { k: 'b', t: 'rychlý bankovní převod / QR platba' },
-        { k: 'c', t: 'Google Pay / Apple Pay' }, { k: 'd', t: 'platba na fakturu se splatností' },
-        { k: 'e', t: 'nákup na splátky či leasing' }, { k: 'f', t: 'dobírka' },
+      { id: 'q10', typ: 'vice', text: 'Které způsoby platby Vám na shop.elkoplast.cz chybí?', pozn: 'Dnes nabízíme: dobírku, bankovní převod, platbu kartou online, online bankovní převod a fakturu se splatností (stálí firemní zákazníci a obce).', moznosti: [
+        { k: 'c', t: 'Google Pay / Apple Pay' },
+        { k: 'v', t: 'odložená platba — „kup teď, zaplať později“ (Twisto, Skip Pay)' },
+        { k: 'e', t: 'nákup na splátky či leasing' },
+        { k: 'k', t: 'platba QR kódem' },
+        { k: 'w', t: 'PayPal' },
         { k: 'g', t: 'žádný — současné možnosti mi vyhovují' }], jine: true },
       { id: 'q11', typ: 'vyber', text: 'Jaká nejdelší doba dodání je pro Vás u tohoto typu zboží ještě přijatelná?', moznosti: [
         { k: 'a', t: 'do 3 pracovních dnů' }, { k: 'b', t: 'do 1 týdne' }, { k: 'c', t: 'do 2 týdnů' },
@@ -1274,6 +1276,7 @@ const SPOKOJENOST_SEED = {
         { k: 'f', t: 'nádrže a výdejní sestavy na naftu' }, { k: 'g', t: 'elektromobilita' },
         { k: 'h', t: 'městský mobiliář' }, { k: 'i', t: 'dílenské vybavení' }], jine: true },
       { id: 'q17', typ: 'kategorie-skala', kategorieZ: 'q16', min: 1, max: 5, text: 'Jak hodnotíte kvalitu zakoupeného zboží?', pozn: 'Ohodnoťte každou kategorii, které se Váš nákup týkal.', popisMin: '😞 velmi špatná', popisMax: '😍 výborná' },
+      { id: 'q31', typ: 'kategorie-skala', kategorieZ: 'q16', min: 1, max: 5, text: 'Jak hodnotíte šíři sortimentu (výběr zboží) v kategoriích, ve kterých jste nakupoval/a?', popisMin: '😕 příliš malý výběr', popisMax: '😊 výborný výběr' },
       { id: 'q18', typ: 'skala', min: 1, max: 5, text: 'Jak hodnotíte poměr kvality a ceny?', popisMin: '😞 velmi špatný', popisMax: '😊 výborný' },
     ]},
     { id: 'F', nazev: 'Sortiment', jen: 'vsichni', otazky: [
@@ -1282,6 +1285,11 @@ const SPOKOJENOST_SEED = {
       { id: 'q20', typ: 'text', text: 'Jaké produkty nebo kategorie Vám v naší nabídce chybí?' },
     ]},
     { id: 'G', nazev: 'Komunikace a služby', jen: 'vsichni', otazky: [
+      { id: 'q30', typ: 'vyber', text: 'Očekáváte, že Vás e-shop bude sám informovat o postupu objednávky (potvrzení, vychystání, expedice, pohyb zásilky)?', moznosti: [
+        { k: 'a', t: 'ano, chci vědět o každém kroku objednávky' },
+        { k: 'b', t: 'stačí mi potvrzení objednávky a zpráva o odeslání' },
+        { k: 'c', t: 'stačí mi jen potvrzení objednávky' },
+        { k: 'd', t: 'notifikace nepotřebuji' }] },
       { id: 'q21', typ: 'skala', min: 1, max: 5, text: 'Pokud jste komunikoval/a s naším týmem (telefon, e-mail, poptávkový formulář), jak hodnotíte ochotu a odbornost?', popisMin: '😞 velmi špatné', popisMax: '😊 výborné', nehodnotim: 's týmem jsem nekomunikoval/a' },
       { id: 'q22', typ: 'skala', min: 1, max: 5, text: 'Pokud jste řešil/a vrácení zboží nebo reklamaci, jak jste spokojen/a s jejím vyřízením?', popisMin: '😞 velmi nespokojen/a', popisMax: '😊 velmi spokojen/a', nehodnotim: 'vrácení ani reklamaci jsem neřešil/a' },
     ]},
@@ -1314,6 +1322,9 @@ const SPOKOJENOST_SEED = {
       { id: 'q28', typ: 'vyber', text: 'Vyvíjíme nové produkty a rádi je dáváme vyzkoušet svým zákazníkům. Měl/a byste zájem zapojit se do testování novinek?', moznosti: [
         { k: 'a', t: 'ano, mám zájem' }, { k: 'b', t: 'možná, podle typu produktu' }, { k: 'c', t: 'ne' }],
         email: ['a', 'b'], emailText: 'Váš e-mail (použijeme jen k pozvánce na testování):' },
+      { id: 'q32', typ: 'vyber', text: 'Zapojil/a byste se do prezentace našich produktů — například natočení ukázky zboží a instalace u Vás doma nebo ve firmě?', moznosti: [
+        { k: 'a', t: 'ano, rád/a' }, { k: 'b', t: 'možná, podle produktu' }, { k: 'c', t: 'ne' }],
+        email: ['a', 'b'], emailText: 'Váš e-mail (ozveme se s detaily):' },
       { id: 'q29', typ: 'text', text: 'Máte pro nás jakýkoli další vzkaz, nápad nebo návrh na zlepšení?' },
     ]},
   ],
