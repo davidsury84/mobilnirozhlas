@@ -84,6 +84,13 @@ try {
   for (const k in raw) { if (k.startsWith('_')) continue; ABR_RADY_CFG[k] = raw[k].$ref ? raw[raw[k].$ref] : raw[k]; }
 } catch (_) {}
 
+// Jakosti materiálu k výběru u tlouštěk plechů. Našeptávač (nabídne, ale
+// nebrání napsat vlastní) — přidávat sem, projeví se ve všech dotaznících.
+const MATERIALY = ['S235JR', 'S355JR', 'S235SLZA', 'S420', 'QStE380', 'QStE690',
+  'HARDOX 400', 'HARDOX 450', 'DOMEX WEAR', 'STRENX700CR', 'STRENX700MC'];
+// (nápovědu nese placeholder pole — druhý řádek pod ním by ji jen opakoval)
+const poleMaterial = (k) => ({ k: k || 'materialJakost', label: 'Materiál (jakost)', type: 'sugg', opts: MATERIALY });
+
 // Pole dotazníku vyrobené z jedné sekce číselníku: standard = STD položka
 // (u komponent „může nebýt" položka NE), opce = ostatní platné kódy.
 // Per-řadové překrytí (over._rada z abr-rady.json): std i opce dle LISTU řady;
@@ -132,6 +139,7 @@ function dotaznikAbroll(rada) {
     { title: 'Základní údaje', fields: [
       rozmery,
       { k: 'provedeni', label: 'Provedení — tloušťky plechů dno/bočnice', std: prov.std || '5/3', opce: (Array.isArray(prov.opce) ? prov.opce : ['4/3', '3/3']).join(' / ') },
+      poleMaterial(),
       { k: 'pocet', label: 'Počet ks', type: 'number' },
       { k: 'adresaDodani', label: 'Adresa dodání / určení', type: 'adresa' },
     ] },
@@ -271,6 +279,7 @@ const DOTAZNIK_CITY = [
     { k: 'natahovani', label: 'Natahování (hákový nosič)', std: 'NA 900/35/UPN140 — typ A (DIN, hák 35, lyžina UPN140)', opce: 'NA 1000/40 (do ČR, hák 40) / lyžina IPN120·IPN100·UPN100 / NRS (řetězové sklopné)' },
     { k: 'prumerHaku', label: 'Průměr háku (mm)', std: '35 (DIN, h900)', opce: '40 (ČR, h1000)' },
     { k: 'material', label: 'Materiál / tloušťky plechů (poměr dno/bočnice)', std: '3/2', opce: '4/3 / 5/3' },
+    poleMaterial(),
     { k: 'napojeniPodlaha', label: 'Napojení podlaha × bočnice', std: '45/45 (vytažená)', opce: 'K90 — kolmé (šířky 2300·2420)' },
     { k: 'typLyziny', label: 'Typ lyžiny', std: 'IPN 120', opce: 'UPN 140 (nad 6 t) / IPN 100 / UPN 100' },
     { k: 'vrchniLem', label: 'Vrchní lem', std: '50×50×3', opce: '' },
@@ -305,7 +314,7 @@ const DOTAZNIK_MULDA = [
     { k: 'uchyceni', label: 'Systém uchycení (nosič)', std: 'řetězová / lanová ramena (Absetz)', opce: 'jeřábová (CRAN-MULDE) / jiné' },
     { k: 'norma', label: 'Národní provedení / norma', std: 'CZ', opce: 'DIN / CH / NL / FR / PreZero' },
     { k: 'plechy', label: 'Tloušťky plechů (dno/bočnice/čela)', std: '5/3/4 (534)', opce: '4/3/3 (433) / 6/4/4 (644) / 6/5/5 (655)' },
-    { k: 'material', label: 'Materiál', std: 'ocel S235', opce: 'Hardox 450 (otěruvzdorný)' },
+    poleMaterial('material'),
     { k: 'vyskaBocnic', label: 'Výška bočnic', std: 'dle objemu', opce: '890 mm (S_890mm)' },
     { k: 'ramNosniky', label: 'Rám / nosníky', std: 'U / UPN profily', opce: 'zesílený rám' },
     { k: 'zadniCelo', label: 'Zadní čelo', std: 'sklopná klapka', opce: 'dvoukřídlá vrata / pevné' },
@@ -333,6 +342,7 @@ const DOTAZNIK_SLD = [
     { k: 'frakce', label: 'Sbíraná frakce', std: 'papír', opce: 'plast / sklo / papír + plast' },
     { k: 'komory', label: 'Komorové provedení', std: 'jednokomorové', opce: 'Duo (2 frakce) / Triglo (3 frakce)' },
     { k: 'material', label: 'Materiál / plechy', std: 'ocel S235; plechy 2/3 mm', opce: 'silnější dle zadání' },
+    poleMaterial(),
     { k: 'vhoz', label: 'Vhozové otvory', std: 'dle frakce (standardní)', opce: 'atypické / počet dle zadání' },
     { k: 'vyprazdneni', label: 'Vyprazdňování', std: 'spodní výsyp (dvířka)', opce: 'jeřábové / jiné' },
     { k: 'uprava', label: 'Povrchová úprava', std: 'žárový zinek / základ', opce: 'lakované (RAL) — příplatek' },
@@ -357,6 +367,7 @@ const DOTAZNIK_VANY = [
   ] },
   { title: 'Provedení', fields: [
     { k: 'material', label: 'Materiál', std: 'ocel (svařovaná vana)', opce: 'pozinkovaná / nerez' },
+    poleMaterial(),
     { k: 'rost', label: 'Pochozí rošt', std: 'ano (pozinkovaný rošt)', opce: 'bez roštu' },
     { k: 'uprava', label: 'Povrchová úprava', std: 'žárový zinek', opce: 'lakované (RAL) / základ' },
     { k: 'vidliceKapsy', label: 'Vidlicové kapsy (pro VZV)', std: 'ano', opce: 'ne' },
@@ -381,6 +392,7 @@ const DOTAZNIK_BOXY = [
   ] },
   { title: 'Provedení', fields: [
     { k: 'material', label: 'Materiál / plechy', std: 'ocel S235; stěny 2 mm', opce: 'silnější dle zadání' },
+    poleMaterial(),
     { k: 'vyztuhy', label: 'Výztuhy / rám', std: 'rohové výztuhy 5 mm', opce: 'rám z úhelníku L 60×60×3 (LSB)' },
     { k: 'stohovani', label: 'Stohovatelnost', std: 'ano (stohovací prvky)', opce: 'ne' },
     { k: 'vidliceKapsy', label: 'Vidlicové kapsy (pro VZV)', std: 'ano', opce: 'ne' },
@@ -408,6 +420,7 @@ const DOTAZNIK_SU = [
     { k: 'hrdlo', label: 'Vhozové hrdlo', std: 'jednohrdlové', opce: 'dvouhrdlové (2H)' },
     { k: 'vhoz', label: 'Velikost vhozu', std: 'dle frakce (standardní)', opce: 'GL 160 / 220 / 330 (sklo) / atyp' },
     { k: 'material', label: 'Materiál', std: 'ocel S235 (pilíř, podlaha)', opce: 'silnější dle zadání' },
+    poleMaterial(),
     { k: 'spoje', label: 'Spojovací materiál', std: 'M16', opce: 'jiné' },
     { k: 'vyprazdneni', label: 'Vyprazdňování', std: 'spodní výsyp (jeřáb)', opce: 'jiné' },
     { k: 'uprava', label: 'Povrchová úprava', std: 'žárový zinek / základ', opce: 'lakované (RAL) — příplatek' },

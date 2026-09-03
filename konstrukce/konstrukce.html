@@ -1164,6 +1164,8 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'Materiál (jakost)':['Material (grade)','Werkstoff (Güte)','Materiał (gatunek)','Матеріал (марка)','Material (calitate)'],
+'vyberte z nabídky, nebo napište vlastní':['pick from the list, or type your own','aus der Liste wählen oder selbst eingeben','wybierz z listy lub wpisz własny','оберіть зі списку або впишіть свій','alegeți din listă sau scrieți altul'],
 'bokorys':['side view','Seitenansicht','widok z boku','вигляд збоку','vedere laterală'],
 'zadní čelo':['rear view','Rückansicht','widok z tyłu','вигляд ззаду','vedere din spate'],
 'UPN 200 + sloupky (kolmé napojení, šířka 2420)':['UPN 200 + posts (perpendicular joint, width 2420)','UPN 200 + Stützen (rechtwinkliger Anschluss, Breite 2420)','UPN 200 + słupki (połączenie prostopadłe, szerokość 2420)','UPN 200 + стійки (перпендикулярне зʼєднання, ширина 2420)','UPN 200 + stâlpi (îmbinare perpendiculară, lățime 2420)'],
@@ -3548,6 +3550,12 @@ function renderDotaznik(){
             '<input id="dq_'+f.k+'" class="txt" autocomplete="off" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('začněte psát adresu…'))+'" oninput="adrLookup(this)" onfocus="adrLookup(this)" onblur="setTimeout(adrClose,180)">'+
             '<div class="adr-dd" style="display:none"></div>'+
             '<div class="dq-hint">'+esc(tr('našeptává z OpenStreetMap'))+' · '+((D.adresy||[]).length)+' '+(DQ_LANG==='en'?'saved':DQ_LANG==='de'?'gespeichert':DQ_LANG==='pl'?'zapisane':DQ_LANG==='ua'?'збережено':DQ_LANG==='ro'?'salvat':'uloženo')+'</div></div></div>';
+        } else if(f.type==='sugg'&&Array.isArray(f.opts)&&f.opts.length){
+          /* obyčejný našeptávač: nabídne hodnoty, ale nebrání napsat vlastní */
+          h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg" style="flex-direction:column;align-items:stretch;gap:2px">'+
+            '<input id="dq_'+f.k+'" class="txt" list="dqdl_'+f.k+'" autocomplete="off" value="'+esc(typeof a==='string'?a:'')+'" placeholder="'+esc(tr('vyberte z nabídky, nebo napište vlastní'))+'">'+
+            '<datalist id="dqdl_'+f.k+'">'+f.opts.map(function(o){return '<option value="'+esc(o)+'"></option>'}).join('')+'</datalist>'+
+            (f.hint?'<div class="dq-hint">'+esc(tr(f.hint))+'</div>':'')+'</div></div>';
         } else if(f.ral){
           var m0=(String(typeof a==='string'?a:'').match(/RAL\s*(\d{4})/i)||[])[1]||'';var r0=ralByCode(m0);
           h+='<div class="dq2" data-k="'+f.k+'"><div class="dq2-l">'+esc(tr(f.label))+'</div><div class="dq2-seg" style="flex-direction:column;align-items:stretch;gap:7px">'+
