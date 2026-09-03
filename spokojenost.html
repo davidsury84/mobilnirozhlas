@@ -123,6 +123,12 @@ var LS_KEY = 'spokojenostDotaznik1';
 var $ = function(id){ return document.getElementById(id); };
 var DEF = null;
 
+/* ?novy — zahodí uložené vyplnění a začne načisto (nové vyplnění = nový respondent) */
+if (/[?&]novy\b/.test(location.search)) {
+  try { localStorage.removeItem(LS_KEY); } catch(_) {}
+  try { history.replaceState(null, '', location.pathname); } catch(_) {}
+}
+
 var S = load() || fresh();
 function fresh(){
   var rid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g,'').slice(0,24)

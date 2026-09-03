@@ -215,6 +215,12 @@ var GRP = 6, PICKS = 2;
 var LS_KEY = 'mobiliarHlasovani2';   /* v2: šestice + bez jména (starý formát draftu ignorujeme) */
 var $ = function(id){ return document.getElementById(id); };
 
+/* ?novy — zahodí uložené hodnocení a začne načisto (nové vyplnění = nový respondent) */
+if (/[?&]novy\b/.test(location.search)) {
+  try { localStorage.removeItem(LS_KEY); } catch(_) {}
+  try { history.replaceState(null, '', location.pathname); } catch(_) {}
+}
+
 var S = load() || fresh();
 function fresh(){
   var rid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g,'').slice(0,24)
