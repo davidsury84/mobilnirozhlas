@@ -1072,6 +1072,7 @@ function mount(host) {
     if (z.link) z.link.active = false;
     enterState(d, z, 'zavod');
     audit(z, byLabel || '', 'Nabídka potvrzena → objednávka', z.cislo + ' → ' + z.cisloObj);
+    setTimeout(() => planZapis(z.id), 0);
     employeesWithRole('vykonny-reditel').forEach(em => notify(d, em, 'Nabídka ' + z.cislo + ' potvrzena → objednávka ' + z.cisloObj + '. Vyberte výrobní závod.', z.id));
     notify(d, z.obchodnikEmail, 'Nabídka ' + z.cislo + ' potvrzena → objednávka ' + z.cisloObj + '.', z.id);
   }
@@ -1564,7 +1565,8 @@ function mount(host) {
       typKey: z.typKey, typName: t.name, family: familyOf(z.typKey), familyLabel: FAM_LABEL[familyOf(z.typKey)] || '',
       zakaznik: z.zakaznik, kontakt: z.kontakt, kontaktEmail: z.kontaktEmail,
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
-      cvzHelios: z.cvzHelios || '',   // číslo výrobní zakázky z Heliosu (26C-001 apod.), ručně
+      cvzHelios: z.cvzHelios || '',   // ČVZ (26C-272) — přiděluje aplikace při zápisu do plánu výroby
+      cvzStrecha: z.cvzStrecha || '', // samostatné ČVZ střechy, je-li v zadání požadovaná
       kodAbr: z.kodAbr || '',         // celkový kód kontejneru dle katalogu ABR (varianta B)
       vykresStd: vykresStdFor(z),     // reálný standardní výkres řady (JPG), je-li pro rozměry k dispozici
       prilohy: (z.prilohy || []).map((p, i) => ({ i, name: p.name, at: p.at, author: empName(p.author) })),
@@ -1616,6 +1618,141 @@ function mount(host) {
       }
     }));
     return Object.keys(out).length ? out : null;
+  }
+
+  // ---- Plán výroby Chomutov (Google tabulka) -------------------------------
+  // Po potvrzení objednávky se do listu „zakázky CV <rok>" přidá řádek a zakázka
+  // dostane ČVZ = další volné číslo v řadě (26C-272). Zapisuje se JEDNOU, při
+  // vzniku objednávky (u zakázky bez určeného závodu až při jeho výběru).
+  // Zvláštnost dle výroby: je-li v kartě požadavek na střechu/plachtu, jde
+  // střecha na SAMOSTATNÝ řádek s vlastním ČVZ (26C-272 kontejner, 26C-273 střecha).
+  const PLAN_SHEET = process.env.KONSTRUKCE_PLAN_SHEET_ID || '1mh8Fhi39uClg0xXvKuWvEDqmFvF5-mWv_8IA1cStBQM';
+  const PLAN_STREDISKO = process.env.KONSTRUKCE_PLAN_STREDISKO || 'chomutov';
+  const PLAN_KOD = process.env.KONSTRUKCE_PLAN_KOD || 'C';
+  const PLAN_DRYRUN = process.env.KONSTRUKCE_PLAN_DRYRUN === '1';   // 1 = jen vypíše řádek do logu
+  const planList = (rok) => 'zakázky CV ' + rok;
+  const planCislo = (pref, n) => pref + '-' + String(n).padStart(3, '0');
+
+  function planDatum(ms) { if (!ms) return ''; const x = new Date(ms); return x.getDate() + '.' + (x.getMonth() + 1) + '.' + x.getFullYear(); }
+  function planDatumISO(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (+m[3] + '.' + (+m[2]) + '.' + m[1]) : ''; }
+  function planHod(z, k) {
+    const a = (z.dotaznik || {})[k]; if (a == null) return '';
+    if (typeof a !== 'object') return String(a);
+    let v = String(a.hodnota || ''); if (a.detail) v += (v ? ' · ' : '') + a.detail;
+    return v;
+  }
+  // „Pavel Barna" → „P. Barna" (tabulka vede obchodníky zkratkou)
+  function planZkratka(jmeno) {
+    const c = String(jmeno || '').trim().split(/\s+/).filter(Boolean);
+    if (c.length < 2) return c[0] || '';
+    return c[0].charAt(0).toUpperCase() + '. ' + c[c.length - 1];
+  }
+  function planRozmery(z) { return planHod(z, 'rozmery').replace(/\s+/g, '').replace(/[×Xx]/g, 'x'); }
+  function planTloustky(z) {
+    const v = planHod(z, 'provedeni') || planHod(z, 'plechy') || planHod(z, 'material');
+    const m = String(v).match(/(\d+(?:\s*\/\s*\d+)+)/);
+    return m ? m[1].replace(/[\s/]/g, '') : '';
+  }
+  function planObjem(z) {
+    const m = planRozmery(z).match(/^(\d+)x(\d+)x(\d+)$/);
+    if (!m) return '';
+    const v = (+m[1] * +m[2] * +m[3]) / 1e9;
+    return (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10) + 'm3';
+  }
+  function planRal(z) {
+    const p = planHod(z, 'poznamky') || planHod(z, 'barva');
+    const m = String(p).match(/RAL\s*\d{4}[^,;·]*/i);
+    return m ? m[0].trim() : '';
+  }
+  // Řada výrobku: „ABR-DSD-7000x2420x2350-53-…" → „ABR-DSD"
+  function planVyrobek(d, z) {
+    if (z.kodAbr) { const m = z.kodAbr.match(/^(.*?)-\d+x/); if (m) return m[1]; }
+    const key = String(z.typKey || '').toUpperCase();
+    const fam = familyOf(z.typKey);
+    if (fam === 'abroll') return 'ABR-' + key;     // tabulka vede řady jako ABR-DSD
+    if (fam === 'city') return 'CITY-' + key;
+    return key;
+  }
+  // Požadavek na střechu/plachtu = cokoli jiného než standard „NE / bez".
+  function planStrecha(z) {
+    for (const k of ['strecha', 'viko']) {
+      const a = (z.dotaznik || {})[k]; if (!a) continue;
+      if (typeof a === 'object' && (!a.volba || a.volba === 'standard')) continue;
+      const txt = planHod(z, k).trim();
+      if (!txt || /^(ne|bez)\b/i.test(txt) || /^ne\s*[—–-]/.test(txt)) continue;
+      return txt;
+    }
+    return '';
+  }
+  // Jeden řádek registru (sloupce A..W dle hlavičky listu).
+  function planRadek(d, z, pref, cislo, opt) {
+    opt = opt || {};
+    const r = new Array(23).fill('');
+    r[0] = pref;                                   // A  ČVZ – rok+závod (26C)
+    r[1] = String(cislo).padStart(3, '0');         // B  ČVZ – pořadí
+    r[2] = planVyrobek(d, z) + (opt.strecha ? ' - STŘECHA' : '');   // C  Výrobek
+    r[3] = planRozmery(z);                         // D  rozměry
+    r[4] = opt.strecha ? '' : planTloustky(z);     // E  tl. v mm (u střechy jiná, doplní výroba)
+    r[5] = opt.strecha ? '' : planObjem(z);        // F  Objem (patří ke kontejneru)
+    r[6] = opt.strecha || opt.odkaz || '';         // G  Střecha/Plachta/aj.
+    r[7] = planHod(z, 'pocet');                    // H  ks
+    r[8] = planRal(z);                             // I  RAL
+    r[9] = z.cisloPoptavky || '';                  // J  číslo přijaté objednávky
+    r[10] = planDatum(z.objAt || z.createdAt);     // K  ze dne
+    r[11] = planZkratka(empName(z.obchodnikEmail));// L  kontakt (obchodník)
+    r[12] = planDatumISO(z.pozadovanyTermin);      // M  požadovaný termín expedice
+    r[16] = z.zakaznik || '';                      // Q  zákazník
+    r[17] = z.assignedTo ? empName(z.assignedTo).split(/\s+/)[0] : '';   // R  konstruktér
+    r[22] = z.kodAbr || '';                        // W  kód (opakovaná zakázka)
+    return r;                                      // N,O,P,S,T,U,V = výroba/nákup, needitujeme
+  }
+  async function planDalsiCislo(d, rok) {
+    const pref = String(rok).slice(2) + PLAN_KOD;
+    const j = await host.sheets.read(PLAN_SHEET, "'" + planList(rok) + "'!A1:B3000");
+    let max = 0;
+    for (const r of (j.values || [])) {
+      if (String(r[0] || '').trim() !== pref) continue;
+      const n = parseInt(String(r[1] || '').trim(), 10);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+    if (!max) throw new Error('v listu „' + planList(rok) + '" nejsou žádná čísla ' + pref + ' — nechci hádat začátek řady');
+    // pojistka: tabulka se čte se zpožděním, poslední přidělené číslo si pamatujeme i u sebe
+    const nase = ((d.planPosledni || {})[pref] || 0);
+    return { pref, next: Math.max(max, nase) + 1 };
+  }
+  // Přidělování čísel musí být po jednom — jinak by dvě objednávky založené
+  // ve stejnou chvíli dostaly totéž ČVZ.
+  let planFronta = Promise.resolve();
+  // Idempotentní: jednou zapsaná zakázka se už znovu nezapisuje.
+  function planZapis(zakId) {
+    planFronta = planFronta.then(() => planZapisJedna(zakId)).catch(() => {});
+    return planFronta;
+  }
+  async function planZapisJedna(zakId) {
+    try {
+      if (!host.sheets || !host.sheets.available) return;
+      let d = load();
+      let z = d.zakazky.find(x => x.id === zakId);
+      if (!z || z.rezim !== 'objednavka' || z.planZapsano || z.cvzHelios) return;
+      if ((z.strediskoKey || '') !== PLAN_STREDISKO) return;   // tabulka je plán výroby jednoho závodu
+      const rok = new Date(z.objAt || z.createdAt || Date.now()).getFullYear();
+      const { pref, next } = await planDalsiCislo(d, rok);
+      const strecha = planStrecha(z);
+      const rows = [planRadek(d, z, pref, next, strecha ? { odkaz: 'střecha viz ' + planCislo(pref, next + 1) } : {})];
+      if (strecha) rows.push(planRadek(d, z, pref, next + 1, { strecha }));
+      if (PLAN_DRYRUN) console.log('[konstrukce/plán] DRY-RUN, nezapisuji:', JSON.stringify(rows));
+      else await host.sheets.append(PLAN_SHEET, "'" + planList(rok) + "'!A:W", rows);
+      d = load(); z = d.zakazky.find(x => x.id === zakId); if (!z) return;
+      z.cvzHelios = planCislo(pref, next);
+      if (strecha) z.cvzStrecha = planCislo(pref, next + 1);
+      z.planZapsano = Date.now();
+      if (!d.planPosledni) d.planPosledni = {};
+      d.planPosledni[pref] = next + (strecha ? 1 : 0);
+      delete z.cvzRem;                                    // upomínky na ČVZ jsou bezpředmětné
+      audit(z, 'systém', 'Zapsáno do plánu výroby ' + (z.strediskoName || ''),
+        'ČVZ ' + z.cvzHelios + (strecha ? (' · střecha ' + z.cvzStrecha) : ''));
+      save(d);
+    } catch (e) { console.error('[konstrukce/plán] zápis do tabulky selhal:', e.message); }
   }
 
   // ---- vytvoření zakázky (obchodník) ---------------------------------------
@@ -1684,6 +1821,8 @@ function mount(host) {
       const earliest = addBusinessDays(now, internalDays);
       if (new Date(z.pozadovanyTermin + 'T23:59:59Z').getTime() < earliest) warn = 'Pozor: požadovaný termín je při výchozích lhůtách (interně ~' + internalDays + ' prac. dnů) nereálný ještě před reakcí klienta.';
     }
+    // objednávka do plánu výroby (ČVZ) — na pozadí, ať nedrží odpověď
+    if (jeObj) setTimeout(() => planZapis(z.id), 0);
     const co = jeObj ? 'objednávka' : 'nabídka';
     if (z.stav === 'zavod') {
       // objednávka bez určeného závodu → na tahu ředitel výroby
@@ -1926,6 +2065,7 @@ function mount(host) {
         const cil = z.zNabidky ? 'schvaleno' : 'prideleni';
         enterState(d, z, cil);
         audit(z, me.email, 'Vybrán závod', s.label + (note ? ' — ' + note : ''));
+        setTimeout(() => planZapis(z.id), 0);   // teď už je jasné, do kterého plánu patří
         if (cil === 'schvaleno') {
           if (z.assignedTo) notify(d, z.assignedTo, 'Objednávka ' + (z.cisloObj || z.cislo) + ' — závod ' + s.label + ', vložte výrobní dokumentaci.', z.id);
           employeesWithRole('sef').forEach(em => notify(d, em, 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') → závod ' + s.label + '.', z.id));
@@ -2990,7 +3130,7 @@ function mount(host) {
     const d = load(); const cfg = (d.settings && d.settings.notif) || DEFAULT_NOTIF || {};
     return [{ key: 'konstrukce-eskalace', module: 'Konstrukce', name: 'Eskalace a připomínky zakázek (klient nereaguje, po termínu)', to: ['obchodník / konstruktér / klient dle zakázky'], enabled: true, schedule: 'kontrola každých 6 h (připomínky po ' + (cfg.clientRemind1 || 5) + ' a ' + (cfg.clientRemind2 || 10) + ' prac. dnech)', lastAt: null, preview: null, configHint: 'Konstrukce → SET-UP → notifikace' }];
   }
-  return { handle, tick, reports, hasAccess };
+  return { handle, tick, reports, hasAccess, planZapis };
 }
 
 // Veřejná stránka náhledu (samostatná, bez závislostí na intranetu).

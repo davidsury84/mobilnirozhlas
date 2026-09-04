@@ -372,6 +372,8 @@ select.dq2-opt{width:100%;max-width:560px}
 .ot-item:hover{border-color:var(--g);box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .ot-item-head{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:6px}
 .ot-item-head .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.cvzb{display:inline-flex;align-items:center;gap:5px;background:#eef4ff;border:1px solid #c9d9f5;color:#1b3f7a;font-weight:800;font-size:11.5px;letter-spacing:.02em;border-radius:7px;padding:2px 7px;vertical-align:middle}
+.cvzb i{font-style:normal;font-weight:600;opacity:.8;font-size:10.5px}
 .ot-item .ot-cap{text-align:left;margin:0 0 10px}
 .ot-item .ot-track{margin-bottom:6px}
 .ot-item.red{border-left:4px solid var(--red)}
@@ -1358,6 +1360,12 @@ function hhmm(sec){sec=sec||0;var h=Math.floor(sec/3600),m=Math.round((sec%3600)
 function roleLabel(r){return{obchodnik:'Obchodník',sef:'Šéf konstrukce',konstrukter:'Konstruktér',reditel:'Ředitel','vykonny-reditel':'Výkonný ředitel výroby','vyrobni-reditel':'Výrobní ředitel',admin:'Správce'}[r]||r||'—'}
 // člověk může mít víc rolí najednou (např. šéf konstrukce + konstruktér)
 function maRoli(r){return !!(ME&&ME.roles&&ME.roles.indexOf(r)>=0)}
+/* ČVZ (číslo výrobní zakázky z plánu výroby) se ukazuje PŘED číslem zakázky */
+function cvzOdznak(z){
+  if(!z||!z.cvzHelios)return '';
+  return '<span class="cvzb" title="Číslo výrobní zakázky v plánu výroby">'+esc(z.cvzHelios)+
+    (z.cvzStrecha?('<i>+'+esc(z.cvzStrecha)+' střecha</i>'):'')+'</span> ';
+}
 function roleLabels(){var rs=(ME&&ME.roles&&ME.roles.length)?ME.roles:[(ME||{}).role];return rs.filter(Boolean).map(roleLabel).join(' + ')||roleLabel((ME||{}).role)}
 function api(path,method,body){return fetch('/api/konstrukce'+path,{method:method||'GET',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined,cache:'no-store'}).then(function(r){return r.json().then(function(j){return{ok:r.ok,status:r.status,j:j}})})}
 
@@ -1596,7 +1604,7 @@ function renderDash(m){
   if(!shown.length)h+='<div class="empty">Žádné zakázky v tomto filtru.</div>';
   else h+=shown.map(function(x){ var pi=problemInfo(x); var cc=pi?pi.cls:'';
     return '<div class="ot-item'+(cc?' '+cc:'')+'" onclick="openDrawer(\''+x.id+'\')">'+
-      '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span><b>'+esc(x.cisloZobraz||x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span><span class="muted" style="margin-left:auto;font-size:12px">zadal '+esc(x.obchodnikName||'—')+'</span></div>'+
+      '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span>'+cvzOdznak(x)+'<b>'+esc(x.cisloZobraz||x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span><span class="muted" style="margin-left:auto;font-size:12px">zadal '+esc(x.obchodnikName||'—')+'</span></div>'+
       (pi?'<div class="ot-prob '+pi.cls+'">'+pi.text+'</div>':'')+
       orderTrack(x)+'</div>';}).join('');
   h+='<div class="kpi">'+
@@ -2551,7 +2559,7 @@ function renderDrawer(z){
   comments+='<div class="field"><textarea id="cmtx" rows="2" placeholder="Přidat interní komentář…"></textarea><div class="actions"><button class="btn ghost sm" onclick="addComment(\''+z.id+'\')">Přidat komentář</button></div></div>';
   var audit='<div class="sec">Auditní log</div><div class="tl">'+((z.audit||[]).slice().reverse().map(function(a){return '<div class="it"><div>'+esc(a.action)+(a.note?(' — '+esc(a.note)):'')+'</div><div class="m">'+esc(a.by)+' · '+fdt(a.at)+'</div></div>'}).join('')||'<span class="muted">—</span>')+'</div>';
 
-  d.innerHTML='<div class="dhead"><div><div class="row"><span class="dot '+z.semafor+'"></span><h2 style="margin:0;font-size:18px">'+esc(z.cisloZobraz||z.cislo)+'</h2>'+(z.rezim==='objednavka'?'<span class="ot-faze obj">OBJEDNÁVKA</span>'+(z.zNabidky?'<span class="muted" style="font-size:12.5px">z nabídky '+esc(z.cislo)+'</span>':'<span class="muted" style="font-size:12.5px">přímé zadání</span>'):'<span class="ot-faze nab">NABÍDKA</span>')+'<span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span></div>'+
+  d.innerHTML='<div class="dhead"><div><div class="row"><span class="dot '+z.semafor+'"></span>'+cvzOdznak(z)+'<h2 style="margin:0;font-size:18px">'+esc(z.cisloZobraz||z.cislo)+'</h2>'+(z.rezim==='objednavka'?'<span class="ot-faze obj">OBJEDNÁVKA</span>'+(z.zNabidky?'<span class="muted" style="font-size:12.5px">z nabídky '+esc(z.cislo)+'</span>':'<span class="muted" style="font-size:12.5px">přímé zadání</span>'):'<span class="ot-faze nab">NABÍDKA</span>')+'<span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span></div>'+
       '<div class="muted" style="margin-top:3px">'+esc(z.zakaznik)+' · '+esc(z.typName)+'</div></div><button class="x" onclick="closeDrawer()">×</button></div>'+
     '<div class="dbody">'+
       orderTrack(z)+
@@ -2647,7 +2655,7 @@ function orderTrack(z){
   if(cur==='podklady')eff=z.prevStav||'prace';
   var zam=(cur==='zamitnuto');
   var ci=zam?-1:order.indexOf(eff);
-  var loc=(z.strediskoName?(' · závod '+esc(z.strediskoName)):'')+(z.cvzHelios?(' · ČVZ '+esc(z.cvzHelios)):'');
+  var loc=(z.strediskoName?(' · závod '+esc(z.strediskoName)):'');   // ČVZ je jako odznak před číslem zakázky
   var fazeLbl=(z.rezim==='objednavka')?'<span class="ot-faze obj">OBJEDNÁVKA '+esc(z.cisloObj||z.cislo)+'</span>':'<span class="ot-faze nab">NABÍDKA '+esc(z.cislo)+'</span>';
   var cap= zam?'<span style="color:var(--red);font-weight:700">✕ Zamítnuto / storno</span>'
     : cur==='podklady'?'<span style="color:var(--amber);font-weight:700">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</span>'

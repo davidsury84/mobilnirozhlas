@@ -2468,10 +2468,10 @@ async function driveList(folderId) {
 function driveAvailable() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }
 
 // ---- Google Sheets přes service account (read-only) — pro modul Lodní kontejnery (poptávky + oficiální ceník) ----
-async function sheetsGetToken() {
+async function sheetsGetToken(scope) {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claim = b64url(JSON.stringify({ iss: GOOGLE_SA_CLIENT_EMAIL, scope: 'https://www.googleapis.com/auth/spreadsheets.readonly', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
+  const claim = b64url(JSON.stringify({ iss: GOOGLE_SA_CLIENT_EMAIL, scope: scope || 'https://www.googleapis.com/auth/spreadsheets.readonly', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
   const signer = crypto.createSign('RSA-SHA256'); signer.update(header + '.' + claim);
   const sig = signer.sign(GOOGLE_SA_PRIVATE_KEY).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const tok = await httpsPostForm('oauth2.googleapis.com', '/token', { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: header + '.' + claim + '.' + sig });
@@ -2488,6 +2488,23 @@ async function sheetsGet(spreadsheetId, range) {
     r.on('error', e => reject(new Error('Spojení se Sheets: ' + e.message)));
     r.setTimeout(20000, () => { try { r.destroy(new Error('Sheets: časový limit spojení.')); } catch (_) {} });
     r.end();
+  });
+}
+// Přidání řádků na konec listu (plán výroby Chomutov — modul Konstrukce).
+// Vyžaduje, aby byl service account u tabulky jako Editor.
+async function sheetsAppend(spreadsheetId, range, rows) {
+  if (!GOOGLE_SA_CLIENT_EMAIL || !GOOGLE_SA_PRIVATE_KEY) throw new Error('Service account (GOOGLE_SA_*) není nastaven.');
+  const token = await sheetsGetToken('https://www.googleapis.com/auth/spreadsheets');
+  const body = JSON.stringify({ values: rows });
+  const apiPath = '/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '/values/' + encodeURIComponent(range)
+    + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
+  return await new Promise((resolve, reject) => {
+    const r = https.request({ method: 'POST', hostname: 'sheets.googleapis.com', path: apiPath, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, resp => {
+      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j || {}); reject(new Error('Sheets append ' + resp.statusCode + ': ' + d.slice(0, 200))); });
+    });
+    r.on('error', e => reject(new Error('Spojení se Sheets: ' + e.message)));
+    r.setTimeout(20000, () => { try { r.destroy(new Error('Sheets: časový limit spojení.')); } catch (_) {} });
+    r.end(body);
   });
 }
 // Názvy všech listů tabulky (aby šly načítat i další listy, ne jen první).
@@ -3347,6 +3364,7 @@ try {
 let konstrukceMod = null;
 try {
   konstrukceMod = require('./konstrukce').mount({ reportDisabled,
+    sheets: { get available() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }, read: sheetsGet, append: sheetsAppend },
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
     isObchodnik: isObchodnikEmail,
     obchodniciList: obchodniciPrehled,
