@@ -9,6 +9,7 @@
   :root{--green:#2f7d32;--green-2:#3f9c46;--green-d:#1f5e22;--green-soft:#e4f1e5;
     --ink:#16211a;--soft:#5b6b60;--line:#e2e8e0;--line-s:#cfdccf;--paper:#fff;--bg:#f4f7f2;--r:14px}
   *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
   body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
   .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
   header{background:linear-gradient(150deg,#20303a,#25403a 60%,#2f7d32 170%);color:#fff;padding:34px 0 40px}
@@ -49,6 +50,20 @@
   .gin.saved{border-color:var(--green-2);background:var(--green-soft)}
   .gin.bad{border-color:#e2a29c;background:#fdecea}
   .hp{position:absolute;left:-9999px}
+  .mut{color:var(--soft);font-weight:400}
+  .sm{font-size:11.5px}
+  .cov{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px}
+  .cov.ok{background:#e4f1e5;color:#1f5e22}
+  .cov.warn{background:#fff4d8;color:#8a6d1f}
+  .cov.bad{background:#fdecea;color:#b3261e}
+  .navsek{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 18px}
+  .navsek a{font-size:12.5px;font-weight:600;text-decoration:none;color:var(--green-d);background:var(--green-soft);border-radius:999px;padding:5px 12px}
+  .navsek a:hover{background:#d6ead8}
+  .zpetrow{display:flex;justify-content:flex-end;margin:6px 0 4px}
+  .btn.sm{padding:6px 13px;font-size:13px;border-radius:9px;background:var(--paper);color:var(--green-d);border:1px solid var(--line-s)}
+  .btn.sm:hover{background:var(--green-soft)}
+  #nahoru{position:fixed;right:20px;bottom:20px;z-index:50;display:none;border:1px solid var(--line-s);background:var(--paper);color:var(--green-d);border-radius:999px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(20,40,25,.16);font-family:inherit}
+  #nahoru:hover{background:var(--green-soft)}
   footer{border-top:1px solid var(--line);padding:18px 0 40px;color:var(--soft);font-size:13px}
 </style>
 </head>
@@ -83,6 +98,7 @@
     <div id="tab"><p class="muted" style="margin-top:12px">Načítám…</p></div>
   </div>
 </main>
+<button id="nahoru" type="button" onclick="nahoru()">↑ Zpět nahoru</button>
 <footer class="wrap">ELKOPLAST CZ, s.r.o. · Štefánikova 2664, 760 01 Zlín · interní podklad, nešiřte prosím dál.</footer>
 
 <script>
@@ -93,21 +109,42 @@ function showErr(m){var e=document.getElementById('err');e.textContent=m;e.style
 function kdo(){var e=document.getElementById('kdo');return e?e.value.trim():'';}
 try{ var ulozene=localStorage.getItem('garanti_kdo'); if(ulozene) document.getElementById('kdo').value=ulozene; }catch(e){}
 
+function nahoru(){ try{ window.scrollTo(0,0); }catch(e){} document.documentElement.scrollTop=0; document.body.scrollTop=0; }
+window.addEventListener('scroll', function(){ var b=document.getElementById('nahoru'); if(b) b.style.display = window.scrollY>500 ? 'block' : 'none'; });
+function pokrytiTag(v){
+  var c = v==='Pokryto' ? 'ok' : (v==='Bez zálohy' ? 'warn' : 'bad');
+  return '<span class="cov '+c+'">'+esc(v||'—')+'</span>';
+}
 function tabulka(){
   var h='';
-  (DATA.skupiny||[]).forEach(function(g){
-    h+='<div class="sek">'+esc(g.sekce)+'</div><div class="tw"><table><thead><tr><th style="min-width:200px">Kategorie</th><th>Garant ČR</th><th>Zástup ČR</th><th style="min-width:170px">Slovensko</th><th style="min-width:170px">Polsko</th></tr></thead><tbody>';
+  // rychlá navigace po sekcích
+  h+='<div class="navsek">'+(DATA.skupiny||[]).map(function(g,i){
+    return '<a href="#sek'+i+'">'+esc(g.sekce)+' <b>('+g.polozky.length+')</b></a>'; }).join('')+'</div>';
+  (DATA.skupiny||[]).forEach(function(g,i){
+    h+='<div class="sek" id="sek'+i+'">'+esc(g.sekce)+' <span class="mut">'+g.polozky.length+' kategorií</span></div>'+
+      '<div class="tw"><table><thead><tr>'+
+      '<th style="min-width:210px">Kategorie na webu</th>'+
+      '<th style="min-width:150px">Garant ČR</th>'+
+      '<th style="min-width:130px">Náhradní garant 1</th>'+
+      '<th style="min-width:130px">Náhradní garant 2</th>'+
+      '<th style="min-width:170px">Slovensko</th>'+
+      '<th style="min-width:170px">Polsko</th>'+
+      '<th style="min-width:110px">Stav pokrytí ČR</th>'+
+      '<th style="min-width:160px">Poznámka</th></tr></thead><tbody>';
     g.polozky.forEach(function(p){
       var inp=function(zeme,val){
         return '<input class="gin" data-row="'+esc(p.id)+'" data-zeme="'+zeme+'" value="'+esc(val||'')+'" maxlength="120" autocomplete="off" placeholder="jméno…">';
       };
-      h+='<tr><td><b>'+esc(p.kategorie)+'</b></td>'+
+      h+='<tr><td><b>'+esc(p.kategorie)+'</b>'+(p.stitek?'<div class="mut sm">'+esc(p.stitek)+'</div>':'')+'</td>'+
         '<td>'+(p.pm?esc(p.pm):'<span class="tag none">—</span>')+'</td>'+
-        '<td>'+esc(p.zastup||'')+'</td>'+
+        '<td>'+esc(p.zastup||'—')+'</td>'+
+        '<td>'+esc(p.nahradnik||'—')+'</td>'+
         '<td>'+inp('SK',p.garantSk)+'</td>'+
-        '<td>'+inp('PL',p.garantPl)+'</td></tr>';
+        '<td>'+inp('PL',p.garantPl)+'</td>'+
+        '<td>'+pokrytiTag(p.pokryti)+'</td>'+
+        '<td class="mut sm">'+esc(p.poznamka||'')+'</td></tr>';
     });
-    h+='</tbody></table></div>';
+    h+='</tbody></table></div><div class="zpetrow"><button class="btn sm" type="button" onclick="nahoru()">↑ Zpět nahoru</button></div>';
   });
   document.getElementById('tab').innerHTML=h||'<p class="muted">Zatím tu nic není.</p>';
   document.querySelectorAll('.gin').forEach(function(i){

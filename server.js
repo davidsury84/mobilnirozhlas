@@ -2921,7 +2921,8 @@ function garantiSkupiny() {
     let g = out.find(x => x.sekce === sekce);
     if (!g) { g = { sekce, polozky: [] }; out.push(g); }
     g.polozky.push({
-      id: r.id, kategorie: r.kategorie || '', pm: r.pm || '', zastup: r.zastup || '',
+      id: r.id, kategorie: r.kategorie || '', stitek: r.stitek || '', pm: r.pm || '', zastup: r.zastup || '',
+      nahradnik: r.nahradnik || '', pokryti: obEvalCoverage(r), poznamka: r.poznamka || '',
       garantSk: r.garantSk || '', garantPl: r.garantPl || ''
     });
   });
