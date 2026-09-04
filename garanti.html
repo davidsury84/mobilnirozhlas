@@ -62,7 +62,7 @@
   .zpetrow{display:flex;justify-content:flex-end;margin:6px 0 4px}
   .btn.sm{padding:6px 13px;font-size:13px;border-radius:9px;background:var(--paper);color:var(--green-d);border:1px solid var(--line-s)}
   .btn.sm:hover{background:var(--green-soft)}
-  #nahoru{position:fixed;right:20px;bottom:20px;z-index:50;display:none;border:1px solid var(--line-s);background:var(--paper);color:var(--green-d);border-radius:999px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(20,40,25,.16);font-family:inherit}
+  #nahoru{position:fixed;right:20px;bottom:20px;z-index:50;display:block;border:1px solid var(--line-s);background:var(--paper);color:var(--green-d);border-radius:999px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(20,40,25,.16);font-family:inherit}
   #nahoru:hover{background:var(--green-soft)}
   footer{border-top:1px solid var(--line);padding:18px 0 40px;color:var(--soft);font-size:13px}
 </style>
@@ -95,6 +95,7 @@
     <h2>Rozdělení garantů — doplňte Slovensko a Polsko</h2>
     <p class="muted">V tabulce jsou produktové skupiny a jejich garanti v ČR. Do sloupců <b>Slovensko</b> a <b>Polsko</b> rovnou napište jméno kolegy, kterého za svou zemi navrhujete. <b>Změny se ukládají samy</b> — nic se neodesílá.</p>
     <div class="field" style="max-width:340px;margin-top:12px"><label for="kdo">Vaše jméno (ať víme, kdo doplnil)</label><input id="kdo" maxlength="120" autocomplete="off" placeholder="Jméno a příjmení"></div>
+    <div class="zpetrow" style="justify-content:flex-start;margin:10px 0 2px"><button class="btn sm" type="button" onclick="nahoru()">↑ Zpět nahoru</button></div>
     <div id="tab"><p class="muted" style="margin-top:12px">Načítám…</p></div>
   </div>
 </main>
@@ -110,7 +111,7 @@ function kdo(){var e=document.getElementById('kdo');return e?e.value.trim():'';}
 try{ var ulozene=localStorage.getItem('garanti_kdo'); if(ulozene) document.getElementById('kdo').value=ulozene; }catch(e){}
 
 function nahoru(){ try{ window.scrollTo(0,0); }catch(e){} document.documentElement.scrollTop=0; document.body.scrollTop=0; }
-window.addEventListener('scroll', function(){ var b=document.getElementById('nahoru'); if(b) b.style.display = window.scrollY>500 ? 'block' : 'none'; });
+/* tlačítko „zpět nahoru" je vidět pořád — na dlouhé tabulce se hledá špatně */
 function pokrytiTag(v){
   var c = v==='Pokryto' ? 'ok' : (v==='Bez zálohy' ? 'warn' : 'bad');
   return '<span class="cov '+c+'">'+esc(v||'—')+'</span>';

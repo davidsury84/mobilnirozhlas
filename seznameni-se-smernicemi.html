@@ -2230,6 +2230,9 @@ let GARANTI_DATA=null;
 async function garLoad(){
   try{ const r=await fetch('/api/garanti',{cache:'no-store'}); GARANTI_DATA=await r.json(); }
   catch(e){ GARANTI_DATA={navrhy:[],error:'Nepodařilo se načíst.'}; }
+  if(!OBCHOD_DATA){   // tabulku potřebujeme i tady, ne jen v záložce „Podle kategorií"
+    try{ const r2=await fetch('/api/obchod',{cache:'no-store'}); if(r2.ok) OBCHOD_DATA=await r2.json(); }catch(e){}
+  }
   if(OBCHOD_TAB==='garanti') obRender();
 }
 async function garPost(payload){
@@ -2248,6 +2251,60 @@ function garKopiruj(url){
   try{ navigator.clipboard.writeText(url); toast('Odkaz zkopírován'); }
   catch(e){ prompt('Zkopírujte odkaz:',url); }
 }
+/* Tabulka rozdělení přímo v záložce Garanti SK/PL — sloupce Slovensko a Polsko
+   se dají vyplnit hned tady, stejně jako na veřejné stránce. */
+let GAR_FILTR='';
+function garFiltr(v){ GAR_FILTR=v||''; const b=document.getElementById('garTabBody'); if(b) b.innerHTML=garTabBodyHtml(); const c=document.getElementById('garTabPocet'); if(c) c.textContent=garRadky().length; }
+function garRadky(){
+  const rows=(OBCHOD_DATA&&OBCHOD_DATA.rows)||[];
+  const q=GAR_FILTR.trim().toLowerCase();
+  if(!q) return rows;
+  return rows.filter(r=>((r.sekce||'')+' '+(r.kategorie||'')+' '+(r.pm||'')+' '+(r.garantSk||'')+' '+(r.garantPl||'')).toLowerCase().indexOf(q)>=0);
+}
+async function garSetZeme(id,pole,val){
+  const rows=(OBCHOD_DATA&&OBCHOD_DATA.rows)||[];
+  const r=rows.find(x=>x.id===id); if(!r) return;
+  r[pole]=(val||'').trim();
+  try{
+    const res=await fetch('/api/obchod',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});
+    const j=await res.json();
+    if(!res.ok||j.error){ toast(j.error||'Uložení se nezdařilo'); return; }
+    OBCHOD_DATA=j;
+    toast('Uloženo');
+  }catch(e){ toast('Chyba spojení'); }
+}
+function garTabBodyHtml(){
+  const rows=garRadky();
+  if(!rows.length) return '<tr><td colspan="7" class="muted" style="font-size:13px">Nic nenalezeno.</td></tr>';
+  let out='', sekce=null;
+  rows.forEach(r=>{
+    if((r.sekce||'')!==sekce){ sekce=r.sekce||'';
+      out+='<tr><td colspan="7" style="background:var(--green-soft);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--green-d)">'+esc(sekce||'Ostatní')+'</td></tr>'; }
+    const cv=obEval(r);
+    const inp=(pole,val)=>'<input type="text" value="'+esc(val||'')+'" placeholder="jméno…" style="width:100%;max-width:170px" onchange="garSetZeme(\''+r.id+'\',\''+pole+'\',this.value)">';
+    out+='<tr>'+
+      '<td><b>'+esc(r.kategorie||'')+'</b></td>'+
+      '<td>'+obLinkPeople(r.pm)+'</td>'+
+      '<td>'+esc(r.zastup||'—')+'</td>'+
+      '<td>'+esc(r.nahradnik||'—')+'</td>'+
+      '<td>'+inp('garantSk',r.garantSk)+'</td>'+
+      '<td>'+inp('garantPl',r.garantPl)+'</td>'+
+      '<td><span class="ob-risk '+obCoverClass(cv)+'">'+esc(cv)+'</span></td></tr>';
+  });
+  return out;
+}
+function garTabulkaHtml(){
+  if(!OBCHOD_DATA){ return '<div class="card pad"><p class="muted" style="margin:0">Načítám tabulku…</p></div>'; }
+  const n=garRadky().length;
+  return '<div class="dash-sec">Rozdělení garantů — doplňte Slovensko a Polsko</div>'+
+    '<div class="card pad" style="margin-bottom:16px"><div class="spread" style="margin-bottom:8px;gap:10px;flex-wrap:wrap">'+
+      '<input type="search" placeholder="Hledat kategorii, sekci nebo jméno…" oninput="garFiltr(this.value)" style="max-width:320px">'+
+      '<span class="muted" style="font-size:13px"><b id="garTabPocet">'+n+'</b> kategorií · píše se přímo do sloupců, ukládá se hned</span></div>'+
+    '<div class="ob-wrap"><table class="ob-table"><thead><tr>'+
+      '<th>Kategorie na webu</th><th>Garant ČR</th><th>Náhradní 1</th><th>Náhradní 2</th>'+
+      '<th style="min-width:180px">Slovensko</th><th style="min-width:180px">Polsko</th><th>Pokrytí ČR</th>'+
+      '</tr></thead><tbody id="garTabBody">'+garTabBodyHtml()+'</tbody></table></div></div>';
+}
 function garHtml(){
   const d=GARANTI_DATA||{}, navrhy=d.navrhy||[];
   let h='<div class="card pad" style="margin-bottom:16px">'+
@@ -2263,6 +2320,8 @@ function garHtml(){
     if(!d.enabled) h+='<p class="muted" style="margin:8px 0 0;font-size:12.5px;color:#b3261e">Stránka je vypnutá — odkaz zatím nikomu nefunguje.</p>';
   } else if(!d.canEdit){ h+='<p class="muted" style="margin:0;font-size:13px">Odkaz vidí a spravuje jen správce.</p>'; }
   h+='</div>';
+
+  h+=garTabulkaHtml();
 
   h+='<div class="dash-sec" style="display:flex;align-items:center;gap:10px">Historie zápisů ('+navrhy.length+')'+
     (d.canEdit&&navrhy.length?'<button class="btn ghost sm" type="button" style="margin-left:auto" onclick="garVymazatHistorii()">Vymazat historii</button>':'')+'</div>';
