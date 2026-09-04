@@ -1032,8 +1032,14 @@ function mount(host) {
   }
   // Nastaví nový stav + termín + začátek kroku (výchozí lhůta z číselníku).
   function enterState(d, z, stav) {
+    // Historie kroků — z ní se počítá, jak dlouho který krok reálně trval.
+    // (U starších zakázek chybí; frontend si tam pomůže odhadem z auditu.)
+    if (!Array.isArray(z.stepHistory)) z.stepHistory = [];
+    if (!z.stepHistory.length && z.stav && z.stepStartedAt) z.stepHistory.push({ stav: z.stav, at: z.stepStartedAt });
     z.stav = stav;
     z.stepStartedAt = Date.now();
+    z.stepHistory.push({ stav, at: z.stepStartedAt });
+    if (z.stepHistory.length > 200) z.stepHistory.shift();
     const t = typeOf(d, z.typKey);
     // Lhůty kroků jsou OFFSETY od bodu 0 (zadání = z.createdAt) — dny se NESČÍTAJÍ.
     // Termín kroku = zadání + N prac. dní; stejné N u dvou kroků = stejné datum.
@@ -1571,6 +1577,7 @@ function mount(host) {
       obchodnikEmail: z.obchodnikEmail, obchodnikName: empName(z.obchodnikEmail),
       assignedTo: z.assignedTo || '', assignedName: z.assignedTo ? empName(z.assignedTo) : '',
       deadline: z.deadline || null, stepStartedAt: z.stepStartedAt || null,
+      stepHistory: z.stepHistory || [],   // {stav, at} — doba strávená v jednotlivých krocích
       semafor: semafor(z),
       responsible: responsibleEmail(z), responsibleName: empName(responsibleEmail(z)),
       versionCount: z.versions.length,

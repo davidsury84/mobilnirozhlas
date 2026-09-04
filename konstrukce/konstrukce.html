@@ -354,7 +354,7 @@ select.dq2-opt{width:100%;max-width:560px}
 /* ---- tracker u zakázky (styl sledování zásilky) ---- */
 .ot-cap{text-align:center;color:var(--mut);font-size:13px;margin:2px 0 12px}
 .ot-track{display:flex;align-items:flex-start;overflow-x:auto;padding:2px 2px 4px;margin-bottom:14px}
-.ot-step{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;width:66px}
+.ot-step{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;width:74px}
 .ot-conn{flex:1 1 auto;min-width:14px;height:3px;background:var(--line);margin-top:12px;border-radius:2px}
 .ot-conn.on{background:var(--g)}
 .ot-conn.ot-split{background:linear-gradient(90deg,var(--line) 0,var(--line) 40%,#c98500 40%,#c98500 60%,var(--line) 60%);min-width:26px;position:relative}
@@ -367,6 +367,7 @@ select.dq2-opt{width:100%;max-width:560px}
 .ot-dot.cur{border-color:var(--g);background:var(--card);box-shadow:0 0 0 4px var(--green-soft)}
 .ot-lab{font-size:10.5px;color:var(--mut);line-height:1.2}
 .ot-lab.cur{color:var(--ink);font-weight:800}
+.ot-days{font-size:9.5px;color:var(--mut);line-height:1.1;margin-top:-3px;white-space:nowrap}
 .ot-item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px 4px;margin-bottom:10px;cursor:pointer}
 .ot-item:hover{border-color:var(--g);box-shadow:0 2px 8px rgba(0,0,0,.06)}
 .ot-item-head{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:6px}
@@ -1196,11 +1197,22 @@ function kPattern(s){
   if((m=s.match(/^(termín|poptávka|závod|Vloženo:|Doporučeno:|Na tahu|Čeká na)\s+(.+)$/))){ h=kT(m[1]); return h===m[1]?null:h+' '+m[2]; }
   if((m=s.match(/^(.+?)\s+\((\d+)\)$/))){ h=kT(m[1]); return h===m[1]?null:h+' ('+m[2]+')'; }
   if((m=s.match(/^(\d+)\s+(dní|dnů|prac\. dní)$/))){ h=kT(m[2]); return h===m[2]?null:m[1]+' '+h; }
+  /* doba kroku v pásu: „(0,5 dne)" · „(3 dny)" — číslo zůstává, mění se jen slovo */
+  if((m=s.match(/^\((\d+(?:[,.]\d)?)\s+(den|dny|dní|dne)\)$/))){
+    /* [jednotné, množné, desetinné] — u desetinných je v PL/UA jiný tvar */
+    var jed={en:['day','days','days'],de:['Tag','Tage','Tage'],pl:['dzień','dni','dnia'],ua:['день','дні','дня'],ro:['zi','zile','zile']}[K_LANG];
+    if(!jed) return null;
+    var cis=parseFloat(m[1].replace(',','.'));
+    var tvar=(m[1].indexOf(',')>=0||m[1].indexOf('.')>=0)?jed[2]:(cis===1?jed[0]:jed[1]);
+    return '('+m[1]+' '+tvar+')';
+  }
   /* „NABÍDKA NAB-2026-0001" / „OBJEDNÁVKA VYK-2026-0005" */
   if((m=s.match(/^(NABÍDKA|OBJEDNÁVKA)\s+(\S+)$/))){ h=kT(m[1]); return h===m[1]?null:h+' '+m[2]; }
   /* „· Aktuální krok:" a „· termín 01.09.2026" (fragmenty popisku trackeru) */
   if((m=s.match(/^·\s*(Aktuální krok):?$/))){ h=kT(m[1]); return h===m[1]?null:'· '+h+':'; }
   if((m=s.match(/^·\s*(termín|závod)\s+(.+)$/))){ h=kT(m[1]); return h===m[1]?null:'· '+h+' '+m[2]; }
+  /* popisek prvního kroku „Závod: Chomutov" — název závodu se nepřekládá */
+  if((m=s.match(/^Závod:\s*(.+)$/))){ h=kT('závod'); return h==='závod'?null:(h.charAt(0).toUpperCase()+h.slice(1))+': '+m[1]; }
   /* „zadal Jan Novák" */
   if((m=s.match(/^(zadal)\s+(.+)$/))){ h=kT(m[1]); return h===m[1]?null:h+' '+m[2]; }
   /* „z nabídky NAB-2026-0001" */
@@ -2587,6 +2599,31 @@ function stepDays(z){
   return days;
 }
 function czDays(n){n=Math.abs(n);return n===1?'den':(n>=2&&n<=4?'dny':'dní');}
+/* „0,5 dne" · „1 den" · „3 dny" · „8 dní" — desetinná čísla mají vždy „dne" */
+function dnyText(n){
+  if(n==null)return '';
+  var v=Math.round(n*10)/10;
+  if(Math.abs(v-Math.round(v))<0.05){var i=Math.round(v);return i+' '+czDays(i)}
+  return String(v).replace('.',',')+' dne';
+}
+/* Jak dlouho trval který krok. Primárně z historie kroků (přesné), u starších
+   zakázek bez historie odhadem z auditního logu. Revize se počítá k výkresu,
+   čekání na podklady se do kroku nezapočítává. */
+function stepDurations(z){
+  var h=z.stepHistory;
+  if(!h||!h.length)return stepDays(z);
+  var now=(D&&D.now)||Date.now(), out={};
+  for(var i=0;i<h.length;i++){
+    var k=h[i].stav; if(k==='podklady')continue;
+    if(k==='revize')k='prace';
+    var posledni=(i+1>=h.length);
+    if(posledni&&(k==='dokonceno'||k==='zamitnuto'))continue;   // koncový stav dobu nemá
+    var end=posledni?now:h[i+1].at;
+    out[k]=(out[k]||0)+Math.max(0,(end-h[i].at)/86400000);
+  }
+  Object.keys(out).forEach(function(k){out[k]=Math.round(out[k]*10)/10});
+  return out;
+}
 function problemInfo(z){
   var now=(D&&D.now)||Date.now();
   if(z.stav==='podklady')return {cls:'amber',text:'⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')};
@@ -2615,7 +2652,7 @@ function orderTrack(z){
   var cap= zam?'<span style="color:var(--red);font-weight:700">✕ Zamítnuto / storno</span>'
     : cur==='podklady'?'<span style="color:var(--amber);font-weight:700">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</span>'
     : '<b>'+esc(z.stavLabel)+'</b>'+loc+(z.deadline?(' · termín '+fdate(z.deadline)):'');
-  var parts=[];
+  var parts=[], doby=stepDurations(z);
   stages.forEach(function(s,i){
     if(i>0)parts.push('<div class="ot-conn'+((!zam&&i<=ci)?' on':'')+(s.f==='objednavka'&&stages[i-1].f==='nabidka'?' ot-split':'')+'"></div>');
     var cls=(!zam&&i<ci)?'done':((!zam&&i===ci)?'cur':'fut');
@@ -2623,7 +2660,8 @@ function orderTrack(z){
     var lab=s.l;
     if(s.k==='zavod'&&z.strediskoName)lab='Závod: '+z.strediskoName;
     if(i===ci&&cur==='revize')lab='Revize v'+(z.versionCount||'');
-    parts.push('<div class="ot-step"><div class="ot-dot '+cls+'">'+(cls==='done'?'✓':'')+'</div><div class="ot-lab'+(i===ci&&!zam?' cur':'')+'">'+esc(lab)+'</div></div>');
+    var doba=(!zam&&i<=ci&&doby[s.k]!=null)?('<div class="ot-days">('+dnyText(doby[s.k])+')</div>'):'';
+    parts.push('<div class="ot-step"><div class="ot-dot '+cls+'">'+(cls==='done'?'✓':'')+'</div><div class="ot-lab'+(i===ci&&!zam?' cur':'')+'">'+esc(lab)+'</div>'+doba+'</div>');
   });
   return '<div class="ot-cap">'+fazeLbl+' · Aktuální krok: '+cap+'</div><div class="ot-track">'+parts.join('')+'</div>';
 }
