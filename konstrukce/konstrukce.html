@@ -2478,7 +2478,7 @@ function archStatus(){
     else if(st.bezi)t='⏳ Index se sestavuje… zatím '+(((st.prubeh||{}).soubory)||0).toLocaleString('cs-CZ')+' souborů v '+(((st.prubeh||{}).slozky)||0).toLocaleString('cs-CZ')+' složkách.';
     else if(st.builtAt)t='Index: '+st.souboru.toLocaleString('cs-CZ')+' souborů v '+st.slozek.toLocaleString('cs-CZ')+' složkách · aktualizace '+fdt(st.builtAt)+' (obnovuje se denně).';
     else t='Index zatím nebyl sestaven.'+(st.chyba?' Chyba: '+esc(st.chyba):'');
-    if(ME&&(ME.isAdmin||['sef','konstrukter','reditel','vykonny-reditel'].indexOf(ME.role)>=0)&&!st.bezi)t+=' <button class="btn ghost sm" onclick="archReindex()">⟳ Přeindexovat</button>';
+    if(ME&&(ME.isAdmin||['sef','konstrukter','reditel','vykonny-reditel'].some(maRoli))&&!st.bezi)t+=' <button class="btn ghost sm" onclick="archReindex()">⟳ Přeindexovat</button>';
     el.innerHTML=t;
     clearTimeout(ARCH_ST_T);
     if(st.bezi&&document.getElementById('archSt'))ARCH_ST_T=setTimeout(archStatus,4000);
@@ -2798,11 +2798,14 @@ function semaforText(z){if(isTerminal(z.stav)||z.stav==='schvaleno'||!z.deadline
 
 /* ---- akce dle role a stavu ---- */
 function actionsFor(z){
-  var me=ME, h='', canObch=me.isAdmin||(me.role==='obchodnik'&&z.obchodnikEmail===me.email);
-  var canSef=me.isAdmin||me.role==='sef';
-  var canKon=me.isAdmin||(me.role==='konstrukter'&&z.assignedTo===me.email);
-  var canVyr=me.isAdmin||me.role==='vyrobni-reditel';
-  var canVykonny=me.isAdmin||me.role==='vykonny-reditel';
+  /* Pozor: rolí může mít člověk víc (Andrey = šéf konstrukce + konstruktér).
+     Ptáme se přes maRoli() na CELÝ seznam, ne na me.role (to je jen první z nich) —
+     jinak dvojroli zmizí tlačítka té druhé role, např. vložení výkresu. */
+  var me=ME, h='', canObch=me.isAdmin||(maRoli('obchodnik')&&z.obchodnikEmail===me.email);
+  var canSef=me.isAdmin||maRoli('sef');
+  var canKon=me.isAdmin||(maRoli('konstrukter')&&z.assignedTo===me.email);
+  var canVyr=me.isAdmin||maRoli('vyrobni-reditel');
+  var canVykonny=me.isAdmin||maRoli('vykonny-reditel');
   var blocks=[];
 
   if(z.stav==='zavod'&&(canVykonny||canSef)){blocks.push(rozdelZavodBlock(z))}
@@ -2830,7 +2833,7 @@ function actionsFor(z){
   // pozastavení / obnovení
   if(!isTerminal(z.stav)&&z.stav!=='schvaleno'){
     if(z.stav==='podklady'&&(canObch||canSef))blocks.push('<div class="actions"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'unhold\')">▶ Podklady doplněny — pokračovat</button></div>');
-    else if(z.stav!=='podklady'&&(canObch||canSef))blocks.push('<div class="actions" style="margin-top:4px"><button class="btn ghost sm" onclick="askHold(\''+z.id+'\')">⏸ Čeká na podklady</button>'+((canObch||canSef)?'<button class="btn ghost sm" onclick="askTermin(\''+z.id+'\')">Změnit termín</button>':'')+((me.role==='obchodnik'||me.role==='reditel'||me.isAdmin)?'<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button>':'')+'</div>');
+    else if(z.stav!=='podklady'&&(canObch||canSef))blocks.push('<div class="actions" style="margin-top:4px"><button class="btn ghost sm" onclick="askHold(\''+z.id+'\')">⏸ Čeká na podklady</button>'+((canObch||canSef)?'<button class="btn ghost sm" onclick="askTermin(\''+z.id+'\')">Změnit termín</button>':'')+((maRoli('obchodnik')||maRoli('reditel')||me.isAdmin)?'<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button>':'')+'</div>');
   }
   h=blocks.join('');
   return h;
