@@ -2580,7 +2580,7 @@ function renderDrawer(z){
       '</div>'+
       actionsFor(z)+
       pdfPanel(z)+
-      prilohyBlock(z)+dotaznikView(z)+zmenyView(z)+'<div id="drwArch"></div>'+params+vers+
+      prilohyBlock(z)+vyrobniDokView(z)+dotaznikView(z)+zmenyView(z)+'<div id="drwArch"></div>'+params+vers+
       linkBox(z)+
       comments+audit+
       delBox(z)+
@@ -2880,9 +2880,29 @@ function vyrobniDokBlock(z){
   var has=z.vyrobniDok;
   return '<div class="card" style="background:#e6f6ec"><b>Schváleno klientem ✓ — vložte výrobní dokumentaci</b>'+
     '<p class="muted" style="margin:6px 0">Závod: <b>'+esc(z.strediskoName||'—')+'</b>. Po vložení výrobní dokumentace jde zakázka do výroby.</p>'+
-    (has?'<div class="muted" style="margin:4px 0">Vloženo: <b>'+esc(z.vyrobniDok.name)+'</b> · <a href="/api/konstrukce/soubor?id='+encodeURIComponent(z.id)+'&kind=vyrobni" target="_blank">stáhnout</a></div>':'')+
+    (has?('<div class="muted" style="margin:4px 0">Vloženo: <b>'+esc(z.vyrobniDok.name)+'</b> (v'+(z.vyrobniDok.v||1)+') · <a href="/api/konstrukce/soubor?id='+encodeURIComponent(z.id)+'&kind=vyrobni" target="_blank">stáhnout</a></div>'
+      +(z.vyrobniDokVerze&&z.vyrobniDokVerze.length?'<div class="muted" style="font-size:12px;margin:2px 0 0">Nové vložení starou verzi nepřepíše — zůstane v historii níže.</div>':'')):'')+
     '<div class="row" style="margin-top:6px"><input type="file" id="vd_'+z.id+'" accept=".pdf,.dwg,.dxf,.step,.stp,.zip,.xlsx,.docx" onchange="uploadFile(\''+z.id+'\',\'vyrobni\',this)"><span class="err" id="upErr_'+z.id+'"></span></div>'+
     '<div class="actions" style="margin-top:8px"><button class="btn sm"'+(has?'':' disabled')+' onclick="doAction(\''+z.id+'\',\'vlozit-vyrobni-dok\')">✓ Do výroby v závodě '+(z.strediskoName?esc(z.strediskoName):'')+'</button></div></div>';
+}
+/* Výrobní dokumentace + historie oprav — vidět i poté, co zakázka odejde do výroby */
+function vyrobniDokView(z){
+  if(!z.vyrobniDok)return '';
+  var url=function(vd){return '/api/konstrukce/soubor?id='+encodeURIComponent(z.id)+'&kind=vyrobni'+(vd==null?'':('&vd='+vd))};
+  var h='<div class="sec">Výrobní dokumentace</div><div class="card">'+
+    '<div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap">'+
+    '<span><b>'+esc(z.vyrobniDok.name)+'</b> <span class="muted">· v'+(z.vyrobniDok.v||1)+' · '+esc(z.vyrobniDok.author||'')+' · '+fdt(z.vyrobniDok.at)+'</span></span>'+
+    '<a class="btn ghost sm" href="'+url()+'">Stáhnout</a></div>';
+  var st=z.vyrobniDokVerze||[];
+  if(st.length){
+    h+='<div class="sec" style="margin:10px 0 4px;font-size:11.5px">Předchozí verze ('+st.length+')</div><div class="tl">';
+    st.slice().reverse().forEach(function(v){
+      h+='<div class="it"><div>'+esc(v.name)+' <span class="muted">· v'+v.v+'</span> — <a href="'+url(v.i)+'">stáhnout</a></div>'+
+        '<div class="m">'+esc(v.author||'')+' · '+fdt(v.at)+'</div></div>';
+    });
+    h+='</div>';
+  }
+  return h+'</div>';
 }
 function recomHint(family){
   var cand=(D.kapacita||[]).filter(function(k){return konstrCoversFamily(k.email,family)});

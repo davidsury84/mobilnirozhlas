@@ -1590,7 +1590,8 @@ function mount(host) {
       link: z.link ? { active: z.link.active, expiresAt: z.link.expiresAt, url: '/konstrukce/nahled/' + z.link.token, hasPin: !!z.link.pin, accesses: (z.link.accesses || []).length } : null,
       revisionCount: z.revisionCount || 0,
       strediskoKey: z.strediskoKey || '', strediskoName: z.strediskoName || '',
-      vyrobniDok: z.vyrobniDok ? { name: z.vyrobniDok.name, at: z.vyrobniDok.at, author: empName(z.vyrobniDok.author) } : null,
+      vyrobniDok: z.vyrobniDok ? { name: z.vyrobniDok.name, at: z.vyrobniDok.at, author: empName(z.vyrobniDok.author), v: z.vyrobniDok.v || 1 } : null,
+      vyrobniDokVerze: (z.vyrobniDokVerze || []).map((x, i) => ({ i, v: x.v || (i + 1), name: x.name, at: x.at, author: empName(x.author) })),
       holdReason: z.holdReason || '', prevStav: z.prevStav || '',
       clientDecision: z.clientDecision || null,
       audit: z.audit || [],
@@ -1888,9 +1889,27 @@ function mount(host) {
       if (z.stav !== 'schvaleno') { json(res, 400, { chyba: 'Výrobní dokumentaci lze vložit až po schválení klientem.' }); return true; }
       const sv = saveFile(z.id, b.name, b.dataUrl, 'vyrobni');
       if (sv.chyba) { json(res, 400, { chyba: sv.chyba }); return true; }
-      if (z.vyrobniDok && z.vyrobniDok.path) deleteFile(z.vyrobniDok.path);
-      z.vyrobniDok = { name: sv.name, path: sv.path, at: Date.now(), author: me.email };
-      audit(z, me.email, 'Vložena výrobní dokumentace', sv.name);
+      // Nová výrobní dokumentace nepřepisuje starou — ta jde do historie (v1, v2…),
+      // ať je dohledatelné, podle čeho se vyrábělo před opravou.
+      if (!Array.isArray(z.vyrobniDokVerze)) z.vyrobniDokVerze = [];
+      if (z.vyrobniDok && z.vyrobniDok.path) z.vyrobniDokVerze.push(z.vyrobniDok);
+      const vdV = z.vyrobniDokVerze.length + 1;
+      z.vyrobniDok = { name: sv.name, path: sv.path, at: Date.now(), author: me.email, v: vdV };
+      audit(z, me.email, 'Vložena výrobní dokumentace' + (vdV > 1 ? ' (v' + vdV + ', oprava)' : ''), sv.name);
+      if (vdV > 1) {   // opravená dokumentace — výroba i obchod to musí vědět
+        const komu = new Set(employeesWithRole('sef').map(x => x.toLowerCase()));
+        if (z.obchodnikEmail) komu.add(z.obchodnikEmail.toLowerCase());
+        employeesWithRole('vykonny-reditel').forEach(x => komu.add(x.toLowerCase()));
+        const s2 = (d.strediska || []).find(x => x.key === z.strediskoKey);
+        if (s2 && s2.reditelEmail) komu.add(s2.reditelEmail.toLowerCase());
+        komu.delete((me.email || '').toLowerCase());
+        const cis = z.cisloObj || z.cislo;
+        for (const em of komu) notify(d, em, 'Opravená výrobní dokumentace ' + cis + ' (v' + vdV + ') — ' + me.name, z.id);
+        setTimeout(() => { for (const em of komu) mail(em, 'Opravená výrobní dokumentace · ' + cis,
+          'K zakázce ' + cis + ' (' + z.zakaznik + ') byla vložena NOVÁ verze výrobní dokumentace (v' + vdV + ').\n\nVložil(a): ' + me.name + '\nSoubor: ' + sv.name
+          + '\n\nPředchozí verze zůstávají v detailu zakázky. Zkontrolujte prosím, zda se podle staré verze už nevyrábí.',
+          z, { stitek: 'OPRAVENÁ VÝROBNÍ DOKUMENTACE', stitekBarva: '#b3261e' }); }, 0);
+      }
       save(d);
       json(res, 200, { ok: true, vyrobni: true });
       return true;
@@ -2756,7 +2775,9 @@ function mount(host) {
       res.end(fs.readFileSync(f)); return true;
     }
     if (query.kind === 'vyrobni') {
-      const meta = z.vyrobniDok;
+      // ?vd=<index> → starší verze z historie, jinak platná (poslední)
+      const vdI = query.vd != null && query.vd !== '' ? parseInt(query.vd, 10) : -1;
+      const meta = (vdI >= 0) ? (z.vyrobniDokVerze || [])[vdI] : z.vyrobniDok;
       const f = meta && safePath(meta.path);
       if (!f || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bez výrobní dokumentace'); return true; }
       res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="' + encodeURIComponent(meta.name) + '"' });
