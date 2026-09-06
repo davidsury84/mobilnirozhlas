@@ -2637,6 +2637,8 @@ function mount(host) {
     const cur = CURRENT_V(z);
     json(res, 200, {
       cislo: z.cislo, zakaznik: z.zakaznik, typName: typeOf(d, z.typKey).name,
+      // komu byl náhled poslán — jméno se předvyplní, klient už ho nepíše
+      kontakt: z.kontakt || '',
       version: cur ? cur.v : null, versionCount: z.versions.length,
       hasPdf: !!(cur && cur.pdf),
       pdfUrl: '/konstrukce/nahled/' + token + '/pdf' + (z.link.pin ? '?pin=' + encodeURIComponent(z.link.pin) : ''),
@@ -2677,11 +2679,11 @@ function mount(host) {
 
     if (action === 'schvalit') {
       if (!name || !b.souhlas) { json(res, 400, { chyba: 'Vyplňte jméno a potvrďte souhlas.' }); return true; }
-      z.clientDecision = { action: 'schvalit', name, at: Date.now(), ip, version: cur ? cur.v : null };
+      z.clientDecision = { action: 'schvalit', name, email: z.kontaktEmail || '', at: Date.now(), ip, version: cur ? cur.v : null };
       z.link.accesses.push({ at: Date.now(), ip, action: 'schválil: ' + name });
       if (z.rezim === 'objednavka') {
         // přímá objednávka: klient schválil dokumentaci → konstruktér vypracuje výrobní dokumentaci
-        audit(z, name + ' (klient)', 'Klient schválil výkres', 'verze v' + (cur ? cur.v : '?') + ', IP ' + ip);
+        audit(z, name + ' (klient)', 'Klient schválil výkres', 'verze v' + (cur ? cur.v : '?') + ' · odkaz poslán na ' + (z.kontaktEmail || '—') + ' · IP ' + ip);
         z.link.active = false;
         enterState(d, z, 'schvaleno');
         notify(d, z.obchodnikEmail, 'Klient SCHVÁLIL výkres objednávky ' + (z.cisloObj || z.cislo) + '.', z.id);
@@ -2690,7 +2692,7 @@ function mount(host) {
         mail(z.obchodnikEmail, 'Klient schválil výkres · ' + (z.cisloObj || z.cislo), 'Klient ' + name + ' schválil výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') dne ' + fmtDateTime(Date.now()) + '.\nKonstrukce nyní vypracuje výrobní dokumentaci.', z);
         if (z.assignedTo) mail(z.assignedTo, 'Schváleno klientem · ' + (z.cisloObj || z.cislo), 'Výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') je schválen klientem. Vypracujte a vložte výrobní dokumentaci.');
       } else {
-        audit(z, name + ' (klient)', 'Klient potvrdil nabídku', 'verze v' + (cur ? cur.v : '?') + ', IP ' + ip);
+        audit(z, name + ' (klient)', 'Klient potvrdil nabídku', 'verze v' + (cur ? cur.v : '?') + ' · odkaz poslán na ' + (z.kontaktEmail || '—') + ' · IP ' + ip);
         toObjednavka(d, z, name + ' (klient)');   // nabídka → předání do objednávek (výběr závodu)
         notify(d, z.obchodnikEmail, 'Klient POTVRDIL nabídku ' + z.cislo + ' → objednávka ' + (z.cisloObj || '') + '.', z.id);
         save(d);
@@ -2699,7 +2701,7 @@ function mount(host) {
     } else if (action === 'zamitnout') {
       const duvod = String(b.duvod || '').trim().slice(0, 1500);
       if (!duvod) { json(res, 400, { chyba: 'Uveďte prosím důvod zamítnutí.' }); return true; }
-      z.clientDecision = { action: 'zamitnout', name, at: Date.now(), ip, duvod };
+      z.clientDecision = { action: 'zamitnout', name, email: z.kontaktEmail || '', at: Date.now(), ip, duvod };
       addComment(z, { email: '', name: name || 'Klient' }, 'client', 'ZAMÍTNUTO: ' + duvod);
       z.link.accesses.push({ at: Date.now(), ip, action: 'zamítl' });
       z.link.active = false;
@@ -3188,6 +3190,8 @@ label{display:block;font-size:14px;font-weight:600;margin-top:10px}
 .done.rej{background:#fdecea;color:var(--red);border:1px solid #f5c6cb}
 .hide{display:none}
 .chk{display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:14px}
+.kdo{margin-top:12px;font-size:14px;background:#f2f7ee;border:1px solid var(--line);border-radius:9px;padding:9px 12px}
+.kdo a{color:var(--mut);font-size:12.5px;margin-left:6px}
 .chk input{width:auto;margin-top:3px}
 .err{color:var(--red);font-size:14px;margin-top:8px}
 .foot{text-align:center;color:var(--mut);font-size:12px;padding:14px}
@@ -3198,6 +3202,7 @@ label{display:block;font-size:14px;font-weight:600;margin-top:10px}
 <script>
 var TOKEN=location.pathname.split('/').filter(Boolean).pop();
 var PIN='';
+var KONTAKT='';   // kontaktní osoba, na kterou náhled odešel
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function fdt(ts){if(!ts)return'';var d=new Date(ts);function p(n){return(n<10?'0':'')+n}return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes())}
 function api(){return fetch('/api/konstrukce/nahled/'+TOKEN+(PIN?('?pin='+encodeURIComponent(PIN)):''),{cache:'no-store'}).then(function(r){return r.json().then(function(j){return{status:r.status,j:j}})})}
@@ -3215,6 +3220,7 @@ function pinPrompt(){
 }
 function submitPin(){PIN=document.getElementById('pin').value.trim();load()}
 function render(j){
+  KONTAKT=j.kontakt||'';
   var d=j.decided;
   var pdf=j.hasPdf?'<div class="pdfbox"><iframe src="'+esc(j.pdfUrl)+'#toolbar=1&navpanes=0"></iframe><div class="wm"><span>NÁHLED · '+esc(j.zakaznik||'')+'</span></div></div>':'<p class="muted">PDF výkresu není k dispozici.</p>';
   var head='<div class="card"><h1>Výkres '+esc(j.cislo)+'</h1><div class="muted">'+esc(j.typName||'')+'</div>'+
@@ -3240,15 +3246,28 @@ function render(j){
   }
   root().innerHTML=head+pdfCard+actions+comm;
 }
+/* Kdo rozhoduje: víme, komu jsme odkaz poslali, takže jméno nevyplňuje —
+   jen se ukáže. Přepsat jde, když za klienta rozhoduje někdo jiný. */
+function ktoBlok(){
+  if(!KONTAKT) return '<label>Vaše jméno<input id="nm" placeholder="Jméno a příjmení"></label>';
+  return '<div class="kdo">Rozhodujete jako <b>'+esc(KONTAKT)+'</b>'+
+    ' <a href="#" onclick="jinyClovek(event)">rozhoduje někdo jiný?</a></div>'+
+    '<input type="hidden" id="nm" value="'+esc(KONTAKT)+'">';
+}
+function jinyClovek(e){
+  e.preventDefault();
+  var d=e.target.parentNode;
+  d.outerHTML='<label>Vaše jméno<input id="nm" placeholder="Jméno a příjmení"></label>';
+}
 function show(kind){
   var f=document.getElementById('form');if(!f)return;
-  if(kind==='ok')f.innerHTML='<label>Vaše jméno<input id="nm" placeholder="Jméno a příjmení"></label>'+
+  if(kind==='ok')f.innerHTML=ktoBlok()+
     '<div class="chk"><input type="checkbox" id="sh"><span>Potvrzuji, že výkres odpovídá objednávce a schvaluji jej k výrobě.</span></div>'+
     '<div class="btns"><button class="ok" onclick="send(\\'schvalit\\')">Schválit výkres</button></div>';
-  else if(kind==='note')f.innerHTML='<label>Vaše jméno<input id="nm" placeholder="Jméno a příjmení"></label>'+
+  else if(kind==='note')f.innerHTML=ktoBlok()+
     '<label>Připomínky k výkresu<textarea id="tx" rows="4" placeholder="Popište, co je třeba upravit…"></textarea></label>'+
     '<div class="btns"><button class="note" onclick="send(\\'pripominky\\')">Odeslat připomínky</button></div>';
-  else f.innerHTML='<label>Vaše jméno<input id="nm" placeholder="Jméno a příjmení"></label>'+
+  else f.innerHTML=ktoBlok()+
     '<label>Důvod zamítnutí<textarea id="dv" rows="3" placeholder="Uveďte prosím důvod…"></textarea></label>'+
     '<div class="btns"><button class="rej" onclick="send(\\'zamitnout\\')">Zamítnout výkres</button></div>';
 }
