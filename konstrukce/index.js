@@ -2009,7 +2009,7 @@ function mount(host) {
         if (!isObch) { err = 'Odeslat klientovi smí obchodník zakázky.'; break; }
         if (z.stav !== 'obchodnik') { err = 'Zakázka není připravena k odeslání.'; break; }
         if (!CURRENT_V(z) || !CURRENT_V(z).pdf) { err = 'Chybí PDF výkresu.'; break; }
-        if (!z.kontaktEmail) { err = 'U zakázky chybí e-mail kontaktní osoby klienta.'; break; }
+        if (!z.kontaktEmail && !b.bezEmailu) { err = 'U zakázky chybí e-mail kontaktní osoby klienta.'; break; }
         lockDraft(z);
         const t = typeOf(d, z.typKey);
         const token = crypto.randomBytes(24).toString('hex');
@@ -2021,6 +2021,13 @@ function mount(host) {
         const defaultText = 'Dobrý den,\n\nzasíláme Vám ke schválení výkres k zakázce ' + z.cislo + ' (' + z.zakaznik + ').\nProhlédnout a schválit jej můžete zde:\n' + url + '\n' + (z.link.pin ? '\nPřístupový PIN: ' + z.link.pin + '\n' : '') + '\nS pozdravem,\n' + me.name;
         const text = (b.text ? String(b.text) : defaultText).replace('{ODKAZ}', url);
         const subject = b.subject ? String(b.subject) : ('Výkres ke schválení · ' + z.cislo);
+        // b.bezEmailu: obchodník chce odkaz jen zkopírovat a poslat ho z vlastní pošty
+        if (b.bezEmailu) {
+          audit(z, me.email, 'Odkaz pro klienta vytvořen', 'e-mail si obchodník posílá sám');
+          save(d);
+          json(res, 200, { ok: true, url, text, subject, bezEmailu: true });
+          return true;
+        }
         save(d);
         await mail(z.kontaktEmail, subject, text);
         notify(d, z.obchodnikEmail, 'Náhled výkresu ' + z.cislo + ' odeslán klientovi (' + z.kontaktEmail + ').', z.id);
