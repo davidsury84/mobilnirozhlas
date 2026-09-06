@@ -1069,7 +1069,7 @@ function mount(host) {
     z.zNabidky = true;   // vznikla předáním z nabídky (výkres schválen) — přeskočí kreslení
     z.objAt = Date.now();   // od kdy běží upomínky na doplnění ČVZ (Helios)
     if (!z.cisloObj) { d.seq = (typeof d.seq === 'number' ? d.seq : 0) + 1; z.cisloObj = 'VYK-' + new Date().getUTCFullYear() + '-' + String(d.seq).padStart(4, '0'); }
-    if (z.link) z.link.active = false;
+    // odkaz nezavíráme — klient na něm má vidět, že je potvrzeno
     enterState(d, z, 'zavod');
     audit(z, byLabel || '', 'Nabídka potvrzena → objednávka', z.cislo + ' → ' + z.cisloObj);
     setTimeout(() => planZapis(z.id), 0);
@@ -2063,7 +2063,6 @@ function mount(host) {
         z.clientDecision = { action: 'schvalit', name: 'potvrdil obchodník', at: Date.now(), by: me.email };
         if (z.rezim === 'objednavka') {
           // přímá objednávka: klient schválil dokumentaci → výrobní dokumentace
-          if (z.link) z.link.active = false;
           audit(z, me.email, 'Klient schválil (potvrzeno obchodníkem ručně)', note);
           enterState(d, z, 'schvaleno');
           if (z.assignedTo) { notify(d, z.assignedTo, 'Výkres ' + (z.cisloObj || z.cislo) + ' schválen klientem — vypracujte výrobní dokumentaci.', z.id); mail(z.assignedTo, 'Schváleno klientem · ' + (z.cisloObj || z.cislo), 'Výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') je schválen. Vypracujte a vložte výrobní dokumentaci.'); }
@@ -2107,7 +2106,6 @@ function mount(host) {
         if (!isKon) { err = 'Výrobní dokumentaci vkládá přiřazený konstruktér.'; break; }
         if (z.stav !== 'schvaleno') { err = 'Výrobní dokumentaci lze vložit až po schválení klientem.'; break; }
         if (!z.vyrobniDok || !z.vyrobniDok.path) { err = 'Nejdřív nahrajte soubor výrobní dokumentace.'; break; }
-        if (z.link) z.link.active = false;
         stopTimer(z, me.email);
         z.stav = 'dokonceno'; z.deadline = null; z.closedAt = Date.now();
         audit(z, me.email, 'Vložena výrobní dokumentace → do výroby', (z.strediskoName ? 'závod ' + z.strediskoName : ''));
@@ -2641,8 +2639,10 @@ function mount(host) {
       kontakt: z.kontakt || '',
       version: cur ? cur.v : null, versionCount: z.versions.length,
       hasPdf: !!(cur && cur.pdf),
+      revize: z.stav === 'revize',   // po připomínkách: chystá se nová verze
+      storno: z.stav === 'zamitnuto' && !z.clientDecision,
       pdfUrl: '/konstrukce/nahled/' + token + '/pdf' + (z.link.pin ? '?pin=' + encodeURIComponent(z.link.pin) : ''),
-      decided: z.clientDecision ? { action: z.clientDecision.action, at: z.clientDecision.at, name: z.clientDecision.name } : null,
+      decided: z.clientDecision ? { action: z.clientDecision.action, at: z.clientDecision.at, name: z.clientDecision.name, version: z.clientDecision.version || null } : null,
       history: z.versions.map(v => ({ v: v.v, at: v.createdAt })),
       // veřejné komentáře = jen komunikace s klientem (žádné interní ceny/marže)
       comments: (z.comments || []).filter(c => c.role === 'client' || c.publicToClient).map(c => ({ author: c.role === 'client' ? (c.authorName || 'Klient') : 'ELKOPLAST', text: c.text, at: c.at })),
@@ -2684,7 +2684,6 @@ function mount(host) {
       if (z.rezim === 'objednavka') {
         // přímá objednávka: klient schválil dokumentaci → konstruktér vypracuje výrobní dokumentaci
         audit(z, name + ' (klient)', 'Klient schválil výkres', 'verze v' + (cur ? cur.v : '?') + ' · odkaz poslán na ' + (z.kontaktEmail || '—') + ' · IP ' + ip);
-        z.link.active = false;
         enterState(d, z, 'schvaleno');
         notify(d, z.obchodnikEmail, 'Klient SCHVÁLIL výkres objednávky ' + (z.cisloObj || z.cislo) + '.', z.id);
         if (z.assignedTo) notify(d, z.assignedTo, 'Výkres ' + (z.cisloObj || z.cislo) + ' schválen klientem — vypracujte výrobní dokumentaci.', z.id);
@@ -2704,7 +2703,6 @@ function mount(host) {
       z.clientDecision = { action: 'zamitnout', name, email: z.kontaktEmail || '', at: Date.now(), ip, duvod };
       addComment(z, { email: '', name: name || 'Klient' }, 'client', 'ZAMÍTNUTO: ' + duvod);
       z.link.accesses.push({ at: Date.now(), ip, action: 'zamítl' });
-      z.link.active = false;
       z.stav = 'zamitnuto'; z.deadline = null; z.closedAt = Date.now();
       audit(z, (name || 'klient') + ' (klient)', 'Klient zamítl', duvod + ' — IP ' + ip);
       notify(d, z.obchodnikEmail, 'Klient ZAMÍTL výkres ' + z.cislo + '. Řešte další postup.', z.id);
@@ -2721,7 +2719,8 @@ function mount(host) {
       const nv = { v: (cur ? cur.v : 0) + 1, author: z.assignedTo || '', createdAt: Date.now(), locked: false };
       z.versions.push(nv);
       enterState(d, z, 'revize');
-      z.link.active = false; // původní odkaz se uzavře; po revizi se pošle nový
+      // odkaz necháváme čitelný; místo tlačítek uvidí klient „připomínky přijaty"
+      // (rozhodnout znovu nejde — apiPublicAction pustí akci jen ve stavu „klient")
       audit(z, (name || 'klient') + ' (klient)', 'Klient poslal připomínky', 'založena revize v' + nv.v + ' — IP ' + ip);
       notify(d, z.obchodnikEmail, 'Klient poslal PŘIPOMÍNKY k ' + z.cislo + ' — založena revize v' + nv.v + '.', z.id);
       if (z.assignedTo) notify(d, z.assignedTo, 'Revize v' + nv.v + ' u výkresu ' + z.cislo + ' — zapracujte připomínky klienta.', z.id);
@@ -3228,9 +3227,14 @@ function render(j){
   var pdfCard='<div class="card">'+pdf+'</div>';
   var actions='';
   if(d){
-    if(d.action==='schvalit')actions='<div class="done ok"><b>Výkres byl schválen.</b><br>'+esc(d.name||'')+' · '+fdt(d.at)+'</div>';
-    else actions='<div class="done rej"><b>Výkres byl zamítnut.</b><br>'+fdt(d.at)+'</div>';
+    var kdo=(d.name?esc(d.name)+' · ':'')+fdt(d.at)+(d.version?' · verze v'+d.version:'');
+    if(d.action==='schvalit')actions='<div class="done ok"><b>✓ Výkres byl schválen a předán do výroby.</b><br>'+kdo+'<div class="muted" style="margin-top:6px">Odkaz zůstává platný — výkres si tu můžete kdykoli znovu prohlédnout.</div></div>';
+    else actions='<div class="done rej"><b>✕ Výkres byl zamítnut.</b><br>'+kdo+'<div class="muted" style="margin-top:6px">Ozve se Vám náš obchodník.</div></div>';
     actions='<div class="card">'+actions+'</div>';
+  }else if(j.revize){
+    actions='<div class="card"><div class="done"><b>Připomínky jsme přijali.</b><div class="muted" style="margin-top:6px">Konstrukce zapracovává úpravy — jakmile bude nová verze hotová, pošleme Vám ji ke schválení.</div></div></div>';
+  }else if(j.storno){
+    actions='<div class="card"><div class="done rej"><b>Zakázka byla stornována.</b><div class="muted" style="margin-top:6px">V případě dotazu se prosím obraťte na svého obchodníka.</div></div></div>';
   }else{
     actions='<div class="card"><p class="muted" style="margin-top:0">Prohlédněte si výkres a zvolte, jak chcete pokračovat:</p>'+
       '<div class="btns">'+
