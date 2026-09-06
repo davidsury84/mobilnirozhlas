@@ -1193,7 +1193,7 @@ function recordMobiliar(b) {
   const rid = String(b.rid || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40);
   if (rid.length < 8) return { error: 'Neplatné id hlasování.' };
   // pozice respondenta (cílíme hlavně na obce a technické služby) + velikost obce; starší hodnoty zůstávají platné
-  const ROLE = ['starosta', 'urednik', 'technicke-sluzby', 'firma', 'obchodnik', 'zakaznik', 'ostatni', 'neuvedeno'];
+  const ROLE = ['starosta', 'urednik', 'ts-reditel', 'ts-provoz', 'technicke-sluzby', 'firma', 'obchodnik', 'zakaznik', 'ostatni', 'neuvedeno'];
   const OBEC = ['do1000', '1000-5000', '5000-20000', '20000-100000', 'nad100000', 'netyka-se', 'neuvedeno'];
   const votesIn = (b.votes && typeof b.votes === 'object') ? b.votes : {};
   const votes = {};

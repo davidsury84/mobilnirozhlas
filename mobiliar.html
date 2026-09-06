@@ -152,17 +152,17 @@
 
       <div id="resumeBox"></div>
 
-      <label class="fld">Jaká je vaše pozice?</label>
+      <label class="fld">Jaká je vaše pozice? <span style="font-weight:400; text-transform:none; letter-spacing:0">(povinné)</span></label>
       <div class="pills" id="rolePills">
         <button type="button" class="pill-btn" data-role="starosta">starosta / místostarosta</button>
         <button type="button" class="pill-btn" data-role="urednik">úředník obce či města</button>
-        <button type="button" class="pill-btn" data-role="technicke-sluzby">technické služby / svozová společnost</button>
+        <button type="button" class="pill-btn" data-role="ts-reditel">ředitel technických služeb</button>
+        <button type="button" class="pill-btn" data-role="ts-provoz">provozní pracovník technických služeb</button>
         <button type="button" class="pill-btn" data-role="firma">firma nebo podnikatel</button>
-        <button type="button" class="pill-btn" data-role="obchodnik">obchodník ELKOPLAST</button>
         <button type="button" class="pill-btn" data-role="ostatni">jiné</button>
       </div>
 
-      <label class="fld">Velikost vaší obce či města <span style="font-weight:400; text-transform:none; letter-spacing:0">(počet obyvatel)</span></label>
+      <label class="fld">Velikost vaší obce či města <span style="font-weight:400; text-transform:none; letter-spacing:0">(počet obyvatel, povinné)</span></label>
       <div class="pills" id="obecPills">
         <button type="button" class="pill-btn" data-obec="do1000">do 1 000</button>
         <button type="button" class="pill-btn" data-obec="1000-5000">1–5 tisíc</button>
@@ -249,8 +249,7 @@ function fresh(){
 function load(){ try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); return (d && d.rid) ? d : null; }catch(_){ return null; } }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(_){ } }
 
-/* přihlášenému zaměstnanci server injektuje MJ_EMP → předvybere roli obchodníka */
-if (window.MJ_EMP && !S.role) S.role = 'obchodnik';
+/* pozice „obchodník ELKOPLAST" byla z nabídky odstraněna — zaměstnanci volí pozici jako ostatní */
 
 /* ---------- synchronizace na server ---------- */
 var syncTimer = null, unsyncedSince = 0;
@@ -320,20 +319,21 @@ function renderIntro(){
 function updateStartInfo(){
   var total = KATEGORIE.filter(function(k){ return S.cats.indexOf(k.key) >= 0; }).reduce(function(s,k){ return s + k.pocet; }, 0);
   var grps = Math.ceil(total/GRP);
-  $('btnStart').disabled = !total;
-  $('startInfo').textContent = total ? (grps + ' šestic · cca ' + Math.max(2, Math.round(grps * 8 / 60)) + ' min') : 'Vyberte aspoň jednu kategorii.';
+  var chybi = !S.role ? 'Vyberte prosím svou pozici.' : !S.obec ? 'Vyberte prosím velikost obce.' : !total ? 'Vyberte aspoň jednu kategorii.' : '';
+  $('btnStart').disabled = !!chybi;
+  $('startInfo').textContent = chybi || (grps + ' šestic · cca ' + Math.max(2, Math.round(grps * 8 / 60)) + ' min');
 }
 $('rolePills').addEventListener('click', function(e){
   var b = e.target.closest('.pill-btn'); if (!b) return;
   S.role = (S.role === b.dataset.role) ? '' : b.dataset.role;
   $('rolePills').querySelectorAll('.pill-btn').forEach(function(x){ x.classList.toggle('on', x.dataset.role === S.role); });
-  save();
+  updateStartInfo(); save();
 });
 $('obecPills').addEventListener('click', function(e){
   var b = e.target.closest('.pill-btn'); if (!b) return;
   S.obec = (S.obec === b.dataset.obec) ? '' : b.dataset.obec;
   $('obecPills').querySelectorAll('.pill-btn').forEach(function(x){ x.classList.toggle('on', x.dataset.obec === S.obec); });
-  save();
+  updateStartInfo(); save();
 });
 $('btnStart').onclick = function(){
   /* nové pořadí jen z fotek bez záznamu; hotové šestice se nevracejí (počty zůstávají násobky 6) */
