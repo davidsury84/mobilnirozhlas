@@ -45,7 +45,11 @@
   .hint{color:var(--muted); font-size:12.5px}
 
   label.fld{display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin:18px 0 6px}
-  .pills{display:flex; flex-wrap:wrap; gap:8px}
+  .req{color:var(--bad); font-size:14px}
+  label.fld.chybi{color:var(--bad)}
+  .pills{display:flex; flex-wrap:wrap; gap:8px; border-radius:12px}
+  .pills.chybi{background:#fdf1f1; outline:6px solid #fdf1f1}
+  .pills.chybi .pill-btn{border-color:#e8b9b9; background:#fffafa}
   .pill-btn{
     padding:9px 14px; font-size:14px; font-family:inherit; cursor:pointer;
     border:1.5px solid var(--line-strong); border-radius:999px; background:var(--paper); color:var(--ink-soft);
@@ -152,7 +156,7 @@
 
       <div id="resumeBox"></div>
 
-      <label class="fld">Jaká je vaše pozice? <span style="font-weight:400; text-transform:none; letter-spacing:0">(povinné)</span></label>
+      <label class="fld" id="lblRole">Jaká je vaše pozice? <span class="req">*</span></label>
       <div class="pills" id="rolePills">
         <button type="button" class="pill-btn" data-role="starosta">starosta / místostarosta</button>
         <button type="button" class="pill-btn" data-role="urednik">úředník obce či města</button>
@@ -162,7 +166,7 @@
         <button type="button" class="pill-btn" data-role="ostatni">jiné</button>
       </div>
 
-      <label class="fld">Velikost vaší obce či města <span style="font-weight:400; text-transform:none; letter-spacing:0">(počet obyvatel, povinné)</span></label>
+      <label class="fld" id="lblObec">Velikost vaší obce či města <span style="font-weight:400; text-transform:none; letter-spacing:0">(počet obyvatel)</span> <span class="req">*</span></label>
       <div class="pills" id="obecPills">
         <button type="button" class="pill-btn" data-obec="do1000">do 1 000</button>
         <button type="button" class="pill-btn" data-obec="1000-5000">1–5 tisíc</button>
@@ -322,6 +326,9 @@ function updateStartInfo(){
   var chybi = !S.role ? 'Vyberte prosím svou pozici.' : !S.obec ? 'Vyberte prosím velikost obce.' : !total ? 'Vyberte aspoň jednu kategorii.' : '';
   $('btnStart').disabled = !!chybi;
   $('startInfo').textContent = chybi || (grps + ' šestic · cca ' + Math.max(2, Math.round(grps * 8 / 60)) + ' min');
+  /* nevyplněná povinná pole svítí světle červeně */
+  $('lblRole').classList.toggle('chybi', !S.role);  $('rolePills').classList.toggle('chybi', !S.role);
+  $('lblObec').classList.toggle('chybi', !S.obec);  $('obecPills').classList.toggle('chybi', !S.obec);
 }
 $('rolePills').addEventListener('click', function(e){
   var b = e.target.closest('.pill-btn'); if (!b) return;
