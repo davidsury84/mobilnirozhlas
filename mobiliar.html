@@ -118,6 +118,11 @@
   .done-stats b{display:block; font-size:26px; color:var(--green-d)}
   .done-stats span{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; font-weight:600}
   .center{text-align:center}
+  .sleva{margin:20px auto 0; max-width:460px; background:var(--green-soft); border:2px dashed var(--green); border-radius:14px; padding:16px 18px}
+  .sleva p{font-size:14px; color:var(--green-d); margin-bottom:10px}
+  .sleva-kod{display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap}
+  .sleva-kod code{font-size:28px; font-weight:800; letter-spacing:.28em; padding:8px 14px 8px 20px; background:var(--paper); border:1px solid var(--green); border-radius:10px; color:var(--green-d)}
+  .sleva a.btn{text-decoration:none; margin-top:10px}
   .savenote{position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:60;
     background:var(--ink); color:#fff; font-size:12.5px; padding:7px 14px; border-radius:999px; opacity:0; transition:opacity .25s ease; pointer-events:none}
   .savenote.show{opacity:.92}
@@ -147,11 +152,24 @@
 
       <div id="resumeBox"></div>
 
-      <label class="fld">Kdo jste?</label>
+      <label class="fld">Jaká je vaše pozice?</label>
       <div class="pills" id="rolePills">
-        <button type="button" class="pill-btn" data-role="obchodnik">Obchodník ELKOPLAST</button>
-        <button type="button" class="pill-btn" data-role="zakaznik">Zákazník</button>
-        <button type="button" class="pill-btn" data-role="ostatni">Jiné</button>
+        <button type="button" class="pill-btn" data-role="starosta">starosta / místostarosta</button>
+        <button type="button" class="pill-btn" data-role="urednik">úředník obce či města</button>
+        <button type="button" class="pill-btn" data-role="technicke-sluzby">technické služby / svozová společnost</button>
+        <button type="button" class="pill-btn" data-role="firma">firma nebo podnikatel</button>
+        <button type="button" class="pill-btn" data-role="obchodnik">obchodník ELKOPLAST</button>
+        <button type="button" class="pill-btn" data-role="ostatni">jiné</button>
+      </div>
+
+      <label class="fld">Velikost vaší obce či města <span style="font-weight:400; text-transform:none; letter-spacing:0">(počet obyvatel)</span></label>
+      <div class="pills" id="obecPills">
+        <button type="button" class="pill-btn" data-obec="do1000">do 1 000</button>
+        <button type="button" class="pill-btn" data-obec="1000-5000">1–5 tisíc</button>
+        <button type="button" class="pill-btn" data-obec="5000-20000">5–20 tisíc</button>
+        <button type="button" class="pill-btn" data-obec="20000-100000">20–100 tisíc</button>
+        <button type="button" class="pill-btn" data-obec="nad100000">nad 100 tisíc</button>
+        <button type="button" class="pill-btn" data-obec="netyka-se">netýká se mě</button>
       </div>
 
       <label class="fld">Co chcete hodnotit?</label>
@@ -193,6 +211,7 @@
         <div><b id="dGroups">0</b><span>šestic dokončeno</span></div>
       </div>
       <div id="doneMore" style="margin-top:16px"></div>
+      <div id="doneSleva"></div>
       <p class="hint" style="margin-top:18px">Okno teď můžete zavřít.</p>
     </div>
   </section>
@@ -225,7 +244,7 @@ var S = load() || fresh();
 function fresh(){
   var rid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g,'').slice(0,24)
           : ('r' + Date.now().toString(36) + Math.random().toString(36).slice(2,12));
-  return { rid:rid, role:'', cats:KATEGORIE.map(function(k){return k.key;}), order:[], g:0, votes:{}, started:false };
+  return { rid:rid, role:'', obec:'', cats:KATEGORIE.map(function(k){return k.key;}), order:[], g:0, votes:{}, started:false };
 }
 function load(){ try{ var d = JSON.parse(localStorage.getItem(LS_KEY)); return (d && d.rid) ? d : null; }catch(_){ return null; } }
 function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(_){ } }
@@ -235,7 +254,7 @@ if (window.MJ_EMP && !S.role) S.role = 'obchodnik';
 
 /* ---------- synchronizace na server ---------- */
 var syncTimer = null, unsyncedSince = 0;
-function payload(){ return JSON.stringify({ rid:S.rid, role:S.role || 'neuvedeno', votes:S.votes }); }
+function payload(){ return JSON.stringify({ rid:S.rid, role:S.role || 'neuvedeno', obec:S.obec || 'neuvedeno', votes:S.votes }); }
 function syncNow(){
   clearTimeout(syncTimer); syncTimer = null;
   if (!Object.keys(S.votes).length) return;
@@ -272,8 +291,8 @@ function groupsDone(){ return Math.floor(Object.keys(S.votes).length/GRP); }
 
 /* ---------- úvodní obrazovka ---------- */
 function renderIntro(){
-  var pills = $('rolePills').querySelectorAll('.pill-btn');
-  pills.forEach(function(b){ b.classList.toggle('on', b.dataset.role === S.role); });
+  $('rolePills').querySelectorAll('.pill-btn').forEach(function(b){ b.classList.toggle('on', b.dataset.role === S.role); });
+  $('obecPills').querySelectorAll('.pill-btn').forEach(function(b){ b.classList.toggle('on', b.dataset.obec === S.obec); });
   var h = '';
   KATEGORIE.forEach(function(k){
     var on = S.cats.indexOf(k.key) >= 0;
@@ -308,6 +327,12 @@ $('rolePills').addEventListener('click', function(e){
   var b = e.target.closest('.pill-btn'); if (!b) return;
   S.role = (S.role === b.dataset.role) ? '' : b.dataset.role;
   $('rolePills').querySelectorAll('.pill-btn').forEach(function(x){ x.classList.toggle('on', x.dataset.role === S.role); });
+  save();
+});
+$('obecPills').addEventListener('click', function(e){
+  var b = e.target.closest('.pill-btn'); if (!b) return;
+  S.obec = (S.obec === b.dataset.obec) ? '' : b.dataset.obec;
+  $('obecPills').querySelectorAll('.pill-btn').forEach(function(x){ x.classList.toggle('on', x.dataset.obec === S.obec); });
   save();
 });
 $('btnStart').onclick = function(){
@@ -403,6 +428,17 @@ function renderDone(){
   $('doneMore').innerHTML = zbyva
     ? '<button class="btn ghost" id="btnMore">Vybrat i ze zbývajících šestic (' + Math.ceil(zbyva / GRP) + ')</button>'
     : '<p class="hint">Prošli jste kompletní katalog — paráda!</p>';
+  var sl = window.MJ_SLEVA || {};
+  $('doneSleva').innerHTML = sl.kod
+    ? '<div class="sleva"><p>Jako poděkování za Váš čas jsme pro Vás připravili slevu na nákup na shop.elkoplast.cz. V objednávce zadejte kód:</p>' +
+      '<div class="sleva-kod"><code>' + String(sl.kod).replace(/[<>&"]/g, '') + '</code><button class="btn ghost sm" id="btnKopKod">Kopírovat</button></div>' +
+      '<a class="btn sm" href="https://www.shop.elkoplast.cz/" target="_blank" rel="noopener">Přejít na shop.elkoplast.cz →</a></div>'
+    : '';
+  if ($('btnKopKod')) $('btnKopKod').onclick = function(){
+    (navigator.clipboard ? navigator.clipboard.writeText(String(sl.kod)) : Promise.reject())
+      .then(function(){ $('btnKopKod').textContent = 'Zkopírováno ✓'; })
+      .catch(function(){ prompt('Zkopírujte kód:', sl.kod); });
+  };
   if ($('btnMore')) $('btnMore').onclick = function(){
     S.cats = KATEGORIE.map(function(k){ return k.key; });
     S.order = codesFor(S.cats).filter(function(c){ return !(c in S.votes); });

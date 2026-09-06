@@ -213,6 +213,10 @@ const SPOKOJENOST_F = path.join(DATA_DIR, 'spokojenost-odpovedi.json');      // 
 const SURVEY_SLUGS = { [MOBILIAR_SLUG]: () => MOBILIAR_FILE, [SPOKOJENOST_SLUG]: () => SPOKOJENOST_FILE };
 const MOBILIAR_PUBLIC_URL = SURVEY_PUBLIC_URL + '/' + MOBILIAR_SLUG;         // sběrné odkazy zobrazované v adminu
 const SPOKOJENOST_PUBLIC_URL = SURVEY_PUBLIC_URL + '/' + SPOKOJENOST_SLUG;
+// Jednotný slevový kód za vyplnění průzkumů (číselný, stejný pro všechny) — zobrazuje se na závěrečných
+// obrazovkách; kupón se stejným zněním musí existovat v e-shopu. U spokojenosti jde jen o výchozí hodnotu
+// (v definici ho může admin přepsat), mobiliář ho dostává injektovaný při servírování stránky.
+const SLEVA_KOD = process.env.SLEVA_KOD || '934885';
 // Neutrální stránka kořene sběrné domény (nic neprozrazuje, nikam dál nevede).
 const SURVEY_LANDING = '<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="robots" content="noindex"><title>ELKOPLAST — zákaznické průzkumy</title></head>' +
   '<body style="margin:0;min-height:100svh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,\'Segoe UI\',Roboto,Arial,sans-serif;background:#f2f5f1;color:#111713">' +
@@ -1188,7 +1192,9 @@ function mobiliarKodOk(kod) {
 function recordMobiliar(b) {
   const rid = String(b.rid || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40);
   if (rid.length < 8) return { error: 'Neplatné id hlasování.' };
-  const ROLE = ['obchodnik', 'zakaznik', 'ostatni', 'neuvedeno'];
+  // pozice respondenta (cílíme hlavně na obce a technické služby) + velikost obce; starší hodnoty zůstávají platné
+  const ROLE = ['starosta', 'urednik', 'technicke-sluzby', 'firma', 'obchodnik', 'zakaznik', 'ostatni', 'neuvedeno'];
+  const OBEC = ['do1000', '1000-5000', '5000-20000', '20000-100000', 'nad100000', 'netyka-se', 'neuvedeno'];
   const votesIn = (b.votes && typeof b.votes === 'object') ? b.votes : {};
   const votes = {};
   for (const kod of Object.keys(votesIn)) {
@@ -1201,6 +1207,7 @@ function recordMobiliar(b) {
   const novy = !rec;
   if (!rec) { rec = { rid, createdAt: Date.now() }; all.push(rec); }
   rec.role = ROLE.indexOf(b.role) >= 0 ? b.role : (rec.role || 'neuvedeno');
+  rec.obec = OBEC.indexOf(b.obec) >= 0 ? b.obec : (rec.obec || 'neuvedeno');
   // hlasy jen přibývají/mění se — menší payload (např. ze staré záložky) nesmí smazat už uložené
   rec.votes = Object.assign({}, rec.votes || {}, votes);
   rec.ts = Date.now();
@@ -1225,7 +1232,7 @@ const SPOKOJENOST_SEED = {
   podekovani: 'Děkujeme za Váš čas! Vaše odpovědi nám pomohou zlepšit nabídku, termíny dodání i služby na shop.elkoplast.cz.',
   // Slevový kód na závěrečné obrazovce — jednotný pro všechny respondenty; kód i text se editují
   // v adminu (prázdný kód = nezobrazí se). Stejný kód musí existovat i v e-shopu jako slevový kupón.
-  sleva: { kod: 'VYZKUM', text: 'Jako poděkování za Váš čas jsme pro Vás připravili slevu na nákup na shop.elkoplast.cz. V objednávce zadejte kód:' },
+  sleva: { kod: SLEVA_KOD, text: 'Jako poděkování za Váš čas jsme pro Vás připravili slevu na nákup na shop.elkoplast.cz. V objednávce zadejte kód:' },
   filtr: { otazka: 'q3', kupujici: ['a', 'b'] },
   sekce: [
     { id: 'A', nazev: 'Pár slov o vás', jen: 'vsichni', otazky: [
@@ -3477,7 +3484,9 @@ const server = http.createServer(async (req, res) => {
     const slugFile = SURVEY_SLUGS[p.slice(1)] && SURVEY_SLUGS[p.slice(1)]();
     if (slugFile) {
       if (!fs.existsSync(slugFile)) return send(res, 404, '<h1>Průzkum není k dispozici.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(slugFile, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      // slevový kód se injektuje i tady (stránka s placeholderem, např. mobiliář); jinde je replace neškodný no-op
+      const shtml = fs.readFileSync(slugFile, 'utf8').replace('/*__MJ_EMP__*/', 'window.MJ_SLEVA=' + JSON.stringify({ kod: SLEVA_KOD }) + ';');
+      return send(res, 200, shtml, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/' || p === '/index.html')
       return send(res, 200, SURVEY_LANDING, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
@@ -3741,7 +3750,8 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(MOBILIAR_FILE)) return send(res, 404, '<h1>Chybí mobiliar.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       let html = fs.readFileSync(MOBILIAR_FILE, 'utf8');
       const e = empSession(req);
-      if (e) html = html.replace('/*__MJ_EMP__*/', 'window.MJ_EMP=' + JSON.stringify({ name: e.name || '', email: e.email || '' }) + ';');
+      const inject = 'window.MJ_SLEVA=' + JSON.stringify({ kod: SLEVA_KOD }) + ';' + (e ? 'window.MJ_EMP=' + JSON.stringify({ name: e.name || '', email: e.email || '' }) + ';' : '');
+      html = html.replace('/*__MJ_EMP__*/', inject);
       return send(res, 200, html, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     // Fotky mobiliáře (assets/mobiliar) — vlastní veřejná cesta, /assets/ podadresáře neumí a je za závorou.

@@ -7284,9 +7284,9 @@ async function renderPruzkumyPrehled(){
       return {n:res.length, vysledek:'Ø úspěšnost '+avgP+' %', stav:pill(pa[0],pa[1])+' <span class="muted" style="font-size:11px">≥ 65 %: '+ok+' z '+res.length+'</span>', last:Math.max(...res.map(r=>r.ts||0))}; }
     if(kind==='mobiliar'){ const res=MOBILIAR_DATA.zaznamy||[]; if(!res.length) return {n:0};
       let zobr=0,vybr=0; res.forEach(r=>{ Object.values(r.votes||{}).forEach(v=>{ zobr++; if(v>0) vybr++; }); });
-      const ob=res.filter(r=>r.role==='obchodnik').length, za=res.filter(r=>r.role==='zakaznik').length;
+      const obce=res.filter(r=>r.role==='starosta'||r.role==='urednik').length, ts=res.filter(r=>r.role==='technicke-sluzby').length, ob=res.filter(r=>r.role==='obchodnik'||r.role==='zakaznik').length;
       return {n:res.length, vysledek:(zobr?(Math.floor(zobr/6)+' šestic · '+vybr+' výběrů oblíbených'):'zatím bez výběrů'),
-        stav:(ob?pill('obchodníci: '+ob,'green'):'')+(za?' '+pill('zákazníci: '+za,'amber'):''), last:Math.max(...res.map(r=>r.ts||0))}; }
+        stav:(obce?pill('obce: '+obce,'green'):'')+(ts?' '+pill('tech. služby: '+ts,'amber'):'')+(ob?' '+pill('ostatní: '+ob,'amber'):''), last:Math.max(...res.map(r=>r.ts||0))}; }
     if(kind==='spokojenost'){ const res=SPOK_DATA.zaznamy||[]; if(!res.length) return {n:0};
       const hot=res.filter(r=>r.hotovo).length, nps=spokNps(res), csat=spokPrumer(res,'q23');
       return {n:res.length, vysledek:(nps.n?('NPS '+(nps.score>0?'+':'')+nps.score+(csat.n?' · CSAT Ø '+csat.avg.toFixed(1).replace('.',','):'')):'zatím bez dokončených odpovědí'),
@@ -7413,8 +7413,9 @@ function exportProduktySkoleni(type){
 }
 /* ---- Hodnocení mobiliáře (WeiDu) — obrázkový průzkum, veřejný odkaz /mobiliar ---- */
 let MOBILIAR_DATA={kategorie:[],zaznamy:[]};
-let MOBILIAR_FILTR={role:'',kat:'',sort:'top'};
-const MOBILIAR_ROLE_NAZVY={obchodnik:'Obchodník ELKOPLAST',zakaznik:'Zákazník',ostatni:'Jiné',neuvedeno:'Neuvedeno'};
+let MOBILIAR_FILTR={role:'',obec:'',kat:'',sort:'top'};
+const MOBILIAR_ROLE_NAZVY={starosta:'Starosta / místostarosta',urednik:'Úředník obce/města','technicke-sluzby':'Technické služby',firma:'Firma',obchodnik:'Obchodník ELKOPLAST',zakaznik:'Zákazník',ostatni:'Jiné',neuvedeno:'Neuvedeno'};
+const MOBILIAR_OBEC_NAZVY={do1000:'do 1 000',  '1000-5000':'1–5 tis.','5000-20000':'5–20 tis.','20000-100000':'20–100 tis.',nad100000:'nad 100 tis.','netyka-se':'netýká se',neuvedeno:'—'};
 function mobiliarUrl(){ return MOBILIAR_DATA.verejnyOdkaz||(location.origin+'/mobiliar'); }   /* sběrná doména (vyzkum.elkoplast.cz), bez „intranet" v adrese */
 function mobiliarCopyLink(){
   const url=mobiliarUrl();
@@ -7424,7 +7425,7 @@ function mobiliarKodNazev(kod){ return 'WD-'+kod.toUpperCase(); }   /* ob-001 �
 /* agregace přes respondenty dle aktivního filtru role — z šestice vybírají 2 nejhezčí:
    zobrazeno = kolikrát byla fotka v dokončené šestici, vybráno = kolikrát ji někdo zvolil */
 function mobiliarAgregace(){
-  const zazn=(MOBILIAR_DATA.zaznamy||[]).filter(r=>!MOBILIAR_FILTR.role||((r.role||'neuvedeno')===MOBILIAR_FILTR.role));
+  const zazn=(MOBILIAR_DATA.zaznamy||[]).filter(r=>(!MOBILIAR_FILTR.role||((r.role||'neuvedeno')===MOBILIAR_FILTR.role))&&(!MOBILIAR_FILTR.obec||((r.obec||'neuvedeno')===MOBILIAR_FILTR.obec)));
   const prod={};
   (MOBILIAR_DATA.kategorie||[]).forEach(k=>{ for(let i=1;i<=k.pocet;i++){ const kod=k.key+'-'+String(i).padStart(3,'0'); prod[kod]={kod,kat:k,zobrazeno:0,vybrano:0}; } });
   zazn.forEach(r=>{ Object.entries(r.votes||{}).forEach(([kod,v])=>{ const p=prod[kod]; if(!p) return; p.zobrazeno++; if(v>0) p.vybrano++; }); });
@@ -7462,14 +7463,22 @@ function mobiliarRerender(){
     '<div><div class="muted" style="font-size:12px">Produktů v datech</div><strong style="font-size:20px">'+pokryto+' <span class="muted" style="font-size:13px">z '+Object.keys(prod).length+'</span></strong></div></div>';
   /* filtry */
   const rolePill=(val,txt)=>'<button class="btn sm '+(F.role===val?'':'ghost ')+'" onclick="MOBILIAR_FILTR.role=\''+val+'\';mobiliarRerender()">'+txt+'</button>';
+  const obecPill=(val,txt)=>'<button class="btn sm '+(F.obec===val?'':'ghost ')+'" onclick="MOBILIAR_FILTR.obec=\''+val+'\';mobiliarRerender()">'+txt+'</button>';
   const katPill=(val,txt)=>'<button class="btn sm '+(F.kat===val?'':'ghost ')+'" onclick="MOBILIAR_FILTR.kat=\''+val+'\';mobiliarRerender()">'+txt+'</button>';
-  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+rolePill('','Všichni')+rolePill('obchodnik','Obchodníci')+rolePill('zakaznik','Zákazníci')+rolePill('ostatni','Jiné')+rolePill('neuvedeno','Neuvedeno')+'</div>'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">'+katPill('','Vše')+(MOBILIAR_DATA.kategorie||[]).map(k=>katPill(k.key,k.nazev)).join('')+'</div>'+
-    '<select style="width:auto;padding:7px 10px" onchange="MOBILIAR_FILTR.sort=this.value;mobiliarRerender()">'+
-      '<option value="top"'+(F.sort==='top'?' selected':'')+'>Nejoblíbenější</option>'+
-      '<option value="flop"'+(F.sort==='flop'?' selected':'')+'>Nejméně oblíbené</option>'+
-      '<option value="pocet"'+(F.sort==='pocet'?' selected':'')+'>Nejvíc výběrů</option></select></div>';
+  const maZak=(MOBILIAR_DATA.zaznamy||[]).some(r=>r.role==='zakaznik');
+  h+='<div class="card pad" style="margin-bottom:14px">'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Pozice</span>'+
+        rolePill('','Všichni')+rolePill('starosta','Starostové')+rolePill('urednik','Úředníci')+rolePill('technicke-sluzby','Tech. služby')+rolePill('firma','Firmy')+rolePill('obchodnik','Obchodníci')+(maZak?rolePill('zakaznik','Zákazníci'):'')+rolePill('ostatni','Jiné')+rolePill('neuvedeno','Neuvedeno')+'</div>'+
+      '<select style="width:auto;padding:7px 10px;margin-left:auto" onchange="MOBILIAR_FILTR.sort=this.value;mobiliarRerender()">'+
+        '<option value="top"'+(F.sort==='top'?' selected':'')+'>Nejoblíbenější</option>'+
+        '<option value="flop"'+(F.sort==='flop'?' selected':'')+'>Nejméně oblíbené</option>'+
+        '<option value="pocet"'+(F.sort==='pocet'?' selected':'')+'>Nejvíc výběrů</option></select></div>'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Velikost obce</span>'+
+        obecPill('','Vše')+obecPill('do1000','do 1 000')+obecPill('1000-5000','1–5 tis.')+obecPill('5000-20000','5–20 tis.')+obecPill('20000-100000','20–100 tis.')+obecPill('nad100000','nad 100 tis.')+obecPill('netyka-se','netýká se')+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center"><span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Kategorie</span>'+
+        katPill('','Vše')+(MOBILIAR_DATA.kategorie||[]).map(k=>katPill(k.key,k.nazev)).join('')+'</div></div></div>';
   /* žebříček produktů dle podílu „vybráno, když bylo zobrazeno" */
   let items=Object.values(prod).filter(p=>!F.kat||p.kat.key===F.kat);
   const sDaty=items.filter(p=>p.zobrazeno);
@@ -7497,10 +7506,11 @@ function mobiliarRerender(){
     const radky=(MOBILIAR_DATA.zaznamy||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).map((r,i)=>{
       const vals=Object.values(r.votes||{}), vybral=vals.filter(v=>v>0).length;
       return '<tr><td><strong>Respondent '+(vsech-i)+'</strong></td><td>'+esc(MOBILIAR_ROLE_NAZVY[r.role]||r.role||'—')+'</td>'+
+        '<td>'+esc(MOBILIAR_OBEC_NAZVY[r.obec]||'—')+'</td>'+
         '<td class="num">'+Math.floor(vals.length/6)+'</td><td class="num">'+vybral+'</td><td class="muted">'+fmtD(r.ts)+'</td></tr>';
     }).join('');
     h+='<div class="card pad" style="margin-top:16px"><strong style="display:block;margin-bottom:8px">Respondenti ('+vsech+') <span class="muted" style="font-weight:400;font-size:12px">— hodnocení je anonymní</span></strong>'+
-      '<div class="matrix-wrap" style="max-height:340px"><table class="grid"><thead><tr><th></th><th>Role</th><th class="num">Šestic</th><th class="num">Vybráno</th><th>Naposledy</th></tr></thead><tbody>'+radky+'</tbody></table></div></div>';
+      '<div class="matrix-wrap" style="max-height:340px"><table class="grid"><thead><tr><th></th><th>Pozice</th><th>Velikost obce</th><th class="num">Šestic</th><th class="num">Vybráno</th><th>Naposledy</th></tr></thead><tbody>'+radky+'</tbody></table></div></div>';
   }
   box.innerHTML=h;
 }

@@ -390,7 +390,8 @@ function ukazDone(){
   var sl = DEF.sleva || {};
   $('doneSleva').innerHTML = sl.kod
     ? '<div class="sleva"><p>' + esc(sl.text || 'Váš slevový kód:') + '</p>' +
-      '<div class="sleva-kod"><code>' + esc(sl.kod) + '</code><button class="btn ghost sm" id="btnKopKod">Kopírovat</button></div></div>'
+      '<div class="sleva-kod"><code>' + esc(sl.kod) + '</code><button class="btn ghost sm" id="btnKopKod">Kopírovat</button></div>' +
+      '<a class="btn sm" style="text-decoration:none;margin-top:10px" href="https://www.shop.elkoplast.cz/" target="_blank" rel="noopener">Přejít na shop.elkoplast.cz →</a></div>'
     : '';
   if ($('btnKopKod')) $('btnKopKod').onclick = function(){
     (navigator.clipboard ? navigator.clipboard.writeText(sl.kod) : Promise.reject())
