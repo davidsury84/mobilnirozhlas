@@ -7638,7 +7638,11 @@ function spokRenderEditor(){
   let h='<div class="card pad" style="margin-bottom:14px"><strong style="display:block;margin-bottom:8px">Úvod a texty</strong>'+
     '<label class="muted" style="font-size:12px">Nadpis<input data-sp="uvod.nadpis" style="display:block;width:100%;margin:3px 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px"></label>'+
     '<label class="muted" style="font-size:12px">Úvodní text<textarea data-sp="uvod.text" style="display:block;width:100%;min-height:90px;margin:3px 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit"></textarea></label>'+
-    '<label class="muted" style="font-size:12px">Poděkování na závěr<textarea data-sp="podekovani" style="display:block;width:100%;min-height:50px;margin:3px 0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit"></textarea></label></div>';
+    '<label class="muted" style="font-size:12px">Poděkování na závěr<textarea data-sp="podekovani" style="display:block;width:100%;min-height:50px;margin:3px 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit"></textarea></label>'+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">'+
+      '<label class="muted" style="font-size:12px">Slevový kód na závěr (jednotný pro všechny; prázdný = nezobrazí se)<input data-sp="sleva.kod" maxlength="12" style="display:block;width:160px;margin-top:3px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.1em;text-transform:uppercase"></label>'+
+      '<label class="muted" style="font-size:12px;flex:1;min-width:260px">Text u slevového kódu<input data-sp="sleva.text" style="display:block;width:100%;margin-top:3px;padding:8px 10px;border:1px solid var(--line);border-radius:8px"></label></div>'+
+    '<p class="muted" style="font-size:11px;margin:6px 0 0">Pozor: kód se stejným zněním musí existovat i v e-shopu jako slevový kupón, jinak ho zákazník neuplatní.</p></div>';
   (d.sekce||[]).forEach((s,si)=>{
     h+='<div class="card pad" style="margin-bottom:14px">'+
       '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'+

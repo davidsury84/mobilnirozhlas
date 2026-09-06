@@ -1223,6 +1223,9 @@ const SPOKOJENOST_SEED = {
     text: 'Vážená paní, vážený pane,\nzáleží nám na tom, aby se Vám na shop.elkoplast.cz dobře nakupovalo. Budeme rádi, když nám věnujete zhruba 5 minut — Vaše odpovědi nám pomohou zlepšit nabídku, termíny dodání i služby.\nDotazník je anonymní. E-mail vyplňujete pouze v případě, že se chcete zapojit do testování našich novinek.\nDěkujeme! Tým ELKOPLAST CZ',
   },
   podekovani: 'Děkujeme za Váš čas! Vaše odpovědi nám pomohou zlepšit nabídku, termíny dodání i služby na shop.elkoplast.cz.',
+  // Slevový kód na závěrečné obrazovce — jednotný pro všechny respondenty; kód i text se editují
+  // v adminu (prázdný kód = nezobrazí se). Stejný kód musí existovat i v e-shopu jako slevový kupón.
+  sleva: { kod: 'VYZKUM', text: 'Jako poděkování za Váš čas jsme pro Vás připravili slevu na nákup na shop.elkoplast.cz. V objednávce zadejte kód:' },
   filtr: { otazka: 'q3', kupujici: ['a', 'b'] },
   sekce: [
     { id: 'A', nazev: 'Pár slov o vás', jen: 'vsichni', otazky: [

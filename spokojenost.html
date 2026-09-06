@@ -83,6 +83,10 @@
   .navlink:disabled{opacity:.35; cursor:default}
   .done-emoji{font-size:52px; text-align:center; margin-bottom:6px}
   .center{text-align:center}
+  .sleva{margin:20px auto 0; max-width:440px; background:var(--green-soft); border:2px dashed var(--green); border-radius:14px; padding:16px 18px}
+  .sleva p{font-size:14px; color:var(--green-d); margin-bottom:10px}
+  .sleva-kod{display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap}
+  .sleva-kod code{font-size:28px; font-weight:800; letter-spacing:.28em; padding:8px 14px 8px 20px; background:var(--paper); border:1px solid var(--green); border-radius:10px; color:var(--green-d)}
   .savenote{position:fixed; left:50%; bottom:14px; transform:translateX(-50%); z-index:60; background:var(--ink); color:#fff; font-size:12.5px; padding:7px 14px; border-radius:999px; opacity:0; transition:opacity .25s ease; pointer-events:none}
   .savenote.show{opacity:.92}
 </style>
@@ -111,6 +115,7 @@
       <div class="done-emoji">🙏</div>
       <h1 style="margin-bottom:6px">Děkujeme!</h1>
       <p class="lead" id="doneText" style="text-align:center"></p>
+      <div id="doneSleva"></div>
       <p class="hint" style="margin-top:18px">Okno teď můžete zavřít.</p>
     </div>
   </section>
@@ -379,17 +384,30 @@ function potvrd(q){
   S.cur = list[i+1].q.id;
   save(); syncSoon(); renderQ();
 }
-function dokoncit(){
-  S.hotovo = true; save(); syncNow();
+function ukazDone(){
   $('headProg').hidden = true; $('pbarFill').style.width = '100%';
   $('doneText').textContent = DEF.podekovani || 'Děkujeme za Váš čas!';
+  var sl = DEF.sleva || {};
+  $('doneSleva').innerHTML = sl.kod
+    ? '<div class="sleva"><p>' + esc(sl.text || 'Váš slevový kód:') + '</p>' +
+      '<div class="sleva-kod"><code>' + esc(sl.kod) + '</code><button class="btn ghost sm" id="btnKopKod">Kopírovat</button></div></div>'
+    : '';
+  if ($('btnKopKod')) $('btnKopKod').onclick = function(){
+    (navigator.clipboard ? navigator.clipboard.writeText(sl.kod) : Promise.reject())
+      .then(function(){ $('btnKopKod').textContent = 'Zkopírováno ✓'; })
+      .catch(function(){ prompt('Zkopírujte kód:', sl.kod); });
+  };
   show('scrDone');
+}
+function dokoncit(){
+  S.hotovo = true; save(); syncNow();
+  ukazDone();
 }
 
 /* ---------- start ---------- */
 fetch('/api/spokojenost/dotaznik', { cache:'no-store' })
   .then(function(r){ if(!r.ok) throw 0; return r.json(); })
-  .then(function(d){ DEF = d; if (S.hotovo){ show('scrDone'); $('doneText').textContent = DEF.podekovani||'Děkujeme!'; $('headProg').hidden=true; } else renderIntro(); })
+  .then(function(d){ DEF = d; if (S.hotovo) ukazDone(); else renderIntro(); })
   .catch(function(){ $('introBox').innerHTML = '<p class="lead">Dotazník se nepodařilo načíst. <button class="btn sm" onclick="location.reload()">Zkusit znovu</button></p>'; });
 </script>
 </body>
