@@ -1167,6 +1167,7 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'✓ Potvrdit za klienta (bez odeslání)':['✓ Confirm on behalf of the customer (without sending)','✓ Für den Kunden bestätigen (ohne Versand)','✓ Potwierdź za klienta (bez wysyłki)','✓ Підтвердити за замовника (без надсилання)','✓ Confirmă în numele clientului (fără trimitere)'],
 '✓ Potvrdit za klienta':['✓ Confirm on behalf of the customer','✓ Für den Kunden bestätigen','✓ Potwierdź za klienta','✓ Підтвердити за замовника','✓ Confirmă în numele clientului'],
 '✓ Potvrdit za klienta → objednávka':['✓ Confirm on behalf of the customer → order','✓ Für den Kunden bestätigen → Bestellung','✓ Potwierdź za klienta → zamówienie','✓ Підтвердити за замовника → замовлення','✓ Confirmă în numele clientului → comandă'],
 'Rozhodnutí klienta':['Customer decision','Entscheidung des Kunden','Decyzja klienta','Рішення замовника','Decizia clientului'],
@@ -2952,7 +2953,8 @@ function obchodnikBlock(z){
     '<label>Volitelný PIN (pošlete zvlášť)</label><input id="clPin_'+z.id+'" placeholder="např. 4827">'+
     '<label>Text e-mailu</label><textarea id="clText_'+z.id+'" rows="5">'+esc(defaultMail(z))+'</textarea>'+
     '<div class="actions"><button class="btn blue sm" '+(ready?'':'disabled')+' onclick="sendClient(\''+z.id+'\')">✉ Potvrdit a odeslat klientovi</button>'+
-    '<button class="btn ghost sm" '+(ready?'':'disabled')+' onclick="sendClient(\''+z.id+'\',true)" title="Vytvoří odkaz, ale e-mail neodešle — zkopírujete si ho a pošlete z vlastní pošty">🔗 Jen vytvořit odkaz (pošlu sám)</button></div>'+
+    '<button class="btn ghost sm" '+(ready?'':'disabled')+' onclick="sendClient(\''+z.id+'\',true)" title="Vytvoří odkaz, ale e-mail neodešle — zkopírujete si ho a pošlete z vlastní pošty">🔗 Jen vytvořit odkaz (pošlu sám)</button>'+
+    '<button class="btn sm" '+(ready?'':'disabled')+' onclick="potvrditRucne(\''+z.id+'\')" title="Klient už odsouhlasil mimo systém (telefonicky, e-mailem) — nic se mu neposílá, zaznamená se, kdo za něj potvrdil">✓ Potvrdit za klienta (bez odeslání)</button></div>'+
     '<div class="err" id="sendErr_'+z.id+'"></div></div>';
 }
 function defaultMail(z){return 'Dobrý den,\n\nzasíláme Vám ke schválení výkres k zakázce '+z.cislo+' ('+z.zakaznik+').\nProhlédnout a schválit jej můžete zde:\n{ODKAZ}\n\nS pozdravem'}

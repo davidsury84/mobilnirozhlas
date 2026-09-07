@@ -490,8 +490,11 @@ const SEED_WF_EDGES = [
   { action: 'odeslat-klientovi', from: 'obchodnik', to: 'klient',    roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Odeslat klientovi', needPdf: true },
   { action: 'schvalit',          from: 'klient',    to: 'zavod',     roles: ['klient'],                         kind: 'klient',  source: 'klient', label: 'Klient potvrdil nabídku → předání do objednávek' },
   { action: 'schvalit',          from: 'klient',    to: 'schvaleno', roles: ['klient'],                         kind: 'klient',  source: 'klient', label: 'Klient schválil výkres (objednávka) → výrobní dok.' },
-  { action: 'potvrdit-rucne',    from: 'klient',    to: 'zavod',     roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Obchodník potvrdil (ručně) → předání do objednávek' },
-  { action: 'potvrdit-rucne',    from: 'klient',    to: 'schvaleno', roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Obchodník potvrdil schválení (objednávka)' },
+  { action: 'potvrdit-rucne',    from: 'klient',    to: 'zavod',     roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Potvrzeno za klienta → předání do objednávek' },
+  { action: 'potvrdit-rucne',    from: 'klient',    to: 'schvaleno', roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Potvrzeno za klienta (objednávka)' },
+  // klient odsouhlasil dřív, než se mu náhled vůbec poslal (telefon, e-mail)
+  { action: 'potvrdit-rucne',    from: 'obchodnik', to: 'zavod',     roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Potvrzeno za klienta bez odeslání → objednávky', needPdf: true },
+  { action: 'potvrdit-rucne',    from: 'obchodnik', to: 'schvaleno', roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Potvrzeno za klienta bez odeslání (objednávka)', needPdf: true },
   { action: 'pripominky',        from: 'klient',    to: 'revize',    roles: ['klient'],                         kind: 'revize',  source: 'klient', label: 'Klient poslal připomínky' },
   { action: 'zamitnout',         from: 'klient',    to: 'zamitnuto', roles: ['klient'],                         kind: 'reject',  source: 'klient', label: 'Klient zamítl' },
   { action: 'rozdel-zavod',      from: 'zavod',     to: 'schvaleno', roles: ['vykonny-reditel', 'sef'],         kind: 'forward', source: 'user', label: 'Vybrat závod (z nabídky) → výrobní dok.', needPlant: true },
@@ -509,7 +512,7 @@ function buildSeedWorkflow() {
   });
   return { nodes, edges: JSON.parse(JSON.stringify(SEED_WF_EDGES)), version: 3 };
 }
-const WF_SEED_VERSION = 3;   // bump = přeseeduje d.workflow (v3: přímé objednávky — závod na začátku)
+const WF_SEED_VERSION = 4;   // bump = přeseeduje d.workflow (v4: potvrzení za klienta i od kroku „u obchodníka")
 const SEED_WORKFLOW = buildSeedWorkflow();
 
 // Popisky rolí pro schéma / plátno (kdo je „na tahu")
@@ -2066,7 +2069,9 @@ function mount(host) {
       }
       case 'potvrdit-rucne': { // obchodník potvrzuje ZA klienta (telefon, e-mail mimo systém)
         if (!isObch) { err = 'Potvrdit smí obchodník zakázky.'; break; }
-        if (z.stav !== 'klient') { err = 'Zakázka není u klienta k potvrzení.'; break; }
+        if (z.stav !== 'klient' && z.stav !== 'obchodnik') { err = 'Potvrdit za klienta lze u obchodníka nebo když je zakázka u klienta.'; break; }
+        if (z.stav === 'obchodnik' && !(CURRENT_V(z) && CURRENT_V(z).pdf)) { err = 'Chybí PDF výkresu — není co potvrzovat.'; break; }
+        lockDraft(z);   // co klient odsouhlasil, se už nemění
         // Potvrzuje se cizím jménem — bez záznamu jak a od koho by to bylo netrasovatelné.
         if (!note) { err = 'Napište, jak klient potvrdil (telefonicky, e-mailem…) — potvrzujete za něj.'; break; }
         const kdoPotvrdil = empName(me.email) || me.email;
