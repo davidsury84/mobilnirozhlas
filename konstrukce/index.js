@@ -2064,18 +2064,28 @@ function mount(host) {
         audit(z, me.email, 'Storno', note);
         break;
       }
-      case 'potvrdit-rucne': { // obchodník ručně potvrdí místo klienta (e-mail/telefon)
+      case 'potvrdit-rucne': { // obchodník potvrzuje ZA klienta (telefon, e-mail mimo systém)
         if (!isObch) { err = 'Potvrdit smí obchodník zakázky.'; break; }
         if (z.stav !== 'klient') { err = 'Zakázka není u klienta k potvrzení.'; break; }
-        z.clientDecision = { action: 'schvalit', name: 'potvrdil obchodník', at: Date.now(), by: me.email };
+        // Potvrzuje se cizím jménem — bez záznamu jak a od koho by to bylo netrasovatelné.
+        if (!note) { err = 'Napište, jak klient potvrdil (telefonicky, e-mailem…) — potvrzujete za něj.'; break; }
+        const kdoPotvrdil = empName(me.email) || me.email;
+        const curPR = CURRENT_V(z);
+        z.clientDecision = {
+          action: 'schvalit', name: 'potvrzeno za klienta — ' + kdoPotvrdil, at: Date.now(),
+          by: me.email, byName: kdoPotvrdil, zaKlienta: true, duvod: note,
+          email: z.kontaktEmail || '', version: curPR ? curPR.v : null,
+        };
         if (z.rezim === 'objednavka') {
           // přímá objednávka: klient schválil dokumentaci → výrobní dokumentace
-          audit(z, me.email, 'Klient schválil (potvrzeno obchodníkem ručně)', note);
+          audit(z, me.email, 'Potvrzeno ZA klienta — ' + kdoPotvrdil, note);
           enterState(d, z, 'schvaleno');
-          if (z.assignedTo) { notify(d, z.assignedTo, 'Výkres ' + (z.cisloObj || z.cislo) + ' schválen klientem — vypracujte výrobní dokumentaci.', z.id); mail(z.assignedTo, 'Schváleno klientem · ' + (z.cisloObj || z.cislo), 'Výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') je schválen. Vypracujte a vložte výrobní dokumentaci.'); }
+          if (z.assignedTo) { notify(d, z.assignedTo, 'Výkres ' + (z.cisloObj || z.cislo) + ' schválen klientem — vypracujte výrobní dokumentaci.', z.id); mail(z.assignedTo, 'Schváleno klientem · ' + (z.cisloObj || z.cislo), 'Výkres objednávky ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') je schválen.\nZa klienta potvrdil(a): ' + kdoPotvrdil + ' — ' + note + '\n\nVypracujte a vložte výrobní dokumentaci.'); }
         } else {
-          toObjednavka(d, z, me.email + ' (obchodník)');   // nabídka → předání do objednávek
+          audit(z, me.email, 'Potvrzeno ZA klienta — ' + kdoPotvrdil, note);
+          toObjednavka(d, z, kdoPotvrdil + ' (za klienta)');   // nabídka → předání do objednávek
         }
+        employeesWithRole('sef').forEach(em => notify(d, em, 'Zakázka ' + (z.cisloObj || z.cislo) + ' potvrzena ZA klienta (' + kdoPotvrdil + ').', z.id));
         break;
       }
       case 'rozdel-zavod': { // ředitel výroby vybere výrobní závod (začátek objednávky)

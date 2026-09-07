@@ -1167,6 +1167,11 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'✓ Potvrdit za klienta':['✓ Confirm on behalf of the customer','✓ Für den Kunden bestätigen','✓ Potwierdź za klienta','✓ Підтвердити за замовника','✓ Confirmă în numele clientului'],
+'✓ Potvrdit za klienta → objednávka':['✓ Confirm on behalf of the customer → order','✓ Für den Kunden bestätigen → Bestellung','✓ Potwierdź za klienta → zamówienie','✓ Підтвердити за замовника → замовлення','✓ Confirmă în numele clientului → comandă'],
+'Rozhodnutí klienta':['Customer decision','Entscheidung des Kunden','Decyzja klienta','Рішення замовника','Decizia clientului'],
+'✓ Schváleno':['✓ Approved','✓ Freigegeben','✓ Zatwierdzone','✓ Затверджено','✓ Aprobat'],
+'✕ Zamítnuto':['✕ Rejected','✕ Abgelehnt','✕ Odrzucone','✕ Відхилено','✕ Respins'],
 'Materiál (jakost)':['Material (grade)','Werkstoff (Güte)','Materiał (gatunek)','Матеріал (марка)','Material (calitate)'],
 'vyberte z nabídky, nebo napište vlastní':['pick from the list, or type your own','aus der Liste wählen oder selbst eingeben','wybierz z listy lub wpisz własny','оберіть зі списку або впишіть свій','alegeți din listă sau scrieți altul'],
 'bokorys':['side view','Seitenansicht','widok z boku','вигляд збоку','vedere laterală'],
@@ -2580,7 +2585,7 @@ function renderDrawer(z){
       '</div>'+
       actionsFor(z)+
       pdfPanel(z)+
-      prilohyBlock(z)+vyrobniDokView(z)+dotaznikView(z)+zmenyView(z)+'<div id="drwArch"></div>'+params+vers+
+      prilohyBlock(z)+rozhodnutiView(z)+vyrobniDokView(z)+dotaznikView(z)+zmenyView(z)+'<div id="drwArch"></div>'+params+vers+
       linkBox(z)+
       comments+audit+
       delBox(z)+
@@ -2824,7 +2829,7 @@ function actionsFor(z){
 
   if(z.stav==='klient'&&canObch){var jeObj=(z.rezim==='objednavka');blocks.push(
     '<div class="card" style="background:#eef7f0"><b>'+(jeObj?'U klienta — schválení výkresu':'U klienta — potvrzení nabídky')+'</b><p class="muted" style="margin:6px 0">Odkaz odeslán klientovi'+(z.link?(', platí do '+fdate(z.link.expiresAt)+', '+z.link.accesses+'× otevřen'):'')+'. '+(jeObj?'Klient schválí výkres přes odkaz, nebo schválení potvrdíte ručně (např. po e-mailu/telefonu) — pak konstrukce vypracuje výrobní dokumentaci.':'Klient potvrdí nabídku přes odkaz, nebo ji potvrdíte ručně (např. po e-mailu/telefonu).')+'</p>'+
-    '<div class="actions"><button class="btn sm" onclick="potvrditRucne(\''+z.id+'\')">'+(jeObj?'✓ Potvrdit schválení ručně':'✓ Potvrdit ručně → objednávka')+'</button>'+
+    '<div class="actions"><button class="btn sm" onclick="potvrditRucne(\''+z.id+'\')" title="Když klient potvrdil mimo systém (telefonicky, e-mailem) — zaznamená se, kdo za něj potvrdil">'+(jeObj?'✓ Potvrdit za klienta':'✓ Potvrdit za klienta → objednávka')+'</button>'+
     '<button class="btn ghost sm" onclick="copyLink(\''+(z.link?z.link.url:'')+'\')">Kopírovat odkaz</button>'+
     '<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button></div></div>')}
 
@@ -2869,11 +2874,14 @@ function rozdelZavod(id){
 }
 function potvrditRucne(id){
   var z=D.zakazky.find(function(x){return x.id===id})||{};
-  var q=(z.rezim==='objednavka')
-    ? 'Potvrdit schválení výkresu klientem ručně? Zakázka přejde na výrobní dokumentaci.'
-    : 'Potvrdit nabídku ručně? Vytvoří se objednávka a předá se do aplikace „Zadání do výroby".';
-  if(!confirm(q))return;
-  api('/stav','POST',{id:id,action:'potvrdit-rucne'}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}reloadData()});
+  var co=(z.rezim==='objednavka')?'schválení výkresu':'potvrzení nabídky';
+  var note=prompt('Potvrzujete '+co+' ZA klienta — zapíše se, že jste to byl(a) vy.\n\nJak klient potvrdil? (např. „telefonicky 6.9. s p. Novákem", „e-mailem 6.9.")');
+  if(note===null)return;
+  if(!note.trim()){alert('Napište prosím, jak klient potvrdil.');return}
+  api('/stav','POST',{id:id,action:'potvrdit-rucne',note:note.trim()}).then(function(o){
+    if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}
+    reloadData();toastUlozeno('✓ Potvrzeno za klienta — zaznamenáno');
+  });
 }
 // Poslední krok — konstrukce vloží výrobní dokumentaci → do výroby v přiřazeném závodě
 function vyrobniDokBlock(z){
@@ -3741,6 +3749,23 @@ function saveZadani(id){
     EDIT_ID=null;closeModal();reloadData();
     toastUlozeno('✓ Změna zadání uložena ('+o.j.zmeny+'×) — lidem u zakázky odešlo upozornění');
   });
+}
+/* Rozhodnutí klienta — ať je na první pohled vidět, jestli klikl klient sám,
+   nebo to za něj potvrdil někdo od nás (a kdo). */
+function rozhodnutiView(z){
+  var r=z.clientDecision; if(!r)return '';
+  var ok=(r.action==='schvalit');
+  var h='<div class="sec">Rozhodnutí klienta</div><div class="card" style="background:'+(ok?'#e6f6ec':'#fdecec')+'">'+
+    '<b>'+(ok?'✓ Schváleno':'✕ Zamítnuto')+'</b> <span class="muted">· '+fdt(r.at)+(r.version?(' · verze v'+r.version):'')+'</span>';
+  if(r.zaKlienta){
+    h+='<div style="margin-top:6px"><b>Potvrdil za klienta: '+esc(r.byName||r.by||'')+'</b></div>'+
+       '<div class="muted" style="margin-top:2px">Jak klient potvrdil: '+esc(r.duvod||'—')+'</div>';
+  }else{
+    h+='<div style="margin-top:6px">'+esc(r.name||'')+(r.email?(' <span class="muted">· odkaz poslán na '+esc(r.email)+'</span>'):'')+'</div>'+
+       (r.ip?('<div class="muted" style="font-size:12px;margin-top:2px">rozhodnuto na klientském odkazu · IP '+esc(r.ip)+'</div>'):'');
+  }
+  if(!ok&&r.duvod)h+='<div style="margin-top:6px">Důvod: '+esc(r.duvod)+'</div>';
+  return h+'</div>';
 }
 /* historie úprav zadání v detailu zakázky */
 function zmenyView(z){
