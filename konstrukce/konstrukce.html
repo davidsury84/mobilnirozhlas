@@ -1167,6 +1167,7 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'Jazyk e-mailu a stránky pro klienta':['Language of the e-mail and the customer page','Sprache der E-Mail und der Kundenseite','Język e-maila i strony dla klienta','Мова листа та сторінки для замовника','Limba e-mailului și a paginii pentru client'],
 '✓ Potvrdit za klienta (bez odeslání)':['✓ Confirm on behalf of the customer (without sending)','✓ Für den Kunden bestätigen (ohne Versand)','✓ Potwierdź za klienta (bez wysyłki)','✓ Підтвердити за замовника (без надсилання)','✓ Confirmă în numele clientului (fără trimitere)'],
 '✓ Potvrdit za klienta':['✓ Confirm on behalf of the customer','✓ Für den Kunden bestätigen','✓ Potwierdź za klienta','✓ Підтвердити за замовника','✓ Confirmă în numele clientului'],
 '✓ Potvrdit za klienta → objednávka':['✓ Confirm on behalf of the customer → order','✓ Für den Kunden bestätigen → Bestellung','✓ Potwierdź za klienta → zamówienie','✓ Підтвердити за замовника → замовлення','✓ Confirmă în numele clientului → comandă'],
@@ -2951,18 +2952,50 @@ function obchodnikBlock(z){
     (z.kontaktEmail?'':('<div class="err">Doplňte e-mail kontaktní osoby (přes tlačítko níže nelze odeslat).</div>'))+
     '<label>Komu</label><input value="'+esc(z.kontaktEmail||'')+'" id="clMail_'+z.id+'" placeholder="email@klient.cz">'+
     '<label>Volitelný PIN (pošlete zvlášť)</label><input id="clPin_'+z.id+'" placeholder="např. 4827">'+
-    '<label>Text e-mailu</label><textarea id="clText_'+z.id+'" rows="5">'+esc(defaultMail(z))+'</textarea>'+
+    '<label>Jazyk e-mailu a stránky pro klienta</label>'+
+    '<select id="clLang_'+z.id+'" onchange="mailLangZmena(\''+z.id+'\')">'+
+      ['cs|Čeština','en|English','de|Deutsch','pl|Polski','ua|Українська','ro|Română'].map(function(o){var q=o.split('|');
+        return '<option value="'+q[0]+'">'+q[1]+'</option>'}).join('')+'</select>'+
+    '<label>Text e-mailu</label><textarea id="clText_'+z.id+'" rows="5">'+esc(defaultMail(z,'cs'))+'</textarea>'+
     '<div class="actions"><button class="btn blue sm" '+(ready?'':'disabled')+' onclick="sendClient(\''+z.id+'\')">✉ Potvrdit a odeslat klientovi</button>'+
     '<button class="btn ghost sm" '+(ready?'':'disabled')+' onclick="sendClient(\''+z.id+'\',true)" title="Vytvoří odkaz, ale e-mail neodešle — zkopírujete si ho a pošlete z vlastní pošty">🔗 Jen vytvořit odkaz (pošlu sám)</button>'+
     '<button class="btn sm" '+(ready?'':'disabled')+' onclick="potvrditRucne(\''+z.id+'\')" title="Klient už odsouhlasil mimo systém (telefonicky, e-mailem) — nic se mu neposílá, zaznamená se, kdo za něj potvrdil">✓ Potvrdit za klienta (bez odeslání)</button></div>'+
     '<div class="err" id="sendErr_'+z.id+'"></div></div>';
 }
-function defaultMail(z){return 'Dobrý den,\n\nzasíláme Vám ke schválení výkres k zakázce '+z.cislo+' ('+z.zakaznik+').\nProhlédnout a schválit jej můžete zde:\n{ODKAZ}\n\nS pozdravem'}
+/* Text e-mailu klientovi — klient nemusí umět česky, jazyk se vybírá u odeslání
+   a stejný jazyk pak dostane i stránka náhledu. */
+var MAIL_L10N={
+ cs:{p:'Předmět: Výkres ke schválení',t:'Dobrý den,\n\nzasíláme Vám ke schválení výkres k zakázce {C} ({Z}).\nProhlédnout a schválit jej můžete zde:\n{ODKAZ}\n\nS pozdravem'},
+ en:{p:'Drawing for approval',t:'Dear Sir or Madam,\n\nplease find the drawing for order {C} ({Z}) for your approval.\nYou can review and approve it here:\n{ODKAZ}\n\nKind regards'},
+ de:{p:'Zeichnung zur Freigabe',t:'Sehr geehrte Damen und Herren,\n\nanbei senden wir Ihnen die Zeichnung zum Auftrag {C} ({Z}) zur Freigabe.\nSie können sie hier ansehen und freigeben:\n{ODKAZ}\n\nMit freundlichen Grüßen'},
+ pl:{p:'Rysunek do zatwierdzenia',t:'Dzień dobry,\n\nprzesyłamy do zatwierdzenia rysunek do zlecenia {C} ({Z}).\nMożna go obejrzeć i zatwierdzić tutaj:\n{ODKAZ}\n\nZ poważaniem'},
+ ua:{p:'Креслення на затвердження',t:'Доброго дня,\n\nнадсилаємо вам на затвердження креслення до замовлення {C} ({Z}).\nПереглянути та затвердити його можна тут:\n{ODKAZ}\n\nЗ повагою'},
+ ro:{p:'Desen spre aprobare',t:'Bună ziua,\n\nvă trimitem spre aprobare desenul pentru comanda {C} ({Z}).\nÎl puteți vedea și aproba aici:\n{ODKAZ}\n\nCu stimă'},
+};
+function mailLang(id){return (document.getElementById('clLang_'+id)||{}).value||'cs'}
+function defaultMail(z,lang){
+  var m=MAIL_L10N[lang||'cs']||MAIL_L10N.cs;
+  return m.t.replace('{C}',z.cislo).replace('{Z}',z.zakaznik);
+}
+function mailPredmet(z,lang){
+  var m=MAIL_L10N[lang||'cs']||MAIL_L10N.cs;
+  return (lang==='cs'||!lang?'Výkres ke schválení':m.p)+' · '+z.cislo;
+}
+/* přepnutí jazyka přepíše text, pokud ho obchodník sám neupravil */
+function mailLangZmena(id){
+  var z=(D.zakazky||[]).find(function(x){return x.id===id}); if(!z)return;
+  var ta=document.getElementById('clText_'+id); if(!ta)return;
+  var puvodni=Object.keys(MAIL_L10N).map(function(l){return defaultMail(z,l)});
+  if(ta.value.trim()&&puvodni.indexOf(ta.value)<0){
+    if(!confirm(tr('Text e-mailu máte upravený. Přepsat ho vzorem ve zvoleném jazyce?')))return;
+  }
+  ta.value=defaultMail(z,mailLang(id));
+}
 function linkBox(z){
   if(!z.link)return'';
   var full=location.origin+z.link.url;
   return '<div class="sec">Klientský odkaz</div><div class="card">'+
-    '<div class="row" style="justify-content:space-between"><span class="muted">'+(z.link.active?'Aktivní':'Neaktivní')+' · platí do '+fdate(z.link.expiresAt)+' · '+z.link.accesses+'× otevřen'+(z.link.hasPin?' · PIN':'')+'</span>'+
+    '<div class="row" style="justify-content:space-between"><span class="muted">'+(z.link.active?'Aktivní':'Neaktivní')+' · platí do '+fdate(z.link.expiresAt)+' · '+z.link.accesses+'× otevřen'+(z.link.hasPin?' · PIN':'')+((z.link.lang&&z.link.lang!=='cs')?(' · '+z.link.lang.toUpperCase()):'')+'</span>'+
     '<button class="btn ghost sm" onclick="copyTxtToast(\''+esc(full)+'\',\'✓ Odkaz zkopírován\')">⧉ Kopírovat odkaz</button></div>'+
     '<input readonly value="'+esc(full)+'" onclick="this.select()" style="margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px">'+
     '<div class="actions" style="margin-top:8px"><button class="btn ghost sm" onclick="copyMailKlient(\''+z.id+'\')">⧉ Kopírovat celý text e-mailu</button></div>'+
@@ -3005,7 +3038,10 @@ function sendClient(id,bezEmailu){
   var pin=(document.getElementById('clPin_'+id)||{}).value||'';
   var text=(document.getElementById('clText_'+id)||{}).value||'';
   var errEl=document.getElementById('sendErr_'+id);errEl.textContent='';
-  api('/stav','POST',{id:id,action:'odeslat-klientovi',text:text,pin:pin,bezEmailu:!!bezEmailu}).then(function(o){
+  var lang=mailLang(id);
+  var z0=(D.zakazky||[]).find(function(x){return x.id===id})||{};
+  api('/stav','POST',{id:id,action:'odeslat-klientovi',text:text,pin:pin,lang:lang,
+    subject:mailPredmet(z0,lang),bezEmailu:!!bezEmailu}).then(function(o){
     if(!o.ok){errEl.textContent=o.j.chyba||'Nepodařilo se odeslat.';return}
     if(!bezEmailu){reloadData();toastUlozeno('✓ Náhled odeslán klientovi');return}
     // odkaz se jen vytvořil — rovnou do schránky, ať ho obchodník vloží do vlastní pošty
@@ -3016,7 +3052,7 @@ function sendClient(id,bezEmailu){
 /* hotový text e-mailu i s odkazem — když si obchodník posílá poštu sám */
 function copyMailKlient(id){
   var z=(D.zakazky||[]).find(function(x){return x.id===id}); if(!z||!z.link)return;
-  var t=defaultMail(z).replace('{ODKAZ}',location.origin+z.link.url);
+  var t=defaultMail(z,(z.link.lang||'cs')).replace('{ODKAZ}',location.origin+z.link.url);
   copyTxtToast(t,'✓ Text e-mailu zkopírován');
 }
 /* kopírování s potvrzením (bez otravného prompt okna) */
