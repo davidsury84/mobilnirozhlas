@@ -839,7 +839,21 @@ function mount(host) {
       '<div style="font-size:20px;font-weight:700;color:#243">' + kc(o.kc) + '</div>' +
       '<div style="font-size:12px;color:#8a938a">' + fmt(o.ks) + ' ks' + (d && P ? ' · <span style="color:' + delColor(d.kc) + '">' + signed(d.kc) + '</span>' : '') + '</div></div></td>';
     const dd = dayDeltas(L, P);
-    let body = explainBox([
+    // Výpadek denního exportu — když ve složce chybí soubor, pohyby za ty dny se slijí
+    // do jednoho záznamu. Ať se to pozná hned ráno, ne až v grafu.
+    let chybiHtml = '';
+    try {
+      const ch = chybejiciDny().filter(d => (Date.now() - Date.parse(d)) < 30 * 86400000);
+      if (ch.length) {
+        const dd = ch.map(d => { const t = new Date(d + 'T00:00:00Z');
+          return ['ne', 'po', 'út', 'st', 'čt', 'pá', 'so'][t.getUTCDay()] + ' ' + t.getUTCDate() + '. ' + (t.getUTCMonth() + 1) + '.'; });
+        chybiHtml = '<div style="background:#fdf3dd;border:1px solid #ecd9a8;border-radius:10px;padding:11px 14px;margin:0 0 14px;font-size:13.5px">' +
+          '⚠️ <b>Chybí denní soubor za ' + fmt(ch.length) + ' ' + (ch.length === 1 ? 'den' : (ch.length < 5 ? 'dny' : 'dnů')) + '</b> — ' + esc(dd.join(' · ')) + ' ' +
+          '— pohyby za ně nejsou ztracené, v grafu se dopočítávají podle obvyklého profilu týdne (světlejší sloupce, značka ≈). ' +
+          'Když se soubory doplní do složky na Disku, přepočítá se to samo.</div>';
+      }
+    } catch (_) {}
+    let body = chybiHtml + explainBox([
       ['Co to je', 'Ranní <b>bilance skladu e-shopu</b> — kolik v něm dnes leží peněz a jak se to za den pohnulo. Vše v <b>nákladových (landed) cenách</b>.'],
       ['Stav (4 karty)', '<b>Sklad</b> = fyzická zásoba. <b>K dispozici</b> = sklad − rezervace zákazníků. <b>Objednáno u dodavatelů</b> = co je na cestě (ještě nedorazilo). <b>Rezervováno zákazníky</b> = co si už zákazníci objednali. „±" u karty = změna hodnoty proti včerejšku.'],
       ['Pohyby', '<b>Výdej ze skladu</b> ≈ prodej (co odešlo zákazníkům). <b>Příjem</b> = dodávky, které fyzicky dorazily (z dřívějších objednávek — <u>ne</u> nový nákup). <b>Nové rezervace</b> = nové objednávky zákazníků. <b>Nově objednáno</b> = nové objednávky u dodavatelů.'],
@@ -894,6 +908,59 @@ function mount(host) {
   }
 
   // ---------- plánovač (týdně, pojistka 1×/ISO-týden) ----------
+  // Když ve složce chybí denní soubor (výpadek exportu), pokryje jeden záznam víc dnů
+  // (flowDays > 1) a celý objem se připíše prvnímu dni — týden pak vykáže méně dnů a
+  // graf ukáže jeden nereálný skok. Rozpad rozdělí blok na jednotlivé dny podle toho,
+  // jak se v daný den v týdnu obvykle expeduje (profil z jednodenních záznamů).
+  // Dopočtené dny nesou příznak odhad:true, ať je v UI poznat, že nejsou měřené.
+  function profilDnu(days) {
+    const sum = new Array(7).fill(0), n = new Array(7).fill(0);
+    days.forEach(d => { if ((d.dny || 1) !== 1) return;
+      const t = new Date(d.date + 'T00:00:00Z'); if (isNaN(t)) return;
+      const w = t.getUTCDay(); sum[w] += d.dispKc; n[w]++; });
+    const avg = sum.map((v, i) => n[i] ? v / n[i] : null);
+    const zn = avg.filter(v => v != null && v > 0);
+    if (zn.length < 3) return null;                      // málo dat → rovnoměrný rozpad
+    const fallback = zn.reduce((a, b) => a + b, 0) / zn.length;
+    return avg.map(v => (v == null ? fallback : v));
+  }
+  function rozpadBloky(days) {
+    if (!days.some(d => (d.dny || 1) > 1)) return days;
+    const prof = profilDnu(days), out = [];
+    days.forEach(d => {
+      const n = Math.max(1, Math.round(d.dny || 1));
+      if (n === 1) { out.push(d); return; }
+      // dny bloku: flowDate a n-1 následujících
+      const dt = [];
+      for (let i = 0; i < n; i++) {
+        const t = new Date(d.date + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + i);
+        dt.push({ iso: t.toISOString().slice(0, 10), dow: t.getUTCDay() });
+      }
+      const vahy = dt.map(x => (prof ? Math.max(0, prof[x.dow]) : 1));
+      const cel = vahy.reduce((a, b) => a + b, 0) || n;
+      dt.forEach((x, i) => {
+        const k = (prof ? vahy[i] : 1) / cel;
+        out.push(Object.assign({}, d, { date: x.iso, dny: 1, odhad: true, blokDnu: n, blokOd: d.date,
+          dispKc: d.dispKc * k, dispKs: d.dispKs * k, recvKc: d.recvKc * k,
+          resKc: d.resKc * k, ordKc: d.ordKc * k,
+          polozek: i === 0 ? d.polozek : 0 }));
+      });
+    });
+    return out.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  }
+  // Chybějící denní soubory — z mezer v bilanci (flowDays > 1). Vrací pole ISO dat.
+  function chybejiciDny() {
+    const out = [];
+    loadBilance().forEach(e => {
+      const n = Math.round(e.flowDays || 1);
+      if (!e.hasFlow || !e.flowDate || n <= 1) return;
+      for (let i = 1; i < n; i++) {
+        const t = new Date(e.flowDate + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + i);
+        out.push(t.toISOString().slice(0, 10));
+      }
+    });
+    return out;
+  }
   function isoWeek(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - day + 3); const f = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)); const wk = 1 + Math.round(((t - f) / 86400000 - 3 + ((f.getUTCDay() + 6) % 7)) / 7); return t.getUTCFullYear() + '-W' + String(wk).padStart(2, '0'); }
   // Pojistka: bilance se nesmí odeslat prázdná. Když historie chybí (nový volume, výpadek zápisu),
   // dopočítá se z denních souborů na Disku ještě před odesláním e-mailu.
@@ -1075,9 +1142,11 @@ function mount(host) {
         (mv[k].hist || []).forEach(h => { if (!(h.v > 0)) return;
         itemsPerDay[h.d] = (itemsPerDay[h.d] || 0) + 1;
         const t = agg[k] || (agg[k] = { ks: 0, dny: 0 }); t.ks += h.v; t.dny++; }); });
-      const days = bal.map(e => ({ date: e.flowDate, souborDate: e.date, dny: e.flowDays || 1, dispKc: e.flow.dispatched.kc, dispKs: e.flow.dispatched.ks,
+      let days = bal.map(e => ({ date: e.flowDate, souborDate: e.date, dny: e.flowDays || 1, dispKc: e.flow.dispatched.kc, dispKs: e.flow.dispatched.ks,
         recvKc: e.flow.received.kc, resKc: e.flow.newReserved.kc, ordKc: e.flow.newOnOrder.kc,
         stockKc: e.stock.kc, polozek: itemsPerDay[e.date] || 0 }));
+      const chybi = chybejiciDny();
+      days = rozpadBloky(days);   // vícedenní bloky rozpustit na jednotlivé dny
       // Mimořádné dny: jednorázové zaúčtování / inventurní úprava, ne prodej. Poznáme je podle
       // násobku mediánu dnů s pohybem (stejný princip jako u jednorázových extrémů v prodejích).
       const nz = days.filter(d => d.dispKc > 0).map(d => d.dispKc).sort((a, b) => a - b);
@@ -1097,7 +1166,7 @@ function mount(host) {
         return { kod: k, nazev: m.n || k, dodavatel: m.sup || '', ks: agg[k].ks, dny: agg[k].dny, kc: Math.round(agg[k].ks * (m.uc || 0)) }; })
         .sort((a, b) => b.ks - a.ks).slice(0, 30);
       const itemHist = {}; top.forEach(t => { itemHist[t.kod] = (mv[t.kod] || {}).hist || []; });
-      return json(res, 200, { ok: true, days, weeks, top, itemHist, dataDate: o.date || '', dniCelkem: days.length, limitMimoradne: isFinite(limit) ? Math.round(limit) : null }), true;
+      return json(res, 200, { ok: true, days, weeks, top, itemHist, dataDate: o.date || '', dniCelkem: days.length, chybejiciDny: chybi, limitMimoradne: isFinite(limit) ? Math.round(limit) : null }), true;
     }
     // Historie snímků SMI (mrtvé zásoby v čase) — sdílená, přístup jako e-shop
     if (p === '/api/nakup-report/historie' && req.method === 'GET') {
