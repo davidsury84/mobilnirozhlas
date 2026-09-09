@@ -1673,7 +1673,7 @@ const MJ_L10N = {
   'z plánu': ['from plan','aus dem Plan','z planu','з плану','din plan'],
   'Byl(a) jste pozván(a) ke školení': ['You have been invited to training','Sie wurden zu einer Schulung eingeladen','Zostałeś zaproszony na szkolenie','Вас запросили на навчання','Ați fost invitat la instruire'],
   'Máte nesplněné školení po termínu': ['Overdue training','Überfällige Schulung','Zaległe szkolenie','Прострочене навчання','Instruire restantă'],
-  'Školení je potřeba absolvovat do jednoho týdne od pozvánky.': ['The training must be completed within one week of the invitation.','Die Schulung ist innerhalb einer Woche nach der Einladung zu absolvieren.','Szkolenie należy ukończyć w ciągu tygodnia od zaproszenia.','Навчання потрібно пройти протягом тижня від запрошення.','Instruirea trebuie finalizată în termen de o săptămână de la invitație.'],
+  'Školení je potřeba absolvovat do 14 dnů od pozvánky.': ['The training must be completed within 14 days of the invitation.','Die Schulung ist innerhalb von 14 Tagen nach der Einladung zu absolvieren.','Szkolenie należy ukończyć w ciągu 14 dni od zaproszenia.','Навчання потрібно пройти протягом 14 днів від запрошення.','Instruirea trebuie finalizată în termen de 14 zile de la invitație.'],
   'po termínu': ['overdue','überfällig','po terminie','прострочено','restant'],
   'do': ['by','bis','do','до','până la'],
   'povinné do': ['required by','Pflicht bis','wymagane do','обов’язково до','obligatoriu până la'],
@@ -3245,7 +3245,7 @@ async function showSkoleni(){
      '<button class="btn sm" onclick="openTridiciSkoleni()">'+tb.label+'</button></div></div>';
   body.innerHTML=h; window.scrollTo(0,0);
 }
-/* Pozvánky ke školení: povinnost absolvovat do týdne (zobrazí se, dokud není splněno) */
+/* Pozvánky ke školení: povinnost absolvovat do 14 dnů (zobrazí se, dokud není splněno) */
 function skolPozvanky(){ return (MUJ.data&&MUJ.data.skolPozvanky)||[]; }
 function skolPozvankaPro(kurz){ return skolPozvanky().find(x=>x.kurz===kurz)||null; }
 function skolDatum(ts){ try{ return new Date(ts).toLocaleDateString(({cz:'cs-CZ',en:'en-GB',de:'de-DE',pl:'pl-PL',ua:'uk-UA',ro:'ro-RO'})[MJ_LANG]||'cs-CZ'); }catch(e){ return ''; } }
@@ -3256,7 +3256,7 @@ function skolPozvankyHtml(){
   const pozadi=poLhute?'#fdecea':'#fff8e6';
   let h='<div class="card pad" style="margin:0 0 16px;border-left:4px solid '+barva+';background:'+pozadi+'">'+
     '<strong style="color:'+barva+'">'+(poLhute?mjT('Máte nesplněné školení po termínu'):mjT('Byl(a) jste pozván(a) ke školení'))+'</strong>'+
-    '<p class="muted" style="margin:6px 0 10px;font-size:13.5px">'+mjT('Školení je potřeba absolvovat do jednoho týdne od pozvánky.')+'</p>';
+    '<p class="muted" style="margin:6px 0 10px;font-size:13.5px">'+mjT('Školení je potřeba absolvovat do 14 dnů od pozvánky.')+'</p>';
   p.forEach(x=>{
     const zbyva = x.poLhute
       ? '<span class="pill red">'+mjT('po termínu')+' ('+skolDatum(x.termin)+')</span>'

@@ -739,10 +739,10 @@ function authZadost(email, name) {
   } catch (_) {}
   return z;
 }
-/* ---------- Pozvánky ke školení: povinnost splnit do týdne ----------
+/* ---------- Pozvánky ke školení: povinnost splnit do 14 dnů ----------
    Správce pozve → uloží se termín (7 dní). Zaměstnanec vidí v sekci Školení
    upozornění s datem; po splnění testu pozvánka mizí. */
-const SKOL_LHUTA_DNI = 7;
+const SKOL_LHUTA_DNI = 14;   // lhůta na absolvování školení od pozvánky (2026-09-09: ze 7 na 14 dní)
 const SKOLENI_NAZVY = {
   prumysl: 'Průmysl — obchodník segmentu Skladování',
   loxxer: 'LOXXER — protipožární skříně na Li-Ion baterie',
