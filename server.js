@@ -200,8 +200,9 @@ const MOBILIAR_FILE = path.join(ROOT, 'mobiliar.html');      // veřejné obráz
 const MOBILIAR_F = path.join(DATA_DIR, 'mobiliar-hlasovani.json'); // hlasy hodnocení mobiliáře — upsert dle rid (anonymní id prohlížeče)
 // Veřejná sběrná doména pro ZÁKAZNICKÉ průzkumy (alias na tuto app, bez „intranet" v adrese).
 // Průzkumy pro uchazeče a zaměstnance sem nepatří — zůstávají na intranetu (pozvánky ?i=, SSO).
-// Víc hostů odděl čárkou; první = adresa zobrazovaná v adminu.
-const SURVEY_HOSTS = (process.env.SURVEY_HOSTS || 'vyzkum.elkoplast.cz,survey.elkoplast.cz').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+// Víc hostů odděl čárkou; první = adresa zobrazovaná v adminu. Doména s diakritikou (výzkumy) chodí
+// v Host hlavičce jako punycode (xn--vzkumy-bza.elkoplast.cz), proto je v seznamu v této podobě.
+const SURVEY_HOSTS = (process.env.SURVEY_HOSTS || 'vyzkum.elkoplast.cz,vyzkumy.elkoplast.cz,xn--vzkumy-bza.elkoplast.cz,survey.elkoplast.cz').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
 const SURVEY_PUBLIC_URL = process.env.SURVEY_PUBLIC_URL || ('https://' + SURVEY_HOSTS[0]);
 // Registr průzkumů na sběrné doméně: neuhodnutelná cesta (slug) → HTML soubor průzkumu.
 // Odkaz funguje jen s přesným slugem; kořen domény ukazuje neutrální rozcestník bez odkazů na průzkumy.
