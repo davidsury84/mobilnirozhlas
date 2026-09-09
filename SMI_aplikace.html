@@ -666,7 +666,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           </div>
         </div>
       </details>
-      <div class="note" style="background:#f4f0f8;border-color:#ddd2ea">🛒 <b>Kdo to prodává:</b> sloupce <b>z toho e-shop</b> a <b>z toho obchod</b> rozdělují roční prodej na kanály. E-shop = vydané faktury e-shopových řad z ERP; obchod/sklad = zbytek (prodej v rámci zakázek, obchodníci, odběr ze skladu). U <b>dropshipu</b> může e-shop prodat víc, než projde skladem — takový řádek je označen <b style="color:#7a5200">⚠ mimo sklad</b>.</div>
+      <div class="note" style="background:#f4f0f8;border-color:#ddd2ea">🛒 <b>Kdo to prodává:</b> sloupce <b>z toho e-shop</b> a <b>z toho obchod</b> rozdělují roční prodej na kanály. E-shop = vydané faktury e-shopových řad z ERP; obchod/sklad = zbytek (prodej v rámci zakázek, obchodníci, odběr ze skladu). U <b>dropshipu</b> může e-shop prodat víc, než projde skladem — takový řádek je označen <b style="color:#7a5200">⚠ mimo sklad</b>.
+        <div style="margin-top:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span id="esUpMeta" class="muted" style="font-size:12px"></span>
+          <button class="btn" id="esUpBtn" style="padding:3px 10px;font-size:12px" title="Export „Prodeje eshop" z ERP (.xlsx) — data se uloží na server, uvidí je všichni">⬆️ Načíst nový export prodejů</button>
+          <input type="file" id="esUpFile" accept=".xlsx" style="display:none">
+          <span id="esUpStav" class="muted" style="font-size:12px"></span>
+        </div></div>
       <div class="kpis" id="objKpis"></div>
       <div id="objUtichle"></div>
       <div style="background:#eef4fb;border:1px solid #d3e0f2;border-radius:12px;padding:12px 14px;margin:0 0 12px">
@@ -975,12 +981,29 @@ function eshopRec(it){
 // přes sklad, ve výdejích tedy chybí; obchod se pak ořezává na 0 a rozdíl se hlásí zvlášť.
 let ES_PRODEJE=null, ES_PRODEJE_META='';
 function esOkno(){
-  const info=(DATA_PERIOD&&DATA_PERIOD.info)||(typeof EMBEDDED_PERIOD_INFO!=='undefined'?EMBEDDED_PERIOD_INFO:'');
+  // 1) přesné okno z popisu období („… 2025-07 až 2026-06") — vložený report ho má napsaný
+  const info=(DATA_PERIOD&&DATA_PERIOD.info)||'';
   const m=String(info).match(/(\d{4})-(\d{2})\D{1,8}(\d{4})-(\d{2})/);
-  if(!m)return null;
-  const out=[]; let y=+m[1], mo=+m[2];
-  for(let i=0;i<12;i++){ out.push(y+'-'+String(mo).padStart(2,'0')); mo++; if(mo>12){mo=1;y++;} }
-  return {mesice:out, od:m[1]+'-'+m[2], do:m[3]+'-'+m[4]};
+  let ky=null,km=null;
+  if(m){ ky=+m[3]; km=+m[4]; }
+  else {
+    // 2) ručně nahraný / živý soubor popis nemá — poslední měsíc okna dá hlavička listu
+    //    (COL.anchorMonthIdx = kalendářní index nejnovějšího „N.M Mn-výdeje"), rok z názvu listu.
+    const am=(typeof COL!=='undefined'&&COL.anchorMonthIdx!=null)?COL.anchorMonthIdx:null;
+    if(am==null)return null;
+    km=am+1;
+    const lab=(DATA_PERIOD&&DATA_PERIOD.label)||'';
+    const q=lab.match(/(\d)\s*Q\s*(\d{4})/i), r=lab.match(/(20\d\d)/);
+    if(q&&+q[1]*3===km) ky=+q[2];
+    else if(r) ky=+r[1];
+    else { // poslední výskyt toho měsíce v minulosti
+      const now=new Date(); ky=now.getFullYear(); if(km>now.getMonth()+1)ky--;
+    }
+  }
+  if(!ky||!km)return null;
+  const out=[]; let y=ky, mo=km;                     // od konce dozadu, pak otočit
+  for(let i=0;i<12;i++){ out.unshift(y+'-'+String(mo).padStart(2,'0')); mo--; if(mo<1){mo=12;y--;} }
+  return {mesice:out, od:out[0], do:out[11]};
 }
 // Vrací {q:[12 dle kalendářního měsíce], ks, kc} za stejné okno, jaké má „obrat plasty".
 function esKanal(key){
@@ -998,12 +1021,75 @@ function esSplit(key,D){
   const ob=Math.max(0, cel-es), mimo=Math.max(0, es-cel);
   return {es, ob, mimo, kc:e?e.kc:0, q:e?e.q:null, ma:!!e, podil:cel>0?Math.min(1,es/cel):(es>0?1:null)};
 }
+// Nahrání nového exportu „Prodeje eshop" přímo v appce — xlsx rozebere prohlížeč
+// (stejná logika jako tools-gen-eshop-prodeje.js), na server jde jen hotová mapa.
+function esParseWorkbook(ws){
+  const H=[]; ws.getRow(1).eachCell({includeEmpty:true},(c,n)=>{H[n-1]=String(c.value==null?'':(typeof c.value==='object'?(c.value.result??c.value.text??''):c.value)).trim();});
+  const ci=n=>H.indexOf(n);
+  const iSK=ci('SK'),iR=ci('Reg. č.'),iQ=ci('Množství'),iKC=ci('CC bez daní'),
+        iY=ci('Datum případu (R)'),iM=ci('Datum případu (M)'),iKan=ci('Příjmení');
+  const chybi=[['SK',iSK],['Reg. č.',iR],['Množství',iQ],['CC bez daní',iKC],['Datum případu (R)',iY],['Datum případu (M)',iM]]
+    .filter(x=>x[1]<0).map(x=>x[0]);
+  if(chybi.length)throw new Error('V souboru chybí sloupce: '+chybi.join(', ')+'. Čekám export „Prodeje eshop" z ERP.');
+  const num=v=>{if(v==null||v==='')return 0;if(typeof v==='object'&&v.result!=null)v=v.result;const x=typeof v==='number'?v:parseFloat(String(v).replace(/\s/g,'').replace(',','.'));return isNaN(x)?0:x;};
+  const txt=v=>{if(v==null)return '';if(typeof v==='object')return String(v.result??v.text??'');return String(v);};
+  const items={}; let radku=0,jine=0,od='9999-99',dd='0000-00';
+  const last=ws.actualRowCount||ws.rowCount;
+  for(let r=2;r<=last;r++){
+    const row=ws.getRow(r);
+    // Celý tenhle export JE e-shop. Sloupec „Příjmení" bereme jen jako pojistku: řádek
+    // vynecháme, když je v něm výslovně jiný kanál — chybějící/prázdná hodnota nevadí.
+    if(iKan>=0){ const k=txt(row.getCell(iKan+1).value).trim().toUpperCase();
+      if(k&&k!=='E-SHOP'){ jine++; continue; } }
+    const y=num(row.getCell(iY+1).value), mo=num(row.getCell(iM+1).value);
+    if(!y||!mo)continue;
+    const ym=y+'-'+String(mo).padStart(2,'0');
+    const id=txt(row.getCell(iSK+1).value).trim()+'-'+txt(row.getCell(iR+1).value).trim();
+    if(id==='-')continue;
+    const o=items[id]||(items[id]={ks:{},kc:{}});
+    o.ks[ym]=Math.round(((o.ks[ym]||0)+num(row.getCell(iQ+1).value))*1000)/1000;
+    o.kc[ym]=Math.round((o.kc[ym]||0)+num(row.getCell(iKC+1).value));
+    if(ym<od)od=ym; if(ym>dd)dd=ym;
+    radku++;
+  }
+  if(!radku)throw new Error('V souboru nejsou žádné použitelné řádky prodeje.');
+  return {items,radku,od,do:dd,jine};
+}
+async function esUpload(file){
+  const btn=document.getElementById('esUpBtn'), st=document.getElementById('esUpStav');
+  const say=(t,err)=>{ if(st){st.textContent=t;st.style.color=err?'#b23':'';} };
+  try{
+    if(typeof ExcelJS==='undefined')throw new Error('Čtečka Excelu není načtená.');
+    if(btn)btn.disabled=true; say('Čtu '+file.name+'…');
+    const wb=new ExcelJS.Workbook();
+    await wb.xlsx.load(await file.arrayBuffer());
+    const d=esParseWorkbook(wb.worksheets[0]);
+    say('Odesílám '+fmt(Object.keys(d.items).length)+' položek…');
+    const r=await fetch('/api/nakup-report/eshop-prodeje',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({items:d.items,od:d.od,do:d.do,radku:d.radku,source:file.name})});
+    const j=await r.json();
+    if(!j||!j.ok)throw new Error((j&&j.error)||'Server odmítl soubor.');
+    ES_PRODEJE=null; await loadEshopProdeje(); await renderObjednavky();
+    say('');
+    if(typeof toast==='function')toast('Prodeje e-shopu aktualizovány: '+fmt(j.polozek)+' položek ('+j.od+'…'+j.do+')');
+  }catch(e){ say('Nepovedlo se: '+e.message,true); }
+  finally{ if(btn)btn.disabled=false; }
+}
+function esRenderBadge(){
+  const el=document.getElementById('esUpMeta'); if(!el)return;
+  el.innerHTML=ES_PRODEJE
+    ? ('Zdroj: <b>'+esc(ES_PRODEJE_META)+'</b>')
+    : '<span style="color:#b23">Export prodejů e-shopu není načtený — sloupce kanálů zůstávají prázdné.</span>';
+}
 async function loadEshopProdeje(){
   try{
     const r=await fetch('/api/nakup-report/eshop-prodeje',{cache:'no-store'});
     const d=await r.json();
-    if(d&&d.ok&&d.items){ ES_PRODEJE=d.items; ES_PRODEJE_META='export e-shopových faktur '+(d.od||'')+'…'+(d.do||'')+' · '+Object.keys(d.items).length+' položek'; }
+    if(d&&d.ok&&d.items){ ES_PRODEJE=d.items;
+      ES_PRODEJE_META=(d.source||'export e-shopových faktur')+' · '+(d.od||'')+'…'+(d.do||'')+' · '+Object.keys(d.items).length+' položek'
+        +(d.live?(' · nahrál '+(d.nahral||'?')+' '+String(d.generated||'').slice(0,10)):' · vloženo v aplikaci'); }
   }catch(e){}
+  esRenderBadge();
   try{ if(document.querySelector('#pane-objednavky.active')) renderObjednavky(); }catch(e){}
 }
 async function loadEshopCeny(){
@@ -2527,7 +2613,7 @@ async function renderObjednavky(){
   (OBJ_DATA.rows||[]).forEach(x=>{const rb=robMap[String(x.sk)+'-'+String(x.reg)]||{raw:null,robust:null,outlier:null,sporadic:false};x._out=rb.outlier;x._sporadic=rb.sporadic;x._s=objSeason(rb.robust||rb.raw);x._o=objComputeOrder(x,rb.raw,P,m0,x._s,rb.robust||rb.raw);x._e=objEOQ(x,rb.robust||rb.raw,OBJ_CYCLES);});
   try{objRenderSeason();}catch(e){}
   try{objRenderPlan();}catch(e){}
-  if(!OBJ_WIRED){OBJ_WIRED=true;['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;const ab=$('#objAskBtn');if(ab)ab.onclick=objAsk;const ai=$('#objAsk');if(ai){ai.onkeydown=ev=>{if(ev.key==='Enter')objAsk();};ai.oninput=()=>{if(!ai.value.trim())$('#objAskResult').innerHTML='';};}const rf=$('#objRefresh');if(rf)rf.onclick=()=>{const q=($('#objAsk')&&$('#objAsk').value)||'';OBJ_DATA=null;renderObjednavky().then(()=>{if(q.trim())objAsk();});};}
+  if(!OBJ_WIRED){OBJ_WIRED=true;const ub=$('#esUpBtn'),uf=$('#esUpFile');if(ub&&uf){ub.onclick=()=>uf.click();uf.onchange=e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(f)esUpload(f);};}['objSearch','objSup','objOnly'].forEach(id=>{const e=$('#'+id);if(e)e.oninput=e.onchange=objDraw;});const cv=$('#objCover');if(cv)cv.oninput=renderObjednavky;const ex=$('#objExport');if(ex)ex.onclick=objExport;const ea=$('#objExportAll');if(ea)ea.onclick=objExportAll;const ep=$('#objExportPlan');if(ep)ep.onclick=objExportPlan;const ab=$('#objAskBtn');if(ab)ab.onclick=objAsk;const ai=$('#objAsk');if(ai){ai.onkeydown=ev=>{if(ev.key==='Enter')objAsk();};ai.oninput=()=>{if(!ai.value.trim())$('#objAskResult').innerHTML='';};}const rf=$('#objRefresh');if(rf)rf.onclick=()=>{const q=($('#objAsk')&&$('#objAsk').value)||'';OBJ_DATA=null;renderObjednavky().then(()=>{if(q.trim())objAsk();});};}
   try{nkLoadReportCfg();}catch(e){}
   objDraw();
 }

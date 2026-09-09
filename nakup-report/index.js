@@ -24,6 +24,8 @@ function mount(host) {
   const OBRAT_FOLDER = process.env.OBRAT_DRIVE_FOLDER || ''; // složka s „obrat plasty" (prodejní historie); prázdné = vypnuto, klient jede z embedu
   const OBRAT_RAW = path.join(host.dataDir || __dirname, 'obrat-plasty.xlsx');        // cache nejnovějšího obrat plasty (raw xlsx, writable)
   const OBRAT_STATE = path.join(host.dataDir || __dirname, 'obrat-plasty-sync.json'); // stav sync (poslední soubor/datum)
+  const ESP_LIVE = path.join(host.dataDir || __dirname, 'eshop-prodeje.json');      // rozpad prodeje na kanály — nahrává se v appce (volume)
+  const ESP_SEED = path.join(__dirname, '..', 'eshop-prodeje.json');                // commitnutý seed (poslední známý export)
   const SUP_F = path.join(host.dataDir || __dirname, 'nakup-dodavatele.json');       // dotazník dodavatelů: termín dodání + náklad na dopravu (writable)
   const loadObj = () => { for (const f of [OBJ_LIVE, OBJ_SEED]) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) {} } return { rows: [], columns: [], date: '' }; };
   const loadSup = () => { try { return JSON.parse(fs.readFileSync(SUP_F, 'utf8')) || {}; } catch (_) { return {}; } };
@@ -1089,9 +1091,33 @@ function mount(host) {
     // e-shopových faktur (eshop-prodeje.json, generuje tools-gen-eshop-prodeje.js).
     // Celkový prodej drží „obrat plasty"; e-shop je jeho podmnožina, obchod = celkem − e-shop.
     if (p === '/api/nakup-report/eshop-prodeje' && req.method === 'GET') {
-      try { const d = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'eshop-prodeje.json'), 'utf8'));
-        return json(res, 200, Object.assign({ ok: true }, d)), true; }
-      catch (_) { return json(res, 200, { ok: false, error: 'eshop-prodeje.json není k dispozici.' }), true; }
+      for (const f of [ESP_LIVE, ESP_SEED]) {
+        try { const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+          return json(res, 200, Object.assign({ ok: true, live: f === ESP_LIVE }, d)), true; } catch (_) {}
+      }
+      return json(res, 200, { ok: false, error: 'Export e-shopových prodejů zatím nebyl nahrán.' }), true;
+    }
+    // Nahrání nového exportu přímo z appky — xlsx rozebere prohlížeč, sem přijde jen hotová mapa
+    // {SK-reg: {ks:{YYYY-MM:n}, kc:{…}}}. Ukládá se na volume, takže přežije deploy a vidí ho všichni.
+    if (p === '/api/nakup-report/eshop-prodeje' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
+      const items = b.items;
+      if (!items || typeof items !== 'object' || !Object.keys(items).length)
+        return json(res, 400, { ok: false, error: 'Soubor neobsahuje žádné e-shopové řádky — je to správný export?' }), true;
+      const se = host.empSession && host.empSession(req);
+      const rec = {
+        generated: new Date().toISOString(),
+        source: String(b.source || '').slice(0, 200),
+        kanal: 'E-SHOP (sloupec Příjmení v exportu ERP)',
+        od: String(b.od || '').slice(0, 7), do: String(b.do || '').slice(0, 7),
+        radku: +b.radku || 0,
+        nahral: (se && (se.jmeno || se.email)) || 'neznámý',
+        items,
+      };
+      try { fs.writeFileSync(ESP_LIVE, JSON.stringify(rec)); }
+      catch (e) { return json(res, 500, { ok: false, error: 'Uložení selhalo: ' + e.message }), true; }
+      console.log('[nakup-report] e-shop prodeje nahrány: ' + rec.source + ' (' + Object.keys(items).length + ' pol., ' + rec.od + '…' + rec.do + ')');
+      return json(res, 200, { ok: true, polozek: Object.keys(items).length, od: rec.od, do: rec.do }), true;
     }
     // „obrat plasty" (prodejní historie) — čerstvý raw xlsx pro klienta (SMI app ho parsuje). Přihlášený.
     if (p === '/api/nakup-report/obrat-plasty' && req.method === 'GET') {

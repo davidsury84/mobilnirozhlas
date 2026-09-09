@@ -21,13 +21,15 @@ const s = X.parse(fs.readFileSync(src));
 const H = s[0], c = n => { const i = H.indexOf(n); if (i < 0) throw new Error('chybí sloupec ' + n); return i; };
 const iSK = c('SK'), iR = c('Reg. č.'), iN = c('Název 1'), iQ = c('Množství'),
       iKC = c('CC bez daní'), iY = c('Datum případu (R)'), iM = c('Datum případu (M)'),
-      iKan = c('Příjmení');
+      iKan = H.indexOf('Příjmení');   // nepovinný — chybí-li, bereme celý soubor jako e-shop
 
 const items = {}, nazvy = {};
 let radku = 0, jine = 0, ymMin = '9999-99', ymMax = '0000-00';
 for (let i = 1; i < s.length; i++) {
   const r = s[i];
-  if (String(r[iKan] || '').trim().toUpperCase() !== 'E-SHOP') { jine++; continue; }
+  // Celý export JE e-shop; „Příjmení" je jen pojistka proti řádku jiného kanálu.
+  const kan = iKan >= 0 ? String(r[iKan] || '').trim().toUpperCase() : '';
+  if (kan && kan !== 'E-SHOP') { jine++; continue; }
   const y = +r[iY], m = +r[iM];
   if (!y || !m) continue;
   const ym = y + '-' + String(m).padStart(2, '0');
