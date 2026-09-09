@@ -2307,6 +2307,46 @@ function mount(host) {
     }
     return out;
   }
+  // Hlavička zakázky — co smí editace měnit a jak se to jmenuje v historii.
+  const HLAV_POLE = [
+    ['typKey', 'Typ výrobku'],
+    ['cisloPoptavky', 'Číslo poptávky / zakázky'],
+    ['zakaznik', 'Zákazník'],
+    ['kontakt', 'Kontaktní osoba'],
+    ['kontaktEmail', 'E-mail klienta'],
+    ['pozadovanyTermin', 'Požadovaný termín dodání'],
+    ['strediskoKey', 'Realizuje závod'],
+  ];
+  function hlavZobraz(d, k, v) {
+    if (!v) return '';
+    if (k === 'typKey') { const t = (d.types || []).find(x => x.key === v); return t ? t.name : v; }
+    if (k === 'strediskoKey') { const st = (d.strediska || []).find(x => x.key === v); return st ? st.label : v; }
+    if (k === 'pozadovanyTermin') return fmtDate(new Date(String(v) + 'T12:00:00Z').getTime());
+    return String(v);
+  }
+  // Závod přiřazuje ředitel výroby / šéf — obchodník ho smí jen doplnit, když chybí.
+  function smiMenitZavod(me, z) {
+    return !!(me.isAdmin || ma(me, 'sef') || ma(me, 'vykonny-reditel') || ma(me, 'vyrobni-reditel') || !z.strediskoKey);
+  }
+  function diffHlavicka(d, me, z, h) {
+    const out = [];
+    if (!h || typeof h !== 'object') return out;
+    for (const [k, label] of HLAV_POLE) {
+      if (!(k in h)) continue;
+      let nova = String(h[k] == null ? '' : h[k]).trim().slice(0, 300);
+      if (k === 'typKey' && !(d.types || []).some(x => x.key === nova)) continue;
+      if (k === 'strediskoKey') {
+        if (nova && !(d.strediska || []).some(x => x.key === nova)) continue;
+        if (!smiMenitZavod(me, z)) continue;
+      }
+      if (k === 'pozadovanyTermin') nova = nova ? nova.slice(0, 10) : '';
+      const stara = String(z[k] == null ? '' : z[k]);
+      if (stara === nova) continue;
+      out.push({ k, label, z: hlavZobraz(d, k, stara), na: hlavZobraz(d, k, nova), _nova: nova });
+    }
+    return out;
+  }
+
   async function apiZadani(req, res) {
     const me = roleOf(req);
     let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
@@ -2318,6 +2358,14 @@ function mount(host) {
     }
     const duvod = String(b.duvod || '').trim().slice(0, 1000);
     if (!duvod) { json(res, 400, { chyba: 'Napište důvod změny — co si klient přeje jinak.' }); return true; }
+    // hlavička se mění spolu s dotazníkem — typ napřed, dotazník se pak čistí už dle nového typu
+    const zmenyH = diffHlavicka(d, me, z, b.hlavicka);
+    const zakNovy = zmenyH.find(x => x.k === 'zakaznik');
+    if (zakNovy && !zakNovy._nova) { json(res, 400, { chyba: 'Zákazník nesmí zůstat prázdný.' }); return true; }
+    for (const x of zmenyH) {
+      z[x.k] = x._nova || (x.k === 'pozadovanyTermin' ? null : '');
+      if (x.k === 'strediskoKey') { const st = (d.strediska || []).find(y => y.key === x._nova); z.strediskoName = st ? st.label : ''; }
+    }
     const t = typeOf(d, z.typKey);
     const maDot = !!(t && Array.isArray(t.dotaznik) && t.dotaznik.length);
     let zmeny;
@@ -2330,6 +2378,7 @@ function mount(host) {
       zmeny = diffParams(z.params, novy);
       if (zmeny.length) z.params = novy;
     }
+    zmeny = zmenyH.map(x => ({ k: x.k, label: x.label, z: x.z, na: x.na })).concat(zmeny);
     if (!zmeny.length) { json(res, 200, { ok: true, zmeny: 0 }); return true; }
     const now = Date.now();
     z.kodAbr = genKodAbr(z);   // kódovaná pole se mohla změnit

@@ -3402,7 +3402,7 @@ function reqTag(){return {cs:'poř.',en:'req.',de:'Wunsch',pl:'wym.'}[DQ_LANG]||
 function dqLangRefresh(){
   var mo=document.getElementById('modal');
   if(!mo||!mo.classList.contains('open'))return;
-  if(EDIT_ID){var sb=sbirZadani();openEditZadani(EDIT_ID,{dot:sb.dot,duvod:val('ezDuvod')});return}
+  if(EDIT_ID){var sb=sbirZadani();openEditZadani(EDIT_ID,{dot:sb.dot,duvod:val('ezDuvod'),hlav:sbirHlavicku()});return}
   if(!document.getElementById('nTyp'))return;   // otevřené jiné modální okno
   DQ_PREFILL=collectDot();
   openNew({typKey:val('nTyp'),head:collectHead(),dot:DQ_PREFILL});
@@ -3759,6 +3759,8 @@ function openEditZadani(id,state){
   var z=(D.zakazky||[]).find(function(x){return x.id===id}); if(!z)return;
   state=state||{};
   EDIT_ID=id; DQ_PREFILL=state.dot||z.dotaznik||{};
+  var h=state.hlav||{typKey:z.typKey,cisloPoptavky:z.cisloPoptavky,zakaznik:z.zakaznik,kontakt:z.kontakt,
+    kontaktEmail:z.kontaktEmail,pozadovanyTermin:z.pozadovanyTermin,strediskoKey:z.strediskoKey};
   var langs=['cs','en','de','pl','ua','ro'].map(function(l){return '<button type="button" class="langb'+(DQ_LANG===l?' act':'')+'" onclick="langSwitch(\''+l+'\')">'+(l==='cs'?'CZ':l.toUpperCase())+'</button>'}).join('');
   var m=document.getElementById('modal');
   m.innerHTML='<div class="sheet dqmodal">'+
@@ -3767,8 +3769,15 @@ function openEditZadani(id,state){
       '<div class="ssobar" style="margin:10px 0 0;align-items:flex-start"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;margin-top:2px"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg><span>'+esc(tr('Klient mění objednávku za pochodu. Každá změna se zapíše do historie (kdo, kdy, z čeho na co) a lidem u zakázky přijde upozornění. Stav zakázky se úpravou nemění.'))+'</span></div>'+
     '</div>'+
     '<div class="dqbody">'+
-      '<input type="hidden" id="nTyp" value="'+esc(z.typKey)+'">'+
-      '<div class="dqhg"><div style="grid-column:1/-1"><label>'+esc(tr('Důvod změny'))+' <span class="reqmark">*</span></label>'+
+      '<div class="dqhg">'+
+        '<div><label>'+esc(tr('Typ výrobku'))+'</label>'+typSelectEdit(z,h.typKey)+'</div>'+
+        '<div><label>'+esc(tr('Číslo poptávky / zakázky'))+'</label><input id="ezPopt" value="'+esc(h.cisloPoptavky||'')+'"></div>'+
+        '<div><label>'+esc(tr('Zákazník'))+' <span class="reqmark">*</span></label><input id="ezZak" value="'+esc(h.zakaznik||'')+'"></div>'+
+        '<div><label>'+esc(tr('Kontaktní osoba'))+'</label><input id="ezKontakt" value="'+esc(h.kontakt||'')+'"></div>'+
+        '<div><label>'+esc(tr('E-mail klienta (pro náhled)'))+'</label><input id="ezMail" placeholder="email@klient.cz" value="'+esc(h.kontaktEmail||'')+'"></div>'+
+        '<div><label>'+esc(tr('Požadovaný termín dodání'))+'</label><input id="ezTerm" type="date" value="'+esc(h.pozadovanyTermin||'')+'"></div>'+
+        (muzeZavod(z)?('<div><label>'+esc(tr('Realizuje závod (pokud víte)'))+'</label>'+strediskoSelect('ezZavod',h.strediskoKey||'')+'</div>'):'')+
+        '<div style="grid-column:1/-1"><label>'+esc(tr('Důvod změny'))+' <span class="reqmark">*</span></label>'+
         '<input id="ezDuvod" value="'+esc(state.duvod||'')+'" placeholder="'+esc(tr('co si klient přeje jinak…'))+'"></div></div>'+
       '<div id="paramBox"></div>'+
       '<div class="err" id="nErr"></div>'+
@@ -3777,11 +3786,35 @@ function openEditZadani(id,state){
   '</div>';
   m.classList.add('open');renderDotaznik();
 }
+/* Závod přiřazuje ředitel výroby / šéf — obchodník ho smí jen doplnit, když chybí. */
+function muzeZavod(z){
+  return !!(ME.isAdmin||maRoli('sef')||maRoli('vykonny-reditel')||maRoli('vyrobni-reditel')||!z.strediskoKey);
+}
+/* Výběr typu v editaci: změna typu překreslí dotazník (odpovědi, které v novém
+   typu nejsou, se při uložení zahodí — server je čistí podle typu). */
+function typSelectEdit(z,vybrany){
+  var sel=vybrany||z.typKey;
+  var opts=(D.types||[]).map(function(t){
+    return '<option value="'+esc(t.key)+'"'+(t.key===sel?' selected':'')+'>'+esc(t.name)+'</option>';
+  }).join('');
+  return '<select id="ezTyp" onchange="editTypZmena()">'+opts+'</select>'+
+    '<input type="hidden" id="nTyp" value="'+esc(sel)+'">';
+}
+function editTypZmena(){
+  var novy=val('ezTyp'); var inp=document.getElementById('nTyp'); if(inp)inp.value=novy;
+  DQ_PREFILL=collectDot();     // co jde, přeneseme; zbytek se dorovná dle nového typu
+  renderDotaznik();
+}
+function sbirHlavicku(){
+  return {typKey:val('ezTyp'),cisloPoptavky:val('ezPopt'),zakaznik:val('ezZak'),kontakt:val('ezKontakt'),
+    kontaktEmail:val('ezMail'),pozadovanyTermin:val('ezTerm'),strediskoKey:val('ezZavod')};
+}
 function saveZadani(id){
   var duvod=val('ezDuvod').trim(),err=document.getElementById('nErr');
   if(!duvod){err.textContent=tr('Napište důvod změny — co si klient přeje jinak.');return}
   var sb=sbirZadani();
-  api('/zadani','POST',{id:id,duvod:duvod,dotaznik:sb.dot,params:sb.params}).then(function(o){
+  if(!val('ezZak').trim()){err.textContent=tr('Vyplňte zákazníka.');return}
+  api('/zadani','POST',{id:id,duvod:duvod,dotaznik:sb.dot,params:sb.params,hlavicka:sbirHlavicku()}).then(function(o){
     if(!o.ok){err.textContent=(o.j&&o.j.chyba)||'Chyba.';return}
     if(!o.j.zmeny){err.textContent=tr('Zadání se nezměnilo — nebylo co uložit.');return}
     EDIT_ID=null;closeModal();reloadData();
