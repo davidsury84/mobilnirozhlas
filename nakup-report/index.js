@@ -1085,6 +1085,14 @@ function mount(host) {
         return json(res, 200, Object.assign({ ok: true }, d)), true; }
       catch (_) { return json(res, 200, { ok: false, error: 'eshop-ceny.json není k dispozici.' }), true; }
     }
+    // Rozpad prodeje na kanály: e-shop vs. obchod/sklad (zakázky). Zdroj je ERP export
+    // e-shopových faktur (eshop-prodeje.json, generuje tools-gen-eshop-prodeje.js).
+    // Celkový prodej drží „obrat plasty"; e-shop je jeho podmnožina, obchod = celkem − e-shop.
+    if (p === '/api/nakup-report/eshop-prodeje' && req.method === 'GET') {
+      try { const d = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'eshop-prodeje.json'), 'utf8'));
+        return json(res, 200, Object.assign({ ok: true }, d)), true; }
+      catch (_) { return json(res, 200, { ok: false, error: 'eshop-prodeje.json není k dispozici.' }), true; }
+    }
     // „obrat plasty" (prodejní historie) — čerstvý raw xlsx pro klienta (SMI app ho parsuje). Přihlášený.
     if (p === '/api/nakup-report/obrat-plasty' && req.method === 'GET') {
       try { const b64 = fs.readFileSync(OBRAT_RAW).toString('base64'); const m = obratMeta();

@@ -666,6 +666,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           </div>
         </div>
       </details>
+      <div class="note" style="background:#f4f0f8;border-color:#ddd2ea">🛒 <b>Kdo to prodává:</b> sloupce <b>z toho e-shop</b> a <b>z toho obchod</b> rozdělují roční prodej na kanály. E-shop = vydané faktury e-shopových řad z ERP; obchod/sklad = zbytek (prodej v rámci zakázek, obchodníci, odběr ze skladu). U <b>dropshipu</b> může e-shop prodat víc, než projde skladem — takový řádek je označen <b style="color:#7a5200">⚠ mimo sklad</b>.</div>
       <div class="kpis" id="objKpis"></div>
       <div id="objUtichle"></div>
       <div style="background:#eef4fb;border:1px solid #d3e0f2;border-radius:12px;padding:12px 14px;margin:0 0 12px">
@@ -966,6 +967,44 @@ let ESHOP_CENY=null, ESHOP_META='';
 function eshopRec(it){
   if(!ESHOP_CENY||it==null) return null;
   return ESHOP_CENY[String(it.sk||'').trim()+'-'+String(it.reg||'').trim()]||null;
+}
+// ---- KANÁLY PRODEJE: e-shop vs. obchod/sklad ----
+// „Obrat plasty" dává CELKOVÝ prodej položky (všechny kanály dohromady). Export e-shopových
+// faktur z ERP (eshop-prodeje.json) říká, kolik z toho odbavil e-shop; zbytek prodal
+// obchod v rámci zakázek / sklad. U dropshipu může e-shop celek přesáhnout — zboží nejde
+// přes sklad, ve výdejích tedy chybí; obchod se pak ořezává na 0 a rozdíl se hlásí zvlášť.
+let ES_PRODEJE=null, ES_PRODEJE_META='';
+function esOkno(){
+  const info=(DATA_PERIOD&&DATA_PERIOD.info)||(typeof EMBEDDED_PERIOD_INFO!=='undefined'?EMBEDDED_PERIOD_INFO:'');
+  const m=String(info).match(/(\d{4})-(\d{2})\D{1,8}(\d{4})-(\d{2})/);
+  if(!m)return null;
+  const out=[]; let y=+m[1], mo=+m[2];
+  for(let i=0;i<12;i++){ out.push(y+'-'+String(mo).padStart(2,'0')); mo++; if(mo>12){mo=1;y++;} }
+  return {mesice:out, od:m[1]+'-'+m[2], do:m[3]+'-'+m[4]};
+}
+// Vrací {q:[12 dle kalendářního měsíce], ks, kc} za stejné okno, jaké má „obrat plasty".
+function esKanal(key){
+  if(!ES_PRODEJE)return null;
+  const rec=ES_PRODEJE[key]; if(!rec)return null;
+  const ok=esOkno(); if(!ok)return null;
+  const q=new Array(12).fill(0); let ks=0, kc=0;
+  ok.mesice.forEach(ym=>{ const v=(rec.ks&&rec.ks[ym])||0, k=(rec.kc&&rec.kc[ym])||0;
+    q[+ym.slice(5,7)-1]+=v; ks+=v; kc+=k; });
+  return {q, ks:Math.round(ks*100)/100, kc};
+}
+// Rozdělení celkového ročního prodeje D na kanály.
+function esSplit(key,D){
+  const e=esKanal(key), es=e?e.ks:0, cel=D||0;
+  const ob=Math.max(0, cel-es), mimo=Math.max(0, es-cel);
+  return {es, ob, mimo, kc:e?e.kc:0, q:e?e.q:null, ma:!!e, podil:cel>0?Math.min(1,es/cel):(es>0?1:null)};
+}
+async function loadEshopProdeje(){
+  try{
+    const r=await fetch('/api/nakup-report/eshop-prodeje',{cache:'no-store'});
+    const d=await r.json();
+    if(d&&d.ok&&d.items){ ES_PRODEJE=d.items; ES_PRODEJE_META='export e-shopových faktur '+(d.od||'')+'…'+(d.do||'')+' · '+Object.keys(d.items).length+' položek'; }
+  }catch(e){}
+  try{ if(document.querySelector('#pane-objednavky.active')) renderObjednavky(); }catch(e){}
 }
 async function loadEshopCeny(){
   try{
@@ -2484,6 +2523,7 @@ async function renderObjednavky(){
   const m0=new Date().getMonth();
   const robMap={}; Object.keys(smap).forEach(k=>{robMap[k]=objRobust(smap[k]);});   // robustní poptávka (bez jednorázových extrémů)
   const hold=objHoldRate(); OBJ_CYCLES=objSupplierCycles(OBJ_DATA.rows||[],robMap,hold);
+  (OBJ_DATA.rows||[]).forEach(x=>{x._k=esSplit(String(x.sk)+'-'+String(x.reg),(smap[String(x.sk)+'-'+String(x.reg)]||[]).reduce((a,b)=>a+(b||0),0));});
   (OBJ_DATA.rows||[]).forEach(x=>{const rb=robMap[String(x.sk)+'-'+String(x.reg)]||{raw:null,robust:null,outlier:null,sporadic:false};x._out=rb.outlier;x._sporadic=rb.sporadic;x._s=objSeason(rb.robust||rb.raw);x._o=objComputeOrder(x,rb.raw,P,m0,x._s,rb.robust||rb.raw);x._e=objEOQ(x,rb.robust||rb.raw,OBJ_CYCLES);});
   try{objRenderSeason();}catch(e){}
   try{objRenderPlan();}catch(e){}
@@ -2491,13 +2531,27 @@ async function renderObjednavky(){
   try{nkLoadReportCfg();}catch(e){}
   objDraw();
 }
+// Dva sloupce kanálu: kolik z ročního prodeje odbavil e-shop a kolik obchod/sklad (zakázky).
+function objKanalCells(x){
+  const R='style="text-align:right"';
+  if(!ES_PRODEJE)return '<td '+R+' class="muted">·</td><td '+R+' class="muted">·</td>';
+  const k=x._k||{es:0,ob:0,mimo:0,ma:false};
+  const pd=(k.podil!=null)?(' · '+Math.round(k.podil*100)+' % prodeje'):'';
+  const es=k.es>0
+    ? '<td '+R+' title="E-shop odbavil '+fmt(k.es)+' ks za '+fmt(k.kc)+' Kč'+pd+'">🛒 '+fmt(k.es)+'</td>'
+    : '<td '+R+' class="muted" title="V exportu e-shopových faktur za dané období není — prodává jen obchod/sklad.">—</td>';
+  const ob=k.mimo>0
+    ? '<td '+R+' style="color:#7a5200" title="E-shop prodal víc, než je ve výdejích ze skladu (o '+fmt(k.mimo)+' ks) — typicky dropship: zboží jde od dodavatele rovnou k zákazníkovi, přes sklad neprojde.">0 <span style="font-size:11px">⚠ mimo sklad</span></td>'
+    : '<td '+R+(k.ob>0?'':' class="muted"')+'>'+(k.ob>0?fmt(k.ob):'—')+'</td>';
+  return es+ob;
+}
 function objDraw(){
   const rows=(OBJ_DATA&&OBJ_DATA.rows)||[];
   const q=($('#objSearch').value||'').toLowerCase().trim(),sup=$('#objSup').value,only=$('#objOnly').checked;
   let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||((x.avail||0)<0&&!x._o.spec)));
   const toOrder=rows.filter(x=>x._o.rec>0),oversold=rows.filter(x=>(x.avail||0)<0&&!x._o.spec),specRows=rows.filter(x=>x._o.spec);
   const totVal=toOrder.reduce((s,x)=>s+x._o.value,0),supsOrder=new Set(toOrder.map(x=>x.skupina)).size;
-  $('#objKpis').innerHTML=[['',fmt(rows.length),'Položek v ERP'],['warn',fmt(toOrder.length),'K objednání'],['err',fmt(oversold.length),'Oversold (K dispo < 0)'],['',fmt(specRows.length),'Dropship / doprodej'],['',fmt(totVal)+' Kč','Hodnota objednávek'],['',fmt(supsOrder),'Dodavatelů']]
+  $('#objKpis').innerHTML=[['',fmt(rows.length),'Položek v ERP'],['warn',fmt(toOrder.length),'K objednání'],['err',fmt(oversold.length),'Oversold (K dispo < 0)'],['',fmt(specRows.length),'Dropship / doprodej'],['',fmt(totVal)+' Kč','Hodnota objednávek'],['',fmt(supsOrder),'Dodavatelů'],['',(function(){const e=rows.reduce((s,x)=>s+((x._k&&x._k.es)||0),0),o=rows.reduce((s,x)=>s+((x._k&&x._k.ob)||0),0);return (e+o)>0?Math.round(100*e/(e+o))+' %':'—';})(),'Prodeje přes e-shop']]
     .map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
   // Utichlé položky — model by je objednal, ale v prodejní historii už dlouho mlčí. Na ověření.
   const utichle=rows.filter(x=>x._o&&x._o.utichla&&x._o.utichlaKs>0&&!x._o.dec).sort((a,b)=>b._o.utichlaVal-a._o.utichlaVal);
@@ -2567,10 +2621,10 @@ function objDraw(){
   const gk=Object.keys(groups).map(k=>{const items=groups[k].sort((a,b)=>b._o.value-a._o.value||b._o.rec-a._o.rec);return {sup:k,items,val:items.reduce((s,x)=>s+x._o.value,0),ks:items.reduce((s,x)=>s+x._o.rec,0)};}).sort((a,b)=>b.val-a.val);
   const R='style="text-align:right"';
   // VŠECHNY původní ERP sloupce (Název = dodavatel je členění) + přidané Roční prodej / Objednat / Hodnota
-  const hdrs=[['SK',0],['Registrační číslo',0],['Název 1',0],['Doplňkový kód',0],['Mn.po p/v',1],['K dispo. po p/v',1],['Vypočtený průměr',1],['Průměr+SN',1],['Objednáno',1],['Rezervováno',1],['Dodací lhůta',1],['Roční prodej',1],['Spotřeba/den',1],['Sezónnost',0],['Objednat',1],['Ekon. dávka',1],['Obj. interval',1],['Krytí po obj.',1],['Hodnota',1]];
+  const hdrs=[['SK',0],['Registrační číslo',0],['Název 1',0],['Doplňkový kód',0],['Mn.po p/v',1],['K dispo. po p/v',1],['Vypočtený průměr',1],['Průměr+SN',1],['Objednáno',1],['Rezervováno',1],['Dodací lhůta',1],['Roční prodej',1],['z toho e-shop',1],['z toho obchod',1],['Spotřeba/den',1],['Sezónnost',0],['Objednat',1],['Ekon. dávka',1],['Obj. interval',1],['Krytí po obj.',1],['Hodnota',1]];
   const NC=hdrs.length;
   if(!document.getElementById('objTblCss')){var _st=document.createElement('style');_st.id='objTblCss';_st.textContent='#objTbl{border-collapse:separate;border-spacing:0;width:100%}#objTbl th,#objTbl td{padding:4px 8px;border-bottom:1px solid #eef1ec}#objTbl thead tr:first-child th{position:sticky;top:0;z-index:4;height:26px;box-sizing:border-box}#objTbl thead tr:last-child th{position:sticky;top:26px;z-index:3;background:#f2f5f2;border-bottom:2px solid #dde3dd;box-shadow:0 1px 0 #dde3dd}#objTbl tr.objsup td{background:#e4ebf0;border-top:2px solid #c8d2d9;border-left:4px solid #2f6f8f;font-weight:700;padding:8px 10px}#objTbl tr.dcrit td{background:rgba(194,54,54,.09)}#objTbl tr.dorder td{background:rgba(176,111,0,.07)}#objTbl tr.dzeb td{background:#fafbfc}#objTbl tr.drow:hover td{background:#eaf2fb}.ochip{padding:1px 8px;border-radius:10px;font-weight:700;white-space:nowrap}';document.head.appendChild(_st);}
-  const gcols=[[4,'Identifikace','#eef1f4'],[2,'Sklad','#e6f0e9'],[2,'Ceny (Kč)','#f5efe4'],[3,'Objednávky / rezervace','#eceff5'],[3,'Prodej & sezóna','#f1ecf6'],[5,'Doporučení nákupu','#e5eff9']];
+  const gcols=[[4,'Identifikace','#eef1f4'],[2,'Sklad','#e6f0e9'],[2,'Ceny (Kč)','#f5efe4'],[3,'Objednávky / rezervace','#eceff5'],[5,'Prodej & sezóna','#f1ecf6'],[5,'Doporučení nákupu','#e5eff9']];
   const grpRow='<tr>'+gcols.map(g=>'<th colspan="'+g[0]+'" style="text-align:center;font-size:11px;letter-spacing:.03em;background:'+g[2]+';border-bottom:2px solid #fff;color:#4a544c">'+esc(g[1])+'</th>').join('')+'</tr>';
   let h2='<thead>'+grpRow+'<tr>'+hdrs.map(c=>'<th '+(c[1]?R:'')+'>'+esc(c[0])+'</th>').join('')+'</tr></thead><tbody>';
   gk.forEach(g=>{
@@ -2581,7 +2635,7 @@ function objDraw(){
         '<td '+R+'>'+fmt(x.stock)+'</td><td '+R+(crit?' style="color:#b23;font-weight:700"':'')+'>'+fmt(x.avail)+'</td>'+
         '<td '+R+'>'+fmt(x.unitPrice)+'</td><td '+R+'>'+fmt(x.unitCost)+'</td>'+
         '<td '+R+'>'+fmt(x.onOrder)+'</td><td '+R+'>'+fmt(x.reserved)+'</td><td '+R+'>'+fmt(x.lead)+'</td>'+
-        '<td '+R+(x._out?' title="⚠ Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks. V doporučení objednávky NENÍ zohledněn (omezen na '+fmt(x._out.capped)+' ks/měs), aby nenafoukl nákup."':'')+'>'+fmt(o.D)+(x._out?' <span style="color:#c0392b;cursor:help">⚠</span>':'')+'</td><td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(x._sporadic?' <span class="muted" style="font-size:11px" title="Řídce prodávaná položka (prodej jen v pár měsících) — doporučení jede na plochém průměru, ne na sezónní špičce, aby se nepřeobjednávalo z mála dat.">· málo dat</span>':'')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+(x._out?' <span style=\"color:#c0392b;font-weight:700;cursor:help\" title=\"Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks — v objednávce omezeno na '+fmt(x._out.capped)+' ks/měs\">⚠ extrém</span>':'')+'</td><td '+R+((x.avail<0&&o.rec>0)?' title=\"Oversold: rezervace přesahují sklad o '+fmt(-x.avail)+' ks. Objednat '+fmt(o.rec)+' = vykrýt '+fmt(-x.avail)+' ks rezervací + zásoba na (lhůta+pokrytí) '+fmt(o.rec+x.avail)+' ks.\"':'')+'>'+(o.rec?('<span class="ochip" style="background:'+(crit?'#fadbd8':'#fff0cc')+';color:'+(crit?'#922':'#7a5200')+'">'+fmt(o.rec)+'</span>'):'<span class="muted">—</span>')+'</td><td '+R+' title="'+(x._e&&x._e.eoq?('dodavatel '+esc(x.skupina)+': 1 společná zásilka / '+objIntTxt(x._e.interval)+(x._e.S?(', doprava '+fmt(x._e.S)+' Kč sdílená'):'')+'; toto je množství této položky na zásilku'):'vyplň dotazník dodavatele (náklad na dopravu)')+'">'+(x._e&&x._e.eoq?fmt(x._e.eoq):'—')+'</td><td '+R+'>'+(x._e?objIntTxt(x._e.interval):'—')+'</td><td '+R+(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24?' style="color:#c0392b;font-weight:700" title="Extrémní krytí po objednávce (>2 roky) — zkontroluj, možný jednorázový výkyv nebo příliš velká dávka"':(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8?' style="color:#0a7d33;font-weight:600"':''))+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?'<b>'+fmt(o.value)+' Kč</b>':'—')+'</td></tr>';});
+        '<td '+R+(x._out?' title="⚠ Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks. V doporučení objednávky NENÍ zohledněn (omezen na '+fmt(x._out.capped)+' ks/měs), aby nenafoukl nákup."':'')+'>'+fmt(o.D)+(x._out?' <span style="color:#c0392b;cursor:help">⚠</span>':'')+'</td>'+objKanalCells(x)+'<td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(x._sporadic?' <span class="muted" style="font-size:11px" title="Řídce prodávaná položka (prodej jen v pár měsících) — doporučení jede na plochém průměru, ne na sezónní špičce, aby se nepřeobjednávalo z mála dat.">· málo dat</span>':'')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+(x._out?' <span style=\"color:#c0392b;font-weight:700;cursor:help\" title=\"Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks — v objednávce omezeno na '+fmt(x._out.capped)+' ks/měs\">⚠ extrém</span>':'')+'</td><td '+R+((x.avail<0&&o.rec>0)?' title=\"Oversold: rezervace přesahují sklad o '+fmt(-x.avail)+' ks. Objednat '+fmt(o.rec)+' = vykrýt '+fmt(-x.avail)+' ks rezervací + zásoba na (lhůta+pokrytí) '+fmt(o.rec+x.avail)+' ks.\"':'')+'>'+(o.rec?('<span class="ochip" style="background:'+(crit?'#fadbd8':'#fff0cc')+';color:'+(crit?'#922':'#7a5200')+'">'+fmt(o.rec)+'</span>'):'<span class="muted">—</span>')+'</td><td '+R+' title="'+(x._e&&x._e.eoq?('dodavatel '+esc(x.skupina)+': 1 společná zásilka / '+objIntTxt(x._e.interval)+(x._e.S?(', doprava '+fmt(x._e.S)+' Kč sdílená'):'')+'; toto je množství této položky na zásilku'):'vyplň dotazník dodavatele (náklad na dopravu)')+'">'+(x._e&&x._e.eoq?fmt(x._e.eoq):'—')+'</td><td '+R+'>'+(x._e?objIntTxt(x._e.interval):'—')+'</td><td '+R+(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24?' style="color:#c0392b;font-weight:700" title="Extrémní krytí po objednávce (>2 roky) — zkontroluj, možný jednorázový výkyv nebo příliš velká dávka"':(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8?' style="color:#0a7d33;font-weight:600"':''))+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?'<b>'+fmt(o.value)+' Kč</b>':'—')+'</td></tr>';});
   });
   h2+='<tr><td colspan="'+NC+'" class="muted" style="text-align:right">'+list.length+' položek · '+gk.length+' dodavatelů</td></tr></tbody>';
   $('#objTbl').innerHTML=h2;
@@ -2630,19 +2684,20 @@ async function objExport(supFilter){
   if(supFilter && typeof supFilter!=='string')supFilter=null;   // onclick předá event → ignoruj
   try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
     const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Objednávky');
-    const names=['SK','Registrační číslo','Název 1','Název (dodavatel)','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','Spotřeba/den','Sezónnost (špička)','Objednat','Krytí po obj. (měs.)','Hodnota (Kč)'];
-    const widths=[8,14,38,22,13,10,13,14,12,11,12,12,12,12,16,11,16,12];
-    const groups=[{n:5,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:3,label:'Prodej & sezóna',color:OBJXC.prodej},{n:3,label:'Doporučení nákupu',color:OBJXC.dopor}];
+    const names=['SK','Registrační číslo','Název 1','Název (dodavatel)','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','z toho e-shop (ks)','z toho obchod/sklad (ks)','Spotřeba/den','Sezónnost (špička)','Objednat','Krytí po obj. (měs.)','Hodnota (Kč)'];
+    const widths=[8,14,38,22,13,10,13,14,12,11,12,12,12,16,20,12,16,11,16,12];
+    const groups=[{n:5,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:5,label:'Prodej & sezóna',color:OBJXC.prodej},{n:3,label:'Doporučení nákupu',color:OBJXC.dopor}];
     const N=names.length, first=objXlsxHeader(ws,widths,groups,names);
-    const FMT={6:'#,##0',7:'#,##0',8:'#,##0.00',9:'#,##0.00',10:'#,##0',11:'#,##0',12:'#,##0',13:'#,##0',14:'#,##0.00',16:'#,##0',17:'0.0',18:'#,##0 "Kč"'};
+    const FMT={6:'#,##0',7:'#,##0',8:'#,##0.00',9:'#,##0.00',10:'#,##0',11:'#,##0',12:'#,##0',13:'#,##0',14:'#,##0',15:'#,##0',16:'#,##0.00',18:'#,##0',19:'0.0',20:'#,##0 "Kč"'};
     const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>(x._o.rec>0||(x.avail||0)<0)&&(!supFilter||x.skupina===supFilter)).sort((a,b)=>String(a.skupina).localeCompare(String(b.skupina),'cs')||b._o.value-a._o.value);
     if(supFilter&&!rows.length){if(typeof toast==='function')toast('U dodavatele '+supFilter+' není teď nic k objednání.');return;}
     rows.forEach(x=>{const o=x._o,crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
-      const r=ws.addRow([x.sk,x.reg,x.nazev,x.skupina,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),o.rec,(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value)]);
+      const k=x._k||{};
+      const r=ws.addRow([x.sk,x.reg,x.nazev,x.skupina,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(k.es||0),(k.ob||0),(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),o.rec,(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value)]);
       if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
-      if(o.rec>0){const oc=r.getCell(16);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
-      r.getCell(18).font={bold:true}; objApplyFmt(r,FMT); r.getCell(2).numFmt='@';});
-    objAddCondFmt(ws,first,ws.rowCount,{dispo:7,order:16,cover:17,value:18});
+      if(o.rec>0){const oc=r.getCell(18);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
+      r.getCell(20).font={bold:true}; objApplyFmt(r,FMT); r.getCell(2).numFmt='@';});
+    objAddCondFmt(ws,first,ws.rowCount,{dispo:7,order:18,cover:19,value:20});
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download=supFilter?('objednavka-'+objSafeName(supFilter)+'.xlsx'):'objednaci-seznam.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast((supFilter?('Objednávka '+supFilter):'Objednací seznam')+' vyexportován ('+rows.length+' položek)');
   }catch(e){alert('Export selhal: '+e.message);}
@@ -2728,25 +2783,26 @@ function objShowNakupModal(sup,items,buyers){
 async function objExportAll(){
   try{if(typeof ExcelJS==='undefined'){alert('Export není dostupný.');return;}
     const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('ERP tabulka');
-    const names=['Identifikátor (SK-reg)','SK','Registrační číslo','Dodavatel (skupina)','Název 1','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','Spotřeba/den','Sezónnost (špička)','Objednat','Ekon. dávka (EOQ)','Obj. interval (měs.)','Doprava (Kč/obj.)','Krytí po obj. (měs.)','Hodnota (Kč)','Stav'];
-    const widths=[18,8,16,24,40,16,10,13,14,12,11,12,12,12,12,16,11,14,15,14,16,12,22];
-    const groups=[{n:6,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:3,label:'Prodej & sezóna',color:OBJXC.prodej},{n:7,label:'Doporučení nákupu',color:OBJXC.dopor}];
+    const names=['Identifikátor (SK-reg)','SK','Registrační číslo','Dodavatel (skupina)','Název 1','Doplňkový kód','Mn.po p/v','K dispo. po p/v','Vypočtený průměr','Průměr+SN','Objednáno','Rezervováno','Dodací lhůta','Roční prodej','z toho e-shop (ks)','z toho obchod/sklad (ks)','Spotřeba/den','Sezónnost (špička)','Objednat','Ekon. dávka (EOQ)','Obj. interval (měs.)','Doprava (Kč/obj.)','Krytí po obj. (měs.)','Hodnota (Kč)','Stav'];
+    const widths=[18,8,16,24,40,16,10,13,14,12,11,12,12,12,16,20,12,16,11,14,15,14,16,12,22];
+    const groups=[{n:6,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:5,label:'Prodej & sezóna',color:OBJXC.prodej},{n:7,label:'Doporučení nákupu',color:OBJXC.dopor}];
     const N=names.length, first=objXlsxHeader(ws,widths,groups,names);
     // formát čísel per sloupec (skladové/ks celá, ceny 2 des., interval/krytí 1 des., hodnota Kč)
-    const FMT={7:'#,##0',8:'#,##0',9:'#,##0.00',10:'#,##0.00',11:'#,##0',12:'#,##0',13:'#,##0',14:'#,##0',15:'#,##0.00',17:'#,##0',18:'#,##0',19:'0.0',20:'#,##0',21:'0.0',22:'#,##0 "Kč"'};
+    const FMT={7:'#,##0',8:'#,##0',9:'#,##0.00',10:'#,##0.00',11:'#,##0',12:'#,##0',13:'#,##0',14:'#,##0',15:'#,##0',16:'#,##0',17:'#,##0.00',19:'#,##0',20:'#,##0',21:'0.0',22:'#,##0',23:'0.0',24:'#,##0 "Kč"'};
     const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).slice().sort((a,b)=>String(a.skupina||'').localeCompare(String(b.skupina||''),'cs')||String(a.sk+'-'+a.reg).localeCompare(String(b.sk+'-'+b.reg),'cs'));
     let curSup=null;
     rows.forEach(x=>{
       if(x.skupina!==curSup){curSup=x.skupina; const hr=ws.addRow(['▸ '+(curSup||'—')]); hr.getCell(1).font={bold:true}; objFillRow(hr,N,OBJXC.sup);}
       const o=x._o||{},e=x._e||{},ident=String(x.sk)+'-'+String(x.reg),crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
-      const r=ws.addRow([ident,x.sk,x.reg,x.skupina,x.nazev,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),(o.rec||0),(e.eoq||''),(e.interval!=null&&isFinite(e.interval)?Math.round(e.interval*10)/10:''),(e.S!=null?e.S:''),(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value||0),(o.status||'')]);
+      const k=x._k||{};
+      const r=ws.addRow([ident,x.sk,x.reg,x.skupina,x.nazev,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(k.es||0),(k.ob||0),(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),(o.rec||0),(e.eoq||''),(e.interval!=null&&isFinite(e.interval)?Math.round(e.interval*10)/10:''),(e.S!=null?e.S:''),(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value||0),(o.status||'')]);
       if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
-      if(o.rec>0){const oc=r.getCell(17);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
-      r.getCell(22).font={bold:true};
+      if(o.rec>0){const oc=r.getCell(19);oc.fill=objFill(crit?OBJXC.chipOver:OBJXC.chip);oc.font={bold:true};}
+      r.getCell(24).font={bold:true};
       objApplyFmt(r,FMT); r.getCell(1).numFmt='@'; r.getCell(3).numFmt='@';
     });
     const last=ws.rowCount;
-    objAddCondFmt(ws,first,last);
+    objAddCondFmt(ws,first,last,{dispo:8,order:19,cover:23,value:24});
     const buf=await wb.xlsx.writeBuffer();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf]));a.download='erp-tabulka-dle-dodavatelu.xlsx';document.body.appendChild(a);a.click();a.remove();
     if(typeof toast==='function')toast('Celá tabulka vyexportována ('+rows.length+' položek, '+new Set(rows.map(x=>x.skupina)).size+' dodavatelů)');
   }catch(e){alert('Export selhal: '+e.message);}
@@ -3656,6 +3712,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   }
   try{ await histInit(); }catch(e){}   // historie ze serveru (sdílená) + případná migrace z prohlížeče
   try{ loadEshopCeny(); }catch(e){}    // prodejní ceny z exportu e-shopu (markdown počítá z nich, ne z nákupních)
+  try{ loadEshopProdeje(); }catch(e){}  // rozpad prodeje na kanály (e-shop vs. obchod/sklad)
   try{ ensureModelSup(); }catch(e){}   // živý sklad + skupiny z denního ERP exportu (model je promítne hned)
   try{ renderVyvojEshop(); }catch(e){}  // první záložka = přehled vývoje e-shopu
 });
