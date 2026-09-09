@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Výsledky — spokojenost zákazníků shop.elkoplast.cz</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--bg:#f2f5f1;--paper:#fff;--ink:#111713;--ink-soft:#5d675f;--muted:#8a948c;--line:#dce4dc;
+    --green:#0e8a43;--green-2:#18a957;--green-d:#08612d;--green-soft:#e3f3e9;--r:16px}
+  *{box-sizing:border-box;margin:0;padding:0} html{color-scheme:light}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  header.app{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
+  .app-in{max-width:860px;margin:0 auto;padding:10px 16px}
+  .brand b{font-size:14px;letter-spacing:.05em;color:var(--green-d)}
+  .brand span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);font-weight:600}
+  main{max-width:860px;margin:0 auto;padding:22px 16px 64px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;box-shadow:0 1px 2px rgba(17,23,19,.05);margin-bottom:14px}
+  h1{font-size:23px;line-height:1.25;margin-bottom:4px}
+  .hint{color:var(--muted);font-size:12.5px}
+  .tiles{display:flex;gap:26px;flex-wrap:wrap}
+  .tiles b{display:block;font-size:24px;color:var(--green-d)}
+  .tiles span{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+  .sekce-nadpis{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--green);margin-bottom:4px}
+  .ot{padding:12px 0;border-top:1px solid var(--line)}
+  .ot:first-of-type{border-top:none;padding-top:2px}
+  .ot .t{font-weight:600;font-size:14px;margin-bottom:8px}
+  .ot .t small{font-weight:400;color:var(--muted)}
+  .radek{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:12.5px}
+  .radek .n{flex:0 0 50%}
+  .radek .bar{flex:1;height:13px;background:var(--green-soft);border-radius:99px;overflow:hidden}
+  .radek .bar i{display:block;height:100%;background:var(--green);border-radius:99px}
+  .radek .c{flex:0 0 62px;text-align:right;font-weight:700;font-size:12px}
+  .radek .c small{font-weight:400;color:var(--muted)}
+  .hist{display:flex;align-items:flex-end;gap:3px;height:34px;max-width:420px}
+  .hist span{flex:1;background:var(--green);border-radius:3px 3px 0 0}
+  .hist-pop{display:flex;gap:3px;max-width:420px}
+  .hist-pop span{flex:1;text-align:center;font-size:10.5px;color:var(--ink-soft)}
+  .nacitam{text-align:center;padding:60px 0;color:var(--muted)}
+  .pill{padding:8px 13px;font-size:13.5px;font-family:inherit;cursor:pointer;border:1.5px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<header class="app"><div class="app-in">
+  <div class="brand"><b>ELKOPLAST CZ</b><span>Výsledky průzkumu · spokojenost zákazníků e-shopu</span></div>
+</div></header>
+<main id="obsah"><div class="nacitam">Načítám výsledky…</div></main>
+<script>
+'use strict';
+var $=function(id){return document.getElementById(id);};
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function fmt(x,des){return x.toFixed(des==null?2:des).replace('.',',');}
+function render(d){
+  var h='<div class="card"><h1>Jak jsou zákazníci spokojení se shop.elkoplast.cz?</h1>'+
+    '<p class="hint">Průběžné výsledky anonymního dotazníku (NPS, CSAT, Heureka standard). Kontakty ani volné odpovědi se ve veřejném náhledu nezobrazují.</p>'+
+    '<div class="tiles" style="margin-top:14px">'+
+      '<div><b>'+d.respondentu+'</b><span>respondentů</span></div>'+
+      '<div><b>'+d.dokonceno+'</b><span>dokončeno</span></div>'+
+      '<div><b>'+(d.nps.n?((d.nps.score>0?'+':'')+d.nps.score):'—')+'</b><span>NPS'+(d.nps.n?' ('+d.nps.prom+'↑ '+d.nps.det+'↓)':'')+'</span></div>'+
+      '<div><b>'+(d.csat.n?fmt(d.csat.avg)+' / 5':'—')+'</b><span>celková spokojenost</span></div></div></div>';
+  d.sekce.forEach(function(s){
+    var inner='';
+    s.otazky.forEach(function(q){
+      if(q.typ==='moznosti'){
+        if(!q.n){ inner+=blok(q,'<p class="hint">zatím bez odpovědí</p>'); return; }
+        var max=Math.max(1,...q.polozky.map(p=>p.pocet));
+        inner+=blok(q,q.polozky.map(p=>'<div class="radek"><span class="n">'+esc(p.t)+'</span><span class="bar"><i style="width:'+Math.round(p.pocet/max*100)+'%"></i></span><span class="c">'+p.pocet+'× <small>'+(q.n?Math.round(p.pocet/q.n*100):0)+'%</small></span></div>').join(''));
+      }else if(q.typ==='skala'){
+        if(!q.n&&!q.nehodnotim){ inner+=blok(q,'<p class="hint">zatím bez odpovědí</p>'); return; }
+        var mx=Math.max(1,...q.dist);
+        var g='<div class="hist">'+q.dist.map(function(c,i){return '<span title="'+(q.min+i)+': '+c+'×" style="height:'+Math.max(10,Math.round(c/mx*100))+'%;opacity:'+(c?1:.15)+'"></span>';}).join('')+'</div>'+
+          '<div class="hist-pop">'+q.dist.map(function(_,i){return '<span>'+(q.min+i)+'</span>';}).join('')+'</div>'+
+          '<div style="font-size:13px;margin-top:5px"><strong>Ø '+(q.n?fmt(q.avg):'—')+'</strong> <span class="hint">('+q.n+' odp.'+(q.nehodnotim?(' · '+q.nehodnotim+'× nehodnotí'):'')+')</span></div>';
+        inner+=blok(q,g);
+      }else if(q.typ==='kategorie'){
+        if(!q.polozky.length){ inner+=blok(q,'<p class="hint">zatím bez odpovědí</p>'); return; }
+        inner+=blok(q,q.polozky.map(p=>'<div class="radek"><span class="n">'+esc(p.t)+'</span><span class="bar"><i style="width:'+Math.round(p.avg/5*100)+'%"></i></span><span class="c">Ø '+fmt(p.avg,1)+' <small>('+p.n+'×)</small></span></div>').join(''));
+      }else{
+        inner+=blok(q,'<p class="hint">'+q.n+' odpovědí — volné texty se veřejně nezobrazují</p>');
+      }
+    });
+    if(inner) h+='<div class="card"><div class="sekce-nadpis">'+esc(s.nazev)+(s.jen!=='vsichni'?' <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">· jen '+(s.jen==='kupujici'?'kupující':'nekupující')+'</span>':'')+'</div>'+inner+'</div>';
+  });
+  h+='<p class="hint" style="text-align:center">ELKOPLAST CZ, s.r.o. · průzkum je anonymní, zobrazují se pouze souhrnné výsledky</p>';
+  $('obsah').innerHTML=h;
+}
+function blok(q,inner){ return '<div class="ot"><div class="t">'+esc(q.text)+' <small>('+(q.n||0)+' odp.)</small></div>'+inner+'</div>'; }
+fetch('/api/spokojenost/verejne-vysledky?k='+encodeURIComponent(location.pathname.slice(1)),{cache:'no-store'})
+  .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+  .then(render)
+  .catch(function(){ $('obsah').innerHTML='<div class="nacitam">Výsledky se nepodařilo načíst. <br><button class="pill" style="margin-top:10px" onclick="location.reload()">Zkusit znovu</button></div>'; });
+</script>
+</body>
+</html>

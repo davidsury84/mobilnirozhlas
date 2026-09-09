@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Výsledky — hodnocení venkovního mobiliáře</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--bg:#f2f5f1;--paper:#fff;--ink:#111713;--ink-soft:#5d675f;--muted:#8a948c;--line:#dce4dc;--line-strong:#b9c8bc;
+    --green:#0e8a43;--green-2:#18a957;--green-d:#08612d;--green-soft:#e3f3e9;--r:16px}
+  *{box-sizing:border-box;margin:0;padding:0} html{color-scheme:light}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  header.app{background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
+  .app-in{max-width:1060px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px}
+  .brand b{font-size:14px;letter-spacing:.05em;color:var(--green-d)}
+  .brand span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);font-weight:600}
+  main{max-width:1060px;margin:0 auto;padding:22px 16px 64px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;box-shadow:0 1px 2px rgba(17,23,19,.05);margin-bottom:14px}
+  h1{font-size:24px;line-height:1.2;margin-bottom:4px}
+  .hint{color:var(--muted);font-size:12.5px}
+  .tiles{display:flex;gap:26px;flex-wrap:wrap}
+  .tiles b{display:block;font-size:24px;color:var(--green-d)}
+  .tiles span{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+  .dvojice{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:680px){.dvojice{grid-template-columns:1fr}}
+  .radek{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px}
+  .radek .t{flex:0 0 52%}
+  .radek .bar{flex:1;height:13px;background:var(--green-soft);border-radius:99px;overflow:hidden}
+  .radek .bar i{display:block;height:100%;background:var(--green);border-radius:99px}
+  .radek .c{flex:0 0 40px;text-align:right;font-weight:700;font-size:12.5px}
+  .pills{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .pill{padding:8px 13px;font-size:13.5px;font-family:inherit;cursor:pointer;border:1.5px solid var(--line-strong);border-radius:999px;background:var(--paper);color:var(--ink-soft)}
+  .pill.on{background:var(--green);border-color:var(--green);color:#fff;font-weight:700}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  .prod{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .prod .foto{position:relative;background:#fff;aspect-ratio:3/2.1}
+  .prod .foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .prod .poradi{position:absolute;top:6px;left:6px;background:rgba(17,23,19,.78);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .prod .info{padding:8px 10px 10px}
+  .prod .rate{font-size:16px;font-weight:800;color:var(--green-d)}
+  .prod .bar{height:7px;background:var(--green-soft);border-radius:99px;margin:6px 0 5px;overflow:hidden}
+  .prod .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--green-2));border-radius:99px}
+  .nacitam{text-align:center;padding:60px 0;color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="app"><div class="app-in">
+  <div class="brand"><b>ELKOPLAST CZ</b><span>Výsledky průzkumu · venkovní mobiliář</span></div>
+</div></header>
+<main id="obsah"><div class="nacitam">Načítám výsledky…</div></main>
+<script>
+'use strict';
+var $=function(id){return document.getElementById(id);};
+var DATA=null, KAT='';
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function pct(a,b){return b?Math.round(a/b*100):0;}
+function render(){
+  var d=DATA;
+  var h='<div class="card"><h1>Který mobiliář se líbí nejvíc?</h1>'+
+    '<p class="hint">Respondenti vybírají z šestic fotek vždy 2 nejhezčí. „% oblíbenosti" = jak často byl produkt vybrán, když se ukázal. Průběžné výsledky — aktualizují se při každém načtení stránky.</p>'+
+    '<div class="tiles" style="margin-top:14px">'+
+      '<div><b>'+d.respondentu+'</b><span>respondentů</span></div>'+
+      '<div><b>'+d.sestic+'</b><span>hodnocených šestic</span></div>'+
+      '<div><b>'+d.vybrano+'</b><span>hlasů pro oblíbené</span></div></div></div>';
+  var maxP=Math.max(1,...d.pozice.map(x=>x.pocet)), maxO=Math.max(1,...d.obce.map(x=>x.pocet));
+  h+='<div class="dvojice">'+
+    '<div class="card"><strong style="display:block;margin-bottom:8px;font-size:14px">Kdo hodnotil</strong>'+
+      d.pozice.map(x=>'<div class="radek"><span class="t">'+esc(x.t)+'</span><span class="bar"><i style="width:'+pct(x.pocet,maxP)+'%"></i></span><span class="c">'+x.pocet+'</span></div>').join('')+'</div>'+
+    '<div class="card"><strong style="display:block;margin-bottom:8px;font-size:14px">Velikost obce</strong>'+
+      d.obce.map(x=>'<div class="radek"><span class="t">'+esc(x.t)+'</span><span class="bar"><i style="width:'+pct(x.pocet,maxO)+'%"></i></span><span class="c">'+x.pocet+'</span></div>').join('')+'</div></div>';
+  h+='<div class="card"><div class="pills">'+
+    '<button class="pill'+(KAT===''?' on':'')+'" onclick="KAT=\'\';render()">Vše</button>'+
+    d.kategorie.map(k=>'<button class="pill'+(KAT===k.key?' on':'')+'" onclick="KAT=\''+k.key+'\';render()">'+esc(k.nazev)+'</button>').join('')+'</div>';
+  var katNazvy={}; d.kategorie.forEach(k=>katNazvy[k.key]=k.nazev);
+  var prods=d.produkty.filter(p=>!KAT||p.kat===KAT).map(p=>({...p,rate:p.zobrazeno?p.vybrano/p.zobrazeno:0}));
+  prods.sort((a,b)=>b.rate-a.rate||b.vybrano-a.vybrano||b.zobrazeno-a.zobrazeno);
+  if(!prods.length){ h+='<p class="hint">Zatím žádná data'+(KAT?' v této kategorii':'')+'.</p></div>'; }
+  else{
+    h+='<div class="grid">'+prods.map((p,i)=>
+      '<div class="prod"><div class="foto"><img loading="lazy" src="/mobiliar-foto/'+p.kod+'.jpg" alt=""><span class="poradi">'+(i+1)+'.</span></div>'+
+      '<div class="info"><span class="rate">'+Math.round(p.rate*100)+' %</span>'+
+      '<div class="bar"><i style="width:'+Math.round(p.rate*100)+'%"></i></div>'+
+      '<div class="hint">vybráno '+p.vybrano+'× z '+p.zobrazeno+' zobrazení · '+esc(katNazvy[p.kat]||'')+'</div></div></div>').join('')+'</div></div>';
+  }
+  h+='<p class="hint" style="text-align:center">ELKOPLAST CZ, s.r.o. · průzkum je anonymní, zobrazují se pouze souhrnné výsledky</p>';
+  $('obsah').innerHTML=h;
+}
+fetch('/api/mobiliar/verejne-vysledky?k='+encodeURIComponent(location.pathname.slice(1)),{cache:'no-store'})
+  .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+  .then(function(d){ DATA=d; render(); })
+  .catch(function(){ $('obsah').innerHTML='<div class="nacitam">Výsledky se nepodařilo načíst. <br><button class="pill" style="margin-top:10px" onclick="location.reload()">Zkusit znovu</button></div>'; });
+</script>
+</body>
+</html>

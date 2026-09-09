@@ -210,7 +210,15 @@ const SPOKOJENOST_FILE = path.join(ROOT, 'spokojenost.html');            // dota
 const SPOKOJENOST_SLUG = process.env.SPOKOJENOST_SLUG || 'spokojenost-ofwx7q5f2pdf91';
 const SPOKOJENOST_DEF_F = path.join(DATA_DIR, 'spokojenost-dotaznik.json');  // definice otázek — editovatelná v adminu
 const SPOKOJENOST_F = path.join(DATA_DIR, 'spokojenost-odpovedi.json');      // odpovědi respondentů (upsert dle rid)
-const SURVEY_SLUGS = { [MOBILIAR_SLUG]: () => MOBILIAR_FILE, [SPOKOJENOST_SLUG]: () => SPOKOJENOST_FILE };
+// Veřejné náhledy výsledků (jen agregace, bez osobních údajů) — vlastní neuhodnutelné cesty.
+const MOBILIAR_VYSLEDKY_SLUG = process.env.MOBILIAR_VYSLEDKY_SLUG || 'vysledky-mobiliar-lcurtzm91rjn';
+const SPOKOJENOST_VYSLEDKY_SLUG = process.env.SPOKOJENOST_VYSLEDKY_SLUG || 'vysledky-spokojenost-ajbfcs3ciyk5';
+const MOBILIAR_VYSLEDKY_FILE = path.join(ROOT, 'vysledky-mobiliar.html');
+const SPOKOJENOST_VYSLEDKY_FILE = path.join(ROOT, 'vysledky-spokojenost.html');
+const SURVEY_SLUGS = {
+  [MOBILIAR_SLUG]: () => MOBILIAR_FILE, [SPOKOJENOST_SLUG]: () => SPOKOJENOST_FILE,
+  [MOBILIAR_VYSLEDKY_SLUG]: () => MOBILIAR_VYSLEDKY_FILE, [SPOKOJENOST_VYSLEDKY_SLUG]: () => SPOKOJENOST_VYSLEDKY_FILE,
+};
 const MOBILIAR_PUBLIC_URL = SURVEY_PUBLIC_URL + '/' + MOBILIAR_SLUG;         // sběrné odkazy zobrazované v adminu
 const SPOKOJENOST_PUBLIC_URL = SURVEY_PUBLIC_URL + '/' + SPOKOJENOST_SLUG;
 // Jednotný slevový kód za vyplnění průzkumů (číselný, stejný pro všechny) — zobrazuje se na závěrečných
@@ -1215,6 +1223,25 @@ function recordMobiliar(b) {
   if (novy) logActivity('mobiliar', { email: '', name: 'anonym' }, 'Hodnocení mobiliáře: nový respondent (' + rec.role + ')');
   return { ok: true, ulozeno: Object.keys(rec.votes).length };
 }
+// Veřejný náhled výsledků mobiliáře — JEN agregace (žádný seznam respondentů).
+const MOBILIAR_ROLE_TEXTY = { starosta: 'starosta / místostarosta', urednik: 'úředník obce či města', 'ts-reditel': 'ředitel technických služeb', 'ts-provoz': 'provozní pracovník TS', 'technicke-sluzby': 'technické služby', firma: 'firma nebo podnikatel', obchodnik: 'obchodník ELKOPLAST', zakaznik: 'zákazník', ostatni: 'jiné', neuvedeno: 'neuvedeno' };
+const MOBILIAR_OBEC_TEXTY = { do1000: 'do 1 000 obyvatel', '1000-5000': '1–5 tisíc', '5000-20000': '5–20 tisíc', '20000-100000': '20–100 tisíc', nad100000: 'nad 100 tisíc', 'netyka-se': 'netýká se', neuvedeno: 'neuvedeno' };
+function mobiliarVerejneVysledky() {
+  const res = readJson(MOBILIAR_F, []);
+  const prod = {};
+  MOBILIAR_KATEGORIE.forEach(k => { for (let i = 1; i <= k.pocet; i++) prod[k.key + '-' + String(i).padStart(3, '0')] = { kod: k.key + '-' + String(i).padStart(3, '0'), kat: k.key, zobrazeno: 0, vybrano: 0 }; });
+  let sestic = 0, vybrano = 0;
+  const pocty = pole => { const c = {}; res.forEach(r => { const v = r[pole] || 'neuvedeno'; c[v] = (c[v] || 0) + 1; }); return c; };
+  res.forEach(r => { Object.entries(r.votes || {}).forEach(([kod, v]) => { const p = prod[kod]; if (!p) return; p.zobrazeno++; sestic++; if (v > 0) { p.vybrano++; vybrano++; } }); });
+  const roleC = pocty('role'), obecC = pocty('obec');
+  return {
+    respondentu: res.length, sestic: Math.floor(sestic / 6), vybrano,
+    pozice: Object.keys(roleC).map(k => ({ t: MOBILIAR_ROLE_TEXTY[k] || k, pocet: roleC[k] })).sort((a, b) => b.pocet - a.pocet),
+    obce: Object.keys(obecC).map(k => ({ t: MOBILIAR_OBEC_TEXTY[k] || k, pocet: obecC[k] })).sort((a, b) => b.pocet - a.pocet),
+    kategorie: MOBILIAR_KATEGORIE,
+    produkty: Object.values(prod).filter(p => p.zobrazeno > 0),
+  };
+}
 
 /* ---- Dotazník spokojenosti zákazníků shop.elkoplast.cz (NPS/CSAT/CES/Heureka) ----
    Definice otázek je v data/spokojenost-dotaznik.json a EDITUJE SE V ADMINU (Průzkumy → detail).
@@ -1387,6 +1414,46 @@ function recordSpokojenost(b) {
   writeJson(SPOKOJENOST_F, all);
   if (novy) logActivity('spokojenost', { email: '', name: 'anonym' }, 'Dotazník spokojenosti: nový respondent');
   return { ok: true, ulozeno: Object.keys(rec.odpovedi).length };
+}
+// Veřejný náhled výsledků spokojenosti — JEN agregace: bez e-mailů, bez volných textů (u nich jen počet).
+function spokojenostVerejneVysledky() {
+  const def = spokojenostDef();
+  const res = readJson(SPOKOJENOST_F, []);
+  const odp = qid => res.map(r => (r.odpovedi || {})[qid]).filter(Boolean);
+  let prom = 0, det = 0, npsN = 0, csatS = 0, csatN = 0;
+  odp('q24').forEach(o => { if (typeof o.v === 'number' && o.v >= 0) { npsN++; if (o.v >= 9) prom++; else if (o.v <= 6) det++; } });
+  odp('q23').forEach(o => { if (typeof o.v === 'number' && o.v >= 0) { csatN++; csatS += o.v; } });
+  const sekce = def.sekce.map(s => ({
+    nazev: s.nazev, jen: s.jen || 'vsichni',
+    otazky: s.otazky.filter(q => q.aktivni !== false).map(q => {
+      const os = odp(q.id);
+      if (q.typ === 'vyber' || q.typ === 'vice') {
+        const cnt = {}; let jine = 0;
+        os.forEach(o => { const vs = Array.isArray(o.v) ? o.v : (typeof o.v === 'string' ? [o.v] : []); vs.forEach(k => { if (k === '__jine') jine++; else cnt[k] = (cnt[k] || 0) + 1; }); });
+        return { typ: 'moznosti', text: q.text, n: os.length, polozky: (q.moznosti || []).map(m => ({ t: m.t, pocet: cnt[m.k] || 0 })).concat(q.jine && jine ? [{ t: 'jiné', pocet: jine }] : []) };
+      }
+      if (q.typ === 'skala') {
+        const vals = os.filter(o => typeof o.v === 'number' && o.v >= 0).map(o => o.v);
+        const min = q.min == null ? 1 : q.min, max = q.max == null ? 5 : q.max;
+        const dist = []; for (let v = min; v <= max; v++) dist.push(vals.filter(x => x === v).length);
+        return { typ: 'skala', text: q.text, min, max, popisMin: q.popisMin || '', popisMax: q.popisMax || '', n: vals.length,
+          avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0, dist, nehodnotim: os.filter(o => o.v === -1).length };
+      }
+      if (q.typ === 'kategorie-skala') {
+        const zdroj = (def.sekce.flatMap(x => x.otazky).find(x => x.id === q.kategorieZ) || {}).moznosti || [];
+        const sums = {}, ns = {};
+        os.forEach(o => { if (o.v && typeof o.v === 'object' && !Array.isArray(o.v)) Object.entries(o.v).forEach(([k, v]) => { sums[k] = (sums[k] || 0) + v; ns[k] = (ns[k] || 0) + 1; }); });
+        return { typ: 'kategorie', text: q.text, polozky: Object.keys(ns).map(k => { const m = zdroj.find(x => x.k === k); return { t: m ? m.t : (k === '__jine' ? 'jiné' : k), avg: sums[k] / ns[k], n: ns[k] }; }).sort((a, b) => b.avg - a.avg) };
+      }
+      return { typ: 'text', text: q.text, n: os.filter(o => (o.txt || '').trim()).length };   // volné texty veřejně nezobrazujeme
+    }),
+  }));
+  return {
+    nazev: def.nazev, respondentu: res.length, dokonceno: res.filter(r => r.hotovo).length,
+    nps: { n: npsN, prom, det, score: npsN ? Math.round((prom - det) / npsN * 100) : 0 },
+    csat: { n: csatN, avg: csatN ? csatS / csatN : 0 },
+    sekce,
+  };
 }
 /* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
 const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)', vykresy: 'Test čtení výkresů', logika: 'Test logického myšlení (nákup a logistika)' };
@@ -3492,6 +3559,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, SURVEY_LANDING, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     const surveyOk = p.indexOf('/mobiliar-foto/') === 0 || (p === '/api/mobiliar/vote' && req.method === 'POST')
       || p.indexOf('/pruzkum-foto/') === 0 || (p === '/api/spokojenost/dotaznik' && req.method === 'GET') || (p === '/api/spokojenost/odpoved' && req.method === 'POST')
+      || (p === '/api/mobiliar/verejne-vysledky' && req.method === 'GET') || (p === '/api/spokojenost/verejne-vysledky' && req.method === 'GET')
       || p === '/healthz' || p === '/api/version';
     if (!surveyOk) { res.writeHead(302, { 'Location': '/' }); return res.end(); }
   }
@@ -3518,9 +3586,9 @@ const server = http.createServer(async (req, res) => {
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
   const mobilniLisyPublic = p === '/mobilni-lisy' || (p === '/api/mobilni-lisy/prihlaska' && req.method === 'POST') || (p === '/api/mobilni-lisy/pozadi' && req.method === 'GET');
   // Veřejné cesty hodnocení mobiliáře (obrázkový průzkum pro obchodníky i zákazníky): stránka + fotky + hlasy.
-  const mobiliarPublic = p === '/mobiliar' || p === '/mobiliar.html' || p.indexOf('/mobiliar-foto/') === 0 || (p === '/api/mobiliar/vote' && req.method === 'POST');
+  const mobiliarPublic = p === '/mobiliar' || p === '/mobiliar.html' || p.indexOf('/mobiliar-foto/') === 0 || (p === '/api/mobiliar/vote' && req.method === 'POST') || (p === '/api/mobiliar/verejne-vysledky' && req.method === 'GET');
   // Veřejné cesty dotazníku spokojenosti (shop.elkoplast.cz): stránka + definice otázek + odpovědi + obrázky.
-  const spokojenostPublic = p === '/spokojenost' || p === '/spokojenost.html' || p.indexOf('/pruzkum-foto/') === 0 || (p === '/api/spokojenost/dotaznik' && req.method === 'GET') || (p === '/api/spokojenost/odpoved' && req.method === 'POST');
+  const spokojenostPublic = p === '/spokojenost' || p === '/spokojenost.html' || p.indexOf('/pruzkum-foto/') === 0 || (p === '/api/spokojenost/dotaznik' && req.method === 'GET') || (p === '/api/spokojenost/odpoved' && req.method === 'POST') || (p === '/api/spokojenost/verejne-vysledky' && req.method === 'GET');
 
   // Verze běžícího serveru – klient si podle ní pozná, že běží na staré verzi z cache (mimo závoru, bez cache).
   if (p === '/api/version') return send(res, 200, { commit: GIT_COMMIT, built: BUILD_TIME, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null }, { 'Cache-Control': 'no-store' });
@@ -3959,7 +4027,17 @@ const server = http.createServer(async (req, res) => {
       if (r.error) return send(res, 400, r);
       return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' });
     }
-    if (p === '/api/mobiliar-results' && req.method === 'GET') return send(res, 200, { kategorie: MOBILIAR_KATEGORIE, zaznamy: readJson(MOBILIAR_F, []), verejnyOdkaz: MOBILIAR_PUBLIC_URL });
+    if (p === '/api/mobiliar-results' && req.method === 'GET') return send(res, 200, { kategorie: MOBILIAR_KATEGORIE, zaznamy: readJson(MOBILIAR_F, []), verejnyOdkaz: MOBILIAR_PUBLIC_URL, vysledkyOdkaz: SURVEY_PUBLIC_URL + '/' + MOBILIAR_VYSLEDKY_SLUG });
+
+    // Veřejné náhledy výsledků — jen agregace; klíč k = tajný slug stránky s výsledky.
+    if (p === '/api/mobiliar/verejne-vysledky' && req.method === 'GET') {
+      if ((u.query.k || '') !== MOBILIAR_VYSLEDKY_SLUG) return send(res, 404, { error: 'Nenalezeno.' });
+      return send(res, 200, mobiliarVerejneVysledky(), { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
+    }
+    if (p === '/api/spokojenost/verejne-vysledky' && req.method === 'GET') {
+      if ((u.query.k || '') !== SPOKOJENOST_VYSLEDKY_SLUG) return send(res, 404, { error: 'Nenalezeno.' });
+      return send(res, 200, spokojenostVerejneVysledky(), { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
+    }
 
     // Dotazník spokojenosti: definice otázek (veřejná), příjem odpovědí (veřejný), výsledky + úprava (admin).
     if (p === '/api/spokojenost/dotaznik' && req.method === 'GET') return send(res, 200, spokojenostDef(), { 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
@@ -3969,7 +4047,7 @@ const server = http.createServer(async (req, res) => {
       if (r.error) return send(res, 400, r);
       return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' });
     }
-    if (p === '/api/spokojenost-results' && req.method === 'GET') return send(res, 200, { def: spokojenostDef(), zaznamy: readJson(SPOKOJENOST_F, []), verejnyOdkaz: SPOKOJENOST_PUBLIC_URL });
+    if (p === '/api/spokojenost-results' && req.method === 'GET') return send(res, 200, { def: spokojenostDef(), zaznamy: readJson(SPOKOJENOST_F, []), verejnyOdkaz: SPOKOJENOST_PUBLIC_URL, vysledkyOdkaz: SURVEY_PUBLIC_URL + '/' + SPOKOJENOST_VYSLEDKY_SLUG });
     if (p === '/api/spokojenost/dotaznik-uprava' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }

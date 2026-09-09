@@ -7417,6 +7417,7 @@ let MOBILIAR_FILTR={role:'',obec:'',kat:'',sort:'top'};
 const MOBILIAR_ROLE_NAZVY={starosta:'Starosta / místostarosta',urednik:'Úředník obce/města','ts-reditel':'Ředitel technických služeb','ts-provoz':'Provozní pracovník TS','technicke-sluzby':'Technické služby',firma:'Firma',obchodnik:'Obchodník ELKOPLAST',zakaznik:'Zákazník',ostatni:'Jiné',neuvedeno:'Neuvedeno'};
 const MOBILIAR_OBEC_NAZVY={do1000:'do 1 000',  '1000-5000':'1–5 tis.','5000-20000':'5–20 tis.','20000-100000':'20–100 tis.',nad100000:'nad 100 tis.','netyka-se':'netýká se',neuvedeno:'—'};
 function mobiliarUrl(){ return MOBILIAR_DATA.verejnyOdkaz||(location.origin+'/mobiliar'); }   /* sběrná doména (vyzkum.elkoplast.cz), bez „intranet" v adrese */
+function kopirujOdkaz(url){ (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>toast('Odkaz zkopírován: '+url)).catch(()=>prompt('Zkopírujte odkaz:',url)); }
 function mobiliarCopyLink(){
   const url=mobiliarUrl();
   (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>toast('Odkaz zkopírován: '+url)).catch(()=>prompt('Zkopírujte odkaz:',url));
@@ -7443,6 +7444,9 @@ async function mobiliarBlockHtml(){
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--green-soft);border:1px solid var(--line);border-radius:10px;padding:9px 12px">'+
       '<code style="font-size:13.5px;font-weight:700">'+esc(url)+'</code>'+
       '<button class="btn sm" onclick="mobiliarCopyLink()">🔗 Kopírovat</button></div>'+
+    (MOBILIAR_DATA.vysledkyOdkaz?'<p class="muted" style="font-size:12px;margin:8px 0 0">Veřejný náhled výsledků (jen souhrny — bez respondentů a kontaktů): '+
+      '<code style="font-size:12px;word-break:break-all">'+esc(MOBILIAR_DATA.vysledkyOdkaz)+'</code> '+
+      '<button class="btn ghost sm" onclick="kopirujOdkaz(MOBILIAR_DATA.vysledkyOdkaz)">kopírovat</button></p>':'')+
     '</div>'+
     '<div id="mobiliarVysledky"></div>';
 }
@@ -7553,6 +7557,9 @@ async function spokBlockHtml(){
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--green-soft);border:1px solid var(--line);border-radius:10px;padding:9px 12px">'+
       '<code style="font-size:13px;font-weight:700;word-break:break-all">'+esc(spokUrl())+'</code>'+
       '<button class="btn sm" onclick="spokCopyLink()">🔗 Kopírovat</button></div>'+
+    (SPOK_DATA.vysledkyOdkaz?'<p class="muted" style="font-size:12px;margin:8px 0 0">Veřejný náhled výsledků (jen souhrny — bez e-mailů a volných odpovědí): '+
+      '<code style="font-size:12px;word-break:break-all">'+esc(SPOK_DATA.vysledkyOdkaz)+'</code> '+
+      '<button class="btn ghost sm" onclick="kopirujOdkaz(SPOK_DATA.vysledkyOdkaz)">kopírovat</button></p>':'')+
     '</div><div id="spokBox"></div>';
 }
 function spokPrepni(tab){ SPOK_TAB=tab; if(tab==='editor'&&!SPOK_EDIT) SPOK_EDIT=JSON.parse(JSON.stringify(SPOK_DATA.def||{sekce:[]})); spokRerender(); }
