@@ -33,11 +33,15 @@ function mount(host) {
   // Odvozený seznam dodavatelů z ERP: název, počet položek, medián dodací lhůty, hodnota zásoby — + uložené hodnoty dotazníku.
   function supplierList() {
     const o = loadObj(), saved = loadSup(), g = {};
-    (o.rows || []).forEach(r => { const k = r.skupina || '—'; (g[k] = g[k] || { supplier: k, items: 0, leads: [], stockVal: 0 }); g[k].items++; if (r.lead > 0) g[k].leads.push(r.lead); g[k].stockVal += (r.stock || 0) * (r.unitCost || 0); });
+    (o.rows || []).forEach(r => { const k = r.skupina || '—'; (g[k] = g[k] || { supplier: k, items: 0, leads: [], stockVal: 0, sks: new Set() }); g[k].items++; g[k].sks.add(String(r.sk || '').trim()); if (r.lead > 0) g[k].leads.push(r.lead); g[k].stockVal += (r.stock || 0) * (r.unitCost || 0); });
     return Object.values(g).map(x => {
       const ls = x.leads.slice().sort((a, b) => a - b), med = ls.length ? ls[Math.floor(ls.length / 2)] : 0;
       const s = saved[x.supplier] || {};
-      return { supplier: x.supplier, items: x.items, erpLead: med, stockVal: Math.round(x.stockVal), lead: (s.lead != null ? s.lead : null), shipCost: (s.shipCost != null ? s.shipCost : null), origin: s.origin || '', zdrazeniPct: (s.zdrazeniPct != null ? s.zdrazeniPct : null), zdrazeniOd: s.zdrazeniOd || null };
+      // Výchozí režim z pravidla nákupu (SPEC_SK dle SK řad dodavatele) — dokud se nenastaví ručně.
+      let seed = '';
+      for (const sk of x.sks) { const sp = SPEC_SK[sk]; if (sp) { seed = sp.typ; break; } }
+      return { supplier: x.supplier, items: x.items, erpLead: med, stockVal: Math.round(x.stockVal), lead: (s.lead != null ? s.lead : null), shipCost: (s.shipCost != null ? s.shipCost : null), origin: s.origin || '', zdrazeniPct: (s.zdrazeniPct != null ? s.zdrazeniPct : null), zdrazeniOd: s.zdrazeniOd || null,
+        rezim: s.rezim || '', rezimSeed: seed, sks: [...x.sks].sort() };
     }).sort((a, b) => b.stockVal - a.stockVal);
   }
 
@@ -322,7 +326,7 @@ function mount(host) {
   const saveNew = m => { try { fs.writeFileSync(NEW_F, JSON.stringify(m, null, 2)); } catch (_) {} };
   // Důkaz, že položka „žije": měla pohyb, někdo si ji objednal, nebo je objednaná u dodavatele.
   function isNewActive(r, mv) {
-    if (specOf(r.sk)) return false;   // dropship/doprodej neni "nova polozka k objednani"
+    if (specOf(r.sk, r.skupina)) return false;   // dropship/doprodej neni "nova polozka k objednani"
     // Musi mit platnou nakupni cenu — bez ni to neni zbozi k objednani, ale sluzba
     // („Doprava realizovana cizimi vozidly") nebo nedokoncena kmenova karta.
     if (!((r.unitCost || 0) > 0 || (r.unitPrice || 0) > 0)) return false;
@@ -369,7 +373,7 @@ function mount(host) {
     return (rows || []).filter(r => { const key = r.sk + '-' + r.reg;
       if (k.has(key) || nk.has(key)) return true;
       if (/^služby$/i.test(String(r.skupina || '').trim())) return false;
-      return (r.avail || 0) < 0 || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0 || !!specOf(r.sk); }); };
+      return (r.avail || 0) < 0 || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0 || !!specOf(r.sk, r.skupina); }); };
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
   // SK rady, ktere se NENAKUPUJI na sklad (info od nakupu 2026-08-26). Drzet v synchronu
   // s kopii SPEC_SK v SMI_aplikace.html!
@@ -390,7 +394,17 @@ function mount(host) {
     '364': { typ: 'doprodej', pozn: 'Gardena — leží přes rok, vyprodat' },
     '388': { typ: 'doprodej', pozn: 'Portimpex — na zkoušku, špatná kvalita, doprodej' },
   };
-  const specOf = sk => SPEC_SK[String(sk || '').trim()] || null;
+  // Režim nastavený u dodavatele (dotazník) má přednost před tabulkou SPEC_SK — ta je jen
+  // výchozí pravidlo od nákupu. Nákup tak může kdykoli říct „tenhle dodavatel se naskladňuje"
+  // (rezim 'sklad') i „tenhle nově nenaskladňuje" bez zásahu do kódu.
+  let _supC = null, _supAt = 0;
+  const supCfgCached = () => { if (_supC && (Date.now() - _supAt) < 30000) return _supC; _supC = loadSup(); _supAt = Date.now(); return _supC; };
+  const supCfgReset = () => { _supC = null; };
+  const specOf = (sk, skupina) => {
+    const s = skupina ? supCfgCached()[skupina] : null;
+    if (s && s.rezim) return s.rezim === 'sklad' ? null : { typ: s.rezim, pozn: 'nastaveno v dotazníku dodavatelů' };
+    return SPEC_SK[String(sk || '').trim()] || null;
+  };
   // Přečíslované položky: nová kmenová karta nemá prodejní historii, protože ta zůstala
   // na staré. Bez tohoto můstku vypadá zavedený produkt jako nováček bez poptávky.
   //   Kovobel: dodavatel je v ERP veden dvakrát — 371 „ZBO - LENAERTS" (starý název, drží
@@ -601,7 +615,7 @@ function mount(host) {
   function computeOrderRow(x, sales, P, m0) {
     // Dropshipping / doprodej: tyto SK se na sklad NEOBJEDNAVAJI — zadne doporuceni,
     // zadne utichle, zadny forward-buy. Prodeje mit mohou (jdou primo od dodavatele).
-    const spec = specOf(x.sk);
+    const spec = specOf(x.sk, x.skupina);
     if (spec) {
       const Dsp = sales ? sales.reduce((s2, v) => s2 + (v || 0), 0) : 0;
       return { D: Dsp, rec: 0, status: spec.typ === 'dropship' ? '🚚 dropshipping — nenaskladňuje se' : '🏷 doprodej — neobjednávat',
@@ -1255,9 +1269,10 @@ function mount(host) {
           if (v.origin) e.origin = String(v.origin).slice(0, 40);
           if (v.zdrazeniPct !== '' && v.zdrazeniPct != null && isFinite(+v.zdrazeniPct) && +v.zdrazeniPct > 0) e.zdrazeniPct = Math.min(100, Math.round(+v.zdrazeniPct));
           if (v.zdrazeniOd && /^\d{4}-\d{2}-\d{2}$/.test(String(v.zdrazeniOd))) e.zdrazeniOd = String(v.zdrazeniOd);
+          if (['sklad', 'dropship', 'doprodej'].indexOf(v.rezim) >= 0) e.rezim = v.rezim;
           if (Object.keys(e).length) cur[k] = e; else delete cur[k];
         });
-        saveSup(cur);
+        saveSup(cur); supCfgReset();   // režim ovlivňuje doporučení → zahodit cache
       }
       return json(res, 200, { ok: true, suppliers: cur }), true;
     }

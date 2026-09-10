@@ -955,7 +955,21 @@ const SPEC_SK={
   '364':{typ:'doprodej',pozn:'Gardena — leží přes rok, vyprodat'},
   '388':{typ:'doprodej',pozn:'Portimpex — na zkoušku, špatná kvalita, doprodej'},
 };
-function specOf(sk){return SPEC_SK[String(sk||'').trim()]||null;}
+// Kterému dodavateli patří SK řada (jedna řada = jeden dodavatel v ERP). Plní se z ERP dat.
+var SK_SUP={};
+function skSupMap(rows){ (rows||[]).forEach(x=>{const k=String(x.sk||'').trim(); if(k&&!SK_SUP[k])SK_SUP[k]=x.skupina||'';}); }
+// Režim nastavený v dotazníku dodavatelů má PŘEDNOST před tabulkou SPEC_SK — ta je jen výchozí
+// pravidlo od nákupu. Nákup tak přepne dodavatele na sklad / dropship / doprodej přímo v appce.
+function supRezim(sup){
+  if(!sup)return null;
+  const m=(typeof OBJ_DATA!=='undefined'&&OBJ_DATA&&OBJ_DATA.suppliers)||(typeof LIVE_SUP!=='undefined'&&LIVE_SUP)||{};
+  const s=m[sup]; return (s&&s.rezim)?s.rezim:null;
+}
+function specOf(sk,sup){
+  const r=supRezim(sup||SK_SUP[String(sk||'').trim()]);
+  if(r)return r==='sklad'?null:{typ:r,pozn:'nastaveno v dotazníku dodavatelů'};
+  return SPEC_SK[String(sk||'').trim()]||null;
+}
 // Bunka "Rezim" do tabulek: Sklad / Dropshipping / Doprodej (s vysvetlivkou po najeti)
 function specRezim(sk){
   const s=specOf(sk);
@@ -1375,6 +1389,7 @@ async function ensureModelSup(){
     let liveDate=(OBJ_DATA&&OBJ_DATA.date)||'', supCfgMap=(OBJ_DATA&&OBJ_DATA.suppliers)||null;
     if(!rows){const r=await fetch('/api/nakup-report/objednavky',{cache:'no-store'});const d=await r.json();rows=d.rows||[];liveDate=d.date||'';supCfgMap=d.suppliers||{};}
     LIVE_SUP=supCfgMap||{};
+    skSupMap(rows);
     MODEL_SUP={};LIVE_STOCK={map:{},date:liveDate};
     rows.forEach(x=>{const k=String(x.sk)+'-'+String(x.reg);MODEL_SUP[k]=x.skupina||'';
       LIVE_STOCK.map[k]={stock:+x.stock||0,cost:(x.unitCost>0?x.unitCost:(+x.unitPrice||0))};});
@@ -2430,7 +2445,7 @@ async function utRozhodni(key,stav){
 }
 function objComputeOrder(x,sales,P,m0,sea,dem){
   // Dropshipping / doprodej: neobjednává se na sklad — žádné doporučení, utichlé ani forward-buy.
-  const spec=specOf(x.sk);
+  const spec=specOf(x.sk,x.skupina);
   if(spec){
     const Dsp=sales?sales.reduce((s,v)=>s+(v||0),0):0;
     return {D:Dsp,rec:0,status:spec.typ==='dropship'?'\u{1F69A} Dropshipping — nenaskladňuje se':'\u{1F3F7} Doprodej — neobjednávat',
@@ -2590,6 +2605,7 @@ async function renderObjednavky(){
   if(!OBJ_DATA){
     try{const r=await fetch('/api/nakup-report/objednavky',{cache:'no-store'});OBJ_DATA=await r.json();}catch(e){OBJ_DATA={rows:[]};}
     OBJ_DATA.allRows=(OBJ_DATA.rows||[]).slice();   // plný ERP seznam (pro poradce podle kódu)
+    skSupMap(OBJ_DATA.allRows);                     // index SK → dodavatel (pro režim položky)
     const sups=[...new Set((OBJ_DATA.rows||[]).map(x=>x.skupina))].sort((a,b)=>String(a).localeCompare(String(b),'cs'));
     const sel=$('#objSup');if(sel)sel.innerHTML='<option value="">Všichni dodavatelé ('+(OBJ_DATA.rows||[]).length+')</option>'+sups.map(s=>'<option>'+esc(s)+'</option>').join('');
     const dt=$('#objDate');if(dt)dt.textContent=(OBJ_DATA.date||'?')+' · '+(OBJ_DATA.rows||[]).length+' položek';
@@ -2614,7 +2630,7 @@ async function renderObjednavky(){
       const k=String(x.sk)+'-'+String(x.reg);
       if(smap[k]!==undefined||nove.has(k))return true;
       if(/^služby$/i.test(String(x.skupina||'').trim()))return false;
-      return (x.avail||0)<0||(x.reserved||0)>0||(x.onOrder||0)>0||!!specOf(x.sk);
+      return (x.avail||0)<0||(x.reserved||0)>0||(x.onOrder||0)>0||!!specOf(x.sk,x.skupina);
     });
     OBJ_DATA.rows.forEach(x=>{x._nohist=smap[String(x.sk)+'-'+String(x.reg)]===undefined;});
     const sel=$('#objSup');
@@ -2998,11 +3014,18 @@ function objSupIntervalPreview(supplier,shipCost){
 function objRenderSuppliers(list){
   const wrap=$('#objSupWrap'); if(!wrap)return;
   const orig=['','ČR','EU','Čína','jiná'];
-  let h='<p class="muted" style="margin:0 0 8px">U každého dodavatele vyplň <b>termín dodání</b> (dny), <b>náklad na dopravu</b> (Kč za jednu společnou zásilku/kontejner) a případné <b>ohlášené zdražení</b> (kolik % a od kdy — model pak doporučí předzásobení za staré ceny). Z toho se počítá <b>jak často z toho dodavatele objednávat</b> (společný interval) a <b>ekonomická dávka</b> každé položky. Dražší doprava (Čína) = řidší, větší objednávky. „Doporučený interval" se dopočítá živě. Prázdné = použije se lhůta z ERP, EOQ se nepočítá.</p>';
+  let h='<p class="muted" style="margin:0 0 8px">U každého dodavatele vyplň <b>termín dodání</b> (dny), <b>náklad na dopravu</b> (Kč za jednu společnou zásilku/kontejner) a případné <b>ohlášené zdražení</b> (kolik % a od kdy — model pak doporučí předzásobení za staré ceny). Z toho se počítá <b>jak často z toho dodavatele objednávat</b> (společný interval) a <b>ekonomická dávka</b> každé položky. Dražší doprava (Čína) = řidší, větší objednávky. „Doporučený interval" se dopočítá živě. Prázdné = použije se lhůta z ERP, EOQ se nepočítá.<br><b>Režim</b> říká, jestli se u dodavatele vůbec optimalizuje nákup: <b>Sklad</b> = ano. <b>🚚 Dropshipping</b> = zboží jde od dodavatele rovnou k zákazníkovi, nenaskladňuje se — žádná doporučení, žádné předzásobení. <b>🏷 Doprodej</b> = dojíždí, neobjednávat. Nastavení tady <b>přebíjí</b> výchozí pravidlo podle SK řady, takže když se u dropshipového dodavatele začne naskladňovat, stačí přepnout na Sklad.</p>';
   h+='<div style="margin:0 0 8px"><button class="btn" type="button" id="objSupSave">💾 Uložit dotazník</button> <span class="muted" id="objSupStatus" style="font-size:12px"></span></div>';
-  h+='<div class="tblwrap" style="max-height:420px"><table><thead><tr><th>Dodavatel</th><th>Původ</th><th style="text-align:right">Položek</th><th style="text-align:right">Hodnota zásoby</th><th style="text-align:right">ERP lhůta</th><th style="text-align:right">Termín dodání (dny)</th><th style="text-align:right">Doprava (Kč/zásilka)</th><th style="text-align:right" title="Ohlášené zdražení dodavatele — model doporučí předzásobení za staré ceny">Zdražení %</th><th title="Datum, od kterého nové ceny platí">Od data</th><th style="text-align:right" title="Optimální frekvence objednávek z tohoto dodavatele (joint replenishment)">Doporučený interval</th></tr></thead><tbody>';
+  h+='<div class="tblwrap" style="max-height:420px"><table><thead><tr><th>Dodavatel</th><th title="Sklad = zboží držíme a model doporučuje objednávky. Dropshipping = jde od dodavatele rovnou k zákazníkovi, nenaskladňuje se a NEOPTIMALIZUJE se. Doprodej = dojíždí, neobjednávat.">Režim</th><th>Původ</th><th style="text-align:right">Položek</th><th style="text-align:right">Hodnota zásoby</th><th style="text-align:right">ERP lhůta</th><th style="text-align:right">Termín dodání (dny)</th><th style="text-align:right">Doprava (Kč/zásilka)</th><th style="text-align:right" title="Ohlášené zdražení dodavatele — model doporučí předzásobení za staré ceny">Zdražení %</th><th title="Datum, od kterého nové ceny platí">Od data</th><th style="text-align:right" title="Optimální frekvence objednávek z tohoto dodavatele (joint replenishment)">Doporučený interval</th></tr></thead><tbody>';
   list.forEach(s=>{const k=esc(s.supplier); const prev=objSupIntervalPreview(s.supplier,s.shipCost);
-    h+='<tr data-sup="'+k+'"><td>'+k+'</td>'+
+    const rez=s.rezim||s.rezimSeed||'sklad', zPrav=!s.rezim&&!!s.rezimSeed;
+    const btn=(v,lab,tit)=>'<button type="button" class="rzb'+(rez===v?' on':'')+'" data-v="'+v+'" title="'+tit+'">'+lab+'</button>';
+    h+='<tr data-sup="'+k+'" class="'+(rez==='sklad'?'':'rzoff')+'"><td>'+k+'</td>'+
+      '<td><span class="rzgrp" data-f="rezim" data-val="'+rez+'">'
+        +btn('sklad','Sklad','Držíme na skladě — model doporučuje objednávky')
+        +btn('dropship','🚚 Dropship','Jde od dodavatele rovnou k zákazníkovi — nenaskladňuje se a neoptimalizuje')
+        +btn('doprodej','🏷 Doprodej','Dojíždí — neobjednávat')
+      +'</span>'+(zPrav?' <span class="muted" style="font-size:11px" title="Zatím nepotvrzeno — plyne z pravidla nákupu podle SK řady">z pravidla</span>':'')+'</td>'+
       '<td><select data-f="origin" style="width:80px">'+orig.map(o=>'<option'+(o===(s.origin||'')?' selected':'')+'>'+o+'</option>').join('')+'</select></td>'+
       '<td style="text-align:right">'+fmt(s.items)+'</td><td style="text-align:right">'+fmt(s.stockVal)+' Kč</td>'+
       '<td style="text-align:right" class="muted">'+(s.erpLead?fmt(s.erpLead)+' d':'—')+'</td>'+
@@ -3014,6 +3037,19 @@ function objRenderSuppliers(list){
   });
   h+='</tbody></table></div>';
   wrap.innerHTML=h;
+  if(!document.getElementById('rzCss')){const st2=document.createElement('style');st2.id='rzCss';
+    st2.textContent='.rzgrp{display:inline-flex;border:1px solid #ccd3cc;border-radius:8px;overflow:hidden}'
+      +'.rzb{font:inherit;font-size:12px;padding:3px 9px;border:0;background:#fff;color:#5a635b;cursor:pointer;white-space:nowrap}'
+      +'.rzb+.rzb{border-left:1px solid #e2e7e2}.rzb.on{background:#2f6f8f;color:#fff;font-weight:700}'
+      +'tr.rzoff td{background:#fbf7f0}tr.rzoff input,tr.rzoff select{opacity:.45}';
+    document.head.appendChild(st2);}
+  wrap.querySelectorAll('.rzgrp').forEach(g=>{ g.onclick=ev=>{
+    const b=ev.target.closest('.rzb'); if(!b)return;
+    g.setAttribute('data-val',b.getAttribute('data-v'));
+    g.querySelectorAll('.rzb').forEach(x=>x.classList.toggle('on',x===b));
+    const tr=g.closest('tr[data-sup]'); if(tr)tr.classList.toggle('rzoff',b.getAttribute('data-v')!=='sklad');
+    const zp=g.parentNode&&g.parentNode.querySelector('span.muted'); if(zp)zp.remove();
+  };});
   const sb=$('#objSupSave'); if(sb)sb.onclick=objSaveSuppliers;
   // živý přepočet doporučeného intervalu při psaní dopravy
   wrap.querySelectorAll('input[data-f=shipCost]').forEach(inp=>{inp.oninput=function(){
@@ -3027,7 +3063,9 @@ function objSaveSuppliers(){
   wrap.querySelectorAll('tr[data-sup]').forEach(tr=>{
     const name=tr.getAttribute('data-sup');
     const g=f=>(tr.querySelector('[data-f='+f+']')||{}).value;
-    payload[name]={lead:g('lead'),shipCost:g('shipCost'),origin:g('origin'),zdrazeniPct:g('zdrazeniPct'),zdrazeniOd:g('zdrazeniOd')};
+    const rg=tr.querySelector('[data-f=rezim]');
+    payload[name]={lead:g('lead'),shipCost:g('shipCost'),origin:g('origin'),zdrazeniPct:g('zdrazeniPct'),zdrazeniOd:g('zdrazeniOd'),
+      rezim:rg?rg.getAttribute('data-val'):''};
   });
   const st=$('#objSupStatus'); if(st)st.textContent='Ukládám…';
   fetch('/api/nakup-report/suppliers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({suppliers:payload})})
@@ -3035,6 +3073,7 @@ function objSaveSuppliers(){
       if(OBJ_DATA)OBJ_DATA.suppliers=d.suppliers||{};   // aktualizuj lokálně → EOQ sloupce se přepočtou
       if(st)st.textContent='Uloženo ('+Object.keys(d.suppliers||{}).length+' dodavatelů s údaji).';
       try{renderObjednavky();}catch(e){}
+      try{objLoadSuppliers(true);}catch(e){}
       if(typeof toast==='function')toast('Dotazník dodavatelů uložen');
     }).catch(e=>{if(st)st.textContent='Chyba uložení ('+e+')';});
 }
