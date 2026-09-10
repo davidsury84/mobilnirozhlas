@@ -2589,7 +2589,7 @@ function renderDrawer(z){
         (z.strediskoName?('<b>Výrobní středisko</b><span>'+esc(z.strediskoName)+'</span>'):'')+
         (z.holdReason?('<b>Čeká na</b><span>'+esc(z.holdReason)+'</span>'):'')+
       '</div>'+
-      (z.muzeEditZadani?('<div class="actions" style="margin:-4px 0 10px"><button class="btn ghost sm" onclick="openEditZadani(\''+z.id+'\')" title="Zákazník, kontaktní osoba, e-mail klienta, termín, typ výrobku i celý dotazník">✎ Upravit údaje zakázky a zadání</button></div>'):'')+
+      (z.muzeEditZadani?('<div class="actions" style="margin:2px 0 12px"><button class="btn ghost sm" style="border:1px solid var(--line);background:#fff" onclick="openEditZadani(\''+z.id+'\')" title="Zákazník, kontaktní osoba, e-mail klienta, požadovaný termín, typ výrobku i celý dotazník">✎ Upravit údaje zakázky a zadání</button></div>'):'')+
       actionsFor(z)+
       pdfPanel(z)+
       prilohyBlock(z)+rozhodnutiView(z)+vyrobniDokView(z)+dotaznikView(z)+zmenyView(z)+'<div id="drwArch"></div>'+params+vers+
