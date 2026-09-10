@@ -173,6 +173,7 @@ const VYKRESY_SKOLENI_FILE = path.join(ROOT, 'vykresy-skoleni.html'); // interak
 const SVAROVANI_SKOLENI_FILE = path.join(ROOT, 'svarovani-skoleni.html'); // průvodce svařováním: hodnocení svarů (ISO 5817), fotogalerie vad, QC + závěrečný test
 const ZENTEX_SKOLENI_FILE = path.join(ROOT, 'zentex-skoleni.html'); // interaktivní školení ZENTEX (lisovací kontejnery — výběr vhodného lisu) + závěrečný test (20 z 50 otázek)
 const TRIDICI_SKOLENI_FILE = path.join(ROOT, 'tridici-linky-skoleni.html'); // interaktivní školení Třídicí linky (12 kapitol: technologie, trh, ekonomika) + závěrečný test (24 z 60 otázek)
+const BRAMIDAN_SKOLENI_FILE = path.join(ROOT, 'bramidan-skoleni.html'); // interaktivní školení BRAMIDAN (stacionární vertikální lisy — výběr vhodného modelu) + závěrečný test (20 z 50 otázek)
 const KONCEPT_FILE = path.join(ROOT, 'intranet-koncept.html'); // náhledový koncept redesignu intranetu (SharePoint hub)
 const PUB_DIR  = path.join(DATA_DIR, 'published');
 const STATE_F  = path.join(DATA_DIR, 'state.json');
@@ -196,6 +197,7 @@ const VYKRESY_SKOLENI_F = path.join(DATA_DIR, 'vykresy-skoleni-results.json'); /
 const SVAROVANI_SKOLENI_F = path.join(DATA_DIR, 'svarovani-skoleni-results.json'); // výsledky testu školení Průvodce svařováním — max 3 pokusy na osobu
 const ZENTEX_SKOLENI_F = path.join(DATA_DIR, 'zentex-skoleni-results.json'); // výsledky testu školení ZENTEX (lisovací kontejnery) — max 3 pokusy na osobu
 const TRIDICI_SKOLENI_F = path.join(DATA_DIR, 'tridici-linky-skoleni-results.json'); // výsledky testu školení Třídicí linky — max 3 pokusy na osobu
+const BRAMIDAN_SKOLENI_F = path.join(DATA_DIR, 'bramidan-skoleni-results.json'); // výsledky testu školení BRAMIDAN (stacionární lisy) — max 3 pokusy na osobu
 const MOBILIAR_FILE = path.join(ROOT, 'mobiliar.html');      // veřejné obrázkové hodnocení venkovního mobiliáře (katalog WeiDu)
 const MOBILIAR_F = path.join(DATA_DIR, 'mobiliar-hlasovani.json'); // hlasy hodnocení mobiliáře — upsert dle rid (anonymní id prohlížeče)
 // Veřejná sběrná doména pro ZÁKAZNICKÉ průzkumy (alias na tuto app, bez „intranet" v adrese).
@@ -756,6 +758,7 @@ const SKOLENI_NAZVY = {
   svarovani: 'Průvodce svařováním — hodnocení svarů (ISO 5817)',
   zentex: 'ZENTEX — lisovací kontejnery (výběr vhodného lisu)',
   'tridici-linky': 'Třídicí linky — technologie, trh a ekonomika dotřídění',
+  bramidan: 'BRAMIDAN — stacionární (vertikální) lisy (výběr vhodného modelu)',
 };
 function skolPozRead() { const d = readJson(SKOLPOZ_F, null) || {}; return { items: Array.isArray(d.items) ? d.items : [] }; }
 function skolPozWrite(d) { writeJson(SKOLPOZ_F, { items: (d.items || []).slice(0, 5000) }); return skolPozRead(); }
@@ -804,6 +807,7 @@ function skolSplneno(email, kurz) {
     if (kurz === 'svarovani') return !!svarovaniSkoleniStatus(email).passed;
     if (kurz === 'zentex') return !!zentexSkoleniStatus(email).passed;
     if (kurz === 'tridici-linky') return !!tridiciSkoleniStatus(email).passed;
+    if (kurz === 'bramidan') return !!bramidanSkoleniStatus(email).passed;
   } catch (_) {}
   return false;
 }
@@ -830,6 +834,7 @@ function skolVysledek(email, kurz) {
     else if (kurz === 'svarovani') st = svarovaniSkoleniStatus(email);
     else if (kurz === 'zentex') st = zentexSkoleniStatus(email);
     else if (kurz === 'tridici-linky') st = tridiciSkoleniStatus(email);
+    else if (kurz === 'bramidan') st = bramidanSkoleniStatus(email);
   } catch (_) {}
   if (!st) return prazdny;
   const pokusy = Number(st.attemptsUsed) || 0, nejlepsi = Number(st.best) || 0;
@@ -1880,6 +1885,36 @@ function recordTridiciSkoleni(a) {
   writeJson(TRIDICI_SKOLENI_F, results);
   logActivity('tridici-linky-skoleni', { email, name }, 'Test Třídicí linky · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, TRIDICI_SKOLENI_MAX - rec.attempts.length), passed };
+}
+// Školení BRAMIDAN (stacionární vertikální lisy) – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
+const BRAMIDAN_SKOLENI_MAX = 3;
+function bramidanSkoleniStatus(email) {
+  email = (email || '').toLowerCase();
+  const rec = readJson(BRAMIDAN_SKOLENI_F, []).find(r => (r.email || '').toLowerCase() === email);
+  const attempts = (rec && Array.isArray(rec.attempts)) ? rec.attempts : [];
+  const best = attempts.reduce((m, a) => Math.max(m, a.pct || 0), 0);
+  return { attemptsUsed: attempts.length, attemptsLeft: Math.max(0, BRAMIDAN_SKOLENI_MAX - attempts.length), best, passed: attempts.some(a => a.passed) };
+}
+function recordBramidanSkoleni(a) {
+  const email = (a.email || '').toLowerCase();
+  const s = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const total = Math.max(0, Math.round(Number(a.total) || 0));
+  const correct = Math.max(0, Math.min(total, Math.round(Number(a.correct) || 0)));
+  const pct = Math.max(0, Math.min(100, Math.round(Number(a.pct) || 0)));
+  const passed = pct >= 80;
+  const results = readJson(BRAMIDAN_SKOLENI_F, []);
+  let rec = results.find(r => (r.email || '').toLowerCase() === email);
+  if (!rec) { rec = { email, name, dept, attempts: [] }; results.push(rec); }
+  rec.name = name; rec.dept = dept; if (!Array.isArray(rec.attempts)) rec.attempts = [];
+  if (rec.attempts.length >= BRAMIDAN_SKOLENI_MAX) { writeJson(BRAMIDAN_SKOLENI_F, results); return { blocked: true, attemptsUsed: rec.attempts.length }; }
+  rec.attempts.push({ correct, total, pct, passed, ts: Date.now() });
+  writeJson(BRAMIDAN_SKOLENI_F, results);
+  logActivity('bramidan-skoleni', { email, name }, 'Test BRAMIDAN · pokus ' + rec.attempts.length + ' · ' + pct + ' %' + (passed ? ' · splněno' : ''));
+  return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, BRAMIDAN_SKOLENI_MAX - rec.attempts.length), passed };
 }
 // Školení Čtení technických výkresů (ČSN/ISO) – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
 const VYKRESY_SKOLENI_MAX = 3;
@@ -4106,6 +4141,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/tridici-linky-skoleni' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, tridiciSkoleniStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/tridici-linky-skoleni' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordTridiciSkoleni(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/tridici-linky-skoleni-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(TRIDICI_SKOLENI_F, [])); }
+    if (p === '/api/bramidan-skoleni' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, bramidanSkoleniStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/bramidan-skoleni' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordBramidanSkoleni(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
+    if (p === '/api/bramidan-skoleni-results' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, readJson(BRAMIDAN_SKOLENI_F, [])); }
     // Školení Čtení technických výkresů: GET = stav pokusů dané osoby, POST = odeslání pokusu (max 3)
     if (p === '/api/vykresy-skoleni' && req.method === 'GET') { const eml = (u.query.email || (empSession(req) || {}).email || ''); return send(res, 200, vykresySkoleniStatus(eml), { 'Access-Control-Allow-Origin': '*' }); }
     if (p === '/api/vykresy-skoleni' && req.method === 'POST') { const b = JSON.parse(await readBody(req)); const e = empSession(req); if (e) { b.email = e.email; b.name = b.name || e.name; } if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' }); const r = recordVykresySkoleni(b); if (r.blocked) return send(res, 200, { ok: false, blocked: true, attemptsUsed: r.attemptsUsed }, { 'Access-Control-Allow-Origin': '*' }); return send(res, 200, r, { 'Access-Control-Allow-Origin': '*' }); }
@@ -5081,6 +5119,13 @@ const server = http.createServer(async (req, res) => {
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Třídicí linky je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(TRIDICI_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí tridici-linky-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(TRIDICI_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+
+    if (p === '/bramidan-skoleni-app') {
+      const e = empSession(req);
+      if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení BRAMIDAN je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!fs.existsSync(BRAMIDAN_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí bramidan-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(BRAMIDAN_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----
