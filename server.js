@@ -739,10 +739,12 @@ function authZadost(email, name) {
   } catch (_) {}
   return z;
 }
-/* ---------- Pozvánky ke školení: povinnost splnit do 14 dnů ----------
-   Správce pozve → uloží se termín (7 dní). Zaměstnanec vidí v sekci Školení
+/* ---------- Pozvánky ke školení: povinnost splnit v dané lhůtě ----------
+   Správce pozve → uloží se termín. Zaměstnanec vidí v sekci Školení
    upozornění s datem; po splnění testu pozvánka mizí. */
-const SKOL_LHUTA_DNI = 14;   // lhůta na absolvování školení od pozvánky (2026-09-09: ze 7 na 14 dní)
+const SKOL_LHUTA_DNI = 14;                       // výchozí lhůta od pozvánky (2026-09-09: ze 7 na 14 dní)
+const SKOL_LHUTA_KURZ = { 'tridici-linky': 30 }; // delší lhůta u obsáhlejších školení (2026-09-10)
+function skolLhuta(kurz) { return SKOL_LHUTA_KURZ[kurz] || SKOL_LHUTA_DNI; }
 const SKOLENI_NAZVY = {
   prumysl: 'Průmysl — obchodník segmentu Skladování',
   loxxer: 'LOXXER — protipožární skříně na Li-Ion baterie',
@@ -761,12 +763,35 @@ function skolPozAdd(email, kurz, kdo) {
   email = String(email || '').toLowerCase(); if (!email || !SKOLENI_NAZVY[kurz]) return;
   const d = skolPozRead();
   const ted = Date.now();
-  const termin = ted + SKOL_LHUTA_DNI * 24 * 3600 * 1000;
+  const termin = ted + skolLhuta(kurz) * 24 * 3600 * 1000;
   const stav = d.items.find(x => x.email === email && x.kurz === kurz);
   if (stav) { stav.ts = ted; stav.termin = termin; stav.kdo = kdo || stav.kdo || ''; }
   else d.items.push({ email, kurz, ts: ted, termin, kdo: kdo || '' });
   skolPozWrite(d);
 }
+// Jednorázové prodloužení (2026-09-10): kdo už má pozvánku na Třídicí linky, dostane na ně měsíc.
+(function () {
+  try {
+    const st = readJson(STATE_F, null);
+    if (!st) return;
+    st.settings = st.settings || {};
+    if (st.settings._skolLhutaTridici20260910) return;
+    st.settings._skolLhutaTridici20260910 = 1;
+    const d = skolPozRead();
+    const den = 24 * 3600 * 1000, ted = Date.now();
+    let upraveno = 0;
+    d.items.forEach(x => {
+      if (x.kurz !== 'tridici-linky') return;
+      const zPozvanky = (Number(x.ts) || ted) + 30 * den;
+      const novy = zPozvanky >= ted ? zPozvanky : (ted + 30 * den);   // měsíc od pozvánky; když už uplynul, měsíc od teď
+      if (novy > (Number(x.termin) || 0)) { x.termin = novy; upraveno++; }
+    });
+    if (upraveno) skolPozWrite(d);
+    writeJson(STATE_F, st);
+    if (upraveno) console.log('[školení] Třídicí linky: prodloužena lhůta u ' + upraveno + ' pozvánek na 30 dnů');
+  } catch (e) { console.warn('[školení] prodloužení lhůty selhalo:', e.message); }
+})();
+
 // Splněná školení daného e-mailu (aby pozvánka po absolvování zmizela).
 function skolSplneno(email, kurz) {
   try {
@@ -4257,8 +4282,8 @@ const server = http.createServer(async (req, res) => {
       const me = empSession(req) || { email: '', name: 'správce' };
       const text = 'Dobrý den,\n\nzveme vás k absolvování školení v intranetu ELKOPLAST:\n\n  ' + nazev + '\n\n'
         + (poznamka ? 'Poznámka od správce: ' + poznamka + '\n\n' : '')
-        + 'Školení prosím absolvujte do ' + SKOL_LHUTA_DNI + ' dnů, tedy nejpozději '
-        + new Date(Date.now() + SKOL_LHUTA_DNI * 24 * 3600 * 1000).toLocaleDateString('cs-CZ') + '.\n\n'
+        + 'Školení prosím absolvujte do ' + skolLhuta(String(b.skoleni)) + ' dnů, tedy nejpozději '
+        + new Date(Date.now() + skolLhuta(String(b.skoleni)) * 24 * 3600 * 1000).toLocaleDateString('cs-CZ') + '.\n\n'
         + 'Školení otevřete v intranetu v sekci Školení:\n' + link + '\n\n'
         + (String(b.skoleni) === 'svarovani'
           ? 'Na konci školení je jednorázový závěrečný test — hranice splnění 80 %, jediný pokus.\n\nDěkujeme.\nIntranet ELKOPLAST'

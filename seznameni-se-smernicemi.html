@@ -1673,7 +1673,7 @@ const MJ_L10N = {
   'z plánu': ['from plan','aus dem Plan','z planu','з плану','din plan'],
   'Byl(a) jste pozván(a) ke školení': ['You have been invited to training','Sie wurden zu einer Schulung eingeladen','Zostałeś zaproszony na szkolenie','Вас запросили на навчання','Ați fost invitat la instruire'],
   'Máte nesplněné školení po termínu': ['Overdue training','Überfällige Schulung','Zaległe szkolenie','Прострочене навчання','Instruire restantă'],
-  'Školení je potřeba absolvovat do 14 dnů od pozvánky.': ['The training must be completed within 14 days of the invitation.','Die Schulung ist innerhalb von 14 Tagen nach der Einladung zu absolvieren.','Szkolenie należy ukończyć w ciągu 14 dni od zaproszenia.','Навчання потрібно пройти протягом 14 днів від запрошення.','Instruirea trebuie finalizată în termen de 14 zile de la invitație.'],
+  'Každé školení je potřeba absolvovat do termínu uvedeného níže.': ['Each training must be completed by the deadline shown below.','Jede Schulung ist bis zum unten genannten Termin zu absolvieren.','Każde szkolenie należy ukończyć do terminu podanego poniżej.','Кожне навчання потрібно пройти до вказаного нижче терміну.','Fiecare instruire trebuie finalizată până la termenul indicat mai jos.'],
   'po termínu': ['overdue','überfällig','po terminie','прострочено','restant'],
   'do': ['by','bis','do','до','până la'],
   'povinné do': ['required by','Pflicht bis','wymagane do','обов’язково до','obligatoriu până la'],
@@ -3256,7 +3256,7 @@ function skolPozvankyHtml(){
   const pozadi=poLhute?'#fdecea':'#fff8e6';
   let h='<div class="card pad" style="margin:0 0 16px;border-left:4px solid '+barva+';background:'+pozadi+'">'+
     '<strong style="color:'+barva+'">'+(poLhute?mjT('Máte nesplněné školení po termínu'):mjT('Byl(a) jste pozván(a) ke školení'))+'</strong>'+
-    '<p class="muted" style="margin:6px 0 10px;font-size:13.5px">'+mjT('Školení je potřeba absolvovat do 14 dnů od pozvánky.')+'</p>';
+    '<p class="muted" style="margin:6px 0 10px;font-size:13.5px">'+mjT('Každé školení je potřeba absolvovat do termínu uvedeného níže.')+'</p>';
   p.forEach(x=>{
     const zbyva = x.poLhute
       ? '<span class="pill red">'+mjT('po termínu')+' ('+skolDatum(x.termin)+')</span>'
