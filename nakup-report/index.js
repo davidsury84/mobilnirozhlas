@@ -361,9 +361,15 @@ function mount(host) {
     return d;
   }
 
-  // Pracovní sortiment = kvartální report + nově zavedené živé položky.
+  // Pracovní sortiment = kvartální report + nově zavedené živé položky + vše, co pálí bez ohledu
+  // na prodejní historii: oversold, rezervované, objednané u dodavatele a dropship/doprodej řady
+  // (ty se nikdy nenaskladňují, takže ve výdejích ze skladu nemají co mít). Služby ne.
+  // DRŽET V SYNCHRONU s filtrem v renderObjednavky() v SMI_aplikace.html!
   const onlyActive = rows => { const k = activeKeys(); if (!k.size) return rows || []; const nk = newKeys();
-    return (rows || []).filter(r => { const key = r.sk + '-' + r.reg; return k.has(key) || nk.has(key); }); };
+    return (rows || []).filter(r => { const key = r.sk + '-' + r.reg;
+      if (k.has(key) || nk.has(key)) return true;
+      if (/^služby$/i.test(String(r.skupina || '').trim())) return false;
+      return (r.avail || 0) < 0 || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0 || !!specOf(r.sk); }); };
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
   // SK rady, ktere se NENAKUPUJI na sklad (info od nakupu 2026-08-26). Drzet v synchronu
   // s kopii SPEC_SK v SMI_aplikace.html!
