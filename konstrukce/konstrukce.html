@@ -1167,6 +1167,9 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'✉ Poslat klientovi znovu':['✉ Send to the customer again','✉ Erneut an den Kunden senden','✉ Wyślij klientowi ponownie','✉ Надіслати замовнику ще раз','✉ Trimite din nou clientului'],
+'✎ Upravit údaje zakázky a zadání':['✎ Edit order details and specification','✎ Auftragsdaten und Spezifikation bearbeiten','✎ Edytuj dane zlecenia i zadanie','✎ Редагувати дані замовлення та завдання','✎ Editează datele comenzii și specificația'],
+'✎ doplnit e-mail':['✎ add e-mail','✎ E-Mail ergänzen','✎ uzupełnij e-mail','✎ додати e-mail','✎ adaugă e-mail'],
 'Jazyk e-mailu a stránky pro klienta':['Language of the e-mail and the customer page','Sprache der E-Mail und der Kundenseite','Język e-maila i strony dla klienta','Мова листа та сторінки для замовника','Limba e-mailului și a paginii pentru client'],
 '✓ Potvrdit za klienta (bez odeslání)':['✓ Confirm on behalf of the customer (without sending)','✓ Für den Kunden bestätigen (ohne Versand)','✓ Potwierdź za klienta (bez wysyłki)','✓ Підтвердити за замовника (без надсилання)','✓ Confirmă în numele clientului (fără trimitere)'],
 '✓ Potvrdit za klienta':['✓ Confirm on behalf of the customer','✓ Für den Kunden bestätigen','✓ Potwierdź za klienta','✓ Підтвердити за замовника','✓ Confirmă în numele clientului'],
@@ -2575,7 +2578,8 @@ function renderDrawer(z){
         '<b>Termín kroku</b><span>'+fdate(z.deadline)+semaforText(z)+'</span>'+
         '<b>Obchodník</b><span>'+esc(z.obchodnikName||'')+'</span>'+
         '<b>Konstruktér</b><span>'+esc(z.assignedName||'—')+'</span>'+
-        '<b>Kontakt klienta</b><span>'+esc(z.kontakt||'—')+(z.kontaktEmail?(' · '+esc(z.kontaktEmail)):'')+'</span>'+
+        '<b>Kontakt klienta</b><span>'+esc(z.kontakt||'—')+(z.kontaktEmail?(' · '+esc(z.kontaktEmail)):'')+
+          ((!z.kontaktEmail&&z.muzeEditZadani)?(' <button class="btn ghost sm" onclick="openEditZadani(\''+z.id+'\')">✎ doplnit e-mail</button>'):'')+'</span>'+
         '<b>Poptávka</b><span>'+esc(z.cisloPoptavky||'—')+'</span>'+
         '<b>Č. výrobní zakázky (Helios)</b><span><input id="cvzInp" value="'+esc(z.cvzHelios||'')+'" placeholder="např. 26C-001" style="width:130px;padding:4px 7px;border:1px solid var(--line);border-radius:7px;font:inherit"> <button class="btn ghost sm" onclick="saveCvz(\''+z.id+'\')">Uložit</button></span>'+
         (z.kodAbr?('<b>Kód ABR (katalog)</b><span style="overflow-wrap:anywhere"><code style="font-weight:800;font-size:12px">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')" title="Kopírovat kód">⧉</button></span>'):'')+
@@ -2585,6 +2589,7 @@ function renderDrawer(z){
         (z.strediskoName?('<b>Výrobní středisko</b><span>'+esc(z.strediskoName)+'</span>'):'')+
         (z.holdReason?('<b>Čeká na</b><span>'+esc(z.holdReason)+'</span>'):'')+
       '</div>'+
+      (z.muzeEditZadani?('<div class="actions" style="margin:-4px 0 10px"><button class="btn ghost sm" onclick="openEditZadani(\''+z.id+'\')" title="Zákazník, kontaktní osoba, e-mail klienta, termín, typ výrobku i celý dotazník">✎ Upravit údaje zakázky a zadání</button></div>'):'')+
       actionsFor(z)+
       pdfPanel(z)+
       prilohyBlock(z)+rozhodnutiView(z)+vyrobniDokView(z)+dotaznikView(z)+zmenyView(z)+'<div id="drwArch"></div>'+params+vers+
@@ -2998,7 +3003,8 @@ function linkBox(z){
     '<div class="row" style="justify-content:space-between"><span class="muted">'+(z.link.active?'Aktivní':'Neaktivní')+' · platí do '+fdate(z.link.expiresAt)+' · '+z.link.accesses+'× otevřen'+(z.link.hasPin?' · PIN':'')+((z.link.lang&&z.link.lang!=='cs')?(' · '+z.link.lang.toUpperCase()):'')+'</span>'+
     '<button class="btn ghost sm" onclick="copyTxtToast(\''+esc(full)+'\',\'✓ Odkaz zkopírován\')">⧉ Kopírovat odkaz</button></div>'+
     '<input readonly value="'+esc(full)+'" onclick="this.select()" style="margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px">'+
-    '<div class="actions" style="margin-top:8px"><button class="btn ghost sm" onclick="copyMailKlient(\''+z.id+'\')">⧉ Kopírovat celý text e-mailu</button></div>'+
+    '<div class="actions" style="margin-top:8px"><button class="btn ghost sm" onclick="copyMailKlient(\''+z.id+'\')">⧉ Kopírovat celý text e-mailu</button>'+
+      ((z.stav==='klient'&&z.link.active)?('<button class="btn sm" onclick="poslatZnovu(\''+z.id+'\')" title="Pošle stejný odkaz znovu — token se nemění">✉ Poslat klientovi znovu</button>'):'')+'</div>'+
     '<div class="muted" style="font-size:12px;margin-top:4px">Odkaz můžete klientovi poslat i z vlastní pošty — rozhodnutí se do systému propíše stejně.</div></div>';
 }
 
@@ -3047,6 +3053,20 @@ function sendClient(id,bezEmailu){
     // odkaz se jen vytvořil — rovnou do schránky, ať ho obchodník vloží do vlastní pošty
     copyTxtToast(location.origin+(o.j.url||''),'✓ Odkaz zkopírován — vložte ho do e-mailu (Ctrl+V)');
     reloadData();
+  });
+}
+/* Poslat stejný odkaz znovu (klient e-mail nenašel, nebo se odkaz jen vytvořil).
+   Token zůstává — jinak bychom zneplatnili odkaz, co klient možná má otevřený. */
+function poslatZnovu(id){
+  var z=(D.zakazky||[]).find(function(x){return x.id===id}); if(!z)return;
+  var komu=prompt(tr('Komu poslat odkaz?'),z.kontaktEmail||'');
+  if(komu===null)return;
+  if(!komu.trim()){alert(tr('Vyplňte e-mail.'));return}
+  var lang=(z.link&&z.link.lang)||'cs';
+  api('/stav','POST',{id:id,action:'odeslat-klientovi',komu:komu.trim(),lang:lang,
+    subject:mailPredmet(z,lang),text:defaultMail(z,lang)}).then(function(o){
+    if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}
+    reloadData();toastUlozeno('✓ Odkaz odeslán na '+komu.trim());
   });
 }
 /* hotový text e-mailu i s odkazem — když si obchodník posílá poštu sám */

@@ -488,6 +488,8 @@ const SEED_WF_EDGES = [
   { action: 'obchodnik-ok',      from: 'obchodnik', to: 'obchodnik', roles: ['obchodnik'],                      kind: 'self',    source: 'user', label: 'Obchodník potvrdil' },
   { action: 'obchodnik-vrat',    from: 'obchodnik', to: 'prace',     roles: ['obchodnik'],                      kind: 'reject',  source: 'user', label: 'Připomínky obchodníka', needNote: true },
   { action: 'odeslat-klientovi', from: 'obchodnik', to: 'klient',    roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Odeslat klientovi', needPdf: true },
+  // znovuposlání už vytvořeného odkazu (klient e-mail nenašel, odkaz se jen vytvořil)
+  { action: 'odeslat-klientovi', from: 'klient',    to: '@self',     roles: ['obchodnik'],                      kind: 'self',    source: 'user', label: 'Poslat klientovi znovu' },
   { action: 'schvalit',          from: 'klient',    to: 'zavod',     roles: ['klient'],                         kind: 'klient',  source: 'klient', label: 'Klient potvrdil nabídku → předání do objednávek' },
   { action: 'schvalit',          from: 'klient',    to: 'schvaleno', roles: ['klient'],                         kind: 'klient',  source: 'klient', label: 'Klient schválil výkres (objednávka) → výrobní dok.' },
   { action: 'potvrdit-rucne',    from: 'klient',    to: 'zavod',     roles: ['obchodnik'],                      kind: 'forward', source: 'user', label: 'Potvrzeno za klienta → předání do objednávek' },
@@ -512,7 +514,7 @@ function buildSeedWorkflow() {
   });
   return { nodes, edges: JSON.parse(JSON.stringify(SEED_WF_EDGES)), version: 3 };
 }
-const WF_SEED_VERSION = 4;   // bump = přeseeduje d.workflow (v4: potvrzení za klienta i od kroku „u obchodníka")
+const WF_SEED_VERSION = 5;   // bump = přeseeduje d.workflow (v5: znovuodeslání odkazu klientovi)
 const SEED_WORKFLOW = buildSeedWorkflow();
 
 // Popisky rolí pro schéma / plátno (kdo je „na tahu")
@@ -2010,6 +2012,21 @@ function mount(host) {
       }
       case 'odeslat-klientovi': { // obchodník odešle veřejný náhled (ručně, s možností upravit text)
         if (!isObch) { err = 'Odeslat klientovi smí obchodník zakázky.'; break; }
+        // Zakázka už u klienta = odkaz existuje; jen ho pošleme znovu, token se nemění
+        // (jinak bychom zneplatnili odkaz, který klient možná právě má otevřený).
+        if (z.stav === 'klient') {
+          if (!z.link || !z.link.token) { err = 'Odkaz pro klienta neexistuje.'; break; }
+          const komu2 = String(b.komu || z.kontaktEmail || '').trim();
+          if (!komu2) { err = 'Doplňte e-mail kontaktní osoby.'; break; }
+          const url2 = (host.baseUrl ? host.baseUrl(req) : '') + '/konstrukce/nahled/' + z.link.token;
+          const text2 = String(b.text || '').replace('{ODKAZ}', url2) || url2;
+          const subj2 = String(b.subject || ('Výkres ke schválení · ' + z.cislo));
+          audit(z, me.email, 'Odkaz klientovi poslán znovu', komu2);
+          save(d);
+          await mail(komu2, subj2, text2);
+          json(res, 200, { ok: true, url: url2, znovu: true });
+          return true;
+        }
         if (z.stav !== 'obchodnik') { err = 'Zakázka není připravena k odeslání.'; break; }
         if (!CURRENT_V(z) || !CURRENT_V(z).pdf) { err = 'Chybí PDF výkresu.'; break; }
         if (!z.kontaktEmail && !b.bezEmailu) { err = 'U zakázky chybí e-mail kontaktní osoby klienta.'; break; }
