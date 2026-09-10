@@ -380,7 +380,8 @@ function mount(host) {
     '318': { typ: 'dropship', pozn: 'Happyend' },
     '341': { typ: 'dropship', pozn: 'Profiba' },
     '376': { typ: 'dropship', pozn: 'TBA' },
-    '192': { typ: 'dropship', pozn: 'Kovobel (v přehledech dříve Lenaerts)' },
+    '192': { typ: 'dropship', pozn: 'Kovobel — aktuální řada (historie prodejů je na 371)' },
+    '371': { typ: 'dropship', pozn: 'Kovobel — historická řada, v ERP ještě pod starým názvem Lenaerts' },
     '403': { typ: 'dropship', pozn: 'Aspera' },
     '387': { typ: 'dropship', pozn: 'BinBin (NL) — jen na zakázky' },
     '405': { typ: 'dropship', pozn: 'Diakonie' },
@@ -390,6 +391,20 @@ function mount(host) {
     '388': { typ: 'doprodej', pozn: 'Portimpex — na zkoušku, špatná kvalita, doprodej' },
   };
   const specOf = sk => SPEC_SK[String(sk || '').trim()] || null;
+  // Přečíslované položky: nová kmenová karta nemá prodejní historii, protože ta zůstala
+  // na staré. Bez tohoto můstku vypadá zavedený produkt jako nováček bez poptávky.
+  //   Kovobel: dodavatel je v ERP veden dvakrát — 371 „ZBO - LENAERTS" (starý název, drží
+  //   prodeje) a 192 „ZBO - KOVOBEL" (aktuální řada, prázdná). Párováno podle produktu.
+  const PREDCH = {
+    '192-68768': '371-75756',   // Skladovací kontejner FCM 3 m
+    '192-68770': '371-75757',   // Skladovací kontejner FCM 4 m
+    '192-68771': '371-75758',   // Skladovací kontejner FCM 5 m
+    '192-68772': '371-75759',   // Skladovací kontejner FCM 6 m
+    // 192-68769 (FCM 2 m) protějšek na staré řadě nemá
+  };
+  // Prodejní historie položky — vlastní, jinak zděděná po předchůdci.
+  const salesOf = (smap, x) => { const k = x.sk + '-' + x.reg;
+    return smap[k] !== undefined ? smap[k] : (PREDCH[k] ? smap[PREDCH[k]] : undefined); };
 
   // Plny snimek skladu = soubor pokryva aspon polovinu aktivniho sortimentu. Castecne exporty
   // (20260804.xlsx: 364 radku, jen oversold polozky se zapornym skladem) nesmi do bilance ani
@@ -680,7 +695,7 @@ function mount(host) {
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
     const out = onlyActive(obj.rows)
-      .map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) }))
+      .map(x => ({ x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }))
       // Rozhodnuté položky už do seznamu nepatří: 'vyrazeno' je vyřízené, 'potvrzeno' vypne
       // příznak utichla úplně. Prošlé potvrzení vrací decFor() jako null → položka se zeptá znovu.
       .filter(r => r.o.utichla && r.o.utichlaKs > 0 && !r.o.dec)
@@ -751,7 +766,7 @@ function mount(host) {
     try { detectNew(obj.rows); } catch (_) {}   // NEJDRIV detekce novych, at se dostanou i do doporuceni
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
-    const scored = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, smap[x.sk + '-' + x.reg], P, m0) }));
+    const scored = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }));
     let list = scored.filter(r => r.o.rec > 0 || (r.x.avail < 0 && !r.o.spec));
     // Utichle: hlasime jen ty, ktere by model JINAK objednal — ostatni jsou jen sum.
     // Stejný filtr jako collectUtichle() — rozhodnuté položky se už nepřipomínají.
@@ -1082,7 +1097,8 @@ function mount(host) {
       const rows = (o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
       try { detectNew(o.rows); } catch (_) {}
       json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup(),
-        noveKlice: Object.keys(loadNew()), rozhodnuti: loadDec(), platnostM: DEC_PLATNOST_M, specialSk: SPEC_SK }));
+        noveKlice: Object.keys(loadNew()), rozhodnuti: loadDec(), platnostM: DEC_PLATNOST_M, specialSk: SPEC_SK,
+        predchudci: PREDCH }));
       return true;
     }
     // Prodejní ceny e-shopu (export Shop.CZ feedu, commitnutý v kořeni jako eshop-ceny.json).
