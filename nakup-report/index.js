@@ -30,7 +30,16 @@ function mount(host) {
   const SUP_F = path.join(host.dataDir || __dirname, 'nakup-dodavatele.json');       // dotazník dodavatelů: termín dodání + náklad na dopravu (writable)
   const loadObj = () => { for (const f of [OBJ_LIVE, OBJ_SEED]) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) {} } return { rows: [], columns: [], date: '' }; };
   const loadSup = () => { try { return JSON.parse(fs.readFileSync(SUP_F, 'utf8')) || {}; } catch (_) { return {}; } };
-  const loadVyd = () => { try { return JSON.parse(fs.readFileSync(VYD_F, 'utf8')) || { dny: {} }; } catch (_) { return { dny: {} }; } };
+  const VYD_SEED = path.join(__dirname, '..', 'eshop-vydejky.json');                // commitnutý základ (tools-gen-eshop-vydejky.js)
+  // Seed z repa + živě nahrané dny (volume); u shodného dne vyhrává živý (novější export).
+  const loadVyd = () => {
+    let seed = { dny: {} }, live = null;
+    try { seed = JSON.parse(fs.readFileSync(VYD_SEED, 'utf8')) || { dny: {} }; } catch (_) {}
+    try { live = JSON.parse(fs.readFileSync(VYD_F, 'utf8')); } catch (_) {}
+    if (!live) return seed;
+    const dny = Object.assign({}, seed.dny || {}, live.dny || {});
+    return { dny, nahrano: live.nahrano || seed.nahrano, seedNahrano: seed.nahrano };
+  };
   const saveSup = m => { try { fs.writeFileSync(SUP_F, JSON.stringify(m, null, 2)); } catch (_) {} };
   // Odvozený seznam dodavatelů z ERP: název, počet položek, medián dodací lhůty, hodnota zásoby — + uložené hodnoty dotazníku.
   function supplierList() {
@@ -1000,6 +1009,24 @@ function mount(host) {
     });
     return out;
   }
+  // Měsíční přehled e-shopu z výdejek (prodejní ceny) — nezávisle na denních snímcích skladu,
+  // takže pokryje celý rok, i když bilance drží jen posledních 120 dnů.
+  function vydMesice(vdny) {
+    const M = {};
+    Object.keys(vdny).forEach(d => { const v = vdny[d], m = d.slice(0, 7);
+      const e = M[m] || (M[m] = { mesic: m, kc: 0, ks: 0, zakazek: 0, dny: 0, dopravaKc: 0, b2bKc: 0, b2cKc: 0, polozek: new Set() });
+      e.kc += v.kc || 0; e.ks += v.ks || 0; e.zakazek += v.zakazek || 0; e.dny++; e.dopravaKc += v.dopravaKc || 0; e.b2bKc += v.b2bKc || 0; e.b2cKc += v.b2cKc || 0;
+      Object.keys(v.polozky || {}).forEach(k => e.polozek.add(k)); });
+    return Object.values(M).sort((a, b) => a.mesic.localeCompare(b.mesic)).map(e => Object.assign(e, { polozek: e.polozek.size, prumZak: e.zakazek ? Math.round(e.kc / e.zakazek) : 0 }));
+  }
+  function vydTop(vdny, rok) {
+    rok = rok || new Date().getFullYear();
+    const Z = {}, P = {}; let kc = 0, zak = 0, dny = 0;
+    Object.keys(vdny).forEach(d => { if (!d.startsWith(String(rok))) return; const v = vdny[d]; kc += v.kc || 0; zak += v.zakazek || 0; dny++;
+      Object.keys(v.zakaznici || {}).forEach(n => { const z = v.zakaznici[n]; const e = Z[n] || (Z[n] = { nazev: n, kc: 0, zak: 0, ico: z.ico || '' }); e.kc += z.kc || 0; e.zak += z.zak || 0; });
+      Object.keys(v.polozky || {}).forEach(k => { if (k.startsWith('900-')) return; const q = v.polozky[k]; const e = P[k] || (P[k] = { kod: k, nazev: q.n || k, kc: 0, ks: 0 }); e.kc += q.kc || 0; e.ks += q.ks || 0; }); });
+    return { rok, kc, zakazek: zak, dny, zakaznici: Object.values(Z).sort((a, b) => b.kc - a.kc).slice(0, 25), polozky: Object.values(P).sort((a, b) => b.kc - a.kc).slice(0, 30) };
+  }
   function isoWeek(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - day + 3); const f = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)); const wk = 1 + Math.round(((t - f) / 86400000 - 3 + ((f.getUTCDay() + 6) % 7)) / 7); return t.getUTCFullYear() + '-W' + String(wk).padStart(2, '0'); }
   // Pojistka: bilance se nesmí odeslat prázdná. Když historie chybí (nový volume, výpadek zápisu),
   // dopočítá se z denních souborů na Disku ještě před odesláním e-mailu.
@@ -1142,15 +1169,17 @@ function mount(host) {
       const dny = b.dny && typeof b.dny === 'object' ? b.dny : null;
       const dates = dny ? Object.keys(dny).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
       if (!dates.length) return json(res, 400, { ok: false, error: 'V souboru není žádný den s výdejkami — je to export „Expediční příkazy"?' }), true;
-      const cur = loadVyd(); cur.dny = cur.dny || {};
+      let cur = { dny: {} }; try { cur = JSON.parse(fs.readFileSync(VYD_F, 'utf8')) || { dny: {} }; } catch (_) {} cur.dny = cur.dny || {};
       let radku = 0;
       dates.forEach(d => { const v = dny[d] || {}; const pol = {};
         Object.keys(v.polozky || {}).forEach(k => { const q = v.polozky[k] || {};
           pol[k] = { ks: +q.ks || 0, kc: Math.round(+q.kc || 0), n: String(q.n || '').slice(0, 120) }; });
-        cur.dny[d] = { zakazek: +v.zakazek || 0, radku: +v.radku || 0, ks: +v.ks || 0, kc: Math.round(+v.kc || 0), polozky: pol };
+        const zk = {}; Object.keys(v.zakaznici || {}).slice(0, 500).forEach(n => { const z = v.zakaznici[n] || {}; zk[String(n).slice(0, 120)] = { kc: Math.round(+z.kc || 0), zak: +z.zak || 0, ico: String(z.ico || '').slice(0, 20) }; });
+        cur.dny[d] = { zakazek: +v.zakazek || 0, radku: +v.radku || 0, ks: +v.ks || 0, kc: Math.round(+v.kc || 0),
+          dopravaKc: Math.round(+v.dopravaKc || 0), b2bKc: Math.round(+v.b2bKc || 0), b2cKc: Math.round(+v.b2cKc || 0), polozky: pol, zakaznici: zk };
         radku += +v.radku || 0; });
       // drž posledních 400 dnů
-      const keys = Object.keys(cur.dny).sort(); while (keys.length > 400) delete cur.dny[keys.shift()];
+      const keys = Object.keys(cur.dny).sort(); while (keys.length > 800) delete cur.dny[keys.shift()];
       const se = host.empSession && host.empSession(req);
       cur.nahrano = { kdy: new Date().toISOString(), kdo: (se && (se.jmeno || se.email)) || 'neznámý', source: String(b.source || '').slice(0, 200), od: dates.slice().sort()[0], do: dates.slice().sort().pop(), dnu: dates.length, radku };
       try { fs.writeFileSync(VYD_F, JSON.stringify(cur)); } catch (e) { return json(res, 500, { ok: false, error: 'Uložení selhalo: ' + e.message }), true; }
@@ -1278,7 +1307,8 @@ function mount(host) {
         .sort((a, b) => b.ks - a.ks).slice(0, 30);
       const itemHist = {}; top.forEach(t => { itemHist[t.kod] = (mv[t.kod] || {}).hist || []; });
       return json(res, 200, { ok: true, days, weeks, top, itemHist, dataDate: o.date || '', dniCelkem: days.length, chybejiciDny: chybi, limitMimoradne: isFinite(limit) ? Math.round(limit) : null,
-        vydejky: Object.assign({ dnu: Object.keys(vdny).length }, vyd.nahrano || {}) }), true;
+        vydejky: Object.assign({ dnu: Object.keys(vdny).length }, vyd.nahrano || {}),
+        mesice: vydMesice(vdny), rokTop: vydTop(vdny) }), true;
     }
     // Historie snímků SMI (mrtvé zásoby v čase) — sdílená, přístup jako e-shop
     if (p === '/api/nakup-report/historie' && req.method === 'GET') {
