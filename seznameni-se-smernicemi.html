@@ -6712,7 +6712,7 @@ const GRIT_QUESTIONS=[
 function gritAcksMap(){ const m={}; (GRIT_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
 /* Pozvánkové hash odkazy (bez přihlášení) — podpis dělá server, tady jen cache pro aktuální dotazník */
 let INVITE_MAP={};
-function surveyKind(id){ return id==="survey-grit"?"grit":id==="survey-jss"?"jss":id==="survey-tw44"?"tw44":id==="survey-vykresy"?"vykresy":id==="survey-logika"?"logika":""; }
+function surveyKind(id){ return id==="survey-grit"?"grit":id==="survey-jss"?"jss":id==="survey-tw44"?"tw44":id==="survey-vykresy"?"vykresy":id==="survey-logika"?"logika":id==="survey-obtest"?"obchodni-test":""; }
 async function loadInvites(id, aud){
   const kind=surveyKind(id); if(!kind){ INVITE_MAP={}; return; }
   try{ const r=await fetch("/api/invite-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,list:(aud||[]).map(e=>({email:e.email,name:e.name}))})});
@@ -6755,6 +6755,11 @@ function sendableOf(id){
     return { id:"survey-logika", isSurvey:true, title:"Test logického myšlení (nákup a logistika)",
       assignAll:LOGIKA_ASSIGN.all, assignCats:LOGIKA_ASSIGN.cats, acks:logikaAcksMap(),
       linkFor:(email)=>inviteLinkFor("survey-logika",email) };
+  }
+  if(id==="survey-obtest"){
+    return { id:"survey-obtest", isSurvey:true, title:"Obchodní situační test (B2B)",
+      assignAll:OBTEST_ASSIGN.all, assignCats:OBTEST_ASSIGN.cats, acks:obtestAcksMap(),
+      linkFor:(email)=>inviteLinkFor("survey-obtest",email) };
   }
   const d=DB.directives.find(x=>x.id===id); if(!d) return null;
   return { id:d.id, isSurvey:false, title:d.title, assignAll:d.assignAll, assignCats:d.assignCats,
@@ -6890,9 +6895,9 @@ function gritHero(r){
     '</div>';
 }
 function openVysledekDetail(kind,email){
-  const list = kind==='grit'?GRIT_RESULTS : kind==='jss'?JSS_RESULTS : kind==='vykresy'?VYKRESY_RESULTS : kind==='logika'?LOGIKA_RESULTS : TW44_RESULTS;
+  const list = kind==='grit'?GRIT_RESULTS : kind==='jss'?JSS_RESULTS : kind==='vykresy'?VYKRESY_RESULTS : kind==='logika'?LOGIKA_RESULTS : kind==='obtest'?OBTEST_RESULTS : TW44_RESULTS;
   const r=(list||[]).find(x=>(x.email||'').toLowerCase()===email.toLowerCase()); if(!r) return;
-  const nazev = kind==='grit'?'Test houževnatosti (Grit)' : kind==='jss'?'Dotazník pracovní spokojenosti (JSS)' : kind==='vykresy'?'Test čtení výkresů' : kind==='logika'?'Test logického myšlení (nákup a logistika)' : 'Test kognitivní zátěže (TW44)';
+  const nazev = kind==='grit'?'Test houževnatosti (Grit)' : kind==='jss'?'Dotazník pracovní spokojenosti (JSS)' : kind==='vykresy'?'Test čtení výkresů' : kind==='logika'?'Test logického myšlení (nákup a logistika)' : kind==='obtest'?'Obchodní situační test (B2B)' : 'Test kognitivní zátěže (TW44)';
   const hlava='<div class="muted" style="font-size:13px;margin-bottom:14px">'+esc(r.email)+(r.dept&&r.dept!=='—'?' · '+esc(r.dept):'')+' · vyplněno '+fmtDate(r.ts)+'</div>';
   const big=(label,val)=>'<div><div class="muted" style="font-size:12px">'+label+'</div><strong style="font-size:22px">'+val+'</strong></div>';
   let h='';
@@ -6954,6 +6959,31 @@ function openVysledekDetail(kind,email){
       (r.subs||[]).map(s=>{const p=jssPasmoFacet(s.score);return '<tr><td>'+esc(s.name)+'</td><td class="num">'+s.score+'</td><td><span class="pill '+p[1]+'">'+p[0]+'</span></td></tr>';}).join('')+
       '</tbody></table>'+
       '<p class="muted" style="margin:10px 0 0;font-size:12px">Pásma dle Spectora: oblast ≤ 12 nespokojenost · 13–15 neutrální · ≥ 16 spokojenost. Reverzní položky jsou přepočtené.</p>';
+  } else if(kind==='obtest'){
+    const pc={A:['A — vysoce nadprůměrný','green'],B:['B — nadprůměrný','green'],C:['C — průměrný','amber'],D:['D — podprůměrný','red']}[r.pasmo]||['—','amber'];
+    const dims=r.dimenze||{}, odp=r.odpovedi||[];
+    h=hlava+'<div class="card pad" style="display:flex;gap:32px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+
+      big('Skóre',(r.skore||0)+' / '+(r.maxSkore||50)+' b.')+big('Úspěšnost',(r.procenta||0)+' %')+
+      '<div><div class="muted" style="font-size:12px">Pásmo</div><span class="pill '+pc[1]+'" style="font-size:14px">'+pc[0]+'</span></div>'+
+      big('Zodpovězeno',(r.zodpovezeno||0)+' / '+(r.situaci||10))+
+      big('Čas',vykresyCas(r.casPouzityS)+' / '+vykresyCas(r.limitS))+
+      (r.casVyprsel?'<div><span class="pill red">Čas vypršel</span></div>':'')+
+      (r.pozice?big('Pozice',esc(r.pozice)):'')+'</div>'+
+      '<div class="card pad" style="margin-bottom:14px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.03em">Skóre podle dimenzí</strong>'+
+      Object.keys(dims).map(k=>{ const d=dims[k], pct=d.max?Math.round(d.got/d.max*100):0;
+        return '<div style="margin-top:10px"><div class="spread" style="font-size:13px"><strong>'+esc(d.nazev||k)+'</strong><span class="muted">'+d.got+' / '+d.max+' b.</span></div>'+
+          '<div style="height:8px;background:#eef0ed;border-radius:4px;margin-top:4px"><div style="height:100%;width:'+pct+'%;background:'+(pct>=70?'#12752f':pct>=50?'#c98a00':'#b3261e')+';border-radius:4px"></div></div></div>'; }).join('')+'</div>'+
+      '<div class="card pad" style="margin-bottom:14px;background:var(--green-soft);border-color:#cfe9d8"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.03em">Doporučení</strong>'+
+      '<p style="margin:8px 0 0;font-size:14px;line-height:1.6">'+esc(r.doporuceni||'')+'</p>'+
+      (function(){ const slab=Object.keys(dims).filter(k=>dims[k].max&&dims[k].got/dims[k].max<0.6).map(k=>dims[k].nazev||k);
+        return slab.length?'<p style="margin:8px 0 0;font-size:14px">Na pohovoru ověřte především: <strong>'+esc(slab.join(', '))+'</strong>.</p>':''; })()+'</div>'+
+      (odp.length?'<details class="card pad" open style="margin-bottom:14px"><summary style="cursor:pointer;font-weight:600">Odpovědi proti klíči ('+odp.filter(o=>o.body===5).length+' situací plný počet)</summary>'+
+        '<table class="tbl" style="font-size:13px;width:100%;margin-top:10px"><thead><tr><th>Situace</th><th>Dimenze</th><th>Nejúčinnější</th><th>Nejméně účinná</th><th class="num">Body</th></tr></thead><tbody>'+
+        odp.map(o=>'<tr><td><strong>'+o.situace+'.</strong> '+esc(o.title||'')+'</td><td class="muted">'+esc(o.dimNazev||'')+'</td>'+
+          '<td>'+(o.bestPismeno||'—')+(o.bestPismeno===o.klicBest?' <span class="pill green">klíč</span>':' <span class="muted">(klíč '+o.klicBest+')</span>')+'</td>'+
+          '<td>'+(o.worstPismeno||'—')+(o.worstPismeno===o.klicWorst?' <span class="pill green">klíč</span>':' <span class="muted">(klíč '+o.klicWorst+')</span>')+'</td>'+
+          '<td class="num">'+o.body+' / '+o.max+'</td></tr>').join('')+'</tbody></table></details>':'')+
+      '<p class="muted" style="margin:0;font-size:12px">Situační test úsudku (SJT): 3 b. za klíčovou nejúčinnější reakci, 1 b. za přijatelnou, 2 b. za správně určenou nejhorší reakci, 1 b. za druhou nejhorší. Klíč ani zdůvodnění nejsou v kódu stránky — kandidát je nevidí. Test je screeningový, rozhodnutí doplňte pohovorem nebo hraním rolí.</p>';
   } else if(kind==='vykresy'||kind==='logika'){
     const pa=(kind==='logika'?logikaPasmoCl:vykresyPasmoCl)(r.procenta||0);
     const odp=r.odpovedi||[];
@@ -7229,6 +7259,7 @@ const PRUZKUMY_DEFS=[
   {kind:'tw44',    typ:'pruzkum', sendId:'survey-tw44',    nazev:'Test kognitivní zátěže (TW44)',        popis:'vyhledávání v tabulce 10×10 · výkon pod časovým tlakem'},
   {kind:'vykresy', typ:'pruzkum', sendId:'survey-vykresy', nazev:'Test čtení výkresů',                   popis:'15 otázek · praktické čtení výkresové dokumentace'},
   {kind:'logika',  typ:'pruzkum', sendId:'survey-logika',  nazev:'Test logického myšlení (nákup a logistika)', popis:'29 těžkých úloh · odhady, dedukce, rozhodování, řízení zásob — kreativita, ne znalosti'},
+  {kind:'obtest',  typ:'pruzkum', sendId:'survey-obtest',  nazev:'Obchodní situační test (B2B)', popis:'10 situací · nejúčinnější vs. nejméně účinná reakce — zjišťování potřeb, hodnota, námitky, důvěra, řízení obchodu'},
   {kind:'mobiliar', typ:'pruzkum', nazev:'Hodnocení mobiliáře (WeiDu)', popis:'z každé šestice fotek 2 nejhezčí — lavičky, stoly, koše, lehátka, květináče · anonymní veřejný odkaz /mobiliar'},
   {kind:'spokojenost', typ:'pruzkum', nazev:'Spokojenost zákazníků (shop.elkoplast.cz)', popis:'NPS, CSAT, CES a Heureka standard · větvení kupující/nekupující · otázky editovatelné v adminu · anonymní veřejný odkaz'},
   {kind:'abroll',        typ:'skoleni', nazev:'Školení ABROLL',        popis:'kódování ABROLL kontejnerů · závěrečný test, max 3 pokusy'},
@@ -7267,7 +7298,7 @@ function skolStaty(res,maxPokusu){
 async function renderPruzkumyPrehled(){
   const box=document.getElementById("gritAdmin");
   box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám přehled testů…</p></div>';
-  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto','/api/vykresy-skoleni-results','/api/svarovani-skoleni-results','/api/mobiliar-results','/api/logika-results','/api/zentex-skoleni-results','/api/tridici-linky-skoleni-results','/api/spokojenost-results','/api/bramidan-skoleni-results'];
+  const eps=['/api/grit-results','/api/jss-results','/api/tw44-results','/api/vykresy-results','/api/abroll-results','/api/prumysl-results','/api/loxxer-skoleni-results','/api/acts-skoleni-results','/api/produkty-results?type=kovo','/api/produkty-results?type=roto','/api/vykresy-skoleni-results','/api/svarovani-skoleni-results','/api/mobiliar-results','/api/logika-results','/api/zentex-skoleni-results','/api/tridici-linky-skoleni-results','/api/spokojenost-results','/api/bramidan-skoleni-results','/api/obchodni-test-results'];
   let neprihlasen=false;
   const data=await Promise.all(eps.map(u=>fetch(u,{cache:'no-store'}).then(r=>{ if(r.status===401){ neprihlasen=true; return []; } return r.json(); }).catch(()=>[])));
   if(neprihlasen){ showLogin(); return; }
@@ -7280,6 +7311,7 @@ async function renderPruzkumyPrehled(){
   TRIDICI_SKOLENI_RESULTS=data[15]||[];
   SPOK_DATA=(data[16]&&data[16].zaznamy)?data[16]:{def:null,zaznamy:[]};
   BRAMIDAN_SKOLENI_RESULTS=data[17]||[];
+  OBTEST_RESULTS=data[18]||[];
   const fmtD=ts=>ts?new Date(ts).toLocaleDateString('cs-CZ'):'—';
   const pill=(t,c)=>'<span class="pill '+c+'">'+t+'</span>';
   /* statistiky jednotlivých testů do sloupců: [vyplnilo, Ø výsledek, stav, poslední] */
@@ -7303,6 +7335,11 @@ async function renderPruzkumyPrehled(){
       const avgP=Math.round(res.reduce((s,r)=>s+(r.procenta||0),0)/res.length);
       const ok=res.filter(r=>(r.procenta||0)>=65).length, pa=logikaPasmoCl(avgP);
       return {n:res.length, vysledek:'Ø úspěšnost '+avgP+' %', stav:pill(pa[0],pa[1])+' <span class="muted" style="font-size:11px">≥ 65 %: '+ok+' z '+res.length+'</span>', last:Math.max(...res.map(r=>r.ts||0))}; }
+    if(kind==='obtest'){ const res=OBTEST_RESULTS; if(!res.length) return {n:0};
+      const avg=Math.round(res.reduce((s,r)=>s+(r.skore||0),0)/res.length);
+      const ab=res.filter(r=>r.pasmo==='A'||r.pasmo==='B').length;
+      const pa=avg>=40?['A — vysoce nadprůměrný','green']:avg>=32?['B — nadprůměrný','green']:avg>=24?['C — průměrný','amber']:['D — podprůměrný','red'];
+      return {n:res.length, vysledek:'Ø '+avg+' / 50 b.', stav:pill(pa[0],pa[1])+' <span class="muted" style="font-size:11px">pásmo A/B: '+ab+' z '+res.length+'</span>', last:Math.max(...res.map(r=>r.ts||0))}; }
     if(kind==='mobiliar'){ const res=MOBILIAR_DATA.zaznamy||[]; if(!res.length) return {n:0};
       let zobr=0,vybr=0; res.forEach(r=>{ Object.values(r.votes||{}).forEach(v=>{ zobr++; if(v>0) vybr++; }); });
       const obce=res.filter(r=>r.role==='starosta'||r.role==='urednik').length, ts=res.filter(r=>r.role==='ts-reditel'||r.role==='ts-provoz'||r.role==='technicke-sluzby').length, ob=res.filter(r=>r.role==='firma'||r.role==='obchodnik'||r.role==='zakaznik').length;
@@ -7374,6 +7411,7 @@ async function openPruzkumDetail(kind){
   else if(kind==='tw44') inner=await tw44BlockHtml();
   else if(kind==='vykresy') inner=await vykresyBlockHtml();
   else if(kind==='logika') inner=await logikaBlockHtml();
+  else if(kind==='obtest') inner=await obtestBlockHtml();
   else if(kind==='abroll') inner=await abrollBlockHtml();
   else if(kind==='prumysl') inner=await prumyslBlockHtml();
   else if(kind==='loxxer') inner=await loxxerSkoleniBlockHtml();
@@ -8169,6 +8207,7 @@ async function vykresyBlockHtml(){
 
 /* ---- Test logického myšlení (nábor nákupčí/logistik) — klon obsluhy testu výkresů ---- */
 let LOGIKA_RESULTS=[];
+let OBTEST_RESULTS=[];   // obchodní situační test (SJT, nábor obchodníků)
 let LOGIKA_ASSIGN={all:true,cats:[]};
 const LOGIKA_OBLASTI=["Procenta a ceny","Odhad a čísla","Logická dedukce","Rozhodování a optimalizace","Prostor a logistika","Práce s daty","Řízení zásob a objednávání"];
 function logikaAcksMap(){ const m={}; (LOGIKA_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
@@ -8241,6 +8280,84 @@ async function logikaBlockHtml(){
          '<td class="num">'+vykresyCas(r.casPouzityS)+(r.casVyprsel?' <span title="Čas vypršel">⏱</span>':'')+'</td>'+
          '<td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td>'+
          '<td style="text-align:right"><button class="btn ghost sm" onclick="openVysledekDetail(\'logika\',\''+esc(r.email)+'\')">Detail</button></td></tr>'; });
+    h+='</tbody></table></div>';
+  });
+  return h;
+}
+
+/* ---- Obchodní situační test (SJT) — nábor a rozvoj obchodníků B2B ---- */
+let OBTEST_ASSIGN={all:false,cats:[]};
+function obtestAcksMap(){ const m={}; (OBTEST_RESULTS||[]).forEach(r=>{ m[(r.email||"").toLowerCase()]=true; }); return m; }
+function obtestPasmoCl(p){ return p==='A'?['A — vysoce nadprůměrný','green']:p==='B'?['B — nadprůměrný','green']:p==='C'?['C — průměrný','amber']:['D — podprůměrný','red']; }
+function obtestReadCats(){ OBTEST_ASSIGN.cats=[...document.querySelectorAll(".obcat:checked")].map(c=>c.value); }
+function obtestAssignAll(on){ OBTEST_ASSIGN.all=on; const w=document.getElementById("obCatWrap"); if(w) w.style.opacity=on?.4:1; }
+async function copyObtestLinks(){
+  const S=sendableOf("survey-obtest"); const aud=audienceOf(S);
+  if(!aud.length){ alert("Žádní příjemci — zaškrtni Všem, vyber oddělení nebo přidej uchazeče v dialogu Rozeslat."); return; }
+  await loadInvites("survey-obtest", aud);
+  copyText("Jméno\tE-mail\tOdkaz\n"+aud.map(e=>e.name+"\t"+e.email+"\t"+S.linkFor(e.email)).join("\n")); toast("Odkazy zkopírovány ("+aud.length+")");
+}
+function exportObtest(){
+  if(typeof XLSX==="undefined"){ alert("Knihovna XLSX není načtená."); return; }
+  const dimKeys=[]; (OBTEST_RESULTS||[]).forEach(r=>Object.keys(r.dimenze||{}).forEach(k=>{ if(dimKeys.indexOf(k)<0) dimKeys.push(k); }));
+  const dimNazvy=dimKeys.map(k=>{ const r=(OBTEST_RESULTS||[]).find(x=>x.dimenze&&x.dimenze[k]); return (r&&r.dimenze[k].nazev)||k; });
+  const aoa=[["Oddělení","Jméno","E-mail","Pozice","Skóre","Max","Úspěšnost %","Pásmo"].concat(dimNazvy,["Čas","Čas vypršel","Datum"])];
+  (OBTEST_RESULTS||[]).slice().sort((a,b)=>(b.skore||0)-(a.skore||0)).forEach(r=>{
+    aoa.push([r.dept||"—",r.name,r.email,r.pozice||"",r.skore,r.maxSkore,r.procenta,r.pasmo]
+      .concat(dimKeys.map(k=>{ const d=(r.dimenze||{})[k]; return d?d.got+"/"+d.max:""; }),
+              [vykresyCas(r.casPouzityS),r.casVyprsel?"ano":"ne",new Date(r.ts).toLocaleDateString("cs-CZ")]));
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa), wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Obchodní test"); XLSX.writeFile(wb,"obchodni-test-vysledky.xlsx");
+}
+async function obtestBlockHtml(){
+  try{ const r=await fetch("/api/obchodni-test-results",{cache:"no-store"}); if(r.status===401){ showLogin(); return ""; } OBTEST_RESULTS=await r.json(); }catch(e){ OBTEST_RESULTS=[]; }
+  const catChecks=DB.categories.map(cc=>'<label style="display:inline-flex;gap:6px;align-items:center;margin:0 12px 6px 0"><input type="checkbox" class="obcat" value="'+cc.id+'" '+(OBTEST_ASSIGN.cats.includes(cc.id)?"checked":"")+' onchange="obtestReadCats()"> '+esc(cc.name)+'</label>').join("")||'<span class="muted">Nejprve přidej oddělení (kategorie).</span>';
+  let h='<div class="card pad" style="margin-bottom:18px">'+
+    '<div class="spread" style="margin-bottom:8px"><strong>Obchodní situační test (B2B)</strong>'+
+      '<div class="inline-actions"><button class="btn ghost sm" onclick="window.open(\'/obchodni-test?preview=1\',\'_blank\')">👁 Vyzkoušet (náhled)</button>'+
+      '<button class="btn ghost sm" onclick="copyObtestLinks()">Zkopírovat odkazy</button>'+
+      '<button class="btn sm" onclick="openSendModal(\'survey-obtest\')">Rozeslat</button></div></div>'+
+    '<div class="muted" style="font-size:13px;margin-bottom:12px">10 situací · 5 dimenzí · limit 10 minut · neanonymní · osobní odkaz e-mailem — pro nábor obchodníků i rozvoj stávajících.</div>'+
+    '<div style="background:var(--green-soft);border:1px solid #cfe9d8;border-radius:10px;padding:14px 16px;margin-bottom:12px;font-size:14px;line-height:1.55">'+
+      '<strong>O čem to je:</strong> Situační test úsudku (SJT) z reálných situací B2B prodeje — u každé situace kandidát vybere <strong>nejúčinnější</strong> a <strong>nejméně účinnou</strong> reakci. Měří pět dimenzí: zjišťování potřeb, argumentaci hodnotou místo ceny, práci s námitkami, budování důvěry a řízení obchodního případu. Není to test znalostí produktů — jde o obchodní úsudek.'+
+      '<div class="muted" style="margin-top:6px;font-size:13px">Bodování: 3 b. za klíčovou nejúčinnější reakci, 1 b. za přijatelnou, 2 b. za správně určenou nejhorší, 1 b. za druhou nejhorší — maximum 50 bodů. Pásma: A ≥ 40 · B ≥ 32 · C ≥ 24 · D &lt; 24. <strong>Klíč ani zdůvodnění nejsou v kódu stránky</strong> — kandidát je nevidí, vyhodnocení dělá server.</div>'+
+    '</div>'+
+    '<label class="field" style="margin-bottom:4px"><span>Komu rozeslat — oddělení</span>'+
+      '<label style="display:inline-flex;gap:6px;align-items:center;margin:0 0 8px"><input type="checkbox" id="obAll" '+(OBTEST_ASSIGN.all?"checked":"")+' onchange="obtestAssignAll(this.checked)"> Všem zaměstnancům</label></label>'+
+    '<div id="obCatWrap" style="opacity:'+(OBTEST_ASSIGN.all?.4:1)+'">'+catChecks+'</div></div>';
+  const res=OBTEST_RESULTS||[];
+  if(!res.length){ h+='<div class="card pad"><p class="muted" style="margin:0">Zatím žádné výsledky. Rozešli test uchazečům nebo obchodníkům (tlačítko Rozeslat — uchazeči se přidávají přímo v dialogu) a vyplněné výsledky se tu objeví.</p></div>'; return h; }
+  const avg=Math.round(res.reduce((s,r)=>s+(r.skore||0),0)/res.length);
+  const abN=res.filter(r=>r.pasmo==='A'||r.pasmo==='B').length;
+  h+='<div class="spread" style="margin:4px 0 12px"><h3 style="margin:0">Obchodní úsudek — výsledky</h3><button class="btn sm" onclick="exportObtest()">⬇ Export (XLSX)</button></div>';
+  h+='<div class="card pad" style="margin-bottom:14px;display:flex;gap:28px;flex-wrap:wrap">'+
+     '<div><div class="muted" style="font-size:12px">Respondentů</div><strong style="font-size:20px">'+res.length+'</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Ø skóre</div><strong style="font-size:20px">'+avg+' / 50</strong></div>'+
+     '<div><div class="muted" style="font-size:12px">Pásmo A nebo B</div><strong style="font-size:20px">'+abN+' z '+res.length+'</strong></div></div>';
+  /* průměry po dimenzích — kde je firma slabá napříč obchodníky */
+  const dimAgg={}; res.forEach(r=>Object.keys(r.dimenze||{}).forEach(k=>{ const d=r.dimenze[k]; const a=dimAgg[k]=dimAgg[k]||{nazev:d.nazev||k,got:0,max:0}; a.got+=d.got||0; a.max+=d.max||0; }));
+  const dimKeys=Object.keys(dimAgg);
+  if(dimKeys.length){
+    h+='<div class="card pad" style="margin-bottom:14px"><strong style="font-size:13px;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.03em">Průměr podle dimenzí (všichni respondenti)</strong>'+
+      dimKeys.map(k=>{ const a=dimAgg[k], pct=a.max?Math.round(a.got/a.max*100):0;
+        return '<div style="margin-top:10px"><div class="spread" style="font-size:13px"><strong>'+esc(a.nazev)+'</strong><span class="muted">'+pct+' %</span></div>'+
+          '<div style="height:8px;background:#eef0ed;border-radius:4px;margin-top:4px"><div style="height:100%;width:'+pct+'%;background:'+(pct>=70?'#12752f':pct>=50?'#c98a00':'#b3261e')+';border-radius:4px"></div></div></div>'; }).join('')+'</div>';
+  }
+  const groups={}; res.forEach(r=>{ const d=r.dept||"—"; (groups[d]=groups[d]||[]).push(r); });
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b,"cs")).forEach(d=>{
+    const rows=groups[d].slice().sort((a,b)=>(b.skore||0)-(a.skore||0));
+    const gP=Math.round(rows.reduce((s,r)=>s+(r.procenta||0),0)/rows.length);
+    h+='<div class="spread" style="margin:18px 0 8px"><h3 style="margin:0;font-size:15px">'+(d==="—"?"Uchazeči / bez oddělení":esc(d))+' <span class="muted" style="font-weight:400">('+rows.length+')</span></h3>'+
+       '<span class="pill green">Ø '+gP+' %</span></div>';
+    h+='<div class="matrix-wrap" style="max-height:none"><table class="grid"><thead><tr><th>Jméno</th><th>Pozice</th><th class="num">Skóre</th><th class="num">Úspěšnost</th><th>Pásmo</th><th class="num">Čas</th><th>Datum</th><th></th></tr></thead><tbody>';
+    rows.forEach(r=>{ const pa=obtestPasmoCl(r.pasmo);
+      h+='<tr><td>'+esc(r.name)+'<br><span class="muted mono" style="font-size:11px">'+esc(r.email)+'</span></td>'+
+         '<td>'+esc(r.pozice||"—")+'</td><td class="num">'+(r.skore||0)+' / '+(r.maxSkore||50)+'</td><td class="num">'+(r.procenta||0)+' %</td>'+
+         '<td><span class="pill '+pa[1]+'">'+pa[0]+'</span></td>'+
+         '<td class="num">'+vykresyCas(r.casPouzityS)+(r.casVyprsel?' <span title="Čas vypršel">⏱</span>':'')+'</td>'+
+         '<td class="muted">'+new Date(r.ts).toLocaleDateString("cs-CZ")+'</td>'+
+         '<td style="text-align:right"><button class="btn ghost sm" onclick="openVysledekDetail(\'obtest\',\''+esc(r.email)+'\')">Detail</button></td></tr>'; });
     h+='</tbody></table></div>';
   });
   return h;
@@ -9533,9 +9650,9 @@ function openSendModal(id){
 }
 function refreshSend(id){ const S=sendableOf(id); if(S&&S.isSurvey){ reloadSurveyResults(id); } else { pullAcks(id); } }
 async function reloadSurveyResults(id){
-  const ep = id==="survey-jss" ? "/api/jss-results" : id==="survey-tw44" ? "/api/tw44-results" : id==="survey-vykresy" ? "/api/vykresy-results" : id==="survey-logika" ? "/api/logika-results" : "/api/grit-results";
+  const ep = id==="survey-jss" ? "/api/jss-results" : id==="survey-tw44" ? "/api/tw44-results" : id==="survey-vykresy" ? "/api/vykresy-results" : id==="survey-logika" ? "/api/logika-results" : id==="survey-obtest" ? "/api/obchodni-test-results" : "/api/grit-results";
   try{ const r=await fetch(ep,{cache:"no-store"}); const data=await r.json();
-    if(id==="survey-jss") JSS_RESULTS=data; else if(id==="survey-tw44") TW44_RESULTS=data; else if(id==="survey-vykresy") VYKRESY_RESULTS=data; else GRIT_RESULTS=data;
+    if(id==="survey-jss") JSS_RESULTS=data; else if(id==="survey-tw44") TW44_RESULTS=data; else if(id==="survey-vykresy") VYKRESY_RESULTS=data; else if(id==="survey-logika") LOGIKA_RESULTS=data; else if(id==="survey-obtest") OBTEST_RESULTS=data; else GRIT_RESULTS=data;
   }catch(e){}
   renderSendList(id); toast("Výsledky načteny");
 }

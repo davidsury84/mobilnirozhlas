@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Obchodní situační test — ELKOPLAST CZ</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+
+:root{
+  --paper:#F7F6F2; --surface:#FFFFFF; --ink:#1B2A24; --muted:#63706A; --line:#D9DBD3;
+  --accent:#1E7F5C; --accent-ink:#FFFFFF; --accent-soft:#E3F1EA;
+  --warn:#C8792A; --warn-soft:#F8EBDD; --bad:#B8433A; --bad-soft:#F6E3E1; --good:#1E7F5C;
+  --shadow:0 1px 2px rgba(27,42,36,.06),0 8px 24px rgba(27,42,36,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#131A17; --surface:#1C2521; --ink:#E9ECE7; --muted:#9AA69F; --line:#2F3B35;
+    --accent:#4FBF8F; --accent-ink:#0F1F18; --accent-soft:#1F3A2F;
+    --warn:#E39A4F; --warn-soft:#3A2A18; --bad:#E06B62; --bad-soft:#3D2220; --good:#4FBF8F;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#131A17; --surface:#1C2521; --ink:#E9ECE7; --muted:#9AA69F; --line:#2F3B35;
+  --accent:#4FBF8F; --accent-ink:#0F1F18; --accent-soft:#1F3A2F;
+  --warn:#E39A4F; --warn-soft:#3A2A18; --bad:#E06B62; --bad-soft:#3D2220; --good:#4FBF8F;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:17px;line-height:1.5;padding-inline:16px;padding-block:0 48px}
+h1,h2,h3{font-family:"Fraunces","Iowan Old Style",Georgia,serif;font-weight:600;letter-spacing:-.01em;text-wrap:balance;margin:0}
+h1{font-size:2rem;line-height:1.15}
+h2{font-size:1.45rem;line-height:1.2}
+h3{font-size:1.1rem}
+p{margin:0}
+.wrap{max-width:720px;margin:0 auto}
+.topbar{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--line);margin-inline:-16px;padding:10px 16px}
+.topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:1.05rem}
+.brand small{display:block;font-family:"Source Sans 3",sans-serif;font-weight:400;font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.5rem;padding:4px 12px;border-radius:6px;background:var(--accent-soft);color:var(--accent);min-width:96px;text-align:center}
+.timer.warn{background:var(--warn-soft);color:var(--warn)}
+.timer.bad{background:var(--bad-soft);color:var(--bad)}
+.progress{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:10px}
+.progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:28px;box-shadow:var(--shadow);margin-top:24px}
+.eyebrow{text-transform:uppercase;letter-spacing:.08em;font-size:.78rem;font-weight:700;color:var(--muted)}
+.lead{font-size:1.1rem;color:var(--muted);margin-top:8px;max-width:62ch}
+.stack{display:grid;gap:16px}
+.field label{display:block;font-weight:600;font-size:.92rem;margin-bottom:4px}
+input[type=text],input[type=password]{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
+input:focus,button:focus-visible,.opt:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 18px;border-radius:6px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.ghost{background:transparent}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row.between{justify-content:space-between}
+.scenario{font-size:1.05rem;margin-top:12px;max-width:65ch}
+.scenario b{font-weight:700}
+.opts{display:grid;gap:10px;margin-top:20px}
+.opt{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:start;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.opt .l{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.opt .t{max-width:60ch}
+.pick{display:flex;gap:6px;flex-direction:column}
+.pick label{display:flex;align-items:center;gap:6px;font-size:.82rem;font-weight:600;white-space:nowrap;cursor:pointer;color:var(--muted)}
+.pick input{accent-color:var(--accent);margin:0}
+.opt.best{border-color:var(--accent);background:var(--accent-soft)}
+.opt.worst{border-color:var(--bad);background:var(--bad-soft)}
+.opt.best.worst{border-color:var(--warn);background:var(--warn-soft)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:.88rem;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend .b::before{background:var(--accent)}
+.legend .w::before{background:var(--bad)}
+.nav{margin-top:24px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.note{font-size:.9rem;color:var(--muted)}
+.dots{display:flex;gap:6px;flex-wrap:wrap}
+.dots i{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);display:inline-grid;place-items:center;font-size:.72rem;font-weight:700;font-style:normal;color:var(--muted);cursor:pointer}
+.dots i.done{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.dots i.cur{outline:2px solid var(--accent);outline-offset:1px}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+.score{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center}
+.score .big{font-family:"Fraunces",Georgia,serif;font-size:3.2rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.band{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700;font-size:.85rem}
+.band.A{background:var(--accent-soft);color:var(--accent)}
+.band.B{background:var(--accent-soft);color:var(--accent)}
+.band.C{background:var(--warn-soft);color:var(--warn)}
+.band.D{background:var(--bad-soft);color:var(--bad)}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;min-width:120px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.dim{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center}
+.dim .bar{grid-column:1/-1}
+.key-item{padding:16px 0;border-bottom:1px solid var(--line)}
+.key-item .why{font-size:.93rem;color:var(--muted);margin-top:6px;max-width:65ch}
+.tag{display:inline-block;font-size:.75rem;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:6px}
+.tag.b{background:var(--accent-soft);color:var(--accent)}
+.tag.w{background:var(--bad-soft);color:var(--bad)}
+.tag.p{background:var(--warn-soft);color:var(--warn)}
+.tag.my{background:var(--line);color:var(--ink)}
+.small{font-size:.85rem;color:var(--muted)}
+hr{border:0;border-top:1px solid var(--line);margin:22px 0}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.meta div{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.meta b{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+textarea{width:100%;font:inherit;font-size:.85rem;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);min-height:110px}
+@media (max-width:520px){.opt{grid-template-columns:24px 1fr}.pick{grid-column:1/-1;flex-direction:row;gap:16px}.card{padding:20px}h1{font-size:1.6rem}}
+@media (prefers-reduced-motion: reduce){.progress i{transition:none}}
+@media print{.topbar,.nav,button{display:none!important}.card{box-shadow:none}}
+
+.hid{display:none!important}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <div class="brand">ELKOPLAST CZ<small>Obchodní situační test · B2B</small></div>
+  <div class="row"><div id="dots" class="dots" hidden></div><div id="timer" class="timer" hidden>10:00</div></div>
+</div><div class="wrap"><div class="progress" id="progress" hidden><i></i></div></div></div>
+
+<main class="wrap">
+
+<!-- ÚVOD -->
+<section id="intro" class="card">
+  <p class="eyebrow">Situační test obchodních dovedností · <span id="introMin">10</span> minut · <span id="introN">10</span> situací</p>
+  <h1 style="margin-top:8px">Jak byste postupoval(a) v obchodní situaci?</h1>
+  <p class="lead">Test měří, jak rozumíte prodeji technologií pro odpadové hospodářství obcím, svozovým společnostem a průmyslu: zjišťování potřeb, argumentaci hodnotou, práci s námitkami, uzavírání a budování důvěry.</p>
+  <hr>
+  <div class="stack">
+    <div>
+      <h3>Jak test funguje</h3>
+      <p class="scenario">U každé situace vidíte čtyři možné reakce. Označte, která je podle Vás <b>nejúčinnější</b> a která <b>nejméně účinná</b>. Neexistuje jediná „správná“ odpověď – hodnotí se Váš obchodní úsudek. Odpovídejte tak, jak byste skutečně jednal(a), ne jak si myslíte, že se to od Vás očekává.</p>
+    </div>
+    <div>
+      <h3>Časový limit</h3>
+      <p class="scenario">Na test máte <b><span id="introMin2">10</span> minut</b>, tj. zhruba minutu na situaci. Po vypršení času se test automaticky odevzdá s tím, co jste stihl(a) vyplnit. Mezi situacemi se můžete vracet.</p>
+    </div>
+    <div id="rowIdent" class="stack">
+      <div class="field"><label for="inName">Jméno a příjmení</label><input id="inName" type="text" autocomplete="name"></div>
+      <div class="field" id="rowEmail"><label for="inEmail">E-mail</label><input id="inEmail" type="text" autocomplete="email"></div>
+      <div class="field"><label for="inPos">Pozice, o kterou se ucházíte <span class="small">(nepovinné)</span></label><input id="inPos" type="text"></div>
+    </div>
+    <div class="row between">
+      <button class="primary" id="startBtn">Spustit test</button>
+      <span class="small">Výsledek se odešle personálnímu oddělení ELKOPLAST CZ.</span>
+    </div>
+  </div>
+</section>
+
+<section id="test" hidden></section>
+
+<section id="done" class="card" hidden>
+  <p class="eyebrow">Test odevzdán</p>
+  <h2 style="margin-top:8px">Děkujeme, Vaše odpovědi jsou uložené.</h2>
+  <p class="lead" id="doneMsg">Vyhodnocení provede personální oddělení. Můžete okno zavřít.</p>
+  <p class="small" id="doneTime" style="margin-top:10px"></p>
+</section>
+
+</main>
+
+<script>
+/* Zadání (bez klíče) se načítá ze serveru — správné odpovědi zná jen server. */
+const INVITE_TOKEN=(location.search.match(/[?&]i=([^&]+)/i)||[])[1]||"";
+const API=INVITE_TOKEN?("/api/obchodni-test?i="+encodeURIComponent(INVITE_TOKEN)):"/api/obchodni-test";
+const PREVIEW=/[?&]preview=1/i.test(location.search)&&!INVITE_TOKEN;  /* náhled pro správce — nic se neukládá */
+const $=s=>document.querySelector(s);
+const L="ABCD";
+let ITEMS=[], DIMS={}, LIMIT_S=600;
+let state={cur:0,best:[],worst:[],started:0,ended:0,left:600,timerId:null};
+
+function inviteName(tok){
+  try{
+    const data=tok.split(".")[0].replace(/-/g,"+").replace(/_/g,"/");
+    const bin=atob(data+"=".repeat((4-data.length%4)%4));
+    const o=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))));
+    return (o&&o.n)||"";
+  }catch(e){return "";}
+}
+
+(async function nactiZadani(){
+  try{
+    const u="/api/obchodni-test-zadani"+(INVITE_TOKEN?("?i="+encodeURIComponent(INVITE_TOKEN)):"");
+    const d=await (await fetch(u,{cache:"no-store"})).json();
+    if(d&&Array.isArray(d.items)&&d.items.length){
+      ITEMS=d.items; DIMS=d.dims||{}; LIMIT_S=Math.round((d.limitMin||10)*60);
+      state.best=new Array(ITEMS.length).fill(null);
+      state.worst=new Array(ITEMS.length).fill(null);
+      $("#introN").textContent=ITEMS.length;
+      const mm=Math.round(LIMIT_S/60); $("#introMin").textContent=mm; $("#introMin2").textContent=mm;
+      $("#timer").textContent=String(mm).padStart(2,"0")+":00";
+    }
+  }catch(e){}
+  if(INVITE_TOKEN){
+    const n=inviteName(INVITE_TOKEN);
+    if(n) $("#inName").value=n;
+    $("#rowEmail").classList.add("hid");
+  }
+})();
+
+$("#startBtn").onclick=()=>{
+  if(!ITEMS.length){ alert("Zadání se nepodařilo načíst, zkuste stránku obnovit."); return; }
+  if(!$("#inName").value.trim()){ alert("Vyplňte prosím jméno a příjmení."); return; }
+  if(!INVITE_TOKEN && !/@/.test($("#inEmail").value)){ alert("Vyplňte prosím platný e-mail."); return; }
+  $("#intro").hidden=true; $("#test").hidden=false;
+  $("#timer").hidden=false; $("#dots").hidden=false; $("#progress").hidden=false;
+  state.started=Date.now();
+  state.timerId=setInterval(tick,1000);
+  renderItem(); window.scrollTo(0,0);
+};
+function tick(){
+  state.left=Math.max(0, LIMIT_S-Math.round((Date.now()-state.started)/1000));
+  const m=String(Math.floor(state.left/60)).padStart(2,"0"), s=String(state.left%60).padStart(2,"0");
+  const t=$("#timer"); t.textContent=m+":"+s;
+  t.classList.toggle("warn", state.left<=120&&state.left>30);
+  t.classList.toggle("bad", state.left<=30);
+  if(state.left<=0) finish(true);
+}
+function answered(i){ return state.best[i]!==null && state.worst[i]!==null; }
+function renderItem(){
+  const i=state.cur, it=ITEMS[i];
+  $("#progress i").style.width=(100*ITEMS.filter((_,k)=>answered(k)).length/ITEMS.length)+"%";
+  $("#dots").innerHTML=ITEMS.map((_,k)=>'<i class="'+(answered(k)?'done':'')+' '+(k===i?'cur':'')+'" data-k="'+k+'" title="Situace '+(k+1)+'">'+(k+1)+'</i>').join("");
+  $("#dots").querySelectorAll("i").forEach(d=>d.onclick=()=>{state.cur=+d.dataset.k;renderItem();});
+  $("#test").innerHTML='<div class="card">'+
+    '<p class="eyebrow">Situace '+(i+1)+' z '+ITEMS.length+' · '+(DIMS[it.dim]||"")+'</p>'+
+    '<h2 style="margin-top:6px">'+it.title+'</h2>'+
+    '<p class="scenario">'+it.s+'</p>'+
+    '<div class="legend"><span class="b">Nejúčinnější reakce</span><span class="w">Nejméně účinná reakce</span></div>'+
+    '<div class="opts">'+it.o.map((t,k)=>'<div class="opt '+(state.best[i]===k?'best':'')+' '+(state.worst[i]===k?'worst':'')+'">'+
+        '<span class="l">'+L[k]+'</span><span class="t">'+t+'</span>'+
+        '<span class="pick">'+
+          '<label><input type="radio" name="b'+i+'" value="'+k+'" '+(state.best[i]===k?'checked':'')+'>Nejúčinnější</label>'+
+          '<label><input type="radio" name="w'+i+'" value="'+k+'" '+(state.worst[i]===k?'checked':'')+'>Nejméně účinná</label>'+
+        '</span></div>').join("")+'</div>'+
+    '<p class="note" id="warn" style="margin-top:10px"></p>'+
+    '<div class="nav">'+
+      '<button class="ghost" id="prev" '+(i===0?'disabled':'')+'>← Zpět</button>'+
+      (i<ITEMS.length-1 ? '<button class="primary" id="next">Další situace →</button>'
+                        : '<button class="primary" id="fin">Odevzdat test</button>')+
+    '</div></div>';
+  $("#test").querySelectorAll("input[type=radio]").forEach(r=>r.onchange=()=>{
+    const k=+r.value;
+    if(r.name[0]==="b"){ state.best[i]=k; if(state.worst[i]===k) state.worst[i]=null; }
+    else { state.worst[i]=k; if(state.best[i]===k) state.best[i]=null; }
+    renderItem();
+  });
+  if(state.best[i]!==null&&state.worst[i]===null) $("#warn").textContent="Označte ještě nejméně účinnou reakci.";
+  if(state.best[i]===null&&state.worst[i]!==null) $("#warn").textContent="Označte ještě nejúčinnější reakci.";
+  const prev=$("#prev"); if(prev) prev.onclick=()=>{state.cur--;renderItem();window.scrollTo(0,0);};
+  const next=$("#next"); if(next) next.onclick=()=>{state.cur++;renderItem();window.scrollTo(0,0);};
+  const fin=$("#fin"); if(fin) fin.onclick=()=>{
+    const chybi=ITEMS.map((_,k)=>k).filter(k=>!answered(k));
+    if(chybi.length && !confirm("Nevyplněné situace: "+chybi.map(k=>k+1).join(", ")+". Opravdu odevzdat?")) return;
+    finish(false);
+  };
+}
+function finish(timeout){
+  clearInterval(state.timerId); state.ended=Date.now();
+  $("#test").hidden=true; $("#timer").hidden=true; $("#dots").hidden=true; $("#progress").hidden=true;
+  const cas=Math.round((state.ended-state.started)/1000);
+  const payload={
+    name:$("#inName").value.trim(), email:$("#inEmail").value.trim(), pozice:$("#inPos").value.trim(),
+    odpovedi:ITEMS.map((_,i)=>({best:state.best[i], worst:state.worst[i]})),
+    casPouzityS:cas, limitS:LIMIT_S, casVyprsel:!!timeout
+  };
+  if(PREVIEW){ $("#doneMsg").textContent="Náhled pro správce — výsledek se neukládá a nikomu se neodesílá."; }
+  else fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(d=>{
+      if(d&&d.blocked) $("#doneMsg").textContent="Test jste nedávno vyplnil(a) — uložený zůstává původní výsledek.";
+    }).catch(()=>{});
+  $("#done").hidden=false;
+  $("#doneTime").textContent="Čas: "+Math.floor(cas/60)+" min "+String(cas%60).padStart(2,"0")+" s"+(timeout?" (vypršel limit)":"");
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>

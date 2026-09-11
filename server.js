@@ -164,6 +164,8 @@ const JSS_FILE  = path.join(ROOT, 'jss.html');               // dotazník pracov
 const TW44_FILE = path.join(ROOT, 'tw44.html');              // test kognitivní zátěže (TW44)
 const VYKRESY_FILE = path.join(ROOT, 'vykresy.html');        // test čtení strojírenských výkresů (praktický, 15 otázek)
 const LOGIKA_FILE = path.join(ROOT, 'logika.html');          // test logického myšlení pro nábor nákupčí/logistik (20 úloh)
+const OBTEST_FILE = path.join(ROOT, 'obchodni-test.html');    // obchodní situační test (SJT) pro nábor obchodníků
+const OBTEST_OT_F = path.join(ROOT, 'obchodni-test-otazky.json'); // situace + klíč (klíč nikdy neopouští server)
 const ABROLL_FILE = path.join(ROOT, 'abroll-skoleni.html');  // interaktivní školení ABROLL + závěrečný test
 const PRODUKTY_FILE = path.join(ROOT, 'produkty-skoleni.html'); // interaktivní školení Produkty (znalosti obchodníků) + závěrečný test
 const PRUMYSL_FILE = path.join(ROOT, 'prumysl-skoleni.html'); // interaktivní školení Průmysl (obchodník: skladování, Li-Ion, ADR) + závěrečný test
@@ -186,6 +188,7 @@ const JSS_F    = path.join(DATA_DIR, 'jss-results.json');    // výsledky dotazn
 const TW44_F   = path.join(DATA_DIR, 'tw44-results.json');   // výsledky testu kognitivní zátěže (neanonymní)
 const VYKRESY_F = path.join(DATA_DIR, 'vykresy-results.json'); // výsledky testu čtení výkresů (zaměstnanci i uchazeči)
 const LOGIKA_F = path.join(DATA_DIR, 'logika-results.json'); // výsledky testu logického myšlení (nábor nákupčí/logistik)
+const OBTEST_F = path.join(DATA_DIR, 'obchodni-test-results.json'); // výsledky obchodního situačního testu
 const LOGIKA_OT_SEED = path.join(ROOT, 'logika-otazky.json');      // otázky testu logiky — seed v repu (výchozí sada 25 úloh)
 const LOGIKA_OT_F = path.join(DATA_DIR, 'logika-otazky.json');     // otázky testu logiky — editovatelná kopie na volume (má přednost)
 const ABROLL_F = path.join(DATA_DIR, 'abroll-results.json'); // výsledky testu ABROLL (max 3 pokusy na osobu)
@@ -1042,8 +1045,9 @@ function mySurveys(email) {
     { id: 'grit', title: 'Test houževnatosti (Grit)', desc: '10 otázek · vytrvalost a dlouhodobá vášeň pro cíle', mins: 3, file: GRIT_F },
     { id: 'jss',  title: 'Dotazník pracovní spokojenosti (JSS)', desc: '36 otázek · 9 oblastí pracovní spokojenosti', mins: 8, file: JSS_F },
     { id: 'tw44', title: 'Test kognitivní zátěže (TW44)', desc: 'krátké subtesty pozornosti a paměti', mins: 6, file: TW44_F },
-    // Náborové testy (čtení výkresů, logika) se zaměstnancům v Průzkumech nenabízejí —
-    // uchazeči je dostávají odkazem s tokenem (/vykresy, /logika) a správce je vidí v Průzkumech.
+    // Náborové testy (čtení výkresů, logika, obchodní situační test) se zaměstnancům v Průzkumech
+    // nenabízejí — uchazeči je dostávají odkazem s tokenem (/vykresy, /logika, /obchodni-test)
+    // a správce je vidí v Průzkumech.
   ];
   return DEFS.map(d => {
     const rec = readJson(d.file, []).find(r => (r.email || '').toLowerCase() === email);
@@ -1154,6 +1158,65 @@ function recordVykresy(a) {
   return rec;
 }
 // Uloží (upsert dle e-mailu) výsledek testu logického myšlení — stejný tvar záznamu jako test výkresů.
+/* ---------- Obchodní situační test (SJT, nábor obchodníků) ----------
+   Kandidát u 10 situací označí nejúčinnější a nejméně účinnou reakci.
+   Klíč i bodování jsou jen na serveru — stránka dostane situace bez správných odpovědí. */
+function obtestZadani() {
+  try { const d = JSON.parse(fs.readFileSync(OBTEST_OT_F, 'utf8')); return (d && Array.isArray(d.items) && d.items.length) ? d : null; }
+  catch (_) { return null; }
+}
+function obtestPasmo(z, total) {
+  const pasma = (z && z.pasma) || [];
+  for (const p of pasma) if (total >= Number(p.min || 0)) return p;
+  return { k: 'D', t: '', d: '' };
+}
+function recordObtest(a) {
+  const z = obtestZadani(); if (!z) return { chyba: 'Chybí zadání testu.' };
+  const email = (a.email || '').toLowerCase();
+  const s2 = readJson(STATE_F, { employees: [], categories: [] });
+  const emp = (s2.employees || []).find(x => (x.email || '').toLowerCase() === email);
+  const name = emp ? (emp.name || email) : (a.name || email);
+  let dept = '—';
+  if (emp && emp.cats && emp.cats.length) { const c = (s2.categories || []).find(x => x.id === emp.cats[0]); dept = c ? c.name : '—'; }
+  const odp = Array.isArray(a.odpovedi) ? a.odpovedi : [];
+  const L = 'ABCD';
+  const dims = {}; Object.keys(z.dims || {}).forEach(k => { dims[k] = { nazev: z.dims[k], got: 0, max: 0 }; });
+  const detail = z.items.map((it, i) => {
+    const o = odp[i] || {};
+    const b = (o.best === 0 || o.best) ? Number(o.best) : null;
+    const w = (o.worst === 0 || o.worst) ? Number(o.worst) : null;
+    let sb = 0, sw = 0;
+    if (b === it.best) sb = 3; else if (b === it.ok) sb = 1;
+    if (w === it.worst) sw = 2; else if (w === it.pworst) sw = 1;
+    const body = sb + sw;
+    if (dims[it.dim]) { dims[it.dim].got += body; dims[it.dim].max += 5; }
+    return {
+      situace: i + 1, title: it.title, dim: it.dim, dimNazev: (z.dims || {})[it.dim] || it.dim,
+      best: b, worst: w, bestPismeno: b == null ? null : L[b], worstPismeno: w == null ? null : L[w],
+      klicBest: L[it.best], klicWorst: L[it.worst], body, max: 5
+    };
+  });
+  const skore = detail.reduce((n, d) => n + d.body, 0);
+  const maxSkore = z.items.length * 5;
+  const procenta = Math.round(skore / maxSkore * 100);
+  const pasmo = obtestPasmo(z, skore);
+  const rec = {
+    email, name, dept, pozice: String(a.pozice || '').slice(0, 80),
+    skore, maxSkore, procenta, pasmo: pasmo.k, pasmoText: pasmo.t, doporuceni: pasmo.d,
+    zodpovezeno: detail.filter(d => d.best != null && d.worst != null).length, situaci: z.items.length,
+    dimenze: dims, odpovedi: detail,
+    casPouzityS: Math.max(0, Math.round(Number(a.casPouzityS) || 0)),
+    limitS: Math.max(0, Math.round(Number(a.limitS) || 0)),
+    casVyprsel: !!a.casVyprsel, ts: Date.now()
+  };
+  const results = readJson(OBTEST_F, []);
+  const i = results.findIndex(r => (r.email || '').toLowerCase() === email);
+  if (i >= 0 && results[i].ts && Date.now() < nextFillAt(results[i].ts)) return { blocked: true, nextAt: nextFillAt(results[i].ts) };
+  if (i >= 0) results[i] = rec; else results.push(rec);
+  writeJson(OBTEST_F, results);
+  logActivity('survey', { email, name }, 'Obchodní situační test');
+  return rec;
+}
 function recordLogika(a) {
   const email = (a.email || '').toLowerCase();
   const s2 = readJson(STATE_F, { employees: [], categories: [] });
@@ -1487,7 +1550,7 @@ function spokojenostVerejneVysledky() {
   };
 }
 /* ---- Automatické odeslání výsledku testu na HR manažera (settings.hrEmail) + interpretace ---- */
-const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)', vykresy: 'Test čtení výkresů', logika: 'Test logického myšlení (nákup a logistika)' };
+const SURVEY_NAZVY = { grit: 'Test houževnatosti (Grit)', jss: 'Dotazník pracovní spokojenosti (JSS)', tw44: 'Test kognitivní zátěže (TW44)', vykresy: 'Test čtení výkresů', logika: 'Test logického myšlení (nákup a logistika)', obtest: 'Obchodní situační test (B2B)' };
 /* Test čtení výkresů — pásma dle procent (stejná hranice jako v testu samotném) */
 function vykresyPasmo(p) { return p >= 90 ? 'vyborna' : p >= 70 ? 'dobra' : p >= 50 ? 'zakladni' : 'nedostatecna'; }
 const VYKRESY_HODNOCENI = { vyborna: 'Výborná úroveň', dobra: 'Dobrá úroveň', zakladni: 'Základní orientace', nedostatecna: 'Nedostatečná úroveň' };
@@ -1604,6 +1667,17 @@ function surveyVysledekRadky(kind, rec) {
       ['Upozornění', 'Orientační výsledek — doporučujeme doplnit krátkým pohovorem nad reálným firemním výkresem.']);
     return r;
   }
+  if (kind === 'obtest') {
+    const dims = rec.dimenze || {};
+    return [
+      ['Skóre', rec.skore + ' / ' + rec.maxSkore + ' b. (' + rec.procenta + ' %)'],
+      ['Pásmo', rec.pasmo + ' — ' + (rec.pasmoText || '')],
+      ['Zodpovězeno', rec.zodpovezeno + ' / ' + rec.situaci + ' situací'],
+      ['Čas', Math.floor((rec.casPouzityS || 0) / 60) + ' min ' + String((rec.casPouzityS || 0) % 60).padStart(2, '0') + ' s' + (rec.casVyprsel ? ' (vypršel limit)' : '')],
+      ...Object.keys(dims).map(k => [dims[k].nazev || k, dims[k].got + ' / ' + dims[k].max]),
+      ['Doporučení', rec.doporuceni || '']
+    ];
+  }
   if (kind === 'logika') {
     const r = [
       ['Výsledek', rec.skore + ' / ' + rec.otazekCelkem + ' správně (' + rec.procenta + ' %)'],
@@ -1666,7 +1740,7 @@ function surveyReportHtml(kind, rec, poznamka) {
     '<p style="margin-top:16px;font-size:12px;color:#77796f">Interní podklad HR — ELKOPLAST CZ. Doplňková informace ze sebehodnocení, nikoli samostatné selekční kritérium. Plný interaktivní detail: intranet.elkoplast.cz → Průzkumy.</p></div></div>';
 }
 function surveyRec(kind, email) {
-  const f = kind === 'jss' ? JSS_F : kind === 'tw44' ? TW44_F : kind === 'vykresy' ? VYKRESY_F : kind === 'logika' ? LOGIKA_F : GRIT_F;
+  const f = kind === 'jss' ? JSS_F : kind === 'tw44' ? TW44_F : kind === 'vykresy' ? VYKRESY_F : kind === 'logika' ? LOGIKA_F : kind === 'obtest' ? OBTEST_F : GRIT_F;
   return readJson(f, []).find(r => (r.email || '').toLowerCase() === String(email || '').toLowerCase());
 }
 
@@ -3627,7 +3701,7 @@ const server = http.createServer(async (req, res) => {
 
   // pozvánkový hash: podepsaný odkaz ?i=... pustí NEzaměstnance na dotazník bez přihlášení
   const invite = inviteVerify(u.query.i || '');
-  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/vykresy', '/vykresy.html', '/logika', '/logika.html', '/api/grit', '/api/jss', '/api/tw44', '/api/vykresy', '/api/logika', '/api/logika-zadani'];
+  const INVITE_ROUTES = ['/grit', '/grit.html', '/jss', '/jss.html', '/tw44', '/tw44.html', '/vykresy', '/vykresy.html', '/logika', '/logika.html', '/obchodni-test', '/obchodni-test.html', '/api/grit', '/api/jss', '/api/tw44', '/api/vykresy', '/api/logika', '/api/logika-zadani', '/api/obchodni-test', '/api/obchodni-test-zadani'];
   const inviteOk = !!(invite && INVITE_ROUTES.indexOf(p) >= 0);
   // Veřejné cesty modulu Smlouvy (mimo SSO závoru): potvrzení termínu tokenem + Resend webhook.
   const smlouvyPublic = p.startsWith('/smlouvy/potvrdit') || p === '/api/smlouvy/webhook/resend';
@@ -3746,7 +3820,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // chráněné cesty (správa)
-  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results', '/api/logika-results', '/api/mobiliar-results', '/api/spokojenost-results'];
+  const PROTECTED = ['/api/state', '/api/send', '/api/publish', '/api/test', '/api/config', '/api/library', '/api/report/preview', '/api/report/send', '/api/grit-results', '/api/jss-results', '/api/tw44-results', '/api/vykresy-results', '/api/logika-results', '/api/obchodni-test-results', '/api/mobiliar-results', '/api/spokojenost-results'];
   if (PROTECTED.indexOf(p) >= 0 && !isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
 
   try {
@@ -3866,6 +3940,29 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(VYKRESY_FILE)) return send(res, 404, '<h1>Chybí vykresy.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       return send(res, 200, fs.readFileSync(VYKRESY_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
+    if (p === '/obchodni-test' || p === '/obchodni-test.html') {
+      if (!fs.existsSync(OBTEST_FILE)) return send(res, 404, '<h1>Chybí obchodni-test.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      return send(res, 200, fs.readFileSync(OBTEST_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+    }
+    // Zadání bez klíče — správné odpovědi zná jen server.
+    if (p === '/api/obchodni-test-zadani' && req.method === 'GET') {
+      const z = obtestZadani(); if (!z) return send(res, 500, { error: 'Chybí zadání testu.' });
+      return send(res, 200, {
+        nazev: z.nazev, limitMin: z.limitMin, dims: z.dims,
+        items: z.items.map(it => ({ dim: it.dim, title: it.title, s: it.s, o: it.o }))
+      }, { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+    }
+    if (p === '/api/obchodni-test' && req.method === 'POST') {
+      const b = JSON.parse(await readBody(req));
+      if (invite) { b.email = invite.e; b.name = invite.n; }
+      if (!b.email) return send(res, 400, { error: 'Chybí e-mail.' });
+      const rec = recordObtest(b);
+      if (rec.chyba) return send(res, 500, { error: rec.chyba });
+      if (rec.blocked) return send(res, 200, { ok: false, blocked: true, nextAt: rec.nextAt }, { 'Access-Control-Allow-Origin': '*' });
+      poslatHrVysledek('obtest', rec);
+      return send(res, 200, { ok: true, name: rec.name }, { 'Access-Control-Allow-Origin': '*' });
+    }
+    if (p === '/api/obchodni-test-results' && req.method === 'GET') return send(res, 200, readJson(OBTEST_F, []));
     if (p === '/logika' || p === '/logika.html') {
       if (!fs.existsSync(LOGIKA_FILE)) return send(res, 404, '<h1>Chybí logika.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       let html = fs.readFileSync(LOGIKA_FILE, 'utf8');
@@ -4158,7 +4255,7 @@ const server = http.createServer(async (req, res) => {
       if (!emailConfigured()) return send(res, 500, { error: 'Pošta není nastavená — vyplň ji v záložce Nastavení.' });
       const b = JSON.parse(await readBody(req));
       const kind = (b.kind || '').toLowerCase();
-      if (['grit', 'jss', 'tw44', 'vykresy', 'logika'].indexOf(kind) < 0) return send(res, 400, { error: 'Neznámý typ testu.' });
+      if (['grit', 'jss', 'tw44', 'vykresy', 'logika', 'obtest'].indexOf(kind) < 0) return send(res, 400, { error: 'Neznámý typ testu.' });
       const to = String(b.to || '').trim();
       if (to.indexOf('@') < 0) return send(res, 400, { error: 'Neplatný e-mail příjemce.' });
       const rec = surveyRec(kind, b.email);
@@ -4234,7 +4331,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/invite-links' && req.method === 'POST') {
       if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
       const b = JSON.parse(await readBody(req));
-      const kind = (b.kind || '').replace(/[^a-z0-9]/gi, '');
+      const kind = (b.kind || '').replace(/[^a-z0-9-]/gi, ''); // pomlčka kvůli /obchodni-test
       const base = baseUrl(req); const links = {};
       (b.list || []).forEach(r => { const e = (r.email || '').toLowerCase(); if (e && kind) links[e] = base + '/' + kind + '?i=' + encodeURIComponent(inviteSign(e, r.name || '')); });
       return send(res, 200, { links });

@@ -1,0 +1,199 @@
+{
+ "nazev": "Obchodní situační test (B2B)",
+ "limitMin": 10,
+ "dims": {
+  "potreby": "Zjišťování potřeb",
+  "hodnota": "Argumentace hodnotou",
+  "namitky": "Námitky a uzavírání",
+  "duvera": "Důvěra a vztah",
+  "rizeni": "Řízení obchodu"
+ },
+ "pasma": [
+  {
+   "k": "A",
+   "min": 40,
+   "t": "Vysoce nadprůměrný obchodní úsudek",
+   "d": "Kandidát systematicky volí konzultativní postup a vyhýbá se rizikovým reakcím. Doporučeno pokračovat do dalšího kola — ověřte praxí (hraní rolí, reference)."
+  },
+  {
+   "k": "B",
+   "min": 32,
+   "t": "Nadprůměrný obchodní úsudek",
+   "d": "Solidní základ pro B2B prodej. Zaměřte pohovor na dimenze s nižším skóre."
+  },
+  {
+   "k": "C",
+   "min": 24,
+   "t": "Průměrný obchodní úsudek",
+   "d": "Kandidát rozpozná zjevné chyby, ale nevyužívá příležitosti. Vhodný pro juniorní pozici se zaškolením; ověřte motivaci a učenlivost."
+  },
+  {
+   "k": "D",
+   "min": 0,
+   "t": "Podprůměrný obchodní úsudek",
+   "d": "Kandidát opakovaně volí reakce, které poškozují obchod nebo vztah. Pro samostatnou obchodní pozici nedoporučeno bez dalšího ověření."
+  }
+ ],
+ "items": [
+  {
+   "dim": "potreby",
+   "title": "První schůzka na obecním úřadě",
+   "s": "Starosta obce se 3 200 obyvateli Vám na první schůzce říká: <b>„Potřebujeme nabídku na kontejnery na tříděný odpad, pošlete nám ceník.“</b> Jak zareagujete?",
+   "o": [
+    "Poděkuji, ještě týž den pošlu kompletní katalog s ceníkem a nechám obec vybrat.",
+    "Zeptám se, jak dnes funguje svoz (kdo sváží, kolik je stanovišť, jak často), s čím mají problém – přeplněnost, vzhled, nepořádek – a jakých výsledků třídění chtějí dosáhnout. Až podle toho navrhnu řešení.",
+    "Rovnou doporučím polopodzemní kontejnery, protože jsou aktuální trend a nejvíc se na nich vydělá.",
+    "Zeptám se na výši rozpočtu a podle ní navrhnu odpovídající typ kontejnerů."
+   ],
+   "best": 1,
+   "ok": 3,
+   "worst": 0,
+   "pworst": 2,
+   "why": "Standard konzultativního prodeje (SPIN): nejdřív situace a problém, teprve pak řešení. Poslat ceník bez zjištění potřeb (A) přenechává výběr zákazníkovi a redukuje nás na cenu. Rozpočet (D) je legitimní otázka, ale sama o sobě nevede k dobrému návrhu. Tlačit trendový produkt bez diagnózy (C) je prodej „od výrobku“, ne od potřeby."
+  },
+  {
+   "dim": "hodnota",
+   "title": "„Jste o 15 % dražší“",
+   "s": "Výrobní podnik poptává lisovací kontejner na papír a fólie. Nákupčí Vám ukáže konkurenční nabídku a řekne: <b>„Jste o 15 % dražší, tak proč bychom měli brát vás?“</b>",
+   "o": [
+    "Nabídnu okamžitou slevu 15 %, abychom se srovnali s konkurencí.",
+    "Vrátím se k jejich provozu: kolik odvozů dnes platí, jaký objem a četnost svozu lis změní, kolik stojí servis a jaká je životnost. Spočítám celkové roční náklady obou variant a ukážu, kde je rozdíl.",
+    "Vysvětlím, že konkurence má známé problémy s kvalitou a servisem, a proto je levnější.",
+    "Nabídnu prodlouženou záruku a servis v prvním roce zdarma, aniž bych řešil srovnání nákladů."
+   ],
+   "best": 1,
+   "ok": 3,
+   "worst": 2,
+   "pworst": 0,
+   "why": "Hodnotová argumentace: cena investice je jen část celkových nákladů (TCO). Kdo umí přepočítat úsporu na svozech, nemusí slevovat. Pomlouvání konkurence (C) poškozuje důvěru nejvíc – nákupčí si to ověří. Okamžitá sleva (A) učí zákazníka, že cena je vyjednávatelná bez protihodnoty. Bonus bez propočtu (D) je přijatelný, ale nevyužívá hlavní argument."
+  },
+  {
+   "dim": "namitky",
+   "title": "„Do příštího roku nemáme rozpočet“",
+   "s": "Po dobré prezentaci Vám místostarosta řekne: <b>„Líbí se nám to, ale letos už na to rozpočet nemáme. Vraťte se příští rok.“</b>",
+   "o": [
+    "Poděkuji a poznamenám si, že se ozvu příští rok v lednu.",
+    "Zeptám se, kdy se sestavuje rozpočet a jaké podklady zastupitelstvo potřebuje. Nabídnu, že je připravím, a zmíním možnosti dotace (OPŽP) nebo pronájmu či splátek. Domluvím konkrétní termín dalšího kroku.",
+    "Zdůrazním, že cena platí jen do konce měsíce, a zkusím je přesvědčit k objednávce teď.",
+    "Pošlu nabídku s platností 12 měsíců a nechám na nich, kdy se ozvou."
+   ],
+   "best": 1,
+   "ok": 3,
+   "worst": 2,
+   "pworst": 0,
+   "why": "Námitka „rozpočet“ je často námitka na načasování, ne na produkt. Nejúčinnější je posunout obchod do rozpočtového procesu a nabídnout financování. Časový tlak (C) v komunální sféře nefunguje a poškozuje vztah. Pasivní čekání (A) obvykle znamená, že zakázku mezitím získá někdo jiný."
+  },
+  {
+   "dim": "namitky",
+   "title": "„Pošlete to, ozveme se“",
+   "s": "Ředitel svozové společnosti si prohlédl návrh třídicí technologie a uzavírá schůzku slovy: <b>„Vypadá to dobře, pošlete mi to a my se ozveme.“</b>",
+   "o": [
+    "Nabídku pošlu a počkám, až se ozvou – nechci působit dotěrně.",
+    "Zeptám se, co přesně budou posuzovat, kdo další se bude rozhodovat a co by muselo platit, aby řekli ano. Navrhnu konkrétní další krok – referenční návštěvu nebo schůzku nad technickým zadáním – a domluvím termín.",
+    "Nabídnu 5% slevu, pokud podepíší do konce týdne.",
+    "Zeptám se, jestli je v pořádku, když zavolám za tři týdny."
+   ],
+   "best": 1,
+   "ok": 3,
+   "worst": 2,
+   "pworst": 0,
+   "why": "Uzavírání v B2B znamená zajistit další konkrétní krok a poznat rozhodovací proces (kdo, kdy, podle čeho). Sleva za rychlý podpis (C) u investice v milionech působí nevěrohodně a signalizuje, že cena byla nafouknutá. Domluvit termín hovoru (D) je lepší než nic, ale nezjistí, co se vlastně rozhoduje."
+  },
+  {
+   "dim": "duvera",
+   "title": "Parametr, který nesplňujeme",
+   "s": "Zákazník trvá v technické specifikaci na parametru (např. konkrétní nosnost nebo certifikace), který náš standardní produkt <b>nesplňuje</b>. Zakázka je pro Vás důležitá.",
+   "o": [
+    "Uvedu, že parametr splňujeme – detaily se doladí až při realizaci.",
+    "Otevřeně řeknu, že náš standard tento parametr nesplňuje, a nabídnu úpravu, jiný model, nebo doporučím jiné řešení.",
+    "Parametr v nabídce nezmíním a pošlu standardní nabídku – třeba si toho nevšimnou.",
+    "Zeptám se, k čemu parametr potřebují a jaký cíl za ním stojí. Otevřeně řeknu, co nesplňujeme, a navrhnu, jak cíle dosáhnout jinak."
+   ],
+   "best": 3,
+   "ok": 1,
+   "worst": 0,
+   "pworst": 2,
+   "why": "Důvěryhodnost je v dlouhodobých B2B vztazích hlavní aktivum. Nejlepší je kombinace otevřenosti a zjištění skutečné potřeby (D) – parametr bývá prostředkem, ne cílem. Poctivé přiznání (B) je plně přijatelné. Lhaní (A) a zamlčení (C) vedou k reklamacím, ztrátě zákazníka a ohrožují pověst firmy."
+  },
+  {
+   "dim": "rizeni",
+   "title": "Pondělí ráno – čím začít",
+   "s": "V pondělí ráno máte čtyři věci: <b>(1)</b> dokončit nabídku pro průmyslový podnik za 2 mil. Kč, který se rozhoduje tento týden; <b>(2)</b> novou poptávku z webu na dvě popelnice; <b>(3)</b> stížnost stálého zákazníka (svozová firma, roční obrat 4 mil. Kč) na zpožděnou dodávku kontejnerů; <b>(4)</b> zavolat kontaktu z veletrhu. Čím začnete?",
+   "o": [
+    "Nabídkou za 2 mil. Kč – je to největší obchod a rozhodnutí je tento týden.",
+    "Krátce zavolám stálému zákazníkovi, zjistím stav a domluvím, kdy dostane informaci od výroby. Potom se pustím do nabídky za 2 mil. Kč.",
+    "Poptávkou z webu – vyřídím ji za pět minut a mám ji z hlavy.",
+    "Kontaktem z veletrhu – dokud si nás pamatuje."
+   ],
+   "best": 1,
+   "ok": 0,
+   "worst": 2,
+   "pworst": 3,
+   "why": "Řízení priorit: stálý zákazník s 4 mil. Kč ročně a otevřenou stížností je největší riziko – stačí krátký hovor, který ho ujistí. Pak přichází nabídka s uzávěrkou (A je proto přijatelná volba). Drobná poptávka (C) je nejméně naléhavá a její „vyřízení pro pocit“ je typická chyba v řízení času."
+  },
+  {
+   "dim": "rizeni",
+   "title": "Starosta chce, technické služby ne",
+   "s": "Starosta má o naše polopodzemní kontejnery zájem. Ředitel technických služeb, které budou stanoviště obsluhovat, je ale <b>skeptický kvůli údržbě a technice svozu</b>. Starosta Vám řekne, že rozhoduje on.",
+   "o": [
+    "Soustředím se na starostu – rozhoduje on, technické služby to budou muset přijmout.",
+    "Požádám o schůzku s ředitelem technických služeb, vyslechnu jeho obavy k údržbě a svozu a nabídnu mu referenční návštěvu v obci, kde naše kontejnery obsluhují.",
+    "Pošlu starostovi argumenty k údržbě, ať je technickým službám vysvětlí sám.",
+    "Nabídnu technickým službám slevu na servisní smlouvu, aby změnily názor."
+   ],
+   "best": 1,
+   "ok": 2,
+   "worst": 0,
+   "pworst": 3,
+   "why": "Ve veřejném sektoru rozhoduje formálně starosta, ale provozovatel může projekt zablokovat, sabotovat nebo znehodnotit reference. Skeptika je třeba zapojit a přesvědčit fakty (reference, provoz). Ignorovat ho (A) je nejrizikovější. Sleva (D) neřeší jeho věcné obavy a působí jako úplatek. Delegovat argumentaci na starostu (C) je slabé, ale nešpatné."
+  },
+  {
+   "dim": "potreby",
+   "title": "Rutinní objednávka od svozové firmy",
+   "s": "Stálý zákazník – svozová společnost – volá: <b>„Objednáváme 50 kontejnerů 1 100 l jako vždy.“</b>",
+   "o": [
+    "Objednávku potvrdím a předám k vyřízení – zákazník ví, co chce.",
+    "Zeptám se, kam kontejnery míří a pro jaký svoz. Podle toho zmíním, co by jim mohlo pomoci – čipová identifikace, označení, stojany nebo jiná verze – a vysvětlím přínos.",
+    "Nabídnu 100 kusů s množstevní slevou.",
+    "Doporučím dražší typ kontejneru s vyšší marží."
+   ],
+   "best": 1,
+   "ok": 0,
+   "worst": 3,
+   "pworst": 2,
+   "why": "Rozvoj zákazníka: i rutinní objednávka je příležitost zjistit, co se u zákazníka děje, a nabídnout skutečně užitečné doplňky. Prosté vyřízení (A) je v pořádku, ale nepřidává hodnotu. Nabízet dražší produkt kvůli marži bez důvodu (D) zákazník pozná a důvěra klesá. Tlačit větší objem (C) bez potřeby je jen o něco lepší."
+  },
+  {
+   "dim": "duvera",
+   "title": "Prohrané výběrové řízení",
+   "s": "Město, se kterým jste půl roku jednal(a), vybralo ve výběrovém řízení konkurenci. <b>Cenově jste byli o 4 % výš.</b>",
+   "o": [
+    "Poděkuji za spolupráci, požádám o zpětnou vazbu k nabídce, poblahopřeji k výběru a nabídnu, že zůstáváme k dispozici pro servis a další etapy.",
+    "Napíšu vedení města, že vybraný dodavatel je horší a že toho budou litovat.",
+    "Neudělám nic – rozhodli, nemá cenu se dál angažovat.",
+    "Prověřím zadávací dokumentaci a zvážím námitky proti výsledku, i když důvod nemám."
+   ],
+   "best": 0,
+   "ok": 2,
+   "worst": 1,
+   "pworst": 3,
+   "why": "Prohra je začátek příštího obchodu: v komunální sféře se zakázky opakují a lidé se potkávají. Profesionální reakce a zpětná vazba (A) udržují dveře otevřené. Shazování vítěze (B) firmu v regionu diskvalifikuje. Bezdůvodné námitky (D) zdržují město a kazí vztah. Pasivita (C) je neutrální, ale promarněná příležitost."
+  },
+  {
+   "dim": "hodnota",
+   "title": "Studený telefonát: „Nemám čas“",
+   "s": "Voláte poprvé řediteli výrobního podniku. Po představení Vás přeruší: <b>„Nemám čas, takových jako vy mi volá deset denně.“</b>",
+   "o": [
+    "Omluvím se, poděkuji a zavěsím.",
+    "Do 20 sekund řeknu konkrétní důvod hovoru – např. že podobnému podniku v regionu jsme snížili náklady na svoz o třetinu – a požádám o 15 minut v konkrétním termínu.",
+    "Pokračuji v připravené prezentaci – když ho zaujmu, čas si udělá.",
+    "Zeptám se, kdy by se hodilo zavolat znovu, a pošlu mu e-mail s informacemi."
+   ],
+   "best": 1,
+   "ok": 3,
+   "worst": 2,
+   "pworst": 0,
+   "why": "Prospecting: námitka „nemám čas“ je automatická reakce, ne rozhodnutí. Účinná je stručná, konkrétní hodnota (reference, číslo) a jasná malá žádost. Ignorovat odmítnutí a pokračovat v monologu (C) je nejhorší – pálí kontakt. Domluvit jiný termín (D) je přijatelné; okamžité vzdání (A) znamená, že hovor neměl smysl."
+  }
+ ]
+}
