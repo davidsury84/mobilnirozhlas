@@ -5334,7 +5334,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/eshop-model-app') {
       const e = empSession(req);
       const allowed = (e && employeeModules(e.email).indexOf('eshopmodel') >= 0) || isAdmin(req);
-      if (!allowed) return send(res, 403, '<h1>Přístup k Modelu e-shopu nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (!allowed) return send(res, 403, '<h1>Přístup k modulu Vývoj projektů — E-shop nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (ESHOP_MODEL_APP_URL) {
         // Přihlášený zaměstnanec → krátkodobý SSO token, aby se aplikace v iframu přihlásila sama (jméno pak vidí kolegové u sdílených modelů).
         let target = ESHOP_MODEL_APP_URL;
