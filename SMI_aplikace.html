@@ -290,12 +290,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     </div>
 
     <div class="pane active" id="pane-vyvojeshop">
-      <div class="note">Vývoj e-shopu z <b>denních snímků skladu</b> (ERP soubor každé ráno). Ukazuje, co reálně odešlo ze skladu — <b>výdej ≈ prodej</b>, v nákupních (landed) cenách. <span id="veMeta" class="muted"></span></div>
+      <div class="note">Dva zdroje: <b>denní snímky skladu</b> (ERP každé ráno) = co odešlo ze skladu <b>za všechny kanály, ve skladových cenách</b>; a <b>expediční příkazy e-shopu</b> (řada 441) = co prodal e-shop, <b>v prodejních cenách</b>. E-shop se přepočte na skladové ceny a odečte od výdeje skladu → zbytek je <b>obchod / zakázky</b>. <span id="veMeta" class="muted"></span>
+        <div style="margin-top:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span id="vydMeta" class="muted" style="font-size:12px"></span>
+          <button class="btn" id="vydUpBtn" style="padding:3px 10px;font-size:12px" title="Export „Expediční příkazy" z ERP (.xlsx) — může být za jeden den i za delší okno; každý obsažený den se přepíše celý">⬆️ Načíst výdejky e-shopu</button>
+          <input type="file" id="vydUpFile" accept=".xlsx" style="display:none">
+          <span id="vydUpStav" class="muted" style="font-size:12px"></span>
+        </div></div>
       <div class="kpis" id="veKpis"></div>
       <div class="charts" style="grid-template-columns:1fr 1fr">
-        <div class="card"><h3>Týdenní obrat (výdej ze skladu)</h3><canvas id="veWeekChart" height="150"></canvas>
+        <div class="card"><h3>Týdenní výdej ze skladu (skladové ceny)</h3><canvas id="veWeekChart" height="150"></canvas>
           <div class="note" style="margin-top:8px">Klikni na sloupec týdne → rozpad po dnech níže.</div></div>
-        <div class="card"><h3>Denní výdej</h3><canvas id="veDayChart" height="150"></canvas>
+        <div class="card"><h3>Denní výdej — e-shop vs. obchod</h3><canvas id="veDayChart" height="150"></canvas>
           <div class="note" id="veOutNote" style="margin-top:8px;display:none"></div></div>
       </div>
       <div class="charts" style="grid-template-columns:1fr 1fr;margin-top:14px">
@@ -1582,7 +1588,62 @@ let VE_DATA=null, VE_CHARTS=[], VE_WEEK=null;
 const veKc=n=>{n=+n||0;const a=Math.abs(n);if(a>=1e6)return (Math.round(n/1e5)/10).toLocaleString('cs-CZ')+' mil.';if(a>=1e3)return Math.round(n/1e3).toLocaleString('cs-CZ')+' tis.';return Math.round(n).toLocaleString('cs-CZ');};
 const veDen=d=>{try{const p=String(d).split('-');return p[2]+'.'+p[1]+'.';}catch(e){return d;}};
 const veDow=d=>{try{return ['ne','po','út','st','čt','pá','so'][new Date(d+'T00:00:00').getDay()];}catch(e){return '';}};
+// ---- VÝDEJKY E-SHOPU (expediční příkazy, prodejní ceny) ----
+// Rozebere export „Expediční příkazy" a seskupí ho po dnech; na server jde jen agregát.
+function vydParseWorkbook(ws){
+  const H=[]; ws.getRow(1).eachCell({includeEmpty:true},(c,n)=>{H[n-1]=String(c.value==null?'':(typeof c.value==='object'?(c.value.result??c.value.text??''):c.value)).trim();});
+  const ci=n=>H.indexOf(n);
+  const iSK=ci('SK'),iR=ci('Reg. č.'),iN=ci('Název 1'),iQ=ci('Množství'),iKC=ci('CC bez daní'),iDat=ci('Datum případu'),iZak=ci('Číslo zakázky'),iDr=ci('Druh pohybu');
+  const chybi=[['SK',iSK],['Reg. č.',iR],['Množství',iQ],['CC bez daní',iKC],['Datum případu',iDat],['Číslo zakázky',iZak]].filter(x=>x[1]<0).map(x=>x[0]);
+  if(chybi.length)throw new Error('V souboru chybí sloupce: '+chybi.join(', ')+'. Čekám export „Expediční příkazy" z ERP.');
+  const num=v=>{if(v==null||v==='')return 0;if(typeof v==='object'&&v.result!=null)v=v.result;const x=typeof v==='number'?v:parseFloat(String(v).replace(/\s/g,'').replace(',','.'));return isNaN(x)?0:x;};
+  const txt=v=>{if(v==null)return '';if(typeof v==='object'&&!(v instanceof Date))return String(v.result??v.text??'');return String(v);};
+  // Datum: ExcelJS vrací Date (UTC) nebo sériové číslo Excelu; obojí → YYYY-MM-DD
+  const den=v=>{ if(v&&typeof v==='object'&&v.result!=null)v=v.result;
+    if(v instanceof Date)return isNaN(v)?'':v.toISOString().slice(0,10);
+    if(typeof v==='number')return new Date(Math.round((v-25569)*86400000)).toISOString().slice(0,10);
+    const m=String(v||'').match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/); return m?(m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0')):''; };
+  const dny={}; let radku=0,jine=0;
+  const last=ws.actualRowCount||ws.rowCount;
+  for(let r=2;r<=last;r++){
+    const row=ws.getRow(r);
+    if(iDr>=0){const dr=txt(row.getCell(iDr+1).value).trim(); if(dr&&!/exped/i.test(dr)){jine++;continue;}}
+    const d=den(row.getCell(iDat+1).value); if(!d)continue;
+    const id=txt(row.getCell(iSK+1).value).trim()+'-'+txt(row.getCell(iR+1).value).trim(); if(id==='-')continue;
+    const D=dny[d]||(dny[d]={zak:new Set(),radku:0,ks:0,kc:0,polozky:{}});
+    const ks=num(row.getCell(iQ+1).value), kc=num(row.getCell(iKC+1).value);
+    D.zak.add(txt(row.getCell(iZak+1).value)); D.radku++; D.ks+=ks; D.kc+=kc;
+    const q=D.polozky[id]||(D.polozky[id]={ks:0,kc:0,n:txt(row.getCell(iN+1).value).trim()}); q.ks+=ks; q.kc+=kc;
+    radku++;
+  }
+  if(!radku)throw new Error('V souboru nejsou žádné řádky expedičních příkazů.');
+  const out={}; Object.keys(dny).forEach(d=>{const D=dny[d]; out[d]={zakazek:D.zak.size,radku:D.radku,ks:D.ks,kc:Math.round(D.kc),polozky:D.polozky};});
+  const ds=Object.keys(out).sort();
+  return {dny:out,od:ds[0],do:ds[ds.length-1],radku,jine};
+}
+async function vydUpload(file){
+  const btn=document.getElementById('vydUpBtn'), st=document.getElementById('vydUpStav');
+  const say=(t,err)=>{ if(st){st.textContent=t;st.style.color=err?'#b23':'';} };
+  try{
+    if(typeof ExcelJS==='undefined')throw new Error('Čtečka Excelu není načtená.');
+    if(btn)btn.disabled=true; say('Čtu '+file.name+'…');
+    const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
+    const d=vydParseWorkbook(wb.worksheets[0]);
+    say('Odesílám '+Object.keys(d.dny).length+' dnů…');
+    const r=await fetch('/api/nakup-report/eshop-vydejky',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({dny:d.dny,source:file.name})});
+    const j=await r.json(); if(!j||!j.ok)throw new Error((j&&j.error)||'Server odmítl soubor.');
+    say(''); VE_DATA=null; await renderVyvojEshop();
+    if(typeof toast==='function')toast('Výdejky e-shopu: '+j.dnu+' '+(j.dnu===1?'den':(j.dnu<5?'dny':'dnů'))+' ('+veDen(j.od)+(j.od!==j.do?('–'+veDen(j.do)):'')+'), celkem '+j.celkemDnu+' dnů v evidenci');
+  }catch(e){ say('Nepovedlo se: '+e.message,true); }
+  finally{ if(btn)btn.disabled=false; }
+}
+function vydWire(){
+  const ub=$('#vydUpBtn'),uf=$('#vydUpFile');
+  if(ub&&uf&&!ub._w){ub._w=true;ub.onclick=()=>uf.click();uf.onchange=e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(f)vydUpload(f);};}
+}
 async function renderVyvojEshop(){
+  vydWire();
   const kp=$('#veKpis');
   if(!VE_DATA){
     if(kp)kp.innerHTML='<div class="kpi"><div class="v">…</div><div class="l">Načítám denní snímky</div></div>';
@@ -1597,6 +1658,10 @@ async function renderVyvojEshop(){
   }
   const days=d.days, weeks=d.weeks;
   const mt=$('#veMeta');if(mt)mt.textContent='Zdroj: '+d.dniCelkem+' denních snímků · poslední '+(d.dataDate||'?')+'.';
+  { const vm=$('#vydMeta'), v=d.vydejky||{};
+    if(vm)vm.innerHTML=(v.dnu>0)
+      ?('Výdejky e-shopu: <b>'+v.dnu+' dnů</b>'+(v.do?(' · poslední '+veDen(v.do)):'')+(v.kdo?(' · nahrál '+esc(v.kdo)+' '+String(v.kdy||'').slice(0,10)):''))
+      :'<span style="color:#b23">Výdejky e-shopu zatím nenahrané — rozdělení na e-shop / obchod se neukáže.</span>'; }
   // Výpadek denního exportu: dny bez souboru se v grafu dopočítávají podle profilu týdne.
   {
     const ch=(d.chybejiciDny||[]).filter(x=>(Date.now()-Date.parse(x))<30*86400000);
@@ -1617,14 +1682,20 @@ async function renderVyvojEshop(){
   const w=weeks[weeks.length-1]||{dispKc:0,dispKs:0,dni:0}, wp=weeks[weeks.length-2]||null;
   const chg=wp&&wp.dispKc?((w.dispKc/wp.dispKc-1)*100):null;
   const last=days[days.length-1]||{};
-  if(kp)kp.innerHTML=[
-    ['',veKc(w.dispKc)+' Kč','Obrat tento týden ('+w.dni+' dní)'],
+  const maVyd=(w.esDni||0)>0;
+  const podil=(maVyd&&w.dispKc>0)?Math.min(100,Math.round(100*w.esNaklKc/w.dispKc)):null;
+  const kpis=[
+    ['',veKc(w.dispKc)+' Kč','Výdej skladu tento týden, skladové ceny ('+w.dni+' dní)'],
     [chg==null?'':(chg>=0?'ok':'err'),(chg==null?'—':(chg>=0?'+':'')+chg.toFixed(0)+' %'),'vs. předchozí týden'],
-    ['',fmt(w.dispKs)+' ks','Vydáno kusů tento týden'],
-    ['',veKc(last.dispKc)+' Kč','Poslední den ('+veDen(last.date)+')'],
-    ['',fmt(last.polozek)+'','Položek s výdejem poslední den'],
-    ['',veKc(last.stockKc)+' Kč','Hodnota skladu']
-  ].map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
+    ['',fmt(w.dispKs)+' ks','Vydáno kusů tento týden']];
+  if(maVyd){
+    kpis.push(['ok',veKc(w.esKc)+' Kč','🛒 Obrat e-shopu tento týden, prodejní ceny ('+w.esDni+' '+(w.esDni===1?'den':(w.esDni<5?'dny':'dnů'))+', '+fmt(w.esZak)+' zak.)']);
+    kpis.push(['',(podil==null?'—':podil+' % / '+(100-podil)+' %'),'Podíl e-shop / obchod na výdeji skladu (skladové ceny)']);
+  } else {
+    kpis.push(['',veKc(last.dispKc)+' Kč','Poslední den ('+veDen(last.date)+')']);
+  }
+  kpis.push(['',veKc(last.stockKc)+' Kč','Hodnota skladu']);
+  if(kp)kp.innerHTML=kpis.map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
   // grafy
   VE_CHARTS.forEach(c=>{try{c.destroy();}catch(e){}});VE_CHARTS=[];
   if(typeof Chart!=='undefined'){
@@ -1635,9 +1706,19 @@ async function renderVyvojEshop(){
         scales:{y:{ticks:{color:mut,callback:v=>veKc(v)},grid:{color:line}},x:{ticks:{color:mut},grid:{display:false}}},
         onClick:(e,el)=>{if(el&&el.length){VE_WEEK=weeks[el[0].index].week;renderVyvojEshop();}}}}));
     const c2=$('#veDayChart');
-    if(c2)VE_CHARTS.push(new Chart(c2,{type:'bar',data:{labels:days.map(x=>veDen(x.date)+' '+veDow(x.date)),datasets:[{label:'Výdej (Kč)',data:days.map(x=>x.dispKc),backgroundColor:days.map(x=>x.mimoradny?'#b9c0b7':(x.odhad?'#a5e3c8':'#34c98e')),borderRadius:4}]},
-      options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:c=>{const x=days[c.dataIndex]||{};return veKc(c.raw)+' Kč'+(x.mimoradny?' · mimořádný pohyb (nepočítá se do obratu)':'')+(x.odhad?' · dopočteno (chyběl denní soubor, blok '+x.blokDnu+' dnů od '+veDen(x.blokOd)+')':'');}}}},
-        scales:{y:{ticks:{color:mut,callback:v=>veKc(v)},grid:{color:line}},x:{ticks:{color:mut},grid:{display:false}}}}}));
+    const anyEs=days.some(x=>x.es);
+    // Den s výdejkami: sloupec rozdělený na e-shop (dole) + obchod (nahoře), obojí ve skladových
+    // cenách, ať součet = výdej skladu. Den bez výdejek: jeden sloupec jako dřív.
+    const dsDay=anyEs?[
+      {label:'E-shop (skladové ceny)',data:days.map(x=>x.es?Math.min(x.dispKc,x.es.naklKc):0),backgroundColor:days.map(x=>x.mimoradny?'#c9d0c7':'#2f6f8f'),borderRadius:2,stack:'v'},
+      {label:'Obchod / zakázky (skladové ceny)',data:days.map(x=>x.es?Math.max(0,x.dispKc-x.es.naklKc):0),backgroundColor:days.map(x=>x.mimoradny?'#b9c0b7':'#34c98e'),borderRadius:4,stack:'v'},
+      {label:'Bez výdejek (celý výdej)',data:days.map(x=>x.es?0:x.dispKc),backgroundColor:days.map(x=>x.mimoradny?'#b9c0b7':(x.odhad?'#a5e3c8':'#9fd9c0')),borderRadius:4,stack:'v'}
+    ]:[{label:'Výdej (Kč)',data:days.map(x=>x.dispKc),backgroundColor:days.map(x=>x.mimoradny?'#b9c0b7':(x.odhad?'#a5e3c8':'#34c98e')),borderRadius:4}];
+    if(c2)VE_CHARTS.push(new Chart(c2,{type:'bar',data:{labels:days.map(x=>veDen(x.date)+' '+veDow(x.date)),datasets:dsDay},
+      options:{responsive:true,plugins:{legend:{display:anyEs,labels:{color:mut,boxWidth:10}},datalabels:{display:false},tooltip:{callbacks:{
+        title:i=>{const x=days[i[0].dataIndex]||{};return veDen(x.date)+' '+veDow(x.date)+(x.es?('  ·  🛒 e-shop '+veKc(x.es.kc)+' Kč v prodejních cenách, '+fmt(x.es.zakazek)+' zak.'):'');},
+        label:c=>{const x=days[c.dataIndex]||{};if(anyEs&&!(c.raw>0))return null;return (anyEs?(c.dataset.label+': '):'')+veKc(c.raw)+' Kč'+(x.mimoradny?' · mimořádný pohyb (nepočítá se do obratu)':'')+(x.odhad?' · dopočteno (chyběl denní soubor, blok '+x.blokDnu+' dnů od '+veDen(x.blokOd)+')':'');}}}},
+        scales:{y:{stacked:anyEs,ticks:{color:mut,callback:v=>veKc(v)},grid:{color:line}},x:{stacked:anyEs,ticks:{color:mut},grid:{display:false}}}}}));
   }
   // vysvětlivka k mimořádným dnům
   const outs=days.filter(x=>x.mimoradny), on=$('#veOutNote');
@@ -1648,16 +1729,20 @@ async function renderVyvojEshop(){
     } else on.style.display='none'; }
   // tabulka týdnů (klikatelná)
   const R='style="text-align:right"';
-  $('#veWeekTbl').innerHTML='<thead><tr><th>Týden</th><th>Období</th><th '+R+'>Obrat</th><th '+R+'>Kusů</th><th '+R+'>Dní</th></tr></thead><tbody>'+
+  $('#veWeekTbl').innerHTML='<thead><tr><th>Týden</th><th>Období</th><th '+R+' title="Výdej ze skladu za všechny kanály, ve skladových cenách">Výdej skladu</th><th '+R+'>Kusů</th><th '+R+' title="Z expedičních příkazů e-shopu, v prodejních cenách">🛒 E-shop (prodejní)</th><th '+R+' title="Výdej skladu − e-shop přepočtený na skladové ceny">Obchod (sklad. ceny)</th><th '+R+'>Dní</th></tr></thead><tbody>'+
     [...weeks].reverse().map(x=>'<tr style="cursor:pointer'+(x.week===VE_WEEK?';background:rgba(176,111,0,.10)':'')+'" onclick="veSetWeek(\''+x.week+'\')">'+
       '<td><b>'+esc(x.week)+'</b></td><td class="muted">'+veDen(x.from)+'–'+veDen(x.to)+'</td>'+
-      '<td '+R+'><b>'+veKc(x.dispKc)+' Kč</b>'+(x.mimoradneKc?('<br><span class="muted" style="font-size:11px" title="mimořádné pohyby mimo obrat">+ '+veKc(x.mimoradneKc)+' mimoř.</span>'):'')+'</td><td '+R+'>'+fmt(x.dispKs)+'</td><td '+R+'>'+x.dni+'</td></tr>').join('')+'</tbody>';
+      '<td '+R+'><b>'+veKc(x.dispKc)+' Kč</b>'+(x.mimoradneKc?('<br><span class="muted" style="font-size:11px" title="mimořádné pohyby mimo obrat">+ '+veKc(x.mimoradneKc)+' mimoř.</span>'):'')+'</td><td '+R+'>'+fmt(x.dispKs)+'</td>'+
+      '<td '+R+'>'+(x.esDni?('<b style="color:#2f6f8f">'+veKc(x.esKc)+' Kč</b>'+(x.esDni<x.dni?('<br><span class="muted" style="font-size:11px">jen '+x.esDni+' z '+x.dni+' dnů</span>'):'')):'<span class="muted">—</span>')+'</td>'+
+      '<td '+R+'>'+(x.esDni?veKc(Math.max(0,x.dispKc-x.esNaklKc))+' Kč':'<span class="muted">—</span>')+'</td><td '+R+'>'+x.dni+'</td></tr>').join('')+'</tbody>';
   // tabulka dnů (filtr dle vybraného týdne)
   const dd=VE_WEEK?days.filter(x=>{const t=new Date(x.date+'T00:00:00Z');return veIso(t)===VE_WEEK;}):days;
   const dt=$('#veDayTitle');if(dt)dt.innerHTML='Dny'+(VE_WEEK?(' · '+esc(VE_WEEK)+' <button class="btn ghost sm" style="margin-left:6px" onclick="veSetWeek(null)">✕ zrušit filtr</button>'):' <span class="muted" style="font-weight:400;font-size:12px">— klikatelné</span>');
-  $('#veDayTbl').innerHTML='<thead><tr><th>Den</th><th '+R+'>Výdej</th><th '+R+'>Kusů</th><th '+R+'>Položek</th><th '+R+'>Příjem</th><th '+R+'>Nové rez.</th></tr></thead><tbody>'+
+  $('#veDayTbl').innerHTML='<thead><tr><th>Den</th><th '+R+' title="Všechny kanály, skladové ceny">Výdej skladu</th><th '+R+'>Kusů</th><th '+R+' title="Expediční příkazy e-shopu, prodejní ceny">🛒 E-shop</th><th '+R+' title="Výdej skladu − e-shop ve skladových cenách">Obchod</th><th '+R+'>Položek</th><th '+R+'>Příjem</th><th '+R+'>Nové rez.</th></tr></thead><tbody>'+
     [...dd].reverse().map(x=>'<tr style="cursor:pointer'+(x.mimoradny?';opacity:.7':'')+'" onclick="veShowDay(\''+x.date+'\')"><td>'+veDen(x.date)+' <span class="muted">'+veDow(x.date)+'</span>'+(x.mimoradny?' <span style="font-size:10.5px;background:#eceeeb;color:#5a655c;padding:1px 6px;border-radius:8px" title="Jednorázové zaúčtování / inventurní úprava — nepočítá se do obratu">mimořádné</span>':'')+'</td>'+
-      '<td '+R+'>'+(x.mimoradny?('<span class="muted">'+veKc(x.dispKc)+' Kč</span>'):(x.odhad?('<span style="color:#4a8f74" title="Dopočteno — chyběl denní soubor">'+veKc(x.dispKc)+' Kč ≈</span>'):('<b>'+veKc(x.dispKc)+' Kč</b>')))+'</td><td '+R+'>'+fmt(x.dispKs)+'</td><td '+R+'>'+fmt(x.polozek)+'</td>'+
+      '<td '+R+'>'+(x.mimoradny?('<span class="muted">'+veKc(x.dispKc)+' Kč</span>'):(x.odhad?('<span style="color:#4a8f74" title="Dopočteno — chyběl denní soubor">'+veKc(x.dispKc)+' Kč ≈</span>'):('<b>'+veKc(x.dispKc)+' Kč</b>')))+'</td><td '+R+'>'+fmt(x.dispKs)+'</td>'+
+      '<td '+R+'>'+(x.es?('<b style="color:#2f6f8f" title="'+fmt(x.es.zakazek)+' zakázek · '+fmt(x.es.ks)+' ks · ve skladových cenách '+veKc(x.es.naklKc)+' Kč'+(x.es.bezCenyKs?(' · '+fmt(x.es.bezCenyKs)+' ks bez skladové ceny (služby, dropship)'):'')+'">'+veKc(x.es.kc)+' Kč</b>'):'<span class="muted">—</span>')+'</td>'+
+      '<td '+R+'>'+(x.es?veKc(Math.max(0,x.dispKc-x.es.naklKc))+' Kč':'<span class="muted">—</span>')+'</td><td '+R+'>'+fmt(x.polozek)+'</td>'+
       '<td '+R+' class="muted">'+veKc(x.recvKc)+'</td><td '+R+' class="muted">'+veKc(x.resKc)+'</td></tr>').join('')+'</tbody>';
   // top položky (klikatelné)
   $('#veTopTbl').innerHTML='<thead><tr><th>#</th><th>Položka</th><th>Kód</th><th>Dodavatel</th><th '+R+'>Vydáno ks</th><th '+R+'>Hodnota</th><th '+R+'>Dnů s výdejem</th></tr></thead><tbody>'+
@@ -1674,7 +1759,7 @@ function veShowDay(date){
   $('#veDetailCard').style.display='';
   $('#veDetailTitle').textContent='Den '+veDen(date)+' '+veDow(date);
   $('#veDetail').innerHTML='<div class="kpis" style="margin-bottom:10px">'+
-    [['Výdej',veKc(day.dispKc)+' Kč'],['Kusů',fmt(day.dispKs)],['Položek s výdejem',fmt(day.polozek)],['Příjem',veKc(day.recvKc)+' Kč'],['Nové rezervace',veKc(day.resKc)+' Kč']]
+    [['Výdej skladu (sklad. ceny)',veKc(day.dispKc)+' Kč'],['Kusů',fmt(day.dispKs)]].concat(day.es?[['🛒 E-shop (prodejní ceny)',veKc(day.es.kc)+' Kč'],['E-shop zakázek',fmt(day.es.zakazek)],['Obchod (sklad. ceny)',veKc(Math.max(0,day.dispKc-day.es.naklKc))+' Kč']]:[]).concat([['Položek s výdejem',fmt(day.polozek)],['Příjem',veKc(day.recvKc)+' Kč'],['Nové rezervace',veKc(day.resKc)+' Kč']])
       .map(k=>'<div class="kpi"><div class="v">'+k[1]+'</div><div class="l">'+k[0]+'</div></div>').join('')+'</div>'+
     (items.length?('<div class="tblwrap" style="max-height:280px"><table><thead><tr><th>Položka</th><th>Kód</th><th style="text-align:right">Vydáno ks</th></tr></thead><tbody>'+
       items.map(x=>'<tr><td>'+esc(x.nazev)+'</td><td class="muted">'+esc(x.kod)+'</td><td style="text-align:right"><b>'+fmt(x.v)+'</b></td></tr>').join('')+'</tbody></table></div>')

@@ -24,11 +24,13 @@ function mount(host) {
   const OBRAT_FOLDER = process.env.OBRAT_DRIVE_FOLDER || ''; // složka s „obrat plasty" (prodejní historie); prázdné = vypnuto, klient jede z embedu
   const OBRAT_RAW = path.join(host.dataDir || __dirname, 'obrat-plasty.xlsx');        // cache nejnovějšího obrat plasty (raw xlsx, writable)
   const OBRAT_STATE = path.join(host.dataDir || __dirname, 'obrat-plasty-sync.json'); // stav sync (poslední soubor/datum)
+  const VYD_F = path.join(host.dataDir || __dirname, 'eshop-vydejky.json');       // expediční příkazy e-shopu po dnech, v PRODEJNÍCH cenách (volume)
   const ESP_LIVE = path.join(host.dataDir || __dirname, 'eshop-prodeje.json');      // rozpad prodeje na kanály — nahrává se v appce (volume)
   const ESP_SEED = path.join(__dirname, '..', 'eshop-prodeje.json');                // commitnutý seed (poslední známý export)
   const SUP_F = path.join(host.dataDir || __dirname, 'nakup-dodavatele.json');       // dotazník dodavatelů: termín dodání + náklad na dopravu (writable)
   const loadObj = () => { for (const f of [OBJ_LIVE, OBJ_SEED]) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) {} } return { rows: [], columns: [], date: '' }; };
   const loadSup = () => { try { return JSON.parse(fs.readFileSync(SUP_F, 'utf8')) || {}; } catch (_) { return {}; } };
+  const loadVyd = () => { try { return JSON.parse(fs.readFileSync(VYD_F, 'utf8')) || { dny: {} }; } catch (_) { return { dny: {} }; } };
   const saveSup = m => { try { fs.writeFileSync(SUP_F, JSON.stringify(m, null, 2)); } catch (_) {} };
   // Odvozený seznam dodavatelů z ERP: název, počet položek, medián dodací lhůty, hodnota zásoby — + uložené hodnoty dotazníku.
   function supplierList() {
@@ -1126,6 +1128,35 @@ function mount(host) {
     // Rozpad prodeje na kanály: e-shop vs. obchod/sklad (zakázky). Zdroj je ERP export
     // e-shopových faktur (eshop-prodeje.json, generuje tools-gen-eshop-prodeje.js).
     // Celkový prodej drží „obrat plasty"; e-shop je jeho podmnožina, obchod = celkem − e-shop.
+    // Expediční příkazy e-shopu (řada 441) — jediný zdroj, který má PRODEJNÍ ceny po dnech.
+    // Denní snímky skladu dávají výdej ve skladových cenách za všechny kanály; tohle říká, kolik
+    // z toho byl e-shop a za kolik se to prodalo. Export nahrává nákup/e-shop v appce; každý den
+    // obsažený v souboru se přepíše celý (nový export dne je autoritativní → opravy se promítnou).
+    if (p === '/api/nakup-report/eshop-vydejky' && req.method === 'GET') {
+      if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
+      return json(res, 200, Object.assign({ ok: true }, loadVyd())), true;
+    }
+    if (p === '/api/nakup-report/eshop-vydejky' && req.method === 'POST') {
+      if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
+      const dny = b.dny && typeof b.dny === 'object' ? b.dny : null;
+      const dates = dny ? Object.keys(dny).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
+      if (!dates.length) return json(res, 400, { ok: false, error: 'V souboru není žádný den s výdejkami — je to export „Expediční příkazy"?' }), true;
+      const cur = loadVyd(); cur.dny = cur.dny || {};
+      let radku = 0;
+      dates.forEach(d => { const v = dny[d] || {}; const pol = {};
+        Object.keys(v.polozky || {}).forEach(k => { const q = v.polozky[k] || {};
+          pol[k] = { ks: +q.ks || 0, kc: Math.round(+q.kc || 0), n: String(q.n || '').slice(0, 120) }; });
+        cur.dny[d] = { zakazek: +v.zakazek || 0, radku: +v.radku || 0, ks: +v.ks || 0, kc: Math.round(+v.kc || 0), polozky: pol };
+        radku += +v.radku || 0; });
+      // drž posledních 400 dnů
+      const keys = Object.keys(cur.dny).sort(); while (keys.length > 400) delete cur.dny[keys.shift()];
+      const se = host.empSession && host.empSession(req);
+      cur.nahrano = { kdy: new Date().toISOString(), kdo: (se && (se.jmeno || se.email)) || 'neznámý', source: String(b.source || '').slice(0, 200), od: dates.slice().sort()[0], do: dates.slice().sort().pop(), dnu: dates.length, radku };
+      try { fs.writeFileSync(VYD_F, JSON.stringify(cur)); } catch (e) { return json(res, 500, { ok: false, error: 'Uložení selhalo: ' + e.message }), true; }
+      console.log('[nakup-report] výdejky e-shopu nahrány: ' + cur.nahrano.source + ' (' + dates.length + ' dnů, ' + radku + ' řádků)');
+      return json(res, 200, { ok: true, dnu: dates.length, od: cur.nahrano.od, do: cur.nahrano.do, celkemDnu: Object.keys(cur.dny).length }), true;
+    }
     if (p === '/api/nakup-report/eshop-prodeje' && req.method === 'GET') {
       for (const f of [ESP_LIVE, ESP_SEED]) {
         try { const d = JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -1217,6 +1248,15 @@ function mount(host) {
         stockKc: e.stock.kc, polozek: itemsPerDay[e.date] || 0 }));
       const chybi = chybejiciDny();
       days = rozpadBloky(days);   // vícedenní bloky rozpustit na jednotlivé dny
+      // E-shop z výdejek: prodejní cena (esKc) + tentýž výdej přepočtený na skladové ceny (esNaklKc),
+      // aby šel odečíst od výdeje skladu → zbytek = obchod / zakázky (ve stejných, skladových cenách).
+      const vyd = loadVyd(), vdny = vyd.dny || {};
+      days.forEach(d => { const v = vdny[d.date]; if (!v) { d.es = null; return; }
+        let nakl = 0, bezCeny = 0;
+        Object.keys(v.polozky || {}).forEach(k => { const q = v.polozky[k]; const m = meta[k];
+          if (m && m.uc > 0) nakl += q.ks * m.uc; else bezCeny += q.ks; });
+        d.es = { kc: v.kc, ks: v.ks, zakazek: v.zakazek, naklKc: Math.round(nakl), bezCenyKs: bezCeny };
+        d.esNaklKc = Math.round(nakl); d.obchodNaklKc = Math.max(0, Math.round(d.dispKc - nakl)); });
       // Mimořádné dny: jednorázové zaúčtování / inventurní úprava, ne prodej. Poznáme je podle
       // násobku mediánu dnů s pohybem (stejný princip jako u jednorázových extrémů v prodejích).
       const nz = days.filter(d => d.dispKc > 0).map(d => d.dispKc).sort((a, b) => a - b);
@@ -1226,8 +1266,9 @@ function mount(host) {
       // týdny (ISO) — mimořádné dny se do obratu NEPOČÍTAJÍ, evidují se zvlášť
       const wk = {};
       days.forEach(d => { const dt = new Date(d.date + 'T00:00:00Z'); if (isNaN(dt)) return;
-        const w = isoWeek(dt), e = wk[w] || (wk[w] = { week: w, from: d.date, to: d.date, dispKc: 0, dispKs: 0, recvKc: 0, resKc: 0, dni: 0, polozek: 0, mimoradneKc: 0, mimoradnychDnu: 0 });
+        const w = isoWeek(dt), e = wk[w] || (wk[w] = { week: w, from: d.date, to: d.date, dispKc: 0, dispKs: 0, recvKc: 0, resKc: 0, dni: 0, polozek: 0, mimoradneKc: 0, mimoradnychDnu: 0, esKc: 0, esKs: 0, esZak: 0, esNaklKc: 0, esDni: 0 });
         if (d.date < e.from) e.from = d.date; if (d.date > e.to) e.to = d.date;
+        if (d.es) { e.esKc += d.es.kc; e.esKs += d.es.ks; e.esZak += d.es.zakazek; e.esNaklKc += d.es.naklKc; e.esDni++; }
         e.recvKc += d.recvKc; e.resKc += d.resKc; e.dni++; e.polozek += d.polozek;
         if (d.mimoradny) { e.mimoradneKc += d.dispKc; e.mimoradnychDnu++; }
         else { e.dispKc += d.dispKc; e.dispKs += d.dispKs; } });
@@ -1236,7 +1277,8 @@ function mount(host) {
         return { kod: k, nazev: m.n || k, dodavatel: m.sup || '', ks: agg[k].ks, dny: agg[k].dny, kc: Math.round(agg[k].ks * (m.uc || 0)) }; })
         .sort((a, b) => b.ks - a.ks).slice(0, 30);
       const itemHist = {}; top.forEach(t => { itemHist[t.kod] = (mv[t.kod] || {}).hist || []; });
-      return json(res, 200, { ok: true, days, weeks, top, itemHist, dataDate: o.date || '', dniCelkem: days.length, chybejiciDny: chybi, limitMimoradne: isFinite(limit) ? Math.round(limit) : null }), true;
+      return json(res, 200, { ok: true, days, weeks, top, itemHist, dataDate: o.date || '', dniCelkem: days.length, chybejiciDny: chybi, limitMimoradne: isFinite(limit) ? Math.round(limit) : null,
+        vydejky: Object.assign({ dnu: Object.keys(vdny).length }, vyd.nahrano || {}) }), true;
     }
     // Historie snímků SMI (mrtvé zásoby v čase) — sdílená, přístup jako e-shop
     if (p === '/api/nakup-report/historie' && req.method === 'GET') {
