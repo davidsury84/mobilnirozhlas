@@ -4035,7 +4035,7 @@ const server = http.createServer(async (req, res) => {
       const f = path.join(ROOT, 'assets', rel);
       if (!f.startsWith(path.join(ROOT, 'assets') + path.sep) || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
       const ext = path.extname(f).toLowerCase();
-      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.gif': 'image/gif' };
+      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.gif': 'image/gif', '.pdf': 'application/pdf' }; // .pdf: brožury výrobce ve školeních (např. bramidan-broz-*.pdf) se otevřou v prohlížeči
       res.writeHead(200, { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
       return res.end(fs.readFileSync(f));
     }
