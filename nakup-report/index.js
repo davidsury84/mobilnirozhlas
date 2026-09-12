@@ -90,7 +90,9 @@ function mount(host) {
   const daysBetween = (d1, d2) => { const a = Date.parse(d1), b = Date.parse(d2); return (isNaN(a) || isNaN(b)) ? 1 : Math.max(1, Math.round((b - a) / 86400000)); };
   function applyMovement(prevRows, prevDate, nowRows, nowDate) {
     const mv = loadMoves(), pm = snapMap(prevRows), dd = daysBetween(prevDate, nowDate);
-    onlyActive(nowRows).forEach(r => { const k = r.sk + '-' + r.reg, p = pm[k]; if (!p) return;
+    // Všechny položky, ne jen aktivní: o výdeji skladové novinky mimo kvartální report se jinak
+    // nedozvíme a odvozený dropship (dsAutoCached) by ji omylem označil. Historie drží jen dny s pohybem.
+    (nowRows || []).forEach(r => { const k = r.sk + '-' + r.reg, p = pm[k]; if (!p) return;
       const v = dispatchDiff(p, r), e = mv[k] || (mv[k] = { sum: 0, days: 0, hist: [] });
       e.sum += v; e.days += dd;
       // Ukládej do historie jen dny se skutečným pohybem — od 20. 8. 2026 chodí v exportu i položky
@@ -250,6 +252,7 @@ function mount(host) {
         const prevForFlow = (prev && prev.rows && prev.date && prev.date !== dataDate) ? prev.rows : null;
         if (loadBilance().length === 0) await bootstrapBilance(xls, newest, parsed, dataDate);
         else if (!st.bilanceFixV6) { try { fs.unlinkSync(MOVE_F); } catch (_) {} await bootstrapMovements(xls, newest, parsed, dataDate); await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV6 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů (V6)'); }
+        if (!st.movesAllV7) { try { fs.unlinkSync(MOVE_F); } catch (_) {} await bootstrapMovements(xls, newest, parsed, dataDate); st.movesAllV7 = 1; console.log('[nakup-report] pohyby: jednorázový přepočet pro všechny položky (V7)'); }
         else pushBilance(computeBilance(parsed.rows, dataDate, prevForFlow, prevForFlow ? prev.date : null));
       } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
       fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder, reserved: r.reserved })) }));
@@ -257,6 +260,7 @@ function mount(host) {
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));
     st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV6: st.bilanceFixV6 || 0 };
     try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
+    _dsA = null;   // nový snímek/pohyby → odvozený dropship přepočítat
     console.log('[nakup-report] Drive sync: ' + newest.name + ' → ' + parsed.rows.length + ' položek');
     return { ok: true, file: newest.name, rows: parsed.rows.length };
   }
@@ -355,6 +359,7 @@ function mount(host) {
     // drž jen posledních 200 záznamů
     const ids = Object.keys(st.seen); if (ids.length > 200) ids.sort((a, b) => String(st.seen[a].at).localeCompare(String(st.seen[b].at))).slice(0, ids.length - 200).forEach(i => delete st.seen[i]);
     try { fs.writeFileSync(EXP_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
+    if (done.length) _dsA = null;
     return { ok: true, zpracovano: done };
   }
   const exportyMeta = () => { let st = {}; try { st = JSON.parse(fs.readFileSync(EXP_STATE, 'utf8')) || {}; } catch (_) {} return st.seen || {}; };
@@ -435,7 +440,7 @@ function mount(host) {
   const saveNew = m => { try { fs.writeFileSync(NEW_F, JSON.stringify(m, null, 2)); } catch (_) {} };
   // Důkaz, že položka „žije": měla pohyb, někdo si ji objednal, nebo je objednaná u dodavatele.
   function isNewActive(r, mv) {
-    if (specOf(r.sk, r.skupina)) return false;   // dropship/doprodej neni "nova polozka k objednani"
+    if (specOf(r.sk, r.skupina, r.sk + '-' + r.reg)) return false;   // dropship/doprodej neni "nova polozka k objednani"
     // Musi mit platnou nakupni cenu — bez ni to neni zbozi k objednani, ale sluzba
     // („Doprava realizovana cizimi vozidly") nebo nedokoncena kmenova karta.
     if (!((r.unitCost || 0) > 0 || (r.unitPrice || 0) > 0)) return false;
@@ -482,7 +487,7 @@ function mount(host) {
     return (rows || []).filter(r => { const key = r.sk + '-' + r.reg;
       if (k.has(key) || nk.has(key)) return true;
       if (/^služby$/i.test(String(r.skupina || '').trim())) return false;
-      return (r.avail || 0) < 0 || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0 || !!specOf(r.sk, r.skupina); }); };
+      return (r.avail || 0) < 0 || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0 || !!specOf(r.sk, r.skupina, r.sk + '-' + r.reg); }); };
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
   // SK rady, ktere se NENAKUPUJI na sklad (info od nakupu 2026-08-26). Drzet v synchronu
   // s kopii SPEC_SK v SMI_aplikace.html!
@@ -509,11 +514,34 @@ function mount(host) {
   let _supC = null, _supAt = 0;
   const supCfgCached = () => { if (_supC && (Date.now() - _supAt) < 30000) return _supC; _supC = loadSup(); _supAt = Date.now(); return _supC; };
   const supCfgReset = () => { _supC = null; };
-  const specOf = (sk, skupina) => {
+  const specOf = (sk, skupina, key) => {
     const s = skupina ? supCfgCached()[skupina] : null;
     if (s && s.rezim) return s.rezim === 'sklad' ? null : { typ: s.rezim, pozn: 'nastaveno v dotazníku dodavatelů' };
-    return SPEC_SK[String(sk || '').trim()] || null;
+    const bySk = SPEC_SK[String(sk || '').trim()]; if (bySk) return bySk;
+    if (key) { const a = dsAutoCached()[key]; if (a) return a; }
+    return null;
   };
+  // ODVOZENÝ dropship na úrovni položky (pokyn nákupu 2026-09-12): položku prodává e-shop
+  // (výdejky), ale v prodejní historii skladu není, ze skladu nikdy nevyšla a neleží tam.
+  // Zboží tedy jde od dodavatele rovnou k zákazníkovi. Ruční režim dodavatele má přednost.
+  // Skladové novinky (mají výdej v denních pohybech nebo zásobu) se NEoznačí.
+  let _dsA = null, _dsAt = 0;
+  function dsAutoCached() {
+    if (_dsA && (Date.now() - _dsAt) < 300000) return _dsA;
+    const out = {};
+    try {
+      const ak = activeKeys(), mv = loadMoves(), vd = loadVyd().dny || {}, o = loadObj();
+      const stock = {}; (o.rows || []).forEach(r => { stock[r.sk + '-' + r.reg] = r.stock || 0; });
+      const es = {}; Object.keys(vd).forEach(d => Object.keys(vd[d].polozky || {}).forEach(k => { if (k.startsWith('900-')) return; es[k] = (es[k] || 0) + ((vd[d].polozky[k] || {}).ks || 0); }));
+      Object.keys(es).forEach(k => {
+        if (!(es[k] > 0) || ak.has(k) || !(k in stock) || SPEC_SK[k.split('-')[0]]) return;   // řady v SPEC_SK už dropship jsou
+        const m = mv[k]; if (m && m.sum > 0) return;          // vydává se ze skladu → skladová položka
+        if (stock[k] > 0) return;                              // leží na skladě → skladová položka
+        out[k] = { typ: 'dropship', auto: true, pozn: 'odvozeno: prodává e-shop (' + Math.round(es[k]) + ' ks v ' + new Date().getFullYear() + '), ze skladu nikdy nevyšlo ani tam neleží' };
+      });
+    } catch (_) {}
+    _dsA = out; _dsAt = Date.now(); return out;
+  }
   // Přečíslované položky: nová kmenová karta nemá prodejní historii, protože ta zůstala
   // na staré. Bez tohoto můstku vypadá zavedený produkt jako nováček bez poptávky.
   //   Kovobel: dodavatel je v ERP veden dvakrát — 371 „ZBO - LENAERTS" (starý název, drží
@@ -724,7 +752,7 @@ function mount(host) {
   function computeOrderRow(x, sales, P, m0) {
     // Dropshipping / doprodej: tyto SK se na sklad NEOBJEDNAVAJI — zadne doporuceni,
     // zadne utichle, zadny forward-buy. Prodeje mit mohou (jdou primo od dodavatele).
-    const spec = specOf(x.sk, x.skupina);
+    const spec = specOf(x.sk, x.skupina, x.sk + '-' + x.reg);
     if (spec) {
       const Dsp = sales ? sales.reduce((s2, v) => s2 + (v || 0), 0) : 0;
       return { D: Dsp, rec: 0, status: spec.typ === 'dropship' ? '🚚 dropshipping — nenaskladňuje se' : '🏷 doprodej — neobjednávat',
@@ -1240,7 +1268,7 @@ function mount(host) {
       try { detectNew(o.rows); } catch (_) {}
       json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup(),
         noveKlice: Object.keys(loadNew()), rozhodnuti: loadDec(), platnostM: DEC_PLATNOST_M, specialSk: SPEC_SK,
-        predchudci: PREDCH }));
+        predchudci: PREDCH, dropshipAuto: dsAutoCached() }));
       return true;
     }
     // Prodejní ceny e-shopu (export Shop.CZ feedu, commitnutý v kořeni jako eshop-ceny.json).
@@ -1443,7 +1471,7 @@ function mount(host) {
           if (['sklad', 'dropship', 'doprodej'].indexOf(v.rezim) >= 0) e.rezim = v.rezim;
           if (Object.keys(e).length) cur[k] = e; else delete cur[k];
         });
-        saveSup(cur); supCfgReset();   // režim ovlivňuje doporučení → zahodit cache
+        saveSup(cur); supCfgReset(); _dsA = null;   // režim ovlivňuje doporučení → zahodit cache
       }
       return json(res, 200, { ok: true, suppliers: cur }), true;
     }

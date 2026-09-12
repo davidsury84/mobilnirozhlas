@@ -684,7 +684,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           </div>
         </div>
       </details>
-      <div class="note" style="background:#f4f0f8;border-color:#ddd2ea">🛒 <b>Kdo to prodává:</b> sloupce <b>z toho e-shop</b> a <b>z toho obchod</b> rozdělují roční prodej na kanály. E-shop = vydané faktury e-shopových řad z ERP; obchod/sklad = zbytek (prodej v rámci zakázek, obchodníci, odběr ze skladu). U <b>dropshipu</b> může e-shop prodat víc, než projde skladem — takový řádek je označen <b style="color:#7a5200">⚠ mimo sklad</b>.
+      <div class="note" style="background:#f4f0f8;border-color:#ddd2ea">🛒 <b>Kdo to prodává:</b> sloupce <b>z toho e-shop</b> a <b>z toho obchod</b> rozdělují roční prodej na kanály. E-shop = vydané faktury e-shopových řad z ERP; obchod/sklad = zbytek (prodej v rámci zakázek, obchodníci, odběr ze skladu). U <b>dropshipu</b> může e-shop prodat víc, než projde skladem — takový řádek je označen <b style="color:#7a5200">⚠ mimo sklad</b>. Položka, kterou <b>prodává e-shop, ale ze skladu nikdy nevyšla ani tam neleží</b>, dostane příznak dropshippingu automaticky (ve stavu „odvozeno z výdejek e-shopu"); ruční režim dodavatele má přednost.
         <div style="margin-top:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span id="esUpMeta" class="muted" style="font-size:12px"></span>
           <span class="muted" style="font-size:12px" title="Export „Prodeje eshop" stačí uložit do stejné složky na Disku jako denní snímek skladu — aplikace ho pozná podle hlavičky (Datum případu (M) + Příjmení) a načte při nejbližší kontrole.">· načítá se automaticky z Disku (stejná složka jako denní export)</span>
@@ -981,10 +981,13 @@ function supRezim(sup){
   const m=(typeof OBJ_DATA!=='undefined'&&OBJ_DATA&&OBJ_DATA.suppliers)||(typeof LIVE_SUP!=='undefined'&&LIVE_SUP)||{};
   const s=m[sup]; return (s&&s.rezim)?s.rezim:null;
 }
-function specOf(sk,sup){
+function specOf(sk,sup,key){
   const r=supRezim(sup||SK_SUP[String(sk||'').trim()]);
   if(r)return r==='sklad'?null:{typ:r,pozn:'nastaveno v dotazníku dodavatelů'};
-  return SPEC_SK[String(sk||'').trim()]||null;
+  const bySk=SPEC_SK[String(sk||'').trim()]; if(bySk)return bySk;
+  // Odvozený dropship na úrovni položky (server): prodává ji e-shop, ale ze skladu nikdy nevyšla ani tam neleží.
+  if(key){const a=(typeof OBJ_DATA!=='undefined'&&OBJ_DATA&&OBJ_DATA.dropshipAuto)||{}; if(a[key])return a[key];}
+  return null;
 }
 // Bunka "Rezim" do tabulek: Sklad / Dropshipping / Doprodej (s vysvetlivkou po najeti)
 function specRezim(sk){
@@ -2592,10 +2595,10 @@ async function utRozhodni(key,stav){
 }
 function objComputeOrder(x,sales,P,m0,sea,dem){
   // Dropshipping / doprodej: neobjednává se na sklad — žádné doporučení, utichlé ani forward-buy.
-  const spec=specOf(x.sk,x.skupina);
+  const spec=specOf(x.sk,x.skupina,String(x.sk)+'-'+String(x.reg));
   if(spec){
     const Dsp=sales?sales.reduce((s,v)=>s+(v||0),0):0;
-    return {D:Dsp,rec:0,status:spec.typ==='dropship'?'\u{1F69A} Dropshipping — nenaskladňuje se':'\u{1F3F7} Doprodej — neobjednávat',
+    return {D:Dsp,rec:0,status:spec.typ==='dropship'?('\u{1F69A} Dropshipping — nenaskladňuje se'+(spec.auto?' (odvozeno z výdejek e-shopu)':'')):'\u{1F3F7} Doprodej — neobjednávat',
       ramp:false,nova:false,fwd:null,value:0,windowDem:0,coverAfter:0,spec,
       utichla:false,vyrazeno:false,dec:null,silentM:0,utichlaKs:0,utichlaVal:0,lastSale:'',pattern:null};
   }
@@ -2777,7 +2780,7 @@ async function renderObjednavky(){
       const k=String(x.sk)+'-'+String(x.reg);
       if(smap[k]!==undefined||nove.has(k))return true;
       if(/^služby$/i.test(String(x.skupina||'').trim()))return false;
-      return (x.avail||0)<0||(x.reserved||0)>0||(x.onOrder||0)>0||!!specOf(x.sk,x.skupina);
+      return (x.avail||0)<0||(x.reserved||0)>0||(x.onOrder||0)>0||!!specOf(x.sk,x.skupina,String(x.sk)+'-'+String(x.reg));
     });
     OBJ_DATA.rows.forEach(x=>{x._nohist=smap[String(x.sk)+'-'+String(x.reg)]===undefined;});
     const sel=$('#objSup');
