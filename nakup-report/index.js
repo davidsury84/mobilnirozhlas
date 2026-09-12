@@ -32,6 +32,61 @@ function mount(host) {
   const loadSup = () => { try { return JSON.parse(fs.readFileSync(SUP_F, 'utf8')) || {}; } catch (_) { return {}; } };
   const VYD_SEED = path.join(__dirname, '..', 'eshop-vydejky.json');                // commitnutý základ (tools-gen-eshop-vydejky.js)
   // Seed z repa + živě nahrané dny (volume); u shodného dne vyhrává živý (novější export).
+  // ---- ALTERNATIVNÍ DODAVATELÉ: stejné zboží od více dodavatelů (CLD-S = SULO, CLD-CO = Contenur, CLD-M = Mevatec…) ----
+  // Zákazník kupuje „CLD 240 hnědou", ne značku → poptávka patří SKUPINĚ. Potvrzená skupina se plánuje
+  // jako celek: poptávka i zásoba = součet variant, objednávka jde na jednu aktivní (preferovanou / nejlevnější)
+  // variantu; pozastavené varianty se dál prodávají, jen se od nich neobjednává (dočasně: platiDo).
+  const ALT_F = path.join(host.dataDir || __dirname, 'nakup-alternativy.json');
+  const loadAlt = () => { try { return JSON.parse(fs.readFileSync(ALT_F, 'utf8')) || { skupiny: {}, ignorovane: [] }; } catch (_) { return { skupiny: {}, ignorovane: [] }; } };
+  const saveAlt = a => { try { fs.writeFileSync(ALT_F, JSON.stringify(a, null, 2)); } catch (_) {} };
+  // Jádro názvu = typ + objem + barva bez kódu dodavatele; skupina musí mít číslo (objem), jinak je to
+  // generický název („náhradní díly") a ne zaměnitelné zboží.
+  function coreName(n) {
+    let t = String(n || '').toLowerCase().replace(/[,.;:()\/]/g, ' ');
+    t = t.replace(/\b(cld|cle|clf|clg)\s*-?\s*(s|co|pg|m|b|p|mgb|w|k)\b/g, '$1');
+    // „bio" = hnědá nádoba na bioodpad, stejné zboží jako hnědá bez přívlastku (Plastic Omnium ho v názvu má, SULO ne)
+    t = t.replace(/\b(sulo|contenur|plastic omnium|weber|craemer|ese|otto|europlast|elkoplast|meva|mevatec|gogic|k-tech|mgb|bio|din|en 840|eu|ral\s*\d+)\b/g, ' ');
+    return t.replace(/\s+/g, ' ').trim();
+  }
+  function navrhAlternativy(rows) {
+    const g = {};
+    (rows || []).forEach(r => { if (String(r.sk) === '900') return; const c = coreName(r.nazev); if (!c || !/\d/.test(c)) return; (g[c] = g[c] || []).push(r); });
+    return Object.keys(g).filter(c => new Set(g[c].map(r => r.skupina)).size >= 2)
+      .map(c => ({ gid: 'a:' + c.slice(0, 190), nazev: g[c][0].nazev.replace(/\b(CLD|CLE|CLF|CLG)-?(S|CO|PG|M|B|P|MGB|W|K)\b/g, '$1'), polozky: g[c].map(r => r.sk + '-' + r.reg) }));
+  }
+  // Přerozdělení ve skupinách: cíl = preferovaná, jinak aktivní varianta s nejnižší efektivní nákladovou
+  // cenou (vč. ohlášeného zdražení, které už platí); při shodě kratší lhůta. Rezervace (oversold) zůstávají
+  // na své variantě — ty se kryjí tím, co zákazník objednal.
+  function allocateGroups(scored, smap, P, m0) {
+    const alt = loadAlt(); const gs = alt.skupiny || {}; if (!Object.keys(gs).length) return;
+    const byKey = {}; scored.forEach(r => { byKey[r.x.sk + '-' + r.x.reg] = r; });
+    const sup = supCfgCached(), dnes = new Date().toISOString().slice(0, 10);
+    const effCost = x => { const c = unitVal(x), sc = sup[x.skupina]; return (sc && +sc.zdrazeniPct > 0 && sc.zdrazeniOd && sc.zdrazeniOd <= dnes) ? c * (1 + sc.zdrazeniPct / 100) : c; };
+    Object.keys(gs).forEach(gid => { const g = gs[gid];
+      const mem = (g.polozky || []).map(k => byKey[k]).filter(Boolean); if (mem.length < 2) return;
+      const pauza = k => { const st = (g.stav || {})[k]; if (!st || st.objednavat !== false) return false; return !(st.platiDo && st.platiDo < dnes); };
+      const aktivni = mem.filter(r => !pauza(r.x.sk + '-' + r.x.reg) && !r.o.spec);
+      const D = mem.reduce((a, r) => a + (r.o.D || 0), 0);
+      const serie = new Array(12).fill(0); mem.forEach(r => { const sl = salesOf(smap, r.x) || []; sl.forEach((v, i) => { serie[i] += v || 0; }); });
+      const pos = { avail: mem.reduce((a, r) => a + (r.x.avail || 0), 0), onOrder: mem.reduce((a, r) => a + (r.x.onOrder || 0), 0), stock: mem.reduce((a, r) => a + (r.x.stock || 0), 0) };
+      let target = null;
+      if (g.pref && aktivni.some(r => r.x.sk + '-' + r.x.reg === g.pref)) target = aktivni.find(r => r.x.sk + '-' + r.x.reg === g.pref);
+      else if (aktivni.length) target = aktivni.slice().sort((a, b) => (effCost(a.x) - effCost(b.x)) || ((a.x.lead || 0) - (b.x.lead || 0)))[0];
+      const puvodni = {}; mem.forEach(r => { puvodni[r.x.sk + '-' + r.x.reg] = r.o.rec || 0; });
+      let grec = 0;
+      if (target) {
+        const gx = Object.assign({}, target.x, pos);
+        const go = computeOrderRow(gx, serie, P, m0);
+        grec = Math.max(0, go.rec || 0);
+      }
+      if (process.env.ALT_DEBUG) console.log('[alt-debug]', gid.slice(0, 40), 'členů', mem.length, 'aktivních', aktivni.length, 'cíl', target ? target.x.sk + '-' + target.x.reg : null, 'D', D, 'pos', JSON.stringify(pos), 'grec', grec);
+      mem.forEach(r => { const k = r.x.sk + '-' + r.x.reg, jeCil = target && r === target;
+        r.o.skupina = { gid, nazev: g.nazev, clenu: mem.length, D, cil: target ? target.x.sk + '-' + target.x.reg : null, puvodne: puvodni[k], pauza: pauza(k) };
+        if (jeCil) { r.o.rec = grec; r.o.value = grec * unitVal(r.x); r.o.status = (grec > 0 ? 'Objednat' : (r.o.status || 'OK')) + ' · 🔀 kryje skupinu ' + mem.length + ' variant'; }
+        else if (!r.o.spec) { r.o.rec = 0; r.o.value = 0; r.o.status = (pauza(k) ? '⏸ pozastaveno' : '🔀 kryje ' + (target ? target.x.skupina : '—')) + (target ? ' (' + target.x.sk + '-' + target.x.reg + ')' : ' — žádná aktivní varianta!'); }
+      });
+    });
+  }
   const loadVyd = () => {
     let seed = { dny: {} }, live = null;
     try { seed = JSON.parse(fs.readFileSync(VYD_SEED, 'utf8')) || { dny: {} }; } catch (_) {}
@@ -52,7 +107,7 @@ function mount(host) {
       let seed = '';
       for (const sk of x.sks) { const sp = SPEC_SK[sk]; if (sp) { seed = sp.typ; break; } }
       return { supplier: x.supplier, items: x.items, erpLead: med, stockVal: Math.round(x.stockVal), lead: (s.lead != null ? s.lead : null), shipCost: (s.shipCost != null ? s.shipCost : null), origin: s.origin || '', zdrazeniPct: (s.zdrazeniPct != null ? s.zdrazeniPct : null), zdrazeniOd: s.zdrazeniOd || null,
-        rezim: s.rezim || '', rezimSeed: seed, sks: [...x.sks].sort() };
+        rezim: s.rezim || '', rezimPozn: s.rezimPozn || '', rezimSeed: seed, sks: [...x.sks].sort() };
     }).sort((a, b) => b.stockVal - a.stockVal);
   }
 
@@ -483,9 +538,12 @@ function mount(host) {
   // na prodejní historii: oversold, rezervované, objednané u dodavatele a dropship/doprodej řady
   // (ty se nikdy nenaskladňují, takže ve výdejích ze skladu nemají co mít). Služby ne.
   // DRŽET V SYNCHRONU s filtrem v renderObjednavky() v SMI_aplikace.html!
-  const onlyActive = rows => { const k = activeKeys(); if (!k.size) return rows || []; const nk = newKeys();
+  // Členové potvrzených skupin alternativ patří do sortimentu vždy — varianta bez historie a bez zásoby
+  // (nový, levnější dodavatel) musí jít zvolit jako cíl objednávky.
+  const altKeys = () => { const out = new Set(); try { const a = loadAlt(); Object.values(a.skupiny || {}).forEach(g => (g.polozky || []).forEach(k => out.add(k))); } catch (_) {} return out; };
+  const onlyActive = rows => { const k = activeKeys(); if (!k.size) return rows || []; const nk = newKeys(), ak2 = altKeys();
     return (rows || []).filter(r => { const key = r.sk + '-' + r.reg;
-      if (k.has(key) || nk.has(key)) return true;
+      if (k.has(key) || nk.has(key) || ak2.has(key)) return true;
       if (/^služby$/i.test(String(r.skupina || '').trim())) return false;
       return (r.avail || 0) < 0 || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0 || !!specOf(r.sk, r.skupina, r.sk + '-' + r.reg); }); };
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
@@ -516,7 +574,7 @@ function mount(host) {
   const supCfgReset = () => { _supC = null; };
   const specOf = (sk, skupina, key) => {
     const s = skupina ? supCfgCached()[skupina] : null;
-    if (s && s.rezim) return s.rezim === 'sklad' ? null : { typ: s.rezim, pozn: 'nastaveno v dotazníku dodavatelů' };
+    if (s && s.rezim) return s.rezim === 'sklad' ? null : { typ: s.rezim, pozn: s.rezim === 'pozastaveno' ? ('dodavatel ručně pozastaven' + (s.rezimPozn ? ' — ' + s.rezimPozn : '')) : 'nastaveno v dotazníku dodavatelů' };
     const bySk = SPEC_SK[String(sk || '').trim()]; if (bySk) return bySk;
     if (key) { const a = dsAutoCached()[key]; if (a) return a; }
     return null;
@@ -755,7 +813,7 @@ function mount(host) {
     const spec = specOf(x.sk, x.skupina, x.sk + '-' + x.reg);
     if (spec) {
       const Dsp = sales ? sales.reduce((s2, v) => s2 + (v || 0), 0) : 0;
-      return { D: Dsp, rec: 0, status: spec.typ === 'dropship' ? '🚚 dropshipping — nenaskladňuje se' : '🏷 doprodej — neobjednávat',
+      return { D: Dsp, rec: 0, status: spec.typ === 'dropship' ? '🚚 dropshipping — nenaskladňuje se' : spec.typ === 'pozastaveno' ? '⏸ dodavatel pozastaven — neobjednávat' : '🏷 doprodej — neobjednávat',
         ramp: false, fwd: null, value: 0, coverAfter: 0, spec,
         utichla: false, vyrazeno: false, dec: null, silentM: 0, utichlaKs: 0, utichlaVal: 0, lastSale: '', pattern: null, missed: 0 };
     }
@@ -918,6 +976,7 @@ function mount(host) {
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
     const scored = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }));
+    try { allocateGroups(scored, smap, P, m0); } catch (e) { console.warn('[nakup-report] alternativy:', e.message); }
     let list = scored.filter(r => r.o.rec > 0 || (r.x.avail < 0 && !r.o.spec));
     // Utichle: hlasime jen ty, ktere by model JINAK objednal — ostatni jsou jen sum.
     // Stejný filtr jako collectUtichle() — rozhodnuté položky se už nepřipomínají.
@@ -993,7 +1052,7 @@ function mount(host) {
         '<th style="text-align:left;border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">Položka</th>' +
         R('Sklad') + R('K dispo') + R('Objednáno') + R('Lhůta') + R('Roč. prodej') + R('Objednat') + R('Krytí po obj.') + R('Hodnota') + '</tr></thead><tbody>' +
         g.items.map(r => '<tr' + (r.x.avail < 0 ? ' style="background:#fbeaea"' : '') + '><td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.sk + '-' + r.x.reg) + '</td>' +
-          '<td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.nazev) + '</td>' +
+          '<td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.nazev) + (r.o.skupina ? ' <span title="Alternativní dodavatelé">🔀 <small style="color:#3e5a70">kryje ' + r.o.skupina.clenu + ' variant („' + esc(r.o.skupina.nazev || '') + '")</small></span>' : '') + '</td>' +
           cellR(fmt(r.x.stock)) + cellR((r.x.avail < 0 ? '<b style="color:#b23">' : '') + fmt(r.x.avail) + (r.x.avail < 0 ? '</b>' : '')) + cellR(fmt(r.x.onOrder)) + cellR(fmt(r.x.lead)) + cellR(fmt(r.o.D)) +
           cellR((r.o.fwd ? '<span title="Předzásobení před zdražením +' + r.o.fwd.pct + ' % od ' + r.o.fwd.od + ' (+' + fmt(r.o.fwd.navic) + ' ks navíc)">💰</span> ' : '') + '<b>' + fmt(r.o.rec) + '</b>') + cellR(covTxt(r.o.coverAfter)) + cellR(r.o.value ? kc(r.o.value) : '—') + '</tr>').join('') + '</tbody></table>';
     });
@@ -1286,6 +1345,43 @@ function mount(host) {
     // Denní snímky skladu dávají výdej ve skladových cenách za všechny kanály; tohle říká, kolik
     // z toho byl e-shop a za kolik se to prodalo. Export nahrává nákup/e-shop v appce; každý den
     // obsažený v souboru se přepíše celý (nový export dne je autoritativní → opravy se promítnou).
+    // ---- ALTERNATIVNÍ DODAVATELÉ (zaměnitelné položky od více dodavatelů) ----
+    if (p === '/api/nakup-report/alternativy' && req.method === 'GET') {
+      const o = loadObj(), alt = loadAlt(), navrhy = navrhAlternativy(o.rows || []);
+      const meta = {}; (o.rows || []).forEach(r => { meta[r.sk + '-' + r.reg] = r; });
+      const sd = loadData(); const sm = {}; (sd.rows || []).forEach(r => { sm[r.sk + '-' + r.reg] = (r.sales || []).reduce((a, b) => a + (b || 0), 0); });
+      const detail = keys => keys.filter(k => meta[k]).map(k => { const r = meta[k]; return { key: k, nazev: r.nazev, skupina: r.skupina, stock: r.stock, avail: r.avail, onOrder: r.onOrder, reserved: r.reserved, lead: r.lead, unitCost: unitVal(r), prodej: sm[k] || 0 }; });
+      const skupiny = Object.keys(alt.skupiny || {}).map(gid => { const g = alt.skupiny[gid]; return Object.assign({ gid }, g, { polozky: detail(g.polozky || []) }); });
+      const znam = new Set(Object.keys(alt.skupiny || {}).concat(alt.ignorovane || []));
+      return json(res, 200, { ok: true, skupiny, navrhy: navrhy.filter(n => !znam.has(n.gid)).map(n => Object.assign(n, { polozky: detail(n.polozky) })), ignorovane: alt.ignorovane || [] }), true;
+    }
+    if (p === '/api/nakup-report/alternativy' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
+      const alt = loadAlt(); alt.skupiny = alt.skupiny || {}; alt.ignorovane = alt.ignorovane || [];
+      const se = host.empSession && host.empSession(req), kdo = (se && (se.jmeno || se.email)) || 'neznámý', kdy = new Date().toISOString().slice(0, 10);
+      const gid = String(b.gid || '').slice(0, 200), akce = String(b.akce || '');
+      if (!gid && akce !== 'nova') return json(res, 400, { error: 'Chybí skupina.' }), true;
+      if (akce === 'potvrdit' || akce === 'nova') {
+        const keys = Array.isArray(b.polozky) ? b.polozky.map(String).filter(k => /^[^-]+-[^-]+$/.test(k)).slice(0, 30) : [];
+        if (keys.length < 2) return json(res, 400, { error: 'Skupina musí mít aspoň 2 položky.' }), true;
+        const id = gid || ('m:' + keys.slice().sort().join('|')).slice(0, 200);
+        const g = alt.skupiny[id] || { stav: {} };
+        g.nazev = String(b.nazev || g.nazev || '').slice(0, 120); g.polozky = keys; g.potvrdil = kdo; g.kdy = kdy;
+        alt.skupiny[id] = g; alt.ignorovane = alt.ignorovane.filter(x => x !== id);
+      } else if (akce === 'ignorovat') { delete alt.skupiny[gid]; if (alt.ignorovane.indexOf(gid) < 0) alt.ignorovane.push(gid); }
+      else if (akce === 'zrusit') { delete alt.skupiny[gid]; alt.ignorovane = alt.ignorovane.filter(x => x !== gid); }
+      else if (akce === 'odebrat') { const g = alt.skupiny[gid]; if (g) { g.polozky = (g.polozky || []).filter(k => k !== b.key); if (g.polozky.length < 2) delete alt.skupiny[gid]; } }
+      else if (akce === 'stav') {
+        const g = alt.skupiny[gid]; if (!g) return json(res, 404, { error: 'Skupina není potvrzená.' }), true;
+        const key = String(b.key || ''); if ((g.polozky || []).indexOf(key) < 0) return json(res, 400, { error: 'Položka není ve skupině.' }), true;
+        g.stav = g.stav || {};
+        if (b.objednavat === false) g.stav[key] = { objednavat: false, pozn: String(b.pozn || '').slice(0, 200), platiDo: /^\d{4}-\d{2}-\d{2}$/.test(String(b.platiDo || '')) ? String(b.platiDo) : '', kdo, kdy };
+        else delete g.stav[key];
+        if (b.preferovat === true) g.pref = key; else if (b.preferovat === false && g.pref === key) delete g.pref;
+      } else return json(res, 400, { error: 'Neznámá akce.' }), true;
+      saveAlt(alt);
+      return json(res, 200, { ok: true }), true;
+    }
     if (p === '/api/nakup-report/eshop-vydejky' && req.method === 'GET') {
       if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
       return json(res, 200, Object.assign({ ok: true, drive: { folder: OBJ_FOLDER, saEmail: drive && drive.configured() ? drive.saEmail() : '' } }, loadVyd())), true;
@@ -1468,7 +1564,8 @@ function mount(host) {
           if (v.origin) e.origin = String(v.origin).slice(0, 40);
           if (v.zdrazeniPct !== '' && v.zdrazeniPct != null && isFinite(+v.zdrazeniPct) && +v.zdrazeniPct > 0) e.zdrazeniPct = Math.min(100, Math.round(+v.zdrazeniPct));
           if (v.zdrazeniOd && /^\d{4}-\d{2}-\d{2}$/.test(String(v.zdrazeniOd))) e.zdrazeniOd = String(v.zdrazeniOd);
-          if (['sklad', 'dropship', 'doprodej'].indexOf(v.rezim) >= 0) e.rezim = v.rezim;
+          if (['sklad', 'dropship', 'doprodej', 'pozastaveno'].indexOf(v.rezim) >= 0) e.rezim = v.rezim;
+          if (v.rezimPozn) e.rezimPozn = String(v.rezimPozn).slice(0, 120);
           if (Object.keys(e).length) cur[k] = e; else delete cur[k];
         });
         saveSup(cur); supCfgReset(); _dsA = null;   // režim ovlivňuje doporučení → zahodit cache
