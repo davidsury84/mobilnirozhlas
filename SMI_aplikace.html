@@ -98,6 +98,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .kpi .v{font-size:22px;font-weight:700}.kpi .l{color:var(--mut);font-size:12px;margin-top:4px}
   .kpi.dead .v{color:var(--dead)}.kpi.err .v{color:var(--err)}.kpi.ok .v{color:var(--ok)}.kpi.warn .v{color:var(--warn)}
   .charts{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:16px}
+  .charts>*{min-width:0}
+  #veRokPol td:nth-child(2),#veRokZak td:nth-child(2){white-space:normal;min-width:180px}   /* dlouhé názvy zalamovat, ne roztahovat tabulku */   /* 1fr = minmax(auto,1fr): široká tabulka by jinak roztáhla sloupec přes okraj stránky */
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
   .card h3{margin:0 0 10px;font-size:13px;color:var(--mut);font-weight:600}
   .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:8px 0 16px;flex-wrap:wrap}
@@ -304,7 +306,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <div class="card"><h3>Denní výdej — e-shop vs. obchod</h3><canvas id="veDayChart" height="150"></canvas>
           <div class="note" id="veOutNote" style="margin-top:8px;display:none"></div></div>
       </div>
-      <div class="charts" style="grid-template-columns:1fr 1fr;margin-top:14px">
+      <div class="charts" style="grid-template-columns:1fr 1.3fr;margin-top:14px">
         <div class="card"><h3>Týdny <span class="muted" style="font-weight:400;font-size:12px">— klikatelné</span></h3>
           <div class="tblwrap" style="max-height:320px"><table id="veWeekTbl"></table></div></div>
         <div class="card"><h3 id="veDayTitle">Dny <span class="muted" style="font-weight:400;font-size:12px">— klikatelné</span></h3>
@@ -315,7 +317,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <div class="kpis" id="veRokKpis"></div>
         <div class="charts" style="grid-template-columns:1fr 1fr">
           <div><canvas id="veRokChart" height="150"></canvas></div>
-          <div class="tblwrap" style="max-height:330px"><table id="veRokTbl"></table></div>
+          <div><div class="tblwrap" style="max-height:330px"><table id="veRokTbl"></table></div></div>
         </div>
         <div class="charts" style="grid-template-columns:1fr 1fr;margin-top:12px">
           <div><h4 style="margin:0 0 6px">Největší zákazníci e-shopu</h4><div class="tblwrap" style="max-height:360px"><table id="veRokZak"></table></div></div>
