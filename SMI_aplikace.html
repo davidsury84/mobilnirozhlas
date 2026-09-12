@@ -295,9 +295,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="note">Dva zdroje: <b>denní snímky skladu</b> (ERP každé ráno) = co odešlo ze skladu <b>za všechny kanály, ve skladových cenách</b>; a <b>expediční příkazy e-shopu</b> (řada 441) = co prodal e-shop, <b>v prodejních cenách</b>. E-shop se přepočte na skladové ceny a odečte od výdeje skladu → zbytek je <b>obchod / zakázky</b>. <span id="veMeta" class="muted"></span>
         <div style="margin-top:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span id="vydMeta" class="muted" style="font-size:12px"></span>
-          <button class="btn" id="vydUpBtn" style="padding:3px 10px;font-size:12px" title="Export „Expediční příkazy" z ERP (.xlsx) — může být za jeden den i za delší okno; každý obsažený den se přepíše celý">⬆️ Načíst výdejky e-shopu</button>
-          <input type="file" id="vydUpFile" accept=".xlsx" style="display:none">
-          <span id="vydUpStav" class="muted" style="font-size:12px"></span>
+          <span class="muted" style="font-size:12px" title="Export „Expediční příkazy" stačí uložit do stejné složky na Disku jako denní snímek skladu — aplikace ho pozná podle hlavičky a načte při nejbližší kontrole (1× za hodinu). Každý den obsažený v souboru se přepíše celý, takže opravy z ERP se promítnou.">· načítá se automaticky z Disku (stejná složka jako denní export)</span>
         </div></div>
       <div class="kpis" id="veKpis"></div>
       <div class="charts" style="grid-template-columns:1fr 1fr">
@@ -689,9 +687,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="note" style="background:#f4f0f8;border-color:#ddd2ea">🛒 <b>Kdo to prodává:</b> sloupce <b>z toho e-shop</b> a <b>z toho obchod</b> rozdělují roční prodej na kanály. E-shop = vydané faktury e-shopových řad z ERP; obchod/sklad = zbytek (prodej v rámci zakázek, obchodníci, odběr ze skladu). U <b>dropshipu</b> může e-shop prodat víc, než projde skladem — takový řádek je označen <b style="color:#7a5200">⚠ mimo sklad</b>.
         <div style="margin-top:7px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span id="esUpMeta" class="muted" style="font-size:12px"></span>
-          <button class="btn" id="esUpBtn" style="padding:3px 10px;font-size:12px" title="Export „Prodeje eshop" z ERP (.xlsx) — data se uloží na server, uvidí je všichni">⬆️ Načíst nový export prodejů</button>
-          <input type="file" id="esUpFile" accept=".xlsx" style="display:none">
-          <span id="esUpStav" class="muted" style="font-size:12px"></span>
+          <span class="muted" style="font-size:12px" title="Export „Prodeje eshop" stačí uložit do stejné složky na Disku jako denní snímek skladu — aplikace ho pozná podle hlavičky (Datum případu (M) + Příjmení) a načte při nejbližší kontrole.">· načítá se automaticky z Disku (stejná složka jako denní export)</span>
         </div></div>
       <div class="kpis" id="objKpis"></div>
       <div id="objUtichle"></div>
