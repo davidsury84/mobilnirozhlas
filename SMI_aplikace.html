@@ -317,6 +317,14 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <div><canvas id="veRokChart" height="150"></canvas></div>
           <div><div class="tblwrap" style="max-height:330px"><table id="veRokTbl"></table></div></div>
         </div>
+        <div id="veYoy" style="margin-top:14px;display:none">
+          <h4 style="margin:0 0 4px">Meziroční srovnání <span id="veYoyRoky"></span> <span class="muted" style="font-weight:400;font-size:12px" id="veYoyPozn"></span></h4>
+          <div class="kpis" id="veYoyKpis" style="margin:6px 0 10px"></div>
+          <div class="charts" style="grid-template-columns:1fr 1fr">
+            <div><canvas id="veYoyChart" height="150"></canvas></div>
+            <div><div class="tblwrap" style="max-height:330px"><table id="veYoyTbl"></table></div></div>
+          </div>
+        </div>
         <div class="charts" style="grid-template-columns:1fr 1fr;margin-top:12px">
           <div><h4 style="margin:0 0 6px">Největší zákazníci e-shopu</h4><div class="tblwrap" style="max-height:360px"><table id="veRokZak"></table></div></div>
           <div><h4 style="margin:0 0 6px">Nejprodávanější položky (Kč)</h4><div class="tblwrap" style="max-height:360px"><table id="veRokPol"></table></div></div>
@@ -1015,7 +1023,7 @@ function eshopRec(it){
 // faktur z ERP (eshop-prodeje.json) říká, kolik z toho odbavil e-shop; zbytek prodal
 // obchod v rámci zakázek / sklad. U dropshipu může e-shop celek přesáhnout — zboží nejde
 // přes sklad, ve výdejích tedy chybí; obchod se pak ořezává na 0 a rozdíl se hlásí zvlášť.
-let ES_PRODEJE=null, ES_PRODEJE_META='';
+let ES_PRODEJE=null, ES_PRODEJE_META='', ES_PRODEJE_DO='';
 function esOkno(){
   // 1) přesné okno z popisu období („… 2025-07 až 2026-06") — vložený report ho má napsaný
   const info=(DATA_PERIOD&&DATA_PERIOD.info)||'';
@@ -1121,12 +1129,13 @@ async function loadEshopProdeje(){
   try{
     const r=await fetch('/api/nakup-report/eshop-prodeje',{cache:'no-store'});
     const d=await r.json();
-    if(d&&d.ok&&d.items){ ES_PRODEJE=d.items;
+    if(d&&d.ok&&d.items){ ES_PRODEJE=d.items; ES_PRODEJE_DO=String(d.do||'');
       ES_PRODEJE_META=(d.source||'export e-shopových faktur')+' · '+(d.od||'')+'…'+(d.do||'')+' · '+Object.keys(d.items).length+' položek'
         +(d.live?(' · nahrál '+(d.nahral||'?')+' '+String(d.generated||'').slice(0,10)):' · vloženo v aplikaci'); }
   }catch(e){}
   esRenderBadge();
   try{ if(document.querySelector('#pane-objednavky.active')) renderObjednavky(); }catch(e){}
+  try{ if(document.querySelector('#pane-vyvojeshop.active')&&VE_DATA&&VE_DATA.ok) veRenderRok(VE_DATA); }catch(e){}
 }
 async function loadEshopCeny(){
   try{
@@ -1810,12 +1819,56 @@ function veRenderRok(d){
     [...mr].reverse().map(m=>'<tr'+(m.dny<20?' title="Rozpracovaný měsíc — jen '+m.dny+' dnů"':'')+'><td><b>'+MN[+m.mesic.slice(5,7)-1]+'</b> <span class="muted">'+m.mesic.slice(0,4)+'</span>'+(m.dny<20?' <span class="muted" style="font-size:11px">(část)</span>':'')+'</td>'+
       '<td '+R+'><b>'+veKc(m.kc)+' Kč</b></td><td '+R+'>'+fmt(m.zakazek)+'</td><td '+R+'>'+veKc(m.prumZak)+'</td><td '+R+'>'+fmt(Math.round(m.ks))+'</td><td '+R+'>'+fmt(m.polozek)+'</td><td '+R+'>'+m.dny+'</td></tr>').join('')+
     '<tr style="font-weight:700;border-top:2px solid var(--line,#ccc)"><td>Celkem '+rok+'</td><td '+R+'>'+veKc(tot)+' Kč</td><td '+R+'>'+fmt(zak)+'</td><td '+R+'>'+veKc(zak?tot/zak:0)+'</td><td '+R+'>'+fmt(Math.round(mr.reduce((s,m)=>s+m.ks,0)))+'</td><td></td><td '+R+'>'+mr.reduce((s,m)=>s+m.dny,0)+'</td></tr></tbody>';
+  try{veRenderYoy(d,+rok);}catch(e){console.warn('yoy',e);}
   if(top){
     $('#veRokZak').innerHTML='<thead><tr><th>#</th><th>Zákazník</th><th '+R+'>Zakázek</th><th '+R+'>Obrat</th><th '+R+'>Podíl</th></tr></thead><tbody>'+
       top.zakaznici.map((z,i)=>'<tr><td class="muted">'+(i+1)+'</td><td><b>'+esc(z.nazev)+'</b>'+(z.ico?'':' <span class="muted" style="font-size:11px">soukr.</span>')+'</td><td '+R+'>'+fmt(z.zak)+'</td><td '+R+'>'+veKc(z.kc)+' Kč</td><td '+R+' class="muted">'+(100*z.kc/Math.max(1,top.kc)).toFixed(1)+' %</td></tr>').join('')+'</tbody>';
     $('#veRokPol').innerHTML='<thead><tr><th>#</th><th>Položka</th><th>Kód</th><th '+R+'>Kusů</th><th '+R+'>Obrat</th></tr></thead><tbody>'+
       top.polozky.map((q,i)=>'<tr><td class="muted">'+(i+1)+'</td><td><b>'+esc(q.nazev)+'</b></td><td class="muted">'+esc(q.kod)+'</td><td '+R+'>'+fmt(Math.round(q.ks))+'</td><td '+R+'>'+veKc(q.kc)+' Kč</td></tr>').join('')+'</tbody>';
   }
+}
+// Meziroční srovnání e-shopu. Základ: výdejky, pokud pokrývají oba roky (stejný zdroj jako sekce
+// nad tím); jinak faktury e-shopu (ES_PRODEJE), které jdou zpět do 2020. Porovnávají se jen měsíce
+// kompletní v OBOU letech — poslední měsíc zdroje faktur se vynechává (bývá rozpracovaný).
+var VE_YOY_CHART=null;
+function veRenderYoy(d,rok){
+  const box=$('#veYoy'); if(!box)return;
+  const MN=['led','úno','bře','dub','kvě','čvn','čvc','srp','zář','říj','lis','pro'], R='style="text-align:right"';
+  const pred=rok-1; let src='', A={}, B={}, zdrojPozn='';
+  const mes=d.mesice||[];
+  const vydPred=mes.filter(m=>m.mesic.startsWith(String(pred))&&m.dny>=20).length;
+  if(vydPred>=6){ src='výdejky'; mes.forEach(m=>{const y=m.mesic.slice(0,4),mo=+m.mesic.slice(5,7); if(y==String(pred))A[mo]={kc:m.kc,zak:m.zakazek,ks:m.ks,dny:m.dny}; if(y==String(rok))B[mo]={kc:m.kc,zak:m.zakazek,ks:m.ks,dny:m.dny};});
+    zdrojPozn='z expedičních příkazů (prodejní ceny bez DPH)'; }
+  else if(ES_PRODEJE){ src='faktury';
+    Object.values(ES_PRODEJE).forEach(it=>{Object.keys(it.kc||{}).forEach(ym=>{const y=ym.slice(0,4),mo=+ym.slice(5,7); const t=(y==String(pred))?A:(y==String(rok))?B:null; if(!t)return; const e=t[mo]||(t[mo]={kc:0,ks:0}); e.kc+=it.kc[ym]||0; e.ks+=(it.ks||{})[ym]||0;});});
+    zdrojPozn='z faktur e-shopu (bez DPH) — za '+pred+' nejsou výdejky, proto stejný základ pro oba roky'; }
+  else { box.style.display='none'; return; }
+  // kompletní měsíce v obou letech
+  const dnes=new Date(), lastDo=(src==='faktury'&&ES_PRODEJE_DO)?+ES_PRODEJE_DO.slice(5,7):13;
+  const mon=[]; for(let m=1;m<=12;m++){ if(!A[m]||!B[m])continue; if(src==='faktury'&&(+ES_PRODEJE_DO.slice(0,4)==rok)&&m>=lastDo)continue; if(src==='výdejky'&&B[m].dny<20)continue; mon.push(m); }
+  if(mon.length<2){ box.style.display='none'; return; }
+  box.style.display='';
+  $('#veYoyRoky').textContent=pred+' → '+rok;
+  $('#veYoyPozn').textContent='· '+MN[mon[0]-1]+'–'+MN[mon[mon.length-1]-1]+' · '+zdrojPozn;
+  const sA=mon.reduce((s,m)=>s+A[m].kc,0), sB=mon.reduce((s,m)=>s+B[m].kc,0), kA=mon.reduce((s,m)=>s+(A[m].ks||0),0), kB=mon.reduce((s,m)=>s+(B[m].ks||0),0);
+  const zA=mon.reduce((s,m)=>s+(A[m].zak||0),0), zB=mon.reduce((s,m)=>s+(B[m].zak||0),0);
+  const pct=(a,b)=>a?(((b/a-1)*100)):null, pTxt=v=>v==null?'—':((v>=0?'+':'')+v.toFixed(0)+' %');
+  const kp=[['',veKc(sB)+' Kč','Obrat '+rok+' za srovnávané měsíce'],[pct(sA,sB)>=0?'ok':'err',pTxt(pct(sA,sB)),'vs. '+pred+' ('+veKc(sA)+' Kč)'],[pct(kA,kB)>=0?'ok':'err',pTxt(pct(kA,kB)),'kusy ('+fmt(Math.round(kA))+' → '+fmt(Math.round(kB))+')']];
+  if(zA&&zB){kp.push([pct(zA,zB)>=0?'ok':'err',pTxt(pct(zA,zB)),'zakázky ('+fmt(zA)+' → '+fmt(zB)+')']);kp.push(['',veKc(sB/zB)+' Kč','ø zakázka ('+pred+': '+veKc(sA/zA)+' Kč)']);}
+  $('#veYoyKpis').innerHTML=kp.map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
+  if(typeof Chart!=='undefined'){
+    const mut=_cv('--mut'),line=_cv('--line');
+    try{if(VE_YOY_CHART)VE_YOY_CHART.destroy();}catch(e){}
+    const cv=$('#veYoyChart');
+    if(cv)VE_YOY_CHART=new Chart(cv,{type:'bar',data:{labels:mon.map(m=>MN[m-1]),datasets:[
+        {label:String(pred),data:mon.map(m=>A[m].kc),backgroundColor:'#b9c7d2',borderRadius:3},
+        {label:String(rok),data:mon.map(m=>B[m].kc),backgroundColor:'#2f6f8f',borderRadius:3}]},
+      options:{responsive:true,plugins:{legend:{display:true,labels:{color:mut,boxWidth:10}},datalabels:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+veKc(c.raw)+' Kč'}}},
+        scales:{y:{ticks:{color:mut,callback:v=>veKc(v)},grid:{color:line}},x:{ticks:{color:mut},grid:{display:false}}}}});
+  }
+  $('#veYoyTbl').innerHTML='<thead><tr><th>Měsíc</th><th '+R+'>'+pred+'</th><th '+R+'>'+rok+'</th><th '+R+'>Změna</th>'+(zA?'<th '+R+'>Zak. '+pred+'/'+rok+'</th>':'')+'</tr></thead><tbody>'+
+    mon.map(m=>{const p=pct(A[m].kc,B[m].kc);return '<tr><td><b>'+MN[m-1]+'</b></td><td '+R+' class="muted">'+veKc(A[m].kc)+' Kč</td><td '+R+'><b>'+veKc(B[m].kc)+' Kč</b></td><td '+R+' style="color:'+(p==null?'inherit':(p>=0?'#0a7d33':'#b23'))+';font-weight:600">'+pTxt(p)+'</td>'+(zA?'<td '+R+' class="muted">'+fmt(A[m].zak||0)+' / '+fmt(B[m].zak||0)+'</td>':'')+'</tr>';}).join('')+
+    '<tr style="font-weight:700;border-top:2px solid var(--line,#ccc)"><td>Celkem</td><td '+R+'>'+veKc(sA)+' Kč</td><td '+R+'>'+veKc(sB)+' Kč</td><td '+R+' style="color:'+(pct(sA,sB)>=0?'#0a7d33':'#b23')+'">'+pTxt(pct(sA,sB))+'</td>'+(zA?'<td '+R+'>'+fmt(zA)+' / '+fmt(zB)+'</td>':'')+'</tr></tbody>';
 }
 function veIso(t){const x=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate()));const day=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-day+3);const f=new Date(Date.UTC(x.getUTCFullYear(),0,4));const wk=1+Math.round(((x-f)/86400000-3+((f.getUTCDay()+6)%7))/7);return x.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');}
 function veSetWeek(w){VE_WEEK=w;renderVyvojEshop();}
