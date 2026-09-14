@@ -1796,7 +1796,7 @@ function veRenderRok(d){
   // poslední měsíc bývá rozpracovaný — srovnávej tempo za den, ne celek
   const tempo=posl.kc/dniPosl, tempoPred=pred?pred.kc/dniPred:0, chg=tempoPred?((tempo/tempoPred-1)*100):null;
   $('#veRokKpis').innerHTML=[
-    ['',veKc(tot)+' Kč','Obrat e-shopu '+rok+' (bez DPH, vč. dopravy)'],
+    ['',veKc(tot)+' Kč','Obrat e-shopu '+rok+' · z výdejek '+(mr.length?MN[+mr[0].mesic.slice(5,7)-1]+'–'+MN[+mr[mr.length-1].mesic.slice(5,7)-1]:'')+((d.vydejky&&d.vydejky.do)?(' (do '+veDen(d.vydejky.do)+')'):'')+' · bez DPH, vč. dopravy'],
     ['',fmt(zak),'Zakázek · ø '+veKc(zak?tot/zak:0)+' Kč'],
     ['',veKc(tot/Math.max(1,mr.reduce((s,m)=>s+m.dny,0)))+' Kč','Průměr na den s výdejem'],
     [chg==null?'':(chg>=0?'ok':'err'),(chg==null?'—':(chg>=0?'+':'')+chg.toFixed(0)+' %'),(posl.mesic?MN[+posl.mesic.slice(5,7)-1]:'')+' vs. '+(pred?MN[+pred.mesic.slice(5,7)-1]:'—')+' — tempo za den'],
@@ -1853,9 +1853,15 @@ function veRenderYoy(d,rok){
   const sA=mon.reduce((s,m)=>s+A[m].kc,0), sB=mon.reduce((s,m)=>s+B[m].kc,0), kA=mon.reduce((s,m)=>s+(A[m].ks||0),0), kB=mon.reduce((s,m)=>s+(B[m].ks||0),0);
   const zA=mon.reduce((s,m)=>s+(A[m].zak||0),0), zB=mon.reduce((s,m)=>s+(B[m].zak||0),0);
   const pct=(a,b)=>a?(((b/a-1)*100)):null, pTxt=v=>v==null?'—':((v>=0?'+':'')+v.toFixed(0)+' %');
-  const kp=[['',veKc(sB)+' Kč','Obrat '+rok+' za srovnávané měsíce'],[pct(sA,sB)>=0?'ok':'err',pTxt(pct(sA,sB)),'vs. '+pred+' ('+veKc(sA)+' Kč)'],[pct(kA,kB)>=0?'ok':'err',pTxt(pct(kA,kB)),'kusy ('+fmt(Math.round(kA))+' → '+fmt(Math.round(kB))+')']];
+  const obd=MN[mon[0]-1]+'–'+MN[mon[mon.length-1]-1];
+  const kp=[['',veKc(sB)+' Kč','Obrat '+obd+' '+rok+' · z '+(src==='faktury'?'faktur':'výdejek')],[pct(sA,sB)>=0?'ok':'err',pTxt(pct(sA,sB)),'vs. '+obd+' '+pred+' ('+veKc(sA)+' Kč)'],[pct(kA,kB)>=0?'ok':'err',pTxt(pct(kA,kB)),'kusy ('+fmt(Math.round(kA))+' → '+fmt(Math.round(kB))+')']];
   if(zA&&zB){kp.push([pct(zA,zB)>=0?'ok':'err',pTxt(pct(zA,zB)),'zakázky ('+fmt(zA)+' → '+fmt(zB)+')']);kp.push(['',veKc(sB/zB)+' Kč','ø zakázka ('+pred+': '+veKc(sA/zA)+' Kč)']);}
   $('#veYoyKpis').innerHTML=kp.map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
+  // Stejné měsíce z výdejek — ať je vidět, proč se číslo liší od roční sekce nad tím
+  { let el=document.getElementById('veYoySmir'); if(!el){el=document.createElement('div');el.id='veYoySmir';el.className='muted';el.style.cssText='font-size:12px;margin:-4px 0 8px';$('#veYoyKpis').after(el);}
+    if(src==='faktury'){ const vy=mes.filter(m=>m.mesic.startsWith(String(rok))&&mon.includes(+m.mesic.slice(5,7))); const vs=vy.reduce((s,m)=>s+m.kc,0);
+      el.innerHTML=vy.length?('<b>Pozor na základ:</b> roční sekce nahoře je z <b>výdejek</b> (expediční příkazy) za celé období do posledního souboru; tady jsou <b>faktury</b> jen za '+obd+', protože za '+pred+' výdejky nemáme. Za stejné měsíce '+obd+' '+rok+' dělají výdejky <b>'+veKc(vs)+' Kč</b>, faktury '+veKc(sB)+' Kč — rozdíl je doprava (ve fakturách není) a zboží expedované, ale fakturované později.'):''; el.style.display=vy.length?'':'none'; }
+    else el.style.display='none'; }
   if(typeof Chart!=='undefined'){
     const mut=_cv('--mut'),line=_cv('--line');
     try{if(VE_YOY_CHART)VE_YOY_CHART.destroy();}catch(e){}
