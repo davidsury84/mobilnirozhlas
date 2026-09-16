@@ -325,6 +325,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
             <div><div class="tblwrap" style="max-height:330px"><table id="veYoyTbl"></table></div></div>
           </div>
         </div>
+        <div id="veSup" style="margin-top:14px;display:none">
+          <h4 style="margin:0 0 4px">Prodej po dodavatelích a měsících <span class="muted" style="font-weight:400;font-size:12px" id="veSupPozn"></span></h4>
+          <div style="height:250px;margin-bottom:10px"><canvas id="veSupChart"></canvas></div>
+          <div class="tblwrap" style="max-height:460px"><table id="veSupTbl"></table></div>
+        </div>
         <div class="charts" style="grid-template-columns:1fr 1fr;margin-top:12px">
           <div><h4 style="margin:0 0 6px">Největší zákazníci e-shopu</h4><div class="tblwrap" style="max-height:360px"><table id="veRokZak"></table></div></div>
           <div><h4 style="margin:0 0 6px">Nejprodávanější položky (Kč)</h4><div class="tblwrap" style="max-height:360px"><table id="veRokPol"></table></div></div>
@@ -1820,6 +1825,7 @@ function veRenderRok(d){
       '<td '+R+'><b>'+veKc(m.kc)+' Kč</b></td><td '+R+'>'+fmt(m.zakazek)+'</td><td '+R+'>'+veKc(m.prumZak)+'</td><td '+R+'>'+fmt(Math.round(m.ks))+'</td><td '+R+'>'+fmt(m.polozek)+'</td><td '+R+'>'+m.dny+'</td></tr>').join('')+
     '<tr style="font-weight:700;border-top:2px solid var(--line,#ccc)"><td>Celkem '+rok+'</td><td '+R+'>'+veKc(tot)+' Kč</td><td '+R+'>'+fmt(zak)+'</td><td '+R+'>'+veKc(zak?tot/zak:0)+'</td><td '+R+'>'+fmt(Math.round(mr.reduce((s,m)=>s+m.ks,0)))+'</td><td></td><td '+R+'>'+mr.reduce((s,m)=>s+m.dny,0)+'</td></tr></tbody>';
   try{veRenderYoy(d,+rok);}catch(e){console.warn('yoy',e);}
+  try{veRenderSup(d,+rok);}catch(e){console.warn('sup',e);}
   if(top){
     $('#veRokZak').innerHTML='<thead><tr><th>#</th><th>Zákazník</th><th '+R+'>Zakázek</th><th '+R+'>Obrat</th><th '+R+'>Podíl</th></tr></thead><tbody>'+
       top.zakaznici.map((z,i)=>'<tr><td class="muted">'+(i+1)+'</td><td><b>'+esc(z.nazev)+'</b>'+(z.ico?'':' <span class="muted" style="font-size:11px">soukr.</span>')+'</td><td '+R+'>'+fmt(z.zak)+'</td><td '+R+'>'+veKc(z.kc)+' Kč</td><td '+R+' class="muted">'+(100*z.kc/Math.max(1,top.kc)).toFixed(1)+' %</td></tr>').join('')+'</tbody>';
@@ -1875,6 +1881,37 @@ function veRenderYoy(d,rok){
   $('#veYoyTbl').innerHTML='<thead><tr><th>Měsíc</th><th '+R+'>'+pred+'</th><th '+R+'>'+rok+'</th><th '+R+'>Změna</th>'+(zA?'<th '+R+'>Zak. '+pred+'/'+rok+'</th>':'')+'</tr></thead><tbody>'+
     mon.map(m=>{const p=pct(A[m].kc,B[m].kc);return '<tr><td><b>'+MN[m-1]+'</b></td><td '+R+' class="muted">'+veKc(A[m].kc)+' Kč</td><td '+R+'><b>'+veKc(B[m].kc)+' Kč</b></td><td '+R+' style="color:'+(p==null?'inherit':(p>=0?'#0a7d33':'#b23'))+';font-weight:600">'+pTxt(p)+'</td>'+(zA?'<td '+R+' class="muted">'+fmt(A[m].zak||0)+' / '+fmt(B[m].zak||0)+'</td>':'')+'</tr>';}).join('')+
     '<tr style="font-weight:700;border-top:2px solid var(--line,#ccc)"><td>Celkem</td><td '+R+'>'+veKc(sA)+' Kč</td><td '+R+'>'+veKc(sB)+' Kč</td><td '+R+' style="color:'+(pct(sA,sB)>=0?'#0a7d33':'#b23')+'">'+pTxt(pct(sA,sB))+'</td>'+(zA?'<td '+R+'>'+fmt(zA)+' / '+fmt(zB)+'</td>':'')+'</tr></tbody>';
+}
+// Prodej po dodavatelích (ERP skupinách) a měsících — skládaný graf TOP 8 + Ostatní, tabulka TOP 15.
+var VE_SUP_CHART=null;
+function veRenderSup(d,rok){
+  const box=$('#veSup'); if(!box)return;
+  const D=d.dodavatele; if(!D||!D.rows||!D.rows.length){box.style.display='none';return;}
+  const MN=['led','úno','bře','dub','kvě','čvn','čvc','srp','zář','říj','lis','pro'], R='style="text-align:right"';
+  const mes=D.mesice.filter(m=>m.startsWith(String(rok))); if(!mes.length){box.style.display='none';return;}
+  box.style.display='';
+  const rows=D.rows.map(r=>{const m={};let cel=0;mes.forEach(ym=>{const e=r.mesice[ym];m[ym]=e?e.kc:0;cel+=m[ym];});return {sup:r.sup,m,cel,ks:r.ks,pol:r.polozek};}).filter(r=>r.cel>0).sort((a,b)=>b.cel-a.cel);
+  const tot=rows.reduce((s,r)=>s+r.cel,0);
+  $('#veSupPozn').textContent='· '+rok+' · z výdejek e-shopu, bez dopravy · '+rows.length+' dodavatelů · '+veKc(tot)+' Kč';
+  if(typeof Chart!=='undefined'){
+    const mut=_cv('--mut'),line=_cv('--line');
+    try{if(VE_SUP_CHART)VE_SUP_CHART.destroy();}catch(e){}
+    const pal=['#2f6f8f','#34c98e','#b06f00','#8a2f52','#4f8ef7','#7a5200','#0a7d33','#c0392b'];
+    const top=rows.slice(0,8), rest=rows.slice(8);
+    const ds=top.map((r,i)=>({label:r.sup.replace(/^ZBO - |^VÝR - /,''),data:mes.map(ym=>r.m[ym]),backgroundColor:pal[i%pal.length],stack:'s',borderRadius:2}));
+    if(rest.length)ds.push({label:'Ostatní ('+rest.length+')',data:mes.map(ym=>rest.reduce((s,r)=>s+r.m[ym],0)),backgroundColor:'#c9d0c7',stack:'s',borderRadius:2});
+    const cv=$('#veSupChart');
+    if(cv)VE_SUP_CHART=new Chart(cv,{type:'bar',data:{labels:mes.map(ym=>MN[+ym.slice(5,7)-1]),datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'right',labels:{color:mut,boxWidth:9,font:{size:11}}},datalabels:{display:false},tooltip:{callbacks:{label:c=>(c.raw>0?c.dataset.label+': '+veKc(c.raw)+' Kč':null)}}},
+        scales:{y:{stacked:true,ticks:{color:mut,callback:v=>veKc(v)},grid:{color:line}},x:{stacked:true,ticks:{color:mut},grid:{display:false}}}}});
+  }
+  // tabulka: TOP 15 dodavatelů × měsíce, buňky podbarvené podle podílu v měsíci
+  const T=rows.slice(0,15); const maxCell=Math.max(1,...T.flatMap(r=>mes.map(ym=>r.m[ym])));
+  const cell=v=>{if(!(v>0))return '<td '+R+' class="muted">·</td>';const a=Math.min(.55,.08+.5*v/maxCell);return '<td '+R+' style="background:rgba(47,111,143,'+a.toFixed(2)+');'+(a>.35?'color:#fff;':'')+'">'+veKc(v)+'</td>';};
+  $('#veSupTbl').innerHTML='<thead><tr><th>Dodavatel</th>'+mes.map(ym=>'<th '+R+'>'+MN[+ym.slice(5,7)-1]+'</th>').join('')+'<th '+R+'>Celkem</th><th '+R+'>Podíl</th><th '+R+' title="Počet různých položek">Pol.</th></tr></thead><tbody>'+
+    T.map(r=>'<tr><td title="'+esc(r.sup)+'"><b>'+esc(r.sup.replace(/^ZBO - |^VÝR - /,''))+'</b></td>'+mes.map(ym=>cell(r.m[ym])).join('')+'<td '+R+'><b>'+veKc(r.cel)+'</b></td><td '+R+' class="muted">'+(100*r.cel/tot).toFixed(1)+' %</td><td '+R+' class="muted">'+r.pol+'</td></tr>').join('')+
+    (rows.length>15?('<tr><td class="muted">Ostatní ('+(rows.length-15)+')</td>'+mes.map(ym=>'<td '+R+' class="muted">'+veKc(rows.slice(15).reduce((s,r)=>s+r.m[ym],0))+'</td>').join('')+'<td '+R+' class="muted">'+veKc(rows.slice(15).reduce((s,r)=>s+r.cel,0))+'</td><td '+R+' class="muted">'+(100*rows.slice(15).reduce((s,r)=>s+r.cel,0)/tot).toFixed(1)+' %</td><td></td></tr>'):'')+
+    '<tr style="font-weight:700;border-top:2px solid var(--line,#ccc)"><td>Celkem</td>'+mes.map(ym=>'<td '+R+'>'+veKc(rows.reduce((s,r)=>s+r.m[ym],0))+'</td>').join('')+'<td '+R+'>'+veKc(tot)+' Kč</td><td '+R+'>100 %</td><td></td></tr></tbody>';
 }
 function veIso(t){const x=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate()));const day=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-day+3);const f=new Date(Date.UTC(x.getUTCFullYear(),0,4));const wk=1+Math.round(((x-f)/86400000-3+((f.getUTCDay()+6)%7))/7);return x.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');}
 function veSetWeek(w){VE_WEEK=w;renderVyvojEshop();}
