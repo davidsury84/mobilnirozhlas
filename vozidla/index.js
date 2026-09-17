@@ -33,6 +33,7 @@ const ROLE = {
   'reditel-dopravy': 'Ředitel dopravy',
   'reditel-vyroby': 'Ředitel výroby',
   'reditel-strediska': 'Ředitel střediska',
+  'vedouci': 'Vedoucí',
 };
 const STAVY = { aktivni: 'V provozu', odstaveno: 'Odstaveno', prodano: 'Prodáno', vyrazeno: 'Vyřazeno' };
 const TYPY = { osobni: 'Osobní', uzitkove: 'Užitkové', nakladni: 'Nákladní', tahac: 'Tahač', privees: 'Přívěs / návěs', stroj: 'Stroj' };
@@ -69,6 +70,8 @@ function mount(host) {
     if (typeof n.inventuraMesice !== 'number') n.inventuraMesice = 24;   // inventarizace 1× za 2 roky
     if (!Array.isArray(n.upozorneniDny)) n.upozorneniDny = [60, 30, 14, 7, 1];
     if (!Array.isArray(n.kopieNa)) n.kopieNa = [];               // komu chodí kopie všech upozornění
+    if (typeof n.reditelEmail !== 'string') n.reditelEmail = '';  // ředitel společnosti — hlásí se mu každá škoda
+    if (typeof n.reditelJmeno !== 'string') n.reditelJmeno = '';
     if (!d.odeslano || typeof d.odeslano !== 'object') d.odeslano = {};  // klíč → timestamp (ať se nespamuje)
     return d;
   }
@@ -275,6 +278,7 @@ function mount(host) {
       if (p === '/api/vozidla/foto' && req.method === 'POST') return apiFotoPridat(req, res);
       if (p === '/api/vozidla/foto/smazat' && req.method === 'POST') return apiFotoSmazat(req, res);
       if (p === '/api/vozidla/inventura' && req.method === 'POST') return apiInventura(req, res);
+      if (p === '/api/vozidla/skoda' && req.method === 'POST') return apiSkoda(req, res);
       if (p === '/api/vozidla/zodpovedny' && req.method === 'POST') return apiZodpovedny(req, res);
       if (p === '/api/vozidla/nastaveni' && req.method === 'POST') return apiNastaveni(req, res);
       if (p === '/api/vozidla/export' && req.method === 'GET') return apiExport(req, res);
@@ -318,7 +322,7 @@ function mount(host) {
     let v = b.id ? d.vozidla.find(x => x.id === b.id) : null;
     const novy = !v;
     if (novy) {
-      v = { id: 'v' + crypto.randomBytes(5).toString('hex'), vznik: Date.now(), km: [], fotky: [], inventury: [], stkHistorie: [] };
+      v = { id: 'v' + crypto.randomBytes(5).toString('hex'), vznik: Date.now(), km: [], fotky: [], inventury: [], stkHistorie: [], skody: [] };
       d.vozidla.push(v);
     }
     const s = x => String(b[x] == null ? (v[x] || '') : b[x]).trim();
@@ -481,8 +485,11 @@ function mount(host) {
     // zodpovědné osobě dáme vědět, když se našly závady
     if (zaznam.stav !== 'v-poradku') {
       const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
-      if (zod && zod.email) {
-        mail(zod.email, 'Inventarizace vozidla ' + (v.spz || v.vin) + ' — zjištěny závady',
+      // závažné závady = škoda na svěřeném majetku → i řediteli společnosti
+      const komu = Array.from(new Set([zod && zod.email,
+        zaznam.stav === 'zavazne-zavady' ? d.nastaveni.reditelEmail : null].filter(Boolean).map(low)));
+      if (komu.length) {
+        mail(komu.join(','), 'Inventarizace vozidla ' + (v.spz || v.vin) + ' — zjištěny závady',
           'Při inventarizaci svěřeného vozidla ' + (v.spz || '') + ' (' + [v.znacka, v.model].filter(Boolean).join(' ') + ') byly zjištěny '
           + (zaznam.stav === 'drobne-zavady' ? 'drobné závady' : 'závažné závady') + '.\n\n'
           + 'Provedl: ' + zaznam.kdo + '\nDatum: ' + zaznam.datum + '\n'
@@ -492,6 +499,53 @@ function mount(host) {
       }
     }
     json(res, 200, { ok: true, stav: stavVozu(v, d.nastaveni) });
+    return true;
+  }
+
+  // ---- škodní událost -------------------------------------------------------
+  //  Dle směrnice se každá škoda hlásí správci vozu, zodpovědné osobě za středisko
+  //  A ŘEDITELI SPOLEČNOSTI — ten je v nastavení modulu.
+  async function apiSkoda(req, res) {
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const d = load(), r = role(req);
+    const v = d.vozidla.find(x => x.id === b.id);
+    if (!v) { json(res, 404, { chyba: 'Vozidlo nenalezeno.' }); return true; }
+    if (!smiEditovat(v, r)) { json(res, 403, { chyba: 'K tomuto vozidlu nemáte právo zapisovat.' }); return true; }
+    const popis = String(b.popis || '').trim();
+    if (!popis) { json(res, 400, { chyba: 'Popiš, co se stalo.' }); return true; }
+    const zaznam = {
+      id: 's' + crypto.randomBytes(5).toString('hex'),
+      ts: Date.now(),
+      datum: /^\d{4}-\d{2}-\d{2}$/.test(b.datum || '') ? b.datum : new Date().toISOString().slice(0, 10),
+      kdo: r.name || r.email, kdoEmail: r.email,
+      druh: ['nehoda', 'poskozeni', 'kradez', 'jine'].indexOf(b.druh) >= 0 ? b.druh : 'poskozeni',
+      popis: popis.slice(0, 3000),
+      odhadKc: Number(b.odhadKc) || null,
+      policie: !!b.policie,
+      viník: String(b.vinik || '').slice(0, 200),
+      stav: 'nahlaseno',
+    };
+    v.skody = v.skody || [];
+    v.skody.push(zaznam);
+    save(d);
+    logAct('vozidla', req, 'Škodní událost ' + (v.spz || v.vin) + ' — ' + zaznam.druh);
+    const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
+    const prijemci = Array.from(new Set([
+      v.spravceEmail, zod && zod.email, d.nastaveni.reditelEmail,
+    ].concat(d.nastaveni.kopieNa).filter(Boolean).map(low)));
+    const popisVozu = (v.spz || v.vin) + (v.znacka || v.model ? ' (' + [v.znacka, v.model].filter(Boolean).join(' ') + ')' : '');
+    const DRUHY = { nehoda: 'Dopravní nehoda', poskozeni: 'Poškození vozidla', kradez: 'Krádež / vloupání', jine: 'Jiná škodní událost' };
+    const odeslano = await mail(prijemci.join(','), (DRUHY[zaznam.druh] || 'Škodní událost') + ' — ' + popisVozu,
+      (DRUHY[zaznam.druh] || 'Škodní událost') + ' na vozidle ' + popisVozu + '\n\n'
+      + 'Datum: ' + zaznam.datum + '\nNahlásil: ' + zaznam.kdo + '\n'
+      + 'Správce vozu: ' + (v.spravceJmeno || v.spravceEmail || 'nepřidělen') + '\n'
+      + 'Středisko: ' + (v.stredisko || '—') + (zod ? ' · zodpovídá ' + zod.jmeno : '') + '\n'
+      + (zaznam.odhadKc ? 'Odhad škody: ' + zaznam.odhadKc.toLocaleString('cs-CZ') + ' Kč\n' : '')
+      + (zaznam.viník ? 'Viník: ' + zaznam.viník + '\n' : '')
+      + 'Policie ČR: ' + (zaznam.policie ? 'přivolána' : 'nepřivolána') + '\n\n'
+      + 'Co se stalo:\n' + zaznam.popis + '\n\n'
+      + 'Fotodokumentaci přiložte k vozidlu v intranetu → Vozový park → detail vozidla.');
+    json(res, 200, { ok: true, komu: prijemci, odeslano, bezReditele: !d.nastaveni.reditelEmail });
     return true;
   }
 
@@ -523,6 +577,10 @@ function mount(host) {
     if (b.prahRoky != null) d.nastaveni.prahRoky = Math.max(1, Number(b.prahRoky) || 8);
     if (b.inventuraMesice != null) d.nastaveni.inventuraMesice = Math.max(1, Number(b.inventuraMesice) || 24);
     if (Array.isArray(b.kopieNa)) d.nastaveni.kopieNa = b.kopieNa.map(low).filter(x => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
+    if (b.reditelEmail != null) {
+      d.nastaveni.reditelEmail = low(b.reditelEmail);
+      d.nastaveni.reditelJmeno = jmenoPodleMailu(b.reditelEmail) || String(b.reditelJmeno || '').trim();
+    }
     save(d);
     json(res, 200, { ok: true, nastaveni: d.nastaveni });
     return true;

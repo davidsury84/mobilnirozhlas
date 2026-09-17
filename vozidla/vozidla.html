@@ -309,6 +309,34 @@ function detail(id){
     +'<div class="p">'+esc(f.popis||new Date(f.ts).toLocaleDateString("cs-CZ"))+'</div></div>').join("")+'</div>')
     :'<div class="mut">Zatím bez fotek. Doporučujeme vůz vyfotit ze čtyř stran.</div>';
   h+='</div></div>';
+  // škody a nehody
+  const skody=(v.skody||[]).slice().reverse();
+  h+='<div class="card"><div class="h"><h2>Škody a nehody</h2><div class="sp"></div>'
+    +(skody.length?'<span class="pill '+(skody.length?"warn":"ok")+'">'+skody.length+' '+(skody.length===1?"záznam":skody.length<5?"záznamy":"záznamů")+'</span>':'<span class="pill ok">bez škod</span>')
+    +'</div><div class="b">';
+  if(v.smiEdit){
+    h+='<div class="grid3">'
+      +'<label class="f"><span>Druh události</span><select id="skDruh"><option value="poskozeni">Poškození vozidla</option><option value="nehoda">Dopravní nehoda</option><option value="kradez">Krádež / vloupání</option><option value="jine">Jiná škodní událost</option></select></label>'
+      +'<label class="f"><span>Datum</span><input id="skDatum" type="date" value="'+new Date().toISOString().slice(0,10)+'"></label>'
+      +'<label class="f"><span>Odhad škody (Kč)</span><input id="skKc" type="number" min="0" placeholder="nepovinné"></label>'
+      +'</div><div class="grid2">'
+      +'<label class="f"><span>Viník / protistrana</span><input id="skVinik" placeholder="např. řidič, třetí osoba, neznámý"></label>'
+      +'<label class="f"><span>Policie ČR</span><select id="skPolicie"><option value="ne">nepřivolána</option><option value="ano">přivolána</option></select></label>'
+      +'</div>'
+      +'<label class="f"><span>Co se stalo</span><textarea id="skPopis" placeholder="stručný popis události a rozsahu poškození"></textarea></label>'
+      +'<button class="btn pri" onclick="nahlasSkodu(\''+v.id+'\')">Nahlásit škodu</button>'
+      +'<div class="hint" style="margin-top:8px">Hlášení odejde správci vozu, zodpovědné osobě za středisko a <strong>řediteli společnosti</strong>. '
+      +'Fotky poškození přidej výš v sekci Fotografie.</div>';
+  }
+  if(skody.length){
+    const DR={nehoda:"Dopravní nehoda",poskozeni:"Poškození",kradez:"Krádež / vloupání",jine:"Jiná událost"};
+    h+='<table style="margin-top:12px"><thead><tr><th>Datum</th><th>Druh</th><th>Popis</th><th class="num">Odhad</th><th>Nahlásil</th></tr></thead><tbody>'
+      +skody.map(z=>'<tr><td>'+dat(z.datum)+'</td><td>'+esc(DR[z.druh]||z.druh)+(z.policie?' <span class="pill mute">Policie ČR</span>':'')+'</td>'
+        +'<td>'+esc(z.popis)+(z.vinik?'<div class="mut">viník: '+esc(z.vinik)+'</div>':'')+'</td>'
+        +'<td class="num">'+(z.odhadKc?cis(z.odhadKc)+" Kč":"—")+'</td><td>'+esc(z.kdo)+'</td></tr>').join("")
+      +'</tbody></table>';
+  }else h+='<div class="mut" style="margin-top:8px">Zatím bez záznamu.</div>';
+  h+='</div></div>';
   // inventarizace
   h+='<div class="card"><div class="h"><h2>Inventarizace svěřeného majetku</h2><div class="sp"></div>'
     +'<span class="pill '+(s.inventura.potreba?"warn":"ok")+'">'+esc(s.inventura.text)+'</span></div><div class="b">';
@@ -351,6 +379,17 @@ async function ulozInventuru(id){
   try{
     await api("/api/vozidla/inventura",{id,stav:$("#invStav").value,km:Number($("#invKm").value)||null,vybava:$("#invVybava").value,poznamka:$("#invPozn").value});
     toast("Inventarizace uložena."); await nacti(); detail(id);
+  }catch(e){alert(e.message);}
+}
+async function nahlasSkodu(id){
+  const popis=$("#skPopis").value.trim();
+  if(!popis){alert("Napiš prosím, co se stalo.");return;}
+  if(!confirm("Odeslat hlášení škody? Půjde správci vozu, zodpovědné osobě za středisko a řediteli společnosti."))return;
+  try{
+    const r=await api("/api/vozidla/skoda",{id,druh:$("#skDruh").value,datum:$("#skDatum").value,
+      odhadKc:Number($("#skKc").value)||null,vinik:$("#skVinik").value,policie:$("#skPolicie").value==="ano",popis});
+    toast(r.bezReditele?"Škoda zapsána — ale v nastavení chybí ředitel společnosti!":"Škoda nahlášena "+(r.komu||[]).length+" lidem.");
+    await nacti(); detail(id);
   }catch(e){alert(e.message);}
 }
 async function smazFoto(id,fi){
@@ -452,13 +491,19 @@ async function ulozZod(s){
 async function vykresliSmernici(){
   $("#obsah").innerHTML='<div class="card"><div class="empty">Načítám směrnici…</div></div>';
   const txt=await fetch("/api/vozidla/smernice").then(r=>r.text());
-  $("#obsah").innerHTML='<div class="card"><div class="h"><h2>Směrnice ke svěřenému vozidlu</h2><div class="sp"></div>'
+  $("#obsah").innerHTML='<div class="card"><div class="h"><h2>Směrnice ke svěřenému vozidlu</h2>'
+    +'<span class="pill warn">NÁVRH — nepublikováno</span><div class="sp"></div>'
     +'<button class="btn sm" onclick="window.print()">🖨 Tisk</button>'
-    +(D.me.admin?'<button class="btn pri sm" onclick="zalozSmernici()">Založit mezi směrnice intranetu</button>':'')
-    +'</div><div class="b"><div class="sm-doc">'+txt+'</div></div></div>';
+    +(D.me.admin?'<button class="btn sm" onclick="zalozSmernici()">Publikovat mezi směrnice</button>':'')
+    +'</div><div class="b">'
+    +'<div style="background:var(--yellow-soft);border:1px solid #e8d9a8;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13.5px">'
+    +'<strong>Zatím jen návrh k připomínkování.</strong> Text vychází ze zadání modulu a běžné praxe — projděte si hlavně soukromé použití vozidla, '
+    +'pohonné hmoty a spoluúčast na škodě, to má každá firma jinak. Teprve až bude text odsouhlasený, publikujte ho tlačítkem nahoře '
+    +'a v administraci → Směrnice rozešlete k seznámení.</div>'
+    +'<div class="sm-doc">'+txt+'</div></div></div>';
 }
 async function zalozSmernici(){
-  if(!confirm("Založit tuto směrnici mezi směrnice intranetu? Potom ji v administraci zkontroluj a rozešli k seznámení."))return;
+  if(!confirm("Publikovat směrnici mezi směrnice intranetu?\n\nDělej to až po odsouhlasení textu. Rozeslání k seznámení je pak samostatný krok v administraci → Směrnice."))return;
   try{ const r=await api("/api/vozidla/smernice/zalozit",{}); alert(r.zprava||"Hotovo."); }catch(e){alert(e.message);}
 }
 
@@ -471,6 +516,9 @@ function vykresliNastaveni(){
     +'<label class="f"><span>Práh stáří vozu (roky)</span><input id="nRok" type="number" value="'+n.prahRoky+'"></label>'
     +'<label class="f"><span>Inventarizace po (měsíců)</span><input id="nInv" type="number" value="'+n.inventuraMesice+'"></label>'
     +'</div>'
+    +'<label class="f"><span>Ředitel společnosti — hlásí se mu každá škoda'+(n.reditelEmail?'':' <span style="color:var(--red)">(zatím nevyplněno)</span>')+'</span>'
+      +'<select id="nReditel"><option value="">— nevybrán —</option>'
+      +(D.zamestnanci||[]).map(m=>'<option value="'+esc(m.email)+'" '+(n.reditelEmail===m.email?"selected":"")+'>'+esc(m.name)+' — '+esc(m.email)+'</option>').join("")+'</select></label>'
     +'<label class="f"><span>Kopie upozornění na e-maily (oddělené čárkou)</span><input id="nKopie" value="'+esc((n.kopieNa||[]).join(", "))+'" placeholder="napr. sprava.vozidel@elkoplast.cz"></label>'
     +'<button class="btn pri" onclick="ulozNastaveni()">Uložit</button>'
     +'<div class="hint" style="margin-top:10px">Upozornění na technickou prohlídku chodí '+(n.upozorneniDny||[]).join(", ")+' dní předem správci vozu i zodpovědné osobě za středisko, '
@@ -480,6 +528,7 @@ function vykresliNastaveni(){
 async function ulozNastaveni(){
   try{
     await api("/api/vozidla/nastaveni",{prahKm:$("#nKm").value,prahRoky:$("#nRok").value,inventuraMesice:$("#nInv").value,
+      reditelEmail:$("#nReditel").value,
       kopieNa:$("#nKopie").value.split(/[;,]/).map(s=>s.trim()).filter(Boolean)});
     toast("Nastavení uloženo."); nacti();
   }catch(e){alert(e.message);}
