@@ -3796,6 +3796,8 @@ const server = http.createServer(async (req, res) => {
   // Server-to-server cesty modulu Lodní kontejnery (Bearer = SSO tajemství) z aplikace lodni-kontejnery.
   const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext') || (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') || (p === '/api/kontejnery/list-ext' && req.method === 'GET') || (p === '/api/kontejnery/update-ext' && req.method === 'POST') || (p === '/api/kontejnery/potvrdit-ext' && req.method === 'POST');
   const libraryIngestPublic = (p === '/api/library/ingest-ext' && req.method === 'POST');
+  // Server-to-server importy modulu Výroba Popelnice (Bearer = SSO tajemství; nástroj tools-vyroba-import.js).
+  const vyrobaIngestPublic = (p === '/api/vyroba/ingest' && req.method === 'POST');
   // Veřejná stránka garantů (odkaz s tokenem pro kolegy ze SK/PL) + její API.
   const garantiPublic = p.indexOf('/garanti/') === 0 || p.indexOf('/api/garanti/verejne') === 0 || (p === '/api/garanti/zapis' && req.method === 'POST');   // Bearer SSO_SHARED_SECRET (vkládání dokumentů přes chat)
   // Veřejné cesty modulu Mobilní lisy: prezentační web + odeslání dotazníku (bez přihlášení).
@@ -3879,7 +3881,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !spokojenostPublic && !libraryIngestPublic && !garantiPublic) {
+  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !spokojenostPublic && !libraryIngestPublic && !garantiPublic && !vyrobaIngestPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
