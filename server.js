@@ -3670,7 +3670,7 @@ let vyrobaMod = null;
 try {
   vyrobaMod = require('./vyroba').mount({
     send, readBody, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
-    dataDir: DATA_DIR,
+    dataDir: DATA_DIR, ssoSecret: SSO_SHARED_SECRET,
     // import stávajícího plánu výroby (Google Sheet PLÁN VÝROBY BRUNTÁL POPELNICE) přes service account
     sheets: { get available() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }, read: sheetsGet },
     // složky objednávek BE26xxxx (Bestellung + vydané objednávky) na sdíleném Disku

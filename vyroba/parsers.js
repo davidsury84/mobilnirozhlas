@@ -71,11 +71,27 @@ function parseBestellung(text) {
     if (/^(Übertrag|Betrag netto|Gesamtbetrag|Tel\.:|Geschäftsführer|Bankverbindung|Die Ware bleibt|ConTracT Container|CONTRACT$|Bestellung Nr\.|Pos\. Menge)/i.test(l)) { if (/^(Betrag netto|Gesamtbetrag)/i.test(l)) cur = null; continue; }
     cur.popis.push(l);
   }
+  // Textová extrakce z Disku občas odtrhne „1 2 Stück" od řádku s kódem: kód s cenami bez prefixu pozice → ks = G-Preis / E-Preis
+  const loose = /(?:^|\s)((?:CP|CPR|CPRD|CPRÖ|CPRDÖ|CPRÖD|CPK|CPD|CPGK|HES|USB|DMC|AM|ASM|FLM|ABR|ALST|DSD|SB|CPRET)[A-Za-zÖÄÜ0-9.,\-]{2,})\s+([\d.]+,\d{2})\s*€\s+([\d.]+,\d{2})\s*€/g;
+  const known = new Set(polozky.map(p => p.kodOrig));
+  for (const l of lines) {
+    if (posRe.test(l)) continue;
+    let lm; loose.lastIndex = 0;
+    while ((lm = loose.exec(l))) {
+      if (known.has(lm[1])) continue;
+      const e = num(lm[2].replace(/\./g, '')), g = num(lm[3].replace(/\./g, ''));
+      const ks = e > 0 ? Math.round(g / e) : 0; if (!ks) continue;
+      const k = normKod(lm[1]);
+      polozky.push({ pozice: polozky.length + 1, ks, kod: k.kod, kodOrig: lm[1], tho: k.tho, cena: e, popis: [l.slice(lm.index + lm[0].length)], ral: '', lem: '', razeni: '', polepy: '', rozmer: '', tloustka: null, povrch: '' });
+      known.add(lm[1]);
+    }
+  }
+  polozky.sort((a, b) => a.pozice - b.pozice).forEach((p, i) => { p.pozice = i + 1; });
   polozky.forEach(p => {
     const d = p.popis.join('\n');
     let mm;
     if ((mm = d.match(/Lackierung\s+RAL\s?(\d{4})/i))) p.ral = 'RAL ' + mm[1];
-    if ((mm = d.match(/oberer Rand\s+RAL\s?(\d{4})/i))) p.lem = 'RAL ' + mm[1];
+    if ((mm = d.match(/oberer Rand\s+(?:Höhe\s+\d+\s*mm\s+in\s+)?RAL\s?(\d{4})/i))) p.lem = 'RAL ' + mm[1];
     if (/feuerverzinkt|verzinkt/i.test(d) && !p.ral) p.povrch = 'zinek';
     else if (/grundiert|Grundierung/i.test(d) && !p.ral) p.povrch = 'zaklad';
     else if (p.ral) p.povrch = 'lak';
@@ -98,6 +114,7 @@ function parseHelios(text) {
   const o = { helios: '', doklad: '', cislo: '', datum: '', terminDodani: '', prijemce: { nazev: '', ulice: '', psc: '', mesto: '', zeme: '' }, doprava: '' };
   let m;
   if ((m = t.match(/Zakázka\s*:\s*(\d{6})/))) o.helios = m[1];
+  else if ((m = t.match(/(\d{6})\s+Č\.?\s*obj\.?\s*zákazníka/i))) o.helios = m[1];   // textová extrakce z Disku má číslo před „Č.obj. zákazníka"
   if ((m = t.match(/Číslo dokladu\s*:\s*(\d{3}\s?\d{6})/))) o.doklad = m[1].replace(/\s/g, '');
   if ((m = t.match(/obj\.?\s*zákazníka\s*:\s*(B\s?E?\s?\d{6})/i))) { const c = m[1].replace(/\s/g, '').toUpperCase(); o.cislo = c.startsWith('BE') ? c : 'BE' + c.slice(1); }
   if ((m = t.match(/Datum pořízení\s*:\s*(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/))) o.datum = isoDMY(m[1], m[2], m[3]);

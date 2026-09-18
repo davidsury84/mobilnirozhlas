@@ -275,6 +275,25 @@ function mount(host) {
     const p = u.pathname;
     if (p !== '/vyroba' && p !== '/vyroba/' && !p.startsWith('/api/vyroba')) return false;
 
+    // Server-to-server (Bearer = SSO tajemství intranetu): spuštění importů bez přihlášeného uživatele
+    // (nástroj tools-vyroba-import.js přes `railway run`). Stejný vzor jako ingest u lodních kontejnerů.
+    if (p === '/api/vyroba/ingest' && req.method === 'POST') {
+      const auth = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      let ok = false; try { ok = !!auth && !!host.ssoSecret && require('crypto').timingSafeEqual(Buffer.from(auth), Buffer.from(String(host.ssoSecret))); } catch (_) { ok = false; }
+      if (!ok) { json(res, 401, { chyba: 'Neplatné tajemství.' }); return true; }
+      const rs = { email: 'intranet@elkoplast.cz', name: 'Import (server)', admin: true, obchod: true, vyroba: true, pristup: true };
+      try {
+        const b = JSON.parse(await host.readBody(req) || '{}');
+        if (b.akce === 'sheet') return await apiImportSheet(req, res, rs, b);
+        if (b.akce === 'drive') return await apiImportDrive(req, res, rs, b);
+        if (b.akce === 'xlsx') return apiImportXlsx(req, res, rs, b);
+        if (b.akce === 'pdf') return apiImportPdf(req, res, rs, b);
+        if (b.akce === 'text') return apiImportText(req, res, rs, b);
+        if (b.akce === 'stav') { const d = load(); json(res, 200, { objednavek: d.objednavky.length, polozek: d.polozky.length, zakazniku: d.zakaznici.length, katalog: d.katalog.length, seq: d.seq, import: d.import }); return true; }
+        json(res, 400, { chyba: 'Neznámá akce (sheet | drive | xlsx | pdf | stav).' }); return true;
+      } catch (e) { console.error('[vyroba] ingest:', e); json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true; }
+    }
+
     const r = role(req);
     if (!r.pristup) {
       if (p.startsWith('/api/')) json(res, 403, { chyba: 'K modulu Výroba Popelnice nemáte přístup.' });
@@ -797,10 +816,34 @@ function mount(host) {
     if (!b.nahled) { save(d); logAct('vyroba', req, 'Import PDF: ' + out.map(x => x.nazev).join(', ')); }
     json(res, 200, { ok: true, vysledky: out, objId, stat }); return true;
   }
+  // Už vytěžený text dokumentů (např. z Disku přes jiný kanál): { dokumenty: [{ nazev, text, slozka, link }] }
+  function apiImportText(req, res, r, b) {
+    const docs = Array.isArray(b.dokumenty) ? b.dokumenty : [];
+    if (!docs.length) { json(res, 400, { chyba: 'Chybí dokumenty.' }); return true; }
+    const d = load(); const stat = { zpracovano: 0, nepoznano: 0, nove: 0, aktualizovano: 0, novychObjednavek: 0, chyby: [] };
+    for (const doc of docs.slice(0, 500)) {
+      try {
+        const text = String(doc.text || ''); const name = String(doc.nazev || '');
+        let parsed = null;
+        if (/Bestellung/i.test(name) || /Unser Auftrag|Lieferanten-Nr/.test(text)) parsed = parsers.parseBestellung(text);
+        else if (/VydObj/i.test(name) || /VYDANÁ OBJEDNÁVKA|Helios Inuvio/.test(text)) parsed = parsers.parseHelios(text);
+        if (!parsed) { stat.nepoznano++; continue; }
+        const zeSlozky = (String(doc.slozka || '').match(/^(BE?\d{6})/i) || [])[1] || (name.match(/_?(BE?\d{6})/i) || [])[1] || '';
+        if (!parsed.objednavka.cislo && zeSlozky) parsed.objednavka.cislo = cisloKey(zeSlozky);
+        if (!parsed.objednavka.cislo && !parsed.objednavka.helios) { stat.nepoznano++; continue; }
+        const a = applyParsed(d, parsed, r, 'drive:' + name);
+        if (doc.link && !a.objednavka.driveUrl) a.objednavka.driveUrl = String(doc.link).slice(0, 300);
+        stat.zpracovano++; stat.nove += a.nove; stat.aktualizovano += a.aktualizovano; if (a.novaObjednavka) stat.novychObjednavek++;
+      } catch (e) { stat.chyby.push((doc.nazev || '?') + ': ' + e.message); }
+    }
+    d.import.text = { at: new Date().toISOString(), kdo: r.email, stat: Object.assign({}, stat, { chyby: stat.chyby.slice(0, 20) }) };
+    save(d); logAct('vyroba', req, 'Import textů dokumentů: ' + JSON.stringify(Object.assign({}, stat, { chyby: stat.chyby.length })));
+    json(res, 200, Object.assign({ ok: true }, stat)); return true;
+  }
   function apiImportXlsx(req, res, r, b) {
     if (!b.base64) { json(res, 400, { chyba: 'Chybí soubor.' }); return true; }
     const d = load();
-    const x = parseXlsx(Buffer.from(String(b.base64).replace(/^data:[^,]*,/, ''), 'base64'), [/^Metalboxy$/i, /^MULDY$/i, /^ABROLY$/i]);
+    const x = parseXlsx(Buffer.from(String(b.base64).replace(/^data:[^,]*,/, ''), 'base64'), [/^Metalboxy$/i, /^MULDY$/i, /^ABROLY$/i, /MBT|Hammerer|Andere/i]);
     let rows = [];
     for (const name of Object.keys(x.data)) rows = rows.concat(parsers.parseContractRows(x.data[name], name));
     const stat = applyContractRows(d, rows, r);
