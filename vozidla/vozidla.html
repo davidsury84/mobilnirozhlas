@@ -738,7 +738,18 @@ async function ulozZod(i){
 async function vykresliSmernici(){
   $("#obsah").innerHTML='<div class="card"><div class="empty">Načítám směrnici…</div></div>';
   const txt=await fetch("/api/vozidla/smernice").then(r=>r.text());
-  $("#obsah").innerHTML='<div class="card"><div class="h"><h2>Směrnice ke svěřenému vozidlu</h2>'
+  const a=D.adresatiSmernice||{spravci:[],vedouci:[],tag:""};
+  const seznam=(pole,popisek)=>pole.length?('<div style="margin-top:8px"><strong>'+popisek+' ('+pole.length+')</strong>'
+    +'<div class="mut" style="margin-top:4px;line-height:1.7">'+pole.map(k=>esc(k.jmeno||k.email)
+      +(k.role&&D.role[k.role]?' <span class="pill mute">'+esc(D.role[k.role])+(k.stredisko?' · '+esc(k.stredisko):'')+'</span>':'')).join(" · ")+'</div></div>'):'';
+  $("#obsah").innerHTML='<div class="card"><div class="h"><h2>Komu se směrnice rozešle</h2><div class="sp"></div>'
+    +'<span class="pill ok">'+(a.spravci.length+a.vedouci.length)+' adresátů</span></div><div class="b">'
+    +'<div class="hint">Směrnice se neposílá celé firmě. Cílí se štítkem <strong>'+esc(a.tag)+'</strong>, který modul sám udržuje: '
+    +'má ho každý, komu je svěřené vozidlo, a každý vedoucí zodpovědný za středisko. Když auto předáš, štítek se přesune s ním.</div>'
+    +seznam(a.spravci,"Se svěřeným vozidlem")
+    +seznam(a.vedouci,"Vedoucí zodpovědní za středisko")
+    +'</div></div>'
+    +'<div class="card"><div class="h"><h2>Směrnice ke svěřenému vozidlu</h2>'
     +'<span class="pill warn">NÁVRH — nepublikováno</span><div class="sp"></div>'
     +'<button class="btn sm" onclick="window.print()">🖨 Tisk</button>'
     +(D.me.admin?'<button class="btn sm" onclick="zalozSmernici()">Publikovat mezi směrnice</button>':'')
@@ -750,7 +761,8 @@ async function vykresliSmernici(){
     +'<div class="sm-doc">'+txt+'</div></div></div>';
 }
 async function zalozSmernici(){
-  if(!confirm("Publikovat směrnici mezi směrnice intranetu?\n\nDělej to až po odsouhlasení textu. Rozeslání k seznámení je pak samostatný krok v administraci → Směrnice."))return;
+  const a=D.adresatiSmernice||{spravci:[],vedouci:[]};
+  if(!confirm("Publikovat směrnici mezi směrnice intranetu?\n\nZacílí se na "+(a.spravci.length+a.vedouci.length)+" lidí ("+a.spravci.length+" se svěřeným vozidlem + "+a.vedouci.length+" vedoucích).\nDělej to až po odsouhlasení textu — rozeslání k seznámení je pak samostatný krok v administraci → Směrnice."))return;
   try{ const r=await api("/api/vozidla/smernice/zalozit",{}); alert(r.zprava||"Hotovo."); }catch(e){alert(e.message);}
 }
 

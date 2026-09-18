@@ -3612,8 +3612,24 @@ try {
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – vozový park', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+    // Štítek u zaměstnanců, kterým se směrnice posílá (drží ho modul podle toho, kdo má auto).
+    nastavTag: ({ tag, emaily }) => {
+      const st = readJson(STATE_F, { employees: [] });
+      if (!Array.isArray(st.employees)) return { pridano: 0, odebrano: 0 };
+      const chtene = new Set((emaily || []).map(e => String(e || '').trim().toLowerCase()).filter(Boolean));
+      let pridano = 0, odebrano = 0;
+      st.employees.forEach(e => {
+        const em = String(e.email || '').toLowerCase(); if (!em) return;
+        const tags = Array.isArray(e.tags) ? e.tags.slice() : [];
+        const ma = tags.indexOf(tag) >= 0;
+        if (chtene.has(em) && !ma) { tags.push(tag); e.tags = tags; pridano++; }
+        else if (!chtene.has(em) && ma) { e.tags = tags.filter(t => t !== tag); odebrano++; }
+      });
+      if (pridano || odebrano) writeJson(STATE_F, st);
+      return { pridano, odebrano, celkem: chtene.size };
+    },
     // Modul si umí založit svoji směrnici mezi směrnice intranetu (admin ji pak rozešle k seznámení).
-    zalozSmernici: ({ title, html, kategorie }) => {
+    zalozSmernici: ({ title, html, kategorie, assignTags }) => {
       const st = readJson(STATE_F, { directives: [] });
       if (!Array.isArray(st.directives)) st.directives = [];
       const stejna = st.directives.find(d => d && d.title === title);
@@ -3621,7 +3637,10 @@ try {
       const id = 'd' + crypto.randomBytes(5).toString('hex');
       st.directives.push({
         id, title, html: html || '', pdf: '', pdfName: '', pdfOrient: '',
-        createdAt: Date.now(), assignAll: false, assignCats: [], assignTags: [],
+        createdAt: Date.now(),
+        // cílíme štítkem: adresáty jsou lidé se svěřeným vozidlem a vedoucí, kteří za ně odpovídají
+        assignAll: Array.isArray(assignTags) && assignTags.length ? true : false,
+        assignCats: [], assignTags: Array.isArray(assignTags) ? assignTags : [],
         kategorie: kategorie || '', verze: 1, acks: {},
       });
       writeJson(STATE_F, st);

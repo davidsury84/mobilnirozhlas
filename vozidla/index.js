@@ -44,6 +44,10 @@ const TYPY = { osobni: 'Osobní', uzitkove: 'Užitkové', nakladni: 'Nákladní'
 // Lhůta technické prohlídky podle typu vozidla (roky) — orientační, admin ji může přepsat u vozu.
 const STK_LHUTA = { osobni: 2, uzitkove: 2, nakladni: 1, tahac: 1, privees: 1, stroj: 2 };
 
+// Štítek, kterým se cílí rozeslání směrnice. Drží ho modul podle skutečného stavu:
+// má ho každý, komu je svěřené vozidlo, a každý vedoucí zodpovědný za středisko.
+const TAG_SMERNICE = 'Svěřené vozidlo';
+
 const DEN = 86400000;
 const MAX_FOTO = 6e6;        // 6 MB na fotku (klient zmenšuje před odesláním)
 const MAX_FOTEK = 12;
@@ -329,6 +333,23 @@ function mount(host) {
     return { dnyStk, inventura: inv, chybejiciRoky: chybi, upozorneni: upoz, prodej: doporuceniProdeje(v, nast) };
   }
 
+  // ---- adresáti směrnice ----------------------------------------------------
+  //  Směrnice se neposílá celé firmě: týká se lidí, kteří auto skutečně mají,
+  //  a vedoucích, kteří za vozidla střediska odpovídají.
+  function adresatiSmernice(d) {
+    const spravci = Array.from(new Set(d.vozidla
+      .filter(v => v.stav === 'aktivni' && v.spravceEmail)
+      .map(v => low(v.spravceEmail))));
+    const vedouci = Array.from(new Set(d.zodpovedne.map(z => low(z.email)).filter(Boolean)));
+    return { spravci, vedouci, vse: Array.from(new Set(spravci.concat(vedouci))) };
+  }
+  // Štítek u zaměstnanců přerovnáme podle aktuálního stavu (běží i v tick(), takže se sám opraví).
+  function synchronizujTag(d) {
+    if (!host.nastavTag) return null;
+    try { return host.nastavTag({ tag: TAG_SMERNICE, emaily: adresatiSmernice(d || load()).vse }); }
+    catch (e) { console.error('[vozidla] štítek se nepodařilo nastavit:', e.message); return null; }
+  }
+
   // ---- e-mail --------------------------------------------------------------
   async function mail(to, subject, text) {
     // Pozor: odesílatele NEvyžadujeme — při odesílání přes Resend bývá CFG.user prázdný
@@ -409,6 +430,12 @@ function mount(host) {
       zodpovedne: (r.admin ? d.zodpovedne : d.zodpovedne.filter(z => r.strediska.indexOf(z.stredisko) >= 0))
         .map(z => Object.assign({}, z, { kontakt: kontakt(z.email) })),
       seedImport: d.seedImport || null,
+      adresatiSmernice: (() => { const a = adresatiSmernice(d); return {
+        tag: TAG_SMERNICE,
+        spravci: a.spravci.map(kontakt), vedouci: a.vedouci.map(e => {
+          const z = d.zodpovedne.find(x => low(x.email) === e) || {};
+          return Object.assign({ role: z.role, stredisko: z.stredisko }, kontakt(e));
+        }) }; })(),
       strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA,
       nastaveni: d.nastaveni,
       zamestnanci: zamestnanci(),   // pro našeptávač; stejná data jako telefonní seznam intranetu
@@ -451,6 +478,7 @@ function mount(host) {
     if (!v.spz && !v.vin) { json(res, 400, { chyba: 'Vyplň aspoň SPZ nebo VIN.' }); return true; }
     save(d);
     logAct('vozidla', req, (novy ? 'Založeno vozidlo ' : 'Upraveno vozidlo ') + (v.spz || v.vin));
+    synchronizujTag(d);
     json(res, 200, { ok: true, id: v.id });
     return true;
   }
@@ -634,6 +662,7 @@ function mount(host) {
     Object.keys(d.odeslano).forEach(k => { if (k.indexOf(':' + v.id + ':') > 0 || k.indexOf(':' + v.id) > 0) delete d.odeslano[k]; });
     save(d);
     logAct('vozidla', req, 'Vozidlo ' + (v.spz || v.vin) + ' předáno: ' + (puvodniJm || '—') + ' → ' + v.spravceJmeno);
+    synchronizujTag(d);
     const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
     const popis = (v.spz || v.vin) + (v.znacka || v.model ? ' (' + [v.znacka, v.model].filter(Boolean).join(' ') + ')' : '');
     await mail(Array.from(new Set([novy, zod && zod.email, puvodni].filter(Boolean).map(low))).join(','),
@@ -725,6 +754,7 @@ function mount(host) {
     }
     save(d);
     logAct('vozidla', req, 'Zodpovědná osoba za středisko ' + stredisko + ': ' + (b.email || '— zrušeno'));
+    synchronizujTag(d);
     json(res, 200, { ok: true });
     return true;
   }
@@ -776,13 +806,19 @@ function mount(host) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Směrnici zakládá správce intranetu.' }); return true; }
     if (!host.zalozSmernici) { json(res, 501, { chyba: 'Zakládání směrnic není z modulu dostupné.' }); return true; }
     try {
+      const d = load();
+      synchronizujTag(d);
+      const adr = adresatiSmernice(d);
       const r = host.zalozSmernici({
         title: 'Směrnice — svěřené služební vozidlo',
         html: smerniceHtml(),
         kategorie: 'Vozový park',
+        assignTags: [TAG_SMERNICE],
       });
       logAct('vozidla', req, 'Založena směrnice ke svěřenému vozidlu');
-      json(res, 200, { ok: true, id: r && r.id, zprava: 'Směrnice je založená. V administraci → Směrnice ji zkontroluj a rozešli k seznámení.' });
+      json(res, 200, { ok: true, id: r && r.id, adresatu: adr.vse.length,
+        zprava: 'Směrnice je založená a zacílená na ' + adr.vse.length + ' lidí (' + adr.spravci.length
+          + ' se svěřeným vozidlem + ' + adr.vedouci.length + ' vedoucích). V administraci → Směrnice ji zkontroluj a rozešli k seznámení.' });
     } catch (e) { json(res, 500, { chyba: e.message }); }
     return true;
   }
@@ -841,6 +877,7 @@ function mount(host) {
   async function tick() {
     const d = load();
     if (!d.vozidla.length) return;
+    synchronizujTag(d);   // štítek pro rozeslání směrnice ať sedí, i když někdo přepsal stav zvenčí
     const nast = d.nastaveni;
     const dnesStr = new Date().toISOString().slice(0, 10);
     let zmena = false;
