@@ -3442,7 +3442,8 @@ function openBramidanSkoleni(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=bramidan'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const bxl=(MJ_LANG==='de'?'de':(MJ_LANG==='cz'?'cz':'en'));
+  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+bxl;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>BRAMIDAN</b> — stacionární (vertikální) lisy, 27 lekcí, kapitoly se odemykají postupně. Na konci je závěrečný test: losuje se 20 otázek z 50, každý pokus jiné. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
