@@ -3674,7 +3674,7 @@ try {
     // import stávajícího plánu výroby (Google Sheet PLÁN VÝROBY BRUNTÁL POPELNICE) přes service account
     sheets: { get available() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }, read: sheetsGet },
     // složky objednávek BE26xxxx (Bestellung + vydané objednávky) na sdíleném Disku
-    drive: { get available() { return driveAvailable(); }, list: driveList },
+    drive: { get available() { return driveAvailable(); }, list: driveList, token: driveGetToken },
     // hotové položky se posílají do aplikace Ložný plán (stejné sdílené úložiště /api/shared, podpis SSO)
     loznyplan: { url: LOZNYPLAN_APP_URL, ssoSign },
   });

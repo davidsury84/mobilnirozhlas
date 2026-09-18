@@ -84,7 +84,7 @@ td.r,th.r{text-align:right}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 14px}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:0 14px}
-@media(max-width:820px){.grid2,.grid3,.grid4{grid-template-columns:1fr 1fr}}
+@media(max-width:820px){.grid2,.grid3,.grid4{grid-template-columns:1fr 1fr}.no-body{grid-template-columns:1fr;height:auto}.no-cat{border-right:0;border-bottom:1px solid var(--line);max-height:260px}#noLines{max-height:360px}}
 @media(max-width:560px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
 .modal{position:fixed;inset:0;background:rgba(15,21,18,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:22px 12px}
 .modal.on{display:flex}
@@ -133,6 +133,43 @@ td.r,th.r{text-align:right}
 .hl{background:var(--yellow-soft)}
 details summary{cursor:pointer;color:var(--ink-soft);font-size:12.5px}
 .upoz{background:var(--yellow-soft);border:1px solid #e8d9a8;border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:12px}
+
+/* modal Nová objednávka ve stylu Ložného plánu */
+.modal .box.wide{max-width:1520px;width:96vw}
+.no-head{padding:0 0 6px}
+.no-body{display:grid;grid-template-columns:minmax(260px,1fr) minmax(360px,1.2fr);gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;height:min(560px,58vh)}
+.no-cat{display:flex;flex-direction:column;border-right:1px solid var(--line);min-width:0}
+.no-cat input{margin:10px 12px 8px;padding:9px 11px;border:1px solid var(--line-strong);border-radius:8px;font-size:14px}
+.no-cat input:focus{outline:none;border-color:var(--green)}
+#noCatalog{flex:1;overflow-y:auto;padding:0 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px;align-content:start}
+.cat-it{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;cursor:pointer;min-width:0;background:var(--paper)}
+.cat-it:hover{background:var(--green-soft);border-color:var(--green)}
+.cat-it .k{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:12px}
+.cat-it .r{flex-shrink:0;font-size:10.5px;color:var(--faint);font-family:var(--mono)}
+.dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
+.no-lines{display:flex;flex-direction:column;min-width:0}
+.no-lt{padding:10px 14px 6px;font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);font-family:var(--mono);flex-shrink:0}
+#noLines{flex:1;overflow-y:auto;padding:0 12px 12px}
+.ln{border:1px solid;border-radius:7px;margin-bottom:5px;padding:6px 8px}
+.ln-top{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
+.ln-k{flex:1 1 160px}
+.ln-k{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:12px}
+.ln-ks{width:58px;padding:5px 4px;border:1px solid var(--line-strong);border-radius:5px;font-family:var(--mono);font-size:13px;text-align:center;background:var(--paper)}
+.ln-raz{width:150px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:5px;font-size:12px;background:var(--paper)}
+.ln-x{background:none;border:0;color:var(--faint);font-size:17px;line-height:1;padding:0 3px}
+.ln-x:hover{color:var(--red)}
+.ral-btn{min-width:34px;height:28px;border-radius:5px;border:1px solid var(--line-strong);font-size:11px;color:#fff;text-shadow:0 0 3px rgba(0,0,0,.9);padding:0 6px;display:inline-flex;align-items:center;justify-content:center}
+.ral-btn.sm{min-width:30px;height:24px;font-size:10px}
+.ral-btn:not([style*="background: rgb"]):not([style*="background:#"]){color:var(--ink-soft);text-shadow:none}
+.ln-more{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line-strong)}
+.ln-more .f{margin-bottom:6px}.ln-more .f input,.ln-more .f select{padding:5px 7px;font-size:12.5px}
+.ral-picker{position:fixed;z-index:10000;width:300px;overflow-y:auto;background:var(--paper);border:1px solid var(--line-strong);border-radius:10px;box-shadow:0 12px 34px rgba(15,21,18,.22);padding:8px}
+.ral-picker .rp-t{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.ral-picker .rp-in{width:100%;padding:6px 8px;border:1px solid var(--line-strong);border-radius:5px;font-family:var(--mono);font-size:12px;margin-bottom:8px}
+.ral-picker .rp-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.ral-picker .rp-grid button{width:100%;aspect-ratio:1;border:1px solid var(--line-strong);border-radius:4px;cursor:pointer}
+.ral-picker .rp-clear{margin-top:8px;width:100%;padding:5px;background:transparent;border:1px solid #e7c3c0;color:var(--red);border-radius:5px;font-size:11.5px}
+.f2 .sp{flex:1}
 </style>
 </head>
 <body>
@@ -168,7 +205,7 @@ const kw=(o)=>o.kwDodani?("KW "+o.kwDodani+(o.kwRok?"/"+String(o.kwRok).slice(2)
 let D=null, ZALOZKA="prehled", FILTR={q:"",stav:"",zak:"",jen:""}, VYBER=new Set();
 
 function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2800);}
-function zavri(){$("#modal").classList.remove("on");}
+function zavri(){$("#modal").classList.remove("on");$("#mBox").classList.remove("wide");}
 function zavri2(){$("#modal2").classList.remove("on");}
 function modal(titul,obsah,paticka,uzky){$("#mBox").classList.toggle("uzky",!!uzky);$("#mTitul").textContent=titul;$("#mObsah").innerHTML=obsah;$("#mPaticka").innerHTML=paticka||'<button class="btn" onclick="zavri()">Zavřít</button>';$("#modal").classList.add("on");}
 function modal2(titul,obsah,paticka){$("#m2Titul").textContent=titul;$("#m2Obsah").innerHTML=obsah;$("#m2Paticka").innerHTML=paticka||'<button class="btn" onclick="zavri2()">Zavřít</button>';$("#modal2").classList.add("on");}
@@ -371,55 +408,173 @@ function formVykres(pid){
 }
 async function ulozVykres(pid){ try{ await api("/api/vyroba/polozka/vykres",{id:pid,stav:$("#vkStav").value,datum:$("#vkDatum").value}); toast("Uloženo."); zavri2(); const oid=vsechnyPolozky().find(p=>p.id===pid)?._o.id; await nacti(); if(oid)detail(oid); }catch(e){alert(e.message);} }
 
-/* ---------- formulář objednávky ---------- */
-let RADKY=[];
+/* ---------- formulář objednávky (stejná logika jako „Nová objednávka" v Ložném plánu) ---------- */
+// Paleta RAL — shodná s aplikací Ložný plán, aby barvy seděly i tam.
+const RAL_PALETTE=[
+  {ral:'RAL 1003',name:'Signální žlutá',hex:'#F7BA0B'},{ral:'RAL 1018',name:'Zinková žlutá',hex:'#F8F32B'},{ral:'RAL 1023',name:'Dopravní žlutá',hex:'#F0CA00'},{ral:'RAL 2004',name:'Čistá oranžová',hex:'#E25303'},{ral:'RAL 2008',name:'Světle červenooranžová',hex:'#ED6B21'},{ral:'RAL 2011',name:'Hluboká oranžová',hex:'#EC7C25'},
+  {ral:'RAL 3000',name:'Ohnivě červená',hex:'#A72920'},{ral:'RAL 3001',name:'Signální červená',hex:'#9B2423'},{ral:'RAL 3002',name:'Karmínová',hex:'#9B2321'},{ral:'RAL 3003',name:'Rubínová',hex:'#861A22'},{ral:'RAL 3004',name:'Purpurová',hex:'#6B1C23'},{ral:'RAL 3009',name:'Oxidová červená',hex:'#642424'},{ral:'RAL 3011',name:'Hnědočervená',hex:'#781F19'},{ral:'RAL 3020',name:'Dopravní červená',hex:'#BB1E10'},
+  {ral:'RAL 5002',name:'Ultramarínová',hex:'#00387B'},{ral:'RAL 5003',name:'Safírová modrá',hex:'#1F3855'},{ral:'RAL 5005',name:'Signální modrá',hex:'#004F7C'},{ral:'RAL 5010',name:'Enziánová modrá',hex:'#0E294B'},{ral:'RAL 5012',name:'Světle modrá',hex:'#0089B6'},{ral:'RAL 5013',name:'Kobaltová modrá',hex:'#193153'},{ral:'RAL 5015',name:'Nebeská modrá',hex:'#007CB0'},{ral:'RAL 5017',name:'Dopravní modrá',hex:'#005B8C'},{ral:'RAL 5018',name:'Tyrkysová modrá',hex:'#048B8C'},{ral:'RAL 5021',name:'Vodní modrá',hex:'#007577'},
+  {ral:'RAL 6001',name:'Smaragdová zelená',hex:'#28713E'},{ral:'RAL 6002',name:'Listová zelená',hex:'#276235'},{ral:'RAL 6005',name:'Mechová zelená',hex:'#0F4336'},{ral:'RAL 6018',name:'Žlutozelená',hex:'#61993B'},{ral:'RAL 6029',name:'Mátová zelená',hex:'#006F3D'},
+  {ral:'RAL 7011',name:'Ocelová šedá',hex:'#434B4D'},{ral:'RAL 7016',name:'Antracitová šedá',hex:'#293133'},{ral:'RAL 7021',name:'Černošedá',hex:'#23282B'},{ral:'RAL 7024',name:'Grafitová šedá',hex:'#474A50'},{ral:'RAL 7031',name:'Modrošedá',hex:'#5B686D'},{ral:'RAL 7034',name:'Žlutošedá',hex:'#8F8B66'},{ral:'RAL 7035',name:'Světle šedá',hex:'#C5C7C4'},{ral:'RAL 7037',name:'Prachová šedá',hex:'#7A7B7A'},{ral:'RAL 7040',name:'Okenní šedá',hex:'#9DA3A6'},{ral:'RAL 7042',name:'Dopravní šedá A',hex:'#8D9295'},
+  {ral:'RAL 8004',name:'Měděná hnědá',hex:'#8F4E35'},{ral:'RAL 9002',name:'Šedobílá',hex:'#E7EBDA'},{ral:'RAL 9005',name:'Černá',hex:'#0A0A0D'},{ral:'RAL 9006',name:'Bílý hliník',hex:'#A1A1A0'},{ral:'RAL 9010',name:'Čistá bílá',hex:'#F1ECE1'},{ral:'RAL 9016',name:'Dopravní bílá',hex:'#F1F0EA'},
+];
+function findRal(input){
+  const s=String(input||"").trim(); if(!s)return null;
+  const m=s.match(/(?:RAL\s*)?(\d{4})/i);
+  if(m){ const f=RAL_PALETTE.find(p=>p.ral==="RAL "+m[1]); return f||{ral:"RAL "+m[1],name:"vlastní",hex:(D.ralHex&&D.ralHex[m[1]])||"#9da3a6"}; }
+  if(/^#[0-9a-f]{6}$/i.test(s))return {ral:"vlastní",name:s,hex:s};
+  return null;
+}
+// Paletový výběr RAL (stejný jako v Ložném plánu): klik na políčko, nebo napsat „RAL 5010".
+function openRalPicker(anchor,current,onSelect){
+  document.querySelectorAll(".ral-picker").forEach(x=>x.remove());
+  const dd=document.createElement("div"); dd.className="ral-picker";
+  const rect=anchor.getBoundingClientRect(); const MAX_H=340;
+  const openUp=(window.innerHeight-rect.bottom)<MAX_H+8&&rect.top>window.innerHeight-rect.bottom;
+  dd.style.top=(openUp?Math.max(8,rect.top-MAX_H-4):rect.bottom+4)+"px"; dd.style.left=Math.max(8,Math.min(rect.left-120,window.innerWidth-320))+"px"; dd.style.maxHeight=MAX_H+"px";
+  const cur=findRal(current);
+  dd.innerHTML='<div class="rp-t">RAL barva — vyber, nebo napiš</div><input class="rp-in" placeholder="např. RAL 5010" value="'+esc(cur?cur.ral:"")+'">'
+    +'<div class="rp-grid">'+RAL_PALETTE.map(p=>'<button type="button" data-ral="'+p.ral+'" title="'+p.ral+' — '+esc(p.name)+'" style="background:'+p.hex+(cur&&cur.ral===p.ral?';outline:2px solid var(--green);outline-offset:1px':'')+'"></button>').join("")+'</div>'
+    +(cur?'<button type="button" class="rp-clear">✕ Bez barvy</button>':'');
+  document.body.appendChild(dd);
+  dd.querySelectorAll("button[data-ral]").forEach(b=>b.addEventListener("click",()=>{onSelect(b.dataset.ral);dd.remove();}));
+  const inp=dd.querySelector(".rp-in"); inp.addEventListener("change",()=>{const f=findRal(inp.value); if(f){onSelect(f.ral);dd.remove();}}); inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();inp.dispatchEvent(new Event("change"));}});
+  const cl=dd.querySelector(".rp-clear"); if(cl)cl.addEventListener("click",()=>{onSelect("");dd.remove();});
+  setTimeout(()=>document.addEventListener("click",function h(ev){ if(!dd.contains(ev.target)&&ev.target!==anchor){dd.remove();document.removeEventListener("click",h);} }),10);
+  setTimeout(()=>inp.focus(),30);
+}
+function ralSwatch(ral,label){
+  const f=findRal(ral);
+  return '<span class="ral" style="background:'+(f?f.hex:"transparent")+(f?"":";border-style:dashed")+'"></span>'+esc(f?f.ral:(label||"bez barvy"));
+}
+const LINE_COLORS=["#4d9fff","#ff6b6b","#ffd93d","#6bcb77","#c77dff","#ff9f43","#00d4ff","#f368e0","#48dbfb","#1dd1a1"];
+function katalogBarva(kod){ const ks=(D.katalog||[]); const i=ks.findIndex(k=>k.kod===kod); return LINE_COLORS[(i<0?kod.length:i)%LINE_COLORS.length]; }
+
+let RADKY=[], FORM_ID="", FORM_HL={};
+function novyRadek(k){ return {id:null,cvz:null,kod:k?k.kod:"",nazev:"",ks:1,rozmer:k?(k.rozmer||""):"",tloustka:k&&k.tloustka!=null?k.tloustka:"",povrch:k?(k.povrch||"lak"):"lak",ral:"",lem:"",razeni:"",polepy:"",heliosPolozka:"",cena:"",vykres:{stav:"neni",datum:""},poznamka:"",open:false}; }
 function formObjednavka(id){
-  const o=id?obj(id):null;
-  RADKY=o?o.polozky.filter(p=>p.stav!=="storno").map(p=>Object.assign({},p)):[novyRadek()];
-  const zakOpts=(D.zakaznici||[]).map(z=>'<option value="'+esc(z.nazev)+'">').join("");
-  const h='<datalist id="dlZak">'+zakOpts+'</datalist><datalist id="dlKat">'+(D.katalog||[]).filter(k=>k.aktivni!==false).map(k=>'<option value="'+esc(k.kod)+'">'+esc(k.rozmer||"")+'</option>').join("")+'</datalist>'
-    +'<div class="grid4">'
-    +inp("cislo","Číslo Bestellung (BE26…)",o&&o.cislo,"BE260185")+inp("cisloAU","Auftrag Contract (AU…)",o&&o.cisloAU,"AU260185")+inp("helios","Helios zakázka",o&&o.helios,"266493")+inp("datum","Datum objednávky",o&&o.datum||D.dnes,"","date")
-    +inp("zakaznikNazev","Zákazník (partner)",o&&o.zakaznik,"ConTracT Container…","text","dlZak")+inp("prijemceNazev","Příjemce / místo dodání",o&&o.prijemce&&o.prijemce!==o.zakaznik?o.prijemce:"","koncový zákazník, když se liší","text","dlZak")
-    +inp("kwDodani","KW dodání",o&&o.kwDodani,"47","number")+inp("terminDodani","nebo datum dodání",o&&o.terminDodani,"","date")
-    +inp("doprava","Doprava",o&&o.doprava,"sběrný LKW · CH")+inp("driveUrl","Odkaz na složku na Disku",o&&o.driveUrl,"https://drive.google.com/…")
-    +'<label class="f" style="grid-column:span 2"><span>Poznámka</span><input id="oPoznamka" value="'+esc(o&&o.poznamka||"")+'"></label>'
-    +'</div><label class="chk" style="margin-bottom:10px"><input type="checkbox" id="oPotvrzena"'+(o&&o.potvrzena?" checked":"")+'> Objednávka potvrzena zákazníkovi (AB)</label>'
-    +'<div class="card" style="margin-bottom:0"><div class="h"><h2>Položky</h2><span class="mut">jedna řádka = jedno výrobní číslo ČVZ · produkt vyberte z katalogu, rozměr a hmotnost se doplní</span><div class="sp"></div><button class="btn sm" onclick="pridejRadek()">＋ Řádek</button></div><div class="tw" id="radky"></div></div>';
-  modal(o?"Upravit objednávku":"Nová objednávka",h,'<span class="mut" id="oInfo"></span><button class="btn pri" onclick="ulozObjednavku(\''+(id||"")+'\')">Uložit</button>'+(!o?'<button class="btn" onclick="ulozObjednavku(\'\',true)">Uložit a zadat do výroby</button>':'')+'<button class="btn" onclick="zavri()">Zrušit</button>');
-  vykresliRadky();
-  function inp(k,l,v,ph,typ,dl){return '<label class="f"><span>'+l+'</span><input id="o_'+k+'" type="'+(typ||"text")+'" value="'+esc(v==null?"":v)+'" placeholder="'+esc(ph||"")+'"'+(dl?' list="'+dl+'"':'')+'></label>';}
+  const o=id?obj(id):null; FORM_ID=id||"";
+  RADKY=o?o.polozky.filter(p=>p.stav!=="storno").map(p=>Object.assign({open:false},p,{cena:p.cena==null?"":p.cena,tloustka:p.tloustka==null?"":p.tloustka})):[];
+  FORM_HL={cislo:o&&o.cislo||"",cisloAU:o&&o.cisloAU||"",helios:o&&o.helios||"",datum:o&&o.datum||D.dnes,zakaznikNazev:o?o.zakaznik:"ConTracT Container Vertriebsgesellschaft mbH",prijemceNazev:o&&o.prijemce&&o.prijemce!==o.zakaznik?o.prijemce:"",prijemce:null,kwDodani:o&&o.kwDodani||"",terminDodani:o&&o.terminDodani||"",doprava:o&&o.doprava||"",driveUrl:o&&o.driveUrl||"",poznamka:o&&o.poznamka||"",potvrzena:!!(o&&o.potvrzena)};
+  const dl='<datalist id="dlZak">'+(D.zakaznici||[]).map(z=>'<option value="'+esc(z.nazev)+'">').join("")+'</datalist>';
+  const h=dl+'<div class="no-head" id="noHead"></div>'
+    +'<div class="no-body"><div class="no-cat"><input id="noSearch" placeholder="🔍 Hledat výrobek (kód, rozměr)…" oninput="renderKatalog(this.value)"><div id="noCatalog"></div></div>'
+    +'<div class="no-lines"><div class="no-lt">Položky objednávky <span class="mut" id="noSum"></span></div><div id="noLines"></div></div></div>';
+  modal(o?"Upravit objednávku":"Nová objednávka",h,
+    '<input type="file" id="noPdf" accept="application/pdf" multiple style="display:none" onchange="nacistPdf(this.files)">'
+    +'<button class="btn" onclick="$(\'#noPdf\').click()" title="Bestellung od Contractu nebo vydaná objednávka z Heliosu — hlavička i položky se předvyplní">📄 Načíst z PDF</button>'
+    +'<span class="sp"></span><span class="mut" id="noInfo"></span>'
+    +'<button class="btn pri" onclick="ulozObjednavku(false)">✓ '+(o?"Uložit":"Založit objednávku")+'</button>'
+    +(!o||RADKY.some(r=>!r.cvz)?'<button class="btn" onclick="ulozObjednavku(true)">Uložit a zadat do výroby</button>':'')
+    +'<button class="btn" onclick="zavriForm()">Zrušit</button>',false);
+  $("#mBox").classList.add("wide");
+  renderHead(); renderKatalog(""); renderLines();
+  setTimeout(()=>{const e=$("#noSearch"); if(e&&!o)e.focus();},60);
 }
-function novyRadek(){return {id:null,kod:"",ks:"",rozmer:"",tloustka:"",povrch:"lak",ral:"",lem:"",razeni:"",polepy:"",heliosPolozka:"",vykres:{stav:"neni",datum:""},poznamka:"",cvz:null};}
-function pridejRadek(){const posl=RADKY[RADKY.length-1]; const n=novyRadek(); if(posl){n.ral=posl.ral;n.razeni=posl.razeni;n.povrch=posl.povrch;} RADKY.push(n);vykresliRadky();}
-function vykresliRadky(){
-  $("#radky").innerHTML='<table class="pol"><thead><tr><th>ČVZ</th><th style="min-width:210px">Produkt (kód)</th><th style="width:70px">Ks</th><th style="width:150px">Rozměr</th><th style="width:60px">mm</th><th style="width:95px">Povrch</th><th style="width:95px">RAL</th><th style="width:80px">Lem</th><th style="min-width:170px">Ražení názvu</th><th style="min-width:120px">Polepy</th><th style="width:80px">Helios pol.</th><th style="width:130px">Výkres</th><th></th></tr></thead><tbody>'
-    +RADKY.map((r,i)=>'<tr><td class="cvz">'+esc(r.cvz||"")+'</td><td><input list="dlKat" value="'+esc(r.kod)+'" oninput="rad('+i+',\'kod\',this.value)" onchange="doplnKatalog('+i+',this.value)"></td>'
-      +'<td><input type="number" min="0" value="'+esc(r.ks)+'" oninput="rad('+i+',\'ks\',this.value)"></td><td><input value="'+esc(r.rozmer)+'" oninput="rad('+i+',\'rozmer\',this.value)"></td><td><input value="'+esc(r.tloustka==null?"":r.tloustka)+'" oninput="rad('+i+',\'tloustka\',this.value)"></td>'
-      +'<td><select onchange="rad('+i+',\'povrch\',this.value)">'+Object.keys(D.povrch).map(k=>'<option value="'+k+'"'+(r.povrch===k?" selected":"")+'>'+esc(D.povrch[k])+'</option>').join("")+'</select></td>'
-      +'<td><input value="'+esc(r.ral)+'" placeholder="RAL 5021" oninput="rad('+i+',\'ral\',this.value)"></td><td><input value="'+esc(r.lem)+'" placeholder="RAL 7042" oninput="rad('+i+',\'lem\',this.value)"></td>'
-      +'<td><input value="'+esc(r.razeni)+'" placeholder="THOMMEN AG" oninput="rad('+i+',\'razeni\',this.value)"></td><td><input value="'+esc(r.polepy)+'" oninput="rad('+i+',\'polepy\',this.value)"></td><td><input value="'+esc(r.heliosPolozka)+'" oninput="rad('+i+',\'heliosPolozka\',this.value)"></td>'
-      +'<td><select onchange="RADKY['+i+'].vykres={stav:this.value,datum:RADKY['+i+'].vykres.datum||\'\'}">'+Object.keys(D.vykres).map(k=>'<option value="'+k+'"'+((r.vykres&&r.vykres.stav)===k?" selected":"")+'>'+esc(D.vykres[k])+'</option>').join("")+'</select></td>'
-      +'<td>'+(!r.cvz?'<button class="btn xs danger" onclick="RADKY.splice('+i+',1);vykresliRadky()">✕</button>':'<span class="mut" title="Položka má ČVZ — odebrání = storno">🔒</span>')+'</td></tr>').join("")+'</tbody></table>';
+function zavriForm(){ if(RADKY.length&&!confirm("Zavřít bez uložení?"))return; $("#mBox").classList.remove("wide"); zavri(); }
+function renderHead(){
+  const H=FORM_HL; const f=(k,l,ph,t,dl)=>'<label class="f"><span>'+l+'</span><input id="o_'+k+'" type="'+(t||"text")+'" value="'+esc(H[k]==null?"":H[k])+'" placeholder="'+esc(ph||"")+'" oninput="FORM_HL.'+k+'=this.value"'+(dl?' list="'+dl+'"':'')+'></label>';
+  $("#noHead").innerHTML='<div class="grid4">'
+    +f("cislo","Číslo Bestellung","BE260185")+f("cisloAU","Auftrag Contract","AU260185")+f("helios","Helios zakázka","266493")+f("datum","Datum objednávky","","date")
+    +f("zakaznikNazev","Zákazník (partner)","ConTracT Container…","text","dlZak")+f("prijemceNazev","Příjemce / místo dodání","koncový zákazník, když se liší","text","dlZak")
+    +f("kwDodani","KW dodání","47","number")+f("terminDodani","nebo datum dodání","","date")
+    +f("doprava","Doprava","sběrný LKW · CH")+f("driveUrl","Složka na Disku","https://drive.google.com/…")
+    +'<label class="f" style="grid-column:span 2"><span>Poznámka</span><input id="o_poznamka" value="'+esc(H.poznamka||"")+'" oninput="FORM_HL.poznamka=this.value"></label></div>'
+    +'<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><label class="chk"><input type="checkbox" id="o_potvrzena"'+(H.potvrzena?" checked":"")+' onchange="FORM_HL.potvrzena=this.checked"> Potvrzena zákazníkovi (AB)</label>'
+    +(H.prijemce&&H.prijemce.mesto?'<span class="mut">📍 '+esc([H.prijemce.ulice,[H.prijemce.psc,H.prijemce.mesto].filter(Boolean).join(" "),H.prijemce.zeme].filter(Boolean).join(", "))+'</span>':'')+'</div>';
 }
-function rad(i,k,v){RADKY[i][k]=v;}
-function doplnKatalog(i,kod){
-  const n=String(kod||"").replace(/\s+/g,"").toLowerCase(); const k=(D.katalog||[]).find(x=>x.kod.replace(/\s+/g,"").toLowerCase()===n);
-  if(!k)return; const r=RADKY[i]; r.kod=k.kod; if(!r.rozmer)r.rozmer=k.rozmer||""; if(r.tloustka===""&&k.tloustka!=null)r.tloustka=k.tloustka; if(k.povrch)r.povrch=k.povrch; vykresliRadky();
+function renderKatalog(q){
+  q=String(q||"").trim().toLowerCase();
+  const list=(D.katalog||[]).filter(k=>k.aktivni!==false).filter(k=>!q||(k.kod+" "+(k.rozmer||"")+" "+(k.nazev||"")).toLowerCase().includes(q)).sort((a,b)=>a.kod.localeCompare(b.kod,"cs"));
+  const el=$("#noCatalog"); if(!el)return;
+  if(!list.length){el.innerHTML='<div class="empty" style="padding:16px">Nic nenalezeno'+(q?' — <a href="#" onclick="pridejVolny(\''+esc(q)+'\');return false">přidat „'+esc(q)+'" jako nový kód</a>':'')+'</div>';return;}
+  el.innerHTML=list.map(k=>'<div class="cat-it" title="'+esc(k.kod)+(k.rozmer?'\n'+k.rozmer+' mm':'')+(k.kg?' · '+k.kg+' kg':'')+' — klikni pro přidání" onclick="pridejRadek(\''+esc(k.id)+'\')"><span class="dot" style="background:'+katalogBarva(k.kod)+'"></span><span class="k">'+esc(k.kod)+'</span><span class="r">'+esc(k.rozmer||"")+(k.kg?' · '+k.kg+' kg':'')+'</span></div>').join("");
 }
-async function ulozObjednavku(id,aZadat){
-  const g=k=>($("#o_"+k)||{}).value||"";
+function pridejRadek(katId){
+  const k=(D.katalog||[]).find(x=>x.id===katId); const n=novyRadek(k);
+  const posl=RADKY[RADKY.length-1]; if(posl){n.ral=posl.ral;n.lem=posl.lem;n.razeni=posl.razeni;n.polepy=posl.polepy; if(n.povrch==="lak"&&posl.povrch)n.povrch=posl.povrch;}
+  RADKY.push(n); renderLines(); const el=$("#noLines"); if(el)el.scrollTop=el.scrollHeight;
+}
+function pridejVolny(kod){ const n=novyRadek(null); n.kod=kod; RADKY.push(n); renderLines(); }
+function renderLines(){
+  const el=$("#noLines"); if(!el)return;
+  if(!RADKY.length){ el.innerHTML='<div class="empty" style="padding:26px 10px">Zatím žádné položky — vyber výrobky z katalogu vlevo, nebo načti PDF.</div>'; renderSum(); return; }
+  const cnt={};
+  el.innerHTML=RADKY.map((r,i)=>{
+    cnt[r.kod]=(cnt[r.kod]||0)+1; const multi=RADKY.filter(x=>x.kod===r.kod).length>1; const c=katalogBarva(r.kod);
+    return '<div class="ln" style="background:'+c+'14;border-color:'+c+'55">'
+      +'<div class="ln-top"><span class="dot" style="background:'+c+'"></span>'
+      +(r.cvz?'<span class="cvz">'+esc(r.cvz)+'</span>':'')
+      +'<span class="ln-k" title="'+esc(r.kod)+'">'+(multi?'<span class="mut">#'+cnt[r.kod]+' </span>':'')+esc(r.kod)+'</span>'
+      +'<input class="ln-ks" type="number" min="0" value="'+esc(r.ks)+'" title="Počet kusů" oninput="RADKY['+i+'].ks=this.value;renderSum()"><span class="mut">ks</span>'
+      +'<button type="button" class="ral-btn" title="'+(r.povrch==="zinek"?"zinek — bez RAL":"RAL barva (paleta)")+'" style="background:'+(findRal(r.ral)?findRal(r.ral).hex:"transparent")+'" onclick="vyberRal(event,'+i+',\'ral\')">'+(findRal(r.ral)?'<b>'+esc(r.ral.replace("RAL ",""))+'</b>':(r.povrch==="zinek"?"Zn":"🎨"))+'</button>'
+      +'<button type="button" class="ral-btn sm" title="RAL horního lemu" style="background:'+(findRal(r.lem)?findRal(r.lem).hex:"transparent")+'" onclick="vyberRal(event,'+i+',\'lem\')">'+(findRal(r.lem)?'<b>'+esc(r.lem.replace("RAL ",""))+'</b>':"lem")+'</button>'
+      +'<input class="ln-raz" value="'+esc(r.razeni)+'" placeholder="ražení názvu" title="Ražení názvu" oninput="RADKY['+i+'].razeni=this.value">'
+      +'<button type="button" class="btn xs" onclick="RADKY['+i+'].open=!RADKY['+i+'].open;renderLines()">'+(r.open?"▴":"…")+'</button>'
+      +(r.cvz?'<span class="mut" title="Položka má ČVZ — odebrání = storno">🔒</span>':'<button type="button" class="ln-x" title="Odebrat" onclick="RADKY.splice('+i+',1);renderLines()">×</button>')
+      +'</div>'
+      +(r.open?'<div class="ln-more"><div class="grid4">'
+        +fl(i,"nazev","Název / popis")+fl(i,"rozmer","Rozměr d×š×v/celk.")+fl(i,"tloustka","Tloušťka mm","number")
+        +'<label class="f"><span>Povrch</span><select onchange="RADKY['+i+'].povrch=this.value;renderLines()">'+Object.keys(D.povrch).map(k=>'<option value="'+k+'"'+(r.povrch===k?" selected":"")+'>'+esc(D.povrch[k])+'</option>').join("")+'</select></label>'
+        +fl(i,"polepy","Polepy")+fl(i,"heliosPolozka","Helios položka")+fl(i,"cena","Cena / ks (EUR)","number")
+        +'<label class="f"><span>Výkres</span><select onchange="RADKY['+i+'].vykres={stav:this.value,datum:RADKY['+i+'].vykres.datum||\'\'}">'+Object.keys(D.vykres).map(k=>'<option value="'+k+'"'+((r.vykres&&r.vykres.stav)===k?" selected":"")+'>'+esc(D.vykres[k])+'</option>').join("")+'</select></label>'
+        +'<label class="f" style="grid-column:span 4"><span>Poznámka</span><input value="'+esc(r.poznamka||"")+'" oninput="RADKY['+i+'].poznamka=this.value"></label></div></div>':'')
+      +'</div>';
+  }).join("");
+  renderSum();
+  function fl(i,k,l,t){return '<label class="f"><span>'+l+'</span><input type="'+(t||"text")+'" step="any" value="'+esc(RADKY[i][k]==null?"":RADKY[i][k])+'" oninput="RADKY['+i+'].'+k+'=this.value"></label>';}
+}
+function vyberRal(ev,i,pole){ ev.stopPropagation(); const r=RADKY[i]; openRalPicker(ev.currentTarget,r[pole],val=>{ r[pole]=val; if(pole==="ral"&&val&&r.povrch!=="lak")r.povrch="lak"; renderLines(); }); }
+function renderSum(){
+  const ks=RADKY.reduce((s,r)=>s+(Number(r.ks)||0),0);
+  const kg=RADKY.reduce((s,r)=>{const k=(D.katalog||[]).find(x=>x.kod===r.kod); return s+(Number(r.ks)||0)*((k&&k.kg)||0);},0);
+  const e=$("#noSum"); if(e)e.textContent=RADKY.length?RADKY.length+" položek · "+ks+" ks · "+cis(kg)+" kg":"";
+}
+// PDF (Bestellung / VydObj) → náhled na serveru → předvyplnit hlavičku i položky (nic se ještě neukládá).
+async function nacistPdf(files){
+  if(!files||!files.length)return;
+  const soubory=[];
+  for(const f of files){ const b64=await new Promise((ok,ko)=>{const rd=new FileReader();rd.onload=()=>ok(String(rd.result).split(",")[1]);rd.onerror=ko;rd.readAsDataURL(f);}); soubory.push({nazev:f.name,base64:b64}); }
+  $("#noInfo").textContent="Čtu PDF…";
+  try{
+    const r=await api("/api/vyroba/import/pdf",{soubory,nahled:true});
+    let n=0;
+    for(const v of r.vysledky){
+      if(v.chyba){ alert(v.nazev+": "+v.chyba); continue; }
+      const P=v.parsed, po=P.objednavka; n++;
+      for(const k of ["cislo","cisloAU","helios","datum","terminDodani","doprava"]) if(po[k]&&!FORM_HL[k])FORM_HL[k]=po[k];
+      if(po.kwDodani&&!FORM_HL.kwDodani)FORM_HL.kwDodani=po.kwDodani;
+      if(po.prijemce&&po.prijemce.nazev){ FORM_HL.prijemceNazev=po.prijemce.nazev; FORM_HL.prijemce=po.prijemce; }
+      if(po.zakaznikNazev)FORM_HL.zakaznikNazev=po.zakaznikNazev;
+      for(const pp of P.polozky){
+        const kk=s=>String(s||"").replace(/\s+/g,"").toLowerCase();
+        let r0=RADKY.find(x=>!x.cvz&&kk(x.kod)===kk(pp.kod)&&(!pp.heliosPolozka||!x.heliosPolozka||x.heliosPolozka===pp.heliosPolozka)&&(!x._pdf||Number(x.ks)===Number(pp.ks)));
+        if(!r0){ const k=(D.katalog||[]).find(x=>kk(x.kod)===kk(pp.kod)); r0=novyRadek(k||null); r0.kod=pp.kod; r0.ks=pp.ks; RADKY.push(r0); }
+        r0._pdf=true;
+        for(const k of ["ral","lem","razeni","polepy","rozmer","nazev","heliosPolozka","povrch"]) if(pp[k]&&!r0[k])r0[k]=pp[k];
+        if(pp.tloustka!=null&&r0.tloustka==="")r0.tloustka=pp.tloustka;
+        if(pp.cena!=null&&P.typ==="bestellung"&&r0.cena==="")r0.cena=pp.cena;
+        if(pp.tho&&!/Thommen/.test(r0.poznamka||""))r0.poznamka=(r0.poznamka?r0.poznamka+" · ":"")+"provedení Thommen";
+      }
+    }
+    renderHead(); renderLines();
+    $("#noInfo").textContent=n?"Načteno z "+n+" PDF — zkontrolujte a uložte.":"";
+  }catch(e){ alert(e.message); $("#noInfo").textContent=""; }
+  $("#noPdf").value="";
+}
+async function ulozObjednavku(aZadat){
+  const H=FORM_HL;
   const polozky=RADKY.filter(r=>String(r.kod).trim()&&Number(r.ks)>0).map(r=>Object.assign({},r,{ks:Number(r.ks)}));
-  if(!g("zakaznikNazev").trim()){alert("Vyplňte zákazníka.");return;}
+  if(!String(H.zakaznikNazev||"").trim()){alert("Vyplňte zákazníka.");return;}
   if(!polozky.length){alert("Přidejte aspoň jednu položku s kódem a počtem kusů.");return;}
-  const telo={id:id||undefined,cislo:g("cislo"),cisloAU:g("cisloAU"),helios:g("helios"),datum:g("datum"),zakaznikNazev:g("zakaznikNazev"),prijemceNazev:g("prijemceNazev"),kwDodani:g("kwDodani"),kwRok:g("kwDodani")?(g("datum")||D.dnes).slice(0,4):"",terminDodani:g("terminDodani"),doprava:g("doprava"),driveUrl:g("driveUrl"),poznamka:g("oPoznamka")?g("oPoznamka"):$("#oPoznamka").value,potvrzena:$("#oPotvrzena").checked,polozky};
-  try{ const r=await api("/api/vyroba/objednavka",telo); if(aZadat)await api("/api/vyroba/objednavka/zadat",{id:r.id}); toast(aZadat?"Uloženo a zadáno do výroby.":"Objednávka uložena."); zavri(); await nacti(); detail(r.id); }
+  const telo={id:FORM_ID||undefined,cislo:H.cislo,cisloAU:H.cisloAU,helios:H.helios,datum:H.datum,zakaznikNazev:H.zakaznikNazev,prijemceNazev:H.prijemceNazev,prijemce:H.prijemce&&H.prijemce.nazev===H.prijemceNazev?H.prijemce:undefined,kwDodani:H.kwDodani,kwRok:H.kwDodani?String(H.datum||D.dnes).slice(0,4):"",terminDodani:H.terminDodani,doprava:H.doprava,driveUrl:H.driveUrl,poznamka:H.poznamka,potvrzena:!!H.potvrzena,polozky};
+  try{ const r=await api("/api/vyroba/objednavka",telo); if(aZadat)await api("/api/vyroba/objednavka/zadat",{id:r.id}); toast(aZadat?"Uloženo a zadáno do výroby.":"Objednávka uložena."); $("#mBox").classList.remove("wide"); zavri(); await nacti(); detail(r.id); }
   catch(e){alert(e.message);}
 }
 
 /* ---------- výroba (fronta pro dílnu) ---------- */
 function htmlVyroba(){
-  const pol=vsechnyPolozky().filter(p=>["zadano","svarovna","lakovna","zinkovna","hotovo","pozastaveno"].includes(p.stav)).sort((a,b)=>String(a.terminVyroby||"9").localeCompare(String(b.terminVyroby||"9")));
+  const pol=vsechnyPolozky().filter(p=>!p.mimoBruntal&&["zadano","svarovna","lakovna","zinkovna","hotovo","pozastaveno"].includes(p.stav)).sort((a,b)=>String(a.terminVyroby||"9").localeCompare(String(b.terminVyroby||"9")));
   const sloupce=[["zadano","Zadáno do výroby","svarovna","→ Svařovna"],["svarovna","Svařovna","","→ Lakovna / Zinkovna / Hotovo"],["lakovna","Lakovna","hotovo","→ Hotovo"],["zinkovna","Zinkovna","hotovo","→ Hotovo"],["hotovo","Hotovo na skladě","naplanovano","→ Na kamion"]];
   let h='';
   if(VYBER.size)h+='<div class="upoz">Vybráno <b>'+VYBER.size+'</b> položek · <button class="btn sm pri" onclick="formStav([...VYBER])">Změnit stav hromadně</button> <button class="btn sm" onclick="VYBER.clear();vykresli()">Zrušit výběr</button></div>';
@@ -526,6 +681,12 @@ function htmlNastaveni(){
     +'<label class="f"><span>List ostatní výrobky</span><input id="nList2" value="'+esc(n.sheetListOstatni)+'"></label><label class="f"><span>Složka Contract na Disku (ID)</span><input id="nDrive" value="'+esc(n.driveRoot)+'"></label></div>'
     +'<p class="mut">Import je bezpečný opakovat: řádky se párují podle ČVZ (26B‑nnn). Položky, které už někdo v intranetu ručně měnil, se nepřepisují. Objednávky se sdružují podle čísla zakázky Helios; číslo Bestellung (BE…) doplní obchod dodatečně.</p>'
     +(D.sheetDostupny?'<button class="btn pri" onclick="importSheet(\'boxy\')">⬇ Importovat list boxů</button> <button class="btn" onclick="importSheet(\'ostatni\')">⬇ Importovat ostatní výrobky</button>':'<div class="upoz">Google service account není na tomto serveru nastaven — použijte vložení řádků níže.</div>')
+    +'<h3 style="font-family:var(--cond);font-size:15px;margin:18px 0 6px">Složka Contract na Disku (PDF Bestellung + vydané objednávky, kniha CONTRACT Bestellung.xlsx)</h3>'
+    +'<p class="mut">Projde podsložky <b>BE26xxxx</b> (i v roční složce 2026): z Bestellung od Contractu doplní číslo BE/AU, KW dodání, příjemce s adresou, ceny, RAL, ražení a polepy; z vydané objednávky z Heliosu číslo zakázky a položek. Z knihy Renaty doplní hmotnosti, kamiony a stav výkresů. Už zpracované soubory se přeskakují.</p>'
+    +(D.driveDostupny?'<button class="btn pri" onclick="importDrive(false)">⬇ Načíst z Disku</button> <button class="btn" onclick="importDrive(true)">Znovu vše (i zpracované)</button>':'<div class="upoz">Service account není nastaven — PDF načtete ve formuláři objednávky (Načíst z PDF) a knihu nahrajte níže.</div>')
+    +' <input type="file" id="nXlsx" accept=".xlsx" style="display:none" onchange="importXlsx(this.files[0])"><button class="btn" onclick="$(\'#nXlsx\').click()">⬆ Nahrát knihu CONTRACT Bestellung.xlsx</button>'
+    +(imp.drive?'<div class="mut" style="margin-top:8px">Poslední načtení z Disku: '+new Date(imp.drive.at).toLocaleString("cs-CZ")+' · '+esc(JSON.stringify(imp.drive.stat))+'</div>':'')
+    +(imp.contract?'<div class="mut" style="margin-top:4px">Poslední import knihy: '+new Date(imp.contract.at).toLocaleString("cs-CZ")+' · '+esc(JSON.stringify(imp.contract.stat))+'</div>':'')
     +(imp.sheet?'<div class="mut" style="margin-top:8px">Poslední import ze Sheetu: '+new Date(imp.sheet.at).toLocaleString("cs-CZ")+' · '+esc(JSON.stringify(imp.sheet.stat))+'</div>':'')
     +'<details style="margin-top:14px"><summary>Vložit řádky zkopírované z tabulky (Ctrl+C v Sheetu → Ctrl+V sem)</summary><textarea id="nRows" style="width:100%;min-height:120px;margin-top:8px;font-family:var(--mono);font-size:12px" placeholder="26B	724	18.09.2026	CPR 08.00 LacNam	1200x800x800/920	2	20	lakování RAL 5003	0.8	2	ražení názvu: HS MÜHLE	…"></textarea><div style="margin-top:6px"><button class="btn sm" onclick="importRows()">Importovat vložené řádky</button></div></details>'
     +(imp.rows?'<div class="mut" style="margin-top:8px">Poslední vložení: '+new Date(imp.rows.at).toLocaleString("cs-CZ")+' · '+esc(JSON.stringify(imp.rows.stat))+'</div>':'')
@@ -538,6 +699,17 @@ async function ulozNastaveni(){
 async function importSheet(list){
   if(!confirm("Načíst řádky ze Sheetu a založit chybějící objednávky a položky?"))return;
   try{ const r=await api("/api/vyroba/import/sheet",{list}); alert("Import hotov.\nObjednávek nově: "+r.objednavek+"\nPoložek nově: "+r.polozek+"\nAktualizováno: "+r.aktualizovano+"\nPřeskočeno: "+r.preskoceno); nacti(); }catch(e){alert(e.message);}
+}
+async function importDrive(force){
+  if(!confirm(force?"Znovu projít celou složku Contract včetně už zpracovaných souborů?":"Načíst nové dokumenty ze složky Contract na Disku?"))return;
+  toast("Načítám z Disku… může to trvat i minutu.");
+  try{ const r=await api("/api/vyroba/import/drive",{force:!!force}); alert("Hotovo.\nSložek: "+r.slozek+"\nPDF zpracováno: "+r.pdf+" (přeskočeno "+r.preskoceno+")\nKnih xlsx: "+r.xlsx+"\nNových objednávek: "+r.novychObjednavek+"\nNových položek: "+r.nove+"\nAktualizováno: "+r.aktualizovano+(r.chyby&&r.chyby.length?"\n\nChyby:\n"+r.chyby.join("\n"):"")); nacti(); }catch(e){alert(e.message);}
+}
+async function importXlsx(f){
+  if(!f)return;
+  const b64=await new Promise((ok,ko)=>{const rd=new FileReader();rd.onload=()=>ok(String(rd.result).split(",")[1]);rd.onerror=ko;rd.readAsDataURL(f);});
+  try{ const r=await api("/api/vyroba/import/xlsx",{base64:b64,nazev:f.name}); alert("Kniha načtena ("+r.listy.join(", ")+", "+r.radku+" řádků).\nNových objednávek: "+r.objednavek+"\nNových položek: "+r.polozek+"\nAktualizováno: "+r.aktualizovano+"\nPřeskočeno: "+r.preskoceno); nacti(); }catch(e){alert(e.message);}
+  $("#nXlsx").value="";
 }
 async function importRows(){
   const t=$("#nRows").value; if(!t.trim())return;

@@ -32,6 +32,9 @@ const urlLib = require('url');
 
 const HTML_FILE = path.join(__dirname, 'vyroba.html');
 const KATALOG_SEED = path.join(__dirname, 'katalog-seed.json');
+const { pdfToText } = require('./pdftext');
+const { parseXlsx } = require('./xlsx');
+const parsers = require('./parsers');
 
 // Stavy položky (= jeden řádek ČVZ). Pořadí = průběh zakázky; „pozastaveno" a „storno" jsou mimo řadu.
 const STAVY = [
@@ -289,6 +292,9 @@ function mount(host) {
       if (p === '/api/vyroba/drive' && req.method === 'GET') return await apiDrive(req, res, u.query);
       if (req.method !== 'POST') { json(res, 404, { chyba: 'Neznámý požadavek.' }); return true; }
       const b = JSON.parse(await host.readBody(req) || '{}');
+      if (p === '/api/vyroba/import/pdf') { if (!r.obchod) { json(res, 403, { chyba: 'Jen obchod.' }); return true; } return apiImportPdf(req, res, r, b); }
+      if (p === '/api/vyroba/import/xlsx') { if (!r.obchod) { json(res, 403, { chyba: 'Jen obchod.' }); return true; } return apiImportXlsx(req, res, r, b); }
+      if (p === '/api/vyroba/import/drive') { if (!r.obchod) { json(res, 403, { chyba: 'Jen obchod.' }); return true; } return await apiImportDrive(req, res, r, b); }
       const jenObchod = () => { if (!r.obchod) { json(res, 403, { chyba: 'Tuto akci může provést jen obchod nebo správce.' }); return false; } return true; };
       switch (p) {
         case '/api/vyroba/objednavka':          return jenObchod() && apiObjednavka(req, res, r, b);
@@ -655,6 +661,206 @@ function mount(host) {
     const s = importRows(d, b.rows, r, b.list === 'ostatni' ? 'ostatni' : 'boxy');
     d.import.rows = { at: new Date().toISOString(), kdo: r.email, stat: s };
     save(d); json(res, 200, Object.assign({ ok: true }, s)); return true;
+  }
+
+  // ---- import z dokumentů (PDF Bestellung / VydObj, kniha CONTRACT Bestellung.xlsx, Disk) -------
+  const cisloKey = c => String(c || '').replace(/\s/g, '').toUpperCase().replace(/^B(?=\d{6}$)/, 'BE');
+  function najdiObjednavku(d, cislo, helios) {
+    const ck = cisloKey(cislo);
+    let o = ck ? d.objednavky.find(x => cisloKey(x.cislo) === ck) : null;
+    if (!o && helios) o = d.objednavky.find(x => x.helios && x.helios === String(helios)) || null;
+    return o;
+  }
+  function doplnPrijemce(d, o, pr) {
+    if (!pr || !pr.nazev) return;
+    const z = zajistiZakaznika(d, null, pr.nazev, { ulice: pr.ulice, psc: pr.psc, mesto: pr.mesto, zeme: pr.zeme, partner: 'contract' });
+    if (!z) return;
+    if (!o.prijemceId || o.prijemceId === o.zakaznikId) { o.prijemceId = z.id; o.prijemceNazev = z.nazev; }
+    if (!o.zakaznikId) { const c = zajistiZakaznika(d, null, 'ConTracT Container Vertriebsgesellschaft mbH', { ulice: 'Neuer Weg 37', psc: '38302', mesto: 'Wolfenbüttel', zeme: 'DE', partner: 'contract', jazyk: 'de' }); o.zakaznikId = c.id; o.zakaznikNazev = c.nazev; }
+  }
+  // Sloučí naparsovaný dokument do dat. Vrací {objednavka, nove, aktualizovano}.
+  function applyParsed(d, parsed, r, zdroj) {
+    const po = parsed.objednavka || {}; const stat = { nove: 0, aktualizovano: 0, novaObjednavka: false };
+    let o = najdiObjednavku(d, po.cislo, po.helios);
+    if (!o) {
+      o = { id: newId('o'), createdAt: Date.now(), createdBy: r.email, loznyplan: null, cislo: cisloKey(po.cislo), cisloAU: '', helios: '', datum: po.datum || dnesISO(), zakaznikId: null, zakaznikNazev: '', prijemceId: null, prijemceNazev: '',
+        kwDodani: null, kwRok: null, terminDodani: '', doprava: '', mena: 'EUR', potvrzena: false, potvrzenaDatum: '', poznamka: '', driveUrl: '', zdroj };
+      d.objednavky.push(o); stat.novaObjednavka = true;
+    }
+    if (!o.cislo && po.cislo) o.cislo = cisloKey(po.cislo);
+    if (!o.cisloAU && po.cisloAU) o.cisloAU = po.cisloAU;
+    if (!o.helios && po.helios) o.helios = String(po.helios);
+    if (!o.kwDodani && po.kwDodani) { o.kwDodani = po.kwDodani; o.kwRok = po.kwRok || Number(String(o.datum || dnesISO()).slice(0, 4)); }
+    if (!o.terminDodani && po.terminDodani) { o.terminDodani = po.terminDodani; if (!o.kwDodani) { const k = kwZData(po.terminDodani); if (k) { o.kwDodani = k.kw; o.kwRok = k.rok; } } }
+    if (po.datum && (!o.datum || parsed.typ === 'bestellung')) o.datum = po.datum;
+    if (po.doprava && !o.doprava) o.doprava = po.doprava;
+    if (parsed.typ === 'bestellung') { o.potvrzena = o.potvrzena || false; if (po.celkem != null) o.celkem = po.celkem; }
+    doplnPrijemce(d, o, po.prijemce);
+    if (po.zakaznikNazev && !o.zakaznikId) { const z = zajistiZakaznika(d, null, po.zakaznikNazev, { partner: 'contract', zeme: 'DE', jazyk: 'de' }); o.zakaznikId = z.id; o.zakaznikNazev = z.nazev; }
+    const stavajici = d.polozky.filter(p => p.objId === o.id);
+    const kodKey = k => low(k).replace(/\s+/g, '');
+    (parsed.polozky || []).forEach((pp, i) => {
+      let p = null;
+      if (pp.heliosPolozka) p = stavajici.find(x => x.heliosPolozka === pp.heliosPolozka && (!x.kod || kodKey(x.kod) === kodKey(pp.kod))) || null;
+      if (!p) p = stavajici.find(x => kodKey(x.kod) === kodKey(pp.kod) && num(x.ks) === num(pp.ks) && !x._matched) || null;
+      if (!p) p = stavajici.find(x => kodKey(x.kod) === kodKey(pp.kod) && !x._matched) || null;
+      if (p) {
+        p._matched = true;
+        const before = JSON.stringify([p.heliosPolozka, p.cena, p.ral, p.lem, p.razeni, p.polepy, p.rozmer, p.tloustka]);
+        if (!p.heliosPolozka && pp.heliosPolozka) p.heliosPolozka = pp.heliosPolozka;
+        if (p.cena == null && pp.cena != null && parsed.typ === 'bestellung') p.cena = pp.cena;
+        if (!p.ral && pp.ral) p.ral = pp.ral; if (!p.lem && pp.lem) p.lem = pp.lem;
+        if (!p.razeni && pp.razeni) p.razeni = pp.razeni; if (!p.polepy && pp.polepy) p.polepy = pp.polepy;
+        if (!p.rozmer && pp.rozmer) p.rozmer = pp.rozmer; if (p.tloustka == null && pp.tloustka != null) p.tloustka = pp.tloustka;
+        if (!p.povrch && pp.povrch) p.povrch = pp.povrch; if (!p.nazev && pp.nazev) p.nazev = pp.nazev;
+        if (pp.tho && !/Thommen/i.test(p.poznamka || '')) p.poznamka = str((p.poznamka ? p.poznamka + ' · ' : '') + 'provedení Thommen', 400);
+        if (JSON.stringify([p.heliosPolozka, p.cena, p.ral, p.lem, p.razeni, p.polepy, p.rozmer, p.tloustka]) !== before) stat.aktualizovano++;
+      } else {
+        const np = normPolozka(d, { kod: pp.kod, nazev: pp.nazev, ks: pp.ks, rozmer: pp.rozmer, tloustka: pp.tloustka, povrch: pp.povrch, ral: pp.ral, lem: pp.lem, razeni: pp.razeni, polepy: pp.polepy, heliosPolozka: pp.heliosPolozka, cena: parsed.typ === 'bestellung' ? pp.cena : null, poznamka: pp.tho ? 'provedení Thommen' : '' }, o.id);
+        np.pozice = pp.pozice || (stavajici.length + i + 1);
+        Object.assign(np, { cvz: null, rok: null, poradi: null, stav: 'prijata', hotovoKs: 0, kamion: '', terminVyroby: terminVyrobyZ(o, d.nastaveni), udalosti: [udalost(r, 'prijata', null, 'import ' + zdroj)], zdroj });
+        d.polozky.push(np); stavajici.push(np); np._matched = true; stat.nove++;
+      }
+    });
+    stavajici.forEach(p => { delete p._matched; });
+    o.updatedAt = Date.now(); o.updatedBy = r.email;
+    return Object.assign({ objednavka: o }, stat);
+  }
+  // Řádky z knihy CONTRACT Bestellung.xlsx: doplní BE čísla, KW, adresy, kg, kamiony k existujícím položkám (párování přes ČVZ nebo Helios).
+  function applyContractRows(d, rows, r) {
+    const stat = { objednavek: 0, polozek: 0, aktualizovano: 0, preskoceno: 0 };
+    const kodKey = k => low(k).replace(/\s+/g, '');
+    for (const row of rows) {
+      if (!row.cislo) { stat.preskoceno++; continue; }
+      const rok = 2000 + Number(row.cislo.slice(2, 4));
+      if (rok < 2025) { stat.preskoceno++; continue; }
+      const cvz = row.cvzPoradi ? String(rok).slice(2) + 'B-' + String(row.cvzPoradi).padStart(3, '0') : (row.cvzText || '');
+      const mimoBruntal = !row.cvzPoradi && !!row.cvzText;   // S-nnn / C-nnn = Supíkovice / Chomutov (v knize jsou kvůli společné dopravě)
+      let p = cvz ? d.polozky.find(x => x.cvz === cvz) : null;
+      let o = p ? d.objednavky.find(x => x.id === p.objId) : najdiObjednavku(d, row.cislo, row.helios);
+      if (!o && rok < new Date().getFullYear()) { stat.preskoceno++; continue; }   // loňské zakázky, které v systému nejsou, nezakládat
+      if (!o) {
+        o = { id: newId('o'), createdAt: Date.now(), createdBy: r.email, loznyplan: null, cislo: row.cislo, cisloAU: '', helios: row.helios || '', datum: dnesISO(), zakaznikId: null, zakaznikNazev: '', prijemceId: null, prijemceNazev: '',
+          kwDodani: row.kwDodani || null, kwRok: row.kwDodani ? rok : null, terminDodani: '', doprava: '', mena: 'EUR', potvrzena: true, potvrzenaDatum: '', poznamka: row.poznamka || '', driveUrl: '', zdroj: 'contract-xlsx' };
+        d.objednavky.push(o); stat.objednavek++;
+      }
+      let zm = false;
+      if (!o.cislo) { o.cislo = row.cislo; zm = true; }
+      if (!o.helios && row.helios) { o.helios = row.helios; zm = true; }
+      if (!o.kwDodani && row.kwDodani) { o.kwDodani = row.kwDodani; o.kwRok = rok; zm = true; }
+      if (row.poznamka && !(o.poznamka || '').includes(row.poznamka)) { o.poznamka = str((o.poznamka ? o.poznamka + ' · ' : '') + row.poznamka, 1000); zm = true; }
+      doplnPrijemce(d, o, row.prijemce);
+      const ve = d.polozky.filter(x => x.objId === o.id);
+      if (!p) p = ve.find(x => kodKey(x.kod) === kodKey(row.kod) && (!x.cvz || !cvz) && num(x.ks) === num(row.ks)) || ve.find(x => kodKey(x.kod) === kodKey(row.kod) && !x.cvz) || null;
+      if (!p) {
+        p = normPolozka(d, { kod: row.kod, ks: row.ks, rozmer: row.rozmer, kgKs: row.kgKs, povrch: row.povrch, ral: row.ral, lem: row.lem, poznamka: row.tho ? 'provedení Thommen' : '' }, o.id);
+        p.pozice = ve.length + 1;
+        Object.assign(p, { cvz: cvz || null, rok: cvz ? rok : null, poradi: row.cvzPoradi || null, stav: cvz ? 'zadano' : 'prijata', hotovoKs: 0, kamion: row.kamion || '', terminVyroby: terminVyrobyZ(o, d.nastaveni), udalosti: [udalost(r, cvz ? 'zadano' : 'prijata', null, 'import z knihy CONTRACT Bestellung')], zdroj: 'contract-xlsx', mimoBruntal });
+        if (mimoBruntal) p.poznamka = str('výroba mimo Bruntál (' + row.cvzText + ')' + (p.poznamka ? ' · ' + p.poznamka : ''), 400);
+        if (row.cvzPoradi) posunSeq(d, rok, row.cvzPoradi);
+        d.polozky.push(p); stat.polozek++;
+      } else {
+        let pz = false;
+        if (p.kgKs == null && row.kgKs) { p.kgKs = row.kgKs; pz = true; }
+        if (!p.rozmer && row.rozmer) { p.rozmer = row.rozmer; pz = true; }
+        if (!p.ral && row.ral) { p.ral = row.ral; pz = true; } if (!p.lem && row.lem) { p.lem = row.lem; pz = true; }
+        if (!p.kamion && row.kamion) { p.kamion = row.kamion; pz = true; }
+        if (row.vykresOk && (!p.vykres || p.vykres.stav === 'neni' || p.vykres.stav === 'poslan')) { p.vykres = { stav: 'schvalen', datum: p.vykres && p.vykres.datum || '' }; pz = true; }
+        else if (row.vykresPoslan && (!p.vykres || p.vykres.stav === 'neni')) { p.vykres = { stav: 'poslan', datum: '' }; pz = true; }
+        if (pz) stat.aktualizovano++;
+      }
+      if (zm) stat.aktualizovano++;
+    }
+    return stat;
+  }
+  function parsePdfBuffer(buf, name) {
+    const text = pdfToText(buf);
+    if (/Bestellung/i.test(name || '') || /Unser Auftrag|Lieferanten-Nr/.test(text)) return parsers.parseBestellung(text);
+    if (/VydObj/i.test(name || '') || /VYDANÁ OBJEDNÁVKA|Helios Inuvio/.test(text)) return parsers.parseHelios(text);
+    return null;
+  }
+  // Nahrané PDF z prohlížeče: náhled (nahled:true) nebo rovnou sloučit do dat.
+  function apiImportPdf(req, res, r, b) {
+    const files = Array.isArray(b.soubory) ? b.soubory : (b.base64 ? [{ nazev: b.nazev, base64: b.base64 }] : []);
+    if (!files.length) { json(res, 400, { chyba: 'Chybí PDF.' }); return true; }
+    const d = load(); const out = []; const stat = { nove: 0, aktualizovano: 0 };
+    let objId = null;
+    for (const f of files.slice(0, 20)) {
+      let parsed = null;
+      try { parsed = parsePdfBuffer(Buffer.from(String(f.base64 || '').replace(/^data:[^,]*,/, ''), 'base64'), f.nazev); } catch (e) { out.push({ nazev: f.nazev, chyba: e.message }); continue; }
+      if (!parsed) { out.push({ nazev: f.nazev, chyba: 'Nepoznaný typ dokumentu (čekám Bestellung od Contractu nebo vydanou objednávku z Heliosu).' }); continue; }
+      if (b.nahled) { out.push({ nazev: f.nazev, parsed }); continue; }
+      const a = applyParsed(d, parsed, r, 'pdf:' + (f.nazev || parsed.typ));
+      objId = a.objednavka.id; stat.nove += a.nove; stat.aktualizovano += a.aktualizovano;
+      out.push({ nazev: f.nazev, typ: parsed.typ, objednavka: a.objednavka.cislo || a.objednavka.helios, nove: a.nove, aktualizovano: a.aktualizovano, novaObjednavka: a.novaObjednavka });
+    }
+    if (!b.nahled) { save(d); logAct('vyroba', req, 'Import PDF: ' + out.map(x => x.nazev).join(', ')); }
+    json(res, 200, { ok: true, vysledky: out, objId, stat }); return true;
+  }
+  function apiImportXlsx(req, res, r, b) {
+    if (!b.base64) { json(res, 400, { chyba: 'Chybí soubor.' }); return true; }
+    const d = load();
+    const x = parseXlsx(Buffer.from(String(b.base64).replace(/^data:[^,]*,/, ''), 'base64'), [/^Metalboxy$/i, /^MULDY$/i, /^ABROLY$/i]);
+    let rows = [];
+    for (const name of Object.keys(x.data)) rows = rows.concat(parsers.parseContractRows(x.data[name], name));
+    const stat = applyContractRows(d, rows, r);
+    d.import.contract = { at: new Date().toISOString(), kdo: r.email, stat, listy: Object.keys(x.data) };
+    save(d); logAct('vyroba', req, 'Import knihy CONTRACT Bestellung: ' + JSON.stringify(stat));
+    json(res, 200, Object.assign({ ok: true, radku: rows.length, listy: Object.keys(x.data) }, stat)); return true;
+  }
+  // Stažení souboru z Disku přes service account (host.drive.token).
+  function driveDownload(id) {
+    return new Promise(async (resolve, reject) => {
+      let tok; try { tok = await host.drive.token(); } catch (e) { return reject(e); }
+      const req = https.request({ method: 'GET', hostname: 'www.googleapis.com', path: '/drive/v3/files/' + encodeURIComponent(id) + '?alt=media&supportsAllDrives=true', headers: { Authorization: 'Bearer ' + tok } }, resp => {
+        const chunks = []; resp.on('data', c => chunks.push(c)); resp.on('end', () => { const buf = Buffer.concat(chunks); if (resp.statusCode >= 200 && resp.statusCode < 300) resolve(buf); else reject(new Error('Drive ' + resp.statusCode + ': ' + buf.toString('utf8').slice(0, 160))); });
+      });
+      req.on('error', reject); req.setTimeout(30000, () => { try { req.destroy(new Error('Drive: časový limit.')); } catch (_) {} }); req.end();
+    });
+  }
+  // Projde složku Contract na Disku: podsložky BE26xxxx (i v ročních složkách „2026") → PDF Bestellung + VydObj; kniha CONTRACT Bestellung*.xlsx.
+  async function apiImportDrive(req, res, r, b) {
+    if (!(host.drive && host.drive.available && host.drive.token)) { json(res, 400, { chyba: 'Google service account (GOOGLE_SA_*) není nastaven — nahrajte PDF/xlsx ručně.' }); return true; }
+    const d = load(); const nast = d.nastaveni;
+    d.import.driveSoubory = d.import.driveSoubory || {};
+    const hotovo = d.import.driveSoubory; const force = !!b.force;
+    const stat = { slozek: 0, pdf: 0, xlsx: 0, preskoceno: 0, nove: 0, aktualizovano: 0, novychObjednavek: 0, chyby: [] };
+    const rokMin = Number(b.rokOd) || (new Date().getFullYear() - 1);
+    let root; try { root = await host.drive.list(nast.driveRoot); } catch (e) { json(res, 502, { chyba: 'Disk: ' + e.message }); return true; }
+    const slozky = root.filter(f => f.isFolder && /^BE?\d{6}/i.test(f.name));
+    for (const y of root.filter(f => f.isFolder && /^20\d{2}$/.test(f.name) && Number(f.name) >= rokMin)) { try { (await host.drive.list(y.id)).filter(f => f.isFolder && /^BE?\d{6}/i.test(f.name)).forEach(f => slozky.push(f)); } catch (e) { stat.chyby.push(y.name + ': ' + e.message); } }
+    const jeAktualni = f => { const m = f.name.match(/^BE?(\d{2})\d{4}/i); return m && (2000 + Number(m[1])) >= rokMin; };
+    for (const s of slozky.filter(jeAktualni)) {
+      stat.slozek++;
+      let files; try { files = await host.drive.list(s.id); } catch (e) { stat.chyby.push(s.name + ': ' + e.message); continue; }
+      const o0 = najdiObjednavku(d, (s.name.match(/^(BE?\d{6})/i) || [])[1], null);
+      if (o0 && !o0.driveUrl) o0.driveUrl = s.link || '';
+      for (const f of files.filter(f => /\.pdf$/i.test(f.name))) {
+        if (!force && hotovo[f.id]) { stat.preskoceno++; continue; }
+        try {
+          const buf = await driveDownload(f.id);
+          const parsed = parsePdfBuffer(buf, f.name);
+          if (!parsed) { hotovo[f.id] = 'nepoznano'; stat.preskoceno++; continue; }
+          if (!parsed.objednavka.cislo) parsed.objednavka.cislo = (s.name.match(/^(BE?\d{6})/i) || [])[1] || '';
+          const a = applyParsed(d, parsed, r, 'drive:' + f.name);
+          if (!a.objednavka.driveUrl) a.objednavka.driveUrl = s.link || '';
+          stat.pdf++; stat.nove += a.nove; stat.aktualizovano += a.aktualizovano; if (a.novaObjednavka) stat.novychObjednavek++;
+          hotovo[f.id] = new Date().toISOString();
+        } catch (e) { stat.chyby.push(f.name + ': ' + e.message); }
+      }
+    }
+    for (const f of root.filter(f => !f.isFolder && /CONTRACT Bestellung.*\.xlsx$/i.test(f.name) && !/ARCHIVE/i.test(f.name))) {
+      try {
+        const buf = await driveDownload(f.id);
+        const x = parseXlsx(buf, [/^Metalboxy$/i, /^MULDY$/i, /^ABROLY$/i]);
+        let rows = []; for (const name of Object.keys(x.data)) rows = rows.concat(parsers.parseContractRows(x.data[name], name));
+        const st = applyContractRows(d, rows, r); stat.xlsx++; stat.nove += st.polozek; stat.aktualizovano += st.aktualizovano; stat.novychObjednavek += st.objednavek;
+        d.import.contract = { at: new Date().toISOString(), kdo: r.email, stat: st, soubor: f.name };
+      } catch (e) { stat.chyby.push(f.name + ': ' + e.message); }
+    }
+    d.import.drive = { at: new Date().toISOString(), kdo: r.email, stat: Object.assign({}, stat, { chyby: stat.chyby.slice(0, 20) }) };
+    save(d); logAct('vyroba', req, 'Import z Disku: ' + JSON.stringify(Object.assign({}, stat, { chyby: stat.chyby.length })));
+    json(res, 200, Object.assign({ ok: true }, stat)); return true;
   }
 
   // ---- Google Drive: složka BE26xxxx k objednávce ---------------------------------
