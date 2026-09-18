@@ -685,6 +685,7 @@ function htmlNastaveni(){
     +'<p class="mut">Projde podsložky <b>BE26xxxx</b> (i v roční složce 2026): z Bestellung od Contractu doplní číslo BE/AU, KW dodání, příjemce s adresou, ceny, RAL, ražení a polepy; z vydané objednávky z Heliosu číslo zakázky a položek. Z knihy Renaty doplní hmotnosti, kamiony a stav výkresů. Už zpracované soubory se přeskakují.</p>'
     +(D.driveDostupny?'<button class="btn pri" onclick="importDrive(false)">⬇ Načíst z Disku</button> <button class="btn" onclick="importDrive(true)">Znovu vše (i zpracované)</button>':'<div class="upoz">Service account není nastaven — PDF načtete ve formuláři objednávky (Načíst z PDF) a knihu nahrajte níže.</div>')
     +' <input type="file" id="nXlsx" accept=".xlsx" style="display:none" onchange="importXlsx(this.files[0])"><button class="btn" onclick="$(\'#nXlsx\').click()">⬆ Nahrát knihu CONTRACT Bestellung.xlsx</button>'
+    +'<div class="mut" id="drvProgress" style="margin-top:8px"></div>'
     +(imp.drive?'<div class="mut" style="margin-top:8px">Poslední načtení z Disku: '+new Date(imp.drive.at).toLocaleString("cs-CZ")+' · '+esc(JSON.stringify(imp.drive.stat))+'</div>':'')
     +(imp.contract?'<div class="mut" style="margin-top:4px">Poslední import knihy: '+new Date(imp.contract.at).toLocaleString("cs-CZ")+' · '+esc(JSON.stringify(imp.contract.stat))+'</div>':'')
     +(imp.sheet?'<div class="mut" style="margin-top:8px">Poslední import ze Sheetu: '+new Date(imp.sheet.at).toLocaleString("cs-CZ")+' · '+esc(JSON.stringify(imp.sheet.stat))+'</div>':'')
@@ -702,8 +703,12 @@ async function importSheet(list){
 }
 async function importDrive(force){
   if(!confirm(force?"Znovu projít celou složku Contract včetně už zpracovaných souborů?":"Načíst nové dokumenty ze složky Contract na Disku?"))return;
-  toast("Načítám z Disku… může to trvat i minutu.");
-  try{ const r=await api("/api/vyroba/import/drive",{force:!!force}); alert("Hotovo.\nSložek: "+r.slozek+"\nPDF zpracováno: "+r.pdf+" (přeskočeno "+r.preskoceno+")\nKnih xlsx: "+r.xlsx+"\nNových objednávek: "+r.novychObjednavek+"\nNových položek: "+r.nove+"\nAktualizováno: "+r.aktualizovano+(r.chyby&&r.chyby.length?"\n\nChyby:\n"+r.chyby.join("\n"):"")); nacti(); }catch(e){alert(e.message);}
+  try{ await api("/api/vyroba/import/drive",{force:!!force}); toast("Načítání z Disku běží na pozadí…"); sledujDrive(); }catch(e){alert(e.message);}
+}
+async function sledujDrive(){
+  try{ const r=await api("/api/vyroba/import/drive",{stav:true}); const j=r.job||{}; const el=$("#drvProgress");
+    if(el)el.textContent=j.hotovo?("Hotovo: složek "+j.stat.slozek+", PDF "+j.stat.pdf+", nových položek "+j.stat.nove+", aktualizováno "+j.stat.aktualizovano+(j.stat.chyby.length?", chyb "+j.stat.chyby.length:"")+(j.chyba?" · CHYBA: "+j.chyba:"")):("Běží… "+(j.stat?j.stat.slozek:0)+"/"+(j.celkemSlozek||"?")+" složek · "+(j.faze||""));
+    if(r.bezi)setTimeout(sledujDrive,3000); else if(j.hotovo)nacti(); }catch(e){}
 }
 async function importXlsx(f){
   if(!f)return;

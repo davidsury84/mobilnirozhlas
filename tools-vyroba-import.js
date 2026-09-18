@@ -14,9 +14,18 @@ if (akce === 'drive') { body.force = args.includes('--force'); const r = args.fi
 if (akce === 'xlsx') { if (!args[1]) { console.error('Chybí soubor.'); process.exit(1); } body.base64 = fs.readFileSync(args[1]).toString('base64'); body.nazev = args[1]; }
 if (akce === 'text') { if (!args[1]) { console.error('Chybí JSON se seznamem dokumentů.'); process.exit(1); } body.dokumenty = JSON.parse(fs.readFileSync(args[1], 'utf8')); }
 if (akce === 'pdf') { body.soubory = args.slice(1).filter(a => !a.startsWith('--')).map(f => ({ nazev: require('path').basename(f), base64: fs.readFileSync(f).toString('base64') })); }
+const call = async (b) => { const res = await fetch(BASE + '/api/vyroba/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SECRET }, body: JSON.stringify(b) }); const j = await res.json().catch(() => ({})); if (!res.ok || j.chyba) { throw new Error('HTTP ' + res.status + ' ' + (j.chyba || JSON.stringify(j))); } return j; };
 (async () => {
-  const res = await fetch(BASE + '/api/vyroba/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SECRET }, body: JSON.stringify(body) });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok || j.chyba) { console.error('HTTP', res.status, j.chyba || j); process.exit(1); }
+  const j = await call(body);
+  if (akce === 'drive' && j.bezi) {
+    // import z Disku běží na serveru na pozadí → sledovat průběh
+    for (;;) {
+      await new Promise(r => setTimeout(r, 8000));
+      const s = await call({ akce: 'drive', stav: true }); const job = s.job || {};
+      process.stdout.write((job.hotovo ? 'HOTOVO ' : 'běží… ') + (job.stat ? job.stat.slozek : 0) + '/' + (job.celkemSlozek || '?') + ' složek · ' + (job.faze || '') + '\n');
+      if (!s.bezi) { console.log(JSON.stringify(job, null, 1)); break; }
+    }
+    return;
+  }
   console.log(JSON.stringify(j, null, 1));
 })().catch(e => { console.error('Chyba:', e.message); process.exit(1); });

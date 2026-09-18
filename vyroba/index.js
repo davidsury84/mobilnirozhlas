@@ -882,19 +882,32 @@ function mount(host) {
     });
   }
   // Projde složku Contract na Disku: podsložky BE26xxxx (i v ročních složkách „2026") → PDF Bestellung + VydObj; kniha CONTRACT Bestellung*.xlsx.
+  let driveJob = null;   // { start, stat, hotovo, chyba }
   async function apiImportDrive(req, res, r, b) {
     if (!(host.drive && host.drive.available && host.drive.token)) { json(res, 400, { chyba: 'Google service account (GOOGLE_SA_*) není nastaven — nahrajte PDF/xlsx ručně.' }); return true; }
+    if (b.stav) { json(res, 200, { ok: true, bezi: !!(driveJob && !driveJob.hotovo), job: driveJob }); return true; }
+    if (driveJob && !driveJob.hotovo) { json(res, 200, { ok: true, bezi: true, job: driveJob, zprava: 'Načítání z Disku už běží.' }); return true; }
+    driveJob = { start: new Date().toISOString(), stat: { slozek: 0, pdf: 0, xlsx: 0, preskoceno: 0, nove: 0, aktualizovano: 0, novychObjednavek: 0, chyby: [] }, hotovo: false, faze: 'start' };
+    const job = driveJob;
+    runDriveImport(r, b, job).then(() => { job.hotovo = true; job.konec = new Date().toISOString(); }).catch(e => { job.hotovo = true; job.chyba = e.message; job.konec = new Date().toISOString(); console.error('[vyroba] import z Disku:', e); });
+    if (b.cekat) { await new Promise(res2 => { const t = setInterval(() => { if (job.hotovo) { clearInterval(t); res2(); } }, 500); }); json(res, 200, Object.assign({ ok: !job.chyba, chyba: job.chyba }, job.stat)); return true; }
+    json(res, 202, { ok: true, bezi: true, job, zprava: 'Načítání z Disku běží na pozadí — průběh v Nastavení a import.' }); return true;
+  }
+  async function runDriveImport(r, b, job) {
+    const req = null, res = null; void req; void res;
     const d = load(); const nast = d.nastaveni;
     d.import.driveSoubory = d.import.driveSoubory || {};
     const hotovo = d.import.driveSoubory; const force = !!b.force;
-    const stat = { slozek: 0, pdf: 0, xlsx: 0, preskoceno: 0, nove: 0, aktualizovano: 0, novychObjednavek: 0, chyby: [] };
+    const stat = job.stat;
     const rokMin = Number(b.rokOd) || (new Date().getFullYear() - 1);
-    let root; try { root = await host.drive.list(nast.driveRoot); } catch (e) { json(res, 502, { chyba: 'Disk: ' + e.message }); return true; }
+    job.faze = 'seznam složek';
+    const root = await host.drive.list(nast.driveRoot);
     const slozky = root.filter(f => f.isFolder && /^BE?\d{6}/i.test(f.name));
     for (const y of root.filter(f => f.isFolder && /^20\d{2}$/.test(f.name) && Number(f.name) >= rokMin)) { try { (await host.drive.list(y.id)).filter(f => f.isFolder && /^BE?\d{6}/i.test(f.name)).forEach(f => slozky.push(f)); } catch (e) { stat.chyby.push(y.name + ': ' + e.message); } }
     const jeAktualni = f => { const m = f.name.match(/^BE?(\d{2})\d{4}/i); return m && (2000 + Number(m[1])) >= rokMin; };
-    for (const s of slozky.filter(jeAktualni)) {
-      stat.slozek++;
+    const vybrane = slozky.filter(jeAktualni); job.celkemSlozek = vybrane.length;
+    for (const s of vybrane) {
+      stat.slozek++; job.faze = s.name.slice(0, 40);
       let files; try { files = await host.drive.list(s.id); } catch (e) { stat.chyby.push(s.name + ': ' + e.message); continue; }
       const o0 = najdiObjednavku(d, (s.name.match(/^(BE?\d{6})/i) || [])[1], null);
       if (o0 && !o0.driveUrl) o0.driveUrl = s.link || '';
@@ -911,7 +924,9 @@ function mount(host) {
           hotovo[f.id] = new Date().toISOString();
         } catch (e) { stat.chyby.push(f.name + ': ' + e.message); }
       }
+      if (stat.slozek % 20 === 0) { try { save(d); } catch (_) {} }
     }
+    job.faze = 'kniha CONTRACT Bestellung.xlsx';
     for (const f of root.filter(f => !f.isFolder && /CONTRACT Bestellung.*\.xlsx$/i.test(f.name) && !/ARCHIVE/i.test(f.name))) {
       try {
         const buf = await driveDownload(f.id);
@@ -921,9 +936,9 @@ function mount(host) {
         d.import.contract = { at: new Date().toISOString(), kdo: r.email, stat: st, soubor: f.name };
       } catch (e) { stat.chyby.push(f.name + ': ' + e.message); }
     }
+    job.faze = 'ukládám';
     d.import.drive = { at: new Date().toISOString(), kdo: r.email, stat: Object.assign({}, stat, { chyby: stat.chyby.slice(0, 20) }) };
-    save(d); logAct('vyroba', req, 'Import z Disku: ' + JSON.stringify(Object.assign({}, stat, { chyby: stat.chyby.length })));
-    json(res, 200, Object.assign({ ok: true }, stat)); return true;
+    save(d); try { if (host.logActivity) host.logActivity('vyroba', { email: r.email, name: r.name }, 'Import z Disku: ' + JSON.stringify(Object.assign({}, stat, { chyby: stat.chyby.length }))); } catch (_) {}
   }
 
   // ---- Google Drive: složka BE26xxxx k objednávce ---------------------------------
