@@ -9,7 +9,7 @@
 
 const str = (s, n) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n || 300);
 const num = (v) => { const n = Number(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
-const isoDMY = (d, m, y) => { y = String(y); if (y.length === 2) y = '20' + y; return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0'); };
+const isoDMY = (d, m, y) => { y = String(y); if (y.length === 2) y = '20' + y; if (+m < 1 || +m > 12 || +d < 1 || +d > 31) return ''; return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0'); };
 
 // „CPRDÖ04.00LacNamDecÖlaTho" → { kod: 'CPRDÖ 04.00 LacNamDecÖla', tho: true }
 function normKod(raw) {
@@ -129,6 +129,7 @@ function parseBestellung(text) {
       }
     }
     if ((mm = d.match(/([^\n]*Aufkleber[^\n]*)/i))) p.polepy = str(mm[1], 200);
+    if (/Deckel/i.test(p.kod) && !/\d/.test(p.kod) && (mm = d.match(/Metallbox\s+([\d,.]+(?:\/[\d,.]+)?)\s*m³/i))) p.kod = p.kod + ' ' + mm[1];   // velikost víka z popisu → párování s CZ názvy
     p.nazev = str((p.popis[0] || '').replace(/^Metallbox\s*/i, 'Metallbox '), 160);
     delete p.popis;
   });

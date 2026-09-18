@@ -218,7 +218,7 @@ function mount(host) {
     return { kw: Math.ceil((((d - y0) / DEN) + 1) / 7), rok: d.getUTCFullYear() };
   }
   function terminVyrobyZ(o, nast) {
-    if (o.terminDodani) { const t = new Date(o.terminDodani + 'T00:00:00Z'); return new Date(t.getTime() - nast.prubeznaDobaDny * DEN).toISOString().slice(0, 10); }
+    if (o.terminDodani) { const t = new Date(o.terminDodani + 'T00:00:00Z'); if (!isNaN(t)) return new Date(t.getTime() - nast.prubeznaDobaDny * DEN).toISOString().slice(0, 10); }
     const p = pondeliKW(o.kwDodani, o.kwRok || (o.datum ? Number(o.datum.slice(0, 4)) : null));
     if (!p) return null;
     return new Date(new Date(p + 'T00:00:00Z').getTime() - nast.prubeznaDobaDny * DEN).toISOString().slice(0, 10);
@@ -684,6 +684,21 @@ function mount(host) {
 
   // ---- import z dokumentů (PDF Bestellung / VydObj, kniha CONTRACT Bestellung.xlsx, Disk) -------
   const cisloKey = c => String(c || '').replace(/\s/g, '').toUpperCase().replace(/^B(?=\d{6}$)/, 'BE');
+  // „Rodina" kódu: stejný výrobek pojmenovaný různě v Bestellung (DE), Heliosu (CZ) a knize Renaty
+  //   CPRETKunststoff-Deckel ~ Plastové víko k boxu 1,6 m3 ~ Víko na bednu 1.6 → VIKO1.6 ; DMC-CH-6,3-543 ~ DMC-CHN-6.3 → DMCCH6.3
+  function kodFam(k) {
+    let s = String(k || '').toUpperCase().replace(/\s+/g, '').replace(/,/g, '.');
+    if (/DECKEL|VÍKO|VIKO/.test(s)) {
+      const m = s.match(/(08[.]00|04[.]00|16[.]00|22[.]00|0[.]8|0[.]4|1[.]6|2[.]2|12M3|6[.]3|(?<![\d.])8(?![\d.])|(?<![\d.])4(?![\d.]))/);
+      let v = m ? m[1] : '';
+      v = ({ '08.00': '0.8', '04.00': '0.4', '16.00': '1.6', '22.00': '1.6', '2.2': '1.6', '8': '0.8', '4': '0.4' })[v] || v;
+      return 'VIKO' + v;
+    }
+    if (/ABLASSHAHN|KOHOUT|VENTIL/.test(s)) return 'KOHOUT';
+    return s.replace(/^CPRET/, '').replace(/-?(543|534|644|533|43|53|54)$/, '').replace(/CHN/, 'CH').replace(/-/g, '').replace(/\/.*$/, '');
+  }
+  // Pozice v Bestellung, které nejsou výrobek (doprava, popisky, ostatní) – nezakládat jako položku
+  const jeSluzba = k => /^(Transportkosten|Transport|Fracht|ET|Beschriftung|Verpackung|Montage|Sonstiges|Rabatt)$/i.test(String(k || '').trim());
   function najdiObjednavku(d, cislo, helios) {
     const ck = cisloKey(cislo);
     let o = ck ? d.objednavky.find(x => cisloKey(x.cislo) === ck) : null;
@@ -719,10 +734,14 @@ function mount(host) {
     const stavajici = d.polozky.filter(p => p.objId === o.id);
     const kodKey = k => low(k).replace(/\s+/g, '');
     (parsed.polozky || []).forEach((pp, i) => {
+      if (jeSluzba(pp.kod)) { if (pp.kod && !(o.poznamka || '').includes(pp.kod)) o.poznamka = str((o.poznamka ? o.poznamka + ' · ' : '') + pp.kod + (pp.cena ? ' ' + pp.cena + ' €' : ''), 1000); return; }
       let p = null;
-      if (pp.heliosPolozka) p = stavajici.find(x => x.heliosPolozka === pp.heliosPolozka && (!x.kod || kodKey(x.kod) === kodKey(pp.kod))) || null;
+      if (pp.heliosPolozka) p = stavajici.find(x => x.heliosPolozka === pp.heliosPolozka && (!x.kod || kodKey(x.kod) === kodKey(pp.kod) || kodFam(x.kod) === kodFam(pp.kod))) || null;
       if (!p) p = stavajici.find(x => kodKey(x.kod) === kodKey(pp.kod) && num(x.ks) === num(pp.ks) && !x._matched) || null;
       if (!p) p = stavajici.find(x => kodKey(x.kod) === kodKey(pp.kod) && !x._matched) || null;
+      if (!p) p = stavajici.find(x => kodFam(x.kod) === kodFam(pp.kod) && num(x.ks) === num(pp.ks) && !x._matched) || null;
+      if (!p) p = stavajici.find(x => kodFam(x.kod) === kodFam(pp.kod) && !x._matched) || null;
+      if (!p && kodFam(pp.kod).startsWith('VIKO')) p = stavajici.find(x => kodFam(x.kod).startsWith('VIKO') && num(x.ks) === num(pp.ks) && !x._matched) || null;
       if (p) {
         p._matched = true;
         const before = JSON.stringify([p.heliosPolozka, p.cena, p.ral, p.lem, p.razeni, p.polepy, p.rozmer, p.tloustka]);
@@ -770,7 +789,8 @@ function mount(host) {
       if (row.poznamka && !(o.poznamka || '').includes(row.poznamka)) { o.poznamka = str((o.poznamka ? o.poznamka + ' · ' : '') + row.poznamka, 1000); zm = true; }
       doplnPrijemce(d, o, row.prijemce);
       const ve = d.polozky.filter(x => x.objId === o.id);
-      if (!p) p = ve.find(x => kodKey(x.kod) === kodKey(row.kod) && (!x.cvz || !cvz) && num(x.ks) === num(row.ks)) || ve.find(x => kodKey(x.kod) === kodKey(row.kod) && !x.cvz) || null;
+      if (!p) p = ve.find(x => kodKey(x.kod) === kodKey(row.kod) && (!x.cvz || !cvz) && num(x.ks) === num(row.ks)) || ve.find(x => kodKey(x.kod) === kodKey(row.kod) && !x.cvz)
+        || ve.find(x => kodFam(x.kod) === kodFam(row.kod) && num(x.ks) === num(row.ks) && (!x.cvz || !cvz)) || null;
       if (!p) {
         p = normPolozka(d, { kod: row.kod, ks: row.ks, rozmer: row.rozmer, kgKs: row.kgKs, povrch: row.povrch, ral: row.ral, lem: row.lem, poznamka: row.tho ? 'provedení Thommen' : '' }, o.id);
         p.pozice = ve.length + 1;
