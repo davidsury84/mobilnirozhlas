@@ -36,7 +36,7 @@ function parseBestellung(text) {
   // „2 40 Stück" na samostatném řádku (zlom stránky) → spojit s řádkem kódu
   const lines = [];
   for (let i = 0; i < lines0.length; i++) {
-    let l = lines0[i];
+    let l = lines0[i].replace(/^Pos\.\s*Menge\s+Einheit\s+Artikel\s+E-Preis\s+(?:%\s+)?G-Preis\s+(?=\d)/i, '');
     if (/^\d{1,2}$/.test(l) && lines0[i + 1] && /^\d+\s+(?:Stück|Stk\.?)$/i.test(lines0[i + 1])) { l = l + ' ' + lines0[i + 1]; i++; }
     if (/^\d{1,2}\s+\d+\s+(?:Stück|Stk\.?)$/i.test(l) && lines0[i + 1] && /€/.test(lines0[i + 1]) && !/^\\?-?\d+,\d{2}\s*€$/.test(lines0[i + 1])) { l = l + ' ' + lines0[i + 1]; i++; }
     lines.push(l);
@@ -51,7 +51,7 @@ function parseBestellung(text) {
   if ((m = t.match(/(?:Betrag netto|Gesamtbetrag)\s*([\d.]+,\d{2})\s*€/))) o.celkem = num(m[1].replace(/\./g, ''));
   // Příjemce: řádek „CH-2504 Biel-Bienne" (PSČ + město), nad ním ulice, nad ní název.
   const zipIdx = lines.findIndex((l, i) => i > 0 && /^[A-Z]{1,2}\s?-\s?\d{4,5}\s+\S/.test(l) && !/Wolfenbüttel|ZLIN|Zlín/i.test(l));
-  const oneLine = lines.find((l, i) => i > 0 && i < 12 && /\s(?:[A-Z]{1,2}-)?\d{4,5}\s+[A-Za-zÀ-ž][A-Za-zÀ-ž.\-/ ]*$/.test(l) && !/Wolfenbüttel|ZLIN|Zlín|Steuer|USt|Nummer:|Lieferanten/i.test(l) && /\d/.test(l));
+  const oneLine = lines.find((l, i) => i > 0 && i < 12 && /\s(?:[A-Z]{1,2}-)?\d{4,5}\s+[A-Za-zÀ-ž][A-Za-zÀ-ž.\-/ ]*$/.test(l) && !/Wolfenbüttel|ZLIN|Zlín|Steuer-Nr|USt-IdNr|Nummer:|Lieferanten-Nr/i.test(l) && /\d/.test(l));
   if (zipIdx <= 1 && oneLine) {
     const m2 = oneLine.match(/^(.*?)\s+(?:([A-Z]{1,2})-)?(\d{4,5})\s+([A-Za-zÀ-ž][A-Za-zÀ-ž.\-/ ]*)$/);
     if (m2) {
@@ -72,12 +72,13 @@ function parseBestellung(text) {
   }
   // Pozice: „1 40 Stück CPRDÖ04.00LacNamDecÖlaTho 305,00 € 12.200,00 €" + popis až po další pozici / Übertrag / Betrag
   const polozky = [];
-  const posRe = /^(\d{1,2})\s+(\d+)\s+(?:Stück|Stk\.?|St\.)\s+(\S+)\s+([\d.]+,\d{2})\s*€\s+(?:\d+\s*%\s+)?([\d.]+,\d{2})\s*€\s*(.*)$/i;
+  const posRe = /^(\d{1,2})\s+(\d+)\s+(?:Stück|Stk\.?|St\.)\s+(\S+(?:\s+\S+){0,3}?)\s+([\d.]+,\d{2})\s*€\s+(?:\d+\s*%\s+)?([\d.]+,\d{2})\s*€\s*(.*)$/i;
   let cur = null;
   for (const l of lines) {
     const pm = l.match(posRe);
     if (pm) {
-      const k = normKod(pm[3]);
+      const k = normKod(pm[3].split(/\s+/).length > 1 && /^[A-Z]{1,2}\s+\d/.test(pm[3]) ? pm[3] : pm[3].split(/\s+/)[0]);
+      if (pm[3].split(/\s+/).length > 1 && !/^[A-Z]{1,2}\s+\d/.test(pm[3])) k.kod = normKod(pm[3].split(/\s+/)[0]).kod;
       cur = { pozice: +pm[1], ks: +pm[2], kod: k.kod, kodOrig: pm[3], tho: k.tho, cena: num(pm[4].replace(/\./g, '')), popis: [pm[6] || ''], ral: '', lem: '', razeni: '', polepy: '', rozmer: '', tloustka: null, povrch: '' };
       polozky.push(cur); continue;
     }
@@ -93,7 +94,8 @@ function parseBestellung(text) {
     if (posRe.test(l) || /^(Übertrag|Betrag netto|Gesamtbetrag)/i.test(l)) continue;
     let lm; loose.lastIndex = 0;
     while ((lm = loose.exec(l))) {
-      const kodRaw = lm[1].replace(/^(?:Artikel|G-Preis|E-Preis|%)\s+/g, '').trim();
+      let kodRaw = lm[1].trim();
+      for (let g = 0; g < 6; g++) kodRaw = kodRaw.replace(/^(?:Artikel|G-Preis|E-Preis|Gesamtpreis|Einheit|Menge|Pos\.|%)\s+/i, '');
       if (!kodRaw || known.has(kodRaw) || /^(Übertrag|Betrag|Gesamtbetrag|MwSt|aus)$/i.test(kodRaw)) continue;
       const e = num(lm[2].replace(/\./g, '')), rab = lm[3] ? num(lm[3]) : 0, g = num(lm[4].replace(/\./g, ''));
       const ks = e > 0 ? Math.round(g / (e * (1 - rab / 100))) : 0; if (!ks) continue;
@@ -114,9 +116,18 @@ function parseBestellung(text) {
     else if (p.ral) p.povrch = 'lak';
     if ((mm = d.match(/Masse\s+([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*\/\s*([\d.]+)\s*mm/i))) p.rozmer = [mm[1], mm[2], mm[3]].map(x => x.replace(/\./g, '')).join('x') + '/' + mm[4].replace(/\./g, '');
     else if ((mm = d.match(/Masse\s+([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)\s*mm/i))) p.rozmer = [mm[1], mm[2], mm[3]].map(x => x.replace(/\./g, '')).join('x');
+    else if ((mm = d.match(/(\d\.?\d{3})\s*x\s*(\d\.?\d{3}(?:\/\d\.?\d{3})?)\s*x\s*(\d\.?\d{3})\s*mm/i))) p.rozmer = [mm[1], mm[2], mm[3]].map(x => x.replace(/\./g, '')).join('x');
     if ((mm = d.match(/(\d(?:[.,]\d)?)\s*mm\s+Stärke/i))) p.tloustka = num(mm[1]);
-    if ((mm = d.match(/Namensprägung[^\n]*?(?:Feld[^\n]*?\)?\s*)?[:\-]?\s*([A-ZÄÖÜ0-9][A-ZÄÖÜ0-9 .&+\-/]{2,})\s*$/im))) p.razeni = slozitRazeni(mm[1]);
-    if (!p.razeni && (mm = d.match(/Namensprägung\s*(.+)/i))) p.razeni = slozitRazeni(mm[1].replace(/^\d\.\s*Feld\s*(\([^)]*\))?\s*/i, ''));
+    {
+      const ls = p.popis; const ni = ls.findIndex(l => /Namensprägung/i.test(l));
+      if (ni >= 0) {
+        let first = ls[ni].replace(/^.*?Namensprägung\s*:?\s*/i, '').replace(/^\d\.\s*Feld\s*(\([^)]*\))?\s*:?\s*/i, '').replace(/\s*Lackierung.*$/i, '').trim();
+        const parts = [first];
+        for (let j = ni + 1; j < ls.length && j <= ni + 3; j++) { if (/^(?:[^\s]\s+){2,}[^\s]$/.test(ls[j]) && !/€/.test(ls[j])) parts.push(ls[j]); else break; }
+        const collapse = l => { const tk = l.split(/\s+/); return tk.filter(t => t.length === 1).length >= tk.length * 0.6 ? tk.join('') : l; };
+        p.razeni = str(parts.map(collapse).filter(Boolean).join(' '), 120);
+      }
+    }
     if ((mm = d.match(/([^\n]*Aufkleber[^\n]*)/i))) p.polepy = str(mm[1], 200);
     p.nazev = str((p.popis[0] || '').replace(/^Metallbox\s*/i, 'Metallbox '), 160);
     delete p.popis;
