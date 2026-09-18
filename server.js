@@ -140,6 +140,7 @@ const LOXXER_KALK_APP_URL = process.env.LOXXER_KALK_APP_URL || 'https://loxxer-k
 const LOXXER_WEB_URL = process.env.LOXXER_WEB_URL || 'https://loxxer-production.up.railway.app'; // Veřejná prezentace LOXXER (Railway); má /admin na správu fotky a textů
 const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
 const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace „Hlídač sortimentu" (repo ranges-watchdog)
+const STAVEBNI_POVOLENI_URL = (process.env.STAVEBNI_POVOLENI_URL || '').replace(/\/$/, ''); // aplikace „Stavební povolení" (repo stavebni-povoleni) — leady pro obchodníky z úředních desek stavebních úřadů
 const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://tridici-linka-production.up.railway.app'; // aplikace „Design třídicí linky" — digitální dvojče (repo tridici-linka-railway); lze přepsat proměnnou
 const TRIDICI_LINKA_APP_FILE = path.join(ROOT, 'design-tridici-linky.html'); // alternativně lokální soubor (stejně jako u Kalkulace-lisy)
 const ESHOP_MODEL_APP_URL = (process.env.ESHOP_MODEL_APP_URL || 'https://eshop-model-production.up.railway.app').replace(/\/$/, ''); // aplikace „Model e-shopu" — drátový model nového e-shopu (repo davidsury84/1, složka eshop; Railway služba eshop-model); lze přepsat proměnnou
@@ -5397,6 +5398,19 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { 'Location': target }); return res.end();
       }
       return send(res, 200, '<!doctype html><meta charset="utf-8"><div style="font-family:system-ui;max-width:520px;margin:60px auto;text-align:center"><h1>🛰️ Hlídač sortimentu</h1><p>Pro napojení nastav proměnnou <code>RANGES_WATCHDOG_URL</code>.</p></div>', { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    // ---- Stavební povolení (modul): leady pro obchodníky z úředních desek stavebních úřadů; přístup řídí správce, identita přes SSO token ----
+    if (p === '/stavebni-povoleni-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('stavebnipovoleni') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k modulu Stavební povolení nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (STAVEBNI_POVOLENI_URL) {
+        let target = STAVEBNI_POVOLENI_URL + '/';
+        if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
+        res.writeHead(302, { 'Location': target }); return res.end();
+      }
+      return send(res, 200, '<!doctype html><meta charset="utf-8"><div style="font-family:system-ui;max-width:520px;margin:60px auto;text-align:center"><h1>🏗️ Stavební povolení</h1><p>Pro napojení nastav proměnnou <code>STAVEBNI_POVOLENI_URL</code>.</p></div>', { 'Content-Type': 'text/html; charset=utf-8' });
     }
 
     // ---- Aplikace modulu Model e-shopu: drátový model nového e-shopu (spolupráce více lidí); gating a SSO jako u třídicí linky ----

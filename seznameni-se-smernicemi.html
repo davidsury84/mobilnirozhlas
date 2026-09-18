@@ -1522,6 +1522,7 @@ const MUJ_MODS = [
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
+  { key:"stavebnipovoleni", icon:MUJ_IC.file, label:"Stavební povolení", gated:true },
   { grp:"Rozvoj a nástup" },
   { key:"adaptace", icon:MUJ_IC.adapt, label:"Adaptace" },
   { key:"skoleni", icon:MUJ_IC.school, label:"Školení" },
@@ -1572,6 +1573,7 @@ const MJ_L10N = {
   'Nabídka – konstrukce': ['Quotation — engineering','Angebot — Konstruktion','Oferta — konstrukcja','Пропозиція — конструкція','Ofertă — proiectare'],
   'Smlouvy': ['Contracts','Verträge','Umowy','Договори','Contracte'],
   'Hlídač sortimentu': ['Product range watchdog','Sortimentswächter','Monitor asortymentu','Моніторинг асортименту','Monitor sortiment'],
+  'Stavební povolení': ['Building permits','Baugenehmigungen','Pozwolenia na budowę','Дозволи на будівництво','Stavebné povolenia'],
   'Rozvoj a nástup': ['Development & onboarding','Entwicklung & Einstieg','Rozwój i wdrożenie','Розвиток і адаптація','Dezvoltare și integrare'],
   'Adaptace': ['Onboarding','Einarbeitung','Adaptacja','Адаптація','Integrare'],
   'Školení': ['Training','Schulungen','Szkolenia','Навчання','Instruiri'],
@@ -1873,7 +1875,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1968,6 +1970,7 @@ function mjGo(key){
   else if(key==="reklamace") showReklamace();
   else if(key==="pozadavky") showPozadavky();
   else if(key==="sortiment") showSortiment();
+  else if(key==="stavebnipovoleni") showStavebniPovoleni();
   else if(key==="adaptace") showAdaptace();
   else if(key==="dovolena") showDovolena();
   else if(key==="pruzkumy") showPruzkumy();
@@ -3493,6 +3496,13 @@ function showSortiment(){
   const body=document.getElementById("mujBody");
   if(!MUJ.admin && (MUJ.modules||[]).indexOf("sortiment")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
   body.innerHTML='<iframe src="/sortiment-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Hlídač sortimentu"></iframe>';
+  window.scrollTo(0,0);
+}
+function showStavebniPovoleni(){
+  MUJ.view="stavebnipovoleni"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("stavebnipovoleni")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<iframe src="/stavebni-povoleni-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#fff" title="Stavební povolení"></iframe>';
   window.scrollTo(0,0);
 }
 function showAdaptace(){
@@ -5857,14 +5867,14 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["qooling","Qooling — kvalita (závady)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["qooling","Qooling — kvalita (závady)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop","qooling"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
   ["Vývoj projektů",["eshopmodel"]],
-  ["Agendy",["doprava","loznyplan","vozidla","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","adaptace","freelo","aktuality"]]
+  ["Agendy",["doprava","loznyplan","vozidla","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","stavebnipovoleni","adaptace","freelo","aktuality"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }
