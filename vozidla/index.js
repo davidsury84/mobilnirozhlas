@@ -218,11 +218,9 @@ function mount(host) {
     const r = role(req);
     return !!(r.admin || r.spravce || r.zodpovedny);
   }
-  // Která vozidla člověk uvidí.
-  function viditelna(d, r) {
-    if (r.admin) return d.vozidla;
-    return d.vozidla.filter(v => low(v.spravceEmail) === r.email || r.strediska.indexOf(v.stredisko) >= 0);
-  }
+  // Vozový park vidí celý každý, kdo má do modulu přístup — přehled o firemních autech
+  // není tajný a lidem pomáhá najít, kdo které auto má. Editovat smí jen svoje.
+  function viditelna(d, r) { return d.vozidla; }
   function smiEditovat(v, r) {
     return !!(r.admin || low(v.spravceEmail) === r.email || r.strediska.indexOf(v.stredisko) >= 0);
   }
@@ -413,7 +411,7 @@ function mount(host) {
       seedImport: d.seedImport || null,
       strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA,
       nastaveni: d.nastaveni,
-      zamestnanci: (r.admin || r.zodpovedny) ? zamestnanci() : [],
+      zamestnanci: zamestnanci(),   // pro našeptávač; stejná data jako telefonní seznam intranetu
     });
     return true;
   }
@@ -421,11 +419,14 @@ function mount(host) {
   // ---- zápis vozidla -------------------------------------------------------
   async function apiVuz(req, res) {
     const r = role(req);
-    if (!r.admin) { json(res, 403, { chyba: 'Vozidlo může zakládat a měnit jen správce modulu.' }); return true; }
     const b = JSON.parse(await host.readBody(req) || '{}');
     const d = load();
     let v = b.id ? d.vozidla.find(x => x.id === b.id) : null;
     const novy = !v;
+    // Zakládat vozidla smí správce modulu; upravovat i ten, kdo za vozidlo odpovídá
+    // (jeho správce nebo vedoucí jeho střediska) — jinak by museli všechno hlásit adminovi.
+    if (novy && !r.admin) { json(res, 403, { chyba: 'Nové vozidlo může založit jen správce modulu.' }); return true; }
+    if (!novy && !smiEditovat(v, r)) { json(res, 403, { chyba: 'Toto vozidlo nemáte v gesci.' }); return true; }
     if (novy) {
       v = { id: 'v' + crypto.randomBytes(5).toString('hex'), vznik: Date.now(), km: [], fotky: [], inventury: [], stkHistorie: [], skody: [] };
       d.vozidla.push(v);
