@@ -27,6 +27,8 @@ const urlLib = require('url');
 
 const HTML_FILE = path.join(__dirname, 'vozidla.html');
 const SMERNICE_FILE = path.join(__dirname, 'smernice-sverene-vozidlo.html');
+// Prvotní naplnění evidence: soubor se NEDÁVÁ do repa (je veřejné) — nahraje se na datový
+// disk jako data/vozidla-import.json a modul ho při startu jednorázově naimportuje.
 
 // Role člověka zodpovědného za středisko — dle zadání.
 const ROLE = {
@@ -48,6 +50,7 @@ const MIME = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 function mount(host) {
   const DATA_F = path.join(host.dataDir || __dirname, 'vozidla.json');
+  const SEED_FILE = path.join(host.dataDir || __dirname, 'vozidla-import.json');
   const FILES_DIR = path.join(host.dataDir || __dirname, 'vozidla-files');
   try { if (!fs.existsSync(FILES_DIR)) fs.mkdirSync(FILES_DIR, { recursive: true }); } catch (_) {}
 
@@ -73,6 +76,8 @@ function mount(host) {
     if (typeof n.reditelEmail !== 'string') n.reditelEmail = '';  // ředitel společnosti — hlásí se mu každá škoda
     if (typeof n.reditelJmeno !== 'string') n.reditelJmeno = '';
     if (!d.odeslano || typeof d.odeslano !== 'object') d.odeslano = {};  // klíč → timestamp (ať se nespamuje)
+    if (typeof n.upominkyOd !== 'string') n.upominkyOd = '';      // odklad upomínek po hromadném importu
+    if (!d.seedImport && !d.vozidla.length) { if (importSeed(d)) save(d); }
     return d;
   }
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
@@ -85,11 +90,101 @@ function mount(host) {
     return emps.filter(e => e && e.email).map(e => ({
       email: low(e.email), name: e.name || e.email,
       pozice: e.pozice || '', stredisko: e.stredisko || '',
+      telefon: String(e.telefon || '').trim(), osCislo: String(e.osCislo || '').trim(),
     }));
   }
   function jmenoPodleMailu(email) {
     const e = zamestnanci().find(x => x.email === low(email));
     return e ? e.name : '';
+  }
+  // Kontakt se NIKDY neukládá k vozidlu — bere se živě z databáze zaměstnanců,
+  // takže změna telefonu v Organizaci se hned projeví i tady.
+  function kontakt(email) {
+    if (!email) return null;
+    const e = zamestnanci().find(x => x.email === low(email));
+    return e ? { email: e.email, jmeno: e.name, telefon: e.telefon, pozice: e.pozice, stredisko: e.stredisko } : { email: low(email), jmeno: '', telefon: '', pozice: '', stredisko: '' };
+  }
+
+  // ---- párování osoby z firemní tabulky na zaměstnance -----------------------
+  //  V tabulce stojí „002119 Vasiliadis Lazaros PhD." nebo „Krajčová Barbora".
+  //  Nejspolehlivější je osobní číslo, jinak zkusíme jméno bez diakritiky a titulů.
+  function bezDiakritiky(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+  const TITULY = /\b(bc|ing|mgr|mudr|phdr|judr|dis|phd|ph|msc|mba|rndr|doc|prof)\b/g;
+  function slovaJmena(jm) {
+    const t = bezDiakritiky(jm).replace(/[^a-z ]/g, ' ').replace(TITULY, ' ');
+    return t.split(/\s+/).filter(w => w.length > 1).sort();
+  }
+  function najdiZamestnance(osoba) {
+    const txt = String(osoba || '').trim(); if (!txt) return null;
+    const zam = zamestnanci();
+    const m = /^(\d{4,6})\s+(.*)$/.exec(txt);
+    const cislo = m ? m[1].replace(/^0+/, '') : '';
+    const jmeno = m ? m[2] : txt;
+    if (cislo) {
+      const p = zam.find(e => e.osCislo && e.osCislo.replace(/^0+/, '') === cislo);
+      if (p) return { emp: p, jak: 'osobní číslo' };
+    }
+    const s2 = slovaJmena(jmeno).join(' ');
+    if (!s2) return null;
+    const presne = zam.filter(e => slovaJmena(e.name).join(' ') === s2);
+    if (presne.length === 1) return { emp: presne[0], jak: 'jméno' };
+    // částečná shoda (v tabulce bývá jméno navíc: „Šmídová Rabie Suzan" × „Šmídová Suzan")
+    const a = new Set(s2.split(' '));
+    const cast = zam.filter(e => {
+      const b = new Set(slovaJmena(e.name));
+      if (!b.size) return false;
+      const prunik = [...b].filter(w => a.has(w)).length;
+      return prunik >= 2 && (prunik === b.size || prunik === a.size);
+    });
+    if (cast.length === 1) return { emp: cast[0], jak: 'jméno (částečná shoda)' };
+    return null;
+  }
+
+  // ---- jednorázový import evidence z firemní tabulky --------------------------
+  const TYP_Z_TABULKY = { 'osobní vozidlo': 'osobni', 'nákladní vozidlo': 'nakladni', 'užitkové vozidlo': 'uzitkove', 'přívěs': 'privees', 'návěs': 'privees', 'tahač': 'tahac' };
+  function importSeed(d) {
+    if (d.seedImport || d.vozidla.length) return null;
+    let seed = [];
+    try { seed = JSON.parse(fs.readFileSync(SEED_FILE, 'utf8')); } catch (_) { return null; }
+    if (!Array.isArray(seed) || !seed.length) return null;
+    let sparovano = 0;
+    seed.forEach(r => {
+      const nalez = najdiZamestnance(r.osoba);
+      const popis = String(r.popis || '').trim();
+      const mezera = popis.indexOf(' ');
+      const v = {
+        id: 'v' + crypto.randomBytes(5).toString('hex'),
+        vznik: Date.now(),
+        spz: String(r.spz || '').trim().toUpperCase(),
+        znacka: mezera > 0 ? popis.slice(0, mezera) : popis,
+        model: mezera > 0 ? popis.slice(mezera + 1) : '',
+        vin: '',
+        rokVyroby: Number(r.rokVyroby) || 0,
+        typ: TYP_Z_TABULKY[String(r.typ || '').toLowerCase()] || 'osobni',
+        stav: 'aktivni',
+        stredisko: String(r.stredisko || '').trim(),
+        spravceEmail: nalez ? nalez.emp.email : '',
+        spravceJmeno: nalez ? nalez.emp.name : '',
+        spravceZTabulky: String(r.osoba || '').trim(),   // co bylo v tabulce (i když se nespároval)
+        spravceParovani: nalez ? nalez.jak : '',
+        evidCislo: String(r.evid || '').trim(),
+        utvar: String(r.utvar || '').trim(),
+        cisloTp: String(r.cisloTp || '').trim(),
+        majitel: String(r.majitel || '').trim(),
+        stkDo: '',
+        porizeno: '',
+        poznamka: String(r.poznamka || '').trim(),
+        km: [], fotky: [], inventury: [], stkHistorie: [], skody: [],
+      };
+      if (nalez) sparovano++;
+      d.vozidla.push(v);
+    });
+    d.seedImport = { ts: Date.now(), vozidel: seed.length, sparovano, zdroj: 'Vozidla.xlsx' };
+    try { fs.renameSync(SEED_FILE, SEED_FILE + '.hotovo'); } catch (_) {}   // ať se import nespustí podruhé
+    // Aby import hned nerozeslal desítky výzev: upomínky se rozjedou až za 14 dní.
+    d.nastaveni.upominkyOd = new Date(Date.now() + 14 * DEN).toISOString().slice(0, 10);
+    console.log('[vozidla] import evidence: ' + seed.length + ' vozidel, správce spárován u ' + sparovano);
+    return d.seedImport;
   }
 
   // ---- přístup -------------------------------------------------------------
@@ -222,12 +317,14 @@ function mount(host) {
     const chybi = chybejiciRoky(v);
     const upoz = [];
     if (v.stav === 'aktivni') {
-      if (dnyStk === null) upoz.push({ druh: 'stk', urgent: true, text: 'chybí datum platnosti technické prohlídky' });
+      // Chybějící údaj není totéž co propadlá prohlídka — urgentní je jen to druhé.
+      if (dnyStk === null) upoz.push({ druh: 'stk-chybi', urgent: false, text: 'chybí datum platnosti technické prohlídky' });
       else if (dnyStk < 0) upoz.push({ druh: 'stk', urgent: true, text: 'technická prohlídka propadla před ' + (-dnyStk) + ' dny' });
       else if (dnyStk <= 60) upoz.push({ druh: 'stk', urgent: dnyStk <= 14, text: 'technická prohlídka končí za ' + dnyStk + ' ' + (dnyStk === 1 ? 'den' : dnyStk < 5 ? 'dny' : 'dní') });
       if (chybi.length) upoz.push({ druh: 'km', urgent: false, text: 'chybí stav tachometru za rok ' + chybi.join(', ') });
       if (inv.potreba) upoz.push({ druh: 'inventura', urgent: false, text: 'inventarizace svěřeného majetku — ' + inv.text });
       if (!v.spravceEmail) upoz.push({ druh: 'spravce', urgent: false, text: 'není přidělen správce vozu' });
+      if (!v.vin) upoz.push({ druh: 'vin', urgent: false, text: 'chybí VIN' });
     }
     return { dnyStk, inventura: inv, chybejiciRoky: chybi, upozorneni: upoz, prodej: doporuceniProdeje(v, nast) };
   }
@@ -297,6 +394,8 @@ function mount(host) {
     const vozy = viditelna(d, r).map(v => Object.assign({}, v, {
       stav_: stavVozu(v, d.nastaveni),
       smiEdit: smiEditovat(v, r),
+      spravceKontakt: kontakt(v.spravceEmail),                    // živě z databáze zaměstnanců
+      zodpovednyKontakt: (() => { const z = d.zodpovedne.find(x => x.stredisko === v.stredisko); return z ? Object.assign({ role: z.role }, kontakt(z.email)) : null; })(),
       fotky: (v.fotky || []).map((f, i) => ({ i, popis: f.popis || '', ts: f.ts, kdo: f.kdo || '', url: '/api/vozidla/foto?id=' + v.id + '&fi=' + i })),
     }));
     const strediska = Array.from(new Set(
@@ -305,7 +404,9 @@ function mount(host) {
     json(res, 200, {
       me: r,
       vozidla: vozy,
-      zodpovedne: r.admin ? d.zodpovedne : d.zodpovedne.filter(z => r.strediska.indexOf(z.stredisko) >= 0),
+      zodpovedne: (r.admin ? d.zodpovedne : d.zodpovedne.filter(z => r.strediska.indexOf(z.stredisko) >= 0))
+        .map(z => Object.assign({}, z, { kontakt: kontakt(z.email) })),
+      seedImport: d.seedImport || null,
       strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA,
       nastaveni: d.nastaveni,
       zamestnanci: (r.admin || r.zodpovedny) ? zamestnanci() : [],
@@ -337,6 +438,7 @@ function mount(host) {
     v.spravceJmeno = v.spravceEmail ? (jmenoPodleMailu(v.spravceEmail) || s('spravceJmeno')) : '';
     v.stkDo = s('stkDo');
     v.porizeno = s('porizeno');
+    v.evidCislo = s('evidCislo'); v.cisloTp = s('cisloTp'); v.majitel = s('majitel');
     v.poznamka = String(b.poznamka == null ? (v.poznamka || '') : b.poznamka).slice(0, 2000);
     if (!v.spz && !v.vin) { json(res, 400, { chyba: 'Vyplň aspoň SPZ nebo VIN.' }); return true; }
     save(d);
@@ -688,6 +790,8 @@ function mount(host) {
       if (ok) { d.odeslano[klic] = Date.now(); zmena = true; }
       return ok;
     };
+    // Po hromadném importu evidence dáme lidem čas doplnit údaje, než začnou chodit upomínky.
+    if (nast.upominkyOd && dnesStr < nast.upominkyOd) return;
     for (const v of d.vozidla) {
       if (v.stav !== 'aktivni') continue;
       const st = stavVozu(v, nast);
@@ -733,6 +837,9 @@ function mount(host) {
     }
     if (zmena) save(d);
   }
+
+  // Při startu si data načteme — tím proběhne i jednorázový import evidence z firemní tabulky.
+  try { load(); } catch (e) { console.error('[vozidla] data se nepodařilo načíst:', e.message); }
 
   return { handle, tick, notifikace, hasAccess: (email) => {
     const d = load(); email = low(email);

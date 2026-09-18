@@ -179,7 +179,9 @@ function stavPill(v){
   if(v.stav!=="aktivni")return '<span class="pill mute">'+esc(D.stavy[v.stav]||v.stav)+'</span>';
   const urg=s.upozorneni.some(u=>u.urgent);
   if(urg)return '<span class="pill bad">vyžaduje zásah</span>';
-  if(s.upozorneni.length)return '<span class="pill warn">'+s.upozorneni.length+' upozornění</span>';
+  // chybějící údaje po importu evidence nejsou problém vozidla, ale nedoplněná evidence
+  const jenDoplnit=s.upozorneni.every(u=>["stk-chybi","vin","km","inventura","spravce"].indexOf(u.druh)>=0);
+  if(s.upozorneni.length)return '<span class="pill warn">'+(jenDoplnit?"doplnit údaje":s.upozorneni.length+" upozornění")+'</span>';
   return '<span class="pill ok">v pořádku</span>';
 }
 function stkPill(v){
@@ -196,6 +198,7 @@ function filtrovana(){
   if(q)vs=vs.filter(v=>[v.spz,v.znacka,v.model,v.vin,v.spravceJmeno,v.stredisko].join(" ").toLowerCase().includes(q));
   if(FILTR.stredisko)vs=vs.filter(v=>v.stredisko===FILTR.stredisko);
   if(FILTR.jen==="stk")vs=vs.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk"));
+  if(FILTR.jen==="doplnit")vs=vs.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0));
   if(FILTR.jen==="km")vs=vs.filter(v=>v.stav_.chybejiciRoky.length);
   if(FILTR.jen==="inv")vs=vs.filter(v=>v.stav_.inventura.potreba);
   return vs.sort((a,b)=>{
@@ -206,22 +209,33 @@ function filtrovana(){
 }
 function vykresliPrehled(){
   const vs=filtrovana(), akt=D.vozidla.filter(v=>v.stav==="aktivni");
-  const stk=akt.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk")).length;
+  const stk=akt.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk")).length;          // propadlá nebo do 60 dní
+  const chybiUdaj=akt.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0)).length;
   const km=akt.filter(v=>v.stav_.chybejiciRoky.length).length;
   const inv=akt.filter(v=>v.stav_.inventura.potreba).length;
   let h='<div class="stat">'
     +'<div class="s"><div class="n">'+akt.length+'</div><div class="l">vozidel v provozu</div></div>'
-    +'<div class="s '+(stk?"bad":"")+'"><div class="n">'+stk+'</div><div class="l">technická prohlídka</div></div>'
+    +'<div class="s '+(stk?"bad":"")+'"><div class="n">'+stk+'</div><div class="l">technická prohlídka končí nebo propadla</div></div>'
+    +'<div class="s '+(chybiUdaj?"warn":"")+'"><div class="n">'+chybiUdaj+'</div><div class="l">chybí údaje (STK, VIN, správce)</div></div>'
     +'<div class="s '+(km?"warn":"")+'"><div class="n">'+km+'</div><div class="l">chybí roční tachometr</div></div>'
     +'<div class="s '+(inv?"warn":"")+'"><div class="n">'+inv+'</div><div class="l">čeká inventarizace</div></div>'
     +'</div>';
+  if(D.seedImport&&ZALOZKA!=="moje"){
+    const bezSpravce=D.vozidla.filter(v=>!v.spravceEmail&&v.spravceZTabulky).length;
+    h+='<div class="card"><div class="b" style="background:var(--green-soft);border-bottom:0">'
+      +'<strong>Evidence načtena z firemní tabulky Vozidla.xlsx</strong> — '+D.seedImport.vozidel+' vozidel, '
+      +'u '+D.seedImport.sparovano+' se podařilo spárovat správce vozu s databází zaměstnanců.'
+      +(bezSpravce?' U '+bezSpravce+' zbývá správce přiřadit ručně (jméno z tabulky je u vozidla vidět).':'')
+      +' <span class="mut">Tabulka neobsahovala VIN ani platnost technické prohlídky — ty je potřeba doplnit.</span>'
+      +'</div></div>';
+  }
   h+='<div class="card"><div class="h">'
     +'<h2>'+(ZALOZKA==="moje"?"Moje vozidla":"Vozidla")+'</h2>'
     +'<input class="btn" style="font-weight:400;min-width:200px" placeholder="Hledat SPZ, VIN, správce…" value="'+esc(FILTR.q)+'" oninput="FILTR.q=this.value;vykresli()">'
     +'<select class="btn" style="font-weight:400" onchange="FILTR.stredisko=this.value;vykresli()"><option value="">všechna střediska</option>'
       +D.strediska.map(s=>'<option '+(FILTR.stredisko===s?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select>'
     +'<select class="btn" style="font-weight:400" onchange="FILTR.jen=this.value;vykresli()">'
-      +[["","vše"],["stk","jen technická prohlídka"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
+      +[["","vše"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
         .map(([k,t])=>'<option value="'+k+'" '+(FILTR.jen===k?"selected":"")+'>'+t+'</option>').join("")+'</select>'
     +'<div class="sp"></div>'
     +'<a class="btn sm" href="/api/vozidla/export">⬇ CSV</a>'
@@ -234,7 +248,7 @@ function vykresliPrehled(){
     h+='<tr>'
       +'<td><span class="spz">'+esc(v.spz||"bez SPZ")+'</span><div class="mut">'+esc([v.znacka,v.model].filter(Boolean).join(" ")||"—")+'</div></td>'
       +'<td class="num">'+esc(v.vin||"—")+'<div class="mut">'+(v.rokVyroby||"—")+'</div></td>'
-      +'<td>'+esc(v.spravceJmeno||v.spravceEmail||"—")+(v.spravceEmail?'<div class="mut">'+esc(v.spravceEmail)+'</div>':'<div class="mut" style="color:var(--red)">nepřidělen</div>')+'</td>'
+      +'<td>'+spravceBunka(v)+'</td>'
       +'<td>'+esc(v.stredisko||"—")+'</td>'
       +'<td>'+stkPill(v)+'</td>'
       +'<td class="num">'+(pk?cis(pk.km)+' km<div class="mut">za '+pk.rok+'</div>':'<span class="mut">nezadán</span>')+'</td>'
@@ -247,6 +261,18 @@ function vykresliPrehled(){
 }
 
 /* ---------- detail vozidla ---------- */
+// Jméno, telefon i pozice bereme z databáze zaměstnanců — v modulu se žádné kontakty nevedou.
+function spravceBunka(v){
+  const k=v.spravceKontakt;
+  if(!k||!k.email){
+    return '<span class="mut" style="color:var(--red)">nepřidělen</span>'
+      +(v.spravceZTabulky?'<div class="mut">v tabulce: '+esc(v.spravceZTabulky)+'</div>':'');
+  }
+  return '<strong>'+esc(k.jmeno||k.email)+'</strong>'
+    +(k.pozice?'<div class="mut">'+esc(k.pozice)+'</div>':'')
+    +'<div class="mut"><a href="mailto:'+esc(k.email)+'">'+esc(k.email)+'</a>'
+    +(k.telefon?' · <a href="tel:'+esc(k.telefon.replace(/\s/g,""))+'">'+esc(k.telefon)+'</a>':'')+'</div>';
+}
 function vuz(id){return D.vozidla.find(v=>v.id===id);}
 function detail(id){
   const v=vuz(id), s=v.stav_;
@@ -255,8 +281,19 @@ function detail(id){
   let h='<div class="grid3">'
     +'<div><div class="mut">Vozidlo</div><div class="spz">'+esc(v.spz||"—")+'</div><div>'+esc([v.znacka,v.model].filter(Boolean).join(" "))+'</div></div>'
     +'<div><div class="mut">VIN</div><div class="mono">'+esc(v.vin||"—")+'</div><div class="mut">rok výroby '+(v.rokVyroby||"—")+'</div></div>'
-    +'<div><div class="mut">Správce vozu</div><div><strong>'+esc(v.spravceJmeno||v.spravceEmail||"nepřidělen")+'</strong></div><div class="mut">'+esc(v.stredisko||"bez střediska")+'</div></div>'
-    +'</div>';
+    +'<div><div class="mut">Správce vozu</div>'+spravceBunka(v)+'</div>'
+    +'</div>'
+    +'<div class="grid3" style="margin-top:10px">'
+    +'<div><div class="mut">Středisko</div><div>'+esc(v.stredisko||"—")+'</div>'
+      +(v.zodpovednyKontakt&&v.zodpovednyKontakt.email
+        ? '<div class="mut">zodpovídá '+esc(v.zodpovednyKontakt.jmeno||v.zodpovednyKontakt.email)
+          +(D.role[v.zodpovednyKontakt.role]?' ('+esc(D.role[v.zodpovednyKontakt.role])+')':'')
+          +(v.zodpovednyKontakt.telefon?' · '+esc(v.zodpovednyKontakt.telefon):'')+'</div>'
+        : '<div class="mut" style="color:var(--red)">zodpovědná osoba nenastavena</div>')+'</div>'
+    +'<div><div class="mut">Evidenční číslo / útvar</div><div>'+esc(v.evidCislo||"—")+(v.utvar?' · '+esc(v.utvar):'')+'</div></div>'
+    +'<div><div class="mut">Technický průkaz</div><div class="mono">'+esc(v.cisloTp||"—")+'</div>'+(v.majitel?'<div class="mut">'+esc(v.majitel)+'</div>':'')+'</div>'
+    +'</div>'
+    +(v.poznamka?'<div class="mut" style="margin-top:8px">Poznámka z evidence: '+esc(v.poznamka)+'</div>':'');
   if(s.upozorneni.length){
     h+='<div class="card" style="margin:14px 0 0;border-color:#e8d9a8"><div class="b" style="background:var(--yellow-soft)"><strong>Co je potřeba udělat</strong><div class="upoz" style="margin-top:6px">'
       +s.upozorneni.map(u=>'<span class="u'+(u.urgent?" urg":"")+'">• '+esc(u.text)+'</span>').join("")+'</div></div></div>';
@@ -438,6 +475,10 @@ function editVuz(id){
     +'</div><div class="grid2">'
     +'<label class="f"><span>Technická prohlídka platí do</span><input id="eStk" type="date" value="'+esc(v.stkDo||"")+'"></label>'
     +'<label class="f"><span>Datum pořízení</span><input id="ePor" type="date" value="'+esc(v.porizeno||"")+'"></label>'
+    +'</div><div class="grid3">'
+    +'<label class="f"><span>Evidenční číslo</span><input id="eEvid" value="'+esc(v.evidCislo||"")+'"></label>'
+    +'<label class="f"><span>Číslo technického průkazu</span><input id="eTp" value="'+esc(v.cisloTp||"")+'"></label>'
+    +'<label class="f"><span>Majitel / režim</span><input id="eMaj" value="'+esc(v.majitel||"")+'" placeholder="Vlastní, leasing…"></label>'
     +'</div>'
     +'<label class="f"><span>Poznámka</span><textarea id="ePozn">'+esc(v.poznamka||"")+'</textarea></label>'
     +'<div class="hint">Jeden člověk může být správcem více vozidel — stačí ho vybrat u každého z nich.</div>';
@@ -447,7 +488,8 @@ function editVuz(id){
 async function ulozVuz(id){
   const t={id:id||undefined,spz:$("#eSpz").value,znacka:$("#eZnacka").value,model:$("#eModel").value,vin:$("#eVin").value,
     rokVyroby:$("#eRok").value,typ:$("#eTyp").value,stredisko:$("#eStred").value,spravceEmail:$("#eSpravce").value,
-    stav:$("#eStav").value,stkDo:$("#eStk").value,porizeno:$("#ePor").value,poznamka:$("#ePozn").value};
+    stav:$("#eStav").value,stkDo:$("#eStk").value,porizeno:$("#ePor").value,poznamka:$("#ePozn").value,
+    evidCislo:$("#eEvid").value,cisloTp:$("#eTp").value,majitel:$("#eMaj").value};
   try{ const r=await api("/api/vozidla/vuz",t); toast("Uloženo."); zavri(); await nacti(); detail(id||r.id); }
   catch(e){alert(e.message);}
 }
@@ -475,7 +517,11 @@ function vykresliStrediska(){
         +'<td class="num">'+pocet+'</td>'
         +'<td style="text-align:right"><button class="btn sm" onclick="ulozZod(\''+esc(s)+'\')">Uložit</button></td>';
     }else{
-      h+='<td>'+esc(z?z.jmeno||z.email:"— nikdo —")+'</td><td>'+esc(z?D.role[z.role]||z.role:"—")+'</td><td class="num">'+pocet+'</td>';
+      const k=z&&z.kontakt;
+      h+='<td>'+(z?('<strong>'+esc(k&&k.jmeno||z.jmeno||z.email)+'</strong>'
+        +'<div class="mut"><a href="mailto:'+esc(z.email)+'">'+esc(z.email)+'</a>'
+        +(k&&k.telefon?' · '+esc(k.telefon):'')+'</div>'):'<span class="mut">— nikdo —</span>')+'</td>'
+        +'<td>'+esc(z?D.role[z.role]||z.role:"—")+'</td><td class="num">'+pocet+'</td>';
     }
     h+='</tr>';
   });
