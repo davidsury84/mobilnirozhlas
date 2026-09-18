@@ -90,6 +90,20 @@ td.num{font-family:var(--mono);white-space:nowrap}
 .modal .box .b{padding:18px}
 .modal .box .f2{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 
+.ac{position:relative}
+.ac .acin{width:100%;padding:8px 30px 8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper)}
+.ac .acin:focus{outline:none;border-color:var(--green)}
+.ac .acx{position:absolute;right:6px;top:6px;border:0;background:transparent;color:var(--faint);font-size:13px;padding:2px 4px;line-height:1}
+.ac .acx:hover{color:var(--red)}
+.acbox{position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--paper);border:1px solid var(--line-strong);
+  border-radius:10px;box-shadow:0 12px 30px rgba(15,21,18,.16);max-height:260px;overflow:auto;display:none;margin-top:3px}
+.acbox.on{display:block}
+.acbox .it{padding:7px 11px;cursor:pointer;border-bottom:1px solid var(--line);font-size:13px}
+.acbox .it:last-child{border-bottom:0}
+.acbox .it:hover,.acbox .it.sel{background:var(--green-soft)}
+.acbox .it b{font-weight:600}
+.acbox .it .m{color:var(--ink-soft);font-size:11.5px}
+.acbox .prazdno{padding:10px 11px;color:var(--ink-soft);font-size:12.5px}
 .fotky{display:flex;gap:10px;flex-wrap:wrap}
 .fotky .fo{position:relative;width:132px}
 .fotky .fo img{width:132px;height:99px;object-fit:cover;border-radius:9px;border:1px solid var(--line-strong);display:block;cursor:zoom-in}
@@ -194,8 +208,13 @@ function stkPill(v){
 function filtrovana(){
   let vs=D.vozidla.slice();
   if(ZALOZKA==="moje")vs=vs.filter(v=>v.spravceEmail===D.me.email);
-  const q=FILTR.q.trim().toLowerCase();
-  if(q)vs=vs.filter(v=>[v.spz,v.znacka,v.model,v.vin,v.spravceJmeno,v.stredisko].join(" ").toLowerCase().includes(q));
+  const tok=bezDiak(FILTR.q).split(/\s+/).filter(Boolean);
+  if(tok.length)vs=vs.filter(v=>{
+    const k=v.spravceKontakt||{};
+    const seno=bezDiak([v.spz,v.znacka,v.model,v.vin,v.stredisko,v.evidCislo,v.cisloTp,
+      v.spravceJmeno,v.spravceZTabulky,k.jmeno,k.email,k.pozice].join(" "));
+    return tok.every(t=>seno.includes(t));
+  });
   if(FILTR.stredisko)vs=vs.filter(v=>v.stredisko===FILTR.stredisko);
   if(FILTR.jen==="stk")vs=vs.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk"));
   if(FILTR.jen==="doplnit")vs=vs.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0));
@@ -231,7 +250,7 @@ function vykresliPrehled(){
   }
   h+='<div class="card"><div class="h">'
     +'<h2>'+(ZALOZKA==="moje"?"Moje vozidla":"Vozidla")+'</h2>'
-    +'<input class="btn" style="font-weight:400;min-width:200px" placeholder="Hledat SPZ, VIN, správce…" value="'+esc(FILTR.q)+'" oninput="FILTR.q=this.value;vykresli()">'
+    +'<input class="btn" style="font-weight:400;min-width:200px" placeholder="Hledat SPZ, VIN, správce, středisko…" value="'+esc(FILTR.q)+'" oninput="FILTR.q=this.value;vykresli()">'
     +'<select class="btn" style="font-weight:400" onchange="FILTR.stredisko=this.value;vykresli()"><option value="">všechna střediska</option>'
       +D.strediska.map(s=>'<option '+(FILTR.stredisko===s?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select>'
     +'<select class="btn" style="font-weight:400" onchange="FILTR.jen=this.value;vykresli()">'
@@ -260,7 +279,80 @@ function vykresliPrehled(){
   $("#obsah").innerHTML=h;
 }
 
+/* ---------- našeptávač zaměstnanců ----------
+   Vybírat člověka z 85 položek v rozbalovacím seznamu je utrpení. Tohle hledá
+   při psaní v celém jméně, e-mailu, pozici i středisku, bez ohledu na diakritiku
+   a na pořadí slov („sury david" najde i „Surý David"). */
+function bezDiak(t){return String(t==null?"":t).normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();}
+function lidi(){return (D.zamestnanci||[]);}
+function osobaPodleMailu(em){return lidi().find(x=>x.email===String(em||"").toLowerCase())||null;}
+function hleda(q){
+  const tok=bezDiak(q).split(/\s+/).filter(Boolean);
+  const vse=lidi();
+  if(!tok.length)return vse.slice(0,50);
+  return vse.filter(e=>{
+    const seno=bezDiak([e.name,e.email,e.pozice,e.stredisko].join(" "));
+    return tok.every(t=>seno.includes(t));
+  }).slice(0,50);
+}
+let AC_SEL={};
+function acHtml(id,email,placeholder){
+  const k=osobaPodleMailu(email);
+  return '<div class="ac">'
+    +'<input type="hidden" id="'+id+'" value="'+esc(email||"")+'">'
+    +'<input class="acin" id="'+id+'_in" autocomplete="off" placeholder="'+esc(placeholder||"Začni psát jméno, pozici nebo středisko…")+'"'
+    +' value="'+esc(k?k.name:(email||""))+'"'
+    +" oninput=\"acOtevri('"+id+"')\" onfocus=\"acOtevri('"+id+"')\" onkeydown=\"acKlavesa(event,'"+id+"')\">"
+    +"<button type=\"button\" class=\"acx\" onclick=\"acZrus('"+id+"')\" title=\"Zrušit výběr\">✕</button>"
+    +'<div class="acbox" id="'+id+'_box"></div></div>';
+}
+function acOtevri(id){
+  const vstup=document.getElementById(id+"_in"), box=document.getElementById(id+"_box");
+  if(!vstup||!box)return;
+  const nalezeno=hleda(vstup.value);
+  AC_SEL[id]=0;
+  box.innerHTML=nalezeno.length
+    ? nalezeno.map((e,i)=>'<div class="it'+(i===0?" sel":"")+'" data-em="'+esc(e.email)+'"'
+        +" onmousedown=\"acVyber('"+id+"','"+esc(e.email)+"')\">"
+        +'<b>'+esc(e.name)+'</b>'
+        +'<div class="m">'+[e.pozice,e.stredisko].filter(Boolean).map(esc).join(" · ")+(e.telefon?' · '+esc(e.telefon):'')+'</div>'
+        +'<div class="m">'+esc(e.email)+'</div></div>').join("")
+    : '<div class="prazdno">Nikdo takový v databázi zaměstnanců není.</div>';
+  box.classList.add("on");
+}
+function acVyber(id,email){
+  const e=osobaPodleMailu(email);
+  document.getElementById(id).value=email;
+  document.getElementById(id+"_in").value=e?e.name:email;
+  acZavri(id);
+}
+function acZrus(id){
+  document.getElementById(id).value="";
+  document.getElementById(id+"_in").value="";
+  acZavri(id);
+}
+function acZavri(id){const b=document.getElementById(id+"_box");if(b)b.classList.remove("on");}
+function acKlavesa(ev,id){
+  const box=document.getElementById(id+"_box");if(!box)return;
+  const it=[...box.querySelectorAll(".it")];
+  if(ev.key==="Escape"){acZavri(id);return;}
+  if(!it.length)return;
+  if(ev.key==="ArrowDown"||ev.key==="ArrowUp"){
+    ev.preventDefault();
+    AC_SEL[id]=Math.max(0,Math.min(it.length-1,(AC_SEL[id]||0)+(ev.key==="ArrowDown"?1:-1)));
+    it.forEach((x,i)=>x.classList.toggle("sel",i===AC_SEL[id]));
+    it[AC_SEL[id]].scrollIntoView({block:"nearest"});
+  } else if(ev.key==="Enter"){
+    ev.preventDefault();
+    const x=it[AC_SEL[id]||0]; if(x)acVyber(id,x.dataset.em);
+  }
+}
+document.addEventListener("mousedown",function(ev){
+  if(!ev.target.closest(".ac")) document.querySelectorAll(".acbox.on").forEach(function(b){b.classList.remove("on");});
+});
+
 /* ---------- detail vozidla ---------- */
+
 // Jméno, telefon i pozice bereme z databáze zaměstnanců — v modulu se žádné kontakty nevedou.
 function spravceBunka(v){
   const k=v.spravceKontakt;
@@ -458,8 +550,6 @@ function nahrajFoto(id,input){
 /* ---------- editace vozidla (správce modulu) ---------- */
 function editVuz(id){
   const v=id?vuz(id):{};
-  const zam=D.zamestnanci||[];
-  const opt=(m,vyb)=>'<option value="'+esc(m.email)+'" '+(vyb===m.email?"selected":"")+'>'+esc(m.name)+' — '+esc(m.email)+'</option>';
   const h='<div class="grid3">'
     +'<label class="f"><span>SPZ</span><input id="eSpz" value="'+esc(v.spz||"")+'" placeholder="1AB 2345"></label>'
     +'<label class="f"><span>Značka</span><input id="eZnacka" value="'+esc(v.znacka||"")+'"></label>'
@@ -470,7 +560,7 @@ function editVuz(id){
     +'<label class="f"><span>Typ</span><select id="eTyp">'+Object.keys(D.typy).map(k=>'<option value="'+k+'" '+(v.typ===k?"selected":"")+'>'+esc(D.typy[k])+'</option>').join("")+'</select></label>'
     +'</div><div class="grid3">'
     +'<label class="f"><span>Středisko</span><input id="eStred" list="stredL" value="'+esc(v.stredisko||"")+'"><datalist id="stredL">'+D.strediska.map(s=>'<option>'+esc(s)+'</option>').join("")+'</datalist></label>'
-    +'<label class="f"><span>Správce vozu</span><select id="eSpravce"><option value="">— nepřidělen —</option>'+zam.map(m=>opt(m,v.spravceEmail)).join("")+'</select></label>'
+    +'<label class="f"><span>Správce vozu</span>'+acHtml("eSpravce",v.spravceEmail,"Začni psát jméno…")+'</label>'
     +'<label class="f"><span>Stav</span><select id="eStav">'+Object.keys(D.stavy).map(k=>'<option value="'+k+'" '+((v.stav||"aktivni")===k?"selected":"")+'>'+esc(D.stavy[k])+'</option>').join("")+'</select></label>'
     +'</div><div class="grid2">'
     +'<label class="f"><span>Technická prohlídka platí do</span><input id="eStk" type="date" value="'+esc(v.stkDo||"")+'"></label>'
@@ -501,21 +591,22 @@ async function smazVuz(id){
 
 /* ---------- střediska a odpovědnost ---------- */
 function vykresliStrediska(){
-  const zam=D.zamestnanci||[];
   let h='<div class="card"><div class="h"><h2>Kdo zodpovídá za středisko</h2></div><div class="b">'
     +'<div class="hint" style="margin-bottom:10px">Za vozidla střediska odpovídá konkrétní člověk — ředitel dopravy, ředitel výroby nebo ředitel střediska. '
     +'Dostává upozornění za celé středisko a vidí v modulu všechna jeho vozidla.</div>'
     +'<table><thead><tr><th>Středisko</th><th>Zodpovědná osoba</th><th>Role</th><th>Vozidel</th>'+(D.me.admin?'<th></th>':'')+'</tr></thead><tbody>';
-  D.strediska.forEach(s=>{
-    const z=D.zodpovedne.find(x=>x.stredisko===s), pocet=D.vozidla.filter(v=>v.stredisko===s).length;
+  const poradi=D.strediska.map((s,i)=>({s,i,pocet:D.vozidla.filter(v=>v.stredisko===s).length}))
+    .sort((a,b)=>b.pocet-a.pocet||a.s.localeCompare(b.s,"cs"));
+  poradi.forEach(({s,i,pocet})=>{
+    const z=D.zodpovedne.find(x=>x.stredisko===s);
     h+='<tr><td><strong>'+esc(s)+'</strong></td>';
     if(D.me.admin){
-      h+='<td><select class="btn" style="font-weight:400;min-width:230px" id="zod_'+esc(s)+'"><option value="">— nikdo —</option>'
-        +zam.map(m=>'<option value="'+esc(m.email)+'" '+(z&&z.email===m.email?"selected":"")+'>'+esc(m.name)+'</option>').join("")+'</select></td>'
-        +'<td><select class="btn" style="font-weight:400" id="rol_'+esc(s)+'">'
+      h+='<td style="min-width:250px">'+acHtml("zod_"+i,z?z.email:"","Začni psát jméno…")+'</td>'
+        +'<td><select class="btn" style="font-weight:400" id="rol_'+i+'">'
+          +(z?'':'<option value="">— role —</option>')
           +Object.keys(D.role).map(k=>'<option value="'+k+'" '+(z&&z.role===k?"selected":"")+'>'+esc(D.role[k])+'</option>').join("")+'</select></td>'
         +'<td class="num">'+pocet+'</td>'
-        +'<td style="text-align:right"><button class="btn sm" onclick="ulozZod(\''+esc(s)+'\')">Uložit</button></td>';
+        +'<td style="text-align:right"><button class="btn sm" onclick="ulozZod('+i+')">Uložit</button></td>';
     }else{
       const k=z&&z.kontakt;
       h+='<td>'+(z?('<strong>'+esc(k&&k.jmeno||z.jmeno||z.email)+'</strong>'
@@ -528,9 +619,10 @@ function vykresliStrediska(){
   h+='</tbody></table></div></div>';
   $("#obsah").innerHTML=h;
 }
-async function ulozZod(s){
-  const email=document.getElementById("zod_"+s).value, role=document.getElementById("rol_"+s).value;
-  try{ await api("/api/vozidla/zodpovedny",{stredisko:s,email,role}); toast("Uloženo."); nacti(); }catch(e){alert(e.message);}
+async function ulozZod(i){
+  const s=D.strediska[i];
+  const email=document.getElementById("zod_"+i).value, role=document.getElementById("rol_"+i).value;
+  try{ await api("/api/vozidla/zodpovedny",{stredisko:s,email,role}); toast(email?"Uloženo.":"Zodpovědná osoba zrušena."); nacti(); }catch(e){alert(e.message);}
 }
 
 /* ---------- směrnice ---------- */
@@ -563,8 +655,7 @@ function vykresliNastaveni(){
     +'<label class="f"><span>Inventarizace po (měsíců)</span><input id="nInv" type="number" value="'+n.inventuraMesice+'"></label>'
     +'</div>'
     +'<label class="f"><span>Ředitel společnosti — hlásí se mu každá škoda'+(n.reditelEmail?'':' <span style="color:var(--red)">(zatím nevyplněno)</span>')+'</span>'
-      +'<select id="nReditel"><option value="">— nevybrán —</option>'
-      +(D.zamestnanci||[]).map(m=>'<option value="'+esc(m.email)+'" '+(n.reditelEmail===m.email?"selected":"")+'>'+esc(m.name)+' — '+esc(m.email)+'</option>').join("")+'</select></label>'
+      +acHtml("nReditel",n.reditelEmail,"Začni psát jméno…")+'</label>'
     +'<label class="f"><span>Kopie upozornění na e-maily (oddělené čárkou)</span><input id="nKopie" value="'+esc((n.kopieNa||[]).join(", "))+'" placeholder="napr. sprava.vozidel@elkoplast.cz"></label>'
     +'<button class="btn pri" onclick="ulozNastaveni()">Uložit</button>'
     +'<div class="hint" style="margin-top:10px">Upozornění na technickou prohlídku chodí '+(n.upozorneniDny||[]).join(", ")+' dní předem správci vozu i zodpovědné osobě za středisko, '
