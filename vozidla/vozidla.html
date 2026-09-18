@@ -220,6 +220,7 @@ function filtrovana(){
   if(FILTR.stredisko)vs=vs.filter(v=>v.stredisko===FILTR.stredisko);
   if(FILTR.jen==="stk")vs=vs.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk"));
   if(FILTR.jen==="doplnit")vs=vs.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0));
+  if(FILTR.jen==="nepotvrzeno")vs=vs.filter(v=>v.spravceEmail&&!v.spravcePotvrzen);
   if(FILTR.jen==="km")vs=vs.filter(v=>v.stav_.chybejiciRoky.length);
   if(FILTR.jen==="inv")vs=vs.filter(v=>v.stav_.inventura.potreba);
   return vs.sort((a,b)=>{
@@ -256,7 +257,7 @@ function vykresliPrehled(){
     +'<select class="btn" style="font-weight:400" onchange="FILTR.stredisko=this.value;vykresli()"><option value="">všechna střediska</option>'
       +D.strediska.map(s=>'<option '+(FILTR.stredisko===s?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select>'
     +'<select class="btn" style="font-weight:400" onchange="FILTR.jen=this.value;vykresli()">'
-      +[["","vše"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
+      +[["","vše"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["nepotvrzeno","jen nepotvrzený správce"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
         .map(([k,t])=>'<option value="'+k+'" '+(FILTR.jen===k?"selected":"")+'>'+t+'</option>').join("")+'</select>'
     +'<div class="sp"></div>'
     +'<a class="btn sm" href="/api/vozidla/export">⬇ CSV</a>'
@@ -378,6 +379,7 @@ function spravceBunka(v){
       +(v.spravceZTabulky?'<div class="mut">v tabulce: '+esc(v.spravceZTabulky)+'</div>':'');
   }
   return '<strong>'+esc(k.jmeno||k.email)+'</strong>'
+    +(v.spravcePotvrzen?'':' <span class="pill warn" title="Převzato z firemní tabulky, nikdo zatím nepotvrdil, že s vozem opravdu jezdí">z evidence</span>')
     +(k.pozice?'<div class="mut">'+esc(k.pozice)+'</div>':'')
     +'<div class="mut"><a href="mailto:'+esc(k.email)+'">'+esc(k.email)+'</a>'
     +(k.telefon?' · <a href="tel:'+esc(k.telefon.replace(/\s/g,""))+'">'+esc(k.telefon)+'</a>':'')+'</div>';
@@ -406,6 +408,28 @@ function detail(id){
   if(s.upozorneni.length){
     h+='<div class="card" style="margin:14px 0 0;border-color:#e8d9a8"><div class="b" style="background:var(--yellow-soft)"><strong>Co je potřeba udělat</strong><div class="upoz" style="margin-top:6px">'
       +s.upozorneni.map(u=>'<span class="u'+(u.urgent?" urg":"")+'">• '+esc(u.text)+'</span>').join("")+'</div></div></div>';
+  }
+  // správce vozu — potvrzení a předání
+  if(v.smiEdit){
+    h+='<div class="card" style="margin-top:14px"><div class="h"><h2>Kdo vozidlo má</h2><div class="sp"></div>'
+      +(v.spravceEmail?(v.spravcePotvrzen?'<span class="pill ok">potvrzeno</span>':'<span class="pill warn">převzato z evidence</span>'):'<span class="pill bad">nepřidělen</span>')
+      +'</div><div class="b">';
+    if(v.spravceEmail&&!v.spravcePotvrzen){
+      h+='<div class="hint" style="margin-bottom:10px">Vozidlo je vedené na <strong>'+esc(v.spravceJmeno||v.spravceEmail)+'</strong> podle firemní tabulky. '
+        +'Pokud s ním fakticky jezdí někdo jiný, předej ho — upomínky (tachometr, technická prohlídka, inventarizace) pak budou chodit jemu.</div>'
+        +'<button class="btn" onclick="potvrdSpravce(\''+v.id+'\')">✓ Ano, vozidlo má '+esc((v.spravceJmeno||"").split(" ")[0]||"tento člověk")+'</button> ';
+    }
+    h+='<div class="grid2" style="margin-top:12px">'
+      +'<label class="f"><span>Předat jinému správci</span>'+acHtml("predatKdo_"+v.id,"","Začni psát jméno…")+'</label>'
+      +'<label class="f"><span>Poznámka k předání</span><input id="predatPozn_'+v.id+'" autocomplete="off" placeholder="nepovinné"></label>'
+      +'</div><button class="btn pri" onclick="predatVuz(\''+v.id+'\')">Předat vozidlo</button>'
+      +'<div class="hint" style="margin-top:8px">O předání dáme vědět novému správci i zodpovědné osobě za středisko.</div>';
+    if((v.predani||[]).length){
+      h+='<table style="margin-top:12px"><thead><tr><th>Datum</th><th>Z koho</th><th>Na koho</th><th>Zapsal</th></tr></thead><tbody>'
+        +v.predani.slice().reverse().map(z=>'<tr><td>'+dat(z.datum)+'</td><td>'+esc(z.zJmeno||"—")+'</td><td>'+esc(z.naJmeno)+'</td><td>'+esc(z.kdo)+'</td></tr>').join("")
+        +'</tbody></table>';
+    }
+    h+='</div></div>';
   }
   // technická prohlídka
   h+='<div class="card" style="margin-top:14px"><div class="h"><h2>Technická prohlídka</h2><div class="sp"></div>'+stkPill(v)+'</div><div class="b">';
@@ -509,6 +533,17 @@ function detail(id){
 }
 function novaPlatnost(roky){const d=new Date();d.setFullYear(d.getFullYear()+roky);return d.toISOString().slice(0,10);}
 
+async function potvrdSpravce(id){
+  try{ await api("/api/vozidla/potvrdit",{id}); toast("Potvrzeno."); await nacti(); detail(id); }catch(e){alert(e.message);}
+}
+async function predatVuz(id){
+  const kdo=document.getElementById("predatKdo_"+id).value;
+  if(!kdo){alert("Vyber, komu se vozidlo předává.");return;}
+  const pozn=(document.getElementById("predatPozn_"+id)||{}).value||"";
+  if(!confirm("Předat vozidlo? Upomínky začnou chodit novému správci a dáme o tom vědět jemu i zodpovědné osobě za středisko."))return;
+  try{ await api("/api/vozidla/predat",{id,email:kdo,poznamka:pozn}); toast("Vozidlo předáno."); await nacti(); detail(id); }
+  catch(e){alert(e.message);}
+}
 async function ulozStk(id){
   try{
     await api("/api/vozidla/stk",{id,provedeno:$("#stkProv").value,platiDo:$("#stkDo").value,poznamka:$("#stkPozn").value});

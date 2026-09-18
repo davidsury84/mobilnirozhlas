@@ -167,6 +167,7 @@ function mount(host) {
         spravceEmail: nalez ? nalez.emp.email : '',
         spravceJmeno: nalez ? nalez.emp.name : '',
         spravceZTabulky: String(r.osoba || '').trim(),   // co bylo v tabulce (i když se nespároval)
+        spravcePotvrzen: false,   // tabulka vede vozidlo účetně; kdo s ním fakticky jezdí, se potvrzuje v modulu
         spravceParovani: nalez ? nalez.jak : '',
         evidCislo: String(r.evid || '').trim(),
         utvar: String(r.utvar || '').trim(),
@@ -377,6 +378,8 @@ function mount(host) {
       if (p === '/api/vozidla/foto/smazat' && req.method === 'POST') return apiFotoSmazat(req, res);
       if (p === '/api/vozidla/inventura' && req.method === 'POST') return apiInventura(req, res);
       if (p === '/api/vozidla/skoda' && req.method === 'POST') return apiSkoda(req, res);
+      if (p === '/api/vozidla/predat' && req.method === 'POST') return apiPredat(req, res);
+      if (p === '/api/vozidla/potvrdit' && req.method === 'POST') return apiPotvrdit(req, res);
       if (p === '/api/vozidla/zodpovedny' && req.method === 'POST') return apiZodpovedny(req, res);
       if (p === '/api/vozidla/nastaveni' && req.method === 'POST') return apiNastaveni(req, res);
       if (p === '/api/vozidla/export' && req.method === 'GET') return apiExport(req, res);
@@ -437,7 +440,9 @@ function mount(host) {
     v.stav = STAVY[b.stav] ? b.stav : (v.stav || 'aktivni');
     v.stredisko = s('stredisko');
     v.spravceEmail = low(b.spravceEmail != null ? b.spravceEmail : v.spravceEmail);
+    const zmenaSpravce = b.spravceEmail !== undefined && low(b.spravceEmail) !== low(v.spravceEmail || '');
     v.spravceJmeno = v.spravceEmail ? (jmenoPodleMailu(v.spravceEmail) || s('spravceJmeno')) : '';
+    if (zmenaSpravce) v.spravcePotvrzen = !!v.spravceEmail;   // koho zadá člověk, ten je potvrzený
     v.stkDo = s('stkDo');
     v.porizeno = s('porizeno');
     v.evidCislo = s('evidCislo'); v.cisloTp = s('cisloTp'); v.majitel = s('majitel');
@@ -603,6 +608,55 @@ function mount(host) {
       }
     }
     json(res, 200, { ok: true, stav: stavVozu(v, d.nastaveni) });
+    return true;
+  }
+
+  // ---- předání vozidla jinému správci ---------------------------------------
+  //  Evidence z firemní tabulky vede auto na toho, kdo ho má „na sobě" účetně.
+  //  Kdo s ním fakticky jezdí, to ví jen on sám — proto si ho může předat.
+  async function apiPredat(req, res) {
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const d = load(), r = role(req);
+    const v = d.vozidla.find(x => x.id === b.id);
+    if (!v) { json(res, 404, { chyba: 'Vozidlo nenalezeno.' }); return true; }
+    if (!smiEditovat(v, r)) { json(res, 403, { chyba: 'K tomuto vozidlu nemáte právo zapisovat.' }); return true; }
+    const novy = low(b.email);
+    if (!novy) { json(res, 400, { chyba: 'Vyber, komu se vozidlo předává.' }); return true; }
+    const puvodni = v.spravceEmail, puvodniJm = v.spravceJmeno;
+    v.spravceEmail = novy;
+    v.spravceJmeno = jmenoPodleMailu(novy) || novy;
+    v.spravcePotvrzen = true;
+    v.predani = v.predani || [];
+    v.predani.push({ ts: Date.now(), datum: new Date().toISOString().slice(0, 10), zEmail: puvodni || '', zJmeno: puvodniJm || '',
+      naEmail: novy, naJmeno: v.spravceJmeno, kdo: r.name || r.email, poznamka: String(b.poznamka || '').slice(0, 500) });
+    // upomínky k tomuhle vozidlu ať začnou nanovo u nového správce
+    Object.keys(d.odeslano).forEach(k => { if (k.indexOf(':' + v.id + ':') > 0 || k.indexOf(':' + v.id) > 0) delete d.odeslano[k]; });
+    save(d);
+    logAct('vozidla', req, 'Vozidlo ' + (v.spz || v.vin) + ' předáno: ' + (puvodniJm || '—') + ' → ' + v.spravceJmeno);
+    const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
+    const popis = (v.spz || v.vin) + (v.znacka || v.model ? ' (' + [v.znacka, v.model].filter(Boolean).join(' ') + ')' : '');
+    await mail(Array.from(new Set([novy, zod && zod.email, puvodni].filter(Boolean).map(low))).join(','),
+      'Svěřené vozidlo ' + popis, 
+      'Vozidlo ' + popis + ' je nově vedené na: ' + v.spravceJmeno + '.\n'
+      + (puvodniJm ? 'Dosud bylo vedené na: ' + puvodniJm + '.\n' : '')
+      + 'Předal: ' + (r.name || r.email) + ' (' + new Date().toLocaleDateString('cs-CZ') + ')\n'
+      + (b.poznamka ? '\nPoznámka: ' + b.poznamka + '\n' : '')
+      + '\nSprávce vozu doplňuje roční stav tachometru, hlídá technickou prohlídku a dělá inventarizaci.\n'
+      + 'Detail: https://intranet.elkoplast.cz/#modul=vozidla');
+    json(res, 200, { ok: true });
+    return true;
+  }
+  // Správce potvrdí, že vozidlo skutečně užívá (u evidence převzaté z tabulky).
+  async function apiPotvrdit(req, res) {
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const d = load(), r = role(req);
+    const v = d.vozidla.find(x => x.id === b.id);
+    if (!v) { json(res, 404, { chyba: 'Vozidlo nenalezeno.' }); return true; }
+    if (!smiEditovat(v, r)) { json(res, 403, { chyba: 'K tomuto vozidlu nemáte právo zapisovat.' }); return true; }
+    v.spravcePotvrzen = true;
+    save(d);
+    logAct('vozidla', req, 'Potvrzen správce vozidla ' + (v.spz || v.vin));
+    json(res, 200, { ok: true });
     return true;
   }
 
@@ -777,6 +831,12 @@ function mount(host) {
   }
 
   // E-maily: technická prohlídka, chybějící roční tachometr, inventarizace.
+  // Dokud správce vozidlo nepotvrdil, přidáme do e-mailu možnost ho předat dál.
+  function nezapomen(v) {
+    return v.spravcePotvrzen ? ''
+      : '\nPoznámka: vozidlo je na vás vedené podle firemní evidence. Pokud s ním fakticky jezdí někdo jiný, '
+        + 'předejte ho v modulu tlačítkem „Předat jinému správci" — upomínky pak budou chodit jemu.\n';
+  }
   async function tick() {
     const d = load();
     if (!d.vozidla.length) return;
@@ -798,22 +858,26 @@ function mount(host) {
       if (v.stav !== 'aktivni') continue;
       const st = stavVozu(v, nast);
       const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
-      const prijemci = Array.from(new Set([v.spravceEmail, zod && zod.email].concat(nast.kopieNa).filter(Boolean).map(low)));
-      if (!prijemci.length) continue;
+      // Termíny a škody zajímají i vedoucího střediska; úkoly „doplň tachometr" a
+      // „udělej inventarizaci" patří tomu, kdo vozidlo fakticky má — jinak by vedoucímu
+      // chodil e-mail za každé auto ve středisku.
+      const terminy = Array.from(new Set([v.spravceEmail, zod && zod.email].concat(nast.kopieNa).filter(Boolean).map(low)));
+      const ukoly = Array.from(new Set([v.spravceEmail].concat(nast.kopieNa).filter(Boolean).map(low)));
+      if (!terminy.length) continue;
       const popis = (v.spz || v.vin) + (v.znacka || v.model ? ' (' + [v.znacka, v.model].filter(Boolean).join(' ') + ')' : '');
 
       // 1) technická prohlídka
       if (st.dnyStk !== null) {
         const prah = (nast.upozorneniDny || []).filter(x => st.dnyStk <= x).sort((a, b) => a - b)[0];
         if (st.dnyStk >= 0 && prah !== undefined) {
-          await poslatJednou('stk:' + v.id + ':' + prah, 300, prijemci.join(','),
+          await poslatJednou('stk:' + v.id + ':' + prah, 300, terminy.join(','),
             'Technická prohlídka končí — ' + popis,
             'Vozidlu ' + popis + ' končí technická prohlídka ' + v.stkDo + ' (zbývá ' + st.dnyStk + ' dní).\n\n'
             + 'Správce vozu: ' + (v.spravceJmeno || v.spravceEmail || 'nepřidělen') + '\n'
             + 'Středisko: ' + (v.stredisko || '—') + (zod ? ' · zodpovídá ' + zod.jmeno : '') + '\n\n'
             + 'Po absolvování prohlídky ji prosím odškrtněte v intranetu → Vozový park (zapíše se nové datum platnosti).');
         } else if (st.dnyStk < 0) {
-          await poslatJednou('stk-po:' + v.id + ':' + dnesStr.slice(0, 7), 25, prijemci.join(','),
+          await poslatJednou('stk-po:' + v.id + ':' + dnesStr.slice(0, 7), 25, terminy.join(','),
             'PROPADLÁ technická prohlídka — ' + popis,
             'Vozidlo ' + popis + ' má propadlou technickou prohlídku (platila do ' + v.stkDo + ', tedy před ' + (-st.dnyStk) + ' dny).\n\n'
             + 'S propadlou prohlídkou nesmí vozidlo do provozu. Zajistěte prohlídku a zapište ji v intranetu → Vozový park.');
@@ -825,16 +889,20 @@ function mount(host) {
         await poslatJednou('km:' + v.id + ':' + dnesStr.slice(0, 7), 25,
           [v.spravceEmail].concat(nast.kopieNa).join(','), 'Doplňte stav tachometru — ' + popis,
           'U svěřeného vozidla ' + popis + ' chybí roční zápis stavu tachometru za rok ' + st.chybejiciRoky.join(', ') + '.\n\n'
-          + 'Vyplňte ho prosím v intranetu → Vozový park → detail vozidla. Zabere to půl minuty a slouží k plánování údržby i obměny vozidel.');
+          + 'Vyplňte ho prosím zde: https://intranet.elkoplast.cz/#modul=vozidla → detail vozidla → Stav tachometru po letech.\n'
+          + 'Zabere to půl minuty a slouží k plánování údržby i obměny vozidel.\n'
+          + nezapomen(v));
       }
 
       // 3) inventarizace svěřeného majetku (jednou za dva roky)
       if (st.inventura.potreba && v.spravceEmail) {
-        await poslatJednou('inv:' + v.id + ':' + dnesStr.slice(0, 7), 25, prijemci.join(','),
+        await poslatJednou('inv:' + v.id + ':' + dnesStr.slice(0, 7), 25, ukoly.join(','),
           'Inventarizace svěřeného vozidla — ' + popis,
           'U vozidla ' + popis + ' je potřeba provést inventarizaci svěřeného majetku (' + st.inventura.text + ').\n\n'
-          + 'Projděte vozidlo, doplňte stav tachometru, vyfoťte ho ze čtyř stran a zápis uložte v intranetu → Vozový park → Inventarizace.\n'
-          + 'Inventarizace se dělá jednou za ' + (nast.inventuraMesice / 12) + ' roky.');
+          + 'Projděte vozidlo, doplňte stav tachometru, vyfoťte ho ze čtyř stran a zápis uložte zde:\n'
+          + 'https://intranet.elkoplast.cz/#modul=vozidla → detail vozidla → Inventarizace svěřeného majetku.\n'
+          + 'Inventarizace se dělá jednou za ' + (nast.inventuraMesice / 12) + ' roky.\n'
+          + nezapomen(v));
       }
     }
     if (zmena) save(d);
