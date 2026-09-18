@@ -36,8 +36,10 @@ function parseBestellung(text) {
   // „2 40 Stück" na samostatném řádku (zlom stránky) → spojit s řádkem kódu
   const lines = [];
   for (let i = 0; i < lines0.length; i++) {
-    if (/^\d{1,2}\s+\d+\s+(?:Stück|Stk\.?)$/i.test(lines0[i]) && lines0[i + 1] && /€/.test(lines0[i + 1])) { lines.push(lines0[i] + ' ' + lines0[i + 1]); i++; }
-    else lines.push(lines0[i]);
+    let l = lines0[i];
+    if (/^\d{1,2}$/.test(l) && lines0[i + 1] && /^\d+\s+(?:Stück|Stk\.?)$/i.test(lines0[i + 1])) { l = l + ' ' + lines0[i + 1]; i++; }
+    if (/^\d{1,2}\s+\d+\s+(?:Stück|Stk\.?)$/i.test(l) && lines0[i + 1] && /€/.test(lines0[i + 1]) && !/^\\?-?\d+,\d{2}\s*€$/.test(lines0[i + 1])) { l = l + ' ' + lines0[i + 1]; i++; }
+    lines.push(l);
   }
   const o = { cislo: '', cisloAU: '', datum: '', kwDodani: null, kwRok: null, prijemce: { nazev: '', ulice: '', psc: '', mesto: '', zeme: '' }, zakaznikNazev: 'ConTracT Container Vertriebsgesellschaft mbH', mena: 'EUR', celkem: null };
   let m;
@@ -49,6 +51,18 @@ function parseBestellung(text) {
   if ((m = t.match(/(?:Betrag netto|Gesamtbetrag)\s*([\d.]+,\d{2})\s*€/))) o.celkem = num(m[1].replace(/\./g, ''));
   // Příjemce: řádek „CH-2504 Biel-Bienne" (PSČ + město), nad ním ulice, nad ní název.
   const zipIdx = lines.findIndex((l, i) => i > 0 && /^[A-Z]{1,2}\s?-\s?\d{4,5}\s+\S/.test(l) && !/Wolfenbüttel|ZLIN|Zlín/i.test(l));
+  const oneLine = lines.find((l, i) => i > 0 && i < 12 && /\s(?:[A-Z]{1,2}-)?\d{4,5}\s+[A-Za-zÀ-ž][A-Za-zÀ-ž.\-/ ]*$/.test(l) && !/Wolfenbüttel|ZLIN|Zlín|Steuer|USt|Nummer:|Lieferanten/i.test(l) && /\d/.test(l));
+  if (zipIdx <= 1 && oneLine) {
+    const m2 = oneLine.match(/^(.*?)\s+(?:([A-Z]{1,2})-)?(\d{4,5})\s+([A-Za-zÀ-ž][A-Za-zÀ-ž.\-/ ]*)$/);
+    if (m2) {
+      const toks = m2[1].split(/\s+/); let ni = toks.findIndex(t => /^\d+[a-zA-Z]?(?:\/\d+[a-z]?)?$/.test(t) || /^\d+-\d+$/.test(t));
+      if (ni > 0) {
+        let si = ni - 1;
+        if (si > 0 && /^(Weg|Strasse|Straße|Str\.|Gasse|Platz|Allee|Ring|Zone|Route|Rue|Via|Chemin|Industriestrasse|Industriestraße|Strada)$/i.test(toks[si])) si--;
+        o.prijemce = { nazev: str(toks.slice(0, si).join(' '), 160), ulice: str(toks.slice(si).join(' '), 120), zeme: m2[2] || (m2[3].length === 5 ? 'DE' : 'CH'), psc: m2[3], mesto: str(m2[4], 80) };
+      } else o.prijemce = { nazev: str(m2[1], 160), ulice: '', zeme: m2[2] || (m2[3].length === 5 ? 'DE' : 'CH'), psc: m2[3], mesto: str(m2[4], 80) };
+    }
+  }
   if (zipIdx > 1) {
     const zm = lines[zipIdx].match(/^([A-Z]{1,2})\s?-\s?(\d{4,5})\s+(.+)$/);
     o.prijemce = { zeme: zm[1], psc: zm[2], mesto: str(zm[3], 80), ulice: str(lines[zipIdx - 1], 120), nazev: str(lines[zipIdx - 2], 160) };
@@ -58,7 +72,7 @@ function parseBestellung(text) {
   }
   // Pozice: „1 40 Stück CPRDÖ04.00LacNamDecÖlaTho 305,00 € 12.200,00 €" + popis až po další pozici / Übertrag / Betrag
   const polozky = [];
-  const posRe = /^(\d{1,2})\s+(\d+)\s+(?:Stück|Stk\.?|St\.)\s+(\S+)\s+([\d.]+,\d{2})\s*€\s+([\d.]+,\d{2})\s*€\s*(.*)$/i;
+  const posRe = /^(\d{1,2})\s+(\d+)\s+(?:Stück|Stk\.?|St\.)\s+(\S+)\s+([\d.]+,\d{2})\s*€\s+(?:\d+\s*%\s+)?([\d.]+,\d{2})\s*€\s*(.*)$/i;
   let cur = null;
   for (const l of lines) {
     const pm = l.match(posRe);
@@ -72,24 +86,27 @@ function parseBestellung(text) {
     cur.popis.push(l);
   }
   // Textová extrakce z Disku občas odtrhne „1 2 Stück" od řádku s kódem: kód s cenami bez prefixu pozice → ks = G-Preis / E-Preis
-  const loose = /(?:^|\s)((?:CP|CPR|CPRD|CPRÖ|CPRDÖ|CPRÖD|CPK|CPD|CPGK|HES|USB|DMC|AM|ASM|FLM|ABR|ALST|DSD|SB|CPRET)[A-Za-zÖÄÜ0-9.,\-]{2,})\s+([\d.]+,\d{2})\s*€\s+([\d.]+,\d{2})\s*€/g;
+  // kód (+ max 3 slova názvu typu) a hned za ním E-Preis € [rabat %] G-Preis €
+  const loose = /(?:^|\s)([A-Z][A-Za-zÖÄÜ0-9.,\-]{2,}(?:\s+(?!\d)[A-Za-zÖÄÜ0-9.,\-]+){0,3}?)\s+([\d.]+,\d{2})\s*€\s+(?:(\d+)\s*%\s+)?([\d.]+,\d{2})\s*€/g;
   const known = new Set(polozky.map(p => p.kodOrig));
   for (const l of lines) {
-    if (posRe.test(l)) continue;
+    if (posRe.test(l) || /^(Übertrag|Betrag netto|Gesamtbetrag)/i.test(l)) continue;
     let lm; loose.lastIndex = 0;
     while ((lm = loose.exec(l))) {
-      if (known.has(lm[1])) continue;
-      const e = num(lm[2].replace(/\./g, '')), g = num(lm[3].replace(/\./g, ''));
-      const ks = e > 0 ? Math.round(g / e) : 0; if (!ks) continue;
-      const k = normKod(lm[1]);
-      polozky.push({ pozice: polozky.length + 1, ks, kod: k.kod, kodOrig: lm[1], tho: k.tho, cena: e, popis: [l.slice(lm.index + lm[0].length)], ral: '', lem: '', razeni: '', polepy: '', rozmer: '', tloustka: null, povrch: '' });
-      known.add(lm[1]);
+      const kodRaw = lm[1].replace(/^(?:Artikel|G-Preis|E-Preis|%)\s+/g, '').trim();
+      if (!kodRaw || known.has(kodRaw) || /^(Übertrag|Betrag|Gesamtbetrag|MwSt|aus)$/i.test(kodRaw)) continue;
+      const e = num(lm[2].replace(/\./g, '')), rab = lm[3] ? num(lm[3]) : 0, g = num(lm[4].replace(/\./g, ''));
+      const ks = e > 0 ? Math.round(g / (e * (1 - rab / 100))) : 0; if (!ks) continue;
+      const k = normKod(kodRaw.split(/\s+/)[0]);
+      polozky.push({ pozice: polozky.length + 1, ks, kod: k.kod, kodOrig: kodRaw, tho: k.tho, cena: e, popis: [l.slice(lm.index + lm[0].length)], ral: '', lem: '', razeni: '', polepy: '', rozmer: '', tloustka: null, povrch: '' });
+      known.add(kodRaw);
     }
   }
   polozky.sort((a, b) => a.pozice - b.pozice).forEach((p, i) => { p.pozice = i + 1; });
   polozky.forEach(p => {
     const d = p.popis.join('\n');
     let mm;
+    if ((mm = d.match(/\bTyp\s+([A-Z]{2,5}-[A-Z0-9][A-Z0-9,.\-]+)/))) { p.kodTyp = mm[1]; if (!/^(CP|HES|USB|SB)/.test(p.kod)) p.kod = mm[1]; }
     if ((mm = d.match(/Lackierung\s+RAL\s?(\d{4})/i))) p.ral = 'RAL ' + mm[1];
     if ((mm = d.match(/oberer Rand\s+(?:Höhe\s+\d+\s*mm\s+in\s+)?RAL\s?(\d{4})/i))) p.lem = 'RAL ' + mm[1];
     if (/feuerverzinkt|verzinkt/i.test(d) && !p.ral) p.povrch = 'zinek';
@@ -127,16 +144,21 @@ function parseHelios(text) {
     const clean = s => str(s.replace(/Vrchlického\s*10/i, '').replace(/792\s?01\s+Bruntál\s*1?/i, '').replace(/ELKOPLAST\s*-?\s*VÝROBA\s*BRUNTÁL/i, ''), 120);
     for (let i = mi + 1; i < Math.min(lines.length, mi + 6); i++) {
       const l = lines[i];
-      const zm = clean(l).match(/^([A-Z]{1,2})\s*-\s*(\d{4,5})\s+(.+)$/);
-      if (zm) { o.prijemce.zeme = zm[1]; o.prijemce.psc = zm[2]; o.prijemce.mesto = str(zm[3], 80); break; }
+      const zm = clean(l).match(/^(?:([A-Z]{1,2})\s*-\s*)?(\d{4,5})\s+(.+)$/);
+      if (zm) { o.prijemce.zeme = zm[1] || (zm[2].length === 5 ? 'DE' : 'CH'); o.prijemce.psc = zm[2]; o.prijemce.mesto = str(zm[3], 80); break; }
       const c = clean(l);
       if (c && !/^(Datum|IČ|DIČ|Požadované|-|řádek)/.test(c) && !o.prijemce.ulice) o.prijemce.ulice = c;
     }
-    if (!o.prijemce.nazev && lines[mi + 1]) o.prijemce.nazev = clean(lines[mi + 1]);
+    if (!o.prijemce.nazev) {
+      const ei = lines.findIndex(l => /ELKOPLAST\s*-\s*VÝROBA\s*BRUNTÁL/i.test(l));
+      const cand = ei > 0 ? lines[ei - 1] : '';
+      if (cand && !/^[:\-\s]*$/.test(cand) && !/DIČ|IČO|CZ25347942|Bruntál|Vrchlického/.test(cand)) o.prijemce.nazev = str(cand.replace(/^:\s*/, ''), 160);
+    }
+    if (/Wolfenbüttel/i.test(o.prijemce.mesto)) o.prijemce = { nazev: '', ulice: '', psc: '', mesto: '', zeme: '' };   // adresa Contractu, ne koncového příjemce
   }
   // Řádky položek: „1 286 00002 CPR 08.00 LacNam 2,0 20,00 ks 5 030,00 100 600,00 0 100 600,00"
   const polozky = [];
-  const itemRe = /^(\d{1,3})\s+(\d{3})\s+(\d{4,6})\s+(.+?)\s+(\d[\d\s]*,\d{2})\s+ks\s+(\d[\d\s]*,\d{2})\s+(\d[\d\s]*,\d{2})/;
+  const itemRe = /(?:^|\s)(\d{1,3})\s+(\d{3})\s+(\d{4,6})\s+(.+?)\s+(\d[\d\s]*,\d{2})\s+ks\s+(\d[\d\s]*,\d{2})\s+(\d[\d\s]*,\d{2})/;
   for (const l of lines) {
     const im = l.match(itemRe);
     if (!im) continue;
