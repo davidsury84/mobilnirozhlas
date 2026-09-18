@@ -37,7 +37,7 @@ const STAVY = {
 // Jen typy z oficiálního ceníku (žádný reefer / kancelářský / na míru) + možnost poradit.
 const TYPY = ['20′ skladový (DC)', '40′ skladový (DV)', '20′ High Cube', '40′ High Cube', 'Potřebuji poradit'];
 // Obchodníci, kteří mohou být přiřazeni k poptávce lodních kontejnerů (dohledáni v DB zaměstnanců podle jména).
-const OBCHODNICI_JMENA = ['Jana Rychlíková', 'Josef Beránek'];
+const OBCHODNICI_JMENA = ['Josef Beránek', 'David Menšík', 'Jana Rychlíková'];
 const REZIM = ['Koupě', 'Pronájem', 'Ještě nevím'];
 // Google tabulka, kam padají poptávky (i z Meta lead reklam). ID lze přepsat proměnnou.
 const SHEET_ID_DEFAULT = process.env.KONTEJNERY_SHEET_ID || '11SjL5D9-S0HG0D4zNE5eS0zU-uC2U64GcL4Pgqnm4pk';
@@ -784,6 +784,40 @@ function mount(host) {
         save(db);
       }
     } catch (_) {}
+  })();
+
+  // Jednorázové předání agendy (2026-09): Janu Rychlíkovou ve střídačce nahradil David Menšík.
+  // Poptávky, na kterých už Jana pracovala, zůstávají jí; nedotčené („nová" bez jediného zásahu)
+  // přecházejí na Davida. Běží jen jednou, podle příznaku v konfiguraci.
+  (function predaniMensik() {
+    try {
+      const db = load();
+      if (db.config._predaniMensik2026) return;
+      const JANA = 'jana.rychlikova@elkoplast.cz';
+      const MENSIK = { email: 'david.mensik@elkoplast.cz', name: 'David Menšík' };
+      const BERANEK = { email: 'josef.beranek@elkoplast.cz', name: 'Josef Beránek' };
+      const meJana = e => String((e && e.email) || '').toLowerCase() === JANA;
+      // pracovala na ní = posunutý stav, interní poznámka nebo vlastní zápis v historii
+      const dotcena = it => it.stav !== 'nova' || !!it.interniPoznamka
+        || (it.historie || []).some(h => h.by && /rychl/i.test(String(h.by.name || '') + String(h.by.email || '')));
+      let presunuto = 0;
+      db.items.forEach(it => {
+        if (!meJana(it.obchodnik) || dotcena(it)) return;
+        it.obchodnik = { email: MENSIK.email, name: MENSIK.name };
+        it.updatedAt = Date.now();
+        (it.historie = it.historie || []).push({
+          stav: it.stav, note: 'Předáno v rámci změny obsazení: Jana Rychlíková → David Menšík',
+          by: { name: 'systém' }, at: Date.now(),
+        });
+        presunuto++;
+      });
+      // střídačka nově Beránek + Menšík (Jana zůstává jen u svých rozpracovaných)
+      db.config.rotace = [BERANEK, MENSIK];
+      db.config.rotaceIdx = 0;
+      db.config._predaniMensik2026 = true;
+      save(db);
+      console.log('[kontejnery] předání agendy: ' + presunuto + ' nedotčených poptávek Jany → David Menšík; střídačka Beránek + Menšík');
+    } catch (e) { console.error('[kontejnery] předání agendy selhalo:', e.message); }
   })();
 
   // Descriptor pro centrální přehled rozesílek (správce → „Rozesílky").
