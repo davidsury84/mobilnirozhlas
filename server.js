@@ -967,6 +967,7 @@ function buildNotifikace(email) {
   try { out = out.concat(notifDovolena(email, mods, admin)); } catch (_) {}
   try { out = out.concat(notifReklamace(email, mods, admin)); } catch (_) {}
   try { if (vozidlaMod && vozidlaMod.notifikace) out = out.concat(vozidlaMod.notifikace(email)); } catch (_) {}
+  try { if (vyrobaMod && vyrobaMod.notifikace) out = out.concat(vyrobaMod.notifikace(email)); } catch (_) {}
   return out.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0)).slice(0, 25);
 }
 function ensureEmployee(email, name) {
@@ -3664,6 +3665,23 @@ try {
   console.error('[vozidla] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Výroba Popelnice" (zakázky boxů a muld závodu Bruntál: zadání, výroba, ložné plány) ----
+let vyrobaMod = null;
+try {
+  vyrobaMod = require('./vyroba').mount({
+    send, readBody, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
+    dataDir: DATA_DIR,
+    // import stávajícího plánu výroby (Google Sheet PLÁN VÝROBY BRUNTÁL POPELNICE) přes service account
+    sheets: { get available() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }, read: sheetsGet },
+    // složky objednávek BE26xxxx (Bestellung + vydané objednávky) na sdíleném Disku
+    drive: { get available() { return driveAvailable(); }, list: driveList },
+    // hotové položky se posílají do aplikace Ložný plán (stejné sdílené úložiště /api/shared, podpis SSO)
+    loznyplan: { url: LOZNYPLAN_APP_URL, ssoSign },
+  });
+} catch (e) {
+  console.error('[vyroba] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 // ---- Modul „Zápisy z interních jednání" — samostatná složka ./zapisy ----
 let zapisyMod = null;
 try {
@@ -3898,6 +3916,8 @@ const server = http.createServer(async (req, res) => {
     if (reklamaceMod && await reklamaceMod.handle(req, res)) return;
     // Modul „Vozový park" si obslouží vlastní cesty (/vozidla*, /api/vozidla*).
     if (vozidlaMod && await vozidlaMod.handle(req, res)) return;
+    // Modul „Výroba Popelnice" si obslouží vlastní cesty (/vyroba*, /api/vyroba*).
+    if (vyrobaMod && await vyrobaMod.handle(req, res)) return;
     // Modul „Zápisy z interních jednání" si obslouží vlastní cesty (/api/zapisy*).
     if (zapisyMod && await zapisyMod.handle(req, res)) return;
     // Modul „Požadavky nákupu" si obslouží vlastní cesty (/pozadavky*, /api/pozadavky*).
@@ -4769,6 +4789,8 @@ const server = http.createServer(async (req, res) => {
       }
       // Vozový park vidí i ten, komu je svěřené auto nebo kdo zodpovídá za středisko — bez přidělování přístupu.
       try { if (vozidlaMod && vozidlaMod.hasAccess && vozidlaMod.hasAccess(e.email) && !modsUser.includes('vozidla')) modsUser.push('vozidla'); } catch (_) {}
+      // Výroba Popelnice vidí i dílna (modul „vyrobadilna" nebo e-mail v nastavení modulu) — klíč dlaždice je jeden.
+      try { if (vyrobaMod && vyrobaMod.hasAccess && vyrobaMod.hasAccess(e.email) && !modsUser.includes('vyroba')) modsUser.push('vyroba'); } catch (_) {}
       return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: modsUser, surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), skolPozvanky: skolPozMoje(e.email), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, aktualityNew: aktualityNew, heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 

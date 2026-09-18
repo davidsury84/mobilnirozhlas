@@ -1,0 +1,793 @@
+'use strict';
+// ============================================================================
+//  Modul „Výroba Popelnice" — zakázky kovových boxů, muld a abrollů (závod Bruntál)
+// ============================================================================
+//  Co modul dělá (fáze 1, bez napojení na Helios):
+//   1) obchodník zadá objednávku JEDNOU (hlavička + položky z katalogu) → položky
+//      dostanou výrobní číslo ČVZ (26B-nnn) a objeví se ve frontě výroby
+//   2) ředitel výroby (Ladislav Mathé) mění stavy položek přímo v dílně
+//      (zadáno → svařovna → lakovna / zinkovna → hotovo → naplánováno → expedováno)
+//   3) hotové položky se jedním tlačítkem odešlou do aplikace „Ložný plán"
+//      (/api/shared na Railway, stejná data, nic se nepřepisuje podruhé)
+//   4) živý přehled: stav každé položky, termíny, skluz, kooperace
+//   5) jednorázový import stávajícího Google Sheetu PLÁN VÝROBY (list Boxy contract 2026)
+//
+//  Mount v server.js:
+//    const vyroba = require('./vyroba').mount({
+//      send, readBody, empSession, isAdmin, employeeModules, getState, logActivity, dataDir,
+//      sheets: { available, read(spreadsheetId, range) },     // Google Sheets (service account)
+//      drive:  { available, list(folderId) },                  // Google Drive (read-only)
+//      loznyplan: { url, ssoSign },                            // aplikace Ložný plán + podpis SSO
+//      baseUrl,
+//    });
+//    if (vyroba && await vyroba.handle(req, res)) return;
+//    vyroba.notifikace(email) — dlaždice na nástěnku intranetu
+// ----------------------------------------------------------------------------
+
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const http = require('http');
+const urlLib = require('url');
+
+const HTML_FILE = path.join(__dirname, 'vyroba.html');
+const KATALOG_SEED = path.join(__dirname, 'katalog-seed.json');
+
+// Stavy položky (= jeden řádek ČVZ). Pořadí = průběh zakázky; „pozastaveno" a „storno" jsou mimo řadu.
+const STAVY = [
+  ['prijata',      'Objednávka přijata',  'Order received',        'Bestellung eingegangen'],
+  ['zadano',       'Zadáno do výroby',    'Released to production','In Produktion freigegeben'],
+  ['svarovna',     'Svařovna',            'In production',         'In Produktion'],
+  ['lakovna',      'Lakovna',             'Painting',              'Lackierung'],
+  ['zinkovna',     'Zinkovna',            'Galvanising',           'Verzinkung'],
+  ['hotovo',       'Hotovo na skladě',    'Ready for dispatch',    'Fertig, versandbereit'],
+  ['naplanovano',  'Naplánováno na LKW',  'Loading scheduled',     'Verladung geplant'],
+  ['expedovano',   'Expedováno',          'Dispatched',            'Verladen'],
+  ['doruceno',     'Doručeno',            'Delivered',             'Geliefert'],
+  ['pozastaveno',  'Pozastaveno',         'On hold',               'Zurückgestellt'],
+  ['storno',       'Storno',              'Cancelled',             'Storniert'],
+];
+const STAV_KEYS = STAVY.map(s => s[0]);
+const STAV_PORADI = {}; STAVY.forEach((s, i) => { STAV_PORADI[s[0]] = i; });
+const VYKRES = { neni: 'není třeba', poslan: 'poslán ke schválení', schvalen: 'schválen', vydan: 'vydán do výroby' };
+const POVRCH = { lak: 'lakování', zinek: 'žárový zinek', zaklad: 'základní nátěr', bez: 'bez úpravy' };
+
+// Nejčastější RAL na boxech (pro barvu v ložném plánu a přehledu). Ostatní se zobrazí neutrálně.
+const RAL_HEX = {
+  '1003': '#F7BA0B', '1023': '#F7B500', '2002': '#C63927', '2004': '#E25303', '2008': '#ED6B21', '3000': '#A72920', '3001': '#9B2423', '3002': '#9B2321', '3003': '#861A22',
+  '3004': '#6B1C23', '3009': '#642424', '3011': '#781F19', '3020': '#BB1E10', '5002': '#00387B', '5003': '#1F3855', '5005': '#004F7C', '5010': '#004F7C', '5012': '#0089B6',
+  '5013': '#193153', '5015': '#007CB0', '5017': '#005B8C', '5021': '#007577', '6001': '#28713E', '6002': '#276235', '6005': '#0F4336', '6018': '#61993B', '6029': '#006F3D',
+  '7011': '#434B4D', '7016': '#293133', '7021': '#23282B', '7024': '#474A50', '7031': '#5B686D', '7034': '#8F8B66', '7035': '#C5C7C4', '7037': '#7A7B7A', '7040': '#9DA3A6',
+  '7042': '#8D9295', '8004': '#8F4E35', '9002': '#E7EBDA', '9005': '#0A0A0D', '9006': '#A1A1A0', '9010': '#F1ECE1', '9016': '#F1F0EA',
+};
+
+const DEN = 86400000;
+
+function mount(host) {
+  const DATA_F = path.join(host.dataDir || __dirname, 'vyroba-popelnice.json');
+
+  const json = (res, code, obj) => host.send(res, code, obj, { 'Cache-Control': 'no-store' });
+  const htmlOut = (res, code, s) => host.send(res, code, s, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  const low = s => String(s || '').trim().toLowerCase();
+  const str = (s, max) => String(s == null ? '' : s).trim().slice(0, max || 400);
+  const num = (v, def) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) ? n : (def == null ? 0 : def); };
+  const dnesISO = () => new Date().toISOString().slice(0, 10);
+  const newId = (p) => (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  // ---- perzistence ---------------------------------------------------------
+  function load() {
+    let d = null;
+    try { d = JSON.parse(fs.readFileSync(DATA_F, 'utf8')); } catch (_) {}
+    if (!d || typeof d !== 'object') d = {};
+    for (const k of ['objednavky', 'polozky', 'zakaznici', 'katalog']) if (!Array.isArray(d[k])) d[k] = [];
+    if (!d.seq || typeof d.seq !== 'object') d.seq = {};
+    if (!d.seq.cvz || typeof d.seq.cvz !== 'object') d.seq.cvz = {};
+    if (!d.nastaveni || typeof d.nastaveni !== 'object') d.nastaveni = {};
+    const n = d.nastaveni;
+    if (!Array.isArray(n.reditelVyroby)) n.reditelVyroby = [];      // e-maily lidí z výroby (mění stavy, nezakládají)
+    if (!Array.isArray(n.obchod)) n.obchod = [];                    // e-maily obchodu (zakládají objednávky)
+    if (typeof n.sheetId !== 'string') n.sheetId = '1620BTnSV5qlN25CcSg60CuTOgqiey6ck2eC_JKFOIbE';   // PLÁN VÝROBY BRUNTÁL POPELNICE
+    if (typeof n.sheetList !== 'string') n.sheetList = 'Boxy contract 2026';
+    if (typeof n.sheetListOstatni !== 'string') n.sheetListOstatni = 'Ostatní výrobky';
+    if (typeof n.driveRoot !== 'string') n.driveRoot = '1VVre4yFfde8sKx36QtXuO7kbKMHwv41h';        // složka Contract (BE26xxxx …)
+    if (typeof n.prubeznaDobaDny !== 'number') n.prubeznaDobaDny = 7;   // termín výroby = KW dodání − X dní
+    if (typeof n.upozorneniDny !== 'number') n.upozorneniDny = 7;       // „hotovo bez kamionu déle než"
+    if (!d.import || typeof d.import !== 'object') d.import = {};
+    if (!d.katalog.length) { seedKatalog(d); }
+    return d;
+  }
+  function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
+
+  function seedKatalog(d) {
+    try {
+      const seed = JSON.parse(fs.readFileSync(KATALOG_SEED, 'utf8'));
+      if (Array.isArray(seed)) d.katalog = seed.map(normKatalog).filter(k => k.kod);
+    } catch (_) {}
+  }
+
+  // ---- katalog produktů ----------------------------------------------------
+  // Kód provedení: CPRÖ 08.00 LacNamÖla → řada CPRÖ, objem 0.8 m³, Lac = lak, Nam = ražení, Öla = výpustný kohout.
+  function parseKod(kod) {
+    const k = String(kod || '').trim();
+    const m = k.match(/^([A-ZÖ]+)\s*(\d{1,2}[.,]\d{2})\s*(.*)$/i);
+    if (!m) return { rada: '', objem: null, provedeni: k };
+    return { rada: m[1].toUpperCase(), objem: Math.round(num(m[2]) * 100) / 100, provedeni: m[3] || '' };
+  }
+  function povrchZKodu(kod) {
+    const p = String(kod || '');
+    if (/Zin/i.test(p) || /pozink|zinek/i.test(p)) return 'zinek';
+    if (/Gru/i.test(p)) return 'zaklad';
+    if (/Lac/i.test(p)) return 'lak';
+    return '';
+  }
+  // „1200x800x800/920" → vnější rozměry pro ložný plán (délka, šířka, výška celkem, výška vnitřní)
+  function parseRozmer(s) {
+    const m = String(s || '').replace(/\s/g, '').replace(/\./g, '').match(/(\d{3,4})[x×](\d{3,4})[x×](\d{3,4})(?:\/(\d{3,4}))?/i);
+    if (!m) return null;
+    return { l: +m[1], w: +m[2], hi: +m[3], h: +(m[4] || m[3]) };
+  }
+  function normKatalog(k) {
+    const kod = str(k.kod, 80);
+    const pk = parseKod(kod);
+    const roz = parseRozmer(k.rozmer);
+    return {
+      id: k.id || newId('k'),
+      kod,
+      nazev: str(k.nazev, 160),
+      rada: str(k.rada, 20) || pk.rada,
+      objem: k.objem != null && k.objem !== '' ? num(k.objem) : pk.objem,
+      rozmer: str(k.rozmer, 40),
+      tloustka: k.tloustka != null && k.tloustka !== '' ? num(k.tloustka) : null,
+      kg: k.kg != null && k.kg !== '' ? num(k.kg) : null,
+      povrch: str(k.povrch, 10) || povrchZKodu(kod),
+      l: roz ? roz.l : (k.l || null), w: roz ? roz.w : (k.w || null), h: roz ? roz.h : (k.h || null), hi: roz ? roz.hi : (k.hi || null),
+      stoh: k.stoh != null ? num(k.stoh) : null,        // kolik ks na sebe v kamionu (null = dle ložného plánu)
+      aktivni: k.aktivni !== false,
+    };
+  }
+  function najdiKatalog(d, kod) {
+    const n = low(kod).replace(/\s+/g, '');
+    if (!n) return null;
+    return d.katalog.find(k => low(k.kod).replace(/\s+/g, '') === n) || null;
+  }
+  // Produkt mimo katalog (nové provedení stejné bedny, např. CPRDÖ 08.00 …): rozměr a hmotnost
+  // se odvodí od sourozence stejné řady CP* a stejného objemu, aby ložný plán měl s čím počítat.
+  function odvozenyProdukt(d, kod) {
+    const pk = parseKod(kod);
+    if (!pk.objem || !/^CP/.test(pk.rada)) return null;
+    const me = low(kod).replace(/\s+/g, '');
+    const sour = d.katalog.filter(k => /^CP/.test(k.rada || '') && k.objem === pk.objem && low(k.kod).replace(/\s+/g, '') !== me);
+    if (!sour.length) return null;
+    const zin = /Zin/i.test(kod);
+    const pref = arr => arr.slice().sort((a, b) => Number((/Zin/i.test(b.kod)) === zin) - Number((/Zin/i.test(a.kod)) === zin));
+    const sKg = pref(sour.filter(k => k.kg != null)), sRoz = pref(sour.filter(k => k.rozmer));
+    if (!sKg.length && !sRoz.length) return null;
+    const zdroj = sRoz[0] || sKg[0];
+    return { rozmer: sRoz.length ? sRoz[0].rozmer : '', kg: sKg.length ? sKg[0].kg : null, tloustka: zdroj.tloustka != null ? zdroj.tloustka : null, objem: pk.objem };
+  }
+
+  // ---- lidé a role ---------------------------------------------------------
+  function zamestnanci() {
+    let s = null; try { s = host.getState ? host.getState() : null; } catch (_) {}
+    const emps = (s && Array.isArray(s.employees)) ? s.employees : [];
+    return emps.filter(e => e && e.email).map(e => ({ email: low(e.email), name: e.name || e.email, stredisko: e.stredisko || '' }));
+  }
+  function moduly(email) { try { return host.employeeModules(email) || []; } catch (_) { return []; } }
+  function role(req) {
+    const d = load(), e = host.empSession(req);
+    const email = e ? low(e.email) : '';
+    const admin = host.isAdmin(req);
+    const mods = email ? moduly(email) : [];
+    const obchod = admin || mods.includes('vyroba') || d.nastaveni.obchod.map(low).includes(email);
+    const vyroba = obchod || mods.includes('vyrobadilna') || d.nastaveni.reditelVyroby.map(low).includes(email);
+    return { email, name: e ? (e.name || '') : '', admin, obchod, vyroba, pristup: !!(obchod || vyroba) };
+  }
+  function hasAccess(email) {
+    email = low(email); if (!email) return false;
+    const d = load(); const mods = moduly(email);
+    return mods.includes('vyroba') || mods.includes('vyrobadilna')
+      || d.nastaveni.obchod.map(low).includes(email) || d.nastaveni.reditelVyroby.map(low).includes(email);
+  }
+
+  // ---- ČVZ, termíny --------------------------------------------------------
+  function dalsiCvz(d, rok) {
+    rok = rok || new Date().getFullYear();
+    const cur = num(d.seq.cvz[rok], 0);
+    const next = cur + 1; d.seq.cvz[rok] = next;
+    return { cvz: String(rok).slice(2) + 'B-' + String(next).padStart(3, '0'), rok, poradi: next };
+  }
+  function posunSeq(d, rok, poradi) { if (num(d.seq.cvz[rok], 0) < poradi) d.seq.cvz[rok] = poradi; }
+  // ISO týden → pondělí toho týdne
+  function pondeliKW(kw, rok) {
+    kw = num(kw, 0); rok = num(rok, new Date().getFullYear());
+    if (!kw) return null;
+    const jan4 = new Date(Date.UTC(rok, 0, 4));
+    const den = jan4.getUTCDay() || 7;
+    const mon1 = new Date(jan4.getTime() - (den - 1) * DEN);
+    return new Date(mon1.getTime() + (kw - 1) * 7 * DEN).toISOString().slice(0, 10);
+  }
+  function kwZData(iso) {
+    if (!iso) return null;
+    const dt = new Date(iso + 'T00:00:00Z'); if (isNaN(dt)) return null;
+    const d = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+    const den = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() + 4 - den);
+    const y0 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return { kw: Math.ceil((((d - y0) / DEN) + 1) / 7), rok: d.getUTCFullYear() };
+  }
+  function terminVyrobyZ(o, nast) {
+    if (o.terminDodani) { const t = new Date(o.terminDodani + 'T00:00:00Z'); return new Date(t.getTime() - nast.prubeznaDobaDny * DEN).toISOString().slice(0, 10); }
+    const p = pondeliKW(o.kwDodani, o.kwRok || (o.datum ? Number(o.datum.slice(0, 4)) : null));
+    if (!p) return null;
+    return new Date(new Date(p + 'T00:00:00Z').getTime() - nast.prubeznaDobaDny * DEN).toISOString().slice(0, 10);
+  }
+
+  // ---- odvozené údaje ------------------------------------------------------
+  function stavObjednavky(polozky) {
+    const ziv = polozky.filter(p => p.stav !== 'storno');
+    if (!ziv.length) return polozky.length ? 'storno' : 'prijata';
+    if (ziv.some(p => p.stav === 'pozastaveno')) return 'pozastaveno';
+    // stav objednávky = nejméně pokročilá živá položka
+    return ziv.reduce((a, p) => (STAV_PORADI[p.stav] < STAV_PORADI[a] ? p.stav : a), 'doruceno');
+  }
+  function skluz(p, dnes) {
+    if (!p.terminVyroby) return 0;
+    if (STAV_PORADI[p.stav] >= STAV_PORADI.hotovo || p.stav === 'storno') return 0;
+    const dni = Math.floor((new Date(dnes + 'T00:00:00Z') - new Date(p.terminVyroby + 'T00:00:00Z')) / DEN);
+    return dni > 0 ? dni : 0;
+  }
+  function obohatPolozku(d, p, dnes, nast) {
+    const k = p.katalogId ? d.katalog.find(x => x.id === p.katalogId) : najdiKatalog(d, p.kod);
+    // provedení mimo katalog (nebo v katalogu bez hmotnosti) → hmotnost/rozměr od sourozence stejné řady a objemu
+    const od = (!k || k.kg == null || !k.rozmer) ? odvozenyProdukt(d, p.kod) : null;
+    const kg = p.kgKs != null ? p.kgKs : (k && k.kg != null ? k.kg : (od && od.kg != null ? od.kg : null));
+    const posledni = (p.udalosti || []).slice(-1)[0] || null;
+    const dnuVeStavu = posledni ? Math.floor((Date.now() - posledni.ts) / DEN) : null;
+    return Object.assign({}, p, {
+      kgKs: kg, kgCelkem: kg != null ? Math.round(kg * num(p.ks)) : null, kgOdvozene: kg != null && p.kgKs == null && !(k && k.kg != null),
+      rozmer: p.rozmer || (k ? k.rozmer : (od ? od.rozmer : '')), objem: p.objem != null ? p.objem : (k ? k.objem : (od ? od.objem : null)),
+      skluzDni: skluz(p, dnes), dnuVeStavu,
+      cekaBezKamionu: p.stav === 'hotovo' && dnuVeStavu != null && dnuVeStavu >= nast.upozorneniDny,
+    });
+  }
+  function obohatObjednavku(d, o, dnes, nast) {
+    const pol = d.polozky.filter(p => p.objId === o.id).sort((a, b) => (a.pozice || 0) - (b.pozice || 0)).map(p => obohatPolozku(d, p, dnes, nast));
+    const z = d.zakaznici.find(x => x.id === o.zakaznikId) || null;
+    const pr = d.zakaznici.find(x => x.id === o.prijemceId) || z;
+    return Object.assign({}, o, {
+      polozky: pol,
+      stav: stavObjednavky(pol),
+      zakaznik: z ? z.nazev : (o.zakaznikNazev || ''),
+      prijemce: pr ? pr.nazev : (o.prijemceNazev || ''),
+      prijemceAdresa: pr ? adresa(pr) : (o.prijemceAdresa || ''),
+      ks: pol.filter(p => p.stav !== 'storno').reduce((s, p) => s + num(p.ks), 0),
+      kg: pol.filter(p => p.stav !== 'storno').reduce((s, p) => s + (p.kgCelkem || 0), 0),
+      skluzDni: Math.max(0, ...pol.map(p => p.skluzDni)),
+    });
+  }
+  function adresa(z) { return [z.ulice, [z.psc, z.mesto].filter(Boolean).join(' '), z.zeme].filter(Boolean).join(', '); }
+
+  // ---- HTTP ----------------------------------------------------------------
+  async function handle(req, res) {
+    const u = urlLib.parse(req.url, true);
+    const p = u.pathname;
+    if (p !== '/vyroba' && p !== '/vyroba/' && !p.startsWith('/api/vyroba')) return false;
+
+    const r = role(req);
+    if (!r.pristup) {
+      if (p.startsWith('/api/')) json(res, 403, { chyba: 'K modulu Výroba Popelnice nemáte přístup.' });
+      else htmlOut(res, 403, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">'
+        + 'K modulu Výroba Popelnice nemáte přístup. Přiděluje ho správce intranetu (Přístupy → Výroba Popelnice).</p>');
+      return true;
+    }
+    if ((p === '/vyroba' || p === '/vyroba/') && req.method === 'GET') {
+      if (!fs.existsSync(HTML_FILE)) { htmlOut(res, 404, '<h1>Chybí vyroba.html</h1>'); return true; }
+      htmlOut(res, 200, fs.readFileSync(HTML_FILE, 'utf8')); return true;
+    }
+    try {
+      if (p === '/api/vyroba/data' && req.method === 'GET') return apiData(req, res, r);
+      if (p === '/api/vyroba/export' && req.method === 'GET') return apiExport(req, res);
+      if (p === '/api/vyroba/drive' && req.method === 'GET') return await apiDrive(req, res, u.query);
+      if (req.method !== 'POST') { json(res, 404, { chyba: 'Neznámý požadavek.' }); return true; }
+      const b = JSON.parse(await host.readBody(req) || '{}');
+      const jenObchod = () => { if (!r.obchod) { json(res, 403, { chyba: 'Tuto akci může provést jen obchod nebo správce.' }); return false; } return true; };
+      switch (p) {
+        case '/api/vyroba/objednavka':          return jenObchod() && apiObjednavka(req, res, r, b);
+        case '/api/vyroba/objednavka/zadat':    return jenObchod() && apiZadat(req, res, r, b);
+        case '/api/vyroba/objednavka/stav':     return jenObchod() && apiObjStav(req, res, r, b);
+        case '/api/vyroba/objednavka/smazat':   return jenObchod() && apiObjSmazat(req, res, r, b);
+        case '/api/vyroba/polozka':             return jenObchod() && apiPolozka(req, res, r, b);
+        case '/api/vyroba/polozka/stav':        return apiPolozkaStav(req, res, r, b);
+        case '/api/vyroba/polozka/vykres':      return apiPolozkaVykres(req, res, r, b);
+        case '/api/vyroba/zakaznik':            return jenObchod() && apiZakaznik(req, res, r, b);
+        case '/api/vyroba/katalog':             return jenObchod() && apiKatalog(req, res, r, b);
+        case '/api/vyroba/katalog/smazat':      return jenObchod() && apiKatalogSmazat(req, res, r, b);
+        case '/api/vyroba/import/sheet':        return jenObchod() && await apiImportSheet(req, res, r, b);
+        case '/api/vyroba/import/rows':         return jenObchod() && apiImportRows(req, res, r, b);
+        case '/api/vyroba/loznyplan/odeslat':   return jenObchod() && await apiLoznyPlanOdeslat(req, res, r, b);
+        case '/api/vyroba/nastaveni':           return jenObchod() && apiNastaveni(req, res, r, b);
+      }
+    } catch (e) {
+      console.error('[vyroba] chyba obsluhy:', e);
+      json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true;
+    }
+    json(res, 404, { chyba: 'Neznámý požadavek.' }); return true;
+  }
+
+  // ---- čtení ---------------------------------------------------------------
+  function apiData(req, res, r) {
+    const d = load(), dnes = dnesISO(), nast = d.nastaveni;
+    const objednavky = d.objednavky.map(o => obohatObjednavku(d, o, dnes, nast))
+      .sort((a, b) => String(b.datum || '').localeCompare(String(a.datum || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    json(res, 200, {
+      me: r,
+      objednavky,
+      katalog: d.katalog.slice().sort((a, b) => a.kod.localeCompare(b.kod, 'cs')),
+      zakaznici: d.zakaznici.slice().sort((a, b) => a.nazev.localeCompare(b.nazev, 'cs')),
+      nastaveni: nast,
+      stavy: STAVY, vykres: VYKRES, povrch: POVRCH, ralHex: RAL_HEX,
+      seq: d.seq, import: d.import,
+      sheetDostupny: !!(host.sheets && host.sheets.available),
+      driveDostupny: !!(host.drive && host.drive.available),
+      loznyplanUrl: host.loznyplan && host.loznyplan.url || '',
+      zamestnanci: zamestnanci(),
+      dnes,
+    });
+    return true;
+  }
+
+  // ---- objednávka ----------------------------------------------------------
+  function normPolozka(d, p, objId) {
+    const k = p.katalogId ? d.katalog.find(x => x.id === p.katalogId) : najdiKatalog(d, p.kod);
+    const kod = str(p.kod || (k && k.kod), 80);
+    const od = (!k || k.kg == null || !k.rozmer) ? odvozenyProdukt(d, kod) : null;
+    return {
+      id: p.id || newId('p'), objId,
+      pozice: num(p.pozice, 0) || null,
+      katalogId: k ? k.id : null,
+      kod, nazev: str(p.nazev, 200),
+      ks: Math.max(0, Math.round(num(p.ks))),
+      rozmer: str(p.rozmer || (k && k.rozmer) || (od && od.rozmer), 40),
+      tloustka: p.tloustka != null && p.tloustka !== '' ? num(p.tloustka) : (k && k.tloustka != null ? k.tloustka : (od && od.tloustka != null ? od.tloustka : null)),
+      objem: p.objem != null && p.objem !== '' ? num(p.objem) : (k ? k.objem : (od ? od.objem : null)),
+      kgKs: p.kgKs != null && p.kgKs !== '' ? num(p.kgKs) : (od && od.kg != null ? od.kg : null),
+      povrch: str(p.povrch, 10) || (k ? k.povrch : povrchZKodu(kod)),
+      ral: str(p.ral, 40), lem: str(p.lem, 40),
+      razeni: str(p.razeni, 200), polepy: str(p.polepy, 200),
+      heliosPolozka: str(p.heliosPolozka, 20), cena: p.cena != null && p.cena !== '' ? num(p.cena) : null,
+      vykres: { stav: (p.vykres && VYKRES[p.vykres.stav]) ? p.vykres.stav : 'neni', datum: str(p.vykres && p.vykres.datum, 10) },
+      poznamka: str(p.poznamka, 400),
+    };
+  }
+  function apiObjednavka(req, res, r, b) {
+    const d = load();
+    const je = b.id ? d.objednavky.find(o => o.id === b.id) : null;
+    if (b.id && !je) { json(res, 404, { chyba: 'Objednávka nenalezena.' }); return true; }
+    const o = je || { id: newId('o'), createdAt: Date.now(), createdBy: r.email, loznyplan: null };
+    // zákazník / příjemce: buď existující id, nebo nový záznam podle názvu
+    const zak = zajistiZakaznika(d, b.zakaznikId, b.zakaznikNazev, b.zakaznik);
+    const pri = zajistiZakaznika(d, b.prijemceId, b.prijemceNazev, b.prijemce);
+    Object.assign(o, {
+      cislo: str(b.cislo, 30), cisloAU: str(b.cisloAU, 30), helios: str(b.helios, 20),
+      datum: str(b.datum, 10) || dnesISO(),
+      zakaznikId: zak ? zak.id : null, zakaznikNazev: zak ? zak.nazev : str(b.zakaznikNazev, 160),
+      prijemceId: pri ? pri.id : (zak ? zak.id : null), prijemceNazev: pri ? pri.nazev : '',
+      kwDodani: num(b.kwDodani, 0) || null, kwRok: num(b.kwRok, 0) || null,
+      terminDodani: str(b.terminDodani, 10),
+      doprava: str(b.doprava, 80), mena: str(b.mena, 3) || 'EUR',
+      potvrzena: !!b.potvrzena, potvrzenaDatum: b.potvrzena ? (o.potvrzenaDatum || dnesISO()) : '',
+      poznamka: str(b.poznamka, 1000), driveUrl: str(b.driveUrl, 300),
+      updatedAt: Date.now(), updatedBy: r.email,
+    });
+    if (!o.kwRok && o.kwDodani) o.kwRok = Number(o.datum.slice(0, 4));
+    if (!je) d.objednavky.push(o);
+    // položky: přijaté pole je kompletní stav položek (upravit, přidat, odebrat ty bez ČVZ)
+    if (Array.isArray(b.polozky)) {
+      const stavajici = d.polozky.filter(p => p.objId === o.id);
+      const ids = new Set();
+      b.polozky.forEach((bp, i) => {
+        const ex = bp.id ? stavajici.find(p => p.id === bp.id) : null;
+        const np = normPolozka(d, bp, o.id); np.pozice = np.pozice || (i + 1);
+        if (ex) { Object.assign(ex, np, { id: ex.id, cvz: ex.cvz, rok: ex.rok, poradi: ex.poradi, stav: ex.stav, udalosti: ex.udalosti, terminVyroby: ex.terminVyroby, hotovoKs: ex.hotovoKs, kamion: ex.kamion }); ids.add(ex.id); }
+        else { Object.assign(np, { cvz: null, rok: null, poradi: null, stav: 'prijata', hotovoKs: 0, kamion: '', terminVyroby: terminVyrobyZ(o, d.nastaveni), udalosti: [udalost(r, 'prijata', null, 'založeno')] }); d.polozky.push(np); ids.add(np.id); }
+      });
+      // odebrané položky: bez ČVZ smazat, s ČVZ stornovat (řada čísel musí zůstat souvislá)
+      stavajici.filter(p => !ids.has(p.id)).forEach(p => {
+        if (!p.cvz) d.polozky = d.polozky.filter(x => x.id !== p.id);
+        else if (p.stav !== 'storno') { p.stav = 'storno'; p.udalosti.push(udalost(r, 'storno', null, 'položka odebrána z objednávky')); }
+      });
+    }
+    // termín výroby položek, které ho nemají (nebo se změnila KW)
+    d.polozky.filter(p => p.objId === o.id && !p.cvz).forEach(p => { p.terminVyroby = terminVyrobyZ(o, d.nastaveni); });
+    save(d);
+    logAct('vyroba', req, (je ? 'Upravena' : 'Založena') + ' objednávka ' + (o.cislo || o.helios || o.id));
+    json(res, 200, { ok: true, id: o.id, objednavka: obohatObjednavku(d, o, dnesISO(), d.nastaveni) });
+    return true;
+  }
+  function zajistiZakaznika(d, id, nazev, obj) {
+    if (id) { const z = d.zakaznici.find(x => x.id === id); if (z) { if (obj && typeof obj === 'object') Object.assign(z, normZakaznik(obj, z)); return z; } }
+    const n = str(nazev || (obj && obj.nazev), 160); if (!n) return null;
+    let z = d.zakaznici.find(x => low(x.nazev) === low(n));
+    if (!z) { z = normZakaznik(Object.assign({ nazev: n }, obj || {}), null); d.zakaznici.push(z); }
+    else if (obj && typeof obj === 'object') Object.assign(z, normZakaznik(Object.assign({}, obj, { nazev: z.nazev }), z));
+    return z;
+  }
+  function normZakaznik(b, ex) {
+    return {
+      id: (ex && ex.id) || b.id || newId('z'),
+      nazev: str(b.nazev, 160), ulice: str(b.ulice, 120), mesto: str(b.mesto, 80), psc: str(b.psc, 12), zeme: str(b.zeme, 4) || (ex ? ex.zeme : 'CH'),
+      partner: str(b.partner, 20) || (ex ? ex.partner : 'contract'),   // contract | primy
+      kontakt: str(b.kontakt, 120), email: str(b.email, 120), telefon: str(b.telefon, 40),
+      jazyk: str(b.jazyk, 2) || (ex ? ex.jazyk : 'de'),
+      poznamka: str(b.poznamka, 400),
+    };
+  }
+  function udalost(r, stav, ks, pozn) { return { ts: Date.now(), kdo: r.email, jmeno: r.name, stav, ks: ks == null ? null : num(ks), pozn: str(pozn, 300) }; }
+
+  // Zadání do výroby: přidělí ČVZ všem položkám bez čísla a posune je na „zadáno".
+  function apiZadat(req, res, r, b) {
+    const d = load();
+    const o = d.objednavky.find(x => x.id === b.id); if (!o) { json(res, 404, { chyba: 'Objednávka nenalezena.' }); return true; }
+    const rok = new Date().getFullYear();
+    let n = 0;
+    d.polozky.filter(p => p.objId === o.id && p.stav !== 'storno').forEach(p => {
+      if (!p.cvz) { const c = dalsiCvz(d, rok); p.cvz = c.cvz; p.rok = c.rok; p.poradi = c.poradi; }
+      if (p.stav === 'prijata') { p.stav = 'zadano'; p.zadanoDne = dnesISO(); p.udalosti.push(udalost(r, 'zadano', null, b.pozn || '')); n++; }
+      if (!p.terminVyroby) p.terminVyroby = terminVyrobyZ(o, d.nastaveni);
+    });
+    o.zadanoDne = o.zadanoDne || dnesISO();
+    save(d);
+    logAct('vyroba', req, 'Zadáno do výroby: ' + (o.cislo || o.helios || o.id) + ' (' + n + ' položek)');
+    json(res, 200, { ok: true, objednavka: obohatObjednavku(d, o, dnesISO(), d.nastaveni) });
+    return true;
+  }
+  function apiObjStav(req, res, r, b) {
+    const d = load();
+    const o = d.objednavky.find(x => x.id === b.id); if (!o) { json(res, 404, { chyba: 'Objednávka nenalezena.' }); return true; }
+    const akce = str(b.akce, 20);
+    const pol = d.polozky.filter(p => p.objId === o.id);
+    if (akce === 'potvrdit') { o.potvrzena = true; o.potvrzenaDatum = str(b.datum, 10) || dnesISO(); }
+    else if (akce === 'storno') pol.forEach(p => { if (STAV_PORADI[p.stav] < STAV_PORADI.expedovano) { p.stav = 'storno'; p.udalosti.push(udalost(r, 'storno', null, b.pozn || '')); } });
+    else if (akce === 'pozastavit') pol.forEach(p => { if (STAV_PORADI[p.stav] < STAV_PORADI.hotovo) { p.stavPred = p.stav; p.stav = 'pozastaveno'; p.udalosti.push(udalost(r, 'pozastaveno', null, b.pozn || '')); } });
+    else if (akce === 'obnovit') pol.forEach(p => { if (p.stav === 'pozastaveno') { p.stav = p.stavPred || 'zadano'; delete p.stavPred; p.udalosti.push(udalost(r, p.stav, null, 'obnoveno')); } });
+    else { json(res, 400, { chyba: 'Neznámá akce.' }); return true; }
+    save(d);
+    logAct('vyroba', req, 'Objednávka ' + (o.cislo || o.helios) + ': ' + akce);
+    json(res, 200, { ok: true, objednavka: obohatObjednavku(d, o, dnesISO(), d.nastaveni) });
+    return true;
+  }
+  function apiObjSmazat(req, res, r, b) {
+    const d = load();
+    const o = d.objednavky.find(x => x.id === b.id); if (!o) { json(res, 404, { chyba: 'Objednávka nenalezena.' }); return true; }
+    if (d.polozky.some(p => p.objId === o.id && p.cvz)) { json(res, 400, { chyba: 'Objednávka už má výrobní čísla — místo smazání ji stornujte.' }); return true; }
+    d.objednavky = d.objednavky.filter(x => x.id !== o.id);
+    d.polozky = d.polozky.filter(p => p.objId !== o.id);
+    save(d); json(res, 200, { ok: true }); return true;
+  }
+  function apiPolozka(req, res, r, b) {
+    const d = load();
+    const p = d.polozky.find(x => x.id === b.id); if (!p) { json(res, 404, { chyba: 'Položka nenalezena.' }); return true; }
+    const np = normPolozka(d, Object.assign({}, p, b), p.objId);
+    Object.assign(p, np, { id: p.id, cvz: p.cvz, rok: p.rok, poradi: p.poradi, stav: p.stav, udalosti: p.udalosti, hotovoKs: p.hotovoKs, kamion: p.kamion });
+    if (b.terminVyroby !== undefined) p.terminVyroby = str(b.terminVyroby, 10) || p.terminVyroby;
+    save(d); json(res, 200, { ok: true, polozka: obohatPolozku(d, p, dnesISO(), d.nastaveni) }); return true;
+  }
+
+  // Změna stavu položky (dílna i obchod). Částečné množství = zapíše se ks k události a hotovoKs.
+  function apiPolozkaStav(req, res, r, b) {
+    const d = load();
+    const ids = Array.isArray(b.ids) ? b.ids : [b.id];
+    const stav = str(b.stav, 20);
+    if (!STAV_KEYS.includes(stav)) { json(res, 400, { chyba: 'Neznámý stav.' }); return true; }
+    if (!r.obchod && ['prijata', 'storno', 'doruceno'].includes(stav)) { json(res, 403, { chyba: 'Tento stav mění jen obchod.' }); return true; }
+    const out = [];
+    ids.forEach(id => {
+      const p = d.polozky.find(x => x.id === id); if (!p) return;
+      const ks = b.ks != null && b.ks !== '' ? Math.max(0, Math.round(num(b.ks))) : null;
+      if (stav === 'hotovo') p.hotovoKs = ks != null ? Math.min(num(p.ks), num(p.hotovoKs) + ks) : num(p.ks);
+      if (stav === 'hotovo' && ks != null && p.hotovoKs < num(p.ks)) {
+        // část hotová: položka zůstává ve stavu, jen se zapíše událost s počtem
+        p.udalosti.push(udalost(r, p.stav, ks, 'hotovo ' + p.hotovoKs + ' z ' + p.ks + ' ks' + (b.pozn ? ' · ' + b.pozn : '')));
+      } else {
+        p.stav = stav;
+        if (stav === 'zinkovna' || stav === 'lakovna') p.kooperace = { druh: stav, odvoz: str(b.datum, 10) || dnesISO(), ks: ks != null ? ks : num(p.ks) };
+        if (stav === 'naplanovano') p.kamion = str(b.kamion, 30) || p.kamion;
+        if (stav === 'expedovano') { p.expedovanoDne = str(b.datum, 10) || dnesISO(); p.kamion = str(b.kamion, 30) || p.kamion; }
+        if (stav === 'doruceno') p.dorucenoDne = str(b.datum, 10) || dnesISO();
+        if (stav === 'hotovo') p.hotovoDne = str(b.datum, 10) || dnesISO();
+        p.udalosti.push(udalost(r, stav, ks, b.pozn || ''));
+      }
+      out.push(obohatPolozku(d, p, dnesISO(), d.nastaveni));
+    });
+    save(d);
+    logAct('vyroba', req, 'Stav ' + stav + ': ' + out.map(p => p.cvz || p.kod).join(', '));
+    json(res, 200, { ok: true, polozky: out }); return true;
+  }
+  function apiPolozkaVykres(req, res, r, b) {
+    const d = load();
+    const p = d.polozky.find(x => x.id === b.id); if (!p) { json(res, 404, { chyba: 'Položka nenalezena.' }); return true; }
+    const stav = str(b.stav, 12); if (!VYKRES[stav]) { json(res, 400, { chyba: 'Neznámý stav výkresu.' }); return true; }
+    p.vykres = { stav, datum: str(b.datum, 10) || dnesISO() };
+    p.udalosti.push(udalost(r, p.stav, null, 'výkres: ' + VYKRES[stav]));
+    save(d); json(res, 200, { ok: true, polozka: obohatPolozku(d, p, dnesISO(), d.nastaveni) }); return true;
+  }
+
+  // ---- zákazníci, katalog, nastavení -------------------------------------------
+  function apiZakaznik(req, res, r, b) {
+    const d = load();
+    if (b.smazat && b.id) {
+      if (d.objednavky.some(o => o.zakaznikId === b.id || o.prijemceId === b.id)) { json(res, 400, { chyba: 'Zákazník má objednávky, nelze smazat.' }); return true; }
+      d.zakaznici = d.zakaznici.filter(z => z.id !== b.id); save(d); json(res, 200, { ok: true }); return true;
+    }
+    const ex = b.id ? d.zakaznici.find(z => z.id === b.id) : null;
+    if (!str(b.nazev, 160)) { json(res, 400, { chyba: 'Chybí název zákazníka.' }); return true; }
+    const z = normZakaznik(b, ex);
+    if (ex) Object.assign(ex, z); else d.zakaznici.push(z);
+    save(d); json(res, 200, { ok: true, zakaznik: ex || z }); return true;
+  }
+  function apiKatalog(req, res, r, b) {
+    const d = load();
+    if (!str(b.kod, 80)) { json(res, 400, { chyba: 'Chybí kód produktu.' }); return true; }
+    const ex = b.id ? d.katalog.find(k => k.id === b.id) : null;
+    const dup = najdiKatalog(d, b.kod);
+    if (dup && (!ex || dup.id !== ex.id)) { json(res, 400, { chyba: 'Produkt ' + dup.kod + ' už v katalogu je.' }); return true; }
+    const k = normKatalog(Object.assign({}, ex || {}, b, { id: ex ? ex.id : undefined }));
+    if (ex) Object.assign(ex, k); else d.katalog.push(k);
+    save(d); json(res, 200, { ok: true, produkt: ex || k }); return true;
+  }
+  function apiKatalogSmazat(req, res, r, b) {
+    const d = load();
+    const k = d.katalog.find(x => x.id === b.id); if (!k) { json(res, 404, { chyba: 'Produkt nenalezen.' }); return true; }
+    if (d.polozky.some(p => p.katalogId === k.id)) { k.aktivni = false; } else d.katalog = d.katalog.filter(x => x.id !== k.id);
+    save(d); json(res, 200, { ok: true }); return true;
+  }
+  function apiNastaveni(req, res, r, b) {
+    const d = load(), n = d.nastaveni;
+    const emaily = v => (Array.isArray(v) ? v : String(v || '').split(/[,;\s]+/)).map(low).filter(x => /@/.test(x));
+    if (b.reditelVyroby !== undefined) n.reditelVyroby = emaily(b.reditelVyroby);
+    if (b.obchod !== undefined) n.obchod = emaily(b.obchod);
+    if (b.sheetId !== undefined) n.sheetId = str(b.sheetId, 120);
+    if (b.sheetList !== undefined) n.sheetList = str(b.sheetList, 80);
+    if (b.sheetListOstatni !== undefined) n.sheetListOstatni = str(b.sheetListOstatni, 80);
+    if (b.driveRoot !== undefined) n.driveRoot = str(b.driveRoot, 120);
+    if (b.prubeznaDobaDny !== undefined) n.prubeznaDobaDny = Math.max(0, Math.round(num(b.prubeznaDobaDny, 7)));
+    if (b.upozorneniDny !== undefined) n.upozorneniDny = Math.max(1, Math.round(num(b.upozorneniDny, 7)));
+    save(d); json(res, 200, { ok: true, nastaveni: n }); return true;
+  }
+
+  // ---- import z Google Sheetu PLÁN VÝROBY ------------------------------------
+  // Sloupce listu „Boxy contract 2026": 0 prefix (26B) · 1 pořadí · 2 zadáno · 3 výrobek · 4 rozměr · 5 tloušťka ·
+  // 6 ks · 7 RAL · 8 objem · 9 číslo položky Helios · 10 název (ražení, polepy) · 11 stav · 12 číslo objednávky Helios ·
+  // 13 (variantní název zákazníka) · 14 místo dodání · 15 požadovaný termín · 16 poznámka · 17 expedice
+  function datumZ(s) {
+    const t = String(s || '').trim();
+    let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    m = t.match(/(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{2,4})/);
+    if (m) { let y = m[3]; if (y.length === 2) y = '20' + y; return y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); }
+    return null;
+  }
+  function importRows(d, rows, r, list) {
+    const stat = { objednavek: 0, polozek: 0, aktualizovano: 0, preskoceno: 0 };
+    const rokTab = new Date().getFullYear();
+    for (const row of rows) {
+      if (!Array.isArray(row)) continue;
+      const prefix = str(row[0], 6).replace(/\s/g, ''); const poradi = Math.round(num(row[1], 0));
+      const vyrobek = str(row[3], 120);
+      const m = prefix.match(/^(\d{2})B$/i);
+      if (!m || !poradi || !vyrobek) { stat.preskoceno++; continue; }
+      const rok = 2000 + Number(m[1]);
+      const cvz = m[1] + 'B-' + String(poradi).padStart(3, '0');
+      const heliosObj = str(row[12], 20).replace(/\.0$/, '');
+      const zakaznikNazev = str(row[14], 160) || str(row[13], 160) || 'Neznámý zákazník';
+      // objednávka = Helios číslo (+ zákazník), jinak jedna „sběrná" na zákazníka
+      const klic = heliosObj || ('bez-helios:' + low(zakaznikNazev));
+      let o = d.objednavky.find(x => (x.helios && x.helios === heliosObj) || (!heliosObj && x.importKlic === klic));
+      if (!o) {
+        const z = zajistiZakaznika(d, null, zakaznikNazev, { partner: list === 'ostatni' ? 'primy' : 'contract' });
+        o = { id: newId('o'), cislo: '', cisloAU: '', helios: heliosObj, importKlic: klic, datum: datumZ(row[2]) || dnesISO(),
+          zakaznikId: z.id, zakaznikNazev: z.nazev, prijemceId: z.id, prijemceNazev: '',
+          kwDodani: null, kwRok: null, terminDodani: datumZ(row[15]) || '', doprava: '', mena: 'EUR', potvrzena: true, potvrzenaDatum: '',
+          poznamka: '', driveUrl: '', createdAt: Date.now(), createdBy: r.email, zdroj: 'sheet', loznyplan: null };
+        const kw = kwZData(o.terminDodani); if (kw) { o.kwDodani = kw.kw; o.kwRok = kw.rok; }
+        d.objednavky.push(o); stat.objednavek++;
+      }
+      const ralText = str(row[7], 80);
+      const ralM = ralText.match(/RAL\s?(\d{4})/i); const lemM = ralText.match(/lem\s*(?:RAL\s?)?(\d{4})/i);
+      const povrch = /pozink|zin/i.test(ralText) ? 'zinek' : (/zákl/i.test(ralText) ? 'zaklad' : (ralM ? 'lak' : povrchZKodu(vyrobek)));
+      const nazev = str(row[10], 200);
+      const razM = nazev.match(/ražení\s*názvu\s*[:\-]?\s*([^\n]*)/i);
+      const polepM = nazev.match(/polepy?\s*([^\n]*)/i);
+      const pozn = str(row[16], 300); const exped = datumZ(row[17]); const stavTxt = low(row[11]) + ' ' + low(pozn) + ' ' + low(row[17]);
+      let stav = 'zadano';
+      if (/storno/.test(stavTxt)) stav = 'storno';
+      else if (exped || /^\s*\d{1,2}\.\s*\d{1,2}\./.test(String(row[17] || ''))) stav = 'expedovano';
+      else if (/zinkovn|zink\b|zin\.|zink /.test(low(pozn))) stav = 'zinkovna';
+      else if (/hotovo|hot\./.test(stavTxt)) stav = 'hotovo';
+      const tl = num(row[5], 0); const objem = num(row[8], 0);
+      let p = d.polozky.find(x => x.cvz === cvz);
+      const kat = najdiKatalog(d, vyrobek); const od = (!kat || kat.kg == null || !kat.rozmer) ? odvozenyProdukt(d, vyrobek) : null;
+      const data = {
+        objId: o.id, pozice: null, katalogId: kat ? kat.id : null, kod: vyrobek, nazev: '',
+        ks: Math.round(num(row[6], 0)), rozmer: str(row[4], 40) || (od ? od.rozmer : ''),
+        tloustka: tl > 0 && tl < 20 ? tl : (od && od.tloustka != null ? od.tloustka : null), objem: objem > 0 && objem < 100 ? objem : (od ? od.objem : null), kgKs: od && od.kg != null ? od.kg : null,
+        // v RAL sloupci bývá u vík a náhradních dílů popis („komplet-hrazda, zámek…") → jde do názvu, ne do RAL
+        povrch, ral: ralM ? 'RAL ' + ralM[1] : (povrch === 'zinek' || !/RAL|lak/i.test(ralText) ? '' : ralText), lem: lemM ? 'RAL ' + lemM[1] : '',
+        nazev: !ralM && !/pozink|zin|RAL|lak/i.test(ralText) ? ralText : '',
+        razeni: razM ? str(razM[1].replace(/\s{2,}/g, ' '), 200) : (nazev && !/polep/i.test(nazev) ? nazev.replace(/\s{2,}/g, ' ') : ''),
+        polepy: polepM ? str(polepM[0].replace(/\s{2,}/g, ' '), 200) : '',
+        heliosPolozka: str(row[9], 20).replace(/\.0$/, ''), cena: null,
+        poznamka: pozn, terminVyroby: datumZ(row[15]), zadanoDne: datumZ(row[2]),
+      };
+      if (!p) {
+        p = Object.assign({ id: newId('p'), cvz, rok, poradi, stav, hotovoKs: stav === 'hotovo' || STAV_PORADI[stav] >= STAV_PORADI.expedovano ? data.ks : 0, kamion: '',
+          expedovanoDne: exped || '', vykres: { stav: 'neni', datum: '' },
+          udalosti: [{ ts: Date.now(), kdo: r.email, jmeno: r.name, stav, ks: null, pozn: 'import ze Sheetu' }], zdroj: 'sheet' }, data);
+        d.polozky.push(p); stat.polozek++;
+        posunSeq(d, rok, poradi);
+      } else if (p.zdroj === 'sheet' && !(p.udalosti || []).some(u => u.pozn !== 'import ze Sheetu')) {
+        // položku ještě nikdo ručně neměnil → přepíšeme ze Sheetu (Renata ho zatím vede dál)
+        Object.assign(p, data, { stav, expedovanoDne: exped || p.expedovanoDne || '' }); stat.aktualizovano++;
+      } else stat.preskoceno++;
+      if (!p.ks) stat.preskoceno++;
+    }
+    return stat;
+  }
+  async function apiImportSheet(req, res, r, b) {
+    if (!(host.sheets && host.sheets.available)) { json(res, 400, { chyba: 'Google service account není nastaven (GOOGLE_SA_*).' }); return true; }
+    const d = load(); const n = d.nastaveni;
+    const listy = [];
+    if (b.list !== 'ostatni') listy.push({ nazev: n.sheetList, typ: 'boxy' });
+    if (b.list === 'ostatni' || b.list === 'vse') listy.push({ nazev: n.sheetListOstatni, typ: 'ostatni' });
+    let celkem = { objednavek: 0, polozek: 0, aktualizovano: 0, preskoceno: 0 };
+    for (const l of listy) {
+      const rows = await host.sheets.read(n.sheetId, "'" + l.nazev.replace(/'/g, "''") + "'!A2:R2000");
+      const s = importRows(d, (rows && rows.values) || rows || [], r, l.typ);
+      for (const k in celkem) celkem[k] += s[k];
+    }
+    d.import.sheet = { at: new Date().toISOString(), kdo: r.email, stat: celkem };
+    save(d);
+    logAct('vyroba', req, 'Import ze Sheetu: ' + JSON.stringify(celkem));
+    json(res, 200, Object.assign({ ok: true }, celkem)); return true;
+  }
+  // Import z pole řádků (např. vyexportovaný list) — stejná logika bez Google účtu.
+  function apiImportRows(req, res, r, b) {
+    if (!Array.isArray(b.rows)) { json(res, 400, { chyba: 'Chybí rows.' }); return true; }
+    const d = load();
+    const s = importRows(d, b.rows, r, b.list === 'ostatni' ? 'ostatni' : 'boxy');
+    d.import.rows = { at: new Date().toISOString(), kdo: r.email, stat: s };
+    save(d); json(res, 200, Object.assign({ ok: true }, s)); return true;
+  }
+
+  // ---- Google Drive: složka BE26xxxx k objednávce ---------------------------------
+  let _driveCache = { at: 0, files: null };
+  async function apiDrive(req, res, q) {
+    if (!(host.drive && host.drive.available)) { json(res, 200, { dostupny: false, soubory: [] }); return true; }
+    const d = load(); const o = d.objednavky.find(x => x.id === q.objId);
+    if (!o) { json(res, 404, { chyba: 'Objednávka nenalezena.' }); return true; }
+    if (!_driveCache.files || Date.now() - _driveCache.at > 10 * 60 * 1000) { _driveCache = { at: Date.now(), files: await host.drive.list(d.nastaveni.driveRoot) }; }
+    const hled = [o.cislo, o.helios].map(low).filter(Boolean);
+    const slozky = _driveCache.files.filter(f => f.isFolder && hled.some(h => low(f.name).includes(h.replace(/^b(?=\d)/, 'be'))));
+    let soubory = [];
+    for (const s of slozky.slice(0, 3)) { try { soubory = soubory.concat((await host.drive.list(s.id)).map(f => Object.assign({ slozka: s.name }, f))); } catch (_) {} }
+    json(res, 200, { dostupny: true, slozky, soubory }); return true;
+  }
+
+  // ---- Ložný plán: odeslání objednávky do sdíleného úložiště aplikace -----------------
+  function httpJson(method, url, body) {
+    return new Promise((resolve, reject) => {
+      let u; try { u = new URL(url); } catch (e) { return reject(e); }
+      const lib = u.protocol === 'http:' ? http : https;
+      const data = body ? JSON.stringify(body) : null;
+      const req = lib.request({ method, hostname: u.hostname, port: u.port || undefined, path: u.pathname + u.search,
+        headers: Object.assign({ 'Accept': 'application/json' }, data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}) }, resp => {
+        let s = ''; resp.on('data', c => s += c); resp.on('end', () => { let j = null; try { j = JSON.parse(s); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) resolve(j || {}); else reject(new Error('Ložný plán ' + resp.statusCode + ': ' + s.slice(0, 160))); });
+      });
+      req.on('error', e => reject(new Error('Spojení s Ložným plánem: ' + e.message)));
+      req.setTimeout(20000, () => { try { req.destroy(new Error('Ložný plán: časový limit spojení.')); } catch (_) {} });
+      if (data) req.write(data); req.end();
+    });
+  }
+  function loznyplanUrl(cesta) {
+    const base = (host.loznyplan && host.loznyplan.url || '').replace(/\/$/, '');
+    if (!base) throw new Error('Adresa aplikace Ložný plán není nastavena (LOZNYPLAN_APP_URL).');
+    let tok = '';
+    try { if (host.loznyplan.ssoSign) tok = host.loznyplan.ssoSign({ email: 'intranet@elkoplast.cz', name: 'Intranet – Výroba Popelnice', exp: Date.now() + 5 * 60 * 1000 }); } catch (_) {}
+    return base + cesta + (tok ? (cesta.includes('?') ? '&' : '?') + 'sso=' + encodeURIComponent(tok) : '');
+  }
+  const PALETA = ['#4d9fff', '#ff6b6b', '#ffd93d', '#6bcb77', '#c77dff', '#ff9f43', '#00d4ff', '#f368e0', '#48dbfb', '#1dd1a1'];
+  function mapaBoxType(shared, p, k) {
+    const nazev = String(p.kod || '').replace(/\s+/g, '');
+    const n = low(nazev);
+    let bt = (shared.boxTypes || []).find(t => low(String(t.name || '')).replace(/\s+/g, '') === n);
+    if (bt) return { bt, novy: false };
+    const roz = parseRozmer(p.rozmer) || (k && k.l ? { l: k.l, w: k.w, h: k.h, hi: k.hi } : null);
+    if (!roz) return { bt: null, novy: false };
+    const maxId = Math.max(0, ...(shared.boxTypes || []).map(t => +t.id || 0));
+    bt = { id: maxId + 1, name: nazev, l: roz.l, w: roz.w, h: roz.h, hi: roz.hi, kg: p.kgKs != null ? p.kgKs : (k && k.kg != null ? k.kg : 100),
+      color: PALETA[(maxId + 1) % PALETA.length], li: Math.round(roz.l * 0.92), wi: Math.round(roz.w * 0.92) };
+    shared.boxTypes.push(bt);
+    return { bt, novy: true };
+  }
+  async function apiLoznyPlanOdeslat(req, res, r, b) {
+    const d = load();
+    const o = d.objednavky.find(x => x.id === b.id); if (!o) { json(res, 404, { chyba: 'Objednávka nenalezena.' }); return true; }
+    const ob = obohatObjednavku(d, o, dnesISO(), d.nastaveni);
+    // do ložného plánu jde to, co se bude vozit: hotové + naplánované položky, nebo vše živé (b.vse)
+    const pol = ob.polozky.filter(p => p.stav !== 'storno' && (b.vse || ['hotovo', 'naplanovano'].includes(p.stav)));
+    if (!pol.length) { json(res, 400, { chyba: 'Objednávka nemá žádné hotové položky. Zaškrtněte „včetně nehotových", pokud chcete plánovat dopředu.' }); return true; }
+    const shared = await httpJson('GET', loznyplanUrl('/api/shared'));
+    shared.boxTypes = shared.boxTypes || []; shared.orders = shared.orders || [];
+    const orderNo = o.cislo || o.helios || ob.zakaznik;
+    const ex = shared.orders.find(x => String(x.orderNo || '') === orderNo && orderNo);
+    const boxes = {}, rals = {}, serials = {}; let nove = 0, bezRozmeru = [];
+    pol.forEach(p => {
+      const k = p.katalogId ? d.katalog.find(x => x.id === p.katalogId) : najdiKatalog(d, p.kod);
+      const m = mapaBoxType(shared, p, k);
+      if (!m.bt) { bezRozmeru.push(p.kod); return; }
+      if (m.novy) nove++;
+      const tid = String(m.bt.id);
+      boxes[tid] = (boxes[tid] || 0) + num(p.ks);
+      const ralM = String(p.ral || '').match(/(\d{4})/);
+      if (ralM) rals[tid] = { ral: 'RAL ' + ralM[1], hex: RAL_HEX[ralM[1]] || '#9da3a6' };
+      serials[tid] = [serials[tid], p.cvz].filter(Boolean).join(', ');
+    });
+    if (!Object.keys(boxes).length) { json(res, 400, { chyba: 'U položek chybí rozměry (' + bezRozmeru.join(', ') + ') — doplňte je v katalogu.' }); return true; }
+    const maxOid = Math.max(1000, ...shared.orders.flatMap(x => [+x.id || 0].concat((x.addresses || []).map(a => +a.id || 0))));
+    const addr = { id: (ex && ex.addresses && ex.addresses[0] && ex.addresses[0].id) || maxOid + 1, address: ob.prijemceAdresa || ob.prijemce, boxes, serials, rals };
+    const order = Object.assign(ex || { id: maxOid + 2, color: PALETA[shared.orders.length % PALETA.length], includeInCalc: true, priority: 0 }, {
+      orderNo, customer: ob.prijemce || ob.zakaznik, name: [orderNo, ob.prijemce || ob.zakaznik].filter(Boolean).join(' · '),
+      addresses: [addr], intranetId: o.id, intranetAt: new Date().toISOString(),
+    });
+    if (!ex) shared.orders.push(order);
+    const out = await httpJson('PUT', loznyplanUrl('/api/shared'), {
+      boxTypes: shared.boxTypes, fleet: shared.fleet || [], orders: shared.orders, team: shared.team || [], activity: shared.activity || [], history: shared.history || [],
+      modifiedBy: 'Intranet – Výroba Popelnice (' + (r.name || r.email) + ')',
+    });
+    o.loznyplan = { orderId: order.id, orderNo, sentAt: new Date().toISOString(), kdo: r.email, polozek: pol.length, verze: out.version || null };
+    pol.forEach(p => { const lp = d.polozky.find(x => x.id === p.id); if (lp && lp.stav === 'hotovo') { lp.stav = 'naplanovano'; lp.udalosti.push(udalost(r, 'naplanovano', null, 'odesláno do Ložného plánu')); } });
+    save(d);
+    logAct('vyroba', req, 'Do Ložného plánu: ' + orderNo + ' (' + pol.length + ' položek)');
+    json(res, 200, { ok: true, verze: out.version, novychTypu: nove, polozek: pol.length, bezRozmeru, objednavka: obohatObjednavku(d, o, dnesISO(), d.nastaveni) }); return true;
+  }
+
+  // ---- export --------------------------------------------------------------
+  function apiExport(req, res) {
+    const d = load(), dnes = dnesISO();
+    const hl = ['ČVZ', 'Objednávka', 'Helios', 'Zákazník', 'Příjemce', 'Produkt', 'Ks', 'Rozměr', 'Tloušťka', 'RAL', 'Lem', 'Ražení', 'Polepy', 'Helios položka', 'Zadáno', 'Termín výroby', 'KW dodání', 'Stav', 'Hotovo ks', 'Kamion', 'Expedováno', 'Skluz dní', 'Poznámka'];
+    const radky = [hl];
+    d.objednavky.map(o => obohatObjednavku(d, o, dnes, d.nastaveni)).forEach(o => o.polozky.forEach(p => radky.push([
+      p.cvz || '', o.cislo, o.helios, o.zakaznik, o.prijemce, p.kod, p.ks, p.rozmer, p.tloustka == null ? '' : p.tloustka, p.ral, p.lem, p.razeni, p.polepy, p.heliosPolozka,
+      p.zadanoDne || '', p.terminVyroby || '', o.kwDodani ? 'KW ' + o.kwDodani : '', (STAVY.find(s => s[0] === p.stav) || [])[1] || p.stav, p.hotovoKs || 0, p.kamion || '', p.expedovanoDne || '', p.skluzDni || 0, p.poznamka,
+    ])));
+    const csv = '﻿' + radky.map(rw => rw.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+    host.send(res, 200, csv, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="vyroba-popelnice-' + dnes + '.csv"' });
+    return true;
+  }
+
+  function logAct(typ, req, detail) {
+    try { const e = host.empSession(req) || {}; if (host.logActivity) host.logActivity(typ, { email: e.email || '', name: e.name || '' }, detail); } catch (_) {}
+  }
+
+  // ---- nástěnka intranetu -------------------------------------------------------
+  function notifikace(email) {
+    email = low(email); if (!email || !hasAccess(email)) return [];
+    const d = load(), dnes = dnesISO(), nast = d.nastaveni; const out = [];
+    const mods = moduly(email);
+    const obchod = mods.includes('vyroba') || nast.obchod.map(low).includes(email);
+    const pol = d.polozky.map(p => obohatPolozku(d, p, dnes, nast));
+    const skl = pol.filter(p => p.skluzDni > 0);
+    if (skl.length) out.push({ modul: 'vyroba', modulNazev: 'Výroba Popelnice', ikona: 'gear', urgent: skl.some(p => p.skluzDni > 7),
+      text: skl.length + (skl.length === 1 ? ' položka je ve skluzu proti termínu výroby' : skl.length < 5 ? ' položky jsou ve skluzu proti termínu výroby' : ' položek je ve skluzu proti termínu výroby'),
+      sub: skl.slice(0, 3).map(p => p.cvz || p.kod).join(', ') });
+    const kZadani = pol.filter(p => p.stav === 'prijata');
+    if (obchod && kZadani.length) out.push({ modul: 'vyroba', modulNazev: 'Výroba Popelnice', ikona: 'gear', urgent: false,
+      text: kZadani.length + (kZadani.length === 1 ? ' položka čeká na zadání do výroby' : ' položek čeká na zadání do výroby'), sub: '' });
+    const bezKam = pol.filter(p => p.cekaBezKamionu);
+    if (obchod && bezKam.length) out.push({ modul: 'vyroba', modulNazev: 'Výroba Popelnice', ikona: 'truck', urgent: false,
+      text: bezKam.length + ' hotových položek čeká na kamion déle než ' + nast.upozorneniDny + ' dní', sub: bezKam.slice(0, 3).map(p => p.cvz || p.kod).join(', ') });
+    return out;
+  }
+
+  return { handle, notifikace, hasAccess, importRows, STAVY };
+}
+
+module.exports = { mount, STAVY, RAL_HEX };

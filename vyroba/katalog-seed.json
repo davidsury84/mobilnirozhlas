@@ -1,0 +1,854 @@
+[
+ {
+  "kod": "CP 08.00 LacNamÖldSPEC",
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CP 08.00 LacNamÖldSpeTho",
+  "kg": 100,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "objem": 8.0
+ },
+ {
+  "kod": "CP 10.00 LacNamÖld",
+  "rozmer": "2350x800x530/650",
+  "objem": 10.0
+ },
+ {
+  "kod": "CP 22.00 LacNamSPEC (43)",
+  "objem": 22.0
+ },
+ {
+  "kod": "CP 30.70 LacNamÖld",
+  "rozmer": "1600x1200x1600/1720",
+  "tloustka": 2.0,
+  "objem": 30.7
+ },
+ {
+  "kod": "CP 41.00 LacNam",
+  "rozmer": "2000x1600x1280/1400",
+  "objem": 41.0
+ },
+ {
+  "kod": "CPD 08.00 LacNamÖldDec-S",
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPK 19.00 LacNamKla",
+  "kg": 216,
+  "l": 1200,
+  "w": 800,
+  "h": 1850,
+  "hi": 1730,
+  "rozmer": "1200x800x1730/1850",
+  "objem": 19.0
+ },
+ {
+  "kod": "CPR 02.00 LacNamÖld",
+  "kg": 50,
+  "l": 800,
+  "w": 600,
+  "h": 520,
+  "hi": 400,
+  "rozmer": "800x600x400/520",
+  "tloustka": 2.0,
+  "objem": 2.0
+ },
+ {
+  "kod": "CPR 02.80 LacNam",
+  "kg": 65,
+  "l": 800,
+  "w": 600,
+  "h": 750,
+  "hi": 480,
+  "rozmer": "800x600x480/750",
+  "tloustka": 2.0,
+  "objem": 2.8
+ },
+ {
+  "kod": "CPR 03.00 LacNamÖld",
+  "rozmer": "800x600x600/720",
+  "tloustka": 2.0,
+  "objem": 3.0
+ },
+ {
+  "kod": "CPR 04.00 LacNam",
+  "kg": 70,
+  "l": 800,
+  "w": 600,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "800x600x800/920",
+  "tloustka": 2.0,
+  "objem": 4.0
+ },
+ {
+  "kod": "CPR 04.00 LacNam +",
+  "kg": 82,
+  "l": 800,
+  "w": 600,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "800x600x800/920",
+  "objem": 4.0
+ },
+ {
+  "kod": "CPR 04.00 LacNamTho",
+  "kg": 75,
+  "l": 800,
+  "w": 600,
+  "h": 920,
+  "hi": 600,
+  "rozmer": "800x600x600/920",
+  "objem": 4.0
+ },
+ {
+  "kod": "CPR 04.00 LacNamÖld",
+  "rozmer": "800x600x800/920",
+  "tloustka": 2.0,
+  "objem": 4.0
+ },
+ {
+  "kod": "CPR 04.00 ZinNam",
+  "kg": 75,
+  "l": 800,
+  "w": 600,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "800x600x800/920",
+  "tloustka": 2.0,
+  "objem": 4.0
+ },
+ {
+  "kod": "CPR 04.00 ZinNam +",
+  "kg": 87,
+  "l": 800,
+  "w": 600,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "800x600x800/920",
+  "objem": 4.0
+ },
+ {
+  "kod": "CPR 04.60 LacNam",
+  "kg": 90,
+  "l": 1200,
+  "w": 800,
+  "h": 600,
+  "hi": 480,
+  "rozmer": "1200x800x480/600",
+  "objem": 4.6
+ },
+ {
+  "kod": "CPR 04.60 LacNam +",
+  "kg": 105,
+  "l": 1200,
+  "w": 800,
+  "h": 600,
+  "hi": 480,
+  "rozmer": "1200x800x480/600",
+  "objem": 4.6
+ },
+ {
+  "kod": "CPR 04.60 ZinNam",
+  "kg": 95,
+  "l": 1200,
+  "w": 800,
+  "h": 600,
+  "hi": 480,
+  "rozmer": "1200x800x480/600",
+  "objem": 4.6
+ },
+ {
+  "kod": "CPR 04.60 ZinNam +",
+  "kg": 110,
+  "l": 1200,
+  "w": 800,
+  "h": 600,
+  "hi": 480,
+  "rozmer": "1200x800x480/600",
+  "objem": 4.6
+ },
+ {
+  "kod": "CPR 06.50 LacNamÖld",
+  "kg": 85,
+  "l": 1200,
+  "w": 800,
+  "h": 950,
+  "hi": 680,
+  "rozmer": "1200x800x680/950",
+  "tloustka": 2.0,
+  "objem": 6.5
+ },
+ {
+  "kod": "CPR 08.00 Gru",
+  "kg": 100,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 Lac",
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 LacNam",
+  "kg": 100,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 LacNam +",
+  "kg": 115,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 LacNamTho",
+  "kg": 100,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 LacNamÖld",
+  "kg": 100,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 LacNamÖldTho",
+  "kg": 100,
+  "l": 1200,
+  "w": 800,
+  "h": 1070,
+  "hi": 800,
+  "rozmer": "1200x800x800/1070",
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 Zin",
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 ZinNam",
+  "kg": 105,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 ZinNam +",
+  "kg": 120,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 08.00 ZinÖld",
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPR 09.90 LacNam",
+  "kg": 120,
+  "l": 1600,
+  "w": 1200,
+  "h": 650,
+  "hi": 530,
+  "rozmer": "1600x1200x530/650",
+  "objem": 9.9
+ },
+ {
+  "kod": "CPR 09.90 ZinNam",
+  "kg": 130,
+  "l": 1600,
+  "w": 1200,
+  "h": 650,
+  "hi": 530,
+  "rozmer": "1600x1200x530/650",
+  "tloustka": 2.0,
+  "objem": 9.9
+ },
+ {
+  "kod": "CPR 16.00 LaNam",
+  "tloustka": 2.0,
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 Lac",
+  "rozmer": "1600x1200x800/920",
+  "tloustka": 2.0,
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 LacNam",
+  "kg": 185,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "tloustka": 2.0,
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 LacNam +",
+  "kg": 215,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 LacNamTho",
+  "kg": 190,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 LacNamÖlaTho",
+  "kg": 190,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 LacNamÖld",
+  "kg": 190,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "tloustka": 2.0,
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 LacNamÖldTho",
+  "kg": 190,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 ZinNam",
+  "kg": 195,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "tloustka": 2.0,
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 16.00 ZinNam +",
+  "kg": 225,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "objem": 16.0
+ },
+ {
+  "kod": "CPR 18.80 LacNam",
+  "kg": 185,
+  "l": 1600,
+  "w": 1200,
+  "h": 1100,
+  "hi": 980,
+  "rozmer": "1600x1200x980/1100",
+  "objem": 18.8
+ },
+ {
+  "kod": "CPR 18.80 ZinNam",
+  "kg": 197,
+  "l": 1600,
+  "w": 1200,
+  "h": 1100,
+  "hi": 980,
+  "rozmer": "1600x1200x980/1100",
+  "tloustka": 2.0,
+  "objem": 18.8
+ },
+ {
+  "kod": "CPR 19.00 LacNam",
+  "kg": 245,
+  "l": 1600,
+  "w": 1200,
+  "h": 1100,
+  "hi": 980,
+  "rozmer": "1600x1200x980/1100",
+  "tloustka": 2.0,
+  "objem": 19.0
+ },
+ {
+  "kod": "CPR 19.00 LacNamÖla",
+  "kg": 245,
+  "l": 1600,
+  "w": 1200,
+  "h": 1100,
+  "hi": 980,
+  "rozmer": "1600x1200x980/1100",
+  "objem": 19.0
+ },
+ {
+  "kod": "CPR 19.00 LacNamÖld",
+  "kg": 245,
+  "l": 1600,
+  "w": 1200,
+  "h": 1100,
+  "hi": 980,
+  "rozmer": "1600x1200x980/1100",
+  "tloustka": 2.0,
+  "objem": 19.0
+ },
+ {
+  "kod": "CPR 22.00 LacNam",
+  "kg": 285,
+  "l": 1600,
+  "w": 1200,
+  "h": 1260,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPR 22.00 LacNam +",
+  "kg": 285,
+  "l": 1600,
+  "w": 1200,
+  "h": 1260,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPR 22.00 LacNam s víkem",
+  "kg": 285,
+  "l": 1600,
+  "w": 1200,
+  "h": 1260,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPR 22.00 LacNamTho",
+  "kg": 230,
+  "l": 1600,
+  "w": 1200,
+  "h": 1260,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPR 22.00 LacNamÖld",
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPR 22.00 ZinNam",
+  "kg": 285,
+  "l": 1600,
+  "w": 1200,
+  "h": 1260,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPR 22.00 ZinNam +",
+  "kg": 285,
+  "l": 1600,
+  "w": 1200,
+  "h": 1260,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPRD 08.00 LacNamDec",
+  "kg": 110,
+  "l": 1200,
+  "w": 800,
+  "h": 1070,
+  "hi": 800,
+  "rozmer": "1200x800x800/1070",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPRD 08.00 LacNamDecTho",
+  "kg": 110,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "objem": 8.0
+ },
+ {
+  "kod": "CPRD 08.00 LacNamÖldDec",
+  "kg": 110,
+  "l": 1200,
+  "w": 800,
+  "h": 1070,
+  "hi": 800,
+  "rozmer": "1200x800x800/1070",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPRD 08.00 ZinNamDec",
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPRD 10.40 LacNamDec",
+  "rozmer": "1200x800x1080/1200",
+  "tloustka": 2.0,
+  "objem": 10.4
+ },
+ {
+  "kod": "CPRD 16.00 LacNamÖldDec",
+  "kg": 200,
+  "l": 1600,
+  "w": 1200,
+  "h": 1070,
+  "hi": 800,
+  "rozmer": "1600x1200x800/1070",
+  "objem": 16.0
+ },
+ {
+  "kod": "CPRD 22.00 LacNamDec",
+  "kg": 230,
+  "l": 1600,
+  "w": 1200,
+  "h": 1410,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1410",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPRD 22.00 LacNamÖldDec",
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPRDÖ 04.00 LacNamDecÖla",
+  "rozmer": "800x600x800/920",
+  "tloustka": 2.0,
+  "objem": 4.0
+ },
+ {
+  "kod": "CPRDÖ 08.00 LacNamDecÖla",
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPRDÖ 22.00 LacNamDecÖla",
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPRDÖ 22.00 LacNamDecÖlaTho",
+  "kg": 230,
+  "l": 1600,
+  "w": 1200,
+  "h": 1410,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1410",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPRÖ 02.00 ZinNamÖla",
+  "rozmer": "800x600x400/520",
+  "objem": 2.0
+ },
+ {
+  "kod": "CPRÖ 04.00 LacNamÖla",
+  "kg": 75,
+  "l": 800,
+  "w": 600,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "800x600x800/920",
+  "tloustka": 2.0,
+  "objem": 4.0
+ },
+ {
+  "kod": "CPRÖ 04.00 LacNamÖla-SPEC",
+  "rozmer": "800x600x800/920",
+  "tloustka": 2.0,
+  "objem": 4.0
+ },
+ {
+  "kod": "CPRÖ 04.00 LacNamÖlaTho",
+  "kg": 75,
+  "l": 800,
+  "w": 600,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "800x600x800/920",
+  "objem": 4.0
+ },
+ {
+  "kod": "CPRÖ 04.00 ZinNamÖla",
+  "rozmer": "800x600x800/920",
+  "objem": 4.0
+ },
+ {
+  "kod": "CPRÖ 04.60 LacNamÖla",
+  "kg": 80,
+  "l": 1200,
+  "w": 800,
+  "h": 600,
+  "hi": 480,
+  "rozmer": "1200x800x480/600",
+  "tloustka": 2.0,
+  "objem": 4.6
+ },
+ {
+  "kod": "CPRÖ 05.00 LacNamÖla",
+  "kg": 93,
+  "l": 1200,
+  "w": 800,
+  "h": 700,
+  "hi": 580,
+  "rozmer": "1200x800x580/700",
+  "objem": 5.0
+ },
+ {
+  "kod": "CPRÖ 05.40 ZinNamÖla",
+  "rozmer": "1200x800x560/680",
+  "tloustka": 2.0,
+  "objem": 5.4
+ },
+ {
+  "kod": "CPRÖ 05.50 LacNamÖla",
+  "rozmer": "1200x800x580/700",
+  "tloustka": 2.0,
+  "objem": 5.5
+ },
+ {
+  "kod": "CPRÖ 06.00 LacNamÖla",
+  "rozmer": "1200x800x630/750",
+  "tloustka": 2.0,
+  "objem": 6.0
+ },
+ {
+  "kod": "CPRÖ 06.50 LacNamÖla",
+  "kg": 85,
+  "l": 1200,
+  "w": 800,
+  "h": 950,
+  "hi": 680,
+  "rozmer": "1200x800x680/950",
+  "tloustka": 2.0,
+  "objem": 6.5
+ },
+ {
+  "kod": "CPRÖ 08.00 LacNamÖla",
+  "kg": 105,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPRÖ 08.00 LacNamÖlaTho",
+  "kg": 100,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "objem": 8.0
+ },
+ {
+  "kod": "CPRÖ 08.00 ZinNamÖla",
+  "rozmer": "1200x800x800/920",
+  "tloustka": 2.0,
+  "objem": 8.0
+ },
+ {
+  "kod": "CPRÖ 16.00 LacNamÖla",
+  "rozmer": "1600x1200x800/920",
+  "tloustka": 2.0,
+  "objem": 16.0
+ },
+ {
+  "kod": "CPRÖ 16.00 LacNamÖlaTho",
+  "kg": 190,
+  "l": 1600,
+  "w": 1200,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1600x1200x800/920",
+  "objem": 16.0
+ },
+ {
+  "kod": "CPRÖ 16.00 ZinNamÖla",
+  "rozmer": "1600x1200x800/920",
+  "objem": 16.0
+ },
+ {
+  "kod": "CPRÖ 22.00 LacNamÖla",
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPRÖ 22.00 LacNamÖlaTho",
+  "kg": 230,
+  "l": 1600,
+  "w": 1200,
+  "h": 1260,
+  "hi": 1140,
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "CPRÖ 22.00 ZinNamÖla",
+  "rozmer": "1600x1200x1140/1260",
+  "objem": 22.0
+ },
+ {
+  "kod": "HESCPR 08.00 ZinNam",
+  "kg": 1,
+  "l": 1200,
+  "w": 800,
+  "h": 920,
+  "hi": 800,
+  "rozmer": "1200x800x800/920",
+  "objem": 8.0
+ },
+ {
+  "kod": "HESCPR 16.00 ZinNam",
+  "rozmer": "1600x1200x800/920",
+  "objem": 16.0
+ },
+ {
+  "kod": "Kunstoffdeckel 1,6 / 2,2m3",
+  "kg": 10,
+  "l": 1600,
+  "w": 1200,
+  "h": 150,
+  "hi": 149,
+  "rozmer": "1600x1200x149/150"
+ },
+ {
+  "kod": "SB 33.75 Lac",
+  "rozmer": "1500x1500x1500",
+  "tloustka": 6.0,
+  "objem": 33.75
+ },
+ {
+  "kod": "SB 33.75 Lac 6,0",
+  "kg": 1,
+  "l": 1500,
+  "w": 1500,
+  "h": 1500,
+  "hi": 1499,
+  "rozmer": "1500x1500x1499/1500",
+  "objem": 33.75
+ },
+ {
+  "kod": "USB 02.00",
+  "kg": 245,
+  "l": 2400,
+  "w": 1200,
+  "h": 1300,
+  "hi": 1180,
+  "rozmer": "2400x1200x1180/1300",
+  "objem": 2.0
+ },
+ {
+  "kod": "Víko 08.00m3",
+  "kg": 5,
+  "l": 1200,
+  "w": 800,
+  "h": 300,
+  "hi": 149,
+  "rozmer": "1200x800x149/300"
+ },
+ {
+  "kod": "Víko 1,6/2,2m3",
+  "kg": 10,
+  "l": 1600,
+  "w": 1200,
+  "h": 300,
+  "hi": 149,
+  "rozmer": "1600x1200x149/300"
+ },
+ {
+  "kod": "Víko 2.2 (kryt)",
+  "kg": 10,
+  "l": 1600,
+  "w": 1200,
+  "h": 150,
+  "hi": 130,
+  "rozmer": "1600x1200x130/150"
+ }
+]
