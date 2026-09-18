@@ -1332,7 +1332,13 @@ async function boot(){
   loadBrandLogo();
   try{
     const res = await fetch("/api/state",{cache:"no-store"});
-    if(res.status===401){ showLogin(); return; }
+    if(res.status===401){
+      // Odkaz #cti= otevřel někdo, kdo není správce → poslat ho na jeho osobní
+      // stránku směrnice /s/<id>, kde se identita bere z přihlášení.
+      const mc = location.hash.match(/cti=([a-z0-9]+)/i);
+      if(mc){ location.replace(location.origin+"/s/"+encodeURIComponent(mc[1])); return; }
+      showLogin(); return;
+    }
     if(!res.ok) throw new Error("bad");
     const s = await res.json();
     DB = { categories:s.categories||[], employees:s.employees||[], directives:s.directives||[], profiles:s.profiles||[], candidates:s.candidates||[], settings:Object.assign({}, DB.settings||{}, s.settings||{}) };
@@ -1431,6 +1437,7 @@ function route(){
   const m = location.hash.match(/cti=([a-z0-9]+)/i);
   if(m){
     if(muj) muj.style.display="none";
+    if(!booted){ boot(); return; }   // bez načtených dat by čtečka neměla co zobrazit
     const km = location.hash.match(/kdo=([^&]+)/i);
     showReader(m[1], km ? decodeURIComponent(km[1]) : "");
     return;
@@ -9991,8 +9998,34 @@ function recordTokens(){
 /* ============================================================
    ČTECÍ REŽIM (zaměstnanec)
    ============================================================ */
+/* Kdo je přihlášený — čtečka si identitu vezme ze session, ne od uživatele.
+   null = ještě nezjištěno, false = nikdo přihlášen. */
+let READER_ME = null;
+function readerIdBar(email){
+  const emp=DB.employees.find(e=>e.email.toLowerCase()===email.toLowerCase());
+  const name=emp?emp.name:((READER_ME&&READER_ME.name)||email);
+  return '<span>Seznamuje se</span>'+
+    '<div style="padding:9px 12px;border:1px solid var(--line-strong);border-radius:8px;background:#faf9f6">'+
+    '<strong>'+esc(name)+'</strong> <span class="mono muted" style="font-size:13px">'+esc(email)+'</span></div>'+
+    '<input type="hidden" id="readerEmail" value="'+esc(email)+'">';
+}
+function readerZjistiMe(){
+  if(READER_ME!==null) return;
+  fetch("/api/me",{cache:"no-store"}).then(r=>r.json()).then(j=>{
+    READER_ME=(j&&j.employee)?j.employee:false;
+    if(!READER_ME) return;
+    if(!MUJ.email){ MUJ.email=READER_ME.email; MUJ.name=READER_ME.name||""; }
+    const r2=document.getElementById("reader"), bar=document.getElementById("readerIdField");
+    if(!bar || !r2 || r2.style.display==="none") return;
+    bar.innerHTML=readerIdBar(READER_ME.email);
+    refreshAckState();
+  }).catch(()=>{ READER_ME=false; });
+}
 function showReader(id, preset){
   const d=DB.directives.find(x=>x.id===id);
+  if(!d){ alert("Směrnice nebyla nalezena."); location.hash=""; return; }
+  if(!preset && MUJ.email) preset=MUJ.email;
+  if(!preset && READER_ME) preset=READER_ME.email;
   document.getElementById("app").style.display="none";
   const r=document.getElementById("reader"); r.style.display="block";
   const bar=document.getElementById("readerIdField");
@@ -10007,15 +10040,12 @@ function showReader(id, preset){
       '<iframe src="'+esc(d.pdf)+'#view=FitH" style="width:100%;height:'+(naSirku?'68vh':'82vh')+';min-height:420px;border:1px solid var(--line);border-radius:10px;background:#f7f7f4" title="PDF"></iframe></div>'):'');
   r.dataset.dirId=id;
   if(preset){
-    const emp=DB.employees.find(e=>e.email.toLowerCase()===preset.toLowerCase());
-    bar.innerHTML='<span>Seznamuje se</span>'+
-      '<div style="padding:9px 12px;border:1px solid var(--line-strong);border-radius:8px;background:#faf9f6">'+
-      '<strong>'+esc(emp?emp.name:preset)+'</strong> <span class="mono muted" style="font-size:13px">'+esc(preset)+'</span></div>'+
-      '<input type="hidden" id="readerEmail" value="'+esc(preset)+'">';
+    bar.innerHTML=readerIdBar(preset);
   } else {
     bar.innerHTML='<span>Vyberte / zadejte svůj e-mail</span>'+
       '<input type="email" id="readerEmail" list="readerEmails" placeholder="jmeno@elkoplast.cz" oninput="refreshAckState()">'+
       '<datalist id="readerEmails">'+audienceOf(d).map(e=>'<option value="'+esc(e.email)+'">'+esc(e.name)+'</option>').join("")+'</datalist>';
+    readerZjistiMe();   // jsem-li přihlášený, pole se za okamžik nahradí mojí identitou
   }
   refreshAckState();
 }
@@ -10146,7 +10176,7 @@ document.addEventListener("click", e=>{ const pop=document.getElementById("theme
 applyTheme((function(){ try{ return localStorage.getItem("intranetTheme"); }catch(e){ return null; } })() || "google");
 
 // Kořen „/" = zaměstnanecký intranet, „/admin" = administrace. (#cti= otevře čtečku směrnice.)
-if(location.hash.match(/cti=/i)) route();
+if(location.hash.match(/cti=/i)) boot();
 else if(isAdminPath()) boot();
 else initIntranet();
 </script>
