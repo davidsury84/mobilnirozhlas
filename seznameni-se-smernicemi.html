@@ -71,6 +71,9 @@ header.appbar{
 }
 .appbar-inner{max-width:1320px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:12px}
+a.brand{text-decoration:none;color:inherit;border-radius:8px}
+a.brand:hover h1{color:var(--ink)}
+a.brand:focus-visible{outline:2px solid var(--accent,#2d7a52);outline-offset:3px}
 .brand .logo{
   width:52px;height:52px;flex:none;border-radius:13px;background:var(--grad-green);
   display:grid;place-items:center;font-weight:800;color:#fff;font-size:28px;
@@ -821,13 +824,13 @@ img.pv-thumb{background:#fff}
 <div id="app">
 <header class="appbar">
   <div class="appbar-inner">
-    <div class="brand">
+    <a class="brand" href="/" title="Zpět na intranet">
       <div class="logo">✓</div>
       <div>
         <h1>intranet</h1>
         <small>Evidence proškolení &amp; potvrzení</small>
       </div>
-    </div>
+    </a>
     <nav class="tabs" id="tabs">
       <button data-view="directives" class="active">Směrnice</button>
       <button data-view="library">Knihovna</button>
@@ -1216,10 +1219,10 @@ img.pv-thumb{background:#fff}
 <div id="reader" style="display:none">
   <header class="appbar">
     <div class="appbar-inner">
-      <div class="brand">
+      <a class="brand" href="/" title="Zpět na intranet">
         <div class="logo">✓</div>
         <div><h1 id="readBrand">Směrnice k seznámení</h1><small>Prosím přečtěte a potvrďte</small></div>
-      </div>
+      </a>
     </div>
   </header>
   <main>
@@ -1242,10 +1245,10 @@ img.pv-thumb{background:#fff}
 <div id="muj" style="display:none">
   <header class="appbar">
     <div class="appbar-inner">
-      <div class="brand">
+      <a class="brand" href="/" title="Zpět na úvodní stránku intranetu">
         <div class="logo">✓</div>
         <div><h1>intranet</h1><small id="mujWho">Intranet pro zaměstnance</small></div>
-      </div>
+      </a>
       <nav class="tabs"><div id="intraLang" class="no-print" role="group" aria-label="Jazyk / Language" style="display:none"></div><button id="mujAdmin" style="display:none" onclick="location.href='/admin'">Správa</button><button id="mujLogout" style="display:none" onclick="location.href='/auth/logout'">Odhlásit</button></nav>
     </div>
   </header>
@@ -1502,6 +1505,7 @@ const MUJ_MODS = [
   { key:"qooling", icon:MUJ_IC.shield, label:"Qooling — kvalita", gated:true },
   { key:"loznyplan", icon:MUJ_IC.truck, label:"Ložný plán", gated:true },
   { key:"vozidla", icon:MUJ_IC.truck, label:"Vozový park", gated:true },
+  { key:"vyroba", icon:MUJ_IC.gear, label:"Výroba Popelnice", gated:true },
   { key:"konstrukce", icon:MUJ_IC.gear, label:"Zadání do výroby – konstrukce", gated:true },
   { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
   { grp:"Kalkulačky" },
@@ -1556,6 +1560,7 @@ const MJ_L10N = {
   'Zadání do výroby – konstrukce': ['Production orders — engineering','Fertigungsaufträge — Konstruktion','Zlecenia do produkcji — konstrukcja','Замовлення у виробництво — конструкція','Comenzi în producție — proiectare'],
   'Freelo': ['Freelo','Freelo','Freelo','Freelo','Freelo'],
   'Vozový park': ['Fleet','Fuhrpark','Flota pojazdów','Автопарк','Parc auto'],
+  'Výroba Popelnice': ['Production — Bruntál boxes','Fertigung — Metallboxen Bruntál','Produkcja — Bruntál','Виробництво — Брунтал','Producție — Bruntál'],
   'Kalkulačky': ['Calculators','Rechner','Kalkulatory','Калькулятори','Calculatoare'],
   'Vývoj projektů': ['Project development','Projektentwicklung','Rozwój projektów','Розвиток проєктів','Dezvoltare proiecte'],
   'E-shop': ['E-shop','E-Shop','E-sklep','Інтернет-магазин','E-shop'],
@@ -1875,7 +1880,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="vyroba"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1960,6 +1965,7 @@ function mjGo(key){
   else if(key==="prekladiste") showPrekladiste();
   else if(key==="loznyplan") showLoznyPlan();
   else if(key==="vozidla") showVozidla();
+  else if(key==="vyroba") showVyroba();
   else if(key==="kovo"||key==="kovokalk") showKovoKalk();
   else if(key==="plasty") showPlasty();
   else if(key==="doprava") showDoprava();
@@ -3085,6 +3091,13 @@ function tlCeleOkno(){
   else { w.style.position="relative"; w.style.inset=""; w.style.zIndex=""; f.style.height="calc(100vh - 69px)"; b.innerHTML="⛶ Na celé okno"; document.body.style.overflow=""; }
 }
 document.addEventListener("keydown",function(e){ const w=document.getElementById("tlWrap"); if(e.key==="Escape"&&w&&w.style.position==="fixed") tlCeleOkno(); });
+function showVyroba(){
+  MUJ.view="vyroba"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!moduleVisible({key:"vyroba",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu Výroba Popelnice nemáte přístup. Přiděluje ho správce intranetu (obchod, nebo dílna).</div>'; return; }
+  body.innerHTML='<iframe src="/vyroba" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f7f9f5" title="Výroba Popelnice — zakázky boxů a muld: zadání, výroba, ložné plány"></iframe>';
+  window.scrollTo(0,0);
+}
 function showPrekladiste(){
   MUJ.view="prekladiste"; renderSidebar();
   const body=document.getElementById("mujBody");
@@ -4282,7 +4295,7 @@ function showDashboard(){
   }
   mainH += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["loznyplan","Ložný plán",MUJ_IC.truck,"Plánování nakládky vozidel a přepravenky"],["vozidla","Vozový park",MUJ_IC.truck,"Svěřená vozidla, technické prohlídky, inventarizace"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["loznyplan","Ložný plán",MUJ_IC.truck,"Plánování nakládky vozidel a přepravenky"],["vozidla","Vozový park",MUJ_IC.truck,"Svěřená vozidla, technické prohlídky, inventarizace"],["vyroba","Výroba Popelnice",MUJ_IC.gear,"Zakázky boxů a muld: zadání, výroba, ložné plány"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     mainH += '<div class="dash-sec">'+mjT('Provozy')+'</div><div class="dash-grid">';
     provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
@@ -5867,14 +5880,14 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["qooling","Qooling — kvalita (závady)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop","qooling"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
   ["Vývoj projektů",["eshopmodel"]],
-  ["Agendy",["doprava","loznyplan","vozidla","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","stavebnipovoleni","adaptace","freelo","aktuality"]]
+  ["Agendy",["doprava","loznyplan","vozidla","vyroba","vyrobadilna","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","stavebnipovoleni","adaptace","freelo","aktuality"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }
@@ -9986,7 +9999,7 @@ window.addEventListener("load",init);`;
     '<title>'+esc(d.title)+'</title>\n'+
     '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@400;500;600&display=swap" rel="stylesheet">\n'+
     '<style>'+css+'</style></head>\n<body>\n'+
-    '<header><div class="b"><div class="lg">&#10003;</div><div><h1 id="hd">Směrnice</h1><small>Prosím přečtěte a potvrďte</small></div></div></header>\n'+
+    '<header><a class="b" href="/" title="Zpět na intranet" style="text-decoration:none;color:inherit"><div class="lg">&#10003;</div><div><h1 id="hd">Směrnice</h1><small>Prosím přečtěte a potvrďte</small></div></a></header>\n'+
     '<main><div class="ident" id="ident"></div><div class="doc" id="doc"></div><div class="ack" id="ack"></div></main>\n'+
     '<script>var DATA='+dataStr+';\n'+js+'\n<\/script>\n</body></html>';
 }

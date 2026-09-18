@@ -114,7 +114,7 @@ window.addEventListener("load",init);`;
     '<title>'+esc(d.title)+'</title>\n'+
     '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@400;500;600&display=swap" rel="stylesheet">\n'+
     '<style>'+css+'</style></head>\n<body>\n'+
-    '<header><div class="b"><div class="lg">&#10003;</div><div><h1 id="hd">Směrnice</h1><small>Prosím přečtěte a potvrďte</small></div></div></header>\n'+
+    '<header><a class="b" href="/" title="Zpět na intranet" style="text-decoration:none;color:inherit"><div class="lg">&#10003;</div><div><h1 id="hd">Směrnice</h1><small>Prosím přečtěte a potvrďte</small></div></a></header>\n'+
     '<main><div class="ident" id="ident"></div><div class="doc" id="doc"></div><div class="ack" id="ack"></div></main>\n'+
     '<script>var DATA='+dataStr+';\n'+js+'\n<\/script>\n</body></html>';
 }
