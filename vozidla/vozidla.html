@@ -123,6 +123,8 @@ td.num{font-family:var(--mono);white-space:nowrap}
 .sm-doc .uvod{color:var(--ink-soft);font-size:13px}
 .sm-doc ul{margin:6px 0 6px 18px;padding:0}
 .sm-doc li{margin-bottom:4px}
+.sm-doc .odkaz{background:var(--green-soft);border:1px solid #cfe9d8;border-radius:10px;padding:10px 13px;font-size:13.5px}
+.sm-doc a{color:var(--green-d)}
 @media print{ .top,.tabs,.btn,.card .h{display:none!important} .card{border:0;box-shadow:none} .wrap{padding:0} }
 </style>
 </head>
@@ -296,7 +298,9 @@ function hleda(q){
   }).slice(0,50);
 }
 let AC_SEL={};
-function acHtml(id,email,placeholder){
+const AC_AKCE={};   // co se má stát po výběru — např. rovnou uložit
+function acHtml(id,email,placeholder,akce){
+  if(akce)AC_AKCE[id]=akce;
   const k=osobaPodleMailu(email);
   return '<div class="ac">'
     +'<input type="hidden" id="'+id+'" value="'+esc(email||"")+'">'
@@ -325,11 +329,13 @@ function acVyber(id,email){
   document.getElementById(id).value=email;
   document.getElementById(id+"_in").value=e?e.name:email;
   acZavri(id);
+  if(AC_AKCE[id])AC_AKCE[id]();
 }
 function acZrus(id){
   document.getElementById(id).value="";
   document.getElementById(id+"_in").value="";
   acZavri(id);
+  if(AC_AKCE[id])AC_AKCE[id]();
 }
 function acZavri(id){const b=document.getElementById(id+"_box");if(b)b.classList.remove("on");}
 function acKlavesa(ev,id){
@@ -350,6 +356,17 @@ function acKlavesa(ev,id){
 document.addEventListener("mousedown",function(ev){
   if(!ev.target.closest(".ac")) document.querySelectorAll(".acbox.on").forEach(function(b){b.classList.remove("on");});
 });
+
+/* ---------- průběžné ukládání ----------
+   Nikde se nemačká „Uložit": co se napíše nebo vybere, to se po chvilce samo uloží.
+   U nového vozidla to neplatí — to by vznikl poloprázdný záznam po prvním písmenu. */
+const ULOZ_T={};
+function ulozZa(klic,ms,fn){ clearTimeout(ULOZ_T[klic]); ULOZ_T[klic]=setTimeout(fn,ms); }
+function stavUlozeni(id,text,barva){
+  const e=document.getElementById(id); if(!e)return;
+  e.textContent=text; e.style.color=barva||"var(--ink-soft)";
+  if(text==="uloženo ✓") setTimeout(()=>{ if(e.textContent==="uloženo ✓") e.textContent=""; },2500);
+}
 
 /* ---------- detail vozidla ---------- */
 
@@ -395,9 +412,9 @@ function detail(id){
   if(v.smiEdit){
     const lhuta=D.stkLhuta[v.typ]||2;
     h+='<div class="grid3">'
-      +'<label class="f"><span>Prohlídka provedena dne</span><input type="date" id="stkProv" value="'+new Date().toISOString().slice(0,10)+'"></label>'
-      +'<label class="f"><span>Nová platnost do</span><input type="date" id="stkDo" value="'+novaPlatnost(lhuta)+'"></label>'
-      +'<label class="f"><span>Poznámka</span><input id="stkPozn" placeholder="např. výměna brzd"></label>'
+      +'<label class="f"><span>Prohlídka provedena dne</span><input type="date" id="stkProv" autocomplete="off" value="'+new Date().toISOString().slice(0,10)+'"></label>'
+      +'<label class="f"><span>Nová platnost do</span><input type="date" id="stkDo" autocomplete="off" value="'+novaPlatnost(lhuta)+'"></label>'
+      +'<label class="f"><span>Poznámka</span><input id="stkPozn" autocomplete="off" placeholder="např. výměna brzd"></label>'
       +'</div><button class="btn pri" onclick="ulozStk(\''+v.id+'\')">✓ Technická prohlídka provedena</button>'
       +'<div class="hint" style="margin-top:8px">U typu „'+esc(D.typy[v.typ]||v.typ)+'“ se počítá lhůta '+lhuta+' roky — datum můžeš přepsat podle protokolu.</div>';
   }
@@ -413,9 +430,9 @@ function detail(id){
   if(v.smiEdit){
     const chybi=s.chybejiciRoky;
     h+='<div class="grid3">'
-      +'<label class="f"><span>Rok</span><select id="kmRok">'
+      +'<label class="f"><span>Rok</span><select id="kmRok" autocomplete="off">'
         +[letos,letos-1,letos-2,letos-3].map(r=>'<option '+(chybi.length&&chybi[chybi.length-1]===r?"selected":"")+'>'+r+'</option>').join("")+'</select></label>'
-      +'<label class="f"><span>Stav tachometru (km)</span><input id="kmHod" type="number" min="0" step="1" placeholder="např. 184500"></label>'
+      +'<label class="f"><span>Stav tachometru (km)</span><input id="kmHod" autocomplete="off" type="number" min="0" step="1" placeholder="např. 184500"></label>'
       +'<div style="display:flex;align-items:flex-end;margin-bottom:10px"><button class="btn pri" onclick="ulozKm(\''+v.id+'\')">Zapsat</button></div>'
       +'</div>';
   }
@@ -445,14 +462,14 @@ function detail(id){
     +'</div><div class="b">';
   if(v.smiEdit){
     h+='<div class="grid3">'
-      +'<label class="f"><span>Druh události</span><select id="skDruh"><option value="poskozeni">Poškození vozidla</option><option value="nehoda">Dopravní nehoda</option><option value="kradez">Krádež / vloupání</option><option value="jine">Jiná škodní událost</option></select></label>'
-      +'<label class="f"><span>Datum</span><input id="skDatum" type="date" value="'+new Date().toISOString().slice(0,10)+'"></label>'
-      +'<label class="f"><span>Odhad škody (Kč)</span><input id="skKc" type="number" min="0" placeholder="nepovinné"></label>'
+      +'<label class="f"><span>Druh události</span><select id="skDruh" autocomplete="off"><option value="poskozeni">Poškození vozidla</option><option value="nehoda">Dopravní nehoda</option><option value="kradez">Krádež / vloupání</option><option value="jine">Jiná škodní událost</option></select></label>'
+      +'<label class="f"><span>Datum</span><input id="skDatum" autocomplete="off" type="date" value="'+new Date().toISOString().slice(0,10)+'"></label>'
+      +'<label class="f"><span>Odhad škody (Kč)</span><input id="skKc" autocomplete="off" type="number" min="0" placeholder="nepovinné"></label>'
       +'</div><div class="grid2">'
-      +'<label class="f"><span>Viník / protistrana</span><input id="skVinik" placeholder="např. řidič, třetí osoba, neznámý"></label>'
-      +'<label class="f"><span>Policie ČR</span><select id="skPolicie"><option value="ne">nepřivolána</option><option value="ano">přivolána</option></select></label>'
+      +'<label class="f"><span>Viník / protistrana</span><input id="skVinik" autocomplete="off" placeholder="např. řidič, třetí osoba, neznámý"></label>'
+      +'<label class="f"><span>Policie ČR</span><select id="skPolicie" autocomplete="off"><option value="ne">nepřivolána</option><option value="ano">přivolána</option></select></label>'
       +'</div>'
-      +'<label class="f"><span>Co se stalo</span><textarea id="skPopis" placeholder="stručný popis události a rozsahu poškození"></textarea></label>'
+      +'<label class="f"><span>Co se stalo</span><textarea id="skPopis" autocomplete="off" placeholder="stručný popis události a rozsahu poškození"></textarea></label>'
       +'<button class="btn pri" onclick="nahlasSkodu(\''+v.id+'\')">Nahlásit škodu</button>'
       +'<div class="hint" style="margin-top:8px">Hlášení odejde správci vozu, zodpovědné osobě za středisko a <strong>řediteli společnosti</strong>. '
       +'Fotky poškození přidej výš v sekci Fotografie.</div>';
@@ -471,10 +488,10 @@ function detail(id){
     +'<span class="pill '+(s.inventura.potreba?"warn":"ok")+'">'+esc(s.inventura.text)+'</span></div><div class="b">';
   if(v.smiEdit){
     h+='<div class="grid3">'
-      +'<label class="f"><span>Stav vozidla</span><select id="invStav"><option value="v-poradku">V pořádku</option><option value="drobne-zavady">Drobné závady</option><option value="zavazne-zavady">Závažné závady</option></select></label>'
-      +'<label class="f"><span>Stav tachometru (km)</span><input id="invKm" type="number" min="0" placeholder="zapíše se i do ročního přehledu"></label>'
-      +'<label class="f"><span>Výbava</span><input id="invVybava" placeholder="rezerva, zvedák, lékárnička, klíče…"></label>'
-      +'</div><label class="f"><span>Poznámka (poškození, co chybí, co je potřeba)</span><textarea id="invPozn"></textarea></label>'
+      +'<label class="f"><span>Stav vozidla</span><select id="invStav" autocomplete="off"><option value="v-poradku">V pořádku</option><option value="drobne-zavady">Drobné závady</option><option value="zavazne-zavady">Závažné závady</option></select></label>'
+      +'<label class="f"><span>Stav tachometru (km)</span><input id="invKm" autocomplete="off" type="number" min="0" placeholder="zapíše se i do ročního přehledu"></label>'
+      +'<label class="f"><span>Výbava</span><input id="invVybava" autocomplete="off" placeholder="rezerva, zvedák, lékárnička, klíče…"></label>'
+      +'</div><label class="f"><span>Poznámka (poškození, co chybí, co je potřeba)</span><textarea id="invPozn" autocomplete="off"></textarea></label>'
       +'<button class="btn pri" onclick="ulozInventuru(\''+v.id+'\')">Uložit inventarizaci</button>'
       +'<div class="hint" style="margin-top:8px">Dělá se jednou za '+(D.nastaveni.inventuraMesice/12)+' roky. Závažné závady systém rovnou pošle zodpovědné osobě za středisko.</div>';
   }
@@ -550,38 +567,57 @@ function nahrajFoto(id,input){
 /* ---------- editace vozidla (správce modulu) ---------- */
 function editVuz(id){
   const v=id?vuz(id):{};
-  const h='<div class="grid3">'
-    +'<label class="f"><span>SPZ</span><input id="eSpz" value="'+esc(v.spz||"")+'" placeholder="1AB 2345"></label>'
-    +'<label class="f"><span>Značka</span><input id="eZnacka" value="'+esc(v.znacka||"")+'"></label>'
-    +'<label class="f"><span>Model</span><input id="eModel" value="'+esc(v.model||"")+'"></label>'
+  let h='<div class="grid3">'
+    +'<label class="f"><span>SPZ</span><input id="eSpz" autocomplete="off" value="'+esc(v.spz||"")+'" placeholder="1AB 2345"></label>'
+    +'<label class="f"><span>Značka</span><input id="eZnacka" autocomplete="off" value="'+esc(v.znacka||"")+'"></label>'
+    +'<label class="f"><span>Model</span><input id="eModel" autocomplete="off" value="'+esc(v.model||"")+'"></label>'
     +'</div><div class="grid3">'
-    +'<label class="f"><span>VIN</span><input id="eVin" value="'+esc(v.vin||"")+'" maxlength="17" placeholder="17 znaků"></label>'
-    +'<label class="f"><span>Rok výroby</span><input id="eRok" type="number" min="1980" max="'+(new Date().getFullYear()+1)+'" value="'+(v.rokVyroby||"")+'"></label>'
-    +'<label class="f"><span>Typ</span><select id="eTyp">'+Object.keys(D.typy).map(k=>'<option value="'+k+'" '+(v.typ===k?"selected":"")+'>'+esc(D.typy[k])+'</option>').join("")+'</select></label>'
+    +'<label class="f"><span>VIN</span><input id="eVin" autocomplete="off" value="'+esc(v.vin||"")+'" maxlength="17" placeholder="17 znaků"></label>'
+    +'<label class="f"><span>Rok výroby</span><input id="eRok" autocomplete="off" type="number" min="1980" max="'+(new Date().getFullYear()+1)+'" value="'+(v.rokVyroby||"")+'"></label>'
+    +'<label class="f"><span>Typ</span><select id="eTyp" autocomplete="off">'+Object.keys(D.typy).map(k=>'<option value="'+k+'" '+(v.typ===k?"selected":"")+'>'+esc(D.typy[k])+'</option>').join("")+'</select></label>'
     +'</div><div class="grid3">'
-    +'<label class="f"><span>Středisko</span><input id="eStred" list="stredL" value="'+esc(v.stredisko||"")+'"><datalist id="stredL">'+D.strediska.map(s=>'<option>'+esc(s)+'</option>').join("")+'</datalist></label>'
-    +'<label class="f"><span>Správce vozu</span>'+acHtml("eSpravce",v.spravceEmail,"Začni psát jméno…")+'</label>'
-    +'<label class="f"><span>Stav</span><select id="eStav">'+Object.keys(D.stavy).map(k=>'<option value="'+k+'" '+((v.stav||"aktivni")===k?"selected":"")+'>'+esc(D.stavy[k])+'</option>').join("")+'</select></label>'
+    +'<label class="f"><span>Středisko</span><input id="eStred" autocomplete="off" list="stredL" value="'+esc(v.stredisko||"")+'"><datalist id="stredL">'+D.strediska.map(s=>'<option>'+esc(s)+'</option>').join("")+'</datalist></label>'
+    +'<label class="f"><span>Správce vozu</span>'+acHtml("eSpravce",v.spravceEmail,"Začni psát jméno…",id?function(){ulozVuz(id,true);}:null)+'</label>'
+    +'<label class="f"><span>Stav</span><select id="eStav" autocomplete="off">'+Object.keys(D.stavy).map(k=>'<option value="'+k+'" '+((v.stav||"aktivni")===k?"selected":"")+'>'+esc(D.stavy[k])+'</option>').join("")+'</select></label>'
     +'</div><div class="grid2">'
-    +'<label class="f"><span>Technická prohlídka platí do</span><input id="eStk" type="date" value="'+esc(v.stkDo||"")+'"></label>'
-    +'<label class="f"><span>Datum pořízení</span><input id="ePor" type="date" value="'+esc(v.porizeno||"")+'"></label>'
+    +'<label class="f"><span>Technická prohlídka platí do</span><input id="eStk" autocomplete="off" type="date" value="'+esc(v.stkDo||"")+'"></label>'
+    +'<label class="f"><span>Datum pořízení</span><input id="ePor" autocomplete="off" type="date" value="'+esc(v.porizeno||"")+'"></label>'
     +'</div><div class="grid3">'
-    +'<label class="f"><span>Evidenční číslo</span><input id="eEvid" value="'+esc(v.evidCislo||"")+'"></label>'
-    +'<label class="f"><span>Číslo technického průkazu</span><input id="eTp" value="'+esc(v.cisloTp||"")+'"></label>'
-    +'<label class="f"><span>Majitel / režim</span><input id="eMaj" value="'+esc(v.majitel||"")+'" placeholder="Vlastní, leasing…"></label>'
+    +'<label class="f"><span>Evidenční číslo</span><input id="eEvid" autocomplete="off" value="'+esc(v.evidCislo||"")+'"></label>'
+    +'<label class="f"><span>Číslo technického průkazu</span><input id="eTp" autocomplete="off" value="'+esc(v.cisloTp||"")+'"></label>'
+    +'<label class="f"><span>Majitel / režim</span><input id="eMaj" autocomplete="off" value="'+esc(v.majitel||"")+'" placeholder="Vlastní, leasing…"></label>'
     +'</div>'
-    +'<label class="f"><span>Poznámka</span><textarea id="ePozn">'+esc(v.poznamka||"")+'</textarea></label>'
+    +'<label class="f"><span>Poznámka</span><textarea id="ePozn" autocomplete="off">'+esc(v.poznamka||"")+'</textarea></label>'
     +'<div class="hint">Jeden člověk může být správcem více vozidel — stačí ho vybrat u každého z nich.</div>';
-  modal(id?"Úprava vozidla":"Nové vozidlo",h,
-    '<button class="btn" onclick="zavri()">Zrušit</button><button class="btn pri" onclick="ulozVuz('+(id?"'"+id+"'":"null")+')">Uložit</button>');
+  if(id){
+    // u existujícího vozidla se každá změna uloží sama; „Uložit" tu nikdo mačkat nemusí
+    h+='<div class="mut" id="vuzStav" style="min-height:18px;margin-top:4px"></div>';
+    modal("Úprava vozidla",h,'<span class="hint" style="margin-right:auto">Změny se ukládají průběžně.</span>'
+      +'<button class="btn" onclick="zavri();nacti()">Hotovo</button>');
+    ["eSpz","eZnacka","eModel","eVin","eRok","eStred","eStk","ePor","ePozn","eEvid","eTp","eMaj"].forEach(function(k){
+      const el=document.getElementById(k); if(el) el.oninput=function(){ ulozZa("vuz",800,function(){ulozVuz(id,true);}); };
+    });
+    ["eTyp","eStav"].forEach(function(k){
+      const el=document.getElementById(k); if(el) el.onchange=function(){ ulozVuz(id,true); };
+    });
+  } else {
+    modal("Nové vozidlo",h,
+      '<button class="btn" onclick="zavri()">Zrušit</button><button class="btn pri" onclick="ulozVuz(null)">Vytvořit</button>');
+  }
 }
-async function ulozVuz(id){
+async function ulozVuz(id,prubezne){
+  if(!document.getElementById("eSpz"))return;          // dialog je mezitím zavřený
   const t={id:id||undefined,spz:$("#eSpz").value,znacka:$("#eZnacka").value,model:$("#eModel").value,vin:$("#eVin").value,
     rokVyroby:$("#eRok").value,typ:$("#eTyp").value,stredisko:$("#eStred").value,spravceEmail:$("#eSpravce").value,
     stav:$("#eStav").value,stkDo:$("#eStk").value,porizeno:$("#ePor").value,poznamka:$("#ePozn").value,
     evidCislo:$("#eEvid").value,cisloTp:$("#eTp").value,majitel:$("#eMaj").value};
-  try{ const r=await api("/api/vozidla/vuz",t); toast("Uloženo."); zavri(); await nacti(); detail(id||r.id); }
-  catch(e){alert(e.message);}
+  if(prubezne)stavUlozeni("vuzStav","ukládám…");
+  try{
+    const r=await api("/api/vozidla/vuz",t);
+    if(prubezne){ stavUlozeni("vuzStav","uloženo ✓","var(--green-d)"); D=await api("/api/vozidla/data"); return; }
+    toast("Uloženo."); zavri(); await nacti(); detail(id||r.id);
+  }
+  catch(e){ if(prubezne)stavUlozeni("vuzStav","neuloženo — "+e.message,"var(--red)"); else alert(e.message); }
 }
 async function smazVuz(id){
   const v=vuz(id);
@@ -594,19 +630,19 @@ function vykresliStrediska(){
   let h='<div class="card"><div class="h"><h2>Kdo zodpovídá za středisko</h2></div><div class="b">'
     +'<div class="hint" style="margin-bottom:10px">Za vozidla střediska odpovídá konkrétní člověk — ředitel dopravy, ředitel výroby nebo ředitel střediska. '
     +'Dostává upozornění za celé středisko a vidí v modulu všechna jeho vozidla.</div>'
-    +'<table><thead><tr><th>Středisko</th><th>Zodpovědná osoba</th><th>Role</th><th>Vozidel</th>'+(D.me.admin?'<th></th>':'')+'</tr></thead><tbody>';
+    +'<table><thead><tr><th>Středisko</th><th>Zodpovědná osoba</th><th>Role</th><th>Vozidel</th><th></th>'+(D.me.admin?'<th></th>':'')+'</tr></thead><tbody>';
   const poradi=D.strediska.map((s,i)=>({s,i,pocet:D.vozidla.filter(v=>v.stredisko===s).length}))
     .sort((a,b)=>b.pocet-a.pocet||a.s.localeCompare(b.s,"cs"));
   poradi.forEach(({s,i,pocet})=>{
     const z=D.zodpovedne.find(x=>x.stredisko===s);
     h+='<tr><td><strong>'+esc(s)+'</strong></td>';
     if(D.me.admin){
-      h+='<td style="min-width:250px">'+acHtml("zod_"+i,z?z.email:"","Začni psát jméno…")+'</td>'
-        +'<td><select class="btn" style="font-weight:400" id="rol_'+i+'">'
-          +(z?'':'<option value="">— role —</option>')
+      h+='<td style="min-width:250px">'+acHtml("zod_"+i,z?z.email:"","Začni psát jméno…",()=>ulozZod(i))+'</td>'
+        +'<td><select class="btn" style="font-weight:400" id="rol_'+i+'" autocomplete="off" onchange="ulozZod('+i+')">'
+          +(z?'':'<option value="" selected>— role —</option>')
           +Object.keys(D.role).map(k=>'<option value="'+k+'" '+(z&&z.role===k?"selected":"")+'>'+esc(D.role[k])+'</option>').join("")+'</select></td>'
         +'<td class="num">'+pocet+'</td>'
-        +'<td style="text-align:right"><button class="btn sm" onclick="ulozZod('+i+')">Uložit</button></td>';
+        +'<td style="text-align:right;min-width:80px"><span class="mut" id="zodstav_'+i+'"></span></td>';
     }else{
       const k=z&&z.kontakt;
       h+='<td>'+(z?('<strong>'+esc(k&&k.jmeno||z.jmeno||z.email)+'</strong>'
@@ -622,7 +658,12 @@ function vykresliStrediska(){
 async function ulozZod(i){
   const s=D.strediska[i];
   const email=document.getElementById("zod_"+i).value, role=document.getElementById("rol_"+i).value;
-  try{ await api("/api/vozidla/zodpovedny",{stredisko:s,email,role}); toast(email?"Uloženo.":"Zodpovědná osoba zrušena."); nacti(); }catch(e){alert(e.message);}
+  stavUlozeni("zodstav_"+i,"ukládám…");
+  try{
+    await api("/api/vozidla/zodpovedny",{stredisko:s,email,role});
+    stavUlozeni("zodstav_"+i,"uloženo ✓","var(--green-d)");
+    D=await api("/api/vozidla/data");   // data si obnovíme potichu, tabulku nepřekreslujeme pod rukama
+  }catch(e){ stavUlozeni("zodstav_"+i,"neuloženo","var(--red)"); alert(e.message); }
 }
 
 /* ---------- směrnice ---------- */
@@ -650,25 +691,53 @@ function vykresliNastaveni(){
   const n=D.nastaveni;
   $("#obsah").innerHTML='<div class="card"><div class="h"><h2>Nastavení modulu</h2></div><div class="b">'
     +'<div class="grid3">'
-    +'<label class="f"><span>Práh nájezdu pro obměnu (km)</span><input id="nKm" type="number" value="'+n.prahKm+'"></label>'
-    +'<label class="f"><span>Práh stáří vozu (roky)</span><input id="nRok" type="number" value="'+n.prahRoky+'"></label>'
-    +'<label class="f"><span>Inventarizace po (měsíců)</span><input id="nInv" type="number" value="'+n.inventuraMesice+'"></label>'
+    +'<label class="f"><span>Práh nájezdu pro obměnu (km)</span><input id="nKm" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" type="number" value="'+n.prahKm+'"></label>'
+    +'<label class="f"><span>Práh stáří vozu (roky)</span><input id="nRok" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" type="number" value="'+n.prahRoky+'"></label>'
+    +'<label class="f"><span>Inventarizace po (měsíců)</span><input id="nInv" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" type="number" value="'+n.inventuraMesice+'"></label>'
     +'</div>'
     +'<label class="f"><span>Ředitel společnosti — hlásí se mu každá škoda'+(n.reditelEmail?'':' <span style="color:var(--red)">(zatím nevyplněno)</span>')+'</span>'
-      +acHtml("nReditel",n.reditelEmail,"Začni psát jméno…")+'</label>'
-    +'<label class="f"><span>Kopie upozornění na e-maily (oddělené čárkou)</span><input id="nKopie" value="'+esc((n.kopieNa||[]).join(", "))+'" placeholder="napr. sprava.vozidel@elkoplast.cz"></label>'
-    +'<button class="btn pri" onclick="ulozNastaveni()">Uložit</button>'
+      +acHtml("nReditel",n.reditelEmail,"Začni psát jméno…",ulozNastaveni)+'</label>'
+    +'<label class="f"><span>Kopie upozornění na e-maily (oddělené čárkou)</span><input id="nKopie" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" value="'+esc((n.kopieNa||[]).join(", "))+'" placeholder="napr. sprava.vozidel@elkoplast.cz"></label>'
+    +'<div class="mut" id="nastStav" style="min-height:18px"></div>'
+    +pristupHtml()
     +'<div class="hint" style="margin-top:10px">Upozornění na technickou prohlídku chodí '+(n.upozorneniDny||[]).join(", ")+' dní předem správci vozu i zodpovědné osobě za středisko, '
     +'po propadnutí pak jednou měsíčně. Chybějící roční tachometr a inventarizace se připomínají jednou měsíčně.</div>'
     +'</div></div>';
 }
+// Kdo modul uvidí — počítá se ze svěřených vozidel a zodpovědností, nikde se to zvlášť nenastavuje.
+function pristupHtml(){
+  const spravci=new Map();
+  D.vozidla.forEach(v=>{ if(v.spravceEmail) {
+    const r=spravci.get(v.spravceEmail)||{k:v.spravceKontakt||{jmeno:v.spravceJmeno,email:v.spravceEmail},vozy:[]};
+    r.vozy.push(v.spz||v.vin); spravci.set(v.spravceEmail,r);
+  }});
+  const zod=(D.zodpovedne||[]).filter(z=>z.email);
+  let h='<div class="card" style="margin-top:18px"><div class="h"><h2>Kdo má modul zpřístupněný</h2><div class="sp"></div>'
+    +'<span class="pill ok">'+(new Set([...spravci.keys(),...zod.map(z=>z.email)]).size)+' lidí</span></div><div class="b">'
+    +'<div class="hint" style="margin-bottom:10px">Přístup se nepřiděluje ručně: modul vidí každý, komu je svěřené vozidlo, '
+    +'a každá zodpovědná osoba za středisko. Přiřadíš auto → člověk modul uvidí; odebereš → přestane. '
+    +'Správci vozu vidí jen svoje vozidla, zodpovědná osoba celé své středisko.</div>';
+  if(spravci.size){
+    h+='<table><thead><tr><th>Správce vozu</th><th>Kontakt</th><th>Vozidla</th></tr></thead><tbody>'
+      +[...spravci.values()].sort((a,b)=>String(a.k.jmeno||"").localeCompare(String(b.k.jmeno||""),"cs"))
+        .map(r=>'<tr><td><strong>'+esc(r.k.jmeno||r.k.email)+'</strong>'+(r.k.pozice?'<div class="mut">'+esc(r.k.pozice)+'</div>':'')+'</td>'
+          +'<td class="mut">'+esc(r.k.email)+(r.k.telefon?'<br>'+esc(r.k.telefon):'')+'</td>'
+          +'<td class="num">'+r.vozy.map(esc).join(", ")+'</td></tr>').join("")
+      +'</tbody></table>';
+  } else h+='<div class="mut">Zatím nemá svěřené vozidlo nikdo.</div>';
+  const bez=D.vozidla.filter(v=>!v.spravceEmail).length;
+  if(bez)h+='<div class="hint" style="margin-top:10px;color:var(--amber)">U '+bez+' vozidel není přidělen správce — ti lidé modul neuvidí, dokud jim auto nepřiřadíš.</div>';
+  return h+'</div></div>';
+}
 async function ulozNastaveni(){
+  stavUlozeni("nastStav","ukládám…");
   try{
     await api("/api/vozidla/nastaveni",{prahKm:$("#nKm").value,prahRoky:$("#nRok").value,inventuraMesice:$("#nInv").value,
       reditelEmail:$("#nReditel").value,
       kopieNa:$("#nKopie").value.split(/[;,]/).map(s=>s.trim()).filter(Boolean)});
-    toast("Nastavení uloženo."); nacti();
-  }catch(e){alert(e.message);}
+    stavUlozeni("nastStav","uloženo ✓","var(--green-d)");
+    D=await api("/api/vozidla/data");
+  }catch(e){ stavUlozeni("nastStav","neuloženo — "+e.message,"var(--red)"); }
 }
 
 /* ---------- render ---------- */

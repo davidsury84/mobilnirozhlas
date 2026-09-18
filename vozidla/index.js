@@ -32,6 +32,7 @@ const SMERNICE_FILE = path.join(__dirname, 'smernice-sverene-vozidlo.html');
 
 // Role člověka zodpovědného za středisko — dle zadání.
 const ROLE = {
+  'reditel': 'Ředitel',
   'reditel-dopravy': 'Ředitel dopravy',
   'reditel-vyroby': 'Ředitel výroby',
   'reditel-strediska': 'Ředitel střediska',
@@ -430,7 +431,8 @@ function mount(host) {
     v.spz = s('spz').toUpperCase();
     v.znacka = s('znacka'); v.model = s('model');
     v.vin = s('vin').toUpperCase().slice(0, 17);
-    v.rokVyroby = Number(b.rokVyroby || v.rokVyroby) || 0;
+    // pozor: prázdná hodnota musí rok SMAZAT, ne se tiše vrátit k původní
+    v.rokVyroby = (b.rokVyroby === undefined) ? (Number(v.rokVyroby) || 0) : (Number(b.rokVyroby) || 0);
     v.typ = TYPY[b.typ] ? b.typ : (v.typ || 'osobni');
     v.stav = STAVY[b.stav] ? b.stav : (v.stav || 'aktivni');
     v.stredisko = s('stredisko');
