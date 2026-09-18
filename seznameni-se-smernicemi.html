@@ -6793,8 +6793,10 @@ function sendableOf(id){
       linkFor:(email)=>inviteLinkFor("survey-obtest",email) };
   }
   const d=DB.directives.find(x=>x.id===id); if(!d) return null;
+  // assignTags musí jít s sebou — jinak dialog Rozeslat ignoruje cílení směrnice
+  // (např. „jen lidé se svěřeným vozidlem") a nabídne ji celé firmě.
   return { id:d.id, isSurvey:false, title:d.title, assignAll:d.assignAll, assignCats:d.assignCats,
-    acks:d.acks||{}, linkFor:(email)=>personalLink(email), dir:d };
+    assignTags:d.assignTags||[], acks:d.acks||{}, linkFor:(email)=>personalLink(email), dir:d };
 }
 function gritAssignAll(on){ GRIT_ASSIGN.all=on; const w=document.getElementById("gCatWrap"); if(w) w.style.opacity=on?.4:1; }
 function gritReadCats(){ GRIT_ASSIGN.cats=[...document.querySelectorAll(".gcat:checked")].map(c=>c.value); }

@@ -801,6 +801,13 @@ function mount(host) {
   function smerniceHtml() {
     try { return fs.readFileSync(SMERNICE_FILE, 'utf8'); } catch (_) { return '<p>Text směrnice chybí.</p>'; }
   }
+  // Směrnice publikovaná dřív, než modul uměl cílit, má prázdný okruh adresátů —
+  // ve výběru příjemců pak není nikdo a štítek se nedá použít. Srovnáme to.
+  function srovnejCileniSmernice() {
+    if (!host.zalozSmernici) return;
+    try { host.zalozSmernici({ title: 'Směrnice — svěřené služební vozidlo', html: smerniceHtml(), kategorie: 'Vozový park', assignTags: [TAG_SMERNICE], jenCileni: true }); }
+    catch (_) {}
+  }
   function apiSmernice(req, res) { htmlOut(res, 200, smerniceHtml()); return true; }
   async function apiSmerniceZalozit(req, res) {
     if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Směrnici zakládá správce intranetu.' }); return true; }
@@ -816,9 +823,13 @@ function mount(host) {
         assignTags: [TAG_SMERNICE],
       });
       logAct('vozidla', req, 'Založena směrnice ke svěřenému vozidlu');
+      const cile = ' na ' + adr.vse.length + ' lidí (' + adr.spravci.length + ' se svěřeným vozidlem + ' + adr.vedouci.length + ' vedoucích)';
       json(res, 200, { ok: true, id: r && r.id, adresatu: adr.vse.length,
-        zprava: 'Směrnice je založená a zacílená na ' + adr.vse.length + ' lidí (' + adr.spravci.length
-          + ' se svěřeným vozidlem + ' + adr.vedouci.length + ' vedoucích). V administraci → Směrnice ji zkontroluj a rozešli k seznámení.' });
+        zprava: (r && r.jizByla
+          ? (r.precileno ? 'Směrnice už mezi směrnicemi byla — přecílil jsem ji' + cile + '.' : 'Směrnice už mezi směrnicemi je, zacílená' + cile + '.')
+          : 'Směrnice je založená a zacílená' + cile + '.')
+          + ' V administraci → Směrnice si v dialogu Rozeslat vyber štítek „Svěřené vozidlo" a rozešli k seznámení.'
+          + '\n\nPokud máš administraci otevřenou v jiné záložce, načti ji prosím znovu — jinak pracuje se starou kopií dat.' });
     } catch (e) { json(res, 500, { chyba: e.message }); }
     return true;
   }
@@ -878,6 +889,7 @@ function mount(host) {
     const d = load();
     if (!d.vozidla.length) return;
     synchronizujTag(d);   // štítek pro rozeslání směrnice ať sedí, i když někdo přepsal stav zvenčí
+    srovnejCileniSmernice();   // publikovaná směrnice bez cílení by nešla rozeslat
     const nast = d.nastaveni;
     const dnesStr = new Date().toISOString().slice(0, 10);
     let zmena = false;

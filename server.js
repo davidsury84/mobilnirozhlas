@@ -3629,11 +3629,23 @@ try {
       return { pridano, odebrano, celkem: chtene.size };
     },
     // Modul si umí založit svoji směrnici mezi směrnice intranetu (admin ji pak rozešle k seznámení).
-    zalozSmernici: ({ title, html, kategorie, assignTags }) => {
+    zalozSmernici: ({ title, html, kategorie, assignTags, jenCileni }) => {
       const st = readJson(STATE_F, { directives: [] });
       if (!Array.isArray(st.directives)) st.directives = [];
       const stejna = st.directives.find(d => d && d.title === title);
-      if (stejna) return { id: stejna.id, jizByla: true };
+      if (stejna) {
+        // Směrnice už existuje — text nepřepisujeme (mohl ho někdo upravit), ale cílení
+        // srovnáme, ať se dá vůbec rozeslat. Bez assignAll je okruh adresátů prázdný
+        // a štítek ho jen zužuje, takže by ve výběru příjemců nebyl nikdo.
+        const tags = Array.isArray(assignTags) ? assignTags : [];
+        let zmena = false;
+        if (tags.length && JSON.stringify(stejna.assignTags || []) !== JSON.stringify(tags)) { stejna.assignTags = tags; zmena = true; }
+        if (tags.length && !stejna.assignAll) { stejna.assignAll = true; zmena = true; }
+        if (zmena) writeJson(STATE_F, st);
+        return { id: stejna.id, jizByla: true, precileno: zmena };
+      }
+      // jenCileni = srovnat cílení už publikované směrnice; nikdy ji tímhle nezakládat
+      if (jenCileni) return null;
       const id = 'd' + crypto.randomBytes(5).toString('hex');
       st.directives.push({
         id, title, html: html || '', pdf: '', pdfName: '', pdfOrient: '',
