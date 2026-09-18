@@ -94,10 +94,14 @@ function mount(host) {
 
   // ---- e-mail (best-effort) ------------------------------------------------
   async function mail(to, subject, text) {
-    if (!to || !host.deliver || !host.mailFrom || !host.mailFrom.user) return;
-    try {
-      await host.deliver({ to, fromAddr: host.mailFrom.user, fromName: host.mailFrom.name || 'Intranet – reklamace', subject, text, html: mailHtml(text) });
-    } catch (e) { console.error('[reklamace] e-mail se nepodařilo odeslat:', e.message); }
+    // Odesílatele NEvyžadujeme: při odesílání přes Resend bývá CFG.user prázdný
+    // (adresu určuje RESEND_FROM) a podmínka na něj by notifikace tiše zahodila.
+    if (!to || !host.deliver) return;
+    const mf = host.mailFrom || {};
+    const zprava = { to, subject, text, html: mailHtml(text) };
+    if (mf.user) { zprava.fromAddr = mf.user; zprava.fromName = mf.name || 'Intranet – reklamace'; }
+    try { await host.deliver(zprava); }
+    catch (e) { console.error('[reklamace] e-mail se nepodařilo odeslat:', e.message); }
   }
   function mailHtml(text) {
     return '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#0f1512;line-height:1.55">'

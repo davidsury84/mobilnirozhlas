@@ -1332,7 +1332,13 @@ async function boot(){
   loadBrandLogo();
   try{
     const res = await fetch("/api/state",{cache:"no-store"});
-    if(res.status===401){ showLogin(); return; }
+    if(res.status===401){
+      // Odkaz #cti= otevřel někdo, kdo není správce → poslat ho na jeho osobní
+      // stránku směrnice /s/<id>, kde se identita bere z přihlášení.
+      const mc = location.hash.match(/cti=([a-z0-9]+)/i);
+      if(mc){ location.replace(location.origin+"/s/"+encodeURIComponent(mc[1])); return; }
+      showLogin(); return;
+    }
     if(!res.ok) throw new Error("bad");
     const s = await res.json();
     DB = { categories:s.categories||[], employees:s.employees||[], directives:s.directives||[], profiles:s.profiles||[], candidates:s.candidates||[], settings:Object.assign({}, DB.settings||{}, s.settings||{}) };
@@ -1431,6 +1437,7 @@ function route(){
   const m = location.hash.match(/cti=([a-z0-9]+)/i);
   if(m){
     if(muj) muj.style.display="none";
+    if(!booted){ boot(); return; }   // bez načtených dat by čtečka neměla co zobrazit
     const km = location.hash.match(/kdo=([^&]+)/i);
     showReader(m[1], km ? decodeURIComponent(km[1]) : "");
     return;
@@ -1494,6 +1501,7 @@ const MUJ_MODS = [
   { key:"doprava", icon:MUJ_IC.truck, label:"Doprava", gated:true },
   { key:"qooling", icon:MUJ_IC.shield, label:"Qooling — kvalita", gated:true },
   { key:"loznyplan", icon:MUJ_IC.truck, label:"Ložný plán", gated:true },
+  { key:"vozidla", icon:MUJ_IC.truck, label:"Vozový park", gated:true },
   { key:"konstrukce", icon:MUJ_IC.gear, label:"Zadání do výroby – konstrukce", gated:true },
   { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
   { grp:"Kalkulačky" },
@@ -1503,6 +1511,8 @@ const MUJ_MODS = [
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
   { key:"kontejnerykalk", icon:MUJ_IC.calc, label:"Lodní kontejnery", gated:true },
+  { grp:"Vývoj projektů" },
+  { key:"eshopmodel", icon:MUJ_IC.cart, label:"E-shop", gated:true },
   { grp:"Obchod" },
   { key:"pozadavky", icon:MUJ_IC.cart, label:"Požadavky nákupu", gated:true },
   { key:"poptavky", icon:MUJ_IC.ticket, label:"Poptávky", gated:true },
@@ -1544,7 +1554,10 @@ const MJ_L10N = {
   'Ložný plán': ['Loading plan','Ladeplan','Plan załadunku','План завантаження','Plan de încărcare'],
   'Zadání do výroby – konstrukce': ['Production orders — engineering','Fertigungsaufträge — Konstruktion','Zlecenia do produkcji — konstrukcja','Замовлення у виробництво — конструкція','Comenzi în producție — proiectare'],
   'Freelo': ['Freelo','Freelo','Freelo','Freelo','Freelo'],
+  'Vozový park': ['Fleet','Fuhrpark','Flota pojazdów','Автопарк','Parc auto'],
   'Kalkulačky': ['Calculators','Rechner','Kalkulatory','Калькулятори','Calculatoare'],
+  'Vývoj projektů': ['Project development','Projektentwicklung','Rozwój projektów','Розвиток проєктів','Dezvoltare proiecte'],
+  'E-shop': ['E-shop','E-Shop','E-sklep','Інтернет-магазин','E-shop'],
   'Kalkulace-lisy': ['Baler calculator','Kalkulation Pressen','Kalkulacja — prasy','Калькуляція — преси','Calculație prese'],
   'LOXXER — kalkulace': ['LOXXER — calculator','LOXXER — Kalkulation','LOXXER — kalkulacja','LOXXER — калькуляція','LOXXER — calculație'],
   'Kalkulačka svoz ESA': ['ESA collection calculator','Rechner ESA-Abholung','Kalkulator odbioru ESA','Калькулятор вивозу ESA','Calculator colectare ESA'],
@@ -1860,7 +1873,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1941,8 +1954,10 @@ function mjGo(key){
   else if(key==="kontejnerykalk") showKontejneryKalk();
   else if(key==="svozesa") showSvozEsa();
   else if(key==="tridicilinka") showTridiciLinka();
+  else if(key==="eshopmodel") showEshopModel();
   else if(key==="prekladiste") showPrekladiste();
   else if(key==="loznyplan") showLoznyPlan();
+  else if(key==="vozidla") showVozidla();
   else if(key==="kovo"||key==="kovokalk") showKovoKalk();
   else if(key==="plasty") showPlasty();
   else if(key==="doprava") showDoprava();
@@ -3043,6 +3058,22 @@ function showTridiciLinka(){
   window.scrollTo(0,0);
 }
 // Přepnutí dvojčete třídicí linky na celé okno prohlížeče (a zpět; zavře i Esc).
+function showEshopModel(){
+  MUJ.view="eshopmodel"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("eshopmodel")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<div id="tlWrap" style="position:relative;background:#0e1116">'
+    +'<button id="tlFs" onclick="tlCeleOkno()" title="Roztáhnout na celé okno (Esc zavře)" style="position:absolute;top:10px;right:14px;z-index:5;display:flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid #cdd3ca;border-radius:999px;background:rgba(255,255,255,.92);backdrop-filter:blur(4px);color:#1c1d1a;font:600 13px system-ui;cursor:pointer;box-shadow:0 2px 10px rgba(15,21,18,.12)">⛶ Na celé okno</button>'
+    +'<iframe src="/eshop-model-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#0e1116" title="E-shop — model"></iframe></div>';
+  window.scrollTo(0,0);
+}
+function showVozidla(){
+  MUJ.view="vozidla"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!moduleVisible({key:"vozidla",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu Vozový park nemáte přístup. Uvidí ho správce vozu, zodpovědná osoba za středisko a správce intranetu.</div>'; return; }
+  body.innerHTML='<iframe src="/vozidla" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f7f9f5" title="Vozový park — svěřená vozidla, technické prohlídky, inventarizace"></iframe>';
+  window.scrollTo(0,0);
+}
 function tlCeleOkno(){
   const w=document.getElementById("tlWrap"); if(!w) return;
   const f=w.querySelector("iframe"), b=document.getElementById("tlFs");
@@ -4241,7 +4272,7 @@ function showDashboard(){
   }
   mainH += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["loznyplan","Ložný plán",MUJ_IC.truck,"Plánování nakládky vozidel a přepravenky"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["loznyplan","Ložný plán",MUJ_IC.truck,"Plánování nakládky vozidel a přepravenky"],["vozidla","Vozový park",MUJ_IC.truck,"Svěřená vozidla, technické prohlídky, inventarizace"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     mainH += '<div class="dash-sec">'+mjT('Provozy')+'</div><div class="dash-grid">';
     provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
@@ -4251,6 +4282,12 @@ function showDashboard(){
   if(kalk.length){
     mainH += '<div class="dash-sec">'+mjT('Kalkulačky')+'</div><div class="dash-grid">';
     kalk.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
+    mainH += '</div>';
+  }
+  const vyvoj = [["eshopmodel","E-shop",MUJ_IC.cart,"Drátový model nového e-shopu — logika, obrazovky, procesy; společná práce"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  if(vyvoj.length){
+    mainH += '<div class="dash-sec">'+mjT('Vývoj projektů')+'</div><div class="dash-grid">';
+    vyvoj.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
     mainH += '</div>';
   }
 
@@ -5820,13 +5857,14 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["qooling","Qooling — kvalita (závady)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["qooling","Qooling — kvalita (závady)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","eshop","qooling"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
-  ["Agendy",["doprava","loznyplan","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","adaptace","freelo","aktuality"]]
+  ["Vývoj projektů",["eshopmodel"]],
+  ["Agendy",["doprava","loznyplan","vozidla","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","adaptace","freelo","aktuality"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }
@@ -6763,8 +6801,10 @@ function sendableOf(id){
       linkFor:(email)=>inviteLinkFor("survey-obtest",email) };
   }
   const d=DB.directives.find(x=>x.id===id); if(!d) return null;
+  // assignTags musí jít s sebou — jinak dialog Rozeslat ignoruje cílení směrnice
+  // (např. „jen lidé se svěřeným vozidlem") a nabídne ji celé firmě.
   return { id:d.id, isSurvey:false, title:d.title, assignAll:d.assignAll, assignCats:d.assignCats,
-    acks:d.acks||{}, linkFor:(email)=>personalLink(email), dir:d };
+    assignTags:d.assignTags||[], acks:d.acks||{}, linkFor:(email)=>personalLink(email), dir:d };
 }
 function gritAssignAll(on){ GRIT_ASSIGN.all=on; const w=document.getElementById("gCatWrap"); if(w) w.style.opacity=on?.4:1; }
 function gritReadCats(){ GRIT_ASSIGN.cats=[...document.querySelectorAll(".gcat:checked")].map(c=>c.value); }
@@ -9959,8 +9999,34 @@ function recordTokens(){
 /* ============================================================
    ČTECÍ REŽIM (zaměstnanec)
    ============================================================ */
+/* Kdo je přihlášený — čtečka si identitu vezme ze session, ne od uživatele.
+   null = ještě nezjištěno, false = nikdo přihlášen. */
+let READER_ME = null;
+function readerIdBar(email){
+  const emp=DB.employees.find(e=>e.email.toLowerCase()===email.toLowerCase());
+  const name=emp?emp.name:((READER_ME&&READER_ME.name)||email);
+  return '<span>Seznamuje se</span>'+
+    '<div style="padding:9px 12px;border:1px solid var(--line-strong);border-radius:8px;background:#faf9f6">'+
+    '<strong>'+esc(name)+'</strong> <span class="mono muted" style="font-size:13px">'+esc(email)+'</span></div>'+
+    '<input type="hidden" id="readerEmail" value="'+esc(email)+'">';
+}
+function readerZjistiMe(){
+  if(READER_ME!==null) return;
+  fetch("/api/me",{cache:"no-store"}).then(r=>r.json()).then(j=>{
+    READER_ME=(j&&j.employee)?j.employee:false;
+    if(!READER_ME) return;
+    if(!MUJ.email){ MUJ.email=READER_ME.email; MUJ.name=READER_ME.name||""; }
+    const r2=document.getElementById("reader"), bar=document.getElementById("readerIdField");
+    if(!bar || !r2 || r2.style.display==="none") return;
+    bar.innerHTML=readerIdBar(READER_ME.email);
+    refreshAckState();
+  }).catch(()=>{ READER_ME=false; });
+}
 function showReader(id, preset){
   const d=DB.directives.find(x=>x.id===id);
+  if(!d){ alert("Směrnice nebyla nalezena."); location.hash=""; return; }
+  if(!preset && MUJ.email) preset=MUJ.email;
+  if(!preset && READER_ME) preset=READER_ME.email;
   document.getElementById("app").style.display="none";
   const r=document.getElementById("reader"); r.style.display="block";
   const bar=document.getElementById("readerIdField");
@@ -9975,15 +10041,12 @@ function showReader(id, preset){
       '<iframe src="'+esc(d.pdf)+'#view=FitH" style="width:100%;height:'+(naSirku?'68vh':'82vh')+';min-height:420px;border:1px solid var(--line);border-radius:10px;background:#f7f7f4" title="PDF"></iframe></div>'):'');
   r.dataset.dirId=id;
   if(preset){
-    const emp=DB.employees.find(e=>e.email.toLowerCase()===preset.toLowerCase());
-    bar.innerHTML='<span>Seznamuje se</span>'+
-      '<div style="padding:9px 12px;border:1px solid var(--line-strong);border-radius:8px;background:#faf9f6">'+
-      '<strong>'+esc(emp?emp.name:preset)+'</strong> <span class="mono muted" style="font-size:13px">'+esc(preset)+'</span></div>'+
-      '<input type="hidden" id="readerEmail" value="'+esc(preset)+'">';
+    bar.innerHTML=readerIdBar(preset);
   } else {
     bar.innerHTML='<span>Vyberte / zadejte svůj e-mail</span>'+
       '<input type="email" id="readerEmail" list="readerEmails" placeholder="jmeno@elkoplast.cz" oninput="refreshAckState()">'+
       '<datalist id="readerEmails">'+audienceOf(d).map(e=>'<option value="'+esc(e.email)+'">'+esc(e.name)+'</option>').join("")+'</datalist>';
+    readerZjistiMe();   // jsem-li přihlášený, pole se za okamžik nahradí mojí identitou
   }
   refreshAckState();
 }
@@ -10114,7 +10177,7 @@ document.addEventListener("click", e=>{ const pop=document.getElementById("theme
 applyTheme((function(){ try{ return localStorage.getItem("intranetTheme"); }catch(e){ return null; } })() || "google");
 
 // Kořen „/" = zaměstnanecký intranet, „/admin" = administrace. (#cti= otevře čtečku směrnice.)
-if(location.hash.match(/cti=/i)) route();
+if(location.hash.match(/cti=/i)) boot();
 else if(isAdminPath()) boot();
 else initIntranet();
 </script>

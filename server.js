@@ -142,6 +142,8 @@ const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka 
 const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace „Hlídač sortimentu" (repo ranges-watchdog)
 const TRIDICI_LINKA_APP_URL = process.env.TRIDICI_LINKA_APP_URL || 'https://tridici-linka-production.up.railway.app'; // aplikace „Design třídicí linky" — digitální dvojče (repo tridici-linka-railway); lze přepsat proměnnou
 const TRIDICI_LINKA_APP_FILE = path.join(ROOT, 'design-tridici-linky.html'); // alternativně lokální soubor (stejně jako u Kalkulace-lisy)
+const ESHOP_MODEL_APP_URL = (process.env.ESHOP_MODEL_APP_URL || 'https://eshop-model-production.up.railway.app').replace(/\/$/, ''); // aplikace „Model e-shopu" — drátový model nového e-shopu (repo davidsury84/1, složka eshop; Railway služba eshop-model); lze přepsat proměnnou
+const ESHOP_MODEL_APP_FILE = path.join(ROOT, 'eshop-model.html'); // alternativně lokální soubor (stejně jako u třídicí linky)
 const PREKLADISTE_APP_URL = process.env.PREKLADISTE_APP_URL || ''; // aplikace „Kalkulačka překladiště" — prodejní kalkulačka (repo prekladiste-kalkulacka); doplň URL nasazení
 const LOZNYPLAN_APP_URL = (process.env.LOZNYPLAN_APP_URL || 'https://loznyplan-production.up.railway.app').replace(/\/$/, ''); // aplikace „Ložný plán" — plánování nakládky (repo loznyplan, Railway služba loznyplan)
 const LODAKY_APP_URL = (process.env.LODAKY_APP_URL || '').replace(/\/$/, ''); // aplikace „Lodní kontejnery" (repo lodni-kontejnery) — nacenění obchodníka přes SSO
@@ -963,6 +965,7 @@ function buildNotifikace(email) {
   try { out = out.concat(notifPoptavky(email, mods, admin)); } catch (_) {}
   try { out = out.concat(notifDovolena(email, mods, admin)); } catch (_) {}
   try { out = out.concat(notifReklamace(email, mods, admin)); } catch (_) {}
+  try { if (vozidlaMod && vozidlaMod.notifikace) out = out.concat(vozidlaMod.notifikace(email)); } catch (_) {}
   return out.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0)).slice(0, 25);
 }
 function ensureEmployee(email, name) {
@@ -3602,6 +3605,64 @@ try {
   console.error('[reklamace] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Vozový park" (svěřená vozidla, technické prohlídky, inventarizace) ----
+let vozidlaMod = null;
+try {
+  vozidlaMod = require('./vozidla').mount({
+    send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
+    dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet – vozový park', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+    // Štítek u zaměstnanců, kterým se směrnice posílá (drží ho modul podle toho, kdo má auto).
+    nastavTag: ({ tag, emaily }) => {
+      const st = readJson(STATE_F, { employees: [] });
+      if (!Array.isArray(st.employees)) return { pridano: 0, odebrano: 0 };
+      const chtene = new Set((emaily || []).map(e => String(e || '').trim().toLowerCase()).filter(Boolean));
+      let pridano = 0, odebrano = 0;
+      st.employees.forEach(e => {
+        const em = String(e.email || '').toLowerCase(); if (!em) return;
+        const tags = Array.isArray(e.tags) ? e.tags.slice() : [];
+        const ma = tags.indexOf(tag) >= 0;
+        if (chtene.has(em) && !ma) { tags.push(tag); e.tags = tags; pridano++; }
+        else if (!chtene.has(em) && ma) { e.tags = tags.filter(t => t !== tag); odebrano++; }
+      });
+      if (pridano || odebrano) writeJson(STATE_F, st);
+      return { pridano, odebrano, celkem: chtene.size };
+    },
+    // Modul si umí založit svoji směrnici mezi směrnice intranetu (admin ji pak rozešle k seznámení).
+    zalozSmernici: ({ title, html, kategorie, assignTags, jenCileni }) => {
+      const st = readJson(STATE_F, { directives: [] });
+      if (!Array.isArray(st.directives)) st.directives = [];
+      const stejna = st.directives.find(d => d && d.title === title);
+      if (stejna) {
+        // Směrnice už existuje — text nepřepisujeme (mohl ho někdo upravit), ale cílení
+        // srovnáme, ať se dá vůbec rozeslat. Bez assignAll je okruh adresátů prázdný
+        // a štítek ho jen zužuje, takže by ve výběru příjemců nebyl nikdo.
+        const tags = Array.isArray(assignTags) ? assignTags : [];
+        let zmena = false;
+        if (tags.length && JSON.stringify(stejna.assignTags || []) !== JSON.stringify(tags)) { stejna.assignTags = tags; zmena = true; }
+        if (tags.length && !stejna.assignAll) { stejna.assignAll = true; zmena = true; }
+        if (zmena) writeJson(STATE_F, st);
+        return { id: stejna.id, jizByla: true, precileno: zmena };
+      }
+      // jenCileni = srovnat cílení už publikované směrnice; nikdy ji tímhle nezakládat
+      if (jenCileni) return null;
+      const id = 'd' + crypto.randomBytes(5).toString('hex');
+      st.directives.push({
+        id, title, html: html || '', pdf: '', pdfName: '', pdfOrient: '',
+        createdAt: Date.now(),
+        // cílíme štítkem: adresáty jsou lidé se svěřeným vozidlem a vedoucí, kteří za ně odpovídají
+        assignAll: Array.isArray(assignTags) && assignTags.length ? true : false,
+        assignCats: [], assignTags: Array.isArray(assignTags) ? assignTags : [],
+        kategorie: kategorie || '', verze: 1, acks: {},
+      });
+      writeJson(STATE_F, st);
+      return { id };
+    },
+  });
+} catch (e) {
+  console.error('[vozidla] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 // ---- Modul „Zápisy z interních jednání" — samostatná složka ./zapisy ----
 let zapisyMod = null;
 try {
@@ -3834,6 +3895,8 @@ const server = http.createServer(async (req, res) => {
     if (konstrukceMod && await konstrukceMod.handle(req, res)) return;
     // Modul „Reklamace" si obslouží vlastní cesty (/reklamace*, /api/reklamace*).
     if (reklamaceMod && await reklamaceMod.handle(req, res)) return;
+    // Modul „Vozový park" si obslouží vlastní cesty (/vozidla*, /api/vozidla*).
+    if (vozidlaMod && await vozidlaMod.handle(req, res)) return;
     // Modul „Zápisy z interních jednání" si obslouží vlastní cesty (/api/zapisy*).
     if (zapisyMod && await zapisyMod.handle(req, res)) return;
     // Modul „Požadavky nákupu" si obslouží vlastní cesty (/pozadavky*, /api/pozadavky*).
@@ -4033,7 +4096,7 @@ const server = http.createServer(async (req, res) => {
       const f = path.join(ROOT, 'assets', rel);
       if (!f.startsWith(path.join(ROOT, 'assets') + path.sep) || !fs.existsSync(f)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Nenalezeno'); }
       const ext = path.extname(f).toLowerCase();
-      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.gif': 'image/gif' };
+      const CT = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.gif': 'image/gif', '.pdf': 'application/pdf' }; // .pdf: brožury výrobce ve školeních (např. bramidan-broz-*.pdf) se otevřou v prohlížeči
       res.writeHead(200, { 'Content-Type': CT[ext] || 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
       return res.end(fs.readFileSync(f));
     }
@@ -4391,6 +4454,12 @@ const server = http.createServer(async (req, res) => {
         .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'cs'));
       return send(res, 200, { lide: list });
     }
+    // ---- Upozornění z modulů na nástěnku (školení, konstrukce, poptávky, dovolená, reklamace, vozový park) ----
+    // Pozor: tahle trasa se 2026-09 omylem smazala spolu s blokem školicích plánů a nástěnka od té doby mlčela.
+    if (p === '/api/notifikace' && req.method === 'GET') {
+      const eN = empSession(req); if (!eN) return send(res, 401, { error: 'Nepřihlášeno.' });
+      return send(res, 200, { items: buildNotifikace(eN.email) }, { 'Cache-Control': 'no-store' });
+    }
     // Přehled školicích úkolů z adaptačních scénářů (pro výpis školení ve správě)
     if (p === '/api/skoleni/adaptace' && req.method === 'GET') {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen správce.' });
@@ -4697,6 +4766,8 @@ const server = http.createServer(async (req, res) => {
         if (!modsUser.includes('konstrukce')) modsUser.push('konstrukce');
         if (!modsUser.includes('zadanikonstrukce')) modsUser.push('zadanikonstrukce');
       }
+      // Vozový park vidí i ten, komu je svěřené auto nebo kdo zodpovídá za středisko — bez přidělování přístupu.
+      try { if (vozidlaMod && vozidlaMod.hasAccess && vozidlaMod.hasAccess(e.email) && !modsUser.includes('vozidla')) modsUser.push('vozidla'); } catch (_) {}
       return send(res, 200, { employee: { email: e.email, name: e.name }, directives: myDirectives(e.email), library: myLibrary(e.email), modules: modsUser, surveys: mySurveys(e.email), surveyToken: inviteSign(e.email, e.name), skolPozvanky: skolPozMoje(e.email), isApprover: !!isApprover, vacPending: vacPending, canPostAktuality: canPostAktuality(req), isNakupci: isNakupci, isKontejnery: isKontejnery, isLisy: isLisy, aktualityNew: aktualityNew, heroImage: (readJson(SITE_F, {}).heroImage) || null });
     }
 
@@ -5328,6 +5399,27 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, '<!doctype html><meta charset="utf-8"><div style="font-family:system-ui;max-width:520px;margin:60px auto;text-align:center"><h1>🛰️ Hlídač sortimentu</h1><p>Pro napojení nastav proměnnou <code>RANGES_WATCHDOG_URL</code>.</p></div>', { 'Content-Type': 'text/html; charset=utf-8' });
     }
 
+    // ---- Aplikace modulu Model e-shopu: drátový model nového e-shopu (spolupráce více lidí); gating a SSO jako u třídicí linky ----
+    if (p === '/eshop-model-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('eshopmodel') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k modulu Vývoj projektů — E-shop nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      if (ESHOP_MODEL_APP_URL) {
+        // Přihlášený zaměstnanec → krátkodobý SSO token, aby se aplikace v iframu přihlásila sama (jméno pak vidí kolegové u sdílených modelů).
+        let target = ESHOP_MODEL_APP_URL;
+        if (e) { const tok = ssoSign({ email: e.email, name: e.name, exp: Date.now() + 5 * 60 * 1000 }); target += (ESHOP_MODEL_APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'sso=' + encodeURIComponent(tok); }
+        res.writeHead(302, { 'Location': target }); return res.end();
+      }
+      if (fs.existsSync(ESHOP_MODEL_APP_FILE)) return send(res, 200, fs.readFileSync(ESHOP_MODEL_APP_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8' });
+      const ph = '<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<title>Model e-shopu</title><style>body{margin:0;font-family:system-ui,sans-serif;background:#eef1ec;color:#0f1512;display:grid;place-items:center;min-height:100vh}'
+        + '.c{max-width:520px;text-align:center;background:#fff;border:1px solid #e3e7e0;border-radius:16px;padding:34px 30px;box-shadow:0 10px 30px rgba(15,21,18,.07)}'
+        + 'h1{font-size:20px;margin:0 0 8px}p{color:#5b635c;margin:0 0 6px;line-height:1.55}code{background:#eef1ec;padding:2px 6px;border-radius:6px;font-size:13px}</style></head>'
+        + '<body><div class="c"><h1>🧩 Model e-shopu</h1><p>Máte k modulu přístup. Aplikace se sem teprve napojí.</p>'
+        + '<p style="margin-top:12px;font-size:13px">Pro napojení nastav proměnnou <code>ESHOP_MODEL_APP_URL</code> na adresu nasazené aplikace (repo 1/eshop na Railway), nebo vlož soubor <code>eshop-model.html</code> do projektu.</p></div></body></html>';
+      return send(res, 200, ph, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
     // ---- Aplikace modulu Design třídicí linky: za přihlášením, přístup řídí správce (vzor Kalkulace-lisy) ----
     if (p === '/tridici-linka-app') {
       const e = empSession(req);
@@ -5484,6 +5576,11 @@ if (require.main === module) {
     if (konstrukceMod) {
       konstrukceMod.tick();
       setInterval(() => konstrukceMod.tick(), 30 * 60 * 1000);
+    }
+    // Vozový park: technické prohlídky, roční tachometr, inventarizace (hodinová kontrola, každé upozornění jen jednou).
+    if (vozidlaMod) {
+      vozidlaMod.tick();
+      setInterval(() => vozidlaMod.tick(), 3600 * 1000);
     }
     // Qooling: Drive sync exportů závad + pondělní report (hodinová kontrola, pojistka 1×/ISO-týden).
     if (qoolingMod) {
