@@ -97,6 +97,14 @@ function mount(host) {
     if (typeof n.upozorneniDny !== 'number') n.upozorneniDny = 7;       // „hotovo bez kamionu déle než"
     if (!d.import || typeof d.import !== 'object') d.import = {};
     if (!d.katalog.length) { seedKatalog(d); }
+    if (!d.migrace || typeof d.migrace !== 'object') d.migrace = {};
+    if (!d.migrace.objem10) {   // objem z kódu se dřív bral doslova (08.00 → 8 m³) místo /10 (→ 0,8 m³)
+      const oprav = (x) => { const m = String(x.kod || '').replace(/\s+/g, '').match(/^[A-ZÖ]{2,8}(\d{1,2}[.,]\d{2})/i); if (!m) return; const stary = Math.round(num(m[1]) * 100) / 100; if (x.objem === stary) x.objem = Math.round(num(m[1]) * 10) / 100; };
+      d.katalog.forEach(oprav); d.polozky.forEach(oprav);
+      // hmotnosti ze seedu (ceník Metallboxy) k produktům, které je v katalogu nemají
+      try { const seed = JSON.parse(fs.readFileSync(KATALOG_SEED, 'utf8')); const kk = k => low(k).replace(/\s+/g, ''); d.katalog.forEach(k => { if (k.kg == null) { const sd = seed.find(x => kk(x.kod) === kk(k.kod)); if (sd && sd.kg != null) k.kg = sd.kg; } }); } catch (_) {}
+      d.migrace.objem10 = new Date().toISOString(); try { save(d); } catch (_) {}
+    }
     return d;
   }
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
@@ -114,7 +122,8 @@ function mount(host) {
     const k = String(kod || '').trim();
     const m = k.match(/^([A-ZÖ]+)\s*(\d{1,2}[.,]\d{2})\s*(.*)$/i);
     if (!m) return { rada: '', objem: null, provedeni: k };
-    return { rada: m[1].toUpperCase(), objem: Math.round(num(m[2]) * 100) / 100, provedeni: m[3] || '' };
+    // Číslo v kódu je objem × 10: 08.00 → 0,8 m³, 16.00 → 1,6 m³, 30.70 → 3,07 m³ (viz ceník Metallboxy)
+    return { rada: m[1].toUpperCase(), objem: Math.round(num(m[2]) * 10) / 100, provedeni: m[3] || '' };
   }
   function povrchZKodu(kod) {
     const p = String(kod || '');
