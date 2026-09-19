@@ -35,6 +35,7 @@ const KATALOG_SEED = path.join(__dirname, 'katalog-seed.json');
 const { pdfToText } = require('./pdftext');
 const { parseXlsx } = require('./xlsx');
 const parsers = require('./parsers');
+const sheetsync = require('./sheetsync');
 
 // Stavy položky (= jeden řádek ČVZ). Pořadí = průběh zakázky; „pozastaveno" a „storno" jsou mimo řadu.
 const STAVY = [
@@ -95,6 +96,9 @@ function mount(host) {
     if (typeof n.driveRoot !== 'string') n.driveRoot = '1VVre4yFfde8sKx36QtXuO7kbKMHwv41h';        // složka Contract (BE26xxxx …)
     if (typeof n.prubeznaDobaDny !== 'number') n.prubeznaDobaDny = 7;   // termín výroby = KW dodání − X dní
     if (typeof n.upozorneniDny !== 'number') n.upozorneniDny = 7;       // „hotovo bez kamionu déle než"
+    if (typeof n.syncSheetId !== 'string') n.syncSheetId = '17pgM2HKTyiVT4fOTF0g7o7mBFWHmkGQIN-CcsIelGjA';   // ZAKÁZKY POPELNICE (intranet) – obousměrně synchronizovaná tabulka
+    if (typeof n.syncMinuty !== 'number') n.syncMinuty = 5;
+    if (!d.sheetSync || typeof d.sheetSync !== 'object') d.sheetSync = {};
     if (!d.import || typeof d.import !== 'object') d.import = {};
     if (!d.katalog.length) { seedKatalog(d); }
     if (!d.migrace || typeof d.migrace !== 'object') d.migrace = {};
@@ -107,7 +111,8 @@ function mount(host) {
     }
     return d;
   }
-  function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
+  function saveRaw(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
+  function save(d) { saveRaw(d); try { if (sheet) sheet.naplanuj(); } catch (_) {} }
 
   function seedKatalog(d) {
     try {
@@ -278,6 +283,74 @@ function mount(host) {
   }
   function adresa(z) { return [z.ulice, [z.psc, z.mesto].filter(Boolean).join(' '), z.zeme].filter(Boolean).join(', '); }
 
+  // ---- Google tabulka ZAKÁZKY POPELNICE (obousměrná synchronizace) ---------------------
+  const stavLabel = k => (STAVY.find(s => s[0] === k) || [k, k])[1];
+  const stavKey = lbl => { const l = low(lbl); const s = STAVY.find(s => low(s[1]) === l || s[0] === l); return s ? s[0] : null; };
+  const SYS = { email: 'tabulka@elkoplast.cz', name: 'Google tabulka' };
+  const norm = x => String(x == null ? '' : x).replace(/\s+/g, ' ').trim();
+  const zmen = (obj, k, v) => { if (norm(obj[k]) === norm(v)) return false; obj[k] = v; return true; };
+  // Převzetí upraveného řádku z tabulky do dat. Vrací true, když se něco změnilo.
+  function aplikujZTabulky(d, key, obj) {
+    if (key === 'objednavky') {
+      const o = d.objednavky.find(x => x.id === obj.id); if (!o) return false; let z = false;
+      if (zmen(o, 'cislo', cisloKey(obj.cislo))) z = true; if (zmen(o, 'cisloAU', str(obj.cisloAU, 30))) z = true; if (zmen(o, 'helios', str(obj.helios, 20))) z = true;
+      if (obj.datum && zmen(o, 'datum', obj.datum)) z = true;
+      if (zmen(o, 'kwDodani', obj.kwDodani == null || obj.kwDodani === '' ? null : Math.round(obj.kwDodani))) { z = true; if (o.kwDodani && !o.kwRok) o.kwRok = Number(String(o.datum || dnesISO()).slice(0, 4)); }
+      if (zmen(o, 'terminDodani', obj.terminDodani || '')) z = true;
+      if (!!o.potvrzena !== !!obj.potvrzena) { o.potvrzena = !!obj.potvrzena; o.potvrzenaDatum = o.potvrzena ? (o.potvrzenaDatum || dnesISO()) : ''; z = true; }
+      if (zmen(o, 'doprava', str(obj.doprava, 80))) z = true; if (zmen(o, 'poznamka', str(obj.poznamka, 1000))) z = true; if (zmen(o, 'driveUrl', str(obj.driveUrl, 300))) z = true;
+      if (z) { o.updatedAt = Date.now(); o.updatedBy = SYS.email; d.polozky.filter(p => p.objId === o.id && !p.cvz).forEach(p => { p.terminVyroby = terminVyrobyZ(o, d.nastaveni) || p.terminVyroby; }); }
+      return z;
+    }
+    if (key === 'polozky') {
+      const p = d.polozky.find(x => x.id === obj.id); if (!p) return false; let z = false; const zm = [];
+      const S = (k, v, max) => { if (zmen(p, k, str(v, max))) { z = true; zm.push(k); } };
+      const N = (k, v) => { const nv = v == null || v === '' ? null : v; if ((p[k] == null ? '' : String(p[k])) !== (nv == null ? '' : String(nv))) { p[k] = nv; z = true; zm.push(k); } };
+      if (obj.kod && zmen(p, 'kod', str(obj.kod, 80))) { z = true; zm.push('kod'); const k = najdiKatalog(d, p.kod); p.katalogId = k ? k.id : null; }
+      S('nazev', obj.nazev, 200); if (obj.ks != null && obj.ks !== '' && Math.round(obj.ks) !== num(p.ks)) { p.ks = Math.max(0, Math.round(obj.ks)); z = true; zm.push('ks'); }
+      S('rozmer', obj.rozmer, 40); N('tloustka', obj.tloustka); N('kgKs', obj.kgKs); if (POVRCH[obj.povrch]) S('povrch', obj.povrch, 10);
+      S('ral', obj.ral, 40); S('lem', obj.lem, 40); S('razeni', obj.razeni, 200); S('polepy', obj.polepy, 200); S('heliosPolozka', obj.heliosPolozka, 20); N('cena', obj.cena);
+      if (obj.vykresStav && VYKRES[obj.vykresStav] && (!p.vykres || p.vykres.stav !== obj.vykresStav)) { p.vykres = { stav: obj.vykresStav, datum: dnesISO() }; z = true; zm.push('výkres'); }
+      if (obj.terminVyroby !== undefined && zmen(p, 'terminVyroby', obj.terminVyroby || '')) { z = true; zm.push('termín'); }
+      const ns = obj.stav ? stavKey(obj.stav) : null;
+      if (ns && ns !== p.stav) { p.stav = ns; z = true; zm.push('stav'); if (ns === 'hotovo') { p.hotovoDne = p.hotovoDne || dnesISO(); p.hotovoKs = num(p.ks); } if (ns === 'expedovano') p.expedovanoDne = p.expedovanoDne || obj.expedovanoDne || dnesISO(); }
+      if (obj.hotovoKs != null && obj.hotovoKs !== '' && Math.round(obj.hotovoKs) !== num(p.hotovoKs)) { p.hotovoKs = Math.max(0, Math.round(obj.hotovoKs)); z = true; zm.push('hotovo ks'); }
+      S('kamion', obj.kamion, 30); if (zmen(p, 'expedovanoDne', obj.expedovanoDne || '')) { z = true; zm.push('expedováno'); } if (zmen(p, 'dorucenoDne', obj.dorucenoDne || '')) { z = true; zm.push('doručeno'); }
+      S('poznamka', obj.poznamka, 400);
+      if (z) { p.udalosti = p.udalosti || []; p.udalosti.push({ ts: Date.now(), kdo: SYS.email, jmeno: SYS.name, stav: p.stav, ks: null, pozn: 'úprava z tabulky: ' + zm.join(', ') }); }
+      return z;
+    }
+    if (key === 'katalog') {
+      const k = d.katalog.find(x => x.id === obj.id); if (!k) return false;
+      const nk = normKatalog(Object.assign({}, k, { kod: obj.kod || k.kod, nazev: obj.nazev, objem: obj.objem, rozmer: obj.rozmer, tloustka: obj.tloustka, kg: obj.kg, povrch: obj.povrch || k.povrch, stoh: obj.stoh, aktivni: !!obj.aktivni, id: k.id }));
+      const before = JSON.stringify(k); Object.assign(k, nk); return JSON.stringify(k) !== before;
+    }
+    if (key === 'zakaznici') {
+      const z = d.zakaznici.find(x => x.id === obj.id); if (!z) return false;
+      const nz = normZakaznik(Object.assign({}, z, obj, { nazev: obj.nazev || z.nazev }), z);
+      const before = JSON.stringify(z); Object.assign(z, nz); return JSON.stringify(z) !== before;
+    }
+    return false;
+  }
+  // Nový řádek v listu Položky (bez ID): založí položku k objednávce podle Bestellung / Helios čísla, případně i objednávku.
+  function novaZTabulky(d, obj) {
+    let o = najdiObjednavku(d, obj.cislo, obj.helios);
+    if (!o) {
+      if (!obj.cislo && !obj.helios) return false;
+      o = { id: newId('o'), createdAt: Date.now(), createdBy: SYS.email, loznyplan: null, cislo: cisloKey(obj.cislo), cisloAU: '', helios: str(obj.helios, 20), datum: dnesISO(), zakaznikId: null, zakaznikNazev: '', prijemceId: null, prijemceNazev: '', kwDodani: obj.kwDodani || null, kwRok: obj.kwDodani ? new Date().getFullYear() : null, terminDodani: '', doprava: '', mena: 'EUR', potvrzena: false, potvrzenaDatum: '', poznamka: '', driveUrl: '', zdroj: 'tabulka' };
+      if (obj.prijemce) { const z = zajistiZakaznika(d, null, obj.prijemce, { partner: 'contract' }); o.zakaznikId = z.id; o.zakaznikNazev = z.nazev; o.prijemceId = z.id; }
+      d.objednavky.push(o);
+    }
+    const np = normPolozka(d, { kod: obj.kod, nazev: obj.nazev, ks: obj.ks, rozmer: obj.rozmer, tloustka: obj.tloustka, kgKs: obj.kgKs, povrch: obj.povrch, ral: obj.ral, lem: obj.lem, razeni: obj.razeni, polepy: obj.polepy, heliosPolozka: obj.heliosPolozka, cena: obj.cena, poznamka: obj.poznamka, vykres: { stav: obj.vykresStav || 'neni', datum: '' } }, o.id);
+    np.pozice = d.polozky.filter(p => p.objId === o.id).length + 1;
+    Object.assign(np, { cvz: null, rok: null, poradi: null, stav: 'prijata', hotovoKs: 0, kamion: str(obj.kamion, 30), terminVyroby: obj.terminVyroby || terminVyrobyZ(o, d.nastaveni), udalosti: [{ ts: Date.now(), kdo: SYS.email, jmeno: SYS.name, stav: 'prijata', ks: null, pozn: 'založeno z tabulky' }], zdroj: 'tabulka' });
+    d.polozky.push(np); return true;
+  }
+  const sheet = sheetsync.mount(host, {
+    load, save: saveRaw, STAVY, stavLabel, stavKey, aplikujZTabulky, novaZTabulky,
+    obohat: (d) => { const dnes = dnesISO(); return d.objednavky.map(o => obohatObjednavku(d, o, dnes, d.nastaveni)).sort((a, b) => String(b.datum || '').localeCompare(String(a.datum || ''))); },
+  });
+
   // ---- HTTP ----------------------------------------------------------------
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true);
@@ -298,6 +371,7 @@ function mount(host) {
         if (b.akce === 'xlsx') return apiImportXlsx(req, res, rs, b);
         if (b.akce === 'pdf') return apiImportPdf(req, res, rs, b);
         if (b.akce === 'text') return apiImportText(req, res, rs, b);
+        if (b.akce === 'sync') { const st = await sheet.sync('ručně (server)'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         if (b.akce === 'stav') { const d = load(); json(res, 200, { objednavek: d.objednavky.length, polozek: d.polozky.length, zakazniku: d.zakaznici.length, katalog: d.katalog.length, seq: d.seq, import: d.import }); return true; }
         json(res, 400, { chyba: 'Neznámá akce (sheet | drive | xlsx | pdf | stav).' }); return true;
       } catch (e) { console.error('[vyroba] ingest:', e); json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true; }
@@ -339,6 +413,7 @@ function mount(host) {
         case '/api/vyroba/import/rows':         return jenObchod() && apiImportRows(req, res, r, b);
         case '/api/vyroba/loznyplan/odeslat':   return jenObchod() && await apiLoznyPlanOdeslat(req, res, r, b);
         case '/api/vyroba/nastaveni':           return jenObchod() && apiNastaveni(req, res, r, b);
+        case '/api/vyroba/sheet/sync':          { if (!jenObchod()) return true; const st = await sheet.sync('ručně'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
       }
     } catch (e) {
       console.error('[vyroba] chyba obsluhy:', e);
@@ -363,6 +438,7 @@ function mount(host) {
       sheetDostupny: !!(host.sheets && host.sheets.available),
       driveDostupny: !!(host.drive && host.drive.available),
       loznyplanUrl: host.loznyplan && host.loznyplan.url || '',
+      sheetSync: Object.assign({}, d.sheetSync || {}, sheet.stav(), { url: nast.syncSheetId ? 'https://docs.google.com/spreadsheets/d/' + nast.syncSheetId + '/edit' : '' }),
       zamestnanci: zamestnanci(),
       dnes,
     });
@@ -585,6 +661,8 @@ function mount(host) {
     if (b.driveRoot !== undefined) n.driveRoot = str(b.driveRoot, 120);
     if (b.prubeznaDobaDny !== undefined) n.prubeznaDobaDny = Math.max(0, Math.round(num(b.prubeznaDobaDny, 7)));
     if (b.upozorneniDny !== undefined) n.upozorneniDny = Math.max(1, Math.round(num(b.upozorneniDny, 7)));
+    if (b.syncSheetId !== undefined) { const v = str(b.syncSheetId, 200); const m = v.match(/\/d\/([A-Za-z0-9_-]{20,})/); n.syncSheetId = m ? m[1] : v; if (d.sheetSync) { d.sheetSync.otisky = {}; d.sheetSync.formatovano = ''; } }
+    if (b.syncMinuty !== undefined) n.syncMinuty = Math.max(1, Math.round(num(b.syncMinuty, 5)));
     save(d); json(res, 200, { ok: true, nastaveni: n }); return true;
   }
 
@@ -972,7 +1050,7 @@ function mount(host) {
       const data = body ? JSON.stringify(body) : null;
       const req = lib.request({ method, hostname: u.hostname, port: u.port || undefined, path: u.pathname + u.search,
         headers: Object.assign({ 'Accept': 'application/json' }, data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}) }, resp => {
-        let s = ''; resp.on('data', c => s += c); resp.on('end', () => { let j = null; try { j = JSON.parse(s); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) resolve(j || {}); else reject(new Error('Ložný plán ' + resp.statusCode + ': ' + s.slice(0, 160))); });
+        resp.setEncoding('utf8'); let s = ''; resp.on('data', c => s += c); resp.on('end', () => { let j = null; try { j = JSON.parse(s); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) resolve(j || {}); else reject(new Error('Ložný plán ' + resp.statusCode + ': ' + s.slice(0, 160))); });
       });
       req.on('error', e => reject(new Error('Spojení s Ložným plánem: ' + e.message)));
       req.setTimeout(20000, () => { try { req.destroy(new Error('Ložný plán: časový limit spojení.')); } catch (_) {} });
@@ -1080,7 +1158,9 @@ function mount(host) {
     return out;
   }
 
-  return { handle, notifikace, hasAccess, importRows, STAVY };
+  function tick() { try { sheet.tick(); } catch (_) {} }
+  function syncMinuty() { try { return load().nastaveni.syncMinuty || 5; } catch (_) { return 5; } }
+  return { handle, notifikace, hasAccess, importRows, STAVY, tick, syncMinuty };
 }
 
 module.exports = { mount, STAVY, RAL_HEX };

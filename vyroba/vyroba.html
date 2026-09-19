@@ -668,7 +668,7 @@ async function smazZakaznik(id){ if(!confirm("Smazat zákazníka?"))return; try{
 
 /* ---------- nastavení a import ---------- */
 function htmlNastaveni(){
-  const n=D.nastaveni; const imp=D.import||{};
+  const n=D.nastaveni; const imp=D.import||{}; const ss=D.sheetSync||{};
   return '<div class="card"><div class="h"><h2>Lidé a lhůty</h2></div><div class="b"><div class="grid2">'
     +'<label class="f"><span>E-maily výroby (mění stavy v dílně; přístup dostanou automaticky)</span><input id="nRed" value="'+esc(n.reditelVyroby.join(", "))+'" placeholder="ladislav.mathe@elkoplast.cz"></label>'
     +'<label class="f"><span>E-maily obchodu (zakládají objednávky)</span><input id="nObch" value="'+esc(n.obchod.join(", "))+'" placeholder="renata.manakova@elkoplast.cz"></label>'
@@ -676,6 +676,11 @@ function htmlNastaveni(){
     +'<label class="f"><span>Upozornit, když hotová položka čeká na kamion déle než (dní)</span><input id="nUpoz" type="number" value="'+n.upozorneniDny+'"></label>'
     +'</div><div class="mut">Přístup do modulu se přiděluje i v intranetu: Přístupy → „Výroba Popelnice (obchod)" / „(dílna)".</div></div>'
     +'<div class="f2" style="padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end"><button class="btn pri" onclick="ulozNastaveni()">Uložit</button></div></div>'
+    +'<div class="card"><div class="h"><h2>Google tabulka ZAKÁZKY POPELNICE</h2><span class="mut">obousměrně: intranet ji přepisuje po každé změně, úpravy v bílých sloupcích tabulky si intranet přebírá</span><div class="sp"></div>'+(ss.url?'<a class="btn sm" href="'+esc(ss.url)+'" target="_blank">Otevřít tabulku ↗</a> ':'')+'<button class="btn sm pri" onclick="syncSheet()">⟳ Synchronizovat teď</button></div><div class="b">'
+    +'<div class="grid2"><label class="f"><span>ID tabulky (nebo odkaz)</span><input id="nSync" value="'+esc(n.syncSheetId||"")+'"></label><label class="f"><span>Interval synchronizace (minut)</span><input id="nSyncMin" type="number" value="'+(n.syncMinuty||5)+'"></label></div>'
+    +'<div class="mut" id="syncInfo">'+(ss.at?'Naposledy '+new Date(ss.at).toLocaleString("cs-CZ")+' · zapsáno '+(ss.push?ss.push.objednavky+' objednávek, '+ss.push.polozky+' položek':'')+(ss.pull?' · převzato z tabulky: objednávky '+ss.pull.objednavky+', položky '+ss.pull.polozky+', nové položky '+ss.pull.novePolozky:''):'Zatím neproběhla.')+(ss.chyba?'<div style="color:var(--red)">Chyba: '+esc(ss.chyba)+'</div>':'')+'</div>'
+    +'<div class="mut" style="margin-top:6px">Tabulka nahrazuje PLÁN VÝROBY i knihu CONTRACT Bestellung: listy Objednávky, Položky, Katalog, Zákazníci, Přehled. Šedé sloupce počítá intranet. Nový řádek v Položkách bez ID založí položku.</div>'
+    +'</div><div class="f2" style="padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="ulozNastaveni()">Uložit</button></div></div>'
     +'<div class="card"><div class="h"><h2>Import stávajícího plánu výroby</h2><span class="mut">Google Sheet PLÁN VÝROBY BRUNTÁL POPELNICE · list „'+esc(n.sheetList)+'"</span></div><div class="b">'
     +'<div class="grid2"><label class="f"><span>ID tabulky</span><input id="nSheet" value="'+esc(n.sheetId)+'"></label><label class="f"><span>List s boxy Contract</span><input id="nList" value="'+esc(n.sheetList)+'"></label>'
     +'<label class="f"><span>List ostatní výrobky</span><input id="nList2" value="'+esc(n.sheetListOstatni)+'"></label><label class="f"><span>Složka Contract na Disku (ID)</span><input id="nDrive" value="'+esc(n.driveRoot)+'"></label></div>'
@@ -695,7 +700,11 @@ function htmlNastaveni(){
     +'<div class="card"><div class="h"><h2>Číselná řada ČVZ</h2></div><div class="b mut">'+Object.keys(D.seq.cvz||{}).map(r=>r+': poslední pořadí <b>'+D.seq.cvz[r]+'</b>').join(" · ")+(Object.keys(D.seq.cvz||{}).length?"":"zatím žádné číslo nepřiděleno")+'</div></div>';
 }
 async function ulozNastaveni(){
-  try{ await api("/api/vyroba/nastaveni",{reditelVyroby:$("#nRed").value,obchod:$("#nObch").value,prubeznaDobaDny:$("#nDoba").value,upozorneniDny:$("#nUpoz").value,sheetId:$("#nSheet").value,sheetList:$("#nList").value,sheetListOstatni:$("#nList2").value,driveRoot:$("#nDrive").value}); toast("Nastavení uloženo."); nacti(); }catch(e){alert(e.message);}
+  try{ await api("/api/vyroba/nastaveni",{reditelVyroby:$("#nRed").value,obchod:$("#nObch").value,prubeznaDobaDny:$("#nDoba").value,upozorneniDny:$("#nUpoz").value,sheetId:$("#nSheet").value,sheetList:$("#nList").value,sheetListOstatni:$("#nList2").value,driveRoot:$("#nDrive").value,syncSheetId:$("#nSync").value,syncMinuty:$("#nSyncMin").value}); toast("Nastavení uloženo."); nacti(); }catch(e){alert(e.message);}
+}
+async function syncSheet(){
+  const el=$("#syncInfo"); if(el)el.textContent="Synchronizuji…";
+  try{ const r=await api("/api/vyroba/sheet/sync",{}); if(r.chyba)throw new Error(r.chyba); toast("Tabulka synchronizována."); nacti(); prepni("nastaveni"); }catch(e){alert(e.message); nacti();}
 }
 async function importSheet(list){
   if(!confirm("Načíst řádky ze Sheetu a založit chybějící objednávky a položky?"))return;

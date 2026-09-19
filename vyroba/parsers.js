@@ -184,7 +184,7 @@ function parseHelios(text) {
   const ral = (t.match(/-\s*lakov[áa]n[íi]\s+RAL\s?(\d{4})/i) || [])[1];
   const lem = (t.match(/horn[íi](?:ho)?\s+(?:lem|okraj)\w*[^\n]*?RAL\s?(\d{4})/i) || [])[1];
   const raz = (t.match(/ra[žz]en[íi]\s+n[áa]zvu\s*:?\s*(?:\d\.\s*pole\s*:?\s*)?([^\n]+)/i) || [])[1];
-  const pol = (t.match(/([^\n]*polep[^\n]*)/i) || [])[1];
+  const pol = (t.match(/^\s*-\s*([^\n]*polep[^\n]*)/im) || [])[1];   // jen odrážka s polepy, ne řádek položky
   const zin = /pozink|žárov|zinek/i.test(t) && !ral;
   const nazev = (lines[0] && /box|bedna|mulda|kontejner|víko|viko/i.test(lines[0])) ? str(lines[0], 160) : '';
   polozky.forEach(p => {

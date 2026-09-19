@@ -2700,7 +2700,7 @@ async function sheetsGet(spreadsheetId, range) {
   const apiPath = '/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '/values/' + encodeURIComponent(range);
   return await new Promise((resolve, reject) => {
     const r = https.request({ method: 'GET', hostname: 'sheets.googleapis.com', path: apiPath, headers: { 'Authorization': 'Bearer ' + token } }, resp => {
-      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j || {}); reject(new Error('Sheets ' + resp.statusCode + ': ' + d.slice(0, 200))); });
+      resp.setEncoding('utf8'); let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j || {}); reject(new Error('Sheets ' + resp.statusCode + ': ' + d.slice(0, 200))); });
     });
     r.on('error', e => reject(new Error('Spojení se Sheets: ' + e.message)));
     r.setTimeout(20000, () => { try { r.destroy(new Error('Sheets: časový limit spojení.')); } catch (_) {} });
@@ -2717,7 +2717,7 @@ async function sheetsAppend(spreadsheetId, range, rows) {
     + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
   return await new Promise((resolve, reject) => {
     const r = https.request({ method: 'POST', hostname: 'sheets.googleapis.com', path: apiPath, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, resp => {
-      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j || {}); reject(new Error('Sheets append ' + resp.statusCode + ': ' + d.slice(0, 200))); });
+      resp.setEncoding('utf8'); let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j || {}); reject(new Error('Sheets append ' + resp.statusCode + ': ' + d.slice(0, 200))); });
     });
     r.on('error', e => reject(new Error('Spojení se Sheets: ' + e.message)));
     r.setTimeout(20000, () => { try { r.destroy(new Error('Sheets: časový limit spojení.')); } catch (_) {} });
@@ -3672,7 +3672,7 @@ try {
     send, readBody, empSession, isAdmin, baseUrl, employeeModules, getState, logActivity,
     dataDir: DATA_DIR, ssoSecret: SSO_SHARED_SECRET,
     // import stávajícího plánu výroby (Google Sheet PLÁN VÝROBY BRUNTÁL POPELNICE) přes service account
-    sheets: { get available() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }, read: sheetsGet },
+    sheets: { get available() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }, read: sheetsGet, token: (scope) => sheetsGetToken(scope) },
     // složky objednávek BE26xxxx (Bestellung + vydané objednávky) na sdíleném Disku
     drive: { get available() { return driveAvailable(); }, list: driveList, token: driveGetToken },
     // hotové položky se posílají do aplikace Ložný plán (stejné sdílené úložiště /api/shared, podpis SSO)
@@ -5619,6 +5619,11 @@ if (require.main === module) {
     if (vozidlaMod) {
       vozidlaMod.tick();
       setInterval(() => vozidlaMod.tick(), 3600 * 1000);
+    }
+    if (vyrobaMod && vyrobaMod.tick) {
+      // Výroba Popelnice ↔ Google tabulka ZAKÁZKY POPELNICE: pravidelná obousměrná synchronizace
+      setTimeout(() => vyrobaMod.tick(), 20 * 1000);
+      setInterval(() => vyrobaMod.tick(), Math.max(1, vyrobaMod.syncMinuty()) * 60 * 1000);
     }
     // Qooling: Drive sync exportů závad + pondělní report (hodinová kontrola, pojistka 1×/ISO-týden).
     if (qoolingMod) {
