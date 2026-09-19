@@ -98,12 +98,12 @@ function mount(host) {
     if (!d.import || typeof d.import !== 'object') d.import = {};
     if (!d.katalog.length) { seedKatalog(d); }
     if (!d.migrace || typeof d.migrace !== 'object') d.migrace = {};
-    if (!d.migrace.objem10) {   // objem z kódu se dřív bral doslova (08.00 → 8 m³) místo /10 (→ 0,8 m³)
-      const oprav = (x) => { const m = String(x.kod || '').replace(/\s+/g, '').match(/^[A-ZÖ]{2,8}(\d{1,2}[.,]\d{2})/i); if (!m) return; const stary = Math.round(num(m[1]) * 100) / 100; if (x.objem === stary) x.objem = Math.round(num(m[1]) * 10) / 100; };
+    if (!d.migrace.objem10 || !d.migrace.objem10b) {   // objem z kódu se dřív bral doslova (08.00 → 8 m³) místo /10 (→ 0,8 m³)
+      const oprav = (x) => { const m = String(x.kod || '').replace(/\s+/g, '').match(/^[A-ZÖ]+(\d{1,2}[.,]\d{2})/i); if (!m) return; const stary = Math.round(num(m[1]) * 100) / 100; if (x.objem === stary) x.objem = Math.round(num(m[1]) * 10) / 100; };
       d.katalog.forEach(oprav); d.polozky.forEach(oprav);
       // hmotnosti ze seedu (ceník Metallboxy) k produktům, které je v katalogu nemají
       try { const seed = JSON.parse(fs.readFileSync(KATALOG_SEED, 'utf8')); const kk = k => low(k).replace(/\s+/g, ''); d.katalog.forEach(k => { if (k.kg == null) { const sd = seed.find(x => kk(x.kod) === kk(k.kod)); if (sd && sd.kg != null) k.kg = sd.kg; } }); } catch (_) {}
-      d.migrace.objem10 = new Date().toISOString(); try { save(d); } catch (_) {}
+      d.migrace.objem10 = d.migrace.objem10 || new Date().toISOString(); d.migrace.objem10b = new Date().toISOString(); try { save(d); } catch (_) {}
     }
     return d;
   }
