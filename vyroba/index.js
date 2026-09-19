@@ -36,6 +36,7 @@ const { pdfToText } = require('./pdftext');
 const { parseXlsx } = require('./xlsx');
 const parsers = require('./parsers');
 const sheetsync = require('./sheetsync');
+const legacysync = require('./legacysync');
 
 // Stavy položky (= jeden řádek ČVZ). Pořadí = průběh zakázky; „pozastaveno" a „storno" jsou mimo řadu.
 const STAVY = [
@@ -107,12 +108,13 @@ function mount(host) {
       d.katalog.forEach(oprav); d.polozky.forEach(oprav);
       // hmotnosti ze seedu (ceník Metallboxy) k produktům, které je v katalogu nemají
       try { const seed = JSON.parse(fs.readFileSync(KATALOG_SEED, 'utf8')); const kk = k => low(k).replace(/\s+/g, ''); d.katalog.forEach(k => { if (k.kg == null) { const sd = seed.find(x => kk(x.kod) === kk(k.kod)); if (sd && sd.kg != null) k.kg = sd.kg; } }); } catch (_) {}
-      d.migrace.objem10 = d.migrace.objem10 || new Date().toISOString(); d.migrace.objem10b = new Date().toISOString(); try { save(d); } catch (_) {}
+      d.migrace.objem10 = d.migrace.objem10 || new Date().toISOString(); d.migrace.objem10b = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
     }
     return d;
   }
   function saveRaw(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
-  function save(d) { saveRaw(d); try { if (sheet) sheet.naplanuj(); } catch (_) {} }
+  let _legacyTimer = null;
+  function save(d) { saveRaw(d); try { if (sheet) sheet.naplanuj(); } catch (_) {} try { clearTimeout(_legacyTimer); _legacyTimer = setTimeout(() => { if (legacy) legacy.sync('změna v intranetu').catch(() => {}); }, 6000); } catch (_) {} }
 
   function seedKatalog(d) {
     try {
@@ -346,8 +348,35 @@ function mount(host) {
     Object.assign(np, { cvz: null, rok: null, poradi: null, stav: 'prijata', hotovoKs: 0, kamion: str(obj.kamion, 30), terminVyroby: obj.terminVyroby || terminVyrobyZ(o, d.nastaveni), udalosti: [{ ts: Date.now(), kdo: SYS.email, jmeno: SYS.name, stav: 'prijata', ks: null, pozn: 'založeno z tabulky' }], zdroj: 'tabulka' });
     d.polozky.push(np); return true;
   }
+  // Převzetí polí z řádku plánu výroby (Ladislavův Sheet) do položky. Vrací true při změně.
+  function aplikujPole(d, p, f) {
+    let z = false; const zm = [];
+    const S = (k, v, max) => { if (v == null) return; if (zmen(p, k, str(v, max))) { z = true; zm.push(k); } };
+    if (f.ks != null && Math.round(f.ks) !== num(p.ks)) { p.ks = Math.max(0, Math.round(f.ks)); z = true; zm.push('ks'); }
+    if (f.kod && kodFam(f.kod) !== kodFam(p.kod) && zmen(p, 'kod', str(f.kod, 80))) { z = true; zm.push('kod'); const k = najdiKatalog(d, p.kod); p.katalogId = k ? k.id : null; }
+    S('rozmer', f.rozmer, 40); if (f.tloustka != null && f.tloustka > 0 && f.tloustka < 20 && f.tloustka !== p.tloustka) { p.tloustka = f.tloustka; z = true; zm.push('tloušťka'); }
+    if (f.povrch && POVRCH[f.povrch]) S('povrch', f.povrch, 10);
+    S('ral', f.ral, 40); S('lem', f.lem, 40); S('razeni', f.razeni, 200); S('polepy', f.polepy, 200); S('heliosPolozka', f.heliosPolozka, 20); S('poznamka', f.poznamka, 400);
+    if (f.terminVyroby && zmen(p, 'terminVyroby', f.terminVyroby)) { z = true; zm.push('termín'); }
+    if (f.expedovanoDne && zmen(p, 'expedovanoDne', f.expedovanoDne)) { z = true; zm.push('expedováno'); if (STAV_PORADI[p.stav] < STAV_PORADI.expedovano && p.stav !== 'storno') { p.stav = 'expedovano'; zm.push('stav'); } }
+    if (f.kamion) S('kamion', f.kamion, 30);
+    const ns = f.stavText ? stavKey(f.stavText) : null;
+    if (ns && ns !== p.stav) { p.stav = ns; z = true; zm.push('stav'); if (ns === 'hotovo') { p.hotovoDne = p.hotovoDne || dnesISO(); p.hotovoKs = num(p.ks); } }
+    if (f.helios) { const o = d.objednavky.find(x => x.id === p.objId); if (o && !o.helios) { o.helios = f.helios; z = true; zm.push('Helios'); } }
+    if (z) { p.udalosti = p.udalosti || []; p.udalosti.push({ ts: Date.now(), kdo: 'plan-vyroby@elkoplast.cz', jmeno: 'Plán výroby (Sheet)', stav: p.stav, ks: null, pozn: 'úprava z plánu výroby: ' + zm.join(', ') }); }
+    return z;
+  }
+  // Synchronizace s tabulkami běží postupně (fronta), nikdy souběžně
+  let _serial = Promise.resolve();
+  const serial = fn => { const p = _serial.then(fn, fn); _serial = p.catch(() => {}); return p; };
+  const legacy = legacysync.mount(host, {
+    load, save: saveRaw, serial, stavLabel, stavKey, STAV_PORADI, importRows, aplikujPole, SYS: { email: 'plan-vyroby@elkoplast.cz', name: 'Plán výroby (Sheet)' },
+    // do kterého listu plánu položka patří: podle importu, jinak podle partnera zákazníka (přímý zákazník = Ostatní výrobky)
+    listPolozky: (d, p) => { if (p.list) return p.list; const o = d.objednavky.find(x => x.id === p.objId); const z = o && d.zakaznici.find(x => x.id === o.zakaznikId); return z && z.partner === 'primy' ? 'ostatni' : 'boxy'; },
+    obohat: (d) => { const dnes = dnesISO(); return d.objednavky.map(o => obohatObjednavku(d, o, dnes, d.nastaveni)); },
+  });
   const sheet = sheetsync.mount(host, {
-    load, save: saveRaw, STAVY, stavLabel, stavKey, aplikujZTabulky, novaZTabulky,
+    load, save: saveRaw, serial, STAVY, stavLabel, stavKey, aplikujZTabulky, novaZTabulky,
     obohat: (d) => { const dnes = dnesISO(); return d.objednavky.map(o => obohatObjednavku(d, o, dnes, d.nastaveni)).sort((a, b) => String(b.datum || '').localeCompare(String(a.datum || ''))); },
   });
 
@@ -378,6 +407,7 @@ function mount(host) {
           if (b.osirele) d.objednavky = d.objednavky.filter(o => sOb.has(o.id));
           save(d); json(res, 200, { ok: true, smazanoPolozek: n, smazanoObjednavek: m0 - d.objednavky.length }); return true;
         }
+        if (b.akce === 'plan') { const st = await legacy.sync('ručně (server)'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         if (b.akce === 'sync') { const st = await sheet.sync('ručně (server)'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         if (b.akce === 'stav') { const d = load(); json(res, 200, { objednavek: d.objednavky.length, polozek: d.polozky.length, zakazniku: d.zakaznici.length, katalog: d.katalog.length, seq: d.seq, import: d.import }); return true; }
         json(res, 400, { chyba: 'Neznámá akce (sheet | drive | xlsx | pdf | stav).' }); return true;
@@ -420,6 +450,7 @@ function mount(host) {
         case '/api/vyroba/import/rows':         return jenObchod() && apiImportRows(req, res, r, b);
         case '/api/vyroba/loznyplan/odeslat':   return jenObchod() && await apiLoznyPlanOdeslat(req, res, r, b);
         case '/api/vyroba/nastaveni':           return jenObchod() && apiNastaveni(req, res, r, b);
+        case '/api/vyroba/plan/sync':           { if (!jenObchod()) return true; const st = await legacy.sync('ručně'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         case '/api/vyroba/sheet/sync':          { if (!jenObchod()) return true; const st = await sheet.sync('ručně'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
       }
     } catch (e) {
@@ -445,6 +476,7 @@ function mount(host) {
       sheetDostupny: !!(host.sheets && host.sheets.available),
       driveDostupny: !!(host.drive && host.drive.available),
       loznyplanUrl: host.loznyplan && host.loznyplan.url || '',
+      legacySync: Object.assign({}, d.legacySync || {}, legacy.stav(), { url: nast.sheetId ? 'https://docs.google.com/spreadsheets/d/' + nast.sheetId + '/edit' : '', zapnuto: nast.legacySync !== false }),
       sheetSync: Object.assign({}, d.sheetSync || {}, sheet.stav(), { url: nast.syncSheetId ? 'https://docs.google.com/spreadsheets/d/' + nast.syncSheetId + '/edit' : '' }),
       zamestnanci: zamestnanci(),
       dnes,
@@ -669,6 +701,7 @@ function mount(host) {
     if (b.prubeznaDobaDny !== undefined) n.prubeznaDobaDny = Math.max(0, Math.round(num(b.prubeznaDobaDny, 7)));
     if (b.upozorneniDny !== undefined) n.upozorneniDny = Math.max(1, Math.round(num(b.upozorneniDny, 7)));
     if (b.syncSheetId !== undefined) { const v = str(b.syncSheetId, 200); const m = v.match(/\/d\/([A-Za-z0-9_-]{20,})/); n.syncSheetId = m ? m[1] : v; if (d.sheetSync) { d.sheetSync.otisky = {}; d.sheetSync.formatovano = ''; } }
+    if (b.legacySync !== undefined) n.legacySync = !!b.legacySync;
     if (b.syncMinuty !== undefined) n.syncMinuty = Math.max(1, Math.round(num(b.syncMinuty, 5)));
     save(d); json(res, 200, { ok: true, nastaveni: n }); return true;
   }
@@ -739,7 +772,7 @@ function mount(host) {
       if (!p) {
         p = Object.assign({ id: newId('p'), cvz, rok, poradi, stav, hotovoKs: stav === 'hotovo' || STAV_PORADI[stav] >= STAV_PORADI.expedovano ? data.ks : 0, kamion: '',
           expedovanoDne: exped || '', vykres: { stav: 'neni', datum: '' },
-          udalosti: [{ ts: Date.now(), kdo: r.email, jmeno: r.name, stav, ks: null, pozn: 'import ze Sheetu' }], zdroj: 'sheet' }, data);
+          udalosti: [{ ts: Date.now(), kdo: r.email, jmeno: r.name, stav, ks: null, pozn: 'import ze Sheetu' }], zdroj: 'sheet', list: list === 'ostatni' ? 'ostatni' : 'boxy' }, data);
         d.polozky.push(p); stat.polozek++;
         posunSeq(d, rok, poradi);
       } else if (p.zdroj === 'sheet' && !(p.udalosti || []).some(u => u.pozn !== 'import ze Sheetu')) {
@@ -1165,7 +1198,7 @@ function mount(host) {
     return out;
   }
 
-  function tick() { try { sheet.tick(); } catch (_) {} }
+  function tick() { try { sheet.tick(); } catch (_) {} try { legacy.tick(); } catch (_) {} }
   function syncMinuty() { try { return load().nastaveni.syncMinuty || 5; } catch (_) { return 5; } }
   return { handle, notifikace, hasAccess, importRows, STAVY, tick, syncMinuty };
 }

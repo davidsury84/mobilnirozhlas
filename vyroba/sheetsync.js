@@ -219,33 +219,39 @@ function mount(host, ctx) {
   // (Sheets ořezává mezery na krajích buňky a čísla vrací jako number → normalizovat, aby se neobjevily falešné změny)
   function editVals(cols, obj) { return cols.filter(c => c.edit).map(c => { const v = obj[c.k]; if (c.typ === 'b') return v ? 'ano' : 'ne'; if (c.typ === 'n') { const n = Number(String(v == null ? '' : v).replace(',', '.')); return v == null || v === '' || !Number.isFinite(n) ? '' : Math.round(n * 10000) / 10000; } return v == null ? '' : cistyText(String(v)).replace(/\s+/g, ' ').trim(); }); }
 
-  async function pull(tok, sid, d) {
+  // 1) načíst všechny listy (síť), 2) teprve pak nad čerstvě načtenými daty změny aplikovat a hned uložit
+  async function pull(tok, sid) {
     const stat = { objednavky: 0, polozky: 0, katalog: 0, zakaznici: 0, novePolozky: 0, chyby: [] };
-    const ot = d.sheetSync.otisky || {};
     const tabs = { objednavky: [LISTY.objednavky, OBJ_COLS], polozky: [LISTY.polozky, POL_COLS], katalog: [LISTY.katalog, KAT_COLS], zakaznici: [LISTY.zakaznici, ZAK_COLS] };
+    const nacteno = {};
+    for (const key of Object.keys(tabs)) { try { nacteno[key] = await readTab(tok, sid, tabs[key][0]); } catch (e) { stat.chyby.push(tabs[key][0] + ': ' + e.message); } }
+    const d = ctx.load(); d.sheetSync = d.sheetSync || {};
+    const ot = d.sheetSync.otisky || {};
+    let zmena = false;
     for (const key of Object.keys(tabs)) {
       const [title, cols] = tabs[key];
-      let rows; try { rows = await readTab(tok, sid, title); } catch (e) { stat.chyby.push(title + ': ' + e.message); continue; }
-      if (rows.length < 2) continue;
+      const rows = nacteno[key]; if (!rows || rows.length < 2) continue;
       const hdr = rows[0];
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i]; if (!row || !row.some(v => v !== '' && v != null)) continue;
         const obj = rowToObj(cols, hdr, row);
         const id = obj.id || '';
         if (!id) {
-          if (key === 'polozky' && obj.kod && obj.ks) { try { if (ctx.novaZTabulky(d, obj)) { stat.novePolozky++; } } catch (e) { stat.chyby.push(title + ' ř.' + (i + 1) + ': ' + e.message); } }
+          if (key === 'polozky' && obj.kod && obj.ks) { try { if (ctx.novaZTabulky(d, obj)) { stat.novePolozky++; zmena = true; } } catch (e) { stat.chyby.push(title + ' ř.' + (i + 1) + ': ' + e.message); } }
           continue;
         }
         const h = otisk(editVals(cols, obj));
         if (ot[id] && ot[id] === h) continue;          // beze změny od posledního zápisu
         if (!ot[id]) continue;                          // řádek, který jsme ještě nezapsali (např. po přesunu) → nejdřív push
-        try { if (ctx.aplikujZTabulky(d, key, obj)) stat[key]++; } catch (e) { stat.chyby.push(title + ' ř.' + (i + 1) + ': ' + e.message); }
+        try { if (ctx.aplikujZTabulky(d, key, obj)) { stat[key]++; zmena = true; } } catch (e) { stat.chyby.push(title + ' ř.' + (i + 1) + ': ' + e.message); }
       }
     }
+    if (zmena) ctx.save(d);
     return stat;
   }
 
-  async function push(tok, sid, d, ids) {
+  async function push(tok, sid, ids) {
+    const d = ctx.load(); d.sheetSync = d.sheetSync || {};
     const ob = ctx.obohat(d);
     const data = [
       { range: "'" + LISTY.objednavky + "'!A1", values: [OBJ_COLS.map(c => c.h)].concat(radkyObjednavek(ob)) },
@@ -264,27 +270,31 @@ function mount(host, ctx) {
     ob.forEach(o => o.polozky.forEach(p => { const row = radkyPolozek([Object.assign({}, o, { polozky: [p] })])[0]; const obj = {}; POL_COLS.forEach((c, i) => { obj[c.k] = row[i]; }); ot[p.id] = otisk(editVals(POL_COLS, obj)); }));
     d.katalog.forEach(k => { const row = radkyKatalog({ katalog: [k] })[0]; const obj = {}; KAT_COLS.forEach((c, i) => { obj[c.k] = row[i]; }); ot[k.id] = otisk(editVals(KAT_COLS, Object.assign(obj, { aktivni: k.aktivni !== false }))); });
     d.zakaznici.forEach(z => { const row = radkyZak({ zakaznici: [z] })[0]; const obj = {}; ZAK_COLS.forEach((c, i) => { obj[c.k] = row[i]; }); ot[z.id] = otisk(editVals(ZAK_COLS, obj)); });
-    d.sheetSync.otisky = ot;
-    return { objednavky: ob.length, polozky: ob.reduce((s, o) => s + o.polozky.length, 0) };
+    return { otisky: ot, objednavky: ob.length, polozky: ob.reduce((s, o) => s + o.polozky.length, 0) };
   }
 
   // ---- hlavní cyklus: pull → push ------------------------------------------------------
+  // Data se nikdy nedrží přes síťové volání: každý krok si je znovu načte a hned uloží.
+  // Synchronizace běží postupně (ctx.serial), aby se nepřepisovaly navzájem ani s ostatními.
   async function sync(duvod) {
     if (bezi) return posledni;
     const d0 = ctx.load(); const sid = sheetId(d0);
     if (!sid || !(host.sheets && host.sheets.available && host.sheets.token)) return posledni;
     bezi = true;
     try {
-      const tok = await token();
-      const d = ctx.load(); d.sheetSync = d.sheetSync || {};
-      const ids = await ensureStructure(tok, sid, d);
-      if (!d.sheetSync.formatovano || d.sheetSync.formatovano !== sid) { try { await formatAll(tok, sid, ids, d); d.sheetSync.formatovano = sid; } catch (e) { log('formát:', e.message); } }
-      const pl = await pull(tok, sid, d);
-      const ps = await push(tok, sid, d, ids);
-      d.sheetSync.at = new Date().toISOString(); d.sheetSync.pull = pl; d.sheetSync.push = ps; d.sheetSync.chyba = null;
-      ctx.save(d);
-      posledni = { at: d.sheetSync.at, chyba: null, pull: pl, push: ps, duvod };
-      if (pl.objednavky || pl.polozky || pl.katalog || pl.zakaznici || pl.novePolozky) log('převzato z tabulky:', JSON.stringify(pl));
+      await ctx.serial(async () => {
+        const tok = await token();
+        const ids = await ensureStructure(tok, sid, d0);
+        if ((d0.sheetSync || {}).formatovano !== sid) { try { await formatAll(tok, sid, ids, d0); const d1 = ctx.load(); d1.sheetSync = d1.sheetSync || {}; d1.sheetSync.formatovano = sid; ctx.save(d1); } catch (e) { log('formát:', e.message); } }
+        const pl = await pull(tok, sid);
+        const ps = await push(tok, sid, ids);
+        const d = ctx.load(); d.sheetSync = d.sheetSync || {};
+        d.sheetSync.otisky = ps.otisky; delete ps.otisky;
+        d.sheetSync.at = new Date().toISOString(); d.sheetSync.pull = pl; d.sheetSync.push = ps; d.sheetSync.chyba = null;
+        ctx.save(d);
+        posledni = { at: d.sheetSync.at, chyba: null, pull: pl, push: ps, duvod };
+        if (pl.objednavky || pl.polozky || pl.katalog || pl.zakaznici || pl.novePolozky) log('převzato z tabulky:', JSON.stringify(pl));
+      });
     } catch (e) {
       log('chyba synchronizace:', e.message);
       try { const d = ctx.load(); d.sheetSync = d.sheetSync || {}; d.sheetSync.chyba = e.message; d.sheetSync.chybaAt = new Date().toISOString(); ctx.save(d); } catch (_) {}
@@ -300,4 +310,4 @@ function mount(host, ctx) {
   return { sync, naplanuj, tick, stav, LISTY, OBJ_COLS, POL_COLS };
 }
 
-module.exports = { mount };
+module.exports = { mount, api, otisk, colLetter };
