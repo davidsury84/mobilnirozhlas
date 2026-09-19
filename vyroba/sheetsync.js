@@ -187,7 +187,7 @@ function mount(host, ctx) {
   function prehledRows() {
     const O = LISTY.objednavky, P = LISTY.polozky; const pc = k => colLetter(POL_COLS.findIndex(c => c.k === k)); const oc = k => colLetter(OBJ_COLS.findIndex(c => c.k === k));
     const st = pc('stav'), ks = pc('ks'), kg = pc('kgCelkem'), tv = pc('terminVyroby');
-    const rows = [['ZAKÁZKY POPELNICE — přehled (počítá se ze záložky Položky)', '', '', ''], ['Aktualizováno', "=INDEX('_info'!B:B;2)", '', ''], ['', '', '', ''], ['Stav položky', 'Položek', 'Ks', 'Kg']];
+    const rows = [['ZAKÁZKY POPELNICE — přehled (počítá se ze záložky Položky)', '', '', ''], ['Aktualizováno', "=INDEX('_info'!B:B;1)", '', ''], ['', '', '', ''], ['Stav položky', 'Položek', 'Ks', 'Kg']];
     ctx.STAVY.forEach(s => rows.push([s[1], `=COUNTIF('${P}'!${st}:${st};A${rows.length + 1})`, `=SUMIF('${P}'!${st}:${st};A${rows.length + 1};'${P}'!${ks}:${ks})`, `=SUMIF('${P}'!${st}:${st};A${rows.length + 1};'${P}'!${kg}:${kg})`]));
     rows.push(['', '', '', '']);
     rows.push(['Ve skluzu (termín výroby < dnes, nehotové)', `=COUNTIFS('${P}'!${tv}:${tv};"<"&TODAY();'${P}'!${st}:${st};"Zadáno do výroby")+COUNTIFS('${P}'!${tv}:${tv};"<"&TODAY();'${P}'!${st}:${st};"Svařovna")+COUNTIFS('${P}'!${tv}:${tv};"<"&TODAY();'${P}'!${st}:${st};"Lakovna")+COUNTIFS('${P}'!${tv}:${tv};"<"&TODAY();'${P}'!${st}:${st};"Zinkovna")`, '', '']);

@@ -371,6 +371,13 @@ function mount(host) {
         if (b.akce === 'xlsx') return apiImportXlsx(req, res, rs, b);
         if (b.akce === 'pdf') return apiImportPdf(req, res, rs, b);
         if (b.akce === 'text') return apiImportText(req, res, rs, b);
+        if (b.akce === 'smazat') {   // úklid zmetků z importu: položky bez ČVZ podle ID (+ osiřelé objednávky bez položek)
+          const d = load(); const ids = new Set(Array.isArray(b.ids) ? b.ids : []); let n = 0;
+          d.polozky = d.polozky.filter(p => { if (ids.has(p.id) && !p.cvz) { n++; return false; } return true; });
+          const sOb = new Set(d.polozky.map(p => p.objId)); const m0 = d.objednavky.length;
+          if (b.osirele) d.objednavky = d.objednavky.filter(o => sOb.has(o.id));
+          save(d); json(res, 200, { ok: true, smazanoPolozek: n, smazanoObjednavek: m0 - d.objednavky.length }); return true;
+        }
         if (b.akce === 'sync') { const st = await sheet.sync('ručně (server)'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         if (b.akce === 'stav') { const d = load(); json(res, 200, { objednavek: d.objednavky.length, polozek: d.polozky.length, zakazniku: d.zakaznici.length, katalog: d.katalog.length, seq: d.seq, import: d.import }); return true; }
         json(res, 400, { chyba: 'Neznámá akce (sheet | drive | xlsx | pdf | stav).' }); return true;

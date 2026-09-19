@@ -12,6 +12,7 @@ const body = { akce };
 if (akce === 'sheet') body.list = args[1] || 'boxy';
 if (akce === 'drive') { body.force = args.includes('--force'); const r = args.find(a => a.startsWith('--rok-od=')); if (r) body.rokOd = Number(r.split('=')[1]); }
 if (akce === 'xlsx') { if (!args[1]) { console.error('Chybí soubor.'); process.exit(1); } body.base64 = fs.readFileSync(args[1]).toString('base64'); body.nazev = args[1]; }
+if (akce === 'smazat') { body.ids = args.slice(1).filter(a => !a.startsWith('--')); body.osirele = args.includes('--osirele'); }
 if (akce === 'text') { if (!args[1]) { console.error('Chybí JSON se seznamem dokumentů.'); process.exit(1); } body.dokumenty = JSON.parse(fs.readFileSync(args[1], 'utf8')); }
 if (akce === 'pdf') { body.soubory = args.slice(1).filter(a => !a.startsWith('--')).map(f => ({ nazev: require('path').basename(f), base64: fs.readFileSync(f).toString('base64') })); }
 const call = async (b) => { const res = await fetch(BASE + '/api/vyroba/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SECRET }, body: JSON.stringify(b) }); const j = await res.json().catch(() => ({})); if (!res.ok || j.chyba) { throw new Error('HTTP ' + res.status + ' ' + (j.chyba || JSON.stringify(j))); } return j; };

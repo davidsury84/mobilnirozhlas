@@ -98,7 +98,8 @@ function parseBestellung(text) {
       for (let g = 0; g < 6; g++) kodRaw = kodRaw.replace(/^(?:Artikel|G-Preis|E-Preis|Gesamtpreis|Einheit|Menge|Pos\.|%)\s+/i, '');
       if (!kodRaw || known.has(kodRaw) || /^(Übertrag|Betrag|Gesamtbetrag|MwSt|aus)$/i.test(kodRaw)) continue;
       const e = num(lm[2].replace(/\./g, '')), rab = lm[3] ? num(lm[3]) : 0, g = num(lm[4].replace(/\./g, ''));
-      const ks = e > 0 ? Math.round(g / (e * (1 - rab / 100))) : 0; if (!ks) continue;
+      const ks = e > 0 ? Math.round(g / (e * (1 - rab / 100))) : 0; if (!ks || ks > 1000) continue;   // >1000 ks = špatně zachycená čísla, ne pozice
+      if (/,\s/.test(kodRaw)) continue;                                                            // věta s čárkami není kód výrobku
       const k = normKod(kodRaw.split(/\s+/)[0]);
       polozky.push({ pozice: polozky.length + 1, ks, kod: k.kod, kodOrig: kodRaw, tho: k.tho, cena: e, popis: [l.slice(lm.index + lm[0].length)], ral: '', lem: '', razeni: '', polepy: '', rozmer: '', tloustka: null, povrch: '' });
       known.add(kodRaw);
