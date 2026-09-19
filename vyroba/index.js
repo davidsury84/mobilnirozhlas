@@ -370,7 +370,9 @@ function mount(host) {
   let _serial = Promise.resolve();
   const serial = fn => { const p = _serial.then(fn, fn); _serial = p.catch(() => {}); return p; };
   const legacy = legacysync.mount(host, {
-    load, save: saveRaw, serial, stavLabel, stavKey, STAV_PORADI, importRows, aplikujPole, SYS: { email: 'plan-vyroby@elkoplast.cz', name: 'Plán výroby (Sheet)' },
+    load, save: saveRaw, serial, stavLabel, stavKey, STAV_PORADI, importRows, aplikujPole,
+    zapisPovolen: () => load().nastaveni.legacyZapis === true,   // výchozí: jen čtení (rozhodnutí 19. 9. 2026)
+    SYS: { email: 'plan-vyroby@elkoplast.cz', name: 'Plán výroby (Sheet)' },
     // do kterého listu plánu položka patří: podle importu, jinak podle partnera zákazníka (přímý zákazník = Ostatní výrobky)
     listPolozky: (d, p) => { if (p.list) return p.list; const o = d.objednavky.find(x => x.id === p.objId); const z = o && d.zakaznici.find(x => x.id === o.zakaznikId); return z && z.partner === 'primy' ? 'ostatni' : 'boxy'; },
     obohat: (d) => { const dnes = dnesISO(); return d.objednavky.map(o => obohatObjednavku(d, o, dnes, d.nastaveni)); },
@@ -702,6 +704,7 @@ function mount(host) {
     if (b.upozorneniDny !== undefined) n.upozorneniDny = Math.max(1, Math.round(num(b.upozorneniDny, 7)));
     if (b.syncSheetId !== undefined) { const v = str(b.syncSheetId, 200); const m = v.match(/\/d\/([A-Za-z0-9_-]{20,})/); n.syncSheetId = m ? m[1] : v; if (d.sheetSync) { d.sheetSync.otisky = {}; d.sheetSync.formatovano = ''; } }
     if (b.legacySync !== undefined) n.legacySync = !!b.legacySync;
+    if (b.legacyZapis !== undefined) n.legacyZapis = b.legacyZapis === true;
     if (b.syncMinuty !== undefined) n.syncMinuty = Math.max(1, Math.round(num(b.syncMinuty, 5)));
     save(d); json(res, 200, { ok: true, nastaveni: n }); return true;
   }

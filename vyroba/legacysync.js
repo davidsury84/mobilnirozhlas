@@ -13,7 +13,7 @@
 //   - zapíše řádky, které se liší od stavu v intranetu (jen mapované sloupce; ostatní buňky řádku nechá),
 //   - položky s ČVZ, které v listu chybí, přidá na konec,
 //   - podbarví řádek podle stavu (zelená = hotovo, žlutá = lakovna/zinkovna, červená = storno; bílá = ve výrobě).
-//  Bez práva zápisu (servisní účet jen čtenář) běží jen směr list → intranet a v nastavení svítí upozornění.
+//  Zápis do listů je vypnutý (nastavení legacyZapis, výchozí NE): intranet plán výroby jen čte, dílna v něm pracuje dál po svém.
 // ----------------------------------------------------------------------------
 const sheetsync = require('./sheetsync'); const api = (...a) => sheetsync.api(...a); const { otisk } = sheetsync;
 const enc = s => encodeURIComponent(s);
@@ -85,18 +85,19 @@ function mount(host, ctx) {
     let d = ctx.load(); d.legacySync = d.legacySync || {}; d.legacySync.otisky = d.legacySync.otisky || {};
     const ot = Object.assign({}, d.legacySync.otisky); let zmena = false;
     const byCvz = {}; d.polozky.forEach(p => { if (p.cvz) byCvz[p.cvz] = p; });
-    const rowOf = {}; const nove = [];
+    const rowOf = {}; const nove = []; const otiskyZListu = {};
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i] || []; const prefix = cl(row[0]).replace(/\s/g, ''); const por = Math.round(num(row[1]) || 0);
       if (!/^\d{2}B$/i.test(prefix) || !por || !cl(row[3])) continue;
       const cvz = prefix.slice(0, 2) + 'B-' + String(por).padStart(3, '0');
+      if (otiskyZListu[cvz] != null) { stat.duplicity = (stat.duplicity || 0) + 1; continue; }   // stejné ČVZ podruhé v listu → bere se první výskyt
       const p = byCvz[cvz];
       if (!p) { nove.push(row); continue; }
       rowOf[cvz] = i + 1;
-      const h = otiskRadku(row, list);
+      const h = otiskRadku(row, list); otiskyZListu[cvz] = h;
       if (ot[cvz] && ot[cvz] !== h) { try { if (ctx.aplikujPole(d, p, radekNaPole(row, list))) { stat.prevzato++; zmena = true; } } catch (e) { stat.chyby.push(cvz + ': ' + e.message); } }
     }
-    if (nove.length) { try { const s = ctx.importRows(d, nove, r, list); stat.novych = s.polozek; if (s.polozek || s.aktualizovano || s.objednavek) zmena = true; } catch (e) { stat.chyby.push('nové řádky: ' + e.message); } }
+    if (nove.length) { try { const s = ctx.importRows(d, nove, r, list); stat.novych = s.polozek; if (s.polozek || s.aktualizovano || s.objednavek) zmena = true; } catch (e) { stat.chyby.push('nové řádky: ' + (e.stack || e.message).split('\n').slice(0, 3).join(' | ')); } }
     // ---- zápis: řádky, které se liší od intranetu (jen naše položky roku listu) ------
     const rokList = 2000 + Number((rows.find((rw, i) => i > 0 && /^\d{2}B$/i.test(cl(rw[0]))) || ['26B'])[0].slice(0, 2)) || new Date().getFullYear();
     const objById = {}; d.objednavky.forEach(o => { objById[o.id] = o; });
@@ -119,6 +120,9 @@ function mount(host, ctx) {
     // zápis (potřebuje roli Editor u tabulky; bez ní se změny z intranetu jen počítají a čekají)
     stat.kZapsani = data.filter(x => x.range).length + appendRows.length;
     if (zmena) ctx.save(d);
+    // Rozhodnutí 19. 9. 2026 (David Surý): do plánu výroby dílny intranet NEZAPISUJE — jen čte. Otisky si uložíme,
+    // aby se příště poznalo, co se v listu změnilo; rozdíly proti intranetu jen počítáme (stat.kZapsani).
+    if (!ctx.zapisPovolen || !ctx.zapisPovolen()) { const d2 = ctx.load(); d2.legacySync = d2.legacySync || {}; d2.legacySync.otisky = Object.assign({}, d2.legacySync.otisky || {}, otiskyZListu); ctx.save(d2); stat.jenCteni = true; stat.zapsano = 0; stat.pridano = 0; return stat; }
     const ulozOtisky = () => { const d2 = ctx.load(); d2.legacySync = d2.legacySync || {}; d2.legacySync.otisky = ot; ctx.save(d2); };
     try {
       const realData = data.filter(x => x.range);
