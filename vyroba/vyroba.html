@@ -602,15 +602,19 @@ function pracovniciEdit(){ const cur=(D.planSkladani.pracovnici||[]).join("\n");
 async function ulozPracovniky(){ const list=$("#prList").value.split(/\n/).map(x=>x.trim()).filter(Boolean); try{ await api("/api/vyroba/plan-skladani",{pracovnici:list}); zavri2(); toast("Uloženo."); nacti(); }catch(e){alert(e.message);} }
 function htmlFronta(){
   const pol=vsechnyPolozky().filter(p=>!p.mimoBruntal&&["zadano","svarovna","lakovna","zinkovna","hotovo","pozastaveno"].includes(p.stav)).sort((a,b)=>String(a.terminVyroby||"9").localeCompare(String(b.terminVyroby||"9")));
-  const sloupce=[["zadano","Zadáno do výroby","svarovna","→ Svařovna"],["svarovna","Svařovna","","→ Lakovna / Zinkovna / Hotovo"],["lakovna","Lakovna","hotovo","→ Hotovo"],["zinkovna","Zinkovna","hotovo","→ Hotovo"],["hotovo","Hotovo na skladě","naplanovano","→ Na kamion"]];
+  // pořadí operací v dílně: svařovna → zinkovna (externí) → lakovna → hotovo → kamion; další krok si každá položka nese podle provedení (Zin / Lac)
+  const sloupce=[["zadano","Zadáno do výroby"],["svarovna","Svařovna"],["zinkovna","Zinkovna"],["lakovna","Lakovna"],["hotovo","Hotovo na skladě"]];
+  const KROK={svarovna:"→ Svařovna",zinkovna:"→ Zinkovna",lakovna:"→ Lakovna",hotovo:"→ Hotovo",naplanovano:"→ Na kamion"};
   let h='';
   if(VYBER.size)h+='<div class="upoz">Vybráno <b>'+VYBER.size+'</b> položek · <button class="btn sm pri" onclick="formStav([...VYBER])">Změnit stav hromadně</button> <button class="btn sm" onclick="VYBER.clear();vykresli()">Zrušit výběr</button></div>';
-  h+='<div class="fronta">'+sloupce.map(([k,t,dalsi,lbl])=>{
+  const stare=pol.filter(p=>p.stav==="zadano"&&p.terminVyroby&&p.terminVyroby<new Date(Date.now()-45*86400000).toISOString().slice(0,10)).length;
+  if(stare)h+='<div class="upoz">'+stare+' položek je „zadáno" s termínem starším než 45 dní — nejspíš už jsou vyrobené. Zaškrtněte je a změňte stav hromadně, nebo je dílna označí v plánu výroby (zelená = lakováno, žlutá = zinkováno).</div>';
+  h+='<div class="fronta">'+sloupce.map(([k,t])=>{
     const ps=pol.filter(p=>p.stav===k||(k==="zadano"&&p.stav==="pozastaveno"));
     return '<div class="col k-'+k+'"><div class="ch">'+t+' <b>'+ps.length+'</b><span class="sp"></span><span class="mut" style="font-family:var(--sans);font-weight:400;font-size:11.5px">'+ps.reduce((s,p)=>s+Number(p.ks||0),0)+' ks</span></div>'
       +(ps.length?ps.map(p=>'<div class="kart'+(p.skluzDni>0?' skluz':'')+'"><input type="checkbox"'+(VYBER.has(p.id)?" checked":"")+' onchange="this.checked?VYBER.add(\''+p.id+'\'):VYBER.delete(\''+p.id+'\');vykresli()"><div class="t" onclick="detail(\''+p._o.id+'\',\''+p.id+'\')" style="cursor:pointer"><div class="k"><span class="cvz">'+esc(p.cvz||"—")+'</span> · '+esc(p.kod)+' · <b>'+cis(p.ks)+' ks</b></div>'
         +'<div class="d">'+ralHtml(p)+(p.razeni?' · '+esc(p.razeni):'')+'</div><div class="d">'+esc(p._o.prijemce||p._o.zakaznik)+' · termín <b'+(p.skluzDni>0?' style="color:var(--red)"':'')+'>'+dat(p.terminVyroby)+'</b>'+(p.skluzDni>0?' (skluz '+p.skluzDni+' d)':'')+(p.stav==="pozastaveno"?' · <span class="pill warn">pozastaveno</span>':'')+(p.kooperace&&(p.stav==="lakovna"||p.stav==="zinkovna")?' · odvoz '+dat(p.kooperace.odvoz):'')+(p.hotovoKs&&p.hotovoKs<p.ks?' · hotovo '+p.hotovoKs+'/'+p.ks:'')+(p.vykres&&p.vykres.stav==="poslan"?' · <span class="pill warn">čeká na výkres</span>':'')+'</div></div>'
-        +'<div class="akce">'+(p.stav!=="pozastaveno"?(dalsi?'<button class="btn xs" onclick="rychle(\''+p.id+'\',\''+dalsi+'\')">'+lbl+'</button>':'<button class="btn xs" onclick="rychle(\''+p.id+'\',\'lakovna\')">→ Lakovna</button><button class="btn xs" onclick="rychle(\''+p.id+'\',\'zinkovna\')">→ Zinkovna</button><button class="btn xs" onclick="rychle(\''+p.id+'\',\'hotovo\')">→ Hotovo</button>'):'')+'<button class="btn xs" onclick="formStav([\''+p.id+'\'])">…</button></div></div>').join(""):'<div class="empty" style="padding:18px">nic</div>')+'</div>';
+        +'<div class="akce">'+(p.stav!=="pozastaveno"&&p.dalsiKrok&&KROK[p.dalsiKrok]?'<button class="btn xs" title="Další krok podle provedení výrobku" onclick="rychle(\''+p.id+'\',\''+p.dalsiKrok+'\')">'+KROK[p.dalsiKrok]+'</button>':'')+'<button class="btn xs" onclick="formStav([\''+p.id+'\'])">…</button></div></div>').join(""):'<div class="empty" style="padding:18px">nic</div>')+'</div>';
   }).join("")+'</div>';
   return h;
 }

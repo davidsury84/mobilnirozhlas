@@ -43,8 +43,8 @@ const STAVY = [
   ['prijata',      'Objednávka přijata',  'Order received',        'Bestellung eingegangen'],
   ['zadano',       'Zadáno do výroby',    'Released to production','In Produktion freigegeben'],
   ['svarovna',     'Svařovna',            'In production',         'In Produktion'],
-  ['lakovna',      'Lakovna',             'Painting',              'Lackierung'],
   ['zinkovna',     'Zinkovna',            'Galvanising',           'Verzinkung'],
+  ['lakovna',      'Lakovna',             'Painting',              'Lackierung'],
   ['hotovo',       'Hotovo na skladě',    'Ready for dispatch',    'Fertig, versandbereit'],
   ['naplanovano',  'Naplánováno na LKW',  'Loading scheduled',     'Verladung geplant'],
   ['expedovano',   'Expedováno',          'Dispatched',            'Verladen'],
@@ -113,6 +113,11 @@ function mount(host) {
     if (!d.import || typeof d.import !== 'object') d.import = {};
     if (!d.katalog.length) { seedKatalog(d); }
     if (!d.migrace || typeof d.migrace !== 'object') d.migrace = {};
+    if (!d.migrace.loniHotovo) {   // položky loňských zakázek z knihy Contractu, které nikdo neposunul, jsou dávno dodané → nezaplevelovat frontu
+      const rok = new Date().getFullYear();
+      d.polozky.forEach(p => { if (p.rok && p.rok < rok && ['prijata', 'zadano', 'svarovna', 'zinkovna', 'lakovna', 'hotovo', 'naplanovano'].includes(p.stav) && (p.udalosti || []).every(u => /^import/.test(u.pozn || ''))) { p.stav = 'expedovano'; p.hotovoKs = num(p.ks); p.udalosti = p.udalosti || []; p.udalosti.push({ ts: Date.now(), kdo: 'intranet@elkoplast.cz', jmeno: 'Intranet', stav: 'expedovano', ks: null, pozn: 'zakázka z roku ' + p.rok + ' – automaticky uzavřena' }); } });
+      d.migrace.loniHotovo = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
+    }
     if (!d.migrace.objem10 || !d.migrace.objem10b) {   // objem z kódu se dřív bral doslova (08.00 → 8 m³) místo /10 (→ 0,8 m³)
       const oprav = (x) => { const m = String(x.kod || '').replace(/\s+/g, '').match(/^[A-ZÖ]+(\d{1,2}[.,]\d{2})/i); if (!m) return; const stary = Math.round(num(m[1]) * 100) / 100; if (x.objem === stary) x.objem = Math.round(num(m[1]) * 10) / 100; };
       d.katalog.forEach(oprav); d.polozky.forEach(oprav);
@@ -250,6 +255,38 @@ function mount(host) {
     return new Date(new Date(p + 'T00:00:00Z').getTime() - nast.prubeznaDobaDny * DEN).toISOString().slice(0, 10);
   }
 
+  // ---- workflow položky: zadáno → svařovna → (zinkovna) → (lakovna) → hotovo → naplánováno → expedováno ----
+  function potrebujeZinek(p) { return p.povrch === 'zinek' || /Zin/i.test(p.kod || ''); }
+  function potrebujeLak(p) { return p.povrch === 'lak' || p.povrch === 'zaklad' || /Lac|Gru/i.test(p.kod || '') || !!(p.ral && /\d{4}/.test(p.ral)); }
+  function dalsiKrok(p) {
+    switch (p.stav) {
+      case 'prijata': return 'zadano';
+      case 'zadano': return 'svarovna';
+      case 'svarovna': return potrebujeZinek(p) ? 'zinkovna' : (potrebujeLak(p) ? 'lakovna' : 'hotovo');
+      case 'zinkovna': return potrebujeLak(p) && p.povrch !== 'zinek' ? 'lakovna' : 'hotovo';
+      case 'lakovna': return 'hotovo';
+      case 'hotovo': return 'naplanovano';
+      case 'naplanovano': return 'expedovano';
+      case 'expedovano': return 'doruceno';
+      default: return null;
+    }
+  }
+  // Barvy z plánu výroby dílny: sloupec ČVZ zeleně = svařeno; sloupec Zadáno zeleně = lakováno, žlutě = zinkováno;
+  // Expedice (datum) = expedováno. Posouvá stav jen dopředu.
+  function aplikujBarvu(d, p, b) {
+    let cil = null;
+    if (b.expedice) cil = 'expedovano';
+    else if (b.lakovano || b.zinkovano) cil = 'hotovo';
+    else if (b.svareno) cil = 'svarovna';
+    if (!cil || p.stav === 'storno' || p.stav === 'pozastaveno') return false;
+    if (STAV_PORADI[cil] <= STAV_PORADI[p.stav]) return false;
+    const pred = p.stav; p.stav = cil;
+    if (cil === 'hotovo' || cil === 'expedovano') { p.hotovoKs = num(p.ks); p.hotovoDne = p.hotovoDne || dnesISO(); }
+    if (cil === 'expedovano') p.expedovanoDne = p.expedovanoDne || b.expedice || dnesISO();
+    p.udalosti = p.udalosti || []; p.udalosti.push({ ts: Date.now(), kdo: 'plan-vyroby@elkoplast.cz', jmeno: 'Plán výroby (Sheet)', stav: cil, ks: null, pozn: 'podle barvy v plánu výroby: ' + (b.expedice ? 'expedice' : b.lakovano ? 'lakováno (zelená)' : b.zinkovano ? 'zinkováno (žlutá)' : 'svařeno (zelené ČVZ)') + ' · dříve ' + stavLabel(pred) });
+    return true;
+  }
+
   // ---- kamiony a plán skládání -----------------------------------------------------
   const kamionKod = k => String(k || '').toUpperCase().replace(/\s+/g, '').replace(/^LKW0*(\d)/, 'LKW$1');
   function zajistiKamion(d, kod, extra) {
@@ -304,7 +341,7 @@ function mount(host) {
     return Object.assign({}, p, {
       kgKs: kg, kgCelkem: kg != null ? Math.round(kg * num(p.ks)) : null, kgOdvozene: kg != null && p.kgKs == null && !(k && k.kg != null),
       rozmer: p.rozmer || (k ? k.rozmer : (od ? od.rozmer : '')), objem: p.objem != null ? p.objem : (k ? k.objem : (od ? od.objem : null)),
-      skluzDni: skluz(p, dnes), dnuVeStavu,
+      skluzDni: skluz(p, dnes), dnuVeStavu, dalsiKrok: dalsiKrok(p),
       cekaBezKamionu: p.stav === 'hotovo' && dnuVeStavu != null && dnuVeStavu >= nast.upozorneniDny,
     });
   }
@@ -418,7 +455,7 @@ function mount(host) {
   const legacy = legacysync.mount(host, {
     load, save: saveRaw, serial, stavLabel, stavKey, STAV_PORADI, importRows, aplikujPole,
     zapisPovolen: () => load().nastaveni.legacyZapis === true,   // výchozí: jen čtení (rozhodnutí 19. 9. 2026)
-    importArchivZePlanu,
+    importArchivZePlanu, aplikujBarvu,
     SYS: { email: 'plan-vyroby@elkoplast.cz', name: 'Plán výroby (Sheet)' },
     // do kterého listu plánu položka patří: podle importu, jinak podle partnera zákazníka (přímý zákazník = Ostatní výrobky)
     listPolozky: (d, p) => { if (p.list) return p.list; const o = d.objednavky.find(x => x.id === p.objId); const z = o && d.zakaznici.find(x => x.id === o.zakaznikId); return z && z.partner === 'primy' ? 'ostatni' : 'boxy'; },

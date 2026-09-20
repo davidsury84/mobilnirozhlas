@@ -81,6 +81,14 @@ function mount(host, ctx) {
     const stat = { list: title, prevzato: 0, novych: 0, zapsano: 0, pridano: 0, chyby: [] };
     const resp = await api(tokR, 'GET', '/v4/spreadsheets/' + enc(sid) + '/values/' + q(title, 'A1:R3000') + '?valueRenderOption=FORMATTED_VALUE');
     const rows = resp.values || []; if (!rows.length) return stat;
+    // barvy buněk (sloupec A = ČVZ, C = Zadáno): dílna jimi značí svařeno / lakováno / zinkováno
+    let barvy = [];
+    try {
+      const g = await api(tokR, 'GET', '/v4/spreadsheets/' + enc(sid) + '?ranges=' + q(title, 'A1:C' + rows.length) + '&includeGridData=true&fields=' + enc('sheets.data.rowData.values.effectiveFormat.backgroundColor'));
+      const rd = (((g.sheets || [])[0] || {}).data || [])[0] || {}; barvy = rd.rowData || [];
+    } catch (e) { stat.chyby.push('barvy: ' + e.message); }
+    const hexOf = (rowIdx, col) => { const v = ((barvy[rowIdx] || {}).values || [])[col]; const c = v && v.effectiveFormat && v.effectiveFormat.backgroundColor; if (!c) return ''; return ['red', 'green', 'blue'].map(k => Math.round((c[k] || 0) * 255)).join(','); };
+    const jeZelena = h => h === '0,255,0' || h === '0,255,0'; const jeZluta = h => h === '255,255,0';
     // od teď bez čekání na síť: čerstvá data, změny z listu, výpočet zápisu, uložení
     let d = ctx.load(); d.legacySync = d.legacySync || {}; d.legacySync.otisky = d.legacySync.otisky || {};
     const ot = Object.assign({}, d.legacySync.otisky); let zmena = false;
@@ -95,6 +103,9 @@ function mount(host, ctx) {
       if (!p) { nove.push(row); continue; }
       rowOf[cvz] = i + 1;
       const h = otiskRadku(row, list); otiskyZListu[cvz] = h;
+      // barvy → stav (jen dopředu, jen když se barva od minula změnila nebo je to první čtení)
+      const bA = hexOf(i, 0), bC = hexOf(i, 2); const bh = bA + '|' + bC; const bk = 'barva:' + cvz;
+      if (ot[bk] !== bh) { ot[bk] = bh; otiskyZListu[bk] = bh; try { if (ctx.aplikujBarvu(d, p, { svareno: jeZelena(bA), lakovano: jeZelena(bC), zinkovano: jeZluta(bC), expedice: isoZ(row[CZ[list].expedice]) })) { stat.podleBarvy = (stat.podleBarvy || 0) + 1; zmena = true; } } catch (e) { stat.chyby.push(cvz + ' barva: ' + e.message); } }
       if (ot[cvz] && ot[cvz] !== h) { try { if (ctx.aplikujPole(d, p, radekNaPole(row, list))) { stat.prevzato++; zmena = true; } } catch (e) { stat.chyby.push(cvz + ': ' + e.message); } }
     }
     if (nove.length) { try { const s = ctx.importRows(d, nove, r, list); stat.novych = s.polozek; if (s.polozek || s.aktualizovano || s.objednavek) zmena = true; } catch (e) { stat.chyby.push('nové řádky: ' + (e.stack || e.message).split('\n').slice(0, 3).join(' | ')); } }
