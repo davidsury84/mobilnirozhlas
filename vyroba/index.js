@@ -100,6 +100,16 @@ function mount(host) {
     if (typeof n.syncSheetId !== 'string') n.syncSheetId = '17pgM2HKTyiVT4fOTF0g7o7mBFWHmkGQIN-CcsIelGjA';   // ZAKÁZKY POPELNICE (intranet) – obousměrně synchronizovaná tabulka
     if (typeof n.syncMinuty !== 'number') n.syncMinuty = 5;
     if (!d.sheetSync || typeof d.sheetSync !== 'object') d.sheetSync = {};
+    // Plán skládání beden: den × pracovník → text („25B840 - 20 ks", „volno", „plasma"…); z originálu PLÁN VÝROBY / list Plán skládání
+    if (!d.planSkladani || typeof d.planSkladani !== 'object') d.planSkladani = {};
+    if (!Array.isArray(d.planSkladani.pracovnici)) d.planSkladani.pracovnici = [];
+    if (!d.planSkladani.dny || typeof d.planSkladani.dny !== 'object') d.planSkladani.dny = {};
+    if (!d.planSkladani.upravy || typeof d.planSkladani.upravy !== 'object') d.planSkladani.upravy = {};   // datum → ts poslední úpravy v intranetu/nové tabulce
+    // Kamiony (LKWnn / Mnn / ABRnn): KW, datum nakládky, dopravce, poznámka; z knihy CONTRACT Bestellung / list Metalboxy expedice + z položek
+    if (!Array.isArray(d.kamiony)) d.kamiony = [];
+    // Archiv zakázek 2016–2025 z obou originálů (jen ke čtení, do nové tabulky list Archiv)
+    if (!Array.isArray(d.archiv)) d.archiv = [];
+    if (!d.archivImport || typeof d.archivImport !== 'object') d.archivImport = {};
     if (!d.import || typeof d.import !== 'object') d.import = {};
     if (!d.katalog.length) { seedKatalog(d); }
     if (!d.migrace || typeof d.migrace !== 'object') d.migrace = {};
@@ -240,6 +250,36 @@ function mount(host) {
     return new Date(new Date(p + 'T00:00:00Z').getTime() - nast.prubeznaDobaDny * DEN).toISOString().slice(0, 10);
   }
 
+  // ---- kamiony a plán skládání -----------------------------------------------------
+  const kamionKod = k => String(k || '').toUpperCase().replace(/\s+/g, '').replace(/^LKW0*(\d)/, 'LKW$1');
+  function zajistiKamion(d, kod, extra) {
+    kod = kamionKod(kod); if (!/^(LKW|M|ABR|DAS)\d*/.test(kod)) return null;
+    let k = d.kamiony.find(x => kamionKod(x.kod) === kod);
+    if (!k) { k = { kod, kw: null, kwRok: null, datum: '', dopravce: '', typ: '', poznamka: '', createdAt: Date.now() }; d.kamiony.push(k); }
+    if (extra) Object.keys(extra).forEach(key => { if (extra[key] != null && extra[key] !== '' && (k[key] == null || k[key] === '')) k[key] = extra[key]; });
+    return k;
+  }
+  // souhrn kamionu z položek (ks, kg, příjemci, objednávky)
+  function kamionySouhrn(d) {
+    const ob = {}; d.objednavky.forEach(o => { ob[o.id] = o; });
+    const dnes = dnesISO(); const zak = {}; d.zakaznici.forEach(z => { zak[z.id] = z; });
+    const m = {};
+    d.polozky.forEach(p => { const kk = kamionKod(p.kamion); if (!kk) return; zajistiKamion(d, kk); const e = m[kk] = m[kk] || { polozek: 0, ks: 0, kg: 0, prijemci: new Set(), objednavky: new Set(), stavy: {} };
+      const px = obohatPolozku(d, p, dnes, d.nastaveni); e.polozek++; e.ks += num(p.ks); e.kg += px.kgCelkem || 0; const o = ob[p.objId]; if (o) { const z = zak[o.prijemceId] || zak[o.zakaznikId]; if (z) e.prijemci.add(z.nazev); if (o.cislo) e.objednavky.add(o.cislo); } e.stavy[p.stav] = (e.stavy[p.stav] || 0) + 1; });
+    return d.kamiony.map(k => { const e = m[kamionKod(k.kod)] || { polozek: 0, ks: 0, kg: 0, prijemci: new Set(), objednavky: new Set(), stavy: {} };
+      const st = Object.keys(e.stavy); const stav = !e.polozek ? '' : (st.every(x => ['expedovano', 'doruceno'].includes(x)) ? 'expedovano' : (st.some(x => ['hotovo', 'naplanovano'].includes(x)) ? 'naplanovano' : 'planovano'));
+      return Object.assign({}, k, { polozek: e.polozek, ks: e.ks, kg: Math.round(e.kg), prijemci: Array.from(e.prijemci).join(', '), objednavky: Array.from(e.objednavky).join(', '), stav }); })
+      .sort((a, b) => String(b.kod).localeCompare(String(a.kod), 'cs', { numeric: true }));
+  }
+  const DNY_CZ = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
+  function denTydne(iso) { const t = new Date(iso + 'T00:00:00Z'); return isNaN(t) ? '' : DNY_CZ[t.getUTCDay()]; }
+  // řádky plánu skládání pro rozsah dní (chybějící dny prázdné), pracovníci = sloupce
+  function planSkladaniRozsah(d, od, doDne) {
+    const ps = d.planSkladani; const out = []; const t0 = new Date(od + 'T00:00:00Z'); const t1 = new Date(doDne + 'T00:00:00Z');
+    for (let t = t0; t <= t1; t = new Date(t.getTime() + DEN)) { const iso = t.toISOString().slice(0, 10); out.push({ datum: iso, den: denTydne(iso), bunky: ps.dny[iso] || {} }); }
+    return out;
+  }
+
   // ---- odvozené údaje ------------------------------------------------------
   function stavObjednavky(polozky) {
     const ziv = polozky.filter(p => p.stav !== 'storno');
@@ -322,6 +362,12 @@ function mount(host) {
       if (z) { p.udalosti = p.udalosti || []; p.udalosti.push({ ts: Date.now(), kdo: SYS.email, jmeno: SYS.name, stav: p.stav, ks: null, pozn: 'úprava z tabulky: ' + zm.join(', ') }); }
       return z;
     }
+    if (key === 'kamiony') {
+      const k = zajistiKamion(d, obj.id || obj.kod); if (!k) return false; let z = false;
+      if (zmen(k, 'kw', obj.kw == null || obj.kw === '' ? null : Math.round(obj.kw))) { z = true; if (k.kw && !k.kwRok) k.kwRok = new Date().getFullYear(); }
+      if (zmen(k, 'datum', obj.datum || '')) z = true; if (zmen(k, 'dopravce', str(obj.dopravce, 80))) z = true; if (zmen(k, 'typ', str(obj.typ, 40))) z = true; if (zmen(k, 'poznamka', str(obj.poznamka, 400))) z = true;
+      return z;
+    }
     if (key === 'katalog') {
       const k = d.katalog.find(x => x.id === obj.id); if (!k) return false;
       const nk = normKatalog(Object.assign({}, k, { kod: obj.kod || k.kod, nazev: obj.nazev, objem: obj.objem, rozmer: obj.rozmer, tloustka: obj.tloustka, kg: obj.kg, povrch: obj.povrch || k.povrch, stoh: obj.stoh, aktivni: !!obj.aktivni, id: k.id }));
@@ -372,13 +418,14 @@ function mount(host) {
   const legacy = legacysync.mount(host, {
     load, save: saveRaw, serial, stavLabel, stavKey, STAV_PORADI, importRows, aplikujPole,
     zapisPovolen: () => load().nastaveni.legacyZapis === true,   // výchozí: jen čtení (rozhodnutí 19. 9. 2026)
+    importArchivZePlanu,
     SYS: { email: 'plan-vyroby@elkoplast.cz', name: 'Plán výroby (Sheet)' },
     // do kterého listu plánu položka patří: podle importu, jinak podle partnera zákazníka (přímý zákazník = Ostatní výrobky)
     listPolozky: (d, p) => { if (p.list) return p.list; const o = d.objednavky.find(x => x.id === p.objId); const z = o && d.zakaznici.find(x => x.id === o.zakaznikId); return z && z.partner === 'primy' ? 'ostatni' : 'boxy'; },
     obohat: (d) => { const dnes = dnesISO(); return d.objednavky.map(o => obohatObjednavku(d, o, dnes, d.nastaveni)); },
   });
   const sheet = sheetsync.mount(host, {
-    load, save: saveRaw, serial, STAVY, stavLabel, stavKey, aplikujZTabulky, novaZTabulky,
+    load, save: saveRaw, serial, kamionySouhrn, kamionKod, zajistiKamion, planSkladaniRozsah, denTydne, STAVY, stavLabel, stavKey, aplikujZTabulky, novaZTabulky,
     obohat: (d) => { const dnes = dnesISO(); return d.objednavky.map(o => obohatObjednavku(d, o, dnes, d.nastaveni)).sort((a, b) => String(b.datum || '').localeCompare(String(a.datum || ''))); },
   });
 
@@ -409,7 +456,7 @@ function mount(host) {
           if (b.osirele) d.objednavky = d.objednavky.filter(o => sOb.has(o.id));
           save(d); json(res, 200, { ok: true, smazanoPolozek: n, smazanoObjednavek: m0 - d.objednavky.length }); return true;
         }
-        if (b.akce === 'plan') { const st = await legacy.sync('ručně (server)'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
+        if (b.akce === 'plan') { const st = await legacy.sync('ručně (server)', { archiv: !!b.archiv }); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         if (b.akce === 'sync') { const st = await sheet.sync('ručně (server)'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         if (b.akce === 'stav') { const d = load(); json(res, 200, { objednavek: d.objednavky.length, polozek: d.polozky.length, zakazniku: d.zakaznici.length, katalog: d.katalog.length, seq: d.seq, import: d.import }); return true; }
         json(res, 400, { chyba: 'Neznámá akce (sheet | drive | xlsx | pdf | stav).' }); return true;
@@ -446,13 +493,15 @@ function mount(host) {
         case '/api/vyroba/polozka/stav':        return apiPolozkaStav(req, res, r, b);
         case '/api/vyroba/polozka/vykres':      return apiPolozkaVykres(req, res, r, b);
         case '/api/vyroba/zakaznik':            return jenObchod() && apiZakaznik(req, res, r, b);
+        case '/api/vyroba/plan-skladani':       return apiPlanSkladani(req, res, r, b);
+        case '/api/vyroba/kamion':              return apiKamion(req, res, r, b);
         case '/api/vyroba/katalog':             return jenObchod() && apiKatalog(req, res, r, b);
         case '/api/vyroba/katalog/smazat':      return jenObchod() && apiKatalogSmazat(req, res, r, b);
         case '/api/vyroba/import/sheet':        return jenObchod() && await apiImportSheet(req, res, r, b);
         case '/api/vyroba/import/rows':         return jenObchod() && apiImportRows(req, res, r, b);
         case '/api/vyroba/loznyplan/odeslat':   return jenObchod() && await apiLoznyPlanOdeslat(req, res, r, b);
         case '/api/vyroba/nastaveni':           return jenObchod() && apiNastaveni(req, res, r, b);
-        case '/api/vyroba/plan/sync':           { if (!jenObchod()) return true; const st = await legacy.sync('ručně'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
+        case '/api/vyroba/plan/sync':           { if (!jenObchod()) return true; const st = await legacy.sync('ručně', { archiv: !!b.archiv }); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         case '/api/vyroba/sheet/sync':          { if (!jenObchod()) return true; const st = await sheet.sync('ručně'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
       }
     } catch (e) {
@@ -478,6 +527,9 @@ function mount(host) {
       sheetDostupny: !!(host.sheets && host.sheets.available),
       driveDostupny: !!(host.drive && host.drive.available),
       loznyplanUrl: host.loznyplan && host.loznyplan.url || '',
+      kamiony: kamionySouhrn(d),
+      planSkladani: { pracovnici: d.planSkladani.pracovnici, dny: planSkladaniRozsah(d, new Date(Date.now() - 7 * DEN).toISOString().slice(0, 10), new Date(Date.now() + 27 * DEN).toISOString().slice(0, 10)) },
+      archivPolozek: d.archiv.length,
       legacySync: Object.assign({}, d.legacySync || {}, legacy.stav(), { url: nast.sheetId ? 'https://docs.google.com/spreadsheets/d/' + nast.sheetId + '/edit' : '', zapnuto: nast.legacySync !== false }),
       sheetSync: Object.assign({}, d.sheetSync || {}, sheet.stav(), { url: nast.syncSheetId ? 'https://docs.google.com/spreadsheets/d/' + nast.syncSheetId + '/edit' : '' }),
       zamestnanci: zamestnanci(),
@@ -660,6 +712,27 @@ function mount(host) {
     p.vykres = { stav, datum: str(b.datum, 10) || dnesISO() };
     p.udalosti.push(udalost(r, p.stav, null, 'výkres: ' + VYKRES[stav]));
     save(d); json(res, 200, { ok: true, polozka: obohatPolozku(d, p, dnesISO(), d.nastaveni) }); return true;
+  }
+
+  // ---- plán skládání beden (dílna) --------------------------------------------------
+  function apiPlanSkladani(req, res, r, b) {
+    const d = load(); const ps = d.planSkladani;
+    if (Array.isArray(b.pracovnici)) { ps.pracovnici = b.pracovnici.map(x => str(x, 60)).filter(Boolean).slice(0, 30); }
+    if (Array.isArray(b.bunky)) {   // [{datum, pracovnik, text}]
+      b.bunky.slice(0, 500).forEach(c => { const iso = str(c.datum, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return; const jm = str(c.pracovnik, 60); if (!jm) return; ps.dny[iso] = ps.dny[iso] || {}; const t = str(c.text, 200); if (t) ps.dny[iso][jm] = t; else delete ps.dny[iso][jm]; if (!Object.keys(ps.dny[iso]).length) delete ps.dny[iso]; ps.upravy[iso] = Date.now(); if (!ps.pracovnici.includes(jm)) ps.pracovnici.push(jm); });
+    }
+    save(d);
+    const od = str(b.od, 10) || dnesISO(); const doDne = str(b.do, 10) || new Date(new Date(od + 'T00:00:00Z').getTime() + 27 * DEN).toISOString().slice(0, 10);
+    json(res, 200, { ok: true, pracovnici: ps.pracovnici, dny: planSkladaniRozsah(d, od, doDne) }); return true;
+  }
+  function apiKamion(req, res, r, b) {
+    const d = load();
+    if (b.smazat && b.kod) { const kk = kamionKod(b.kod); if (d.polozky.some(p => kamionKod(p.kamion) === kk)) { json(res, 400, { chyba: 'Na kamionu jsou položky.' }); return true; } d.kamiony = d.kamiony.filter(x => kamionKod(x.kod) !== kk); save(d); json(res, 200, { ok: true }); return true; }
+    const k = zajistiKamion(d, b.kod); if (!k) { json(res, 400, { chyba: 'Kamion musí mít označení LKWnn, Mnn nebo ABRnn.' }); return true; }
+    if (b.kw !== undefined) k.kw = num(b.kw, 0) || null; if (b.kwRok !== undefined) k.kwRok = num(b.kwRok, 0) || null; if (b.datum !== undefined) k.datum = str(b.datum, 10);
+    if (b.dopravce !== undefined) k.dopravce = str(b.dopravce, 80); if (b.typ !== undefined) k.typ = str(b.typ, 40); if (b.poznamka !== undefined) k.poznamka = str(b.poznamka, 400);
+    if (b.kw && !k.kwRok) k.kwRok = new Date().getFullYear();
+    save(d); json(res, 200, { ok: true, kamion: kamionySouhrn(d).find(x => kamionKod(x.kod) === kamionKod(k.kod)) }); return true;
   }
 
   // ---- zákazníci, katalog, nastavení -------------------------------------------
@@ -942,6 +1015,62 @@ function mount(host) {
     }
     return stat;
   }
+  // Celý sešit knihy objednávek: zakázkové listy → objednávky/položky; „Metalboxy expedice" → kamiony; ostatní listy → archiv.
+  function applyContractWorkbook(d, x, r, nazevSouboru) {
+    const stat = { objednavek: 0, polozek: 0, aktualizovano: 0, preskoceno: 0, kamiony: 0, archiv: 0, listy: [] };
+    const archivni = /ARCHIVE/i.test(nazevSouboru || '');
+    for (const name of Object.keys(x.data)) {
+      const rows = x.data[name]; stat.listy.push(name);
+      if (/^(Metalboxy|MULDY|ABROLY)$/i.test(name) && !archivni) { const st = applyContractRows(d, parsers.parseContractRows(rows, name), r); for (const k of ['objednavek', 'polozek', 'aktualizovano', 'preskoceno']) stat[k] += st[k]; continue; }
+      if (/expedice/i.test(name)) { stat.kamiony += importKamionyExpedice(d, rows); continue; }
+      if (/^(TEST|List\d*|Sheet\d*)/i.test(name)) continue;
+      stat.archiv += importArchivZKnihy(d, rows, (archivni ? 'ARCHIVE CONTRACT Bestellung' : 'CONTRACT Bestellung') + ' / ' + name);
+    }
+    return stat;
+  }
+  // „Metalboxy expedice": KW | LKW (i „44/45/47/49" nebo „dovolena") | pozn.
+  function importKamionyExpedice(d, rows) {
+    let n = 0;
+    for (const row of rows.slice(1)) {
+      const kw = Math.round(num(row[0], 0)); const lkw = str(row[1], 80); const pozn = [row[2], row[3], row[4], row[5]].map(v => str(v, 200)).filter(Boolean).join(' · ');
+      if (!kw) continue;
+      const cisla = lkw.match(/\d{1,3}/g) || [];
+      if (!cisla.length) { if (pozn || lkw) { const k = zajistiKamion(d, 'LKW0'); void k; } continue; }
+      cisla.forEach(c => { const k = zajistiKamion(d, 'LKW' + Number(c), { kw, kwRok: 2026, poznamka: pozn }); if (k && !k.kw) k.kw = kw; n++; });
+    }
+    d.kamiony = d.kamiony.filter(k => k.kod !== 'LKW0');
+    return n;
+  }
+  // archivní záznam (jednotný tvar pro oba originály)
+  function archivZaznam(z) {
+    const rec = { zdroj: str(z.zdroj, 60), cvz: str(z.cvz, 20), zadano: z.zadano || '', vyrobek: str(z.vyrobek, 120), rozmer: str(z.rozmer, 40), tloustka: z.tloustka == null || z.tloustka === '' ? '' : z.tloustka, ks: z.ks == null ? '' : z.ks, ral: str(z.ral, 80), objem: z.objem == null || z.objem === '' ? '' : z.objem, heliosPolozka: str(z.heliosPolozka, 20), nazev: str(z.nazev, 200), helios: str(z.helios, 20), cislo: str(z.cislo, 20), zakaznik: str(z.zakaznik, 160), termin: z.termin || '', expedice: z.expedice || '', kamion: str(z.kamion, 30), kg: z.kg == null || z.kg === '' ? '' : z.kg, poznamka: str(z.poznamka, 300) };
+    rec.klic = [rec.zdroj, rec.cvz, rec.vyrobek, rec.ks, rec.helios, rec.cislo, rec.zadano].join('|');
+    return rec;
+  }
+  function pridejArchiv(d, recs) { const have = new Set(d.archiv.map(a => a.klic)); let n = 0; recs.forEach(rec => { if (have.has(rec.klic)) return; have.add(rec.klic); d.archiv.push(rec); n++; }); return n; }
+  function importArchivZKnihy(d, rows, zdroj) {
+    const recs = [];
+    parsers.parseContractRows(rows, zdroj).forEach(rw => recs.push(archivZaznam({ zdroj, cvz: rw.cvzText || (rw.cvzPoradi ? String(rw.cvzPoradi) : ''), vyrobek: rw.kodOrig, rozmer: rw.rozmer, ks: rw.ks, ral: rw.ral || (rw.povrch === 'zinek' ? 'pozink' : ''), helios: rw.helios, cislo: rw.cislo, zakaznik: rw.prijemce && rw.prijemce.nazev, kamion: rw.kamion, kg: rw.kgKs, poznamka: rw.poznamka, termin: rw.kwDodani ? 'KW ' + rw.kwDodani : '' })));
+    return pridejArchiv(d, recs);
+  }
+  // archivní listy Sheetu PLÁN VÝROBY (různá rozložení → podle hlaviček)
+  function importArchivZePlanu(d, rows, zdroj) {
+    if (!rows || rows.length < 2) return 0;
+    const hdr = rows[0].map(h => low(h));
+    const ix = (...names) => { for (const n of names) { const i = hdr.findIndex(h => h && h.startsWith(n)); if (i >= 0) return i; } return -1; };
+    const cZad = ix('zadáno'), cVyr = ix('výrobek'), cRoz = ix('rozměr', 'provedení'), cTl = ix('tloušťka'), cKs = ix('ks'), cRal = ix('ral'), cObj = ix('obj'), cHp = ix('číslo položky'), cNaz = ix('název'), cHo = ix('číslo objednávky'), cBe = ix('best'), cMisto = ix('místo dodání', 'zákazník'), cTer = ix('požadovaný termín'), cPoz = ix('poznámka'), cExp = ix('exp');
+    const cvzFull = hdr[0] === 'čvz' && !/^\d{2}\s?b$/i.test(str(rows[1] && rows[1][0], 10));
+    const recs = [];
+    for (const row of rows.slice(1)) {
+      const vyr = str(row[cVyr], 120); if (!vyr || cVyr < 0) continue;
+      let cvz = '';
+      if (cvzFull || /^\d{4}\//.test(str(row[0], 12))) cvz = str(row[0], 12);
+      else { const pf = str(row[0], 6).replace(/\s/g, ''); const po = Math.round(num(row[1], 0)); if (/^\d{2}B$/i.test(pf) && po) cvz = pf.slice(0, 2) + 'B-' + String(po).padStart(3, '0'); }
+      const dz = v => { const t = datumZ(v); return t || ''; };
+      recs.push(archivZaznam({ zdroj, cvz, zadano: dz(row[cZad]), vyrobek: vyr, rozmer: cRoz >= 0 ? row[cRoz] : '', tloustka: cTl >= 0 ? num(row[cTl], 0) || '' : '', ks: cKs >= 0 ? Math.round(num(row[cKs], 0)) || '' : '', ral: cRal >= 0 ? row[cRal] : '', objem: cObj >= 0 ? (num(row[cObj], 0) || '') : '', heliosPolozka: cHp >= 0 ? str(row[cHp], 20).replace(/\.0$/, '') : '', nazev: cNaz >= 0 ? row[cNaz] : '', helios: cHo >= 0 ? str(row[cHo], 20).replace(/\.0$/, '') : '', cislo: cBe >= 0 ? cisloKey(row[cBe]) : '', zakaznik: cMisto >= 0 ? row[cMisto] : '', termin: cTer >= 0 ? dz(row[cTer]) : '', expedice: cExp >= 0 ? (dz(row[cExp]) || str(row[cExp], 20)) : '', poznamka: cPoz >= 0 ? row[cPoz] : '' }));
+    }
+    return pridejArchiv(d, recs);
+  }
   function parsePdfBuffer(buf, name) {
     const text = pdfToText(buf);
     if (/Bestellung/i.test(name || '') || /Unser Auftrag|Lieferanten-Nr/.test(text)) return parsers.parseBestellung(text);
@@ -993,13 +1122,11 @@ function mount(host) {
   function apiImportXlsx(req, res, r, b) {
     if (!b.base64) { json(res, 400, { chyba: 'Chybí soubor.' }); return true; }
     const d = load();
-    const x = parseXlsx(Buffer.from(String(b.base64).replace(/^data:[^,]*,/, ''), 'base64'), [/^Metalboxy$/i, /^MULDY$/i, /^ABROLY$/i, /MBT|Hammerer|Andere/i]);
-    let rows = [];
-    for (const name of Object.keys(x.data)) rows = rows.concat(parsers.parseContractRows(x.data[name], name));
-    const stat = applyContractRows(d, rows, r);
+    const x = parseXlsx(Buffer.from(String(b.base64).replace(/^data:[^,]*,/, ''), 'base64'), null);
+    const stat = applyContractWorkbook(d, x, r, b.nazev || 'kniha.xlsx');
     d.import.contract = { at: new Date().toISOString(), kdo: r.email, stat, listy: Object.keys(x.data) };
     save(d); logAct('vyroba', req, 'Import knihy CONTRACT Bestellung: ' + JSON.stringify(stat));
-    json(res, 200, Object.assign({ ok: true, radku: rows.length, listy: Object.keys(x.data) }, stat)); return true;
+    json(res, 200, Object.assign({ ok: true, listy: Object.keys(x.data) }, stat)); return true;
   }
   // Stažení souboru z Disku přes service account (host.drive.token).
   function driveDownload(id) {
@@ -1057,12 +1184,11 @@ function mount(host) {
       if (stat.slozek % 20 === 0) { try { save(d); } catch (_) {} }
     }
     job.faze = 'kniha CONTRACT Bestellung.xlsx';
-    for (const f of root.filter(f => !f.isFolder && /CONTRACT Bestellung.*\.xlsx$/i.test(f.name) && !/ARCHIVE/i.test(f.name))) {
+    for (const f of root.filter(f => !f.isFolder && /CONTRACT Bestellung.*\.xlsx$/i.test(f.name))) {
       try {
         const buf = await driveDownload(f.id);
-        const x = parseXlsx(buf, [/^Metalboxy$/i, /^MULDY$/i, /^ABROLY$/i]);
-        let rows = []; for (const name of Object.keys(x.data)) rows = rows.concat(parsers.parseContractRows(x.data[name], name));
-        const st = applyContractRows(d, rows, r); stat.xlsx++; stat.nove += st.polozek; stat.aktualizovano += st.aktualizovano; stat.novychObjednavek += st.objednavek;
+        const x = parseXlsx(buf, null);
+        const st = applyContractWorkbook(d, x, r, f.name); stat.xlsx++; stat.nove += st.polozek; stat.aktualizovano += st.aktualizovano; stat.novychObjednavek += st.objednavek;
         d.import.contract = { at: new Date().toISOString(), kdo: r.email, stat: st, soubor: f.name };
       } catch (e) { stat.chyby.push(f.name + ': ' + e.message); }
     }
@@ -1201,7 +1327,7 @@ function mount(host) {
     return out;
   }
 
-  function tick() { try { sheet.tick(); } catch (_) {} try { legacy.tick(); } catch (_) {} }
+  function tick() { try { legacy.tick(); } catch (_) {} try { sheet.tick(); } catch (_) {} }
   function syncMinuty() { try { return load().nastaveni.syncMinuty || 5; } catch (_) { return 5; } }
   return { handle, notifikace, hasAccess, importRows, STAVY, tick, syncMinuty };
 }

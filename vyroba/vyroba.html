@@ -134,6 +134,15 @@ td.r,th.r{text-align:right}
 details summary{cursor:pointer;color:var(--ink-soft);font-size:12.5px}
 .upoz{background:var(--yellow-soft);border:1px solid #e8d9a8;border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:12px}
 
+/* plán skládání beden */
+table.plan td{padding:2px 3px;vertical-align:top;min-width:120px}
+table.plan tr.vik td{background:#f1f3f0}
+table.plan tr.dnes td{background:var(--yellow-soft)}
+table.plan tr.dnes td:first-child b{color:var(--amber)}
+.pcell{min-height:26px;padding:4px 6px;border:1px solid transparent;border-radius:6px;font-size:12.5px;white-space:pre-wrap;word-break:break-word}
+.pcell:hover{border-color:var(--line)}
+.pcell:focus{outline:none;border-color:var(--green);background:var(--paper)}
+.pcell.ok{background:var(--green-soft)}
 /* modal Nová objednávka ve stylu Ložného plánu */
 .modal .box.wide{max-width:1520px;width:96vw}
 .no-head{padding:0 0 6px}
@@ -573,7 +582,25 @@ async function ulozObjednavku(aZadat){
 }
 
 /* ---------- výroba (fronta pro dílnu) ---------- */
+let VYR_POHLED="fronta";
 function htmlVyroba(){
+  const prep='<div class="tabs" style="display:inline-flex;margin-bottom:12px"><button class="'+(VYR_POHLED==="fronta"?"on":"")+'" onclick="VYR_POHLED=\'fronta\';vykresli()">Fronta výroby</button><button class="'+(VYR_POHLED==="plan"?"on":"")+'" onclick="VYR_POHLED=\'plan\';vykresli()">Plán skládání beden</button></div>';
+  return prep+(VYR_POHLED==="plan"?htmlPlanSkladani():htmlFronta());
+}
+/* ---------- plán skládání beden (den × pracovník) ---------- */
+function htmlPlanSkladani(){
+  const ps=D.planSkladani||{pracovnici:[],dny:[]}; const prac=ps.pracovnici||[]; const dnes=D.dnes;
+  let h='<div class="card"><div class="h"><h2>Plán skládání beden</h2><span class="mut">řádek = den, sloupec = pracovník · píše se přímo do buněk (ČVZ a ks, „volno", „plasma"…) · stejné jako list Plán skládání v tabulce</span><div class="sp"></div>'+(D.me.obchod?'<button class="btn sm" onclick="pracovniciEdit()">Pracovníci</button>':'')+'</div>';
+  if(!prac.length){ h+='<div class="empty">Zatím žádní pracovníci — načtou se z původního plánu, nebo je zadejte tlačítkem Pracovníci.</div></div>'; return h; }
+  h+='<div class="tw"><table class="plan"><thead><tr><th>Den</th>'+prac.map(p=>'<th>'+esc(p)+'</th>').join("")+'</tr></thead><tbody>';
+  (ps.dny||[]).forEach(r=>{ const vik=r.den==="sobota"||r.den==="neděle"; const je=r.datum===dnes;
+    h+='<tr class="'+(vik?"vik":"")+(je?" dnes":"")+'"><td class="num" style="white-space:nowrap"><b>'+dat(r.datum)+'</b><div class="mut">'+esc(r.den)+'</div></td>'+prac.map(p=>'<td><div class="pcell" contenteditable="'+(D.me.vyroba?"true":"false")+'" data-d="'+r.datum+'" data-p="'+esc(p)+'" onblur="planCell(this)" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();this.blur();}">'+esc(r.bunky[p]||"")+'</div></td>').join("")+'</tr>'; });
+  h+='</tbody></table></div></div>'; return h;
+}
+async function planCell(el){ const t=el.textContent.trim(); const d=el.dataset.d,p=el.dataset.p; const r=(D.planSkladani.dny||[]).find(x=>x.datum===d); if(r&&(r.bunky[p]||"")===t)return; try{ await api("/api/vyroba/plan-skladani",{bunky:[{datum:d,pracovnik:p,text:t}]}); if(r)r.bunky[p]=t; el.classList.add("ok"); setTimeout(()=>el.classList.remove("ok"),800); }catch(e){alert(e.message);} }
+function pracovniciEdit(){ const cur=(D.planSkladani.pracovnici||[]).join("\n"); modal2("Pracovníci (sloupce plánu)",'<label class="f"><span>Jeden pracovník na řádek — celé jméno</span><textarea id="prList" style="min-height:180px">'+esc(cur)+'</textarea></label><div class="mut">Odebrání pracovníka ze seznamu jeho buňky nesmaže, jen ho skryje.</div>','<button class="btn pri" onclick="ulozPracovniky()">Uložit</button><button class="btn" onclick="zavri2()">Zrušit</button>'); }
+async function ulozPracovniky(){ const list=$("#prList").value.split(/\n/).map(x=>x.trim()).filter(Boolean); try{ await api("/api/vyroba/plan-skladani",{pracovnici:list}); zavri2(); toast("Uloženo."); nacti(); }catch(e){alert(e.message);} }
+function htmlFronta(){
   const pol=vsechnyPolozky().filter(p=>!p.mimoBruntal&&["zadano","svarovna","lakovna","zinkovna","hotovo","pozastaveno"].includes(p.stav)).sort((a,b)=>String(a.terminVyroby||"9").localeCompare(String(b.terminVyroby||"9")));
   const sloupce=[["zadano","Zadáno do výroby","svarovna","→ Svařovna"],["svarovna","Svařovna","","→ Lakovna / Zinkovna / Hotovo"],["lakovna","Lakovna","hotovo","→ Hotovo"],["zinkovna","Zinkovna","hotovo","→ Hotovo"],["hotovo","Hotovo na skladě","naplanovano","→ Na kamion"]];
   let h='';
@@ -604,11 +631,21 @@ function htmlExpedice(){
       +'<td>'+(o.loznyplan?'<span class="pill viol">'+esc(o.loznyplan.orderNo)+' · '+dat(o.loznyplan.sentAt)+'</span>':'<span class="mut">neodesláno</span>')+'</td>'
       +'<td style="white-space:nowrap">'+(D.me.obchod?'<button class="btn xs pri" onclick="formLozny(\''+o.id+'\','+o.hot.length+')">🚚 Do Ložného plánu</button> ':'')+'<button class="btn xs" onclick="formStav('+JSON.stringify(o.hot.map(p=>p.id)).replace(/"/g,"&quot;")+')">Expedováno…</button></td></tr>').join("")+'</tbody></table></div>';
   h+='</div>';
+  const kam=D.kamiony||[];
+  h+='<div class="card"><div class="h"><h2>Kamiony</h2><span class="mut">KW, datum nakládky, dopravce a poznámka jsou editovatelné (i v tabulce, list Kamiony); položky se ke kamionu přiřazují změnou stavu „Naplánováno na LKW"</span><div class="sp"></div>'+(D.me.obchod?'<button class="btn sm pri" onclick="formKamion()">＋ Kamion</button>':'')+'</div><div class="tw">'+(kam.length?'<table><thead><tr><th>Kamion</th><th>KW</th><th>Nakládka</th><th>Dopravce</th><th>Typ</th><th>Stav</th><th class="r">Pol.</th><th class="r">Ks</th><th class="r">Kg</th><th>Příjemci</th><th>Objednávky</th><th>Poznámka</th><th></th></tr></thead><tbody>'
+    +kam.slice(0,60).map(k=>'<tr><td class="cvz">'+esc(k.kod)+'</td><td class="num">'+(k.kw?k.kw+(k.kwRok?"/"+String(k.kwRok).slice(2):""):"—")+'</td><td class="num">'+dat(k.datum)+'</td><td>'+esc(k.dopravce||"")+'</td><td>'+esc(k.typ||"")+'</td><td>'+(k.stav==="expedovano"?'<span class="pill ok">expedováno</span>':k.stav==="naplanovano"?'<span class="pill viol">naplánováno</span>':k.stav?'<span class="pill blue">plánováno</span>':'<span class="pill mute">bez položek</span>')+'</td><td class="num r">'+k.polozek+'</td><td class="num r">'+cis(k.ks)+'</td><td class="num r">'+cis(k.kg)+'</td><td class="mut">'+esc(k.prijemci||"")+'</td><td class="num">'+esc(k.objednavky||"")+'</td><td class="mut">'+esc(k.poznamka||"")+'</td><td>'+(D.me.obchod?'<button class="btn xs" onclick="formKamion(\''+esc(k.kod)+'\')">✎</button>':'')+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">Zatím žádné kamiony.</div>')+'</div></div>';
   const exp=vsechnyPolozky().filter(p=>["expedovano","doruceno"].includes(p.stav)).sort((a,b)=>String(b.expedovanoDne||"").localeCompare(String(a.expedovanoDne||""))).slice(0,80);
   h+='<div class="card"><div class="h"><h2>Expedováno</h2><span class="mut">posledních '+exp.length+'</span></div><div class="tw">'+(exp.length?'<table><thead><tr><th>Expedováno</th><th>Kamion</th><th>ČVZ</th><th>Produkt</th><th class="r">Ks</th><th>Objednávka</th><th>Příjemce</th><th>Stav</th></tr></thead><tbody>'
     +exp.map(p=>'<tr class="klik" onclick="detail(\''+p._o.id+'\',\''+p.id+'\')"><td class="num">'+dat(p.expedovanoDne)+'</td><td class="num">'+esc(p.kamion||"—")+'</td><td class="cvz">'+esc(p.cvz||"—")+'</td><td>'+esc(p.kod)+'</td><td class="num r">'+p.ks+'</td><td class="num">'+esc(p._o.cislo||p._o.helios||"")+'</td><td>'+esc(p._o.prijemce||p._o.zakaznik)+'</td><td>'+stavPill(p)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">Zatím nic.</div>')+'</div></div>';
   return h;
 }
+function formKamion(kod){
+  const k=kod?(D.kamiony||[]).find(x=>x.kod===kod):{};
+  modal2(kod?"Kamion "+kod:"Nový kamion",'<div class="grid2"><label class="f"><span>Označení (LKW67, M12, ABR18)</span><input id="km_kod" value="'+esc(k.kod||"")+'"'+(kod?" readonly":"")+'></label><label class="f"><span>KW</span><input id="km_kw" type="number" value="'+esc(k.kw||"")+'"></label><label class="f"><span>Datum nakládky</span><input id="km_datum" type="date" value="'+esc(k.datum||"")+'"></label><label class="f"><span>Dopravce</span><input id="km_dopravce" value="'+esc(k.dopravce||"")+'" placeholder="DAS Trans, Elkoplast…"></label><label class="f"><span>Typ</span><input id="km_typ" value="'+esc(k.typ||"")+'" placeholder="návěs / souprava 7700+7700"></label></div><label class="f"><span>Poznámka</span><input id="km_pozn" value="'+esc(k.poznamka||"")+'"></label>',
+    '<button class="btn pri" onclick="ulozKamion()">Uložit</button>'+(kod&&!k.polozek?'<button class="btn danger" onclick="smazKamion(\''+esc(kod)+'\')">Smazat</button>':'')+'<button class="btn" onclick="zavri2()">Zrušit</button>');
+}
+async function ulozKamion(){ try{ await api("/api/vyroba/kamion",{kod:$("#km_kod").value,kw:$("#km_kw").value,datum:$("#km_datum").value,dopravce:$("#km_dopravce").value,typ:$("#km_typ").value,poznamka:$("#km_pozn").value}); zavri2(); toast("Uloženo."); nacti(); }catch(e){alert(e.message);} }
+async function smazKamion(kod){ if(!confirm("Smazat kamion "+kod+"?"))return; try{ await api("/api/vyroba/kamion",{kod,smazat:true}); zavri2(); nacti(); }catch(e){alert(e.message);} }
 function formLozny(objId,hotove){
   const o=obj(objId);
   modal2("Do Ložného plánu · "+(o.cislo||o.helios||o.zakaznik),

@@ -143,16 +143,55 @@ function mount(host, ctx) {
     return stat;
   }
 
-  async function sync(duvod) {
+  // ---- Plán skládání (den × pracovník) z originálu: řádek = datum, sloupce = pracovníci (hlavička), poslední sloupec den v týdnu ----
+  async function syncPlanSkladani(tokR, sid, d0) {
+    const stat = { list: 'Plán skládání', prevzato: 0, chyby: [] };
+    const resp = await api(tokR, 'GET', '/v4/spreadsheets/' + enc(sid) + '/values/' + q('Plán skládání', 'A1:Z3000') + '?valueRenderOption=FORMATTED_VALUE');
+    const rows = resp.values || []; if (rows.length < 2) return stat;
+    const hdr = rows[0]; const prac = []; hdr.forEach((h, i) => { if (i > 0 && cl(h) && !/^(den|pondělí|úterý|středa|čtvrtek|pátek|sobota|neděle)$/i.test(cl(h))) prac.push({ i, jm: cl(h) }); });
+    const d = ctx.load(); const ps = d.planSkladani; d.legacySync = d.legacySync || {}; const ot = d.legacySync.otiskyPlan = d.legacySync.otiskyPlan || {};
+    prac.forEach(p => { if (!ps.pracovnici.includes(p.jm)) ps.pracovnici.push(p.jm); });
+    let zmena = false;
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i] || []; const iso = isoZ(row[0]); if (!iso) continue;
+      const bunky = {}; prac.forEach(p => { const t = cl(row[p.i]); if (t) bunky[p.jm] = t; });
+      const h = otisk(prac.map(p => cl(row[p.i])));
+      if (ot[iso] === h) continue;                      // originál se od minula nezměnil
+      const prvni = !(iso in ot); ot[iso] = h;
+      // originál je pracovní plocha dílny → jeho změna vyhrává; při prvním čtení jen doplní, co v intranetu není
+      const cur = ps.dny[iso] || {};
+      if (prvni) { const merged = Object.assign({}, bunky, cur); if (Object.keys(merged).length) ps.dny[iso] = merged; else delete ps.dny[iso]; if (JSON.stringify(merged) !== JSON.stringify(cur)) { zmena = true; stat.prevzato++; } }
+      else { if (Object.keys(bunky).length) ps.dny[iso] = bunky; else delete ps.dny[iso]; ps.upravy[iso] = Date.now(); zmena = true; stat.prevzato++; }
+    }
+    if (zmena || prac.length) ctx.save(d);
+    return stat;
+  }
+  // ---- archivní listy originálu (jednou; znovu jen s force) ----
+  const ARCHIV_LISTY = ['Boxy Contracts', 'Boxy Contract 2025', 'ostatní do roku 2024', 'Boxy Contracts 2024', 'Boxy Contracts 2023', 'Expedované zakázky 2020-2021', 'Expedované zakázky 2019', 'Expedované zakázky 2016-2018'];
+  async function syncArchiv(tokR, sid, gidMap, force) {
+    const d0 = ctx.load(); if (d0.archivImport.planAt && !force) return null;
+    const stat = { list: 'archiv', pridano: 0, listy: [], chyby: [] };
+    const nacteno = [];
+    for (const t of ARCHIV_LISTY) { if (gidMap[t] == null) continue; try { const r = await api(tokR, 'GET', '/v4/spreadsheets/' + enc(sid) + '/values/' + q(t, 'A1:Z3000') + '?valueRenderOption=FORMATTED_VALUE'); nacteno.push([t, r.values || []]); } catch (e) { stat.chyby.push(t + ': ' + e.message); } }
+    const d = ctx.load();
+    nacteno.forEach(([t, rows]) => { try { const n = ctx.importArchivZePlanu(d, rows, 'PLÁN VÝROBY / ' + t); stat.pridano += n; stat.listy.push(t + ' (' + n + ')'); } catch (e) { stat.chyby.push(t + ': ' + e.message); } });
+    d.archivImport.planAt = new Date().toISOString(); d.archivImport.planStat = stat; ctx.save(d);
+    return stat;
+  }
+  let _running = null;
+  async function sync(duvod, opts) {
+    if (bezi && _running) { try { await _running; } catch (_) {} return posledni; }
     if (bezi) return posledni;
     const d0 = ctx.load(); const n = d0.nastaveni; const sid = (n.sheetId || '').trim();
     if (!sid || n.legacySync === false || !(host.sheets && host.sheets.available && host.sheets.token)) return posledni;
     bezi = true;
-    try { await ctx.serial(async () => {
+    try { _running = ctx.serial(async () => {
       const tokR = await host.sheets.token('https://www.googleapis.com/auth/spreadsheets.readonly');
       let gidMap = {}; try { const meta = await api(tokR, 'GET', '/v4/spreadsheets/' + enc(sid) + '?fields=sheets.properties(sheetId,title)'); (meta.sheets || []).forEach(s => { gidMap[s.properties.title] = s.properties.sheetId; }); } catch (_) {}
       const tok = await host.sheets.token('https://www.googleapis.com/auth/spreadsheets');
       const r = ctx.SYS; const out = [];
+      try { out.push(await syncPlanSkladani(tokR, sid, d0)); } catch (e) { out.push({ list: 'Plán skládání', chyba: e.message }); }
+      try { const a = await syncArchiv(tokR, sid, gidMap, !!(opts && opts.archiv)); if (a) out.push(a); } catch (e) { out.push({ list: 'archiv', chyba: e.message }); }
       for (const [list, title] of [['boxy', n.sheetList], ['ostatni', n.sheetListOstatni]]) {
         if (!title || gidMap[title] == null) continue;
         try { out.push(await syncList(tokR, tok, sid, null, list, title, gidMap, r)); }
@@ -168,7 +207,7 @@ function mount(host, ctx) {
       posledni = { at: d.legacySync.at, chyba: null, vysledek: out, duvod };
       const zm = out.reduce((s, x) => s + (x.prevzato || 0) + (x.novych || 0) + (x.zapsano || 0) + (x.pridano || 0), 0);
       if (zm) log(JSON.stringify(out));
-    }); } catch (e) {
+    }); await _running; } catch (e) {
       log('chyba:', e.message);
       try { const d = ctx.load(); d.legacySync = d.legacySync || {}; d.legacySync.chyba = e.message; d.legacySync.chybaAt = new Date().toISOString(); ctx.save(d); } catch (_) {}
       posledni = { at: posledni.at, chyba: e.message, duvod };

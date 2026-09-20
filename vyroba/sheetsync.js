@@ -97,7 +97,17 @@ const ZAK_COLS = [
   { k: 'kontakt', h: 'Kontakt', w: 140, edit: true }, { k: 'email', h: 'E-mail', w: 160, edit: true }, { k: 'telefon', h: 'Telefon', w: 110, edit: true },
   { k: 'jazyk', h: 'Jazyk', w: 50, edit: true }, { k: 'poznamka', h: 'Poznámka', w: 200, edit: true }, { k: 'id', h: 'ID', w: 110 },
 ];
-const LISTY = { objednavky: 'Objednávky', polozky: 'Položky', katalog: 'Katalog', zakaznici: 'Zákazníci', prehled: 'Přehled', info: '_info' };
+const KAM_COLS = [
+  { k: 'kod', h: 'Kamion', w: 80 }, { k: 'kw', h: 'KW', w: 50, edit: true, typ: 'n' }, { k: 'datum', h: 'Datum nakládky', w: 100, edit: true, typ: 'd' }, { k: 'dopravce', h: 'Dopravce', w: 130, edit: true },
+  { k: 'typ', h: 'Typ (návěs / souprava)', w: 130, edit: true }, { k: 'stav', h: 'Stav', w: 110 }, { k: 'polozek', h: 'Položek', w: 60, typ: 'n' }, { k: 'ks', h: 'Ks', w: 55, typ: 'n' }, { k: 'kg', h: 'Kg', w: 65, typ: 'n' },
+  { k: 'prijemci', h: 'Příjemci', w: 260 }, { k: 'objednavky', h: 'Objednávky', w: 200 }, { k: 'poznamka', h: 'Poznámka', w: 260, edit: true }, { k: 'id', h: 'ID', w: 80 },
+];
+const ARCH_COLS = [
+  { k: 'zdroj', h: 'Zdroj', w: 210 }, { k: 'cvz', h: 'ČVZ', w: 70 }, { k: 'zadano', h: 'Zadáno', w: 85, typ: 'd' }, { k: 'vyrobek', h: 'Výrobek', w: 190 }, { k: 'rozmer', h: 'Rozměr', w: 130 }, { k: 'tloustka', h: 'mm', w: 45 }, { k: 'ks', h: 'Ks', w: 50 },
+  { k: 'ral', h: 'RAL', w: 150 }, { k: 'objem', h: 'm³', w: 50 }, { k: 'heliosPolozka', h: 'Helios pol.', w: 70 }, { k: 'nazev', h: 'Název / ražení', w: 220 }, { k: 'helios', h: 'Helios zakázka', w: 90 }, { k: 'cislo', h: 'Bestellung', w: 85 },
+  { k: 'zakaznik', h: 'Zákazník', w: 190 }, { k: 'termin', h: 'Termín', w: 85 }, { k: 'expedice', h: 'Expedice', w: 85 }, { k: 'kamion', h: 'Kamion', w: 70 }, { k: 'kg', h: 'kg/ks', w: 55 }, { k: 'poznamka', h: 'Poznámka', w: 220 },
+];
+const LISTY = { objednavky: 'Objednávky', polozky: 'Položky', plan: 'Plán skládání', kamiony: 'Kamiony', katalog: 'Katalog', zakaznici: 'Zákazníci', archiv: 'Archiv 2016–2025', prehled: 'Přehled', info: '_info' };
 
 const colLetter = i => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
 // osamocené UTF-16 surrogáty (vzniklé oříznutím textu z PDF) Sheets nepřijme shodně → odstranit před zápisem i porovnáním
@@ -119,7 +129,7 @@ function mount(host, ctx) {
     const sheets = (meta.sheets || []).map(s => s.properties);
     const byTitle = {}; sheets.forEach(s => { byTitle[s.title] = s; });
     const reqs = [];
-    const want = [LISTY.prehled, LISTY.objednavky, LISTY.polozky, LISTY.katalog, LISTY.zakaznici, LISTY.info];
+    const want = [LISTY.prehled, LISTY.objednavky, LISTY.polozky, LISTY.plan, LISTY.kamiony, LISTY.katalog, LISTY.zakaznici, LISTY.archiv, LISTY.info];
     want.forEach((t, i) => { if (!byTitle[t]) reqs.push({ addSheet: { properties: { title: t, index: i, gridProperties: { frozenRowCount: 1, columnCount: 40 } } } }); });
     // výchozí „List 1" přejmenovat na Přehled, pokud existuje jen on
     if (!byTitle[LISTY.prehled] && sheets.length === 1 && /^(List|Sheet)\s?1$/i.test(sheets[0].title)) { reqs.length = 0; reqs.push({ updateSheetProperties: { properties: { sheetId: sheets[0].sheetId, title: LISTY.prehled }, fields: 'title' } }); want.slice(1).forEach((t, i) => reqs.push({ addSheet: { properties: { title: t, index: i + 1, gridProperties: { frozenRowCount: 1 } } } })); }
@@ -127,7 +137,7 @@ function mount(host, ctx) {
     const meta2 = reqs.length ? await api(tok, 'GET', '/v4/spreadsheets/' + enc(sid) + '?fields=sheets.properties(sheetId,title,gridProperties.columnCount)') : meta;
     const ids = {}, cols = {}; (meta2.sheets || []).forEach(s => { ids[s.properties.title] = s.properties.sheetId; cols[s.properties.title] = (s.properties.gridProperties || {}).columnCount || 26; });
     // listy musí mít dost sloupců (nový list má jen 26)
-    const need = { [LISTY.objednavky]: OBJ_COLS.length, [LISTY.polozky]: POL_COLS.length, [LISTY.katalog]: KAT_COLS.length, [LISTY.zakaznici]: ZAK_COLS.length };
+    const need = { [LISTY.objednavky]: OBJ_COLS.length, [LISTY.polozky]: POL_COLS.length, [LISTY.katalog]: KAT_COLS.length, [LISTY.zakaznici]: ZAK_COLS.length, [LISTY.kamiony]: KAM_COLS.length, [LISTY.archiv]: ARCH_COLS.length, [LISTY.plan]: 34 };
     const ext = Object.keys(need).filter(t => ids[t] != null && cols[t] < need[t] + 2).map(t => ({ appendDimension: { sheetId: ids[t], dimension: 'COLUMNS', length: need[t] + 2 - cols[t] } }));
     if (ext.length) await api(tok, 'POST', '/v4/spreadsheets/' + enc(sid) + ':batchUpdate', { requests: ext });
     return ids;
@@ -158,7 +168,17 @@ function mount(host, ctx) {
   }
   async function formatAll(tok, sid, ids, d) {
     // smazat staré podmíněné formáty (aby se nehromadily) → jednodušší je list vyčistit formátem jen 1× (příznak)
-    const reqs = [].concat(formatRequests(ids[LISTY.objednavky], OBJ_COLS, d), formatRequests(ids[LISTY.polozky], POL_COLS, d), formatRequests(ids[LISTY.katalog], KAT_COLS, d), formatRequests(ids[LISTY.zakaznici], ZAK_COLS, d));
+    const reqs = [].concat(formatRequests(ids[LISTY.objednavky], OBJ_COLS, d), formatRequests(ids[LISTY.polozky], POL_COLS, d), formatRequests(ids[LISTY.katalog], KAT_COLS, d), formatRequests(ids[LISTY.zakaznici], ZAK_COLS, d), formatRequests(ids[LISTY.kamiony], KAM_COLS, d), formatRequests(ids[LISTY.archiv], ARCH_COLS, d));
+    // Plán skládání: hlavička + zmrazený sloupec s datem, šířky
+    const gp = ids[LISTY.plan]; if (gp != null) {
+      reqs.push({ updateSheetProperties: { properties: { sheetId: gp, gridProperties: { frozenRowCount: 1, frozenColumnCount: 2 } }, fields: 'gridProperties(frozenRowCount,frozenColumnCount)' } });
+      reqs.push({ repeatCell: { range: { sheetId: gp, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { backgroundColor: { red: 0.055, green: 0.54, blue: 0.263 }, textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } } } }, fields: 'userEnteredFormat(backgroundColor,textFormat)' } });
+      reqs.push({ updateDimensionProperties: { range: { sheetId: gp, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 90 }, fields: 'pixelSize' } });
+      reqs.push({ updateDimensionProperties: { range: { sheetId: gp, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 70 }, fields: 'pixelSize' } });
+      reqs.push({ updateDimensionProperties: { range: { sheetId: gp, dimension: 'COLUMNS', startIndex: 2, endIndex: 30 }, properties: { pixelSize: 150 }, fields: 'pixelSize' } });
+      // víkendy šedě (sloupec Den = sobota/neděle)
+      ['sobota', 'neděle'].forEach(dn => reqs.push({ addConditionalFormatRule: { rule: { ranges: [{ sheetId: gp, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: 30 }], booleanRule: { condition: { type: 'CUSTOM_FORMULA', values: [{ userEnteredValue: '=$B2="' + dn + '"' }] }, format: { backgroundColor: { red: 0.93, green: 0.94, blue: 0.93 } } } }, index: 0 } }));
+    }
     await api(tok, 'POST', '/v4/spreadsheets/' + enc(sid) + ':batchUpdate', { requests: reqs });
   }
 
@@ -182,6 +202,18 @@ function mount(host, ctx) {
     return out;
   }
   const radkyKatalog = d => d.katalog.map(k => KAT_COLS.map(c => fmtCell(k[c.k], c.typ)));
+  const dmy = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? Number(m[3]) + '.' + Number(m[2]) + '.' + m[1] : ''; };
+  // Plán skládání: od začátku roku (resp. prvního záznamu) do dneška + 8 týdnů; sloupce = pracovníci; poslední sloupec ID = datum ISO
+  function radkyPlan(d) {
+    const ps = d.planSkladani; const prac = ps.pracovnici.slice();
+    const dny = Object.keys(ps.dny).sort(); const rok = new Date().getFullYear();
+    const od = (dny[0] && dny[0] < rok + '-01-01') ? dny[0] : rok + '-01-01';
+    const doDne = new Date(Date.now() + 56 * 86400000).toISOString().slice(0, 10);
+    const rows = ctx.planSkladaniRozsah(d, od, doDne);
+    return [['Datum', 'Den'].concat(prac, ['ID'])].concat(rows.map(r => [dmy(r.datum), r.den].concat(prac.map(j => r.bunky[j] || ''), [r.datum])));
+  }
+  const radkyKamiony = d => ctx.kamionySouhrn(d).map(k => KAM_COLS.map(c => c.k === 'id' ? k.kod : (c.k === 'stav' ? ({ expedovano: 'expedováno', naplanovano: 'naplánováno', planovano: 'plánováno' }[k.stav] || '') : fmtCell(k[c.k], c.typ))));
+  const radkyArchiv = d => d.archiv.slice().sort((a, b) => String(b.zadano || b.termin || '').localeCompare(String(a.zadano || a.termin || '')) || String(b.cvz).localeCompare(String(a.cvz))).map(a => ARCH_COLS.map(c => fmtCell(a[c.k], c.typ)));
   const radkyZak = d => d.zakaznici.map(z => ZAK_COLS.map(c => fmtCell(z[c.k], c.typ)));
 
   function prehledRows() {
@@ -199,6 +231,7 @@ function mount(host, ctx) {
     rows.push(['• Bílé sloupce můžete upravit tady: intranet si změnu převezme do několika minut a zapíše ji do historie položky.', '', '', '']);
     rows.push(['• Nová položka: v listu Položky vyplňte řádek dole (Bestellung, kód výrobku, ks, RAL, ražení…) a nechte ID prázdné. Intranet ji založí a doplní ČVZ po zadání do výroby.', '', '', '']);
     rows.push(['• Nemažte řádky – stornujte položku stavem „Storno" (v intranetu nebo tady).', '', '', '']);
+    rows.push(['• Plán skládání: řádek = den, sloupec = pracovník; pište přímo do buněk (co kdo skládá, „volno"…). Kamiony: KW, datum nakládky, dopravce a poznámka jsou editovatelné, položky se přiřazují v intranetu.', '', '', '']);
     return rows;
   }
 
@@ -222,8 +255,9 @@ function mount(host, ctx) {
   // 1) načíst všechny listy (síť), 2) teprve pak nad čerstvě načtenými daty změny aplikovat a hned uložit
   async function pull(tok, sid) {
     const stat = { objednavky: 0, polozky: 0, katalog: 0, zakaznici: 0, novePolozky: 0, chyby: [] };
-    const tabs = { objednavky: [LISTY.objednavky, OBJ_COLS], polozky: [LISTY.polozky, POL_COLS], katalog: [LISTY.katalog, KAT_COLS], zakaznici: [LISTY.zakaznici, ZAK_COLS] };
+    const tabs = { objednavky: [LISTY.objednavky, OBJ_COLS], polozky: [LISTY.polozky, POL_COLS], katalog: [LISTY.katalog, KAT_COLS], zakaznici: [LISTY.zakaznici, ZAK_COLS], kamiony: [LISTY.kamiony, KAM_COLS] };
     const nacteno = {};
+    try { nacteno.plan = await readTab(tok, sid, LISTY.plan); } catch (e) { stat.chyby.push(LISTY.plan + ': ' + e.message); }
     for (const key of Object.keys(tabs)) { try { nacteno[key] = await readTab(tok, sid, tabs[key][0]); } catch (e) { stat.chyby.push(tabs[key][0] + ': ' + e.message); } }
     const d = ctx.load(); d.sheetSync = d.sheetSync || {};
     const ot = d.sheetSync.otisky || {};
@@ -246,6 +280,22 @@ function mount(host, ctx) {
         try { if (ctx.aplikujZTabulky(d, key, obj)) { stat[key]++; zmena = true; } } catch (e) { stat.chyby.push(title + ' ř.' + (i + 1) + ': ' + e.message); }
       }
     }
+    // Plán skládání: řádek = datum (ID), sloupce = pracovníci z hlavičky; změna otisku → převzít celý řádek
+    stat.plan = 0;
+    if (nacteno.plan && nacteno.plan.length > 1) {
+      const hdr = nacteno.plan[0]; const idIx = hdr.indexOf('ID'); const prac = hdr.slice(2, idIx > 2 ? idIx : hdr.length).map(h => String(h || '').trim());
+      const ps = d.planSkladani;
+      prac.forEach(j => { if (j && !ps.pracovnici.includes(j)) ps.pracovnici.push(j); });
+      for (let i = 1; i < nacteno.plan.length; i++) {
+        const row = nacteno.plan[i] || []; const iso = idIx >= 0 ? String(row[idIx] || '').slice(0, 10) : normD(row[0]); if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) continue;
+        const vals = prac.map((j, k) => String(row[2 + k] == null ? '' : row[2 + k]).replace(/\s+/g, ' ').trim());
+        const h = otisk(vals); const key = 'plan:' + iso;
+        if (!ot[key] || ot[key] === h) continue;
+        const bunky = {}; prac.forEach((j, k) => { if (j && vals[k]) bunky[j] = vals[k]; });
+        if (Object.keys(bunky).length) ps.dny[iso] = bunky; else delete ps.dny[iso];
+        ps.upravy[iso] = Date.now(); stat.plan++; zmena = true;
+      }
+    }
     if (zmena) ctx.save(d);
     return stat;
   }
@@ -257,12 +307,19 @@ function mount(host, ctx) {
       { range: "'" + LISTY.objednavky + "'!A1", values: [OBJ_COLS.map(c => c.h)].concat(radkyObjednavek(ob)) },
       { range: "'" + LISTY.polozky + "'!A1", values: [POL_COLS.map(c => c.h)].concat(radkyPolozek(ob)) },
       { range: "'" + LISTY.katalog + "'!A1", values: [KAT_COLS.map(c => c.h)].concat(radkyKatalog(d)) },
+      { range: "'" + LISTY.plan + "'!A1", values: radkyPlan(d) },
+      { range: "'" + LISTY.kamiony + "'!A1", values: [KAM_COLS.map(c => c.h)].concat(radkyKamiony(d)) },
       { range: "'" + LISTY.zakaznici + "'!A1", values: [ZAK_COLS.map(c => c.h)].concat(radkyZak(d)) },
       { range: "'" + LISTY.prehled + "'!A1", values: prehledRows() },
-      { range: "'" + LISTY.info + "'!A1", values: [['Aktualizováno', new Date().toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })], ['Zdroj', 'intranet.elkoplast.cz → Výroba Popelnice'], ['Objednávek', ob.length], ['Položek', ob.reduce((s, o) => s + o.polozky.length, 0)], ['', ''], ['Sloupce, které intranet přebírá z tabulky', ''], ['Objednávky', OBJ_COLS.filter(c => c.edit).map(c => c.h).join(', ')], ['Položky', POL_COLS.filter(c => c.edit).map(c => c.h).join(', ')], ['Katalog', KAT_COLS.filter(c => c.edit).map(c => c.h).join(', ')], ['Zákazníci', ZAK_COLS.filter(c => c.edit).map(c => c.h).join(', ')]] },
+      { range: "'" + LISTY.info + "'!A1", values: [['Aktualizováno', new Date().toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })], ['Zdroj', 'intranet.elkoplast.cz → Výroba Popelnice'], ['Objednávek', ob.length], ['Položek', ob.reduce((s, o) => s + o.polozky.length, 0)], ['', ''], ['Sloupce, které intranet přebírá z tabulky', ''], ['Objednávky', OBJ_COLS.filter(c => c.edit).map(c => c.h).join(', ')], ['Položky', POL_COLS.filter(c => c.edit).map(c => c.h).join(', ')], ['Katalog', KAT_COLS.filter(c => c.edit).map(c => c.h).join(', ')], ['Zákazníci', ZAK_COLS.filter(c => c.edit).map(c => c.h).join(', ')], ['Kamiony', KAM_COLS.filter(c => c.edit).map(c => c.h).join(', ')], ['Plán skládání', 'všechny buňky pracovníků (řádek = den)'], ['Archiv 2016–2025', 'jen ke čtení (z původních listů PLÁN VÝROBY a knihy CONTRACT Bestellung)']] },
     ];
     // vyčistit listy (řádky, které zmizely) a zapsat
-    await api(tok, 'POST', '/v4/spreadsheets/' + enc(sid) + '/values:batchClear', { ranges: [LISTY.objednavky, LISTY.polozky, LISTY.katalog, LISTY.zakaznici, LISTY.prehled, LISTY.info].map(t => "'" + t + "'!A1:AZ5000") });
+    // archiv jen když se změnil (velký list)
+    const archH = otisk([d.archiv.length, d.archiv.slice(-1)[0] && d.archiv.slice(-1)[0].klic]);
+    const archNovy = (d.sheetSync.archivOtisk !== archH);
+    if (archNovy) data.push({ range: "'" + LISTY.archiv + "'!A1", values: [ARCH_COLS.map(c => c.h)].concat(radkyArchiv(d)) });
+    const clear = [LISTY.objednavky, LISTY.polozky, LISTY.plan, LISTY.kamiony, LISTY.katalog, LISTY.zakaznici, LISTY.prehled, LISTY.info].concat(archNovy ? [LISTY.archiv] : []);
+    await api(tok, 'POST', '/v4/spreadsheets/' + enc(sid) + '/values:batchClear', { ranges: clear.map(t => "'" + t + "'!A1:AZ10000") });
     await api(tok, 'POST', '/v4/spreadsheets/' + enc(sid) + '/values:batchUpdate', { valueInputOption: 'USER_ENTERED', data });
     // otisky editovatelných sloupců – podle nich se pozná změna v tabulce
     const ot = {};
@@ -270,31 +327,35 @@ function mount(host, ctx) {
     ob.forEach(o => o.polozky.forEach(p => { const row = radkyPolozek([Object.assign({}, o, { polozky: [p] })])[0]; const obj = {}; POL_COLS.forEach((c, i) => { obj[c.k] = row[i]; }); ot[p.id] = otisk(editVals(POL_COLS, obj)); }));
     d.katalog.forEach(k => { const row = radkyKatalog({ katalog: [k] })[0]; const obj = {}; KAT_COLS.forEach((c, i) => { obj[c.k] = row[i]; }); ot[k.id] = otisk(editVals(KAT_COLS, Object.assign(obj, { aktivni: k.aktivni !== false }))); });
     d.zakaznici.forEach(z => { const row = radkyZak({ zakaznici: [z] })[0]; const obj = {}; ZAK_COLS.forEach((c, i) => { obj[c.k] = row[i]; }); ot[z.id] = otisk(editVals(ZAK_COLS, obj)); });
-    return { otisky: ot, objednavky: ob.length, polozky: ob.reduce((s, o) => s + o.polozky.length, 0) };
+    radkyKamiony(d).forEach(row => { const obj = {}; KAM_COLS.forEach((c, i) => { obj[c.k] = row[i]; }); ot[row[KAM_COLS.length - 1]] = otisk(editVals(KAM_COLS, obj)); });
+    radkyPlan(d).slice(1).forEach(row => { ot['plan:' + row[row.length - 1]] = otisk(row.slice(2, row.length - 1).map(v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim())); });
+    return { otisky: ot, archivOtisk: archH, objednavky: ob.length, polozky: ob.reduce((s, o) => s + o.polozky.length, 0) };
   }
 
   // ---- hlavní cyklus: pull → push ------------------------------------------------------
   // Data se nikdy nedrží přes síťové volání: každý krok si je znovu načte a hned uloží.
   // Synchronizace běží postupně (ctx.serial), aby se nepřepisovaly navzájem ani s ostatními.
+  let _running = null;
   async function sync(duvod) {
+    if (bezi && _running) { try { await _running; } catch (_) {} return posledni; }
     if (bezi) return posledni;
     const d0 = ctx.load(); const sid = sheetId(d0);
     if (!sid || !(host.sheets && host.sheets.available && host.sheets.token)) return posledni;
     bezi = true;
     try {
-      await ctx.serial(async () => {
+      _running = ctx.serial(async () => {
         const tok = await token();
         const ids = await ensureStructure(tok, sid, d0);
         if ((d0.sheetSync || {}).formatovano !== sid) { try { await formatAll(tok, sid, ids, d0); const d1 = ctx.load(); d1.sheetSync = d1.sheetSync || {}; d1.sheetSync.formatovano = sid; ctx.save(d1); } catch (e) { log('formát:', e.message); } }
         const pl = await pull(tok, sid);
         const ps = await push(tok, sid, ids);
         const d = ctx.load(); d.sheetSync = d.sheetSync || {};
-        d.sheetSync.otisky = ps.otisky; delete ps.otisky;
+        d.sheetSync.otisky = ps.otisky; delete ps.otisky; d.sheetSync.archivOtisk = ps.archivOtisk; delete ps.archivOtisk;
         d.sheetSync.at = new Date().toISOString(); d.sheetSync.pull = pl; d.sheetSync.push = ps; d.sheetSync.chyba = null;
         ctx.save(d);
         posledni = { at: d.sheetSync.at, chyba: null, pull: pl, push: ps, duvod };
         if (pl.objednavky || pl.polozky || pl.katalog || pl.zakaznici || pl.novePolozky) log('převzato z tabulky:', JSON.stringify(pl));
-      });
+      }); await _running;
     } catch (e) {
       log('chyba synchronizace:', e.message);
       try { const d = ctx.load(); d.sheetSync = d.sheetSync || {}; d.sheetSync.chyba = e.message; d.sheetSync.chybaAt = new Date().toISOString(); ctx.save(d); } catch (_) {}
