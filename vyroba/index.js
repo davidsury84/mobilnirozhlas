@@ -495,7 +495,7 @@ function mount(host) {
         }
         if (b.akce === 'plan') { const st = await legacy.sync('ručně (server)', { archiv: !!b.archiv }); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
         if (b.akce === 'sync') { const st = await sheet.sync('ručně (server)'); json(res, 200, Object.assign({ ok: !st.chyba }, st)); return true; }
-        if (b.akce === 'stav') { const d = load(); json(res, 200, { objednavek: d.objednavky.length, polozek: d.polozky.length, zakazniku: d.zakaznici.length, katalog: d.katalog.length, seq: d.seq, import: d.import }); return true; }
+        if (b.akce === 'stav') { const d = load(); const stavy = {}; d.polozky.forEach(p => { stavy[p.stav] = (stavy[p.stav] || 0) + 1; }); const ot = (d.legacySync || {}).otisky || {}; json(res, 200, { objednavek: d.objednavky.length, polozek: d.polozky.length, zakazniku: d.zakaznici.length, katalog: d.katalog.length, seq: d.seq, stavy, migrace: d.migrace, barevOtisku: Object.keys(ot).filter(k => k.startsWith('barva:')).length, legacy: (d.legacySync || {}).vysledek, import: d.import }); return true; }
         json(res, 400, { chyba: 'Neznámá akce (sheet | drive | xlsx | pdf | stav).' }); return true;
       } catch (e) { console.error('[vyroba] ingest:', e); json(res, 500, { chyba: 'Chyba serveru: ' + e.message }); return true; }
     }

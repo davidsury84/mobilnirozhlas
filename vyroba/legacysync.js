@@ -22,7 +22,7 @@ const q = (title, rng) => enc("'" + title.replace(/'/g, "''") + "'!" + rng);
 const CZ = { boxy: { rozmer: 4, nazev: 10, stav: 11, poznamka: 16, expedice: 17, misto: 14, kontakt: 13 }, ostatni: { rozmer: 4, nazev: 10, stav: 11, poznamka: 16, expedice: 16, misto: 14, kontakt: 13, auto: 17 } };
 
 const dmy2 = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '.' + m[2] + '.' + m[1].slice(2) : ''; };
-const isoZ = s => { const t = String(s == null ? '' : s).trim(); let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0]; m = t.match(/(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{2,4})/); if (m) { let y = m[3]; if (y.length === 2) y = '20' + y; return y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); } return ''; };
+const isoZ = s => { const t = String(s == null ? '' : s).trim(); let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0]; m = t.match(/(\d{1,2})\s*\.\s*(\d{1,2})\s*\.\s*(\d{2,4})/); if (m) { let y = m[3]; if (y.length === 2) y = '20' + y; return y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); } m = t.match(/^(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*$/); if (m && +m[2] >= 1 && +m[2] <= 12) return new Date().getFullYear() + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); return ''; };   /* datum bez roku (08.04.) = letosni rok */
 const cl = s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
 const num = v => { const n = Number(String(v == null ? '' : v).replace(',', '.').replace(/\s/g, '')); return Number.isFinite(n) ? n : null; };
 
