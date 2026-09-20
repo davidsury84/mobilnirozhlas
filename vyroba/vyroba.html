@@ -146,19 +146,19 @@ table.plan tr.dnes td:first-child b{color:var(--amber)}
 /* modal Nová objednávka ve stylu Ložného plánu */
 .modal .box.wide{max-width:1520px;width:96vw}
 .no-head{padding:0 0 6px}
-.no-body{display:grid;grid-template-columns:minmax(260px,1fr) minmax(360px,1.2fr);gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;height:min(560px,58vh)}
-.no-cat{display:flex;flex-direction:column;border-right:1px solid var(--line);min-width:0}
+.no-body{display:grid;grid-template-columns:minmax(260px,1fr) minmax(360px,1.2fr);gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;height:min(640px,62vh)}
+.no-cat{display:flex;flex-direction:column;border-right:1px solid var(--line);min-width:0;min-height:0}
 .no-cat input{margin:10px 12px 8px;padding:9px 11px;border:1px solid var(--line-strong);border-radius:8px;font-size:14px}
 .no-cat input:focus{outline:none;border-color:var(--green)}
-#noCatalog{flex:1;overflow-y:auto;padding:0 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px;align-content:start}
+#noCatalog{flex:1;min-height:0;overflow-y:auto;padding:0 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px;align-content:start}
 .cat-it{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;cursor:pointer;min-width:0;background:var(--paper)}
 .cat-it:hover{background:var(--green-soft);border-color:var(--green)}
 .cat-it .k{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:12px}
 .cat-it .r{flex-shrink:0;font-size:10.5px;color:var(--faint);font-family:var(--mono)}
 .dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
-.no-lines{display:flex;flex-direction:column;min-width:0}
+.no-lines{display:flex;flex-direction:column;min-width:0;min-height:0}
 .no-lt{padding:10px 14px 6px;font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);font-family:var(--mono);flex-shrink:0}
-#noLines{flex:1;overflow-y:auto;padding:0 12px 12px}
+#noLines{flex:1;min-height:0;overflow-y:auto;padding:0 12px 12px}
 .ln{border:1px solid;border-radius:7px;margin-bottom:5px;padding:6px 8px}
 .ln-top{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
 .ln-k{flex:1 1 160px}
