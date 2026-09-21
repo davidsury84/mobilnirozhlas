@@ -268,7 +268,8 @@ function mount(host) {
           if (parsedNow && parsedNow.rows) { await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today); }
         } catch (e) { console.warn('[nakup-report] pohyby (skip):', e.message); }
       }
-      if (loadBilance().length === 0 || !st.bilanceFixV6) {
+      // V8 i tady (větev bez nového souboru): oprava se má projevit hned po nasazení, ne až s dalším denním souborem
+      if (loadBilance().length === 0 || !st.bilanceFixV6 || !st.bilanceFixV8) {
         try {
           // Pozor: dřív se tu jen četl OBJ_LIVE a když chyběl, TIŠE se nestalo nic → bilance zůstala
           // navždy prázdná. Nově se soubor v takovém případě stáhne z Disku.
@@ -284,7 +285,7 @@ function mount(host) {
           try { fs.unlinkSync(MOVE_F); } catch (_) {}
           await bootstrapMovements(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today);
           await bootstrapBilance(xls, newest, parsedNow, parsedNow.date || dateOfName(newest.name) || today, force);
-          st.bilanceFixV6 = 1;
+          st.bilanceFixV6 = 1; st.bilanceFixV8 = 1; st.movesAllV7 = 1;   // bootstrapMovements už jede pro všechny položky
           console.log('[nakup-report] bilance: ' + (force ? 'jednorázový přepočet historie' : 'bootstrap') + ' z denních souborů → ' + loadBilance().length + ' dnů');
         } catch (e) { console.warn('[nakup-report] bilance (skip):', e.message); }
       }
