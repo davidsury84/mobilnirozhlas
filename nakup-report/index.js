@@ -305,15 +305,18 @@ function mount(host) {
       // denní bilance skladu (stav + pohyby vs PŘEDCHOZÍ DEN — nikdy ne proti témuž dni, jinak vyjdou nulové pohyby)
       try {
         const prevForFlow = (prev && prev.rows && prev.date && prev.date !== dataDate) ? prev.rows : null;
+        // Jednorázové přepočty pohybů — SAMOSTATNĚ, nikdy uprostřed řetězce bilance (poučení z V7: else se přivěsí na špatný if)
+        if (!st.movesAllV7) { try { fs.unlinkSync(MOVE_F); } catch (_) {} await bootstrapMovements(xls, newest, parsed, dataDate); st.movesAllV7 = 1; console.log('[nakup-report] pohyby: jednorázový přepočet pro všechny položky (V7)'); }
         if (loadBilance().length === 0) await bootstrapBilance(xls, newest, parsed, dataDate);
         else if (!st.bilanceFixV6) { try { fs.unlinkSync(MOVE_F); } catch (_) {} await bootstrapMovements(xls, newest, parsed, dataDate); await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV6 = 1; console.log('[nakup-report] bilance: jednorázový přepočet historie z denních souborů (V6)'); }
-        if (!st.movesAllV7) { try { fs.unlinkSync(MOVE_F); } catch (_) {} await bootstrapMovements(xls, newest, parsed, dataDate); st.movesAllV7 = 1; console.log('[nakup-report] pohyby: jednorázový přepočet pro všechny položky (V7)'); }
+        // V8: od 13. 9. 2026 se denní zápis bilance omylem přeskakoval (V7 blok rozbil if/else řetězec) → jednou dopočítat z Disku
+        else if (!st.bilanceFixV8) { await bootstrapBilance(xls, newest, parsed, dataDate, true); st.bilanceFixV8 = 1; console.log('[nakup-report] bilance: doplnění chybějících dnů z denních souborů (V8)'); }
         else pushBilance(computeBilance(parsed.rows, dataDate, prevForFlow, prevForFlow ? prev.date : null));
       } catch (e) { console.warn('[nakup-report] bilance:', e.message); }
       fs.writeFileSync(PREV_F, JSON.stringify({ date: dataDate, rows: parsed.rows.map(r => ({ sk: r.sk, reg: r.reg, stock: r.stock, onOrder: r.onOrder, reserved: r.reserved })) }));
     } catch (e) { console.warn('[nakup-report] pohyby:', e.message); }
     fs.writeFileSync(OBJ_LIVE, JSON.stringify({ source: newest.name, date: dataDate, columns: parsed.columns, rows: parsed.rows, syncedAt: new Date().toISOString() }));
-    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV6: st.bilanceFixV6 || 0 };
+    st = { lastSyncDate: today, lastFileId: newest.id, lastFileName: newest.name, lastRows: parsed.rows.length, lastAt: new Date().toISOString(), bilanceFixV6: st.bilanceFixV6, movesAllV7: st.movesAllV7, bilanceFixV8: st.bilanceFixV8 || 0 };
     try { fs.writeFileSync(SYNC_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
     _dsA = null;   // nový snímek/pohyby → odvozený dropship přepočítat
     console.log('[nakup-report] Drive sync: ' + newest.name + ' → ' + parsed.rows.length + ' položek');
