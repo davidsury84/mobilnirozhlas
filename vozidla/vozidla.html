@@ -46,7 +46,13 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .tabs button.on{background:var(--green-soft);color:var(--green-d)}
 
 .stat{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
-.stat .s{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:11px 16px;min-width:120px}
+.stat .s{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:11px 16px;min-width:120px;
+  font:inherit;color:inherit;text-align:left;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.stat .s:hover{border-color:var(--line-strong);box-shadow:0 2px 8px rgba(28,29,26,.07)}
+.stat .s:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.stat .s.on{border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
+.stat .s .f{font-size:10.5px;color:var(--faint);margin-top:4px;letter-spacing:.3px}
+.stat .s.on .f{color:var(--green)}
 .stat .s .n{font-family:var(--cond);font-weight:700;font-size:22px;line-height:1}
 .stat .s .l{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
 .stat .s.warn{border-color:#e8d9a8;background:var(--yellow-soft)}
@@ -227,6 +233,7 @@ function filtrovana(){
     return tok.every(t=>seno.includes(t));
   });
   if(FILTR.stredisko)vs=vs.filter(v=>v.stredisko===FILTR.stredisko);
+  if(FILTR.jen==="provoz")vs=vs.filter(v=>v.stav==="aktivni");
   if(FILTR.jen==="stk")vs=vs.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk"));
   if(FILTR.jen==="doplnit")vs=vs.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0));
   if(FILTR.jen==="nepotvrzeno")vs=vs.filter(v=>v.spravceEmail&&!v.spravcePotvrzen);
@@ -238,18 +245,31 @@ function filtrovana(){
     return ua-ub || String(a.spz||"").localeCompare(String(b.spz||""),"cs");
   });
 }
+function statFiltr(klic){
+  FILTR.jen=(FILTR.jen===klic)?"":klic;
+  vykresli();
+  const t=document.querySelector("#obsah table"); if(t)t.scrollIntoView({behavior:"smooth",block:"center"});
+}
 function vykresliPrehled(){
   const vs=filtrovana(), akt=D.vozidla.filter(v=>v.stav==="aktivni");
   const stk=akt.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk")).length;          // propadlá nebo do 60 dní
   const chybiUdaj=akt.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0)).length;
   const km=akt.filter(v=>v.stav_.chybejiciRoky.length).length;
   const inv=akt.filter(v=>v.stav_.inventura.potreba).length;
+  // dlaždice = filtr; druhé kliknutí na tutéž dlaždici filtr zase zruší
+  const dlazdice=(klic,cislo,popis,barva)=>{
+    const on=FILTR.jen===klic;
+    return '<button type="button" class="s '+(cislo&&barva?barva:"")+(on?" on":"")+'" aria-pressed="'+on+'"'
+      +' title="'+(on?"Zrušit filtr":"Zobrazit jen tato vozidla")+'" onclick="statFiltr(\''+klic+'\')">'
+      +'<div class="n">'+cislo+'</div><div class="l">'+popis+'</div>'
+      +'<div class="f">'+(on?"✓ filtrováno — zrušit":"zobrazit")+'</div></button>';
+  };
   let h='<div class="stat">'
-    +'<div class="s"><div class="n">'+akt.length+'</div><div class="l">vozidel v provozu</div></div>'
-    +'<div class="s '+(stk?"bad":"")+'"><div class="n">'+stk+'</div><div class="l">technická prohlídka končí nebo propadla</div></div>'
-    +'<div class="s '+(chybiUdaj?"warn":"")+'"><div class="n">'+chybiUdaj+'</div><div class="l">chybí údaje (STK, VIN, správce)</div></div>'
-    +'<div class="s '+(km?"warn":"")+'"><div class="n">'+km+'</div><div class="l">chybí roční tachometr</div></div>'
-    +'<div class="s '+(inv?"warn":"")+'"><div class="n">'+inv+'</div><div class="l">čeká inventarizace</div></div>'
+    +dlazdice("provoz",akt.length,"vozidel v provozu","")
+    +dlazdice("stk",stk,"technická prohlídka končí nebo propadla","bad")
+    +dlazdice("doplnit",chybiUdaj,"chybí údaje (STK, VIN, správce)","warn")
+    +dlazdice("km",km,"chybí roční tachometr","warn")
+    +dlazdice("inv",inv,"čeká inventarizace","warn")
     +'</div>';
   if(D.seedImport&&ZALOZKA!=="moje"){
     const bezSpravce=D.vozidla.filter(v=>!v.spravceEmail&&v.spravceZTabulky).length;
@@ -267,7 +287,7 @@ function vykresliPrehled(){
     +'<select class="btn" style="font-weight:400" onchange="FILTR.stredisko=this.value;vykresli()"><option value="">všechna střediska</option>'
       +D.strediska.map(s=>'<option '+(FILTR.stredisko===s?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select>'
     +'<select class="btn" style="font-weight:400" onchange="FILTR.jen=this.value;vykresli()">'
-      +[["","vše"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["nepotvrzeno","jen nepotvrzený správce"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
+      +[["","vše"],["provoz","jen vozidla v provozu"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["nepotvrzeno","jen nepotvrzený správce"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
         .map(([k,t])=>'<option value="'+k+'" '+(FILTR.jen===k?"selected":"")+'>'+t+'</option>').join("")+'</select>'
     +'<div class="sp"></div>'
     +'<a class="btn sm" href="/api/vozidla/export">⬇ CSV</a>'
