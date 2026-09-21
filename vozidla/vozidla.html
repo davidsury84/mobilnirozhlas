@@ -94,6 +94,10 @@ td.num{font-family:var(--mono);white-space:nowrap}
 .inl:hover{border-color:var(--line)}
 .inl:focus{outline:none;border-color:var(--green);background:var(--paper)}
 .inl.mono{font-family:var(--mono);font-size:11.5px}
+/* šipky u number inputu ukrajovaly šířku, takže rok nebyl vidět celý */
+.inl[type=number]{-moz-appearance:textfield;appearance:textfield;text-align:center;min-width:54px}
+.inl[type=number]::-webkit-outer-spin-button,.inl[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.inl[type=date]{min-width:118px}
 .radekStav{font-size:10.5px;color:var(--ink-soft);white-space:nowrap}
 .ac{position:relative}
 .ac .acin{width:100%;padding:8px 30px 8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper)}
@@ -270,7 +274,7 @@ function vykresliPrehled(){
     +(D.me.admin?'<button class="btn pri sm" onclick="editVuz(null)">+ Vozidlo</button>':'')
     +'</div>';
   if(!vs.length){h+='<div class="empty">Žádné vozidlo neodpovídá filtru.</div></div>';$("#obsah").innerHTML=h;return;}
-  h+='<table><thead><tr><th>Vozidlo</th><th style="min-width:150px">VIN</th><th style="width:70px">Rok</th><th style="min-width:190px">Správce vozu</th>'
+  h+='<table><thead><tr><th>Vozidlo</th><th style="min-width:150px">VIN</th><th style="min-width:78px;width:78px">Rok</th><th style="min-width:190px">Správce vozu</th>'
     +'<th>Středisko</th><th style="min-width:125px">Technická do</th><th>Tachometr</th><th>Stav</th><th></th></tr></thead><tbody>';
   vs.forEach(v=>{
     const pk=(v.km||[]).slice().sort((a,b)=>a.rok-b.rok).pop();
@@ -282,7 +286,7 @@ function vykresliPrehled(){
              :'<span class="mono">'+esc(v.vin||"—")+'</span>')+'</td>'
       +'<td>'+(e?'<input class="inl" id="in_'+v.id+'_rok" type="number" min="1980" max="'+(new Date().getFullYear()+1)+'" autocomplete="off" value="'+(v.rokVyroby||"")+'" oninput="ulozZa(\'r'+v.id+'\',800,function(){ulozRadek(\''+v.id+'\');})">'
              :(v.rokVyroby||"—"))+'</td>'
-      +'<td>'+(e?acHtml("in_"+v.id+"_spravce",v.spravceEmail,"Začni psát jméno…",function(){ulozRadek(v.id,true);})
+      +'<td>'+(e?acHtml("in_"+v.id+"_spravce",v.spravceEmail,"Začni psát jméno…",function(){ulozRadek(v.id,true);},"Opravdu odebrat správce vozu? Vozidlo zůstane bez správce a upomínky (technická prohlídka, tachometr, inventarizace) nebudou mít komu chodit.")
                  +(v.spravceEmail&&!v.spravcePotvrzen?'<div class="mut" style="margin-top:2px"><span class="pill warn">z evidence</span></div>':'')
                  +(!v.spravceEmail&&v.spravceZTabulky?'<div class="mut">v tabulce: '+esc(v.spravceZTabulky)+'</div>':'')
              :spravceBunka(v))+'</td>'
@@ -316,8 +320,10 @@ function hleda(q){
 }
 let AC_SEL={};
 const AC_AKCE={};   // co se má stát po výběru — např. rovnou uložit
-function acHtml(id,email,placeholder,akce){
+const AC_POTVRD={};  // na co se zeptat, než se ✕ smaže už vyplněného člověka
+function acHtml(id,email,placeholder,akce,potvrdit){
   if(akce)AC_AKCE[id]=akce;
+  if(potvrdit)AC_POTVRD[id]=potvrdit;
   const k=osobaPodleMailu(email);
   return '<div class="ac">'
     +'<input type="hidden" id="'+id+'" value="'+esc(email||"")+'">'
@@ -349,6 +355,9 @@ function acVyber(id,email){
   if(AC_AKCE[id])AC_AKCE[id]();
 }
 function acZrus(id){
+  // omylem kliknuté ✕ u přiřazeného člověka nemá tiše smazat správce vozu
+  const hod=document.getElementById(id);
+  if(hod&&hod.value&&AC_POTVRD[id]&&!confirm(AC_POTVRD[id]))return;
   document.getElementById(id).value="";
   document.getElementById(id+"_in").value="";
   acZavri(id);
@@ -488,10 +497,11 @@ function detail(id){
     const chybi=s.chybejiciRoky;
     h+='<div class="grid3">'
       +'<label class="f"><span>Rok</span><select id="kmRok" autocomplete="off">'
-        +[letos,letos-1,letos-2,letos-3].map(r=>'<option '+(chybi.length&&chybi[chybi.length-1]===r?"selected":"")+'>'+r+'</option>').join("")+'</select></label>'
+        +[letos,letos-1,letos-2,letos-3].map(r=>'<option '+(r===(chybi[0]||letos)?"selected":"")+'>'+r+'</option>').join("")+'</select></label>'
       +'<label class="f"><span>Stav tachometru (km)</span><input id="kmHod" autocomplete="off" type="number" min="0" step="1" placeholder="např. 184500"></label>'
       +'<div style="display:flex;align-items:flex-end;margin-bottom:10px"><button class="btn pri" onclick="ulozKm(\''+v.id+'\')">Zapsat</button></div>'
-      +'</div>';
+      +'</div>'
+      +'<div class="hint" style="margin-top:-2px">Jednou za rok stačí opsat aktuální stav tachometru. Kolik se za rok najelo, spočítá systém sám z rozdílu proti předchozímu zápisu — zpětně nic dohledávat nemusíte.</div>';
   }
   h+=kmRady.length?('<table><thead><tr><th>Rok</th><th>Stav</th><th>Za rok ujeto</th><th>Zapsal</th></tr></thead><tbody>'
     +kmRady.map((z,i)=>{const pr=kmRady[i+1];return '<tr><td>'+z.rok+'</td><td class="num">'+cis(z.km)+' km</td><td class="num">'+(pr?cis(z.km-pr.km)+" km":"—")+'</td><td>'+esc(z.kdo||"—")+(z.zInventury?' <span class="mut">(z inventarizace)</span>':'')+'</td></tr>';}).join("")
@@ -645,7 +655,7 @@ function editVuz(id){
     +'<label class="f"><span>Typ</span><select id="eTyp" autocomplete="off">'+Object.keys(D.typy).map(k=>'<option value="'+k+'" '+(v.typ===k?"selected":"")+'>'+esc(D.typy[k])+'</option>').join("")+'</select></label>'
     +'</div><div class="grid3">'
     +'<label class="f"><span>Středisko</span><input id="eStred" autocomplete="off" list="stredL" value="'+esc(v.stredisko||"")+'"><datalist id="stredL">'+D.strediska.map(s=>'<option>'+esc(s)+'</option>').join("")+'</datalist></label>'
-    +'<label class="f"><span>Správce vozu</span>'+acHtml("eSpravce",v.spravceEmail,"Začni psát jméno…",id?function(){ulozVuz(id,true);}:null)+'</label>'
+    +'<label class="f"><span>Správce vozu</span>'+acHtml("eSpravce",v.spravceEmail,"Začni psát jméno…",id?function(){ulozVuz(id,true);}:null,"Opravdu odebrat správce vozu? Vozidlo zůstane bez správce a upomínky (technická prohlídka, tachometr, inventarizace) nebudou mít komu chodit.")+'</label>'
     +'<label class="f"><span>Stav</span><select id="eStav" autocomplete="off">'+Object.keys(D.stavy).map(k=>'<option value="'+k+'" '+((v.stav||"aktivni")===k?"selected":"")+'>'+esc(D.stavy[k])+'</option>').join("")+'</select></label>'
     +'</div><div class="grid2">'
     +'<label class="f"><span>Technická prohlídka platí do</span><input id="eStk" autocomplete="off" type="date" value="'+esc(v.stkDo||"")+'"></label>'

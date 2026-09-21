@@ -4,7 +4,8 @@
 // ============================================================================
 //  Co modul hlídá (dle zadání):
 //   1) u každého vozidla je přidělen SPRÁVCE VOZU (jeden člověk může mít víc vozů)
-//   2) u vozidla se eviduje VIN a rok výroby; každý rok se doplňuje stav tachometru
+//   2) u vozidla se eviduje VIN a rok výroby; jednou za rok se opíše stav tachometru
+//      (nájezd za rok = rozdíl proti loňskému zápisu, zpětně se nic nedoplňuje)
 //   3) za STŘEDISKO zodpovídá konkrétní člověk (ředitel dopravy / výroby / střediska);
 //      systém upozorňuje na blížící se konec technické prohlídky a provedení se odškrtne
 //   4) sleduje se nájezd a z něj se odvozuje nejvhodnější období prodeje
@@ -253,22 +254,15 @@ function mount(host) {
     }
     return 0;
   }
-  // Za které roky chybí zápis tachometru. Historii nevymýšlíme: chceme roky od chvíle,
-  // kdy vozidlo firma má a kdy je v evidenci — ne od roku výroby ojetiny koupené vloni.
+  // Zápis tachometru se chce jen za probíhající rok. Zpětně nemá smysl se ptát —
+  // v půlce roku nikdo neví, kolik měl vůz na tachometru k 31. 12. předloni.
+  // Roční nájezd stejně vychází z rozdílu dvou zápisů (2026: 24 000 → 2027: 36 000
+  // = 12 000 km za rok), takže stačí jednou ročně opsat aktuální stav.
+  // Starší zápisy zůstávají v archivu, jen je systém nevyžaduje.
   function chybejiciRoky(v) {
     const letos = dnes().getFullYear();
-    const rokZ = s => { const r = parseInt(String(s || '').slice(0, 4), 10); return isNaN(r) ? 0 : r; };
-    const vznikRok = v.vznik ? new Date(v.vznik).getFullYear() : letos;
-    const odRok = Math.max(
-      Number(v.rokVyroby) || 0,
-      rokZ(v.porizeno),
-      vznikRok - 1,                       // vozidlo zapsané letos → doptáme se nejvýš na loňsko
-      letos - 6                           // dozadu nikdy dál než 6 let
-    );
     const mame = new Set((v.km || []).map(x => Number(x.rok)));
-    const out = [];
-    for (let r = odRok; r <= letos - 1; r++) if (!mame.has(r)) out.push(r);
-    return out;
+    return mame.has(letos) ? [] : [letos];
   }
   // Nejvhodnější období prodeje. Heuristika, ne věštba — v UI je to napsané.
   const DOBRE_MESICE = [3, 4, 5, 9, 10];   // březen–květen a září–říjen: nejvyšší poptávka po ojetinách
@@ -938,9 +932,9 @@ function mount(host) {
       if (st.chybejiciRoky.length && v.spravceEmail) {
         await poslatJednou('km:' + v.id + ':' + dnesStr.slice(0, 7), 25,
           [v.spravceEmail].concat(nast.kopieNa).join(','), 'Doplňte stav tachometru — ' + popis,
-          'U svěřeného vozidla ' + popis + ' chybí roční zápis stavu tachometru za rok ' + st.chybejiciRoky.join(', ') + '.\n\n'
-          + 'Vyplňte ho prosím zde: https://intranet.elkoplast.cz/#modul=vozidla → detail vozidla → Stav tachometru po letech.\n'
-          + 'Zabere to půl minuty a slouží k plánování údržby i obměny vozidel.\n'
+          'U svěřeného vozidla ' + popis + ' chybí letošní zápis stavu tachometru (rok ' + st.chybejiciRoky.join(', ') + ').\n\n'
+          + 'Stačí opsat, kolik má vůz teď na tachometru: https://intranet.elkoplast.cz/#modul=vozidla → detail vozidla → Stav tachometru po letech.\n'
+          + 'Zpětně nic dohledávat nemusíte — kolik se za rok najelo, spočítá systém z rozdílu proti loňskému zápisu.\n'
           + nezapomen(v));
       }
 
