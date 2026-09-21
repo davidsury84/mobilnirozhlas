@@ -1090,6 +1090,9 @@ function mount(host) {
           'Když se soubory doplní do složky na Disku, přepočítá se to samo.</div>';
       }
     } catch (_) {}
+    // Hlídač dat — ať se výpadek pozná ráno v e-mailu, ne až po týdnu v grafu.
+    try { const sd = stavDat(); if (sd.varovani.length) chybiHtml += '<div style="background:#fbeaea;border:1px solid #efc1c1;border-radius:9px;padding:10px 14px;margin:0 0 14px;font-size:13px;line-height:1.6;color:#7a1f1f">' +
+      '<b>🚨 Hlídač dat:</b><ul style="margin:6px 0 0;padding-left:18px">' + sd.varovani.map(v => '<li>' + esc(v) + '</li>').join('') + '</ul></div>'; } catch (_) {}
     let body = chybiHtml + explainBox([
       ['Co to je', 'Ranní <b>bilance skladu e-shopu</b> — kolik v něm dnes leží peněz a jak se to za den pohnulo. Vše v <b>nákladových (landed) cenách</b>.'],
       ['Stav (4 karty)', '<b>Sklad</b> = fyzická zásoba. <b>K dispozici</b> = sklad − rezervace zákazníků. <b>Objednáno u dodavatelů</b> = co je na cestě (ještě nedorazilo). <b>Rezervováno zákazníky</b> = co si už zákazníci objednali. „±" u karty = změna hodnoty proti včerejšku.'],
@@ -1186,6 +1189,19 @@ function mount(host) {
     return out.sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }
   // Chybějící denní soubory — z mezer v bilanci (flowDays > 1). Vrací pole ISO dat.
+  // HLÍDAČ DAT — poučení z 13.–20. 9. 2026: bilance osm dní stála na 36 dnech, tick to hlásil, nikdo si nevšiml.
+  // Vrací datum posledního snímku, posledního dne bilance a výdejek + seznam varování (do logu, ranního e-mailu, aplikace).
+  function stavDat() {
+    const dnes = new Date().toISOString().slice(0, 10), o = loadObj(), bal = loadBilance(), vd = loadVyd().dny || {};
+    const snimek = o.date || '', bilDo = bal.length ? String(bal[bal.length - 1].date || '') : '', vydDo = Object.keys(vd).sort().pop() || '';
+    const dnu = (a, b) => (a && b) ? Math.round((Date.parse(b) - Date.parse(a)) / 86400000) : null;
+    const varovani = [];
+    if (!snimek) varovani.push('Chybí denní snímek skladu — synchronizace z Disku zatím nic nestáhla.');
+    else if (dnu(snimek, dnes) >= 2) varovani.push('Denní snímek skladu nechodí: poslední je z ' + snimek + ' (' + dnu(snimek, dnes) + ' dní). Zkontrolovat export z ERP do složky na Disku.');
+    if (snimek && bilDo && bilDo < snimek) varovani.push('Bilance zaostává za snímkem: bilance do ' + bilDo + ', snímek ' + snimek + ' — denní zápis bilance neproběhl (chyba v synchronizaci).');
+    if (vydDo && dnu(vydDo, dnes) >= 10) varovani.push('Výdejky e-shopu končí ' + vydDo + ' (' + dnu(vydDo, dnes) + ' dní) — chybí nový export „Expediční příkazy" na Disku; podíl e-shop / obchod se za nové dny neukáže.');
+    return { dnes, snimek, bilanceDo: bilDo, bilanceDnu: bal.length, vydejkyDo: vydDo, varovani };
+  }
   function chybejiciDny() {
     const out = [];
     loadBilance().forEach(e => {
@@ -1280,6 +1296,7 @@ function mount(host) {
     // 1) DENNÍ stažení nejnovějšího souboru z Drive (běží nezávisle na e-mailech)
     try { const s = await syncObjednavky(false); if (s && !s.ok && !s.skipped) console.warn('[nakup-report] Drive sync neproběhl:', s.error); } catch (e) { console.error('[nakup-report] Drive sync:', e.message); }
     try { const se = await syncExporty(); if (se && se.zpracovano && se.zpracovano.length) console.log('[nakup-report] exporty z Disku: ' + se.zpracovano.length + ' nový/é'); } catch (e) { console.error('[nakup-report] exporty sync:', e.message); }
+    try { const sd = stavDat(); sd.varovani.forEach(v => console.warn('[nakup-report] ⚠ HLÍDAČ DAT: ' + v)); } catch (_) {}
     if (OBRAT_FOLDER) { try { const so = await syncObrat(false); if (so && !so.ok && !so.skipped) console.warn('[nakup-report] obrat plasty sync neproběhl:', so.error); } catch (e) { console.error('[nakup-report] obrat sync:', e.message); } }
     // 2) E-mailové reporty dle configu
     try {
@@ -1548,7 +1565,7 @@ function mount(host) {
       const itemHist = {}; top.forEach(t => { itemHist[t.kod] = (mv[t.kod] || {}).hist || []; });
       return json(res, 200, { ok: true, days, weeks, top, itemHist, dataDate: o.date || '', dniCelkem: days.length, chybejiciDny: chybi, limitMimoradne: isFinite(limit) ? Math.round(limit) : null,
         vydejky: Object.assign({ dnu: Object.keys(vdny).length }, vyd.nahrano || {}),
-        mesice: vydMesice(vdny), rokTop: vydTop(vdny), dodavatele: vydDodavatele(vdny, meta) }), true;
+        mesice: vydMesice(vdny), rokTop: vydTop(vdny), dodavatele: vydDodavatele(vdny, meta), stavDat: stavDat() }), true;
     }
     // Historie snímků SMI (mrtvé zásoby v čase) — sdílená, přístup jako e-shop
     if (p === '/api/nakup-report/historie' && req.method === 'GET') {

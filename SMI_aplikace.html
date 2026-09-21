@@ -1711,6 +1711,11 @@ async function renderVyvojEshop(){
           ' — pohyby nejsou ztracené, dopočítávají se podle obvyklého profilu týdne (světlejší sloupce, značka ≈). Po doplnění souborů se přepočítá samo.';}
     }
   }
+  // Hlídač dat (server): výpadek snímků, zaostávající bilance, staré výdejky — červený pruh hned nahoře
+  { const sd=d.stavDat||{varovani:[]}; let el=document.getElementById('veStav');
+    if(!el&&mt){el=document.createElement('div');el.id='veStav';el.style.cssText='background:#fbeaea;border:1px solid #efc1c1;border-radius:10px;padding:9px 13px;margin:8px 0 0;font-size:12.5px;color:#7a1f1f';mt.after(el);}
+    if(el){ if(!(sd.varovani||[]).length){el.style.display='none';} else {el.style.display='';el.innerHTML='🚨 <b>Hlídač dat</b><ul style="margin:4px 0 0;padding-left:18px">'+sd.varovani.map(v=>'<li>'+esc(v)+'</li>').join('')+'</ul>';} }
+    if(mt&&sd.snimek)mt.textContent='Zdroj: '+d.dniCelkem+' denních snímků · snímek '+sd.snimek+' · bilance do '+(sd.bilanceDo||'?')+' · výdejky do '+(sd.vydejkyDo||'—')+'.'; }
   // KPI: poslední týden vs předchozí
   const w=weeks[weeks.length-1]||{dispKc:0,dispKs:0,dni:0}, wp=weeks[weeks.length-2]||null;
   const chg=wp&&wp.dispKc?((w.dispKc/wp.dispKc-1)*100):null;
