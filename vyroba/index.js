@@ -77,6 +77,8 @@ function mount(host) {
   const str = (s, max) => String(s == null ? '' : s).trim().slice(0, max || 400);
   const num = (v, def) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) ? n : (def == null ? 0 : def); };
   const dnesISO = () => new Date().toISOString().slice(0, 10);
+  // značka ve sloupcích Výkresy knihy CONTRACT: '' / 'xx' / 'x' / '-' = nic (výkres není potřeba); 'OK' nebo datum (23.3., 16.9., 15.6) = ano
+  function vykresZnacka(v) { const t = String(v == null ? '' : v).trim(); if (!t || /^[x\-–]+$/i.test(t)) return null; const m = t.match(/^(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*(\d{2,4})?$/); let datum = ''; if (m) { let y = m[3] || String(new Date().getFullYear()); if (y.length === 2) y = '20' + y; datum = y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); } return { datum }; }
   const newId = (p) => (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
   // ---- perzistence ---------------------------------------------------------
@@ -117,6 +119,10 @@ function mount(host) {
       const rok = new Date().getFullYear();
       d.polozky.forEach(p => { if (p.rok && p.rok < rok && ['prijata', 'zadano', 'svarovna', 'zinkovna', 'lakovna', 'hotovo', 'naplanovano'].includes(p.stav) && (p.udalosti || []).every(u => /^import/.test(u.pozn || ''))) { p.stav = 'expedovano'; p.hotovoKs = num(p.ks); p.udalosti = p.udalosti || []; p.udalosti.push({ ts: Date.now(), kdo: 'intranet@elkoplast.cz', jmeno: 'Intranet', stav: 'expedovano', ks: null, pozn: 'zakázka z roku ' + p.rok + ' – automaticky uzavřena' }); } });
       d.migrace.loniHotovo = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
+    }
+    if (!d.migrace.vykresXx) {   // „xx" ve sloupci Výkresy Posl. dřív znamenalo „poslán" → čekání na výkres u 300 standardních beden; ve skutečnosti = výkres není potřeba
+      d.polozky.forEach(p => { if (p.vykres && p.vykres.stav === 'poslan' && !p.vykres.datum) p.vykres = { stav: 'neni', datum: '' }; });
+      d.migrace.vykresXx = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
     }
     if (!d.migrace.objem10 || !d.migrace.objem10b) {   // objem z kódu se dřív bral doslova (08.00 → 8 m³) místo /10 (→ 0,8 m³)
       const oprav = (x) => { const m = String(x.kod || '').replace(/\s+/g, '').match(/^[A-ZÖ]+(\d{1,2}[.,]\d{2})/i); if (!m) return; const stary = Math.round(num(m[1]) * 100) / 100; if (x.objem === stary) x.objem = Math.round(num(m[1]) * 10) / 100; };
@@ -1044,8 +1050,10 @@ function mount(host) {
         if (!p.rozmer && row.rozmer) { p.rozmer = row.rozmer; pz = true; }
         if (!p.ral && row.ral) { p.ral = row.ral; pz = true; } if (!p.lem && row.lem) { p.lem = row.lem; pz = true; }
         if (!p.kamion && row.kamion) { p.kamion = row.kamion; pz = true; }
-        if (row.vykresOk && (!p.vykres || p.vykres.stav === 'neni' || p.vykres.stav === 'poslan')) { p.vykres = { stav: 'schvalen', datum: p.vykres && p.vykres.datum || '' }; pz = true; }
-        else if (row.vykresPoslan && (!p.vykres || p.vykres.stav === 'neni')) { p.vykres = { stav: 'poslan', datum: '' }; pz = true; }
+        // sloupce „Výkresy: Posl. / OK" v knize: „xx" = výkres není potřeba (standardní bedna), datum = kdy poslán / kdy schválen (OK)
+        const vyOk = vykresZnacka(row.vykresOk), vyPos = vykresZnacka(row.vykresPoslan);
+        if (vyOk && (!p.vykres || p.vykres.stav === 'neni' || p.vykres.stav === 'poslan')) { p.vykres = { stav: 'schvalen', datum: vyOk.datum || (p.vykres && p.vykres.datum) || '' }; pz = true; }
+        else if (vyPos && (!p.vykres || p.vykres.stav === 'neni')) { p.vykres = { stav: 'poslan', datum: vyPos.datum || '' }; pz = true; }
         if (pz) stat.aktualizovano++;
       }
       if (zm) stat.aktualizovano++;
