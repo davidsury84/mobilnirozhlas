@@ -245,24 +245,76 @@ function filtrovana(){
     return ua-ub || String(a.spz||"").localeCompare(String(b.spz||""),"cs");
   });
 }
+/* Dlaždice nahoře: číslo i seznam za ním se počítají ze stejné funkce,
+   aby v okně bylo vždycky přesně tolik aut, kolik dlaždice ukazuje. */
+function statVozidla(klic){
+  const akt=D.vozidla.filter(v=>v.stav==="aktivni");
+  const vs = klic==="stk"     ? akt.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk"))
+           : klic==="doplnit" ? akt.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0))
+           : klic==="km"      ? akt.filter(v=>v.stav_.chybejiciRoky.length)
+           : klic==="inv"     ? akt.filter(v=>v.stav_.inventura.potreba)
+           : akt;
+  return vs.slice().sort((a,b)=>{
+    const ua=a.stav_.upozorneni.some(u=>u.urgent)?0:1, ub=b.stav_.upozorneni.some(u=>u.urgent)?0:1;
+    return ua-ub || String(a.spz||"").localeCompare(String(b.spz||""),"cs");
+  });
+}
+const STAT_POHLED={
+  provoz:{titul:"Vozidla v provozu", sloupec:"Technická do", bunka:v=>stkPill(v)},
+  stk:{titul:"Technická prohlídka končí nebo propadla", sloupec:"Technická do", bunka:v=>stkPill(v)
+    +(v.stav_.dnyStk!==null&&v.stav_.dnyStk>=0?'<div class="mut">zbývá '+v.stav_.dnyStk+' dní</div>':'')},
+  doplnit:{titul:"Vozidla s chybějícími údaji", sloupec:"Co chybí", bunka:v=>{
+    const u=v.stav_.upozorneni.filter(x=>["stk-chybi","vin","spravce"].indexOf(x.druh)>=0);
+    return u.length?u.map(x=>'<span class="pill warn" style="margin:1px 3px 1px 0">'+esc(x.text)+'</span>').join(""):"—";}},
+  km:{titul:"Chybí roční zápis tachometru", sloupec:"Poslední zápis", bunka:v=>{
+    const z=(v.km||[]).slice().sort((a,b)=>a.rok-b.rok).pop();
+    return z?cis(z.km)+' km <span class="mut">za '+z.rok+'</span>':'<span class="pill warn">žádný zápis</span>';}},
+  inv:{titul:"Čeká inventarizace svěřeného majetku", sloupec:"Poslední inventarizace", bunka:v=>{
+    const i=v.stav_.inventura;
+    return i.posledni?dat(i.posledni.datum)+' <span class="mut">('+esc(i.text)+')</span>':'<span class="pill warn">nikdy neproběhla</span>';}},
+};
+// Klik na dlaždici otevře okno s konkrétními auty, která se za tím číslem skrývají.
+function statOtevri(klic){
+  const p=STAT_POHLED[klic]; if(!p)return;
+  const vs=statVozidla(klic);
+  let h='';
+  if(!vs.length){ h='<div class="empty">Žádné vozidlo — tohle je vyřešené.</div>'; }
+  else{
+    h='<table><thead><tr><th>Vozidlo</th><th>Správce vozu</th><th>Středisko</th><th>'+p.sloupec+'</th><th></th></tr></thead><tbody>'
+      +vs.map(v=>{
+        const k=v.spravceKontakt||{};
+        return '<tr>'
+          +'<td><span class="spz">'+esc(v.spz||"bez SPZ")+'</span><div class="mut">'+esc([v.znacka,v.model].filter(Boolean).join(" ")||"—")+'</div></td>'
+          +'<td>'+(k.email?esc(k.jmeno||v.spravceJmeno||k.email):'<span class="mut" style="color:var(--red)">nepřidělen</span>')+'</td>'
+          +'<td>'+esc(v.stredisko||"—")+'</td>'
+          +'<td>'+p.bunka(v)+'</td>'
+          +'<td style="text-align:right"><button class="btn sm" onclick="zavri();detail(\''+v.id+'\')">Detail</button></td>'
+          +'</tr>';
+      }).join("")
+      +'</tbody></table>';
+  }
+  modal(p.titul+' ('+vs.length+')', h,
+    (vs.length?'<button class="btn" onclick="zavri();statFiltr(\''+klic+'\')">Vyfiltrovat v přehledu</button>':'')
+    +'<button class="btn pri" onclick="zavri()">Zavřít</button>');
+}
 function statFiltr(klic){
   FILTR.jen=(FILTR.jen===klic)?"":klic;
   vykresli();
   const t=document.querySelector("#obsah table"); if(t)t.scrollIntoView({behavior:"smooth",block:"center"});
 }
 function vykresliPrehled(){
-  const vs=filtrovana(), akt=D.vozidla.filter(v=>v.stav==="aktivni");
-  const stk=akt.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk")).length;          // propadlá nebo do 60 dní
-  const chybiUdaj=akt.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0)).length;
-  const km=akt.filter(v=>v.stav_.chybejiciRoky.length).length;
-  const inv=akt.filter(v=>v.stav_.inventura.potreba).length;
+  const vs=filtrovana(), akt=statVozidla("provoz");
+  const stk=statVozidla("stk").length;          // propadlá nebo do 60 dní
+  const chybiUdaj=statVozidla("doplnit").length;
+  const km=statVozidla("km").length;
+  const inv=statVozidla("inv").length;
   // dlaždice = filtr; druhé kliknutí na tutéž dlaždici filtr zase zruší
   const dlazdice=(klic,cislo,popis,barva)=>{
     const on=FILTR.jen===klic;
-    return '<button type="button" class="s '+(cislo&&barva?barva:"")+(on?" on":"")+'" aria-pressed="'+on+'"'
-      +' title="'+(on?"Zrušit filtr":"Zobrazit jen tato vozidla")+'" onclick="statFiltr(\''+klic+'\')">'
+    return '<button type="button" class="s '+(cislo&&barva?barva:"")+(on?" on":"")+'"'
+      +' title="Otevřít seznam těchto vozidel" onclick="statOtevri(\''+klic+'\')">'
       +'<div class="n">'+cislo+'</div><div class="l">'+popis+'</div>'
-      +'<div class="f">'+(on?"✓ filtrováno — zrušit":"zobrazit")+'</div></button>';
+      +'<div class="f">'+(cislo?"zobrazit seznam ›":"vyřešeno ✓")+'</div></button>';
   };
   let h='<div class="stat">'
     +dlazdice("provoz",akt.length,"vozidel v provozu","")
