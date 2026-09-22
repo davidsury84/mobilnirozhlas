@@ -536,21 +536,16 @@ const SEED_STREDISKA = [
 
 // ---- Společná pole všech dotazníků (2026-08, dle zpětné vazby obchodu) ------
 // Důležitá upozornění (volný text — např. výjimka z polepů Contract, otvory pro
-// odtok vody dle výkresu zákazníka), speciální polepy s cenou a ceny dle
-// objednávky pro fakturaci po dodání. Přikládání PDF/obrázků řeší z.prilohy.
+// odtok vody dle výkresu zákazníka) a speciální polepy s cenou.
+// Přikládání PDF/obrázků řeší z.prilohy.
 const POLE_DOPLNKY_EXTRA = [
   { k: 'upozorneni', label: 'Důležitá upozornění pro konstrukci a výrobu', type: 'textarea', hint: 'např. „výjimečně BEZ polepů Contract" · „otvory pro odtok vody uprostřed podlahových příčníků dle přiloženého výkresu zákazníka"' },
   { k: 'polepy', label: 'Speciální polepy — popis a umístění (např. všechny 4 strany)', type: 'text' },
   { k: 'polepyCena', label: 'Cena speciálních polepů (Kč bez DPH)', type: 'number' },
 ];
-const SEKCE_FAKTURACE = { title: 'Ceny dle objednávky (pro fakturaci po dodání)', fields: [
-  { k: 'cenaKontejner', label: 'Cena za kus (Kč bez DPH)', type: 'number' },
-  { k: 'cenaDoprava', label: 'Cena dopravy (Kč bez DPH)', type: 'number' },
-  { k: 'cenaPrislusenstvi', label: 'Cena plachty / příslušenství (Kč bez DPH)', type: 'number' },
-] };
-// Rozšíří dotazník o společná pole (upozornění/polepy do Doplňků + sekce
-// Fakturace na konec). ABROLL prochází přes dotaznikAbroll(), statické
-// dotazníky (CITY/MULDA/SLD/VANY/BOXY/SU) rozšíříme hned zde.
+// Rozšíří dotazník o společná pole (upozornění a polepy do Doplňků).
+// ABROLL prochází přes dotaznikAbroll(), statické dotazníky
+// (CITY/MULDA/SLD/VANY/BOXY/SU) rozšíříme hned zde.
 function rozsirDotaznik(dq) {
   if (dq._rozsireno) return dq;
   Object.defineProperty(dq, '_rozsireno', { value: true, enumerable: false });
@@ -558,7 +553,6 @@ function rozsirDotaznik(dq) {
   const extra = POLE_DOPLNKY_EXTRA.map(f => Object.assign({}, f));
   if (dop) dop.fields.unshift(...extra);
   else dq.push({ title: 'Doplňky', fields: extra });
-  dq.push({ title: SEKCE_FAKTURACE.title, fields: SEKCE_FAKTURACE.fields.map(f => Object.assign({}, f)) });
   return dq;
 }
 [DOTAZNIK_CITY, DOTAZNIK_MULDA, DOTAZNIK_SLD, DOTAZNIK_VANY, DOTAZNIK_BOXY, DOTAZNIK_SU].forEach(rozsirDotaznik);
