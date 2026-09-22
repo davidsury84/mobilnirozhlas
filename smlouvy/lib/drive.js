@@ -105,4 +105,14 @@ async function downloadFileBase64(fileId, maxBytes = 15 * 1024 * 1024) {
   return { base64: buf.toString('base64'), bytes: buf.length };
 }
 
-module.exports = { configured, listFolder, downloadFileBase64, saEmail };
+// Vyhledání podle názvu napříč vším, co SA vidí (sdílené složky i jejich obsah).
+// Vrací [{id,name,mimeType,parents,createdTime}] — složky i soubory (mime volitelně omezí).
+async function findByName(name, mime) {
+  const tok = await accessToken();
+  const q = encodeURIComponent(`name = '${String(name).replace(/'/g, "\\'")}' and trashed=false` + (mime ? ` and mimeType = '${mime}'` : ''));
+  const fields = encodeURIComponent('files(id,name,mimeType,parents,createdTime)');
+  const j = await httpsJson('GET', 'www.googleapis.com', `/drive/v3/files?q=${q}&fields=${fields}&pageSize=50&supportsAllDrives=true&includeItemsFromAllDrives=true`, { headers: { Authorization: 'Bearer ' + tok } });
+  return j.files || [];
+}
+
+module.exports = { configured, listFolder, downloadFileBase64, saEmail, findByName, FOLDER_MIME };

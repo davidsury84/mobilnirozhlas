@@ -378,9 +378,24 @@ function mount(host) {
       if (ym < od) od = ym; if (ym > do_) do_ = ym; radku++; }
     return { items, radku, od, do: do_ };
   }
+  // Složka s denními exporty e-shopu („EP - eshop", export z ERP každý den v 5:00, 2026-09-22).
+  // Najde se podle názvu mezi tím, co má SA nasdílené (id se cachuje); env EXPORTY_DRIVE_FOLDER má přednost.
+  const EXP_FOLDER_NAME = process.env.EXPORTY_DRIVE_FOLDER_NAME || 'EP - eshop';
+  let _expFolder = { id: process.env.EXPORTY_DRIVE_FOLDER || '', at: 0, hledano: false };
+  async function exportyFolderId() {
+    if (_expFolder.id) return _expFolder.id;
+    if (Date.now() - _expFolder.at < 3600000) return '';          // nehledat víckrát než 1× za hodinu
+    _expFolder.at = Date.now(); _expFolder.hledano = true;
+    try { const f = await drive.findByName(EXP_FOLDER_NAME, drive.FOLDER_MIME); if (f && f.length) { _expFolder.id = f[0].id; console.log('[nakup-report] složka exportů „' + EXP_FOLDER_NAME + '" nalezena: ' + f[0].id); } }
+    catch (e) { console.warn('[nakup-report] hledání složky exportů:', e.message); }
+    return _expFolder.id;
+  }
+  const exportyMetaFolder = () => ({ nazev: EXP_FOLDER_NAME, id: _expFolder.id || '', hledano: _expFolder.hledano });
   async function syncExporty(files) {
     if (!drive || !drive.configured()) return { ok: false, error: 'SA není nastavený.' };
     if (!files) files = await drive.listFolder(OBJ_FOLDER);
+    // + složka EP - eshop (když je nasdílená): stejné zpracování, stejný stav
+    try { const eid = await exportyFolderId(); if (eid) { const ef = await drive.listFolder(eid); files = (files || []).concat(ef.map(f => Object.assign({ zeSlozky: EXP_FOLDER_NAME }, f))); } } catch (e) { console.warn('[nakup-report] složka exportů:', e.message); }
     let st = { seen: {} }; try { st = JSON.parse(fs.readFileSync(EXP_STATE, 'utf8')) || { seen: {} }; } catch (_) {} st.seen = st.seen || {};
     const kand = (files || []).filter(f => isXlsx(f) && !isSnapFile(f) && !st.seen[f.id])
       .sort((a, b) => String(a.createdTime || '').localeCompare(String(b.createdTime || ''))).slice(0, 6);   // nejstarší napřed, ať novější přepíše
@@ -1199,6 +1214,7 @@ function mount(host) {
     if (!snimek) varovani.push('Chybí denní snímek skladu — synchronizace z Disku zatím nic nestáhla.');
     else if (dnu(snimek, dnes) >= 2) varovani.push('Denní snímek skladu nechodí: poslední je z ' + snimek + ' (' + dnu(snimek, dnes) + ' dní). Zkontrolovat export z ERP do složky na Disku.');
     if (snimek && bilDo && bilDo < snimek) varovani.push('Bilance zaostává za snímkem: bilance do ' + bilDo + ', snímek ' + snimek + ' — denní zápis bilance neproběhl (chyba v synchronizaci).');
+    try { const ef = exportyMetaFolder(); if (ef.hledano && !ef.id) varovani.push('Složka „' + ef.nazev + '" (denní export e-shopu) není nasdílená servisnímu účtu ' + (drive && drive.configured() ? drive.saEmail() : '') + ' — nasdílet jako Prohlížející.'); } catch (_) {}
     if (vydDo && dnu(vydDo, dnes) >= 10) varovani.push('Výdejky e-shopu končí ' + vydDo + ' (' + dnu(vydDo, dnes) + ' dní) — chybí nový export „Expediční příkazy" na Disku; podíl e-shop / obchod se za nové dny neukáže.');
     return { dnes, snimek, bilanceDo: bilDo, bilanceDnu: bal.length, vydejkyDo: vydDo, varovani };
   }
