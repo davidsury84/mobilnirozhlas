@@ -381,7 +381,8 @@ function mount(host) {
   // Složka s denními exporty e-shopu („EP - eshop", export z ERP každý den v 5:00, 2026-09-22).
   // Najde se podle názvu mezi tím, co má SA nasdílené (id se cachuje); env EXPORTY_DRIVE_FOLDER má přednost.
   const EXP_FOLDER_NAME = process.env.EXPORTY_DRIVE_FOLDER_NAME || 'EP - eshop';
-  let _expFolder = { id: process.env.EXPORTY_DRIVE_FOLDER || '', at: 0, hledano: false };
+  // 2026-09-22: uživatel nasdílel složku s klouzavým exportem expedičních příkazů (35 dní) — id natvrdo jako výchozí
+  let _expFolder = { id: process.env.EXPORTY_DRIVE_FOLDER || '1Je24j5jN4iYUMkWo6v6IrdQ4Mqf86aDu', at: 0, hledano: false };
   async function exportyFolderId() {
     if (_expFolder.id) return _expFolder.id;
     if (Date.now() - _expFolder.at < 3600000) return '';          // nehledat víckrát než 1× za hodinu
@@ -391,13 +392,68 @@ function mount(host) {
     return _expFolder.id;
   }
   const exportyMetaFolder = () => ({ nazev: EXP_FOLDER_NAME, id: _expFolder.id || '', hledano: _expFolder.hledano });
+
+  // ---- POHLEDÁVKY PO SPLATNOSTI (denní snímek z ERP, složka „vydané faktury" 2026-09-22) ----
+  // Soubor YYYYMMDD.xlsx = seznam neuhrazených faktur po splatnosti k danému dni (Párovací znak, Saldo,
+  // Splatnost, Útvar, obchodník). NENÍ to položkový export — na SK/reg se párovat nedá; páruje se přes
+  // zákazníka (Název / Č. org.) s expedičními příkazy e-shopu → „dlužník, kterému dál expedujeme".
+  const POH_FOLDER = process.env.POHLEDAVKY_DRIVE_FOLDER || '1g66yE03YnaZ3Jk_rIAx6Fa3YrL50qoxp';
+  const POH_F = path.join(host.dataDir || __dirname, 'pohledavky.json');
+  const loadPoh = () => { try { return JSON.parse(fs.readFileSync(POH_F, 'utf8')) || { dny: {} }; } catch (_) { return { dny: {} }; } };
+  function parsePohledavkyRows(rows, den) {
+    const H = rows[0].map(x => String(x == null ? '' : x).trim()), c = n => H.indexOf(n);
+    const I = { pz: c('Párovací znak'), kdo: c('Příjmení a jméno'), orgId: c('Č. org.'), org: c('Název'), rada: c('Řada'), dat: c('Datum případu (DMR)'), spl: c('Splatnost'), hm: c('HM celkem zaokr.'), saldo: c('Saldo'), mena: c('Měna'), utvar: H.lastIndexOf('Název') };
+    if (I.pz < 0 || I.saldo < 0 || I.spl < 0) return null;
+    const out = [];
+    for (let i = 1; i < rows.length; i++) { const r = rows[i]; const saldo = +r[I.saldo] || 0; if (!(saldo > 0)) continue;
+      const spl = xlDen(r[I.spl]), dat = xlDen(r[I.dat]); if (!spl || spl >= den) continue;   // jen po splatnosti k danému dni
+      out.push({ pz: String(r[I.pz] || ''), kdo: String(r[I.kdo] || '').trim().slice(0, 60), orgId: String(r[I.orgId] || '').trim(), org: String(r[I.org] || '').trim().slice(0, 120), rada: String(r[I.rada] || ''), dat, spl,
+        hm: +r[I.hm] || 0, saldo, mena: String(r[I.mena] || 'CZK'), utvar: String(r[I.utvar] || '').trim().slice(0, 60), dni: Math.round((Date.parse(den) - Date.parse(spl)) / 86400000) }); }
+    return out;
+  }
+  async function syncPohledavky() {
+    if (!drive || !drive.configured() || !POH_FOLDER) return { ok: false };
+    let files; try { files = await drive.listFolder(POH_FOLDER); } catch (e) { return { ok: false, error: e.message }; }
+    let st = { seen: {} }; try { st = JSON.parse(fs.readFileSync(EXP_STATE, 'utf8')) || { seen: {} }; } catch (_) {} st.seen = st.seen || {};
+    const kand = (files || []).filter(f => isSnapFile(f) && !st.seen[f.id]).sort((a, b) => String(a.name).localeCompare(String(b.name))).slice(0, 10);
+    if (!kand.length) return { ok: true, zpracovano: [] };
+    const poh = loadPoh(); poh.dny = poh.dny || {}; const done = [];
+    for (const f of kand) { let info = '', typ = 'pohledavky';
+      try { const den = dateOfName(f.name); const dl = await drive.downloadFileBase64(f.id, 20 * 1024 * 1024); const rows = xlsxMini.parse(Buffer.from(dl.base64, 'base64'));
+        const fa = parsePohledavkyRows(rows, den);
+        if (!fa) { typ = 'neznamy'; info = 'chybí sloupce Párovací znak / Saldo / Splatnost'; }
+        else { const byU = {}; fa.forEach(x => { const e = byU[x.utvar || '—'] || (byU[x.utvar || '—'] = { n: 0, saldo: 0 }); e.n++; e.saldo += x.saldo; });
+          const es = fa.filter(x => /e\s*-?\s*shop/i.test(x.utvar) || /^E-SHOP$/i.test(x.kdo));
+          poh.dny[den] = { n: fa.length, saldo: Math.round(fa.reduce((a, x) => a + x.saldo, 0)), esN: es.length, esSaldo: Math.round(es.reduce((a, x) => a + x.saldo, 0)), byUtvar: byU };
+          if (!poh.posledni || den >= poh.posledni.den) poh.posledni = { den, soubor: f.name, faktury: fa };
+          info = fa.length + ' faktur po splatnosti, saldo ' + Math.round(fa.reduce((a, x) => a + x.saldo, 0)); } }
+      catch (e) { typ = 'chyba'; info = e.message; }
+      st.seen[f.id] = { name: f.name, typ, at: new Date().toISOString(), info, slozka: 'pohledavky' }; done.push({ name: f.name, typ, info });
+      console.log('[nakup-report] pohledávky z Disku: ' + f.name + ' → ' + typ + ' · ' + info); }
+    const keys = Object.keys(poh.dny).sort(); while (keys.length > 400) delete poh.dny[keys.shift()];
+    try { fs.writeFileSync(POH_F, JSON.stringify(poh)); fs.writeFileSync(EXP_STATE, JSON.stringify(st, null, 2)); } catch (_) {}
+    return { ok: true, zpracovano: done };
+  }
+  // Spárování dlužníků se zákazníky e-shopu (výdejky za posledních N dní) — přes název zákazníka (stejný kmen ERP)
+  function pohledavkyPrehled(dniZpet) {
+    const poh = loadPoh(), P = poh.posledni; if (!P) return { ok: false, error: 'Zatím žádný snímek pohledávek.' };
+    const vd = loadVyd().dny || {}, od = new Date(Date.now() - (dniZpet || 35) * 86400000).toISOString().slice(0, 10);
+    const zak = {}; Object.keys(vd).filter(d => d >= od).forEach(d => Object.keys(vd[d].zakaznici || {}).forEach(n => { const z = vd[d].zakaznici[n]; const e = zak[n] || (zak[n] = { kc: 0, zak: 0, posl: '' }); e.kc += z.kc || 0; e.zak += z.zak || 0; if (d > e.posl) e.posl = d; }));
+    const dl = {}; P.faktury.forEach(x => { const k = x.org || x.orgId; const e = dl[k] || (dl[k] = { org: x.org, orgId: x.orgId, saldo: 0, n: 0, nejstarsi: x.spl, maxDni: 0, utvary: new Set(), kdo: new Set() }); e.saldo += x.saldo; e.n++; if (x.spl < e.nejstarsi) e.nejstarsi = x.spl; if (x.dni > e.maxDni) e.maxDni = x.dni; e.utvary.add(x.utvar); if (x.kdo) e.kdo.add(x.kdo); });
+    const dluznici = Object.values(dl).map(e => Object.assign(e, { utvary: [...e.utvary], kdo: [...e.kdo], eshop: zak[e.org] || null })).sort((a, b) => b.saldo - a.saldo);
+    const buckets = [[0, 30], [31, 60], [61, 90], [91, 99999]].map(([a, b]) => { const r = P.faktury.filter(x => x.dni >= a && x.dni <= b); return { od: a, do: b, n: r.length, saldo: Math.round(r.reduce((s2, x) => s2 + x.saldo, 0)) }; });
+    const trend = Object.keys(poh.dny).sort().slice(-60).map(d => Object.assign({ den: d }, poh.dny[d]));
+    return { ok: true, den: P.den, soubor: P.soubor, faktur: P.faktury.length, saldo: Math.round(P.faktury.reduce((s2, x) => s2 + x.saldo, 0)), buckets, dluznici, expedujeme: dluznici.filter(d => d.eshop), trend,
+      utvary: Object.entries(poh.dny[P.den] ? poh.dny[P.den].byUtvar : {}).map(([u, v]) => ({ utvar: u, n: v.n, saldo: Math.round(v.saldo) })).sort((a, b) => b.saldo - a.saldo), oknoDni: dniZpet || 35 };
+  }
   async function syncExporty(files) {
     if (!drive || !drive.configured()) return { ok: false, error: 'SA není nastavený.' };
     if (!files) files = await drive.listFolder(OBJ_FOLDER);
     // + složka EP - eshop (když je nasdílená): stejné zpracování, stejný stav
     try { const eid = await exportyFolderId(); if (eid) { const ef = await drive.listFolder(eid); files = (files || []).concat(ef.map(f => Object.assign({ zeSlozky: EXP_FOLDER_NAME }, f))); } } catch (e) { console.warn('[nakup-report] složka exportů:', e.message); }
     let st = { seen: {} }; try { st = JSON.parse(fs.readFileSync(EXP_STATE, 'utf8')) || { seen: {} }; } catch (_) {} st.seen = st.seen || {};
-    const kand = (files || []).filter(f => isXlsx(f) && !isSnapFile(f) && !st.seen[f.id])
+    // Ve složce exportů (EP - eshop) se soubory jmenují YYYYMMDD.xlsx jako snímky — tam rozhoduje hlavička, ne název.
+    const kand = (files || []).filter(f => isXlsx(f) && (f.zeSlozky || !isSnapFile(f)) && !st.seen[f.id])
       .sort((a, b) => String(a.createdTime || '').localeCompare(String(b.createdTime || ''))).slice(0, 6);   // nejstarší napřed, ať novější přepíše
     const done = [];
     for (const f of kand) {
@@ -1108,6 +1164,11 @@ function mount(host) {
     // Hlídač dat — ať se výpadek pozná ráno v e-mailu, ne až po týdnu v grafu.
     try { const sd = stavDat(); if (sd.varovani.length) chybiHtml += '<div style="background:#fbeaea;border:1px solid #efc1c1;border-radius:9px;padding:10px 14px;margin:0 0 14px;font-size:13px;line-height:1.6;color:#7a1f1f">' +
       '<b>🚨 Hlídač dat:</b><ul style="margin:6px 0 0;padding-left:18px">' + sd.varovani.map(v => '<li>' + esc(v) + '</li>').join('') + '</ul></div>'; } catch (_) {}
+    // Pohledávky po splatnosti × e-shop: komu dlužícímu jsme v posledních 35 dnech expedovali
+    try { const ph = pohledavkyPrehled(35); if (ph.ok) {
+      chybiHtml += '<div style="background:#fff7e6;border:1px solid #f0d9a8;border-radius:9px;padding:10px 14px;margin:0 0 14px;font-size:13px;line-height:1.6">' +
+        '<b>💸 Pohledávky po splatnosti k ' + esc(ph.den) + ':</b> ' + fmt(ph.faktur) + ' faktur · ' + kc(ph.saldo) + (ph.utvary.find(u => /e\s*-?\s*shop/i.test(u.utvar)) ? ' · e-shop ' + kc(ph.utvary.find(u => /e\s*-?\s*shop/i.test(u.utvar)).saldo) : '') +
+        (ph.expedujeme.length ? '<br><b style="color:#b23">Dlužníci, kterým e-shop dál expeduje (' + ph.expedujeme.length + '):</b> ' + ph.expedujeme.slice(0, 6).map(d => esc(d.org) + ' — dluží ' + kc(d.saldo) + ' (' + d.maxDni + ' d po splatnosti), expedováno ' + kc(d.eshop.kc) + ' v ' + d.eshop.zak + ' zak., naposled ' + esc(d.eshop.posl)).join('; ') : '') + '</div>'; } } catch (_) {}
     let body = chybiHtml + explainBox([
       ['Co to je', 'Ranní <b>bilance skladu e-shopu</b> — kolik v něm dnes leží peněz a jak se to za den pohnulo. Vše v <b>nákladových (landed) cenách</b>.'],
       ['Stav (4 karty)', '<b>Sklad</b> = fyzická zásoba. <b>K dispozici</b> = sklad − rezervace zákazníků. <b>Objednáno u dodavatelů</b> = co je na cestě (ještě nedorazilo). <b>Rezervováno zákazníky</b> = co si už zákazníci objednali. „±" u karty = změna hodnoty proti včerejšku.'],
@@ -1216,7 +1277,9 @@ function mount(host) {
     if (snimek && bilDo && bilDo < snimek) varovani.push('Bilance zaostává za snímkem: bilance do ' + bilDo + ', snímek ' + snimek + ' — denní zápis bilance neproběhl (chyba v synchronizaci).');
     try { const ef = exportyMetaFolder(); if (ef.hledano && !ef.id) varovani.push('Složka „' + ef.nazev + '" (denní export e-shopu) není nasdílená servisnímu účtu ' + (drive && drive.configured() ? drive.saEmail() : '') + ' — nasdílet jako Prohlížející.'); } catch (_) {}
     if (vydDo && dnu(vydDo, dnes) >= 10) varovani.push('Výdejky e-shopu končí ' + vydDo + ' (' + dnu(vydDo, dnes) + ' dní) — chybí nový export „Expediční příkazy" na Disku; podíl e-shop / obchod se za nové dny neukáže.');
-    return { dnes, snimek, bilanceDo: bilDo, bilanceDnu: bal.length, vydejkyDo: vydDo, varovani };
+    let pohDo = ''; try { const P = loadPoh().posledni; pohDo = P ? P.den : ''; } catch (_) {}
+    if (pohDo && dnu(pohDo, dnes) >= 3) varovani.push('Snímek pohledávek po splatnosti končí ' + pohDo + ' (' + dnu(pohDo, dnes) + ' dní) — denní export vydaných faktur nechodí.');
+    return { dnes, snimek, bilanceDo: bilDo, bilanceDnu: bal.length, vydejkyDo: vydDo, pohledavkyDo: pohDo, varovani };
   }
   function chybejiciDny() {
     const out = [];
@@ -1312,6 +1375,7 @@ function mount(host) {
     // 1) DENNÍ stažení nejnovějšího souboru z Drive (běží nezávisle na e-mailech)
     try { const s = await syncObjednavky(false); if (s && !s.ok && !s.skipped) console.warn('[nakup-report] Drive sync neproběhl:', s.error); } catch (e) { console.error('[nakup-report] Drive sync:', e.message); }
     try { const se = await syncExporty(); if (se && se.zpracovano && se.zpracovano.length) console.log('[nakup-report] exporty z Disku: ' + se.zpracovano.length + ' nový/é'); } catch (e) { console.error('[nakup-report] exporty sync:', e.message); }
+    try { await syncPohledavky(); } catch (e) { console.error('[nakup-report] pohledávky sync:', e.message); }
     try { const sd = stavDat(); sd.varovani.forEach(v => console.warn('[nakup-report] ⚠ HLÍDAČ DAT: ' + v)); } catch (_) {}
     if (OBRAT_FOLDER) { try { const so = await syncObrat(false); if (so && !so.ok && !so.skipped) console.warn('[nakup-report] obrat plasty sync neproběhl:', so.error); } catch (e) { console.error('[nakup-report] obrat sync:', e.message); } }
     // 2) E-mailové reporty dle configu
@@ -1431,6 +1495,10 @@ function mount(host) {
       } else return json(res, 400, { error: 'Neznámá akce.' }), true;
       saveAlt(alt);
       return json(res, 200, { ok: true }), true;
+    }
+    if (p === '/api/nakup-report/pohledavky' && req.method === 'GET') {
+      if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
+      return json(res, 200, pohledavkyPrehled(+u.query.dni || 35)), true;
     }
     if (p === '/api/nakup-report/eshop-vydejky' && req.method === 'GET') {
       if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
@@ -1715,7 +1783,7 @@ function mount(host) {
     return reports().find(r => r.key === key) || null;
   }
 
-  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), syncExporty: () => syncExporty(), reports, setReport };
+  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), syncExporty: () => syncExporty(), syncPohledavky: () => syncPohledavky(), reports, setReport };
 }
 
 module.exports = { mount };
