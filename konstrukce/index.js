@@ -1594,7 +1594,7 @@ function mount(host) {
       link: z.link ? { active: z.link.active, expiresAt: z.link.expiresAt, url: '/konstrukce/nahled/' + z.link.token, hasPin: !!z.link.pin, accesses: (z.link.accesses || []).length,
         lang: z.link.lang || 'cs', odeslano: z.link.createdAt || null,
         // kdo (odkud) odkaz otevřel — bez přihlášení víme jen čas, IP a prohlížeč
-        pristupy: (z.link.accesses || []).slice(-60).map(a => ({ at: a.at, ip: a.ip || '', ua: a.ua || '', action: a.action || 'view' })),
+        pristupy: (z.link.accesses || []).slice(-60).map(a => ({ at: a.at, ip: a.ip || '', ua: a.ua || '', action: a.action || 'view', zeme: a.zeme || '', kod: a.kod || '', mesto: a.mesto || '' })),
         pripominky: (z.link.pripominky || []).map(p => ({ at: p.at, komu: p.komu, by: empName(p.by) })) } : null,
       revisionCount: z.revisionCount || 0,
       strediskoKey: z.strediskoKey || '', strediskoName: z.strediskoName || '',
@@ -2878,6 +2878,51 @@ function mount(host) {
     const br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : /Outlook|Microsoft Office/.test(ua) ? 'Outlook' : '';
     return [br, os].filter(Boolean).join(' · ') || ua.slice(0, 40);
   }
+  // ---- země k IP (log otevření odkazu) --------------------------------------
+  // Railway nedává zemi klienta v hlavičce, proto ip-api.com (bez klíče, 45 dotazů/min —
+  // při pár otevřeních denně bez významu). Cache podle IP, privátní adresy se nedohledávají.
+  const GEO_CACHE = new Map();
+  function geoLookup(ip) {
+    ip = String(ip || '').trim();
+    if (!ip || /^(::1|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|fc|fd|::ffff:(10|127|192\.168)\.)/.test(ip)) return Promise.resolve(null);
+    if (GEO_CACHE.has(ip)) return Promise.resolve(GEO_CACHE.get(ip));
+    return new Promise(resolve => {
+      const r = require('http').get({ hostname: 'ip-api.com', path: '/json/' + encodeURIComponent(ip) + '?fields=status,country,countryCode,city&lang=cs', timeout: 4000 }, resp => {
+        let d = ''; resp.on('data', c => d += c);
+        resp.on('end', () => {
+          let g = null;
+          try { const j = JSON.parse(d); if (j && j.status === 'success') g = { kod: j.countryCode || '', zeme: j.country || '', mesto: j.city || '' }; } catch (_) {}
+          if (g) GEO_CACHE.set(ip, g);
+          resolve(g);
+        });
+      });
+      r.on('error', () => resolve(null));
+      r.on('timeout', () => { try { r.destroy(); } catch (_) {} resolve(null); });
+    });
+  }
+  // Doplní zemi ke všem otevřením daného odkazu, kterým chybí (na pozadí, po odpovědi).
+  function geoDopln(zakId) {
+    setTimeout(async () => {
+      try {
+        const d0 = load(); const z0 = d0.zakazky.find(x => x.id === zakId);
+        const chybi = (z0 && z0.link && z0.link.accesses || []).filter(a => a.ip && a.zeme == null).map(a => a.ip);
+        if (!chybi.length) return;
+        const vysl = {};
+        for (const ip of Array.from(new Set(chybi)).slice(0, 20)) vysl[ip] = await geoLookup(ip);
+        const d = load(); const z = d.zakazky.find(x => x.id === zakId); if (!z || !z.link) return;
+        let zm = false;
+        for (const a of (z.link.accesses || [])) {
+          if (a.ip && a.zeme == null && vysl[a.ip] !== undefined) {
+            const g = vysl[a.ip];
+            a.zeme = g ? g.zeme : '';      // '' = dohledáno, ale neznámo (ať se nezkouší donekonečna)
+            a.kod = g ? g.kod : ''; a.mesto = g ? g.mesto : '';
+            zm = true;
+          }
+        }
+        if (zm) save(d);
+      } catch (e) { console.warn('[konstrukce] země k IP se nedohledala:', e.message); }
+    }, 50);
+  }
   function apiPublicData(req, res, token) {
     const d = load();
     const z = findByToken(d, token);
@@ -2888,6 +2933,7 @@ function mount(host) {
     z.link.accesses.push({ at: Date.now(), ip: clientIp(req), ua: kratkyUA(req), action: 'view' });
     if (z.link.accesses.length > 300) z.link.accesses.splice(0, z.link.accesses.length - 300);
     save(d);
+    geoDopln(z.id);
     const cur = CURRENT_V(z);
     json(res, 200, {
       cislo: z.cislo, zakaznik: z.zakaznik, typName: typeOf(d, z.typKey).name,
@@ -2987,6 +3033,7 @@ function mount(host) {
     } else {
       json(res, 400, { chyba: 'Neznámá akce.' }); return true;
     }
+    geoDopln(z.id);
     json(res, 200, { ok: true });
     return true;
   }

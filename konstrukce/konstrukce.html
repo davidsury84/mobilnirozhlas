@@ -1360,6 +1360,8 @@ function kLangSet(v){
   /* otevřený dotazník se vykresluje slovníkem TR — musí se překreslit taky,
      jinak by zůstal v původním jazyce, zatímco okolí je už v novém */
   try{ if(typeof dqLangRefresh==='function') dqLangRefresh(); }catch(e){}
+  /* otevřený detail zakázky překreslit — část textů (země v logu, popisky kroků) vzniká v JS podle jazyka */
+  try{ if(SEL&&document.getElementById('drawer').classList.contains('open')) openDrawer(SEL); }catch(e){}
   kTrAll();
   /* popisy katalogu ABR se dotahují až v cizím jazyce; po načtení přeložit znovu */
   if(K_LANG!=='cz') kAbrLoad(function(){ kTrAll(); });
@@ -3084,6 +3086,14 @@ function poslatZnovu(id){
 }
 /* Kdo odkaz otevřel: bez přihlášení víme jen kdy, z jaké adresy a z jakého
    prohlížeče — a co tam udělal. Jméno je jen to, komu jsme odkaz poslali. */
+function vlajka(kod){kod=String(kod||'').toUpperCase();if(!/^[A-Z]{2}$/.test(kod))return '';return String.fromCodePoint(0x1F1E6+kod.charCodeAt(0)-65,0x1F1E6+kod.charCodeAt(1)-65);}
+/* název země v jazyce modulu (ip-api češtinu nemá — přeloží to prohlížeč) */
+function nazevZeme(kod,fallback){
+  try{ var loc={cz:'cs',en:'en',de:'de',pl:'pl',ua:'uk',ro:'ro'}[typeof K_LANG!=='undefined'?K_LANG:'cz']||'cs';
+    var n=new Intl.DisplayNames([loc],{type:'region'}).of(String(kod||'').toUpperCase()); if(n&&n!==kod)return n; }catch(e){}
+  return fallback||kod||'';
+}
+function odkud(x){ if(!x||!(x.kod||x.zeme))return ''; return (vlajka(x.kod)?vlajka(x.kod)+' ':'')+esc(nazevZeme(x.kod,x.zeme))+(x.mesto?(' · '+esc(x.mesto)):''); }
 function pristupyView(z){
   if(!z.link)return '';
   var p=(z.link.pristupy||[]).slice().reverse(), otevreni=p.filter(function(x){return x.action==='view'});
@@ -3092,11 +3102,12 @@ function pristupyView(z){
   h+='<div><b>Odkaz odeslán</b> '+(z.link.odeslano?fdt(z.link.odeslano):'—')+(z.kontaktEmail?(' · '+esc(z.kontaktEmail)):'')+
      (prip.length?(' · <span class="muted">připomenuto '+prip.length+'×, naposledy '+fdt(prip[prip.length-1].at)+' ('+esc(prip[prip.length-1].by||'')+')</span>'):'')+'</div>';
   if(!otevreni.length){h+='<div class="muted" style="margin-top:4px">Klient odkaz zatím neotevřel.</div>';return h+'</div>';}
-  h+='<div style="margin-top:4px"><b>Otevřeno '+otevreni.length+'×</b> <span class="muted">· naposledy '+fdt(otevreni[0].at)+'</span>'+
+  h+='<div style="margin-top:4px"><b>Otevřeno '+otevreni.length+'×</b> <span class="muted">· naposledy '+fdt(otevreni[0].at)+(odkud(otevreni[0])?(' · '+odkud(otevreni[0])):'')+'</span>'+
      ' <a href="#" onclick="var t=this.parentNode.nextElementSibling;t.hidden=!t.hidden;return false" class="muted">zobrazit log</a></div>';
   h+='<div hidden class="tl" style="margin-top:6px">'+p.slice(0,30).map(function(x){
     var co=x.action==='view'?'zobrazení':x.action;
-    return '<div class="it"><div>'+esc(co)+' <span class="muted">· '+fdt(x.at)+(x.ip?(' · IP '+esc(x.ip)):'')+(x.ua?(' · '+esc(x.ua)):'')+'</span></div></div>';
+    var kde=odkud(x)?('<span title="IP '+esc(x.ip)+'">'+odkud(x)+'</span>'):(x.ip?('IP '+esc(x.ip)):'');
+    return '<div class="it"><div>'+esc(co)+' <span class="muted">· '+fdt(x.at)+(kde?(' · '+kde):'')+(x.ua?(' · '+esc(x.ua)):'')+'</span></div></div>';
   }).join('')+(p.length>30?('<div class="muted">… a dalších '+(p.length-30)+'</div>'):'')+'</div>';
   return h+'</div>';
 }
