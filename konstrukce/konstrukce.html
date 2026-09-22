@@ -1163,6 +1163,12 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'✉ Poslat připomínku':['✉ Send a reminder','✉ Erinnerung senden','✉ Wyślij przypomnienie','✉ Надіслати нагадування','✉ Trimite o reamintire'],
+'Odkaz odeslán':['Link sent','Link gesendet','Link wysłany','Посилання надіслано','Link trimis'],
+'Klient odkaz zatím neotevřel.':['The customer has not opened the link yet.','Der Kunde hat den Link noch nicht geöffnet.','Klient jeszcze nie otworzył linku.','Замовник ще не відкривав посилання.','Clientul nu a deschis încă linkul.'],
+'zobrazit log':['show log','Protokoll anzeigen','pokaż log','показати журнал','afișează jurnalul'],
+'zobrazení':['viewed','Aufruf','wyświetlenie','перегляд','vizualizare'],
+'Komu poslat připomínku?':['Send the reminder to whom?','An wen soll die Erinnerung gehen?','Do kogo wysłać przypomnienie?','Кому надіслати нагадування?','Cui să trimit reamintirea?'],
 'neznámý odstín':['unknown shade','unbekannter Farbton','nieznany odcień','невідомий відтінок','nuanță necunoscută'],
 'Další volné ČVZ':['Next free production order no.','Nächste freie Fertigungsauftrags-Nr.','Następny wolny nr zlecenia prod.','Наступний вільний номер вир. замовлення','Următorul nr. liber de comandă de producție'],
 'Předběžně — přidělí se při uložení objednávky':['Provisional — assigned when the order is saved','Vorläufig — wird beim Speichern der Bestellung vergeben','Wstępnie — zostanie przydzielony przy zapisaniu zamówienia','Попередньо — присвоюється при збереженні замовлення','Provizoriu — se atribuie la salvarea comenzii'],
@@ -2842,8 +2848,10 @@ function actionsFor(z){
   if(z.stav==='klient'&&canObch){var jeObj=(z.rezim==='objednavka');blocks.push(
     '<div class="card" style="background:#eef7f0"><b>'+(jeObj?'U klienta — schválení výkresu':'U klienta — potvrzení nabídky')+'</b><p class="muted" style="margin:6px 0">Odkaz odeslán klientovi'+(z.link?(', platí do '+fdate(z.link.expiresAt)+', '+z.link.accesses+'× otevřen'):'')+'. '+(jeObj?'Klient schválí výkres přes odkaz, nebo schválení potvrdíte ručně (např. po e-mailu/telefonu) — pak konstrukce vypracuje výrobní dokumentaci.':'Klient potvrdí nabídku přes odkaz, nebo ji potvrdíte ručně (např. po e-mailu/telefonu).')+'</p>'+
     '<div class="actions"><button class="btn sm" onclick="potvrditRucne(\''+z.id+'\')" title="Když klient potvrdil mimo systém (telefonicky, e-mailem) — zaznamená se, kdo za něj potvrdil">'+(jeObj?'✓ Potvrdit za klienta':'✓ Potvrdit za klienta → objednávka')+'</button>'+
-    '<button class="btn ghost sm" onclick="copyLink(\''+(z.link?z.link.url:'')+'\')">Kopírovat odkaz</button>'+
-    '<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button></div></div>')}
+    '<button class="btn ghost sm" onclick="poslatPripominku(\''+z.id+'\')" title="Pošle klientovi připomínku se stejným odkazem — token se nemění">✉ Poslat připomínku</button>'+
+    '<button class="btn ghost sm" onclick="copyTxtToast(\''+esc(location.origin+(z.link?z.link.url:''))+'\',\'✓ Odkaz zkopírován\')">Kopírovat odkaz</button>'+
+    '<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button></div>'+
+    pristupyView(z)+'</div>')}
 
   if(z.stav==='schvaleno'&&(canKon||canSef)){blocks.push(vyrobniDokBlock(z))}
 
@@ -3072,6 +3080,45 @@ function poslatZnovu(id){
     subject:mailPredmet(z,lang),text:defaultMail(z,lang)}).then(function(o){
     if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}
     reloadData();toastUlozeno('✓ Odkaz odeslán na '+komu.trim());
+  });
+}
+/* Kdo odkaz otevřel: bez přihlášení víme jen kdy, z jaké adresy a z jakého
+   prohlížeče — a co tam udělal. Jméno je jen to, komu jsme odkaz poslali. */
+function pristupyView(z){
+  if(!z.link)return '';
+  var p=(z.link.pristupy||[]).slice().reverse(), otevreni=p.filter(function(x){return x.action==='view'});
+  var prip=z.link.pripominky||[];
+  var h='<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:8px;font-size:12.5px">';
+  h+='<div><b>Odkaz odeslán</b> '+(z.link.odeslano?fdt(z.link.odeslano):'—')+(z.kontaktEmail?(' · '+esc(z.kontaktEmail)):'')+
+     (prip.length?(' · <span class="muted">připomenuto '+prip.length+'×, naposledy '+fdt(prip[prip.length-1].at)+' ('+esc(prip[prip.length-1].by||'')+')</span>'):'')+'</div>';
+  if(!otevreni.length){h+='<div class="muted" style="margin-top:4px">Klient odkaz zatím neotevřel.</div>';return h+'</div>';}
+  h+='<div style="margin-top:4px"><b>Otevřeno '+otevreni.length+'×</b> <span class="muted">· naposledy '+fdt(otevreni[0].at)+'</span>'+
+     ' <a href="#" onclick="var t=this.parentNode.nextElementSibling;t.hidden=!t.hidden;return false" class="muted">zobrazit log</a></div>';
+  h+='<div hidden class="tl" style="margin-top:6px">'+p.slice(0,30).map(function(x){
+    var co=x.action==='view'?'zobrazení':x.action;
+    return '<div class="it"><div>'+esc(co)+' <span class="muted">· '+fdt(x.at)+(x.ip?(' · IP '+esc(x.ip)):'')+(x.ua?(' · '+esc(x.ua)):'')+'</span></div></div>';
+  }).join('')+(p.length>30?('<div class="muted">… a dalších '+(p.length-30)+'</div>'):'')+'</div>';
+  return h+'</div>';
+}
+/* Připomínka klientovi — stejný odkaz, jiný text; jazyk podle původního odeslání. */
+var REMIND_L10N={
+ cs:{p:'Připomínka: výkres ke schválení',t:'Dobrý den,\n\ndovolujeme si připomenout, že výkres k zakázce {C} ({Z}) stále čeká na Vaše schválení.\nProhlédnout a schválit jej můžete zde:\n{ODKAZ}\n\nDěkujeme a jsme s pozdravem'},
+ en:{p:'Reminder: drawing awaiting your approval',t:'Dear Sir or Madam,\n\nthis is a friendly reminder that the drawing for order {C} ({Z}) is still awaiting your approval.\nYou can review and approve it here:\n{ODKAZ}\n\nThank you and kind regards'},
+ de:{p:'Erinnerung: Zeichnung wartet auf Ihre Freigabe',t:'Sehr geehrte Damen und Herren,\n\nwir möchten Sie daran erinnern, dass die Zeichnung zum Auftrag {C} ({Z}) noch auf Ihre Freigabe wartet.\nSie können sie hier ansehen und freigeben:\n{ODKAZ}\n\nVielen Dank und freundliche Grüße'},
+ pl:{p:'Przypomnienie: rysunek czeka na zatwierdzenie',t:'Dzień dobry,\n\nuprzejmie przypominamy, że rysunek do zlecenia {C} ({Z}) nadal czeka na Państwa zatwierdzenie.\nMożna go obejrzeć i zatwierdzić tutaj:\n{ODKAZ}\n\nDziękujemy i pozdrawiamy'},
+ ua:{p:'Нагадування: креслення очікує на затвердження',t:'Доброго дня,\n\nнагадуємо, що креслення до замовлення {C} ({Z}) досі очікує на ваше затвердження.\nПереглянути та затвердити його можна тут:\n{ODKAZ}\n\nДякуємо, з повагою'},
+ ro:{p:'Reamintire: desenul așteaptă aprobarea dumneavoastră',t:'Bună ziua,\n\nvă reamintim că desenul pentru comanda {C} ({Z}) așteaptă în continuare aprobarea dumneavoastră.\nÎl puteți vedea și aproba aici:\n{ODKAZ}\n\nVă mulțumim, cu stimă'},
+};
+function poslatPripominku(id){
+  var z=(D.zakazky||[]).find(function(x){return x.id===id}); if(!z||!z.link)return;
+  var komu=prompt(tr('Komu poslat připomínku?'),z.kontaktEmail||'');
+  if(komu===null)return;
+  if(!komu.trim()){alert(tr('Vyplňte e-mail.'));return}
+  var lang=z.link.lang||'cs', m=REMIND_L10N[lang]||REMIND_L10N.cs;
+  api('/stav','POST',{id:id,action:'odeslat-klientovi',komu:komu.trim(),lang:lang,pripominka:true,
+    subject:m.p+' · '+z.cislo,text:m.t.replace('{C}',z.cislo).replace('{Z}',z.zakaznik)}).then(function(o){
+    if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}
+    reloadData();toastUlozeno('✓ Připomínka odeslána na '+komu.trim());
   });
 }
 /* hotový text e-mailu i s odkazem — když si obchodník posílá poštu sám */

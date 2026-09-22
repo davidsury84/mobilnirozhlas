@@ -1591,7 +1591,11 @@ function mount(host) {
       versions: z.versions.map(v => ({ v: v.v, hasPdf: !!v.pdf, hasCad: !!v.cad, pdfName: v.pdf && v.pdf.name, cadName: v.cad && v.cad.name, author: empName(v.author), createdAt: v.createdAt })),
       comments: (z.comments || []).map(c => ({ id: c.id, author: c.authorName || empName(c.author), role: c.role, text: c.text, at: c.at, versionRef: c.versionRef })),
       totalSec, myTimer, timerRunning: !!(z.activeTimer),
-      link: z.link ? { active: z.link.active, expiresAt: z.link.expiresAt, url: '/konstrukce/nahled/' + z.link.token, hasPin: !!z.link.pin, accesses: (z.link.accesses || []).length } : null,
+      link: z.link ? { active: z.link.active, expiresAt: z.link.expiresAt, url: '/konstrukce/nahled/' + z.link.token, hasPin: !!z.link.pin, accesses: (z.link.accesses || []).length,
+        lang: z.link.lang || 'cs', odeslano: z.link.createdAt || null,
+        // kdo (odkud) odkaz otevřel — bez přihlášení víme jen čas, IP a prohlížeč
+        pristupy: (z.link.accesses || []).slice(-60).map(a => ({ at: a.at, ip: a.ip || '', ua: a.ua || '', action: a.action || 'view' })),
+        pripominky: (z.link.pripominky || []).map(p => ({ at: p.at, komu: p.komu, by: empName(p.by) })) } : null,
       revisionCount: z.revisionCount || 0,
       strediskoKey: z.strediskoKey || '', strediskoName: z.strediskoName || '',
       vyrobniDok: z.vyrobniDok ? { name: z.vyrobniDok.name, at: z.vyrobniDok.at, author: empName(z.vyrobniDok.author), v: z.vyrobniDok.v || 1 } : null,
@@ -2172,10 +2176,14 @@ function mount(host) {
           const url2 = (host.baseUrl ? host.baseUrl(req) : '') + '/konstrukce/nahled/' + z.link.token;
           const text2 = String(b.text || '').replace('{ODKAZ}', url2) || url2;
           const subj2 = String(b.subject || ('Výkres ke schválení · ' + z.cislo));
-          audit(z, me.email, 'Odkaz klientovi poslán znovu', komu2);
+          if (b.pripominka) {
+            if (!Array.isArray(z.link.pripominky)) z.link.pripominky = [];
+            z.link.pripominky.push({ at: Date.now(), komu: komu2, by: me.email });
+            audit(z, me.email, 'Připomínka klientovi (' + z.link.pripominky.length + '.)', komu2);
+          } else audit(z, me.email, 'Odkaz klientovi poslán znovu', komu2);
           save(d);
           await mail(komu2, subj2, text2);
-          json(res, 200, { ok: true, url: url2, znovu: true });
+          json(res, 200, { ok: true, url: url2, znovu: true, pripominka: !!b.pripominka });
           return true;
         }
         if (z.stav !== 'obchodnik') { err = 'Zakázka není připravena k odeslání.'; break; }
@@ -2862,6 +2870,14 @@ function mount(host) {
     return String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '';
   }
 
+  // „Safari · macOS" / „Chrome · Android" — ať je v logu vidět, odkud se odkaz otevřel
+  function kratkyUA(req) {
+    const ua = String((req && req.headers && req.headers['user-agent']) || '');
+    if (!ua) return '';
+    const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
+    const br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : /Outlook|Microsoft Office/.test(ua) ? 'Outlook' : '';
+    return [br, os].filter(Boolean).join(' · ') || ua.slice(0, 40);
+  }
   function apiPublicData(req, res, token) {
     const d = load();
     const z = findByToken(d, token);
@@ -2869,7 +2885,7 @@ function mount(host) {
     // volitelný PIN
     const pin = (req.headers['x-nahled-pin'] || (urlLib.parse(req.url, true).query.pin) || '');
     if (z.link.pin && String(pin) !== z.link.pin) { json(res, 401, { chyba: 'Zadejte PIN.', needPin: true }); return true; }
-    z.link.accesses.push({ at: Date.now(), ip: clientIp(req), action: 'view' });
+    z.link.accesses.push({ at: Date.now(), ip: clientIp(req), ua: kratkyUA(req), action: 'view' });
     if (z.link.accesses.length > 300) z.link.accesses.splice(0, z.link.accesses.length - 300);
     save(d);
     const cur = CURRENT_V(z);
@@ -2921,7 +2937,7 @@ function mount(host) {
     if (action === 'schvalit') {
       if (!name || !b.souhlas) { json(res, 400, { chyba: 'Vyplňte jméno a potvrďte souhlas.' }); return true; }
       z.clientDecision = { action: 'schvalit', name, email: z.kontaktEmail || '', at: Date.now(), ip, version: cur ? cur.v : null };
-      z.link.accesses.push({ at: Date.now(), ip, action: 'schválil: ' + name });
+      z.link.accesses.push({ at: Date.now(), ip, ua: kratkyUA(req), action: 'schválil: ' + name });
       if (z.rezim === 'objednavka') {
         // přímá objednávka: klient schválil dokumentaci → konstruktér vypracuje výrobní dokumentaci
         audit(z, name + ' (klient)', 'Klient schválil výkres', 'verze v' + (cur ? cur.v : '?') + ' · odkaz poslán na ' + (z.kontaktEmail || '—') + ' · IP ' + ip);
@@ -2943,7 +2959,7 @@ function mount(host) {
       if (!duvod) { json(res, 400, { chyba: 'Uveďte prosím důvod zamítnutí.' }); return true; }
       z.clientDecision = { action: 'zamitnout', name, email: z.kontaktEmail || '', at: Date.now(), ip, duvod };
       addComment(z, { email: '', name: name || 'Klient' }, 'client', 'ZAMÍTNUTO: ' + duvod);
-      z.link.accesses.push({ at: Date.now(), ip, action: 'zamítl' });
+      z.link.accesses.push({ at: Date.now(), ip, ua: kratkyUA(req), action: 'zamítl' });
       z.stav = 'zamitnuto'; z.deadline = null; z.closedAt = Date.now();
       audit(z, (name || 'klient') + ' (klient)', 'Klient zamítl', duvod + ' — IP ' + ip);
       notify(d, z.obchodnikEmail, 'Klient ZAMÍTL výkres ' + z.cislo + '. Řešte další postup.', z.id);
@@ -2954,7 +2970,7 @@ function mount(host) {
       if (!text) { json(res, 400, { chyba: 'Napište prosím připomínky.' }); return true; }
       z.clientDecision = null;
       addComment(z, { email: '', name: name || 'Klient' }, 'client', 'Připomínky klienta: ' + text);
-      z.link.accesses.push({ at: Date.now(), ip, action: 'připomínky' });
+      z.link.accesses.push({ at: Date.now(), ip, ua: kratkyUA(req), action: 'připomínky' });
       // založíme revizi: nová verze, zpět na konstruktéra
       z.revisionCount = (z.revisionCount || 0) + 1;
       const nv = { v: (cur ? cur.v : 0) + 1, author: z.assignedTo || '', createdAt: Date.now(), locked: false };
