@@ -1163,6 +1163,8 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'asistentka ředitele':['director’s assistant','Assistenz der Werkleitung','asystentka dyrektora','асистентка директора','asistenta directorului'],
+'— bez asistentky —':['— no assistant —','— ohne Assistenz —','— bez asystentki —','— без асистентки —','— fără asistentă —'],
 '✉ Poslat klientovi znovu':['✉ Send to the customer again','✉ Erneut an den Kunden senden','✉ Wyślij klientowi ponownie','✉ Надіслати замовнику ще раз','✉ Trimite din nou clientului'],
 '✎ Upravit údaje zakázky a zadání':['✎ Edit order details and specification','✎ Auftragsdaten und Spezifikation bearbeiten','✎ Edytuj dane zlecenia i zadanie','✎ Редагувати дані замовлення та завдання','✎ Editează datele comenzii și specificația'],
 '✎ doplnit e-mail':['✎ add e-mail','✎ E-Mail ergänzen','✎ uzupełnij e-mail','✎ додати e-mail','✎ adaugă e-mail'],
@@ -4010,9 +4012,15 @@ function renderNastaveni(m){
   // — výrobní oblasti + jejich ředitelé —
   h+='<div class="sec">Výroba — oblasti a výrobní ředitelé</div><div class="card"><p class="muted" style="margin-top:0">Každá výrobní oblast má svého ředitele (konkrétní osoba z databáze). Schválená zakázka se předává do vybrané oblasti a je na tahu její výrobní ředitel.</p>';
   (D.strediska||[]).forEach(function(s){
-    h+='<div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap"><div style="min-width:120px"><b>'+esc(s.label)+'</b><div class="sub">výrobní ředitel</div></div>'+
-      '<div style="flex:1;min-width:220px">'+personPicker('dir_'+s.key,s.reditelEmail,'setReditel(\''+esc(s.key)+'\',\'dir_'+s.key+'\')','— vyberte ředitele —')+'</div>'+
-      '<button class="btn ghost sm" onclick="delStredisko(\''+esc(s.key)+'\')">×</button></div>';
+    h+='<div style="padding:10px 0;border-bottom:1px solid var(--line)">'+
+      '<div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap">'+
+        '<div style="min-width:120px"><b>'+esc(s.label)+'</b><div class="sub">výrobní ředitel</div></div>'+
+        '<div style="flex:1;min-width:220px">'+personPicker('dir_'+s.key,s.reditelEmail,'setReditel(\''+esc(s.key)+'\',\'dir_'+s.key+'\')','— vyberte ředitele —')+'</div>'+
+        '<button class="btn ghost sm" onclick="delStredisko(\''+esc(s.key)+'\')">×</button></div>'+
+      '<div class="row" style="justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:6px">'+
+        '<div style="min-width:120px"><div class="sub">asistentka ředitele</div></div>'+
+        '<div style="flex:1;min-width:220px">'+personPicker('asi_'+s.key,s.asistentkaEmail,'setAsistentka(\''+esc(s.key)+'\',\'asi_'+s.key+'\')','— bez asistentky —')+'</div>'+
+        '<span style="width:34px"></span></div></div>';
   });
   h+='<div class="row" style="margin-top:10px"><input id="strLabel" placeholder="Název nové oblasti" style="max-width:240px"><button class="btn sm" onclick="addStredisko()">+ Přidat oblast</button></div></div>';
   h+='<div class="sec">Číselník typů výrobků</div><div class="card">';
@@ -4146,6 +4154,8 @@ function saveKonstrGroups(email){
 }
 function addRolePerson(role,email){pridejRoli(email,role)}   // přidá roli, ostatní role člověka zůstávají
 function setReditel(key,selId){var email=(document.getElementById(selId)||{}).value||'';api('/admin/stredisko','POST',{key:key,reditel:email}).then(function(o){if(!o.ok){alert(o.j.chyba);return}toastUlozeno();reloadData()})}
+/* Asistentka ředitele výroby — chodí jí kopie oznámení o zakázkách její oblasti. */
+function setAsistentka(key,selId){var email=(document.getElementById(selId)||{}).value||'';api('/admin/stredisko','POST',{key:key,asistentka:email}).then(function(o){if(!o.ok){alert(o.j.chyba);return}toastUlozeno();reloadData()})}
 function editTyp(key){
   var t=(D.types||[]).find(function(x){return x.key===key})||{key:'',name:'',normohodiny:8,revizeNh:2,lhutaZkresleniDays:3,lhutaRevizeDays:2,lhutaPrideleniDays:1,lhutaKontrolaDays:1,lhutaObchodnikDays:1,lhutaKlientDays:5,linkValidDays:30,internalCheck:true,params:[]};
   var m=document.getElementById('modal');

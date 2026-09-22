@@ -525,13 +525,15 @@ const ROLE_LABELS = {
 };
 
 // ---- Výrobní oblasti / střediska (seed — editovatelné v adminu) -------------
-// Každá oblast má svého výrobního ředitele (reditelEmail = konkrétní člověk z databáze).
+// Každá oblast má svého výrobního ředitele (reditelEmail = konkrétní člověk
+// z databáze) a jeho asistentku (asistentkaEmail) — oba dostávají oznámení
+// o nových objednávkách pro svou oblast.
 const SEED_STREDISKA = [
-  { key: 'supikovice', label: 'Supíkovice', reditelEmail: '' },
-  { key: 'bruntal', label: 'Bruntál', reditelEmail: '' },
-  { key: 'bruntal-popelnice', label: 'Bruntál popelnice', reditelEmail: '' },
-  { key: 'chomutov', label: 'Chomutov', reditelEmail: '' },
-  { key: 'polsko', label: 'Polsko', reditelEmail: '' },
+  { key: 'supikovice', label: 'Supíkovice', reditelEmail: '', asistentkaEmail: '' },
+  { key: 'bruntal', label: 'Bruntál', reditelEmail: '', asistentkaEmail: '' },
+  { key: 'bruntal-popelnice', label: 'Bruntál popelnice', reditelEmail: '', asistentkaEmail: '' },
+  { key: 'chomutov', label: 'Chomutov', reditelEmail: '', asistentkaEmail: '' },
+  { key: 'polsko', label: 'Polsko', reditelEmail: '', asistentkaEmail: '' },
 ];
 
 // ---- Společná pole všech dotazníků (2026-08, dle zpětné vazby obchodu) ------
@@ -1502,7 +1504,9 @@ function mount(host) {
       kapacita,
       konstrukteri: employeesWithRole('konstrukter').map(em => ({ email: em, name: empName(em), groups: (d.konstrukterGroups[em] || []) })),
       families: FAM_ORDER.map(k => ({ key: k, label: FAM_LABEL[k] })),
-      strediska: (d.strediska || []).map(s => ({ key: s.key, label: s.label, reditelEmail: s.reditelEmail || '', reditelName: s.reditelEmail ? empName(s.reditelEmail) : '' })),
+      strediska: (d.strediska || []).map(s => ({ key: s.key, label: s.label,
+        reditelEmail: s.reditelEmail || '', reditelName: s.reditelEmail ? empName(s.reditelEmail) : '',
+        asistentkaEmail: s.asistentkaEmail || '', asistentkaName: s.asistentkaEmail ? empName(s.asistentkaEmail) : '' })),
       adresy: (d.adresy || []).slice().sort((a, b) => a.localeCompare(b, 'cs')),
       natahImg: NATAH_IMG,                             // kod natahování → soubor ilustrace (natah-img/)
       roles: (me.isAdmin || ma(me, 'sef')) ? roleAssignments(d) : undefined,
@@ -1760,6 +1764,13 @@ function mount(host) {
   // objednávky v app Zadání do výroby — bez nabídkové před-fáze).
   // b.stredisko (jen objednávka): „zadávám přímo, když vím kdo to bude dělat"
   // — závod se určí hned a krok výběru závodu ředitelem výroby se přeskočí.
+  // Ředitel výroby dané oblasti a jeho asistentka — oba chodí do kopie.
+  function lideStrediska(d, key) {
+    const s = (d.strediska || []).find(x => x.key === key);
+    if (!s) return [];
+    return [s.reditelEmail, s.asistentkaEmail].filter(Boolean).map(x => x.toLowerCase());
+  }
+
   async function apiCreate(req, res) {
     const me = roleOf(req);
     if (!(me.isAdmin || ma(me, 'obchodnik'))) { json(res, 403, { chyba: 'Zadávat požadavky smí jen obchodník.' }); return true; }
@@ -1831,6 +1842,19 @@ function mount(host) {
       for (const em of employeesWithRole('vykonny-reditel')) mail(em, 'Nová objednávka · výběr závodu · ' + cislo, 'Obchodník ' + me.name + ' založil novou objednávku.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + '\n\nVyberte prosím výrobní závod v intranetu → Zadání do výroby – konstrukce.', z);
     } else {
       employeesWithRole('sef').forEach(em => { notify(d, em, 'Nová ' + co + ' ' + cislo + ' (' + zakaznik + ') — přidělte konstruktéra.', z.id); });
+      // Nová objednávka s určeným závodem — ať o ní ví i výroba, ne jen konstrukce.
+      if (jeObj && z.strediskoKey) {
+        const vyroba = lideStrediska(d, z.strediskoKey);
+        vyroba.forEach(em => notify(d, em, 'Nová objednávka ' + cislo + ' (' + zakaznik + ') pro závod ' + z.strediskoName + '.', z.id));
+        setTimeout(() => {
+          for (const em of vyroba) mail(em, 'Nová objednávka · závod ' + z.strediskoName + ' · ' + cislo,
+            'Obchodník ' + me.name + ' založil novou objednávku pro závod ' + z.strediskoName + '.\n\n'
+            + 'Číslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name
+            + (z.pozadovanyTermin ? ('\nPožadovaný termín dodání: ' + fmtDate(new Date(z.pozadovanyTermin + 'T12:00:00Z').getTime())) : '')
+            + '\n\nKonstrukce nyní přiděluje konstruktéra; dokumentaci dostanete po schválení klientem.',
+            z, { stitek: 'NOVÁ OBJEDNÁVKA PRO VÝROBU', stitekBarva: '#0e8a43' });
+        }, 0);
+      }
       save(d);
       // e-mail šéfovi konstrukce (první krok = přidělení konstruktéra)
       for (const em of employeesWithRole('sef')) mail(em, 'Nová ' + co + ' · přidělení konstruktéra · ' + cislo, 'Obchodník ' + me.name + ' založil novou ' + (jeObj ? 'objednávku' : 'nabídku') + '.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + (z.strediskoName ? '\nZávod: ' + z.strediskoName : '') + '\n\nPřidělte prosím konstruktéra v intranetu → ' + (jeObj ? 'Zadání do výroby – konstrukce' : 'Nabídka – konstrukce') + '.', z);
@@ -1899,8 +1923,7 @@ function mount(host) {
         const komu = new Set(employeesWithRole('sef').map(x => x.toLowerCase()));
         if (z.obchodnikEmail) komu.add(z.obchodnikEmail.toLowerCase());
         employeesWithRole('vykonny-reditel').forEach(x => komu.add(x.toLowerCase()));
-        const s2 = (d.strediska || []).find(x => x.key === z.strediskoKey);
-        if (s2 && s2.reditelEmail) komu.add(s2.reditelEmail.toLowerCase());
+        lideStrediska(d, z.strediskoKey).forEach(em => komu.add(em));
         komu.delete((me.email || '').toLowerCase());
         const cis = z.cisloObj || z.cislo;
         for (const em of komu) notify(d, em, 'Opravená výrobní dokumentace ' + cis + ' (v' + vdV + ') — ' + me.name, z.id);
@@ -2409,8 +2432,7 @@ function mount(host) {
       // objednávka už je ve výrobě — musí se to dozvědět i závod
       employeesWithRole('vykonny-reditel').forEach(em => komu.add(em.toLowerCase()));
       employeesWithRole('vyrobni-reditel').forEach(em => komu.add(em.toLowerCase()));
-      const s = (d.strediska || []).find(x => x.key === z.strediskoKey);
-      if (s && s.reditelEmail) komu.add(s.reditelEmail.toLowerCase());
+      lideStrediska(d, z.strediskoKey).forEach(em => komu.add(em));
     }
     komu.delete((me.email || '').toLowerCase());
     for (const em of komu) notify(d, em, 'Změna zadání ' + cis + ' (' + zmeny.length + '×) — ' + me.name, z.id);
@@ -3126,9 +3148,10 @@ function mount(host) {
     if (!key) { json(res, 400, { chyba: 'Chybí název střediska.' }); return true; }
     if (b.delete) { d.strediska = d.strediska.filter(x => x.key !== key); save(d); json(res, 200, { ok: true, strediska: d.strediska }); return true; }
     let s = d.strediska.find(x => x.key === key);
-    if (!s) { s = { key, reditelEmail: '' }; d.strediska.push(s); }
+    if (!s) { s = { key, reditelEmail: '', asistentkaEmail: '' }; d.strediska.push(s); }
     if (b.label != null) s.label = String(b.label || s.label || key).slice(0, 60);
     if (b.reditel !== undefined) s.reditelEmail = String(b.reditel || '').toLowerCase().trim();
+    if (b.asistentka !== undefined) s.asistentkaEmail = String(b.asistentka || '').toLowerCase().trim();
     save(d);
     json(res, 200, { ok: true, strediska: d.strediska });
     return true;
