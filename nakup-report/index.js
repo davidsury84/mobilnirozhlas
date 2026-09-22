@@ -415,7 +415,7 @@ function mount(host) {
     if (!drive || !drive.configured() || !POH_FOLDER) return { ok: false };
     let files; try { files = await drive.listFolder(POH_FOLDER); } catch (e) { return { ok: false, error: e.message }; }
     let st = { seen: {} }; try { st = JSON.parse(fs.readFileSync(EXP_STATE, 'utf8')) || { seen: {} }; } catch (_) {} st.seen = st.seen || {};
-    const kand = (files || []).filter(f => isSnapFile(f) && !st.seen[f.id]).sort((a, b) => String(a.name).localeCompare(String(b.name))).slice(0, 10);
+    const kand = (files || []).filter(f => isSnapFile(f) && !st.seen[f.id]).sort((a, b) => String(a.name).localeCompare(String(b.name))).slice(0, 40);   // první běh vezme celou historii najednou
     if (!kand.length) return { ok: true, zpracovano: [] };
     const poh = loadPoh(); poh.dny = poh.dny || {}; const done = [];
     for (const f of kand) { let info = '', typ = 'pohledavky';
@@ -443,7 +443,9 @@ function mount(host) {
     const dluznici = Object.values(dl).map(e => Object.assign(e, { utvary: [...e.utvary], kdo: [...e.kdo], eshop: zak[e.org] || null })).sort((a, b) => b.saldo - a.saldo);
     const buckets = [[0, 30], [31, 60], [61, 90], [91, 99999]].map(([a, b]) => { const r = P.faktury.filter(x => x.dni >= a && x.dni <= b); return { od: a, do: b, n: r.length, saldo: Math.round(r.reduce((s2, x) => s2 + x.saldo, 0)) }; });
     const trend = Object.keys(poh.dny).sort().slice(-60).map(d => Object.assign({ den: d }, poh.dny[d]));
-    return { ok: true, den: P.den, soubor: P.soubor, faktur: P.faktury.length, saldo: Math.round(P.faktury.reduce((s2, x) => s2 + x.saldo, 0)), buckets, dluznici, expedujeme: dluznici.filter(d => d.eshop), trend,
+    const ob = {}; P.faktury.forEach(x => { const k = x.kdo || ''; const e = ob[k] || (ob[k] = { kdo: k, n: 0, saldo: 0, maxDni: 0 }); e.n++; e.saldo += x.saldo; if (x.dni > e.maxDni) e.maxDni = x.dni; });
+    return { ok: true, den: P.den, soubor: P.soubor, dnesDatum: new Date().toISOString().slice(0, 10), faktur: P.faktury.length, saldo: Math.round(P.faktury.reduce((s2, x) => s2 + x.saldo, 0)), buckets, dluznici, expedujeme: dluznici.filter(d => d.eshop), trend,
+      faktury: P.faktury, obchodnici: Object.values(ob).map(e => Object.assign(e, { saldo: Math.round(e.saldo) })).sort((a, b) => b.saldo - a.saldo),
       utvary: Object.entries(poh.dny[P.den] ? poh.dny[P.den].byUtvar : {}).map(([u, v]) => ({ utvar: u, n: v.n, saldo: Math.round(v.saldo) })).sort((a, b) => b.saldo - a.saldo), oknoDni: dniZpet || 35 };
   }
   async function syncExporty(files) {
@@ -1431,8 +1433,15 @@ function mount(host) {
   }
 
   // ---------- router ----------
+  // Pohledávky = samostatná kategorie intranetu (klíč „pohledavky" v matici přístupů); vidí ji i admin a e-shop.
+  const hasPohledavky = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); const m = (e && host.employeeModules && host.employeeModules(e.email)) || []; return m.indexOf('pohledavky') >= 0 || m.indexOf('eshop') >= 0; } catch (_) { return false; } };
+  const POH_HTML = path.join(__dirname, 'pohledavky.html');
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true), p = u.pathname;
+    if (p === '/pohledavky') {
+      if (!hasPohledavky(req)) return htmlOut(res, 403, '<h1 style="font-family:sans-serif">K modulu Pohledávky nemáte přístup.</h1>'), true;
+      try { return htmlOut(res, 200, fs.readFileSync(POH_HTML, 'utf8')), true; } catch (_) { return htmlOut(res, 404, '<h1>Chybí pohledavky.html</h1>'), true; }
+    }
     if (!p.startsWith('/api/nakup-report')) return false;
     // ERP objednávková data — čtení pro každého přihlášeného (globální SSO už ověřuje); optimalizace objednávek v appce.
     if (p === '/api/nakup-report/objednavky' && req.method === 'GET') {
@@ -1497,7 +1506,7 @@ function mount(host) {
       return json(res, 200, { ok: true }), true;
     }
     if (p === '/api/nakup-report/pohledavky' && req.method === 'GET') {
-      if (!hasEshop(req)) { json(res, 403, { error: 'Bez přístupu k modulu e-shop.' }); return true; }
+      if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu k pohledávkám.' }); return true; }
       return json(res, 200, pohledavkyPrehled(+u.query.dni || 35)), true;
     }
     if (p === '/api/nakup-report/eshop-vydejky' && req.method === 'GET') {

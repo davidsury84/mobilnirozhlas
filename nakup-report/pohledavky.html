@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pohledávky po splatnosti · Intranet ELKOPLAST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --green:#0e8a43; --green-soft:#e6f6ec; --ink:#0f1512; --ink-soft:#5b635c; --faint:#8b938c; --bg:#eef1ec; --paper:#fff; --line:#e3e7e0; --amber:#7a5c0e; --amber-soft:#fff6d2; --red:#c23636; --red-soft:#fbe9e7; --blue:#2f6f8f; --blue-soft:#e7f0fb; --sans:'IBM Plex Sans',system-ui,sans-serif; --cond:'IBM Plex Sans Condensed',var(--sans); }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans)}
+  .wrap{max-width:1380px;margin:0 auto;padding:18px 22px 40px}
+  h1{font:700 24px/1.2 var(--cond);margin:0 0 4px} h2{font:700 16px/1.2 var(--cond);margin:18px 0 8px} h3{font:600 13.5px var(--sans);margin:0 0 6px;color:var(--ink-soft)}
+  .sub{color:var(--ink-soft);font-size:13px;margin:0 0 14px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:12px 0}
+  .kpi{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px} .kpi .v{font:700 22px/1.1 var(--cond)} .kpi .l{font-size:12px;color:var(--ink-soft);margin-top:4px}
+  .kpi.red .v{color:var(--red)} .kpi.amber .v{color:var(--amber)} .kpi.blue .v{color:var(--blue)}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 14px}
+  .alert{background:var(--red-soft);border:1px solid #efc1c1;border-radius:12px;padding:12px 16px;margin:0 0 14px;color:#7a1f1f} .alert ul{margin:6px 0 0;padding-left:20px}
+  .warn{background:var(--amber-soft);border:1px solid #ecd9a8;border-radius:12px;padding:10px 14px;margin:0 0 14px;color:var(--amber);font-size:13px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} .grid2>*{min-width:0} @media(max-width:980px){.grid2{grid-template-columns:1fr}}
+  table{border-collapse:collapse;width:100%;font-size:13px} th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap} th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);background:#f5f7f3;position:sticky;top:0} td.r,th.r{text-align:right} td.wrap{white-space:normal;min-width:180px}
+  .tblwrap{overflow:auto;max-height:460px;border:1px solid var(--line);border-radius:10px}
+  .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px} input,select{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11.5px;font-weight:600} .pill.red{background:var(--red-soft);color:var(--red)} .pill.amber{background:var(--amber-soft);color:var(--amber)} .pill.blue{background:var(--blue-soft);color:var(--blue)}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:120px;padding:6px 0 0} .bars i{display:block;flex:1;background:#c9d8e6;border-radius:3px 3px 0 0;min-width:4px;position:relative} .bars i.last{background:var(--blue)} .bars i:hover::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#243;color:#fff;font-size:11px;padding:3px 7px;border-radius:6px;white-space:nowrap;margin-bottom:4px}
+  .aging{display:grid;grid-template-columns:repeat(4,1fr);gap:8px} .aging div{border-radius:10px;padding:10px 12px;border:1px solid var(--line)} .aging b{display:block;font:700 18px/1.1 var(--cond)} .aging span{font-size:12px;color:var(--ink-soft)}
+  .muted{color:var(--faint)} .err{color:var(--red)} .ok{color:var(--green)}
+  .foot{font-size:12px;color:var(--faint);margin-top:16px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💸 Pohledávky po splatnosti</h1>
+  <p class="sub" id="sub">Načítám denní snímek z ERP…</p>
+  <div id="stav"></div>
+  <div class="kpis" id="kpis"></div>
+  <div id="exp"></div>
+  <div class="grid2">
+    <div class="card"><h3>Stáří pohledávek (dní po splatnosti)</h3><div class="aging" id="aging"></div></div>
+    <div class="card"><h3>Vývoj celkového salda <span class="muted" id="trendInfo"></span></h3><div class="bars" id="trend"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Podle útvaru</h3><div class="tblwrap" style="max-height:300px"><table id="utv"></table></div></div>
+    <div class="card"><h3>Podle obchodníka / vystavil</h3><div class="tblwrap" style="max-height:300px"><table id="kdo"></table></div></div>
+  </div>
+  <div class="card">
+    <h3>Dlužníci</h3>
+    <div class="tools"><input id="q" placeholder="Hledat zákazníka…" style="min-width:240px"><select id="fUtv"><option value="">Všechny útvary</option></select><label><input type="checkbox" id="fEs"> jen ti, kterým e-shop dál expeduje</label><span class="muted" id="cnt"></span></div>
+    <div class="tblwrap"><table id="dl"></table></div>
+  </div>
+  <div class="card">
+    <h3>Všechny faktury po splatnosti</h3>
+    <div class="tblwrap"><table id="fa"></table></div>
+  </div>
+  <div class="foot">Zdroj: denní export neuhrazených faktur po splatnosti z ERP (složka „vydané faktury" na Disku, každý den). Částky = <b>saldo</b> (neuhrazený zbytek), měny se nepřepočítávají (EUR položky jsou označené). <b>„E-shop dál expeduje"</b> = zákazník je mezi dlužníky a zároveň má v expedičních příkazech e-shopu za posledních <span id="okno">35</span> dní zakázku — párováno přes název zákazníka z ERP. Na jednotlivé položky (SK/reg) se tento export párovat nedá — neobsahuje řádky faktur.</div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const kc=n=>Math.round(n||0).toLocaleString('cs-CZ');
+const den=d=>{if(!d)return '—';const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+'. '+(+m[2])+'. '+m[1]:d;};
+let P=null;
+async function load(){
+  try{const r=await fetch('/api/nakup-report/pohledavky?dni=35',{cache:'no-store'});P=await r.json();}catch(e){P={ok:false,error:e.message};}
+  if(!P||!P.ok){$('#sub').innerHTML='<span class="err">'+esc((P&&P.error)||'Data nejsou k dispozici.')+'</span>';return;}
+  $('#okno').textContent=P.oknoDni;
+  $('#sub').innerHTML='Snímek k <b>'+den(P.den)+'</b> (soubor '+esc(P.soubor||'')+') · '+P.faktur+' faktur · saldo <b>'+kc(P.saldo)+' Kč</b>'+(P.dnesDatum&&P.dnesDatum!==P.den?' · dnes '+den(P.dnesDatum):'');
+  const es=P.utvary.find(u=>/e\s*-?\s*shop/i.test(u.utvar)); const b=P.buckets;
+  $('#kpis').innerHTML=[['red',kc(P.saldo)+' Kč','Po splatnosti celkem · '+P.faktur+' faktur'],['blue',es?kc(es.saldo)+' Kč':'—','útvar E-shop'+(es?' · '+es.n+' fa':'')],['',P.dluznici.length,'dlužníků'],['amber',P.expedujeme.length,'dlužníků, kterým e-shop dál expeduje'],['red',kc(b[3].saldo)+' Kč','přes 90 dní · '+b[3].n+' fa']]
+    .map(k=>'<div class="kpi '+k[0]+'"><div class="v">'+k[1]+'</div><div class="l">'+esc(k[2])+'</div></div>').join('');
+  $('#aging').innerHTML=b.map((x,i)=>'<div style="background:'+['#f4f8f2','#fff6d2','#ffe9cc','#fbe9e7'][i]+'"><b>'+kc(x.saldo)+' Kč</b><span>'+(i<3?(x.od+'–'+x.do+' dní'):'přes 90 dní')+' · '+x.n+' fa</span></div>').join('');
+  const t=P.trend||[]; const mx=Math.max.apply(null,t.map(x=>x.saldo||0))||1;
+  $('#trend').innerHTML=t.map((x,i)=>'<i style="height:'+Math.max(2,Math.round(100*(x.saldo||0)/mx))+'%" class="'+(i===t.length-1?'last':'')+'" data-t="'+den(x.den)+': '+kc(x.saldo)+' Kč · '+x.n+' fa"></i>').join('');
+  $('#trendInfo').textContent=t.length?('· '+t.length+' dnů, '+den(t[0].den)+' – '+den(t[t.length-1].den)):'';
+  $('#exp').innerHTML=P.expedujeme.length
+    ?'<div class="alert"><b>⚠ Dlužníci, kterým e-shop v posledních '+P.oknoDni+' dnech dál expedoval ('+P.expedujeme.length+'):</b><ul>'+P.expedujeme.map(d=>'<li><b>'+esc(d.org)+'</b> dluží <b>'+kc(d.saldo)+' Kč</b> ('+d.n+' fa, nejstarší '+d.maxDni+' dní po splatnosti'+(d.kdo.length?', obch. '+esc(d.kdo.join(', ')):'')+') — expedováno '+kc(d.eshop.kc)+' Kč v '+d.eshop.zak+' zak., naposled '+den(d.eshop.posl)+'</li>').join('')+'</ul></div>'
+    :'<div class="warn">Žádnému dlužníkovi po splatnosti e-shop v posledních '+P.oknoDni+' dnech neexpedoval.</div>';
+  $('#utv').innerHTML='<thead><tr><th>Útvar</th><th class="r">Faktur</th><th class="r">Saldo</th><th class="r">Podíl</th></tr></thead><tbody>'+P.utvary.map(u=>'<tr><td>'+esc(u.utvar)+'</td><td class="r">'+u.n+'</td><td class="r"><b>'+kc(u.saldo)+' Kč</b></td><td class="r muted">'+(P.saldo?Math.round(100*u.saldo/P.saldo):0)+' %</td></tr>').join('')+'</tbody>';
+  $('#kdo').innerHTML='<thead><tr><th>Obchodník / vystavil</th><th class="r">Faktur</th><th class="r">Saldo</th><th class="r">Max. dní</th></tr></thead><tbody>'+(P.obchodnici||[]).map(u=>'<tr><td>'+esc(u.kdo||'(neuvedeno)')+'</td><td class="r">'+u.n+'</td><td class="r"><b>'+kc(u.saldo)+' Kč</b></td><td class="r'+(u.maxDni>90?' err':'')+'">'+u.maxDni+'</td></tr>').join('')+'</tbody>';
+  const sel=$('#fUtv'); [...new Set(P.utvary.map(u=>u.utvar))].forEach(u=>{const o=document.createElement('option');o.textContent=u;sel.appendChild(o);});
+  ['q','fUtv','fEs'].forEach(id=>{$('#'+id).oninput=$('#'+id).onchange=drawDl;}); drawDl();
+  $('#fa').innerHTML='<thead><tr><th>Faktura</th><th>Zákazník</th><th>Útvar</th><th>Vystavil</th><th>Vystaveno</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Celkem</th><th class="r">Saldo</th></tr></thead><tbody>'
+    +(P.faktury||[]).slice().sort((a,b)=>b.dni-a.dni).map(f=>'<tr><td>'+esc(f.pz)+(f.mena&&f.mena!=='CZK'?' <span class="pill blue">'+esc(f.mena)+'</span>':'')+'</td><td class="wrap">'+esc(f.org)+'</td><td class="muted">'+esc(f.utvar)+'</td><td class="muted">'+esc(f.kdo)+'</td><td>'+den(f.dat)+'</td><td>'+den(f.spl)+'</td><td class="r'+(f.dni>90?' err':'')+'">'+f.dni+'</td><td class="r muted">'+kc(f.hm)+'</td><td class="r"><b>'+kc(f.saldo)+'</b></td></tr>').join('')+'</tbody>';
+}
+function drawDl(){
+  const q=($('#q').value||'').toLowerCase(), u=$('#fUtv').value, onlyEs=$('#fEs').checked;
+  const rows=P.dluznici.filter(d=>(!q||d.org.toLowerCase().includes(q))&&(!u||d.utvary.includes(u))&&(!onlyEs||d.eshop));
+  $('#cnt').textContent=rows.length+' z '+P.dluznici.length;
+  $('#dl').innerHTML='<thead><tr><th>Zákazník</th><th>Útvar</th><th>Obchodník</th><th class="r">Faktur</th><th class="r">Saldo</th><th class="r">Max. dní</th><th>E-shop expedice (35 d)</th></tr></thead><tbody>'
+    +rows.map(d=>'<tr'+(d.eshop?' style="background:#fdf2f2"':'')+'><td class="wrap"><b>'+esc(d.org)+'</b></td><td class="muted">'+esc(d.utvary.join(', '))+'</td><td class="muted">'+esc(d.kdo.join(', '))+'</td><td class="r">'+d.n+'</td><td class="r"><b>'+kc(d.saldo)+' Kč</b></td><td class="r'+(d.maxDni>90?' err':'')+'">'+d.maxDni+'</td><td>'+(d.eshop?('<span class="pill red">🚚 '+kc(d.eshop.kc)+' Kč · '+d.eshop.zak+' zak. · '+den(d.eshop.posl)+'</span>'):'<span class="muted">—</span>')+'</td></tr>').join('')+'</tbody>';
+}
+load();
+</script>
+</body>
+</html>
