@@ -29,6 +29,7 @@ const num = v => { const n = Number(String(v == null ? '' : v).replace(',', '.')
 function mount(host, ctx) {
   // ctx: { load, save, stavLabel, stavKey, STAV_PORADI, importRows(d, rows, r, list), aplikujPole(d, p, pole) → bool, SYS }
   const log = (...a) => console.log('[vyroba/plan-vyroby]', ...a);
+  const expZ = v => (ctx.expediceZ ? ctx.expediceZ(v) : isoZ(v));
   let bezi = false; let posledni = { at: null, chyba: null, zapis: null };
 
   // ---- text sloupců v jejich formátu -------------------------------------------------
@@ -50,7 +51,7 @@ function mount(host, ctx) {
       ral: ralM ? 'RAL ' + ralM[1] : (/pozink|zin|zákl/i.test(ralT) || !ralT ? '' : ralT), lem: lemM ? 'RAL ' + lemM[1] : '',
       razeni: razM ? cl(razM[1]) : (nazev && !/polep/i.test(nazev) && !/^komplet|víko|viko|hrazd/i.test(nazev) ? nazev : ''), polepy: polM ? cl(polM[1]) : '',
       heliosPolozka: cl(row[9]).replace(/\.0$/, ''), helios: cl(row[12]).replace(/\.0$/, ''),
-      stavText: cl(row[c.stav]), terminVyroby: isoZ(row[15]), poznamka: cl(row[c.poznamka]), expedovanoDne: isoZ(row[c.expedice]),
+      stavText: cl(row[c.stav]), terminVyroby: isoZ(row[15]), poznamka: cl(row[c.poznamka]), expedovanoDne: expZ(row[c.expedice]),
       kamion: c.auto != null ? cl(row[c.auto]) : '',
     };
   }
@@ -105,9 +106,10 @@ function mount(host, ctx) {
       const h = otiskRadku(row, list); otiskyZListu[cvz] = h;
       // barvy → stav (jen dopředu, jen když se barva od minula změnila nebo je to první čtení)
       const bA = hexOf(i, 0), bC = hexOf(i, 2); const bh = bA + '|' + bC; const bk = 'barva:' + cvz;
-      if (ot[bk] !== bh) { ot[bk] = bh; otiskyZListu[bk] = bh; try { if (ctx.aplikujBarvu(d, p, { svareno: jeZelena(bA), lakovano: jeZelena(bC), zinkovano: jeZluta(bC), expedice: isoZ(row[CZ[list].expedice]) })) { stat.podleBarvy = (stat.podleBarvy || 0) + 1; zmena = true; } } catch (e) { stat.chyby.push(cvz + ' barva: ' + e.message); } }
+      if (ot[bk] !== bh) { ot[bk] = bh; otiskyZListu[bk] = bh; try { if (ctx.aplikujBarvu(d, p, { svareno: jeZelena(bA), lakovano: jeZelena(bC), zinkovano: jeZluta(bC), expedice: expZ(row[CZ[list].expedice]) })) { stat.podleBarvy = (stat.podleBarvy || 0) + 1; zmena = true; } } catch (e) { stat.chyby.push(cvz + ' barva: ' + e.message); } }
       if (ot[cvz] && ot[cvz] !== h) { try { if (ctx.aplikujPole(d, p, radekNaPole(row, list))) { stat.prevzato++; zmena = true; } } catch (e) { stat.chyby.push(cvz + ': ' + e.message); } }
     }
+    if (ctx.uzavriOdjeteKamiony) { try { const n = ctx.uzavriOdjeteKamiony(d); if (n) { stat.odjeteKamiony = n; zmena = true; } } catch (e) { stat.chyby.push('kamiony: ' + e.message); } }
     if (nove.length) { try { const s = ctx.importRows(d, nove, r, list); stat.novych = s.polozek; if (s.polozek || s.aktualizovano || s.objednavek) zmena = true; } catch (e) { stat.chyby.push('nové řádky: ' + (e.stack || e.message).split('\n').slice(0, 3).join(' | ')); } }
     // ---- zápis: řádky, které se liší od intranetu (jen naše položky roku listu) ------
     const rokList = 2000 + Number((rows.find((rw, i) => i > 0 && /^\d{2}B$/i.test(cl(rw[0]))) || ['26B'])[0].slice(0, 2)) || new Date().getFullYear();

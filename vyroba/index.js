@@ -77,6 +77,8 @@ function mount(host) {
   const str = (s, max) => String(s == null ? '' : s).trim().slice(0, max || 400);
   const num = (v, def) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) ? n : (def == null ? 0 : def); };
   const dnesISO = () => new Date().toISOString().slice(0, 10);
+  // sloupec Expedice v plánu výroby: cokoli s datem („27.02.26", „06.03.", „23.03", „tech 30.04", „21.05-8ks, 29.05.-2ks") = odjelo; „storno" = ne
+  function expediceZ(s) { const t = String(s == null ? '' : s).trim(); if (!t || /storno/i.test(t)) return ''; let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0]; m = t.match(/(\d{1,2})\s*\.\s*(\d{1,2})(?:\s*\.\s*(\d{4}|\d{2})(?!\d))?/); if (!m || +m[1] < 1 || +m[1] > 31 || +m[2] < 1 || +m[2] > 12) return ''; let y = m[3] || String(new Date().getFullYear()); if (y.length === 2) y = '20' + y; return y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); }
   // značka ve sloupcích Výkresy knihy CONTRACT: '' / 'xx' / 'x' / '-' = nic (výkres není potřeba); 'OK' nebo datum (23.3., 16.9., 15.6) = ano
   function vykresZnacka(v) { const t = String(v == null ? '' : v).trim(); if (!t || /^[x\-–]+$/i.test(t)) return null; const m = t.match(/^(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*(\d{2,4})?$/); let datum = ''; if (m) { let y = m[3] || String(new Date().getFullYear()); if (y.length === 2) y = '20' + y; datum = y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); } return { datum }; }
   const newId = (p) => (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -119,6 +121,10 @@ function mount(host) {
       const rok = new Date().getFullYear();
       d.polozky.forEach(p => { if (p.rok && p.rok < rok && ['prijata', 'zadano', 'svarovna', 'zinkovna', 'lakovna', 'hotovo', 'naplanovano'].includes(p.stav) && (p.udalosti || []).every(u => /^import/.test(u.pozn || ''))) { p.stav = 'expedovano'; p.hotovoKs = num(p.ks); p.udalosti = p.udalosti || []; p.udalosti.push({ ts: Date.now(), kdo: 'intranet@elkoplast.cz', jmeno: 'Intranet', stav: 'expedovano', ks: null, pozn: 'zakázka z roku ' + p.rok + ' – automaticky uzavřena' }); } });
       d.migrace.loniHotovo = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
+    }
+    if (!d.migrace.expedice2) {   // sloupec Expedice se čte benevolentně (23.03, tech 30.04, 21.05-8ks) → barevné otisky pryč, další čtení plánu vše přehodnotí
+      const ot = (d.legacySync || {}).otisky || {}; Object.keys(ot).forEach(k => { if (k.startsWith('barva:')) delete ot[k]; });
+      d.migrace.expedice2 = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
     }
     if (!d.migrace.vykresXx) {   // „xx" ve sloupci Výkresy Posl. dřív znamenalo „poslán" → čekání na výkres u 300 standardních beden; ve skutečnosti = výkres není potřeba
       d.polozky.forEach(p => { if (p.vykres && p.vykres.stav === 'poslan' && !p.vykres.datum) p.vykres = { stav: 'neni', datum: '' }; });
@@ -293,6 +299,22 @@ function mount(host) {
     return true;
   }
 
+  // kamion z knihy CONTRACT (list Metalboxy expedice: KW → LKW) z minulého týdne už odjel → jeho položky jsou expedované
+  function uzavriOdjeteKamiony(d) {
+    const dnes = dnesISO(); const akt = kwZData(dnes); if (!akt) return 0; let n = 0;
+    const kamBy = {}; (d.kamiony || []).forEach(k => { kamBy[kamionKod(k.kod)] = k; });
+    const patek = (rok, kw) => { const t = new Date(Date.UTC(rok, 0, 4)); const den = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() - den + 1 + (kw - 1) * 7 + 4); return t.toISOString().slice(0, 10); };
+    d.polozky.forEach(p => {
+      const k = kamBy[kamionKod(p.kamion)]; if (!k || !k.kw) return;
+      const rok = k.kwRok || akt.rok; if (rok > akt.rok || (rok === akt.rok && k.kw >= akt.kw)) return;   // teprve pojede (nebo jede tento týden)
+      if (p.stav === 'storno' || p.stav === 'pozastaveno' || STAV_PORADI[p.stav] >= STAV_PORADI.expedovano) return;
+      const pred = p.stav; p.stav = 'expedovano'; p.hotovoKs = num(p.ks); p.hotovoDne = p.hotovoDne || dnes; p.expedovanoDne = p.expedovanoDne || k.datum || patek(rok, k.kw);
+      p.udalosti = p.udalosti || []; p.udalosti.push({ ts: Date.now(), kdo: 'plan-vyroby@elkoplast.cz', jmeno: 'Plán expedic (kniha CONTRACT)', stav: 'expedovano', ks: null, pozn: 'kamion ' + k.kod + ' odjel v KW ' + k.kw + '/' + rok + ' · dříve ' + stavLabel(pred) });
+      n++;
+    });
+    return n;
+  }
+
   // ---- kamiony a plán skládání -----------------------------------------------------
   const kamionKod = k => String(k || '').toUpperCase().replace(/\s+/g, '').replace(/^LKW0*(\d)/, 'LKW$1');
   function zajistiKamion(d, kod, extra) {
@@ -461,7 +483,7 @@ function mount(host) {
   const legacy = legacysync.mount(host, {
     load, save: saveRaw, serial, stavLabel, stavKey, STAV_PORADI, importRows, aplikujPole,
     zapisPovolen: () => load().nastaveni.legacyZapis === true,   // výchozí: jen čtení (rozhodnutí 19. 9. 2026)
-    importArchivZePlanu, aplikujBarvu,
+    importArchivZePlanu, aplikujBarvu, expediceZ, uzavriOdjeteKamiony,
     SYS: { email: 'plan-vyroby@elkoplast.cz', name: 'Plán výroby (Sheet)' },
     // do kterého listu plánu položka patří: podle importu, jinak podle partnera zákazníka (přímý zákazník = Ostatní výrobky)
     listPolozky: (d, p) => { if (p.list) return p.list; const o = d.objednavky.find(x => x.id === p.objId); const z = o && d.zakaznici.find(x => x.id === o.zakaznikId); return z && z.partner === 'primy' ? 'ostatni' : 'boxy'; },
@@ -867,10 +889,11 @@ function mount(host) {
       const nazev = str(row[10], 200);
       const razM = nazev.match(/ražení\s*názvu\s*[:\-]?\s*([^\n]*)/i);
       const polepM = nazev.match(/polepy?\s*([^\n]*)/i);
-      const pozn = str(row[16], 300); const exped = datumZ(row[17]); const stavTxt = low(row[11]) + ' ' + low(pozn) + ' ' + low(row[17]);
+      const cExp = list === 'ostatni' ? 16 : 17;   // Boxy: R = Expedice; Ostatní výrobky: Q = Exp. (R = Auto)
+      const pozn = str(row[16], 300); const exped = expediceZ(row[cExp]); const stavTxt = low(row[11]) + ' ' + low(pozn) + ' ' + low(row[cExp]);
       let stav = 'zadano';
       if (/storno/.test(stavTxt)) stav = 'storno';
-      else if (exped || /^\s*\d{1,2}\.\s*\d{1,2}\./.test(String(row[17] || ''))) stav = 'expedovano';
+      else if (exped) stav = 'expedovano';
       else if (/zinkovn|zink\b|zin\.|zink /.test(low(pozn))) stav = 'zinkovna';
       else if (/hotovo|hot\./.test(stavTxt)) stav = 'hotovo';
       const tl = num(row[5], 0); const objem = num(row[8], 0);
