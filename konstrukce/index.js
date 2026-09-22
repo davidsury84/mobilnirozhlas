@@ -1728,17 +1728,50 @@ function mount(host) {
   // ve stejnou chvíli dostaly totéž ČVZ.
   let planFronta = Promise.resolve();
   // Idempotentní: jednou zapsaná zakázka se už znovu nezapisuje.
-  function planZapis(zakId) {
-    planFronta = planFronta.then(() => planZapisJedna(zakId)).catch(() => {});
+  // Jeden e-mail výrobě: že je objednávka v systému a (když se zapisuje do
+  // plánu) pod jakým ČVZ. Posílá se až po zápisu, ať nechodí dvě zprávy.
+  function oznamVyrobe(d, z, kdo) {
+    if (!z || z.oznamenoVyrobe) return;
+    const komu = lideStrediska(d, z.strediskoKey);
+    if (!komu.length) return;
+    z.oznamenoVyrobe = Date.now();
+    const cis = z.cisloObj || z.cislo;
+    const t = typeOf(d, z.typKey);
+    const cvz = z.cvzHelios
+      ? ('\nČíslo výrobní zakázky: ' + z.cvzHelios + (z.cvzStrecha ? (' · střecha ' + z.cvzStrecha) : '')
+         + '\nŘádek je zapsaný v plánu výroby ' + (z.strediskoName || '') + '.')
+      : '\nČíslo výrobní zakázky zatím přidělené není.';
+    komu.forEach(em => notify(d, em, 'Nová objednávka ' + cis + ' (' + z.zakaznik + ') pro závod '
+      + (z.strediskoName || '') + (z.cvzHelios ? (' · ČVZ ' + z.cvzHelios) : '') + '.', z.id));
+    setTimeout(() => {
+      for (const em of komu) mail(em, 'Nová objednávka · závod ' + (z.strediskoName || '') + ' · ' + cis,
+        'Pro závod ' + (z.strediskoName || '') + ' přibyla nová objednávka.\n\n'
+        + 'Číslo: ' + cis + '\nZákazník: ' + z.zakaznik + '\nTyp: ' + (t.name || '')
+        + (kdo ? ('\nZadal(a): ' + kdo) : '')
+        + (z.pozadovanyTermin ? ('\nPožadovaný termín dodání: ' + fmtDate(new Date(z.pozadovanyTermin + 'T12:00:00Z').getTime())) : '')
+        + cvz
+        + '\n\nKonstrukce nyní přiděluje konstruktéra; dokumentaci dostanete po schválení klientem.',
+        z, { stitek: 'NOVÁ OBJEDNÁVKA PRO VÝROBU', stitekBarva: '#0e8a43' });
+    }, 0);
+  }
+
+  function planZapis(zakId, kdo) {
+    planFronta = planFronta.then(() => planZapisJedna(zakId, kdo)).catch(() => {});
     return planFronta;
   }
-  async function planZapisJedna(zakId) {
+  // Ať zápis dopadne jakkoli, výroba dostane jednu zprávu — s ČVZ, nebo bez něj.
+  function planKonec(zakId, kdo) {
+    try { const d = load(); const z = d.zakazky.find(x => x.id === zakId);
+      if (z && z.rezim === 'objednavka' && z.strediskoKey && !z.oznamenoVyrobe) { oznamVyrobe(d, z, kdo); save(d); }
+    } catch (e) { console.error('[konstrukce/plán] oznámení výrobě selhalo:', e.message); }
+  }
+  async function planZapisJedna(zakId, kdo) {
     try {
-      if (!host.sheets || !host.sheets.available) return;
+      if (!host.sheets || !host.sheets.available) return planKonec(zakId, kdo);
       let d = load();
       let z = d.zakazky.find(x => x.id === zakId);
-      if (!z || z.rezim !== 'objednavka' || z.planZapsano || z.cvzHelios) return;
-      if ((z.strediskoKey || '') !== PLAN_STREDISKO) return;   // tabulka je plán výroby jednoho závodu
+      if (!z || z.rezim !== 'objednavka' || z.planZapsano || z.cvzHelios) return planKonec(zakId, kdo);
+      if ((z.strediskoKey || '') !== PLAN_STREDISKO) return planKonec(zakId, kdo);   // tabulka je plán výroby jednoho závodu
       const rok = new Date(z.objAt || z.createdAt || Date.now()).getFullYear();
       const { pref, next } = await planDalsiCislo(d, rok);
       const strecha = planStrecha(z);
@@ -1755,8 +1788,12 @@ function mount(host) {
       delete z.cvzRem;                                    // upomínky na ČVZ jsou bezpředmětné
       audit(z, 'systém', 'Zapsáno do plánu výroby ' + (z.strediskoName || ''),
         'ČVZ ' + z.cvzHelios + (strecha ? (' · střecha ' + z.cvzStrecha) : ''));
+      oznamVyrobe(d, z, kdo);     // teď už víme číslo — pošleme výrobě jednu zprávu
       save(d);
-    } catch (e) { console.error('[konstrukce/plán] zápis do tabulky selhal:', e.message); }
+    } catch (e) {
+      console.error('[konstrukce/plán] zápis do tabulky selhal:', e.message);
+      planKonec(zakId, kdo);      // zápis nevyšel, ale o objednávce výroba vědět musí
+    }
   }
 
   // ---- vytvoření zakázky (obchodník) ---------------------------------------
@@ -1833,7 +1870,7 @@ function mount(host) {
       if (new Date(z.pozadovanyTermin + 'T23:59:59Z').getTime() < earliest) warn = 'Pozor: požadovaný termín je při výchozích lhůtách (interně ~' + internalDays + ' prac. dnů) nereálný ještě před reakcí klienta.';
     }
     // objednávka do plánu výroby (ČVZ) — na pozadí, ať nedrží odpověď
-    if (jeObj) setTimeout(() => planZapis(z.id), 0);
+    if (jeObj) setTimeout(() => planZapis(z.id, me.name), 0);
     const co = jeObj ? 'objednávka' : 'nabídka';
     if (z.stav === 'zavod') {
       // objednávka bez určeného závodu → na tahu ředitel výroby
@@ -1842,19 +1879,7 @@ function mount(host) {
       for (const em of employeesWithRole('vykonny-reditel')) mail(em, 'Nová objednávka · výběr závodu · ' + cislo, 'Obchodník ' + me.name + ' založil novou objednávku.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + '\n\nVyberte prosím výrobní závod v intranetu → Zadání do výroby – konstrukce.', z);
     } else {
       employeesWithRole('sef').forEach(em => { notify(d, em, 'Nová ' + co + ' ' + cislo + ' (' + zakaznik + ') — přidělte konstruktéra.', z.id); });
-      // Nová objednávka s určeným závodem — ať o ní ví i výroba, ne jen konstrukce.
-      if (jeObj && z.strediskoKey) {
-        const vyroba = lideStrediska(d, z.strediskoKey);
-        vyroba.forEach(em => notify(d, em, 'Nová objednávka ' + cislo + ' (' + zakaznik + ') pro závod ' + z.strediskoName + '.', z.id));
-        setTimeout(() => {
-          for (const em of vyroba) mail(em, 'Nová objednávka · závod ' + z.strediskoName + ' · ' + cislo,
-            'Obchodník ' + me.name + ' založil novou objednávku pro závod ' + z.strediskoName + '.\n\n'
-            + 'Číslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name
-            + (z.pozadovanyTermin ? ('\nPožadovaný termín dodání: ' + fmtDate(new Date(z.pozadovanyTermin + 'T12:00:00Z').getTime())) : '')
-            + '\n\nKonstrukce nyní přiděluje konstruktéra; dokumentaci dostanete po schválení klientem.',
-            z, { stitek: 'NOVÁ OBJEDNÁVKA PRO VÝROBU', stitekBarva: '#0e8a43' });
-        }, 0);
-      }
+      // Výrobě (ředitel oblasti + asistentka) hlásí až planZapis — počká si na ČVZ.
       save(d);
       // e-mail šéfovi konstrukce (první krok = přidělení konstruktéra)
       for (const em of employeesWithRole('sef')) mail(em, 'Nová ' + co + ' · přidělení konstruktéra · ' + cislo, 'Obchodník ' + me.name + ' založil novou ' + (jeObj ? 'objednávku' : 'nabídku') + '.\n\nČíslo: ' + cislo + '\nZákazník: ' + zakaznik + '\nTyp: ' + t.name + (z.strediskoName ? '\nZávod: ' + z.strediskoName : '') + '\n\nPřidělte prosím konstruktéra v intranetu → ' + (jeObj ? 'Zadání do výroby – konstrukce' : 'Nabídka – konstrukce') + '.', z);
@@ -2141,7 +2166,7 @@ function mount(host) {
         const cil = z.zNabidky ? 'schvaleno' : 'prideleni';
         enterState(d, z, cil);
         audit(z, me.email, 'Vybrán závod', s.label + (note ? ' — ' + note : ''));
-        setTimeout(() => planZapis(z.id), 0);   // teď už je jasné, do kterého plánu patří
+        setTimeout(() => planZapis(z.id, me.name), 0);   // teď už je jasné, do kterého plánu patří
         if (cil === 'schvaleno') {
           if (z.assignedTo) notify(d, z.assignedTo, 'Objednávka ' + (z.cisloObj || z.cislo) + ' — závod ' + s.label + ', vložte výrobní dokumentaci.', z.id);
           employeesWithRole('sef').forEach(em => notify(d, em, 'Objednávka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') → závod ' + s.label + '.', z.id));
