@@ -2724,6 +2724,21 @@ async function sheetsAppend(spreadsheetId, range, rows) {
     r.end(body);
   });
 }
+// Zápis do konkrétního rozsahu (plán výroby závodu). null v poli hodnot = buňku nechat být.
+async function sheetsUpdate(spreadsheetId, range, rows) {
+  if (!GOOGLE_SA_CLIENT_EMAIL || !GOOGLE_SA_PRIVATE_KEY) throw new Error('Service account (GOOGLE_SA_*) není nastaven.');
+  const token = await sheetsGetToken('https://www.googleapis.com/auth/spreadsheets');
+  const body = JSON.stringify({ values: rows });
+  const apiPath = '/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '/values/' + encodeURIComponent(range) + '?valueInputOption=USER_ENTERED';
+  return await new Promise((resolve, reject) => {
+    const r = https.request({ method: 'PUT', hostname: 'sheets.googleapis.com', path: apiPath, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, resp => {
+      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j || {}); reject(new Error('Sheets update ' + resp.statusCode + ': ' + d.slice(0, 200))); });
+    });
+    r.on('error', e => reject(new Error('Spojení se Sheets: ' + e.message)));
+    r.setTimeout(20000, () => { try { r.destroy(new Error('Sheets: časový limit spojení.')); } catch (_) {} });
+    r.end(body);
+  });
+}
 // Názvy všech listů tabulky (aby šly načítat i další listy, ne jen první).
 async function sheetsMeta(spreadsheetId) {
   if (!GOOGLE_SA_CLIENT_EMAIL || !GOOGLE_SA_PRIVATE_KEY) throw new Error('Service account (GOOGLE_SA_*) není nastaven.');
@@ -3581,7 +3596,7 @@ try {
 let konstrukceMod = null;
 try {
   konstrukceMod = require('./konstrukce').mount({ reportDisabled,
-    sheets: { get available() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }, read: sheetsGet, append: sheetsAppend },
+    sheets: { get available() { return !!(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY); }, read: sheetsGet, append: sheetsAppend, update: sheetsUpdate },
     send, readBody, deliver, empSession, isAdmin, baseUrl, employeeModules, getState,
     isObchodnik: isObchodnikEmail,
     obchodniciList: obchodniciPrehled,

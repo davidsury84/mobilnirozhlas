@@ -1447,6 +1447,7 @@ function mount(host) {
       if (p === '/api/konstrukce/termin' && req.method === 'POST') return apiDeadline(req, res);
       if (p === '/api/konstrukce/cvz' && req.method === 'POST') return apiCvz(req, res);
       if (p === '/api/konstrukce/zadani' && req.method === 'POST') return apiZadani(req, res);
+      if (p === '/api/konstrukce/plan/nahled' && req.method === 'GET') return apiPlanNahled(req, res, u.query);
       if (p === '/api/konstrukce/notif-read' && req.method === 'POST') return apiNotifRead(req, res);
       if (p === '/api/konstrukce/admin/role' && req.method === 'POST') return apiAdminRole(req, res);
       if (p === '/api/konstrukce/admin/fond' && req.method === 'POST') return apiAdminFond(req, res);
@@ -1624,18 +1625,61 @@ function mount(host) {
     return Object.keys(out).length ? out : null;
   }
 
-  // ---- Plán výroby Chomutov (Google tabulka) -------------------------------
-  // Po potvrzení objednávky se do listu „zakázky CV <rok>" přidá řádek a zakázka
-  // dostane ČVZ = další volné číslo v řadě (26C-272). Zapisuje se JEDNOU, při
-  // vzniku objednávky (u zakázky bez určeného závodu až při jeho výběru).
-  // Zvláštnost dle výroby: je-li v kartě požadavek na střechu/plachtu, jde
-  // střecha na SAMOSTATNÝ řádek s vlastním ČVZ (26C-272 kontejner, 26C-273 střecha).
-  const PLAN_SHEET = process.env.KONSTRUKCE_PLAN_SHEET_ID || '1mh8Fhi39uClg0xXvKuWvEDqmFvF5-mWv_8IA1cStBQM';
-  const PLAN_STREDISKO = process.env.KONSTRUKCE_PLAN_STREDISKO || 'chomutov';
-  const PLAN_KOD = process.env.KONSTRUKCE_PLAN_KOD || 'C';
+  // ---- Plány výroby závodů (Google tabulky) --------------------------------
+  // Po potvrzení objednávky se do plánu výroby daného závodu zapíše řádek a
+  // zakázka dostane ČVZ = další volné číslo v řadě (26C-272, 26B-715). Zapisuje
+  // se JEDNOU, při vzniku objednávky (u zakázky bez závodu až při jeho výběru).
+  // Střecha/plachta v zadání = SAMOSTATNÝ řádek s vlastním ČVZ.
+  //
+  // Každý závod vede plán jinak: jiný list, jiný řádek s hlavičkou, jiné pořadí
+  // i sada sloupců. Proto se nezapisuje „na písmeno sloupce", ale PODLE NÁZVU
+  // v hlavičce — vyplní se jen sloupce, které aplikace v hlavičce pozná,
+  // ostatních se nedotkne. Nový závod = přidat sem tabulku, list a řádek
+  // hlavičky; kód se nemění.
   const PLAN_DRYRUN = process.env.KONSTRUKCE_PLAN_DRYRUN === '1';   // 1 = jen vypíše řádek do logu
-  const planList = (rok) => 'zakázky CV ' + rok;
+  const PLANY = {
+    chomutov: { nazev: 'PLÁN VÝROBY CHOMUTOV', kod: 'C', hlavicka: 3,
+      sheet: process.env.KONSTRUKCE_PLAN_SHEET_ID || '1mh8Fhi39uClg0xXvKuWvEDqmFvF5-mWv_8IA1cStBQM',
+      list: rok => 'zakázky CV ' + rok },
+    bruntal: { nazev: 'PLÁN VÝROBY BRUNTÁL KONTEJNERY', kod: 'B', hlavicka: 2,
+      sheet: process.env.KONSTRUKCE_PLAN_SHEET_BRUNTAL || '1CWoHIcbSR7Z5V1PjKE2QslOZ60JrZUPUD_Hhuexizaw',
+      list: () => 'Zak.Bruntál',
+      // řadu 26B sdílí s modulem Výroba (popelnice) — bez ohledu na něj by se rozdávala už použitá čísla
+      sdilenaRada: 'vyroba-popelnice.json' },
+  };
+  const planCfg = (strediskoKey) => PLANY[String(strediskoKey || '')] || null;
   const planCislo = (pref, n) => pref + '-' + String(n).padStart(3, '0');
+  const planSloupec = (n) => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+
+  // Názvy sloupců tak, jak je píšou ředitelé (bez diakritiky, malými) → pole aplikace.
+  const planNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  const PLAN_SLOUPCE = {
+    vyrobek: ['vyrobek'],
+    rozmery: ['rozmery'],
+    tl: ['tl. v mm', 'tl v mm', 'tl.'],
+    objem: ['objem'],
+    napojeniLem: ['napojeni/lem', 'napojeni / lem'],
+    strecha: ['strecha/plachta/aj.', 'strecha/plachta', 'strecha'],
+    ks: ['ks'],
+    ral: ['ral'],
+    cisloObj: ['cislo zakazky', 'cislo'],
+    zeDne: ['ze dne'],
+    kontakt: ['kontakt'],
+    termin: ['pozadovany/potvrzeny', 'pozadovany'],
+    zakaznik: ['zakaznik/customer', 'zakaznik'],
+    konstrukter: ['konstrukter'],
+    kod: ['opakovane zakazka - kod', 'opakovana zakazka - kod', 'opakovane zakazky - kod'],
+  };
+  function planMapa(hlavicka) {
+    const h = (hlavicka || []).map(planNorm), idx = {};
+    for (const [pole, jmena] of Object.entries(PLAN_SLOUPCE)) {
+      for (const j of jmena) { const i = h.indexOf(j); if (i >= 0) { idx[pole] = i; break; } }
+    }
+    // Chomutov: „Výrobek" je sloučený přes dva sloupce, rozměry hlavičku nemají → sloupec hned za ním
+    if (idx.rozmery == null && idx.vyrobek != null && !h[idx.vyrobek + 1]) idx.rozmery = idx.vyrobek + 1;
+    idx.prefix = 0; idx.cislo = 1;   // ČVZ je v obou plánech v A/B (hlavička je sloučená, název tam není)
+    return idx;
+  }
 
   function planDatum(ms) { if (!ms) return ''; const x = new Date(ms); return x.getDate() + '.' + (x.getMonth() + 1) + '.' + x.getFullYear(); }
   function planDatumISO(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (+m[3] + '.' + (+m[2]) + '.' + m[1]) : ''; }
@@ -1645,7 +1689,7 @@ function mount(host) {
     let v = String(a.hodnota || ''); if (a.detail) v += (v ? ' · ' : '') + a.detail;
     return v;
   }
-  // „Pavel Barna" → „P. Barna" (tabulka vede obchodníky zkratkou)
+  // „Pavel Barna" → „P. Barna" (tabulky vedou obchodníky zkratkou)
   function planZkratka(jmeno) {
     const c = String(jmeno || '').trim().split(/\s+/).filter(Boolean);
     if (c.length < 2) return c[0] || '';
@@ -1668,12 +1712,23 @@ function mount(host) {
     const m = String(p).match(/RAL\s*\d{4}[^,;·]*/i);
     return m ? m[0].trim() : '';
   }
+  // napojení + lem: jen odchylky od standardu (standard nese kód ABR), kódy lomítkem
+  function planNapojeniLem(z) {
+    const out = [];
+    for (const k of ['napojeni', 'lem']) {
+      const a = (z.dotaznik || {})[k];
+      if (!a || typeof a !== 'object' || !a.volba || a.volba === 'standard') continue;
+      const kod = String(a.hodnota || '').split(' — ')[0].trim();
+      if (kod) out.push(kod);
+    }
+    return out.join(' / ');
+  }
   // Řada výrobku: „ABR-DSD-7000x2420x2350-53-…" → „ABR-DSD"
   function planVyrobek(d, z) {
     if (z.kodAbr) { const m = z.kodAbr.match(/^(.*?)-\d+x/); if (m) return m[1]; }
     const key = String(z.typKey || '').toUpperCase();
     const fam = familyOf(z.typKey);
-    if (fam === 'abroll') return 'ABR-' + key;     // tabulka vede řady jako ABR-DSD
+    if (fam === 'abroll') return 'ABR-' + key;     // tabulky vedou řady jako ABR-DSD
     if (fam === 'city') return 'CITY-' + key;
     return key;
   }
@@ -1688,46 +1743,95 @@ function mount(host) {
     }
     return '';
   }
-  // Jeden řádek registru (sloupce A..W dle hlavičky listu).
-  function planRadek(d, z, pref, cislo, opt) {
+  // Hodnoty jednoho řádku podle polí aplikace; do sloupců je rozmístí planRadek dle hlavičky.
+  function planHodnoty(d, z, pref, cislo, opt) {
     opt = opt || {};
-    const r = new Array(23).fill('');
-    r[0] = pref;                                   // A  ČVZ – rok+závod (26C)
-    r[1] = String(cislo).padStart(3, '0');         // B  ČVZ – pořadí
-    r[2] = planVyrobek(d, z) + (opt.strecha ? ' - STŘECHA' : '');   // C  Výrobek
-    r[3] = planRozmery(z);                         // D  rozměry
-    r[4] = opt.strecha ? '' : planTloustky(z);     // E  tl. v mm (u střechy jiná, doplní výroba)
-    r[5] = opt.strecha ? '' : planObjem(z);        // F  Objem (patří ke kontejneru)
-    r[6] = opt.strecha || opt.odkaz || '';         // G  Střecha/Plachta/aj.
-    r[7] = planHod(z, 'pocet');                    // H  ks
-    r[8] = planRal(z);                             // I  RAL
-    r[9] = z.cisloPoptavky || '';                  // J  číslo přijaté objednávky
-    r[10] = planDatum(z.objAt || z.createdAt);     // K  ze dne
-    r[11] = planZkratka(empName(z.obchodnikEmail));// L  kontakt (obchodník)
-    r[12] = planDatumISO(z.pozadovanyTermin);      // M  požadovaný termín expedice
-    r[16] = z.zakaznik || '';                      // Q  zákazník
-    r[17] = z.assignedTo ? empName(z.assignedTo).split(/\s+/)[0] : '';   // R  konstruktér
-    r[22] = z.kodAbr || '';                        // W  kód (opakovaná zakázka)
-    return r;                                      // N,O,P,S,T,U,V = výroba/nákup, needitujeme
+    return {
+      prefix: pref, cislo: String(cislo).padStart(3, '0'),
+      vyrobek: planVyrobek(d, z) + (opt.strecha ? ' - STŘECHA' : ''),
+      rozmery: planRozmery(z),
+      tl: opt.strecha ? '' : planTloustky(z),          // u střechy jiná tloušťka, doplní výroba
+      objem: opt.strecha ? '' : planObjem(z),          // objem patří ke kontejneru
+      napojeniLem: opt.strecha ? '' : planNapojeniLem(z),
+      strecha: opt.strecha || opt.odkaz || '',
+      ks: planHod(z, 'pocet'), ral: planRal(z),
+      cisloObj: z.cisloPoptavky || '', zeDne: planDatum(z.objAt || z.createdAt),
+      kontakt: planZkratka(empName(z.obchodnikEmail)), termin: planDatumISO(z.pozadovanyTermin),
+      zakaznik: z.zakaznik || '',
+      konstrukter: z.assignedTo ? empName(z.assignedTo).split(/\s+/)[0] : '',
+      kod: z.kodAbr || '',
+    };
   }
-  async function planDalsiCislo(d, rok) {
-    const pref = String(rok).slice(2) + PLAN_KOD;
-    const j = await host.sheets.read(PLAN_SHEET, "'" + planList(rok) + "'!A1:B3000");
-    let max = 0;
-    for (const r of (j.values || [])) {
-      if (String(r[0] || '').trim() !== pref) continue;
-      const n = parseInt(String(r[1] || '').trim(), 10);
-      if (Number.isFinite(n) && n > max) max = n;
+  // null = buňky se nedotknout (Sheets API je při update přeskočí) — cizí sloupce zůstanou, jak jsou
+  function planRadek(hodnoty, mapa, sirka) {
+    const r = new Array(sirka).fill(null);
+    for (const [pole, i] of Object.entries(mapa)) {
+      const v = hodnoty[pole];
+      if (v != null && String(v) !== '' && i < sirka) r[i] = v;   // prázdné neposíláme — '' by buňku smazalo
     }
-    if (!max) throw new Error('v listu „' + planList(rok) + '" nejsou žádná čísla ' + pref + ' — nechci hádat začátek řady');
-    // pojistka: tabulka se čte se zpožděním, poslední přidělené číslo si pamatujeme i u sebe
-    const nase = ((d.planPosledni || {})[pref] || 0);
-    return { pref, next: Math.max(max, nase) + 1 };
+    return r;
   }
+
+  // Přečte list: hlavičku (→ mapa sloupců), nejvyšší číslo v řadě a první
+  // volný řádek POD posledními daty (Bruntál má prefixy „26B" předvyplněné
+  // dopředu — takový řádek je volný, vyplní se první z nich).
+  async function planCil(cfg, rok) {
+    const list = cfg.list(rok);
+    const j = await host.sheets.read(cfg.sheet, "'" + list + "'!A1:BZ3000");
+    const rows = j.values || [];
+    const hl = rows[cfg.hlavicka - 1] || [];
+    const mapa = planMapa(hl);
+    const pref = String(rok).slice(2) + cfg.kod;
+    const maData = r => (r || []).slice(1).some(x => String(x || '').trim());
+    let max = 0, posledniData = cfg.hlavicka - 1;
+    for (let i = cfg.hlavicka; i < rows.length; i++) {
+      const r = rows[i] || [];
+      const n = parseInt(String(r[1] || '').trim(), 10);
+      if (String(r[0] || '').trim() === pref && Number.isFinite(n) && n > max) max = n;
+      if (maData(r)) posledniData = i;
+    }
+    let cil = posledniData + 2;                                   // 1-based řádek hned pod posledními daty
+    for (let i = posledniData + 1; i < rows.length; i++) {        // přeskoč případné řádky s daty (nemělo by nastat)
+      const a = String((rows[i] || [])[0] || '').trim();
+      if (!maData(rows[i]) && (!a || /^\d{2}[A-Z]$/.test(a))) { cil = i + 1; break; }
+    }
+    return { list, mapa, pref, max, cil, sirka: Math.max(hl.length, ...Object.values(mapa).map(i => i + 1)) };
+  }
+  // Bruntál: čísla 26B rozdává i modul Výroba (popelnice) ze svého čítače. Bez pohledu
+  // do něj by konstrukce přidělila číslo, které už má nějaká popelnice.
+  function planSdilenaRadaMax(cfg, pref) {
+    if (!cfg.sdilenaRada) return 0;
+    try {
+      const v = JSON.parse(fs.readFileSync(path.join(host.dataDir || __dirname, cfg.sdilenaRada), 'utf8'));
+      const rok = '20' + pref.slice(0, 2);
+      let m = Number((v.seq && v.seq.cvz && v.seq.cvz[rok]) || 0);
+      for (const p of (v.polozky || [])) { const mm = String(p.cvz || '').match(/^(\d{2}[A-Z])-(\d+)$/); if (mm && mm[1] === pref) m = Math.max(m, +mm[2]); }
+      return m;
+    } catch (_) { return 0; }
+  }
+  function planDalsi(d, cfg, c) {
+    if (!c.max) throw new Error('v listu „' + c.list + '" nejsou žádná čísla ' + c.pref + ' — nechci hádat začátek řady');
+    // pojistky: poslední číslo přidělené námi (tabulka se čte se zpožděním) a sdílená řada
+    const nase = ((d.planPosledni || {})[c.pref] || 0);
+    return Math.max(c.max, nase, planSdilenaRadaMax(cfg, c.pref)) + 1;
+  }
+  // Náhled pro formulář: „další volné je 26C-272" — nic nerezervuje, číslo padne až při uložení.
+  async function apiPlanNahled(req, res, q) {
+    const cfg = planCfg(q.stredisko);
+    if (!cfg) { json(res, 200, { ok: true, plan: false }); return true; }
+    if (!host.sheets || !host.sheets.available) { json(res, 200, { ok: true, plan: true, nedostupne: true }); return true; }
+    try {
+      const d = load(); const rok = new Date().getFullYear();
+      const c = await planCil(cfg, rok);
+      const next = planDalsi(d, cfg, c);
+      json(res, 200, { ok: true, plan: true, nazev: cfg.nazev, list: c.list, radek: c.cil, cvz: planCislo(c.pref, next), cvzStrecha: planCislo(c.pref, next + 1) });
+    } catch (e) { json(res, 200, { ok: true, plan: true, chyba: e.message }); }
+    return true;
+  }
+
   // Přidělování čísel musí být po jednom — jinak by dvě objednávky založené
   // ve stejnou chvíli dostaly totéž ČVZ.
   let planFronta = Promise.resolve();
-  // Idempotentní: jednou zapsaná zakázka se už znovu nezapisuje.
   // Jeden e-mail výrobě: že je objednávka v systému a (když se zapisuje do
   // plánu) pod jakým ČVZ. Posílá se až po zápisu, ať nechodí dvě zprávy.
   function oznamVyrobe(d, z, kdo) {
@@ -1765,29 +1869,34 @@ function mount(host) {
       if (z && z.rezim === 'objednavka' && z.strediskoKey && !z.oznamenoVyrobe) { oznamVyrobe(d, z, kdo); save(d); }
     } catch (e) { console.error('[konstrukce/plán] oznámení výrobě selhalo:', e.message); }
   }
+  // Idempotentní: jednou zapsaná zakázka se už znovu nezapisuje.
   async function planZapisJedna(zakId, kdo) {
     try {
       if (!host.sheets || !host.sheets.available) return planKonec(zakId, kdo);
       let d = load();
       let z = d.zakazky.find(x => x.id === zakId);
       if (!z || z.rezim !== 'objednavka' || z.planZapsano || z.cvzHelios) return planKonec(zakId, kdo);
-      if ((z.strediskoKey || '') !== PLAN_STREDISKO) return planKonec(zakId, kdo);   // tabulka je plán výroby jednoho závodu
+      const cfg = planCfg(z.strediskoKey);
+      if (!cfg) return planKonec(zakId, kdo);                     // závod bez plánu v tabulce
       const rok = new Date(z.objAt || z.createdAt || Date.now()).getFullYear();
-      const { pref, next } = await planDalsiCislo(d, rok);
+      const c = await planCil(cfg, rok);
+      const next = planDalsi(d, cfg, c);
       const strecha = planStrecha(z);
-      const rows = [planRadek(d, z, pref, next, strecha ? { odkaz: 'střecha viz ' + planCislo(pref, next + 1) } : {})];
-      if (strecha) rows.push(planRadek(d, z, pref, next + 1, { strecha }));
-      if (PLAN_DRYRUN) console.log('[konstrukce/plán] DRY-RUN, nezapisuji:', JSON.stringify(rows));
-      else await host.sheets.append(PLAN_SHEET, "'" + planList(rok) + "'!A:W", rows);
+      const rows = [planRadek(planHodnoty(d, z, c.pref, next, strecha ? { odkaz: 'střecha viz ' + planCislo(c.pref, next + 1) } : {}), c.mapa, c.sirka)];
+      if (strecha) rows.push(planRadek(planHodnoty(d, z, c.pref, next + 1, { strecha }), c.mapa, c.sirka));
+      const rozsah = "'" + c.list + "'!A" + c.cil + ':' + planSloupec(c.sirka) + (c.cil + rows.length - 1);
+      if (PLAN_DRYRUN) console.log('[konstrukce/plán] DRY-RUN, nezapisuji:', cfg.nazev, rozsah, JSON.stringify(rows));
+      else await host.sheets.update(cfg.sheet, rozsah, rows);
       d = load(); z = d.zakazky.find(x => x.id === zakId); if (!z) return;
-      z.cvzHelios = planCislo(pref, next);
-      if (strecha) z.cvzStrecha = planCislo(pref, next + 1);
+      z.cvzHelios = planCislo(c.pref, next);
+      if (strecha) z.cvzStrecha = planCislo(c.pref, next + 1);
       z.planZapsano = Date.now();
+      z.planRadek = c.cil;
       if (!d.planPosledni) d.planPosledni = {};
-      d.planPosledni[pref] = next + (strecha ? 1 : 0);
+      d.planPosledni[c.pref] = next + (strecha ? 1 : 0);
       delete z.cvzRem;                                    // upomínky na ČVZ jsou bezpředmětné
       audit(z, 'systém', 'Zapsáno do plánu výroby ' + (z.strediskoName || ''),
-        'ČVZ ' + z.cvzHelios + (strecha ? (' · střecha ' + z.cvzStrecha) : ''));
+        'ČVZ ' + z.cvzHelios + (strecha ? (' · střecha ' + z.cvzStrecha) : '') + ' · řádek ' + c.cil + ' v „' + c.list + '"');
       oznamVyrobe(d, z, kdo);     // teď už víme číslo — pošleme výrobě jednu zprávu
       save(d);
     } catch (e) {

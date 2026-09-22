@@ -1163,6 +1163,12 @@ var K_L10N = {
 'Založení nabídky':['Quotation created','Angebot angelegt','Utworzenie oferty','Створення пропозиції','Creare ofertă'],
 'Založení objednávky':['Order created','Auftrag angelegt','Utworzenie zamówienia','Створення замовлення','Creare comandă'],
 'typ':['type','Typ','typ','тип','tip'],
+'Další volné ČVZ':['Next free production order no.','Nächste freie Fertigungsauftrags-Nr.','Następny wolny nr zlecenia prod.','Наступний вільний номер вир. замовлення','Următorul nr. liber de comandă de producție'],
+'Předběžně — přidělí se při uložení objednávky':['Provisional — assigned when the order is saved','Vorläufig — wird beim Speichern der Bestellung vergeben','Wstępnie — zostanie przydzielony przy zapisaniu zamówienia','Попередньо — присвоюється при збереженні замовлення','Provizoriu — se atribuie la salvarea comenzii'],
+'Plán výroby teď není dostupný — ČVZ se přidělí při uložení.':['The production plan is unavailable right now — the number will be assigned on save.','Der Produktionsplan ist gerade nicht erreichbar — die Nummer wird beim Speichern vergeben.','Plan produkcji jest teraz niedostępny — numer zostanie przydzielony przy zapisie.','План виробництва зараз недоступний — номер присвоїться при збереженні.','Planul de producție nu este disponibil acum — numărul se atribuie la salvare.'],
+'zjišťuji další volné ČVZ…':['looking up the next free number…','ermittle die nächste freie Nummer…','sprawdzam następny wolny numer…','визначаю наступний вільний номер…','caut următorul număr liber…'],
+'střecha':['roof','Dach','dach','дах','acoperiș'],
+'řádek':['row','Zeile','wiersz','рядок','rând'],
 'asistentka ředitele':['director’s assistant','Assistenz der Werkleitung','asystentka dyrektora','асистентка директора','asistenta directorului'],
 '— bez asistentky —':['— no assistant —','— ohne Assistenz —','— bez asystentki —','— без асистентки —','— fără asistentă —'],
 '✉ Poslat klientovi znovu':['✉ Send to the customer again','✉ Erneut an den Kunden senden','✉ Wyślij klientowi ponownie','✉ Надіслати замовнику ще раз','✉ Trimite din nou clientului'],
@@ -3521,7 +3527,7 @@ function openNew(state){
       '<div><label>'+esc(tr('Kontaktní osoba'))+'</label><input id="nKontakt" value="'+esc(head.nKontakt||'')+'"></div>'+
       '<div><label>'+esc(tr('E-mail klienta (pro náhled)'))+'</label><input id="nMail" placeholder="email@klient.cz" value="'+esc(head.nMail||'')+'"></div>'+
       '<div><label>'+esc(tr('Požadovaný termín dodání'))+'</label><input id="nTerm" type="date" value="'+esc(head.nTerm||'')+'"></div>'+
-      (MODE!=='nabidka'?('<div><label>'+esc(tr('Realizuje závod (pokud víte)'))+'</label>'+strediskoSelect('nZavod',head.nZavod||'')+'<div class="muted" style="font-size:11.5px;margin-top:2px">'+esc(tr('Nevyberete-li, závod určí ředitel výroby.'))+'</div></div>'):'')+'</div>'+
+      (MODE!=='nabidka'?('<div><label>'+esc(tr('Realizuje závod (pokud víte)'))+'</label>'+strediskoSelect('nZavod',head.nZavod||'')+'<div class="muted" style="font-size:11.5px;margin-top:2px">'+esc(tr('Nevyberete-li, závod určí ředitel výroby.'))+'</div><div id="cvzNahled" style="margin-top:6px;font-size:12.5px"></div></div>'):'')+'</div>'+
       '<div class="artpick"><label>'+esc(tr('Standardní výrobek (ART NO.)'))+'</label>'+
         '<div style="position:relative"><input id="artInput" autocomplete="off" value="'+esc(DQ_ART||'')+'" placeholder="'+esc(tr('hledat dle kódu, rozměru, objemu…'))+'" oninput="artLookup(this)" onfocus="artLookup(this)" onblur="setTimeout(artClose,180)"><div class="art-dd" style="display:none"></div></div>'+
         '<div id="artInfo" class="art-info"></div></div>'+
@@ -3539,6 +3545,32 @@ function openNew(state){
     '<div class="dqfoot"><div class="dqkod" id="dqKod" style="display:none"></div><span class="cnt" id="dqcount"></span><button class="btn ghost" onclick="closeModal()">'+esc(tr('Zrušit'))+'</button><button class="btn" onclick="createZak()">'+esc(tr(MODE==='nabidka'?'Založit nabídku':'Založit objednávku'))+'</button></div>'+
   '</div>';
   m.classList.add('open');renderDotaznik();
+  var zs=document.getElementById('nZavod'); if(zs){zs.addEventListener('change',function(){CVZ_CACHE={};cvzNahled();});cvzNahled();}
+}
+/* Náhled dalšího volného ČVZ pro zvolený závod — jen orientačně, číslo se přidělí
+   až při uložení (dvě otevřená okna by jinak viděla totéž číslo). Načítá se jen
+   při změně závodu; střecha se dopočítává z formuláře bez dalšího dotazu. */
+var CVZ_CACHE={}, CVZ_T=null;
+function maStrechuVeFormulari(){
+  var dot=collectDot();
+  return ['strecha','viko'].some(function(k){var a=dot[k]; if(!a||typeof a!=='object'||!a.volba||a.volba==='standard')return false;
+    var t=String(a.hodnota||'').trim(); return !!t&&!/^(ne|bez)\b/i.test(t)&&!/^ne\s*[—–-]/.test(t);});
+}
+function cvzNahled(){
+  var box=document.getElementById('cvzNahled'); if(!box)return;
+  var key=val('nZavod'); if(!key){box.innerHTML='';return}
+  var vykresli=function(j){
+    if(!j||!j.plan){box.innerHTML='';return}
+    if(j.nedostupne||j.chyba){box.innerHTML='<span class="muted">'+esc(tr('Plán výroby teď není dostupný — ČVZ se přidělí při uložení.'))+'</span>';return}
+    var str=maStrechuVeFormulari();
+    box.innerHTML='<span class="cvzb"><span>'+esc(tr('Další volné ČVZ'))+'</span>: '+esc(j.cvz)+(str?('<i>+'+esc(j.cvzStrecha)+' '+esc(tr('střecha'))+'</i>'):'')+'</span>'+
+      '<div class="muted" style="font-size:11.5px;margin-top:3px"><span>'+esc(tr('Předběžně — přidělí se při uložení objednávky'))+'</span> · '+esc(j.list)+', '+esc(tr('řádek'))+' '+j.radek+'</div>';
+  };
+  if(CVZ_CACHE[key]){vykresli(CVZ_CACHE[key]);return}
+  box.innerHTML='<span class="muted">'+esc(tr('zjišťuji další volné ČVZ…'))+'</span>';
+  fetch('/api/konstrukce/plan/nahled?stredisko='+encodeURIComponent(key),{cache:'no-store'})
+    .then(function(r){return r.json()}).then(function(j){CVZ_CACHE[key]=j;if(val('nZavod')===key)vykresli(j);})
+    .catch(function(){box.innerHTML=''});
 }
 function curType(){var key=(document.getElementById('nTyp')||{}).value;return (D.types||[]).find(function(x){return x.key===key})||{}}
 var RAL=[
@@ -3586,7 +3618,7 @@ function segClick(el){var row=el.closest('.dq2');row.querySelectorAll('.seg').fo
   // rozbalovací katalog jen pro trigger bez konkrétní hodnoty (řadové opce mají data-optval)
   var ow=row.querySelector('.dq2-optwrap');if(ow)ow.style.display=(v==='opce'&&!el.getAttribute('data-optval')?'':'none');
   if(v==='pozadavek'&&req)req.focus(); else if(v==='opce'&&ow){var oi=ow.querySelector('.dq2-opt');if(oi)oi.focus();}
-  dqKodPreview();}
+  dqKodPreview();clearTimeout(CVZ_T);CVZ_T=setTimeout(cvzNahled,150);}
 /* ---- Natahování: obrázkové dlaždice (ilustrace z katalogu ABROLL) ---- */
 function natGrid(f,opts,vol,curOpt,rq){
   var tile=function(dv,val,lab,selq){
@@ -3738,7 +3770,7 @@ function renderDotaznik(){
   document.getElementById('paramBox').innerHTML=h;
   (t.dotaznik||[]).forEach(function(sec){(sec.fields||[]).forEach(function(f){if(f.ral)ralMark(f.k)})});
   var pb=document.getElementById('paramBox');
-  if(pb&&!pb._kodHook){pb._kodHook=1;pb.addEventListener('input',function(){dqKodPreview()});}
+  if(pb&&!pb._kodHook){pb._kodHook=1;pb.addEventListener('input',function(){dqKodPreview();clearTimeout(CVZ_T);CVZ_T=setTimeout(cvzNahled,150)});}
   dqKodPreview();
 }
 /* Sběr vyplněného formuláře — sdílí ho založení zakázky i pozdější úprava zadání. */
