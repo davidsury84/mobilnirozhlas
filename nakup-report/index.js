@@ -1166,11 +1166,6 @@ function mount(host) {
     // Hlídač dat — ať se výpadek pozná ráno v e-mailu, ne až po týdnu v grafu.
     try { const sd = stavDat(); if (sd.varovani.length) chybiHtml += '<div style="background:#fbeaea;border:1px solid #efc1c1;border-radius:9px;padding:10px 14px;margin:0 0 14px;font-size:13px;line-height:1.6;color:#7a1f1f">' +
       '<b>🚨 Hlídač dat:</b><ul style="margin:6px 0 0;padding-left:18px">' + sd.varovani.map(v => '<li>' + esc(v) + '</li>').join('') + '</ul></div>'; } catch (_) {}
-    // Pohledávky po splatnosti × e-shop: komu dlužícímu jsme v posledních 35 dnech expedovali
-    try { const ph = pohledavkyPrehled(35); if (ph.ok) {
-      chybiHtml += '<div style="background:#fff7e6;border:1px solid #f0d9a8;border-radius:9px;padding:10px 14px;margin:0 0 14px;font-size:13px;line-height:1.6">' +
-        '<b>💸 Pohledávky po splatnosti k ' + esc(ph.den) + ':</b> ' + fmt(ph.faktur) + ' faktur · ' + kc(ph.saldo) + (ph.utvary.find(u => /e\s*-?\s*shop/i.test(u.utvar)) ? ' · e-shop ' + kc(ph.utvary.find(u => /e\s*-?\s*shop/i.test(u.utvar)).saldo) : '') +
-        (ph.expedujeme.length ? '<br><b style="color:#b23">Dlužníci, kterým e-shop dál expeduje (' + ph.expedujeme.length + '):</b> ' + ph.expedujeme.slice(0, 6).map(d => esc(d.org) + ' — dluží ' + kc(d.saldo) + ' (' + d.maxDni + ' d po splatnosti), expedováno ' + kc(d.eshop.kc) + ' v ' + d.eshop.zak + ' zak., naposled ' + esc(d.eshop.posl)).join('; ') : '') + '</div>'; } } catch (_) {}
     let body = chybiHtml + explainBox([
       ['Co to je', 'Ranní <b>bilance skladu e-shopu</b> — kolik v něm dnes leží peněz a jak se to za den pohnulo. Vše v <b>nákladových (landed) cenách</b>.'],
       ['Stav (4 karty)', '<b>Sklad</b> = fyzická zásoba. <b>K dispozici</b> = sklad − rezervace zákazníků. <b>Objednáno u dodavatelů</b> = co je na cestě (ještě nedorazilo). <b>Rezervováno zákazníky</b> = co si už zákazníci objednali. „±" u karty = změna hodnoty proti včerejšku.'],
@@ -1433,8 +1428,8 @@ function mount(host) {
   }
 
   // ---------- router ----------
-  // Pohledávky = samostatná kategorie intranetu (klíč „pohledavky" v matici přístupů); vidí ji i admin a e-shop.
-  const hasPohledavky = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); const m = (e && host.employeeModules && host.employeeModules(e.email)) || []; return m.indexOf('pohledavky') >= 0 || m.indexOf('eshop') >= 0; } catch (_) { return false; } };
+  // Pohledávky = samostatná kategorie intranetu (Finance, klíč „pohledavky" v matici přístupů) — záměrně MIMO e-shop.
+  const hasPohledavky = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); const m = (e && host.employeeModules && host.employeeModules(e.email)) || []; return m.indexOf('pohledavky') >= 0; } catch (_) { return false; } };
   const POH_HTML = path.join(__dirname, 'pohledavky.html');
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true), p = u.pathname;

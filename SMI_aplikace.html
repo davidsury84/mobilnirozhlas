@@ -335,15 +335,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <div><h4 style="margin:0 0 6px">Nejprodávanější položky (Kč)</h4><div class="tblwrap" style="max-height:360px"><table id="veRokPol"></table></div></div>
         </div>
       </div>
-      <div class="card" id="vePohCard" style="margin-top:14px;display:none">
-        <h3>💸 Pohledávky po splatnosti <span id="vePohDen" class="muted" style="font-weight:400;font-size:12px"></span></h3>
-        <div class="kpis" id="vePohKpis"></div>
-        <div id="vePohExp"></div>
-        <div class="charts" style="grid-template-columns:1fr 1fr;margin-top:8px">
-          <div><h4 style="margin:0 0 6px">Největší dlužníci</h4><div class="tblwrap" style="max-height:340px"><table id="vePohTbl"></table></div></div>
-          <div><h4 style="margin:0 0 6px">Podle útvaru</h4><div class="tblwrap" style="max-height:340px"><table id="vePohUtv"></table></div></div>
-        </div>
-      </div>
       <div class="card" style="margin-top:14px"><h3>Nejčastěji vydávané položky ze skladu <span class="muted" style="font-weight:400;font-size:12px">— všechny kanály, z denních snímků; klikni na položku pro historii výdejů</span></h3>
         <div class="tblwrap" style="max-height:420px"><table id="veTopTbl"></table></div></div>
       <div class="card" id="veDetailCard" style="margin-top:14px;display:none"><h3 id="veDetailTitle">Detail</h3>
@@ -1675,7 +1666,7 @@ async function vydUpload(file){
     const r=await fetch('/api/nakup-report/eshop-vydejky',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({dny:d.dny,source:file.name})});
     const j=await r.json(); if(!j||!j.ok)throw new Error((j&&j.error)||'Server odmítl soubor.');
-    say(''); VE_DATA=null; VE_POH=null; await renderVyvojEshop();
+    say(''); VE_DATA=null; await renderVyvojEshop();
     if(typeof toast==='function')toast('Výdejky e-shopu: '+j.dnu+' '+(j.dnu===1?'den':(j.dnu<5?'dny':'dnů'))+' ('+veDen(j.od)+(j.od!==j.do?('–'+veDen(j.do)):'')+'), celkem '+j.celkemDnu+' dnů v evidenci');
   }catch(e){ say('Nepovedlo se: '+e.message,true); }
   finally{ if(btn)btn.disabled=false; }
@@ -1724,7 +1715,7 @@ async function renderVyvojEshop(){
   { const sd=d.stavDat||{varovani:[]}; let el=document.getElementById('veStav');
     if(!el&&mt){el=document.createElement('div');el.id='veStav';el.style.cssText='background:#fbeaea;border:1px solid #efc1c1;border-radius:10px;padding:9px 13px;margin:8px 0 0;font-size:12.5px;color:#7a1f1f';mt.after(el);}
     if(el){ if(!(sd.varovani||[]).length){el.style.display='none';} else {el.style.display='';el.innerHTML='🚨 <b>Hlídač dat</b><ul style="margin:4px 0 0;padding-left:18px">'+sd.varovani.map(v=>'<li>'+esc(v)+'</li>').join('')+'</ul>';} }
-    if(mt&&sd.snimek)mt.textContent='Zdroj: '+d.dniCelkem+' denních snímků · snímek '+sd.snimek+' · bilance do '+(sd.bilanceDo||'?')+' · výdejky do '+(sd.vydejkyDo||'—')+(sd.pohledavkyDo?(' · pohledávky k '+sd.pohledavkyDo):'')+'.'; }
+    if(mt&&sd.snimek)mt.textContent='Zdroj: '+d.dniCelkem+' denních snímků · snímek '+sd.snimek+' · bilance do '+(sd.bilanceDo||'?')+' · výdejky do '+(sd.vydejkyDo||'—')+'.'; }
   // KPI: poslední týden vs předchozí
   const w=weeks[weeks.length-1]||{dispKc:0,dispKs:0,dni:0}, wp=weeks[weeks.length-2]||null;
   const chg=wp&&wp.dispKc?((w.dispKc/wp.dispKc-1)*100):null;
@@ -1795,7 +1786,6 @@ async function renderVyvojEshop(){
       '<td '+R+'>'+(x.es?veKc(Math.max(0,x.dispKc-x.es.naklKc))+' Kč':'<span class="muted">—</span>')+'</td><td '+R+'>'+fmt(x.polozek)+'</td>'+
       '<td '+R+' class="muted">'+veKc(x.recvKc)+'</td><td '+R+' class="muted">'+veKc(x.resKc)+'</td></tr>').join('')+'</tbody>';
   try{veRenderRok(d);}catch(e){console.warn('rok',e);}
-  try{veRenderPoh();}catch(e){console.warn('pohledavky',e);}
   // top položky (klikatelné)
   $('#veTopTbl').innerHTML='<thead><tr><th>#</th><th>Položka</th><th>Kód</th><th>Dodavatel</th><th '+R+'>Vydáno ks</th><th '+R+'>Hodnota</th><th '+R+'>Dnů s výdejem</th></tr></thead><tbody>'+
     d.top.map((t,i)=>'<tr style="cursor:pointer" onclick="veShowItem(\''+t.kod+'\')"><td class="muted">'+(i+1)+'</td><td><b>'+esc(t.nazev)+'</b></td>'+
@@ -1927,31 +1917,6 @@ function veRenderSup(d,rok){
     T.map(r=>'<tr><td title="'+esc(r.sup)+'"><b>'+esc(r.sup.replace(/^ZBO - |^VÝR - /,''))+'</b></td>'+mes.map(ym=>cell(r.m[ym])).join('')+'<td '+R+'><b>'+veKc(r.cel)+'</b></td><td '+R+' class="muted">'+(100*r.cel/tot).toFixed(1)+' %</td><td '+R+' class="muted">'+r.pol+'</td></tr>').join('')+
     (rows.length>15?('<tr><td class="muted">Ostatní ('+(rows.length-15)+')</td>'+mes.map(ym=>'<td '+R+' class="muted">'+veKc(rows.slice(15).reduce((s,r)=>s+r.m[ym],0))+'</td>').join('')+'<td '+R+' class="muted">'+veKc(rows.slice(15).reduce((s,r)=>s+r.cel,0))+'</td><td '+R+' class="muted">'+(100*rows.slice(15).reduce((s,r)=>s+r.cel,0)/tot).toFixed(1)+' %</td><td></td></tr>'):'')+
     '<tr style="font-weight:700;border-top:2px solid var(--line,#ccc)"><td>Celkem</td>'+mes.map(ym=>'<td '+R+'>'+veKc(rows.reduce((s,r)=>s+r.m[ym],0))+'</td>').join('')+'<td '+R+'>'+veKc(tot)+' Kč</td><td '+R+'>100 %</td><td></td></tr></tbody>';
-}
-// Pohledávky po splatnosti (denní snímek z ERP) × zákazníci e-shopu z výdejek — načítá se zvlášť
-var VE_POH=null;
-async function veRenderPoh(){
-  const card=$('#vePohCard'); if(!card)return;
-  if(!VE_POH){try{const r=await fetch('/api/nakup-report/pohledavky?dni=35',{cache:'no-store'});VE_POH=r.ok?await r.json():{ok:false};}catch(e){VE_POH={ok:false};}}
-  const p=VE_POH; if(!p||!p.ok){card.style.display='none';return;} card.style.display='';
-  const R='style="text-align:right"';
-  $('#vePohDen').textContent='— snímek k '+veDen(p.den)+' · z ERP každý den (soubor '+(p.soubor||'')+')';
-  const es=p.utvary.find(u=>/e\s*-?\s*shop/i.test(u.utvar));
-  const b=p.buckets;
-  $('#vePohKpis').innerHTML=[
-    ['err',veKc(p.saldo)+' Kč','Po splatnosti celkem · '+fmt(p.faktur)+' faktur'],
-    ['',es?veKc(es.saldo)+' Kč':'—','z toho útvar E-shop'+(es?' · '+fmt(es.n)+' fa':'')],
-    ['',veKc(b[0].saldo)+' Kč','0–30 dní · '+fmt(b[0].n)+' fa'],['',veKc(b[1].saldo)+' Kč','31–60 dní · '+fmt(b[1].n)+' fa'],['',veKc(b[2].saldo)+' Kč','61–90 dní · '+fmt(b[2].n)+' fa'],['err',veKc(b[3].saldo)+' Kč','přes 90 dní · '+fmt(b[3].n)+' fa']
-  ].map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
-  const ex=$('#vePohExp');
-  if(ex)ex.innerHTML=p.expedujeme.length
-    ?('<div style="background:#fbeaea;border:1px solid #efc1c1;border-radius:10px;padding:9px 13px;margin:6px 0;font-size:12.5px;color:#7a1f1f"><b>⚠ Dlužníci, kterým e-shop v posledních '+p.oknoDni+' dnech dál expedoval ('+p.expedujeme.length+'):</b><ul style="margin:4px 0 0;padding-left:18px">'
-      +p.expedujeme.map(d=>'<li><b>'+esc(d.org)+'</b> dluží '+veKc(d.saldo)+' Kč ('+d.n+' fa, nejstarší '+d.maxDni+' dní po splatnosti'+(d.kdo.length?', obch. '+esc(d.kdo.join(', ')):'')+') — expedováno '+veKc(d.eshop.kc)+' Kč v '+d.eshop.zak+' zak., naposled '+veDen(d.eshop.posl)+'</li>').join('')+'</ul></div>')
-    :'<div class="muted" style="font-size:12.5px;margin:6px 0">Žádnému dlužníkovi po splatnosti e-shop v posledních '+p.oknoDni+' dnech neexpedoval.</div>';
-  $('#vePohTbl').innerHTML='<thead><tr><th>Zákazník</th><th>Útvar</th><th '+R+'>Faktur</th><th '+R+'>Saldo</th><th '+R+' title="Nejstarší faktura — dní po splatnosti">Max. dní</th></tr></thead><tbody>'
-    +p.dluznici.slice(0,40).map(d=>'<tr'+(d.eshop?' style="background:#fdf2f2"':'')+'><td><b>'+esc(d.org)+'</b>'+(d.eshop?' <span title="E-shop mu v okně expedoval">🚚</span>':'')+'</td><td class="muted">'+esc(d.utvary.join(', '))+'</td><td '+R+'>'+d.n+'</td><td '+R+'><b>'+veKc(d.saldo)+' Kč</b></td><td '+R+(d.maxDni>90?' style="color:#b23;font-weight:700"':'')+'>'+d.maxDni+'</td></tr>').join('')+'</tbody>';
-  $('#vePohUtv').innerHTML='<thead><tr><th>Útvar</th><th '+R+'>Faktur</th><th '+R+'>Saldo</th><th '+R+'>Podíl</th></tr></thead><tbody>'
-    +p.utvary.map(u=>'<tr><td>'+esc(u.utvar)+'</td><td '+R+'>'+u.n+'</td><td '+R+'>'+veKc(u.saldo)+' Kč</td><td '+R+' class="muted">'+(p.saldo?Math.round(100*u.saldo/p.saldo):0)+' %</td></tr>').join('')+'</tbody>';
 }
 function veIso(t){const x=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate()));const day=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-day+3);const f=new Date(Date.UTC(x.getUTCFullYear(),0,4));const wk=1+Math.round(((x-f)/86400000-3+((f.getUTCDay()+6)%7))/7);return x.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');}
 function veSetWeek(w){VE_WEEK=w;renderVyvojEshop();}
