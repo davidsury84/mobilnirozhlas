@@ -1167,6 +1167,7 @@ var K_L10N = {
 'Odkaz odeslán':['Link sent','Link gesendet','Link wysłany','Посилання надіслано','Link trimis'],
 'Klient odkaz zatím neotevřel.':['The customer has not opened the link yet.','Der Kunde hat den Link noch nicht geöffnet.','Klient jeszcze nie otworzył linku.','Замовник ще не відкривав посилання.','Clientul nu a deschis încă linkul.'],
 'zobrazit log':['show log','Protokoll anzeigen','pokaż log','показати журнал','afișează jurnalul'],
+'Výkres konstrukce je vložen — orientační standardní výkres ani podobné výkresy z archivu se už nezobrazují.':['The design drawing has been uploaded — the reference standard drawing and similar archive drawings are no longer shown.','Die Konstruktionszeichnung ist hochgeladen — Referenz-Standardzeichnung und ähnliche Archivzeichnungen werden nicht mehr angezeigt.','Rysunek konstrukcyjny został wgrany — orientacyjny rysunek standardowy ani podobne rysunki z archiwum nie są już wyświetlane.','Креслення конструкції завантажено — орієнтовне стандартне креслення та схожі креслення з архіву більше не показуються.','Desenul de construcție a fost încărcat — desenul standard orientativ și desenele similare din arhivă nu se mai afișează.'],
 'zobrazení':['viewed','Aufruf','wyświetlenie','перегляд','vizualizare'],
 'Komu poslat připomínku?':['Send the reminder to whom?','An wen soll die Erinnerung gehen?','Do kogo wysłać przypomnienie?','Кому надіслати нагадування?','Cui să trimit reamintirea?'],
 'neznámý odstín':['unknown shade','unbekannter Farbton','nieznany odcień','невідомий відтінок','nuanță necunoscută'],
@@ -2442,10 +2443,13 @@ function archQueryFor(z){
   if(!q.length&&typeof dot.objem==='string')q.push(dot.objem.split(/[\s(]/)[0]);
   return q.length?{q:q.join(' ')}:null;
 }
+/* Konstruktér už vložil výkres (PDF/CAD)? Od té chvíle platí jen on — podobné a
+   nejbližší výkresy z archivu ani schéma z dotazníku se už neukazují, jen by pletly. */
+function maVykresKonstrukce(z){return !!(z&&z.maVykres)||!!((z&&z.versions)||[]).some(function(v){return v.hasPdf||v.hasCad})}
 function archDrawer(z){
   var el=document.getElementById('drwArch');
   if(!el)return;
-  var qq=archQueryFor(z);
+  var qq=maVykresKonstrukce(z)?null:archQueryFor(z);
   if(!qq){el.innerHTML='';return}
   el.innerHTML='<div class="sec">Podobné výkresy v archivu (Bruntál)</div><p class="muted">Hledám…</p>';
   archFetch(qq,function(o){
@@ -2777,7 +2781,10 @@ function dotaznikView(z){
   // Důležitá upozornění — výrazně nahoře, ať je konstrukce ani výroba nepřehlédne
   if(typeof z.dotaznik.upozorneni==='string'&&z.dotaznik.upozorneni.trim())
     h+='<div class="card" style="background:#fff3e0;border-color:#e0a93f;padding:10px 12px;margin-top:8px"><b>⚠️ Důležitá upozornění pro konstrukci a výrobu</b><div style="white-space:pre-wrap;margin-top:5px">'+esc(z.dotaznik.upozorneni)+'</div></div>';
-  if(z.vykresStd&&z.vykresStd.f){
+  if(maVykresKonstrukce(z)){
+    // výkres konstrukce je vložen → žádný orientační výkres ani schéma; pracuje se jen s ním (viz panel výkresu výše)
+    h+='<div class="muted" style="font-size:11.5px;margin:6px 0 2px">Výkres konstrukce je vložen — orientační standardní výkres ani podobné výkresy z archivu se už nezobrazují.</div>';
+  } else if(z.vykresStd&&z.vykresStd.f){
     // reálný standardní výkres řady (z PRODUCTS/ABROLLCONTAINERS) — nahrazuje schéma;
     // nejblizsi = přesné rozměry v archivu nejsou, ukazuje se nejbližší varianta s výpisem rozdílů
     var vsu='/api/konstrukce/vykres-std?f='+encodeURIComponent(z.vykresStd.f);

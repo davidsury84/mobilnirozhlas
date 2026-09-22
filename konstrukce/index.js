@@ -1059,6 +1059,9 @@ function mount(host) {
   }
 
   const CURRENT_V = (z) => z.versions[z.versions.length - 1] || null;
+  // Konstruktér už vložil výkres (PDF/CAD)? Pak platí jen ten — orientační standardní
+  // a „nejbližší“ výkresy z archivu by jen mátly, proto se dál nenabízejí.
+  const maVykresKonstrukce = (z) => (z.versions || []).some(v => v && (v.pdf || v.cad));
 
   // Předání potvrzené NABÍDKY do aplikace OBJEDNÁVEK: přiřadí číslo objednávky
   // (VYK), přepne režim a přejde na výběr závodu. Výkres už klient schválil
@@ -1572,7 +1575,8 @@ function mount(host) {
       cvzHelios: z.cvzHelios || '',   // ČVZ (26C-272) — přiděluje aplikace při zápisu do plánu výroby
       cvzStrecha: z.cvzStrecha || '', // samostatné ČVZ střechy, je-li v zadání požadovaná
       kodAbr: z.kodAbr || '',         // celkový kód kontejneru dle katalogu ABR (varianta B)
-      vykresStd: vykresStdFor(z),     // reálný standardní výkres řady (JPG), je-li pro rozměry k dispozici
+      vykresStd: maVykresKonstrukce(z) ? null : vykresStdFor(z),   // standardní výkres řady (JPG) jen do doby, než konstruktér vloží vlastní
+      maVykres: maVykresKonstrukce(z),   // od té chvíle se pracuje jen s výkresem konstrukce
       prilohy: (z.prilohy || []).map((p, i) => ({ i, name: p.name, at: p.at, author: empName(p.author) })),
 
       params: z.params || {}, dotaznik: z.dotaznik || null, artNo: z.artNo || '',
