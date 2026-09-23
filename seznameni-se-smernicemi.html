@@ -1860,7 +1860,7 @@ async function refreshMy(){
   if(!MUJ.data.library) MUJ.data.library = {folders:[],docs:[]};
   MUJ.modules = MUJ.data.modules || [];
 }
-function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kontejnery")>=0||mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery)||!!(MUJ.data&&MUJ.data.isLisy); if(m.key==="kontejnerykalk") return mods.indexOf("kontejnerykalk")>=0||mods.indexOf("kontejnery")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
+function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="pohledavky") return ["eshop","obchod","obchodexp","doprava"].some(k=>mods.indexOf(k)>=0); if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kontejnery")>=0||mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery)||!!(MUJ.data&&MUJ.data.isLisy); if(m.key==="kontejnerykalk") return mods.indexOf("kontejnerykalk")>=0||mods.indexOf("kontejnery")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
 function mujCounts(){
   const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[]; const survs=d.surveys||[];
   return { dirs, libDocs, survs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length, survTodo:survs.filter(x=>!x.filled).length };
@@ -3084,7 +3084,7 @@ function showEshopModel(){
 function showPohledavky(){
   MUJ.view="pohledavky"; renderSidebar();
   const body=document.getElementById("mujBody");
-  if(!moduleVisible({key:"pohledavky",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu Pohledávky nemáte přístup. Přiděluje ho správce intranetu (Přístupy → Finance).</div>'; return; }
+  if(!moduleVisible({key:"pohledavky",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu Pohledávky nemáte přístup. Mají ho lidé s přístupem do E-shopu, Obchodu, zahraničního obchodu nebo Dopravy; ostatním ho přidělí správce (Přístupy → Finance).</div>'; return; }
   body.innerHTML='<iframe src="/pohledavky" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#eef1ec" title="Pohledávky po splatnosti"></iframe>';
   window.scrollTo(0,0);
 }

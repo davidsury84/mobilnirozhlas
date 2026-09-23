@@ -1428,8 +1428,9 @@ function mount(host) {
   }
 
   // ---------- router ----------
-  // Pohledávky = samostatná kategorie intranetu (Finance, klíč „pohledavky" v matici přístupů) — záměrně MIMO e-shop.
-  const hasPohledavky = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); const m = (e && host.employeeModules && host.employeeModules(e.email)) || []; return m.indexOf('pohledavky') >= 0; } catch (_) { return false; } };
+  // Pohledávky = samostatná kategorie intranetu (Finance). Vidí ji správce, kdo má klíč „pohledavky", a automaticky
+  // každý s přístupem do E-shopu, Obchodu, zahraničního obchodu (obchodexp) nebo Dopravy (pokyn 2026-09-23).
+  const hasPohledavky = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); const m = (e && host.employeeModules && host.employeeModules(e.email)) || []; return ['pohledavky', 'eshop', 'obchod', 'obchodexp', 'doprava'].some(k => m.indexOf(k) >= 0); } catch (_) { return false; } };
   const POH_HTML = path.join(__dirname, 'pohledavky.html');
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true), p = u.pathname;
