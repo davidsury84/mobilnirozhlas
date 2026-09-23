@@ -130,9 +130,9 @@ function mount(host) {
       const ot = (d.legacySync || {}).otisky || {}; Object.keys(ot).forEach(k => { if (k.startsWith('barva:')) delete ot[k]; });
       d.migrace.expedice2 = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
     }
-    if (!d.migrace.expedice3) {   // „10.09.11" = 10. 9. 11 ks, ne rok 2011 → barevné otisky pryč, datum expedice se přečte znovu
+    if (!d.migrace.expedice4) {   // „10.09.11" = 10. 9. 11 ks, ne rok 2011 → barevné otisky pryč, datum expedice se přečte znovu
       const ot = (d.legacySync || {}).otisky || {}; Object.keys(ot).forEach(k => { if (k.startsWith('barva:')) delete ot[k]; });
-      d.migrace.expedice3 = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
+      d.migrace.expedice4 = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
     }
     if (!d.migrace.vykresXx) {   // „xx" ve sloupci Výkresy Posl. dřív znamenalo „poslán" → čekání na výkres u 300 standardních beden; ve skutečnosti = výkres není potřeba
       d.polozky.forEach(p => { if (p.vykres && p.vykres.stav === 'poslan' && !p.vykres.datum) p.vykres = { stav: 'neni', datum: '' }; });
@@ -299,7 +299,9 @@ function mount(host) {
     else if (b.lakovano || b.zinkovano) cil = 'hotovo';
     else if (b.svareno) cil = 'svarovna';
     if (!cil || p.stav === 'storno' || p.stav === 'pozastaveno') return false;
-    if (b.expedice && p.stav === 'expedovano' && p.expedovanoDne !== b.expedice && (!p.expedovanoDne || p.expedovanoDne < '2025-01-01' || (p.udalosti || []).some(u => /podle barvy v plánu výroby: expedice/.test(u.pozn || '')))) { p.expedovanoDne = b.expedice; return true; }   // datum expedice podle plánu (dřív se kusy četly jako rok)
+    // datum expedice podle plánu vyhrává, pokud ho nezadal člověk ručně v intranetu (dřív se kusy 10.09.11 četly jako rok)
+    const rucne = (p.udalosti || []).some(u => u.stav === 'expedovano' && !/plan-vyroby@|intranet@/.test(u.kdo || '') && !/^import|podle barvy|kamion .* odjel/.test(u.pozn || ''));
+    if (b.expedice && p.stav === 'expedovano' && p.expedovanoDne !== b.expedice && !rucne) { p.expedovanoDne = b.expedice; return true; }
     if (STAV_PORADI[cil] <= STAV_PORADI[p.stav]) return false;
     const pred = p.stav; p.stav = cil;
     if (cil === 'hotovo' || cil === 'expedovano') { p.hotovoKs = num(p.ks); p.hotovoDne = p.hotovoDne || dnesISO(); }
