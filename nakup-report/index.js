@@ -91,7 +91,10 @@ function mount(host) {
   // Konfigurace oddělení: které útvary z pohledávek k němu patří, komu psát, po kolika dnech.
   // Stav per faktura (Párovací znak): kdy se oznámilo, kdy/kdo odškrtl „upomínka odeslána".
   const UPOM_F = path.join(host.dataDir || __dirname, 'pohledavky-upominky.json');
-  const UPOM_DEFAULT = { oddeleni: [ { key: 'doprava', nazev: 'Doprava', utvary: ['DOPRAVA', 'SPEDICE'], komu: [], dni: 10, modul: 'doprava' } ] };
+  // Doprava má zvláštní režim: u přepravních pohledávek je promlčecí lhůta 1 rok (ne 3), takže se stávají
+  // nedobytnými dřív — proto upomínka už po 10 dnech a orientační datum promlčení (splatnost + 1 rok).
+  const UPOM_DEFAULT = { oddeleni: [ { key: 'doprava', nazev: 'Doprava', utvary: ['DOPRAVA', 'SPEDICE'], komu: [], dni: 10, modul: 'doprava', promlceniMes: 12,
+    duvod: 'U přepravních pohledávek je promlčecí lhůta 1 rok (u ostatních 3 roky) — dopravní pohledávky se stávají nedobytnými dřív, proto upomínka už po 10 dnech.' } ] };
   const loadUpom = () => { let d = {}; try { d = JSON.parse(fs.readFileSync(UPOM_F, 'utf8')) || {}; } catch (_) {}
     if (!d.cfg || !Array.isArray(d.cfg.oddeleni) || !d.cfg.oddeleni.length) d.cfg = JSON.parse(JSON.stringify(UPOM_DEFAULT));
     d.stav = d.stav || {}; return d; };
@@ -106,8 +109,10 @@ function mount(host) {
   function upominkyPrehled(oddeleni) {
     const d = loadUpom(), P = loadPoh().posledni; const out = [];
     (oddeleni || d.cfg.oddeleni).forEach(o => {
+      const mes = o.promlceniMes || 12, dnes = new Date().toISOString().slice(0, 10);
       const fa = (P ? P.faktury : []).filter(x => utvarPatri(x.utvar, o.utvary) && x.dni >= (o.dni || 10))
-        .map(x => Object.assign({}, x, { stav: d.stav[x.pz] || null })).sort((a, b) => b.dni - a.dni);
+        .map(x => { const pr = new Date(x.spl + 'T00:00:00Z'); pr.setUTCMonth(pr.getUTCMonth() + mes); const prom = pr.toISOString().slice(0, 10);
+          return Object.assign({}, x, { stav: d.stav[x.pz] || null, promlceni: prom, doPromlceni: Math.round((Date.parse(prom) - Date.parse(dnes)) / 86400000) }); }).sort((a, b) => b.dni - a.dni);
       out.push(Object.assign({}, o, { den: P ? P.den : '', faktury: fa, celkem: Math.round(fa.reduce((a2, x) => a2 + x.saldo, 0)), bezUpominky: fa.filter(x => !(x.stav && x.stav.upominka)).length }));
     });
     return out;
