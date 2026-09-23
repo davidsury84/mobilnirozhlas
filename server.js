@@ -3745,7 +3745,7 @@ try {
 let nakupReportMod = null;
 try {
   nakupReportMod = require('./nakup-report').mount({ reportDisabled,
-    send, readBody, deliver, isAdmin, isAdminEmp, empSession, employeeModules,
+    send, readBody, deliver, isAdmin, isAdminEmp, empSession, employeeModules, getState,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet ELKOPLAST — nákup', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
   });

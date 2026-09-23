@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Předžalobní výzva · ELKOPLAST CZ</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --ink:#111; --soft:#555; --line:#ccc; }
+  *{box-sizing:border-box} body{margin:0;background:#e9ebe6;font:11.5pt/1.5 'IBM Plex Sans',Georgia,serif;color:var(--ink)}
+  .bar{position:sticky;top:0;z-index:5;background:#0f1512;color:#fff;padding:10px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;font:13px system-ui,sans-serif}
+  .bar button,.bar label{font:inherit} .bar button{background:#12a350;color:#fff;border:0;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer} .bar button.ghost{background:transparent;border:1px solid #666} .bar .muted{color:#aaa}
+  .page{width:210mm;min-height:297mm;margin:18px auto;background:#fff;padding:20mm 22mm 22mm 24mm;box-shadow:0 6px 30px rgba(0,0,0,.18);position:relative}
+  .page.predtisk{padding-top:52mm}   /* na předtištěný hlavičkový papír: horní část nechat volnou */
+  .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0e8a43;padding-bottom:6mm;margin-bottom:8mm}
+  .head .brand{font:800 20pt/1 'IBM Plex Sans',sans-serif;letter-spacing:.02em;color:#0e8a43} .head .brand small{display:block;font:500 9pt/1.4 'IBM Plex Sans',sans-serif;color:var(--soft);letter-spacing:0;margin-top:3px}
+  .head .ident{font-size:8.5pt;color:var(--soft);text-align:right;line-height:1.5}
+  .predtisk .head{display:none}
+  .adr{margin:0 0 10mm;padding-left:0;width:85mm;min-height:28mm;line-height:1.45} .adr b{display:block;font-size:12pt}
+  .adr [contenteditable]{outline:1px dashed #bbb;padding:0 2px;min-width:40mm;display:inline-block} .adr [contenteditable]:empty::before{content:attr(data-ph);color:#b23}
+  .meta{display:flex;justify-content:space-between;font-size:10pt;color:var(--soft);margin:0 0 8mm}
+  h1{font:700 14pt/1.3 'IBM Plex Sans',sans-serif;margin:0 0 2mm;text-transform:uppercase;letter-spacing:.03em} .sub{font-size:10pt;color:var(--soft);margin:0 0 6mm}
+  p{margin:0 0 3.2mm;text-align:justify}
+  table{border-collapse:collapse;width:100%;margin:3mm 0 5mm;font-size:10.5pt} th,td{border:1px solid var(--line);padding:2mm 3mm;text-align:left} th{background:#f2f4ef;font-weight:600;font-size:9.5pt} td.r,th.r{text-align:right} tr.sum td{font-weight:700;background:#fafbf8}
+  .lhuta{background:#f2f4ef;border-left:4px solid #0e8a43;padding:3mm 4mm;margin:4mm 0 5mm}
+  .sign{margin-top:16mm;display:flex;justify-content:flex-end} .sign div{width:75mm;text-align:center} .sign .line{border-top:1px solid #333;margin:16mm 0 2mm} .sign b{display:block} .sign small{color:var(--soft)}
+  .foot{position:absolute;left:24mm;right:22mm;bottom:12mm;font-size:8pt;color:var(--soft);border-top:1px solid var(--line);padding-top:2mm;line-height:1.4}
+  .predtisk .foot{display:none}
+  .warn{background:#fbe9e7;color:#7a1f1f;border:1px solid #efc1c1;border-radius:8px;padding:8px 12px;margin:0 auto 10px;width:210mm;font:13px system-ui,sans-serif}
+  @media print{ body{background:#fff} .bar,.warn{display:none} .page{margin:0;box-shadow:none;width:auto;min-height:auto;padding:16mm 20mm 20mm 22mm} .page.predtisk{padding-top:52mm} .adr [contenteditable]{outline:0} @page{size:A4;margin:0} }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>Předžalobní výzva</b> <span class="muted" id="barInfo">načítám…</span>
+  <label><input type="checkbox" id="predtisk"> tisk na předtištěný hlavičkový papír (bez hlavičky)</label>
+  <span style="flex:1"></span>
+  <button class="ghost" id="btnAdresa" title="Uložit doplněnou adresu zákazníka pro příště">Uložit adresu</button>
+  <button id="btnPrint">🖨 Tisk / PDF</button>
+  <button class="ghost" id="btnOdeslana" title="Po odeslání doporučeně odškrtnout — eskalace u těchto faktur končí">✓ Výzva odeslána</button>
+</div>
+<div class="warn" id="warn" style="display:none"></div>
+<div class="page" id="page">
+  <div class="head">
+    <div class="brand" id="hBrand">ELKOPLAST CZ, s.r.o.<small id="hSidlo"></small></div>
+    <div class="ident" id="hIdent"></div>
+  </div>
+  <div class="adr" id="adr"></div>
+  <div class="meta"><span id="mMisto"></span><span id="mDatum"></span></div>
+  <h1>Předžalobní výzva k úhradě dluhu</h1>
+  <div class="sub">výzva k plnění podle § 142a zákona č. 99/1963 Sb., občanský soudní řád, ve znění pozdějších předpisů</div>
+  <div id="text"></div>
+  <div class="sign"><div><div class="line"></div><b id="sJmeno"></b><small id="sFunkce"></small><small id="sFirma"></small></div></div>
+  <div class="foot" id="foot"></div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const kc=n=>Math.round(n||0).toLocaleString('cs-CZ');
+const den=d=>{const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+'. '+(+m[2])+'. '+m[1]:d;};
+const org=new URLSearchParams(location.search).get('org')||'';
+let V=null;
+async function load(){
+  try{const r=await fetch('/api/nakup-report/vyzva?org='+encodeURIComponent(org),{cache:'no-store'});V=await r.json();}catch(e){V={ok:false,error:e.message};}
+  if(!V||!V.ok){$('#barInfo').textContent=(V&&V.error)||'chyba';$('#text').innerHTML='<p style="color:#b23">'+esc((V&&V.error)||'Data nejsou k dispozici.')+'</p>';return;}
+  const c=V.cfg, f=c.firma, dnes=new Date(), datum=den(dnes.toISOString().slice(0,10));
+  $('#barInfo').textContent=V.org+' · '+V.faktury.length+' faktur · '+kc(V.celkem)+' Kč · stav pohledávek k '+den(V.den);
+  $('#hSidlo').textContent=f.sidlo; $('#hBrand').firstChild.textContent=f.nazev;
+  $('#hIdent').innerHTML='IČO '+esc(f.ico)+(f.dic?' · DIČ '+esc(f.dic):'')+'<br>'+esc(f.zapis)+(f.tel||f.email?'<br>'+esc([f.tel,f.email].filter(Boolean).join(' · ')):'');
+  $('#adr').innerHTML='<b>'+esc(V.org)+'</b>'+(V.ico?'IČO '+esc(V.ico)+'<br>':'')+'<span contenteditable="true" id="adrEdit" data-ph="[doplňte sídlo / adresu zákazníka]">'+esc(V.adresa||'')+'</span>';
+  $('#mMisto').textContent='Ve Zlíně'; $('#mDatum').textContent=datum;
+  const rows=V.faktury.map(x=>'<tr><td>'+esc(x.pz)+'</td><td>'+den(x.dat)+'</td><td>'+den(x.spl)+'</td><td class="r">'+x.dni+'</td><td class="r">'+kc(x.hm)+(x.mena&&x.mena!=='CZK'?' '+esc(x.mena):' Kč')+'</td><td class="r"><b>'+kc(x.saldo)+(x.mena&&x.mena!=='CZK'?' '+esc(x.mena):' Kč')+'</b></td></tr>').join('');
+  const vice=V.faktury.length>1, lhuta=c.lhutaVyzvyDni||7;
+  const ucet=f.ucet?('na bankovní účet č. <b>'+esc(f.ucet)+'</b>'+(f.iban?' (IBAN '+esc(f.iban)+')':'')):'na bankovní účet uvedený na faktuře';
+  $('#text').innerHTML=
+    '<p>Vážení,</p>'+
+    '<p>naše společnost '+esc(f.nazev)+' eviduje vůči Vaší společnosti <b>'+esc(V.org)+'</b> neuhrazenou pohledávku z '+(vice?'níže uvedených faktur':'níže uvedené faktury')+', jejichž splatnost již marně uplynula:</p>'+
+    '<table><thead><tr><th>Faktura</th><th>Vystaveno</th><th>Splatnost</th><th class="r">Dní po splatnosti</th><th class="r">Fakturováno</th><th class="r">Dlužná částka</th></tr></thead><tbody>'+rows+'<tr class="sum"><td colspan="5">Celkem k úhradě'+(V.mena==='mix'?' (částky v různých měnách)':'')+'</td><td class="r">'+kc(V.celkem)+(V.mena==='mix'?'':' Kč')+'</td></tr></tbody></table>'+
+    '<p>Přes uplynutí lhůty splatnosti nebyla dlužná částka uhrazena, a to ani přes naše předchozí upozornění. Tímto Vás proto <b>vyzýváme k úhradě celé dlužné částky ve výši '+kc(V.celkem)+(V.mena==='mix'?'':' Kč')+'</b> '+ucet+', s uvedením čísla faktury jako variabilního symbolu,</p>'+
+    '<div class="lhuta"><b>nejpozději do '+lhuta+' dnů ode dne doručení této výzvy.</b></div>'+
+    '<p>Nebude-li pohledávka v uvedené lhůtě uhrazena, <b>předáme věc bez dalšího upozornění k soudnímu vymáhání</b>. V takovém případě budeme vedle jistiny požadovat rovněž zákonný úrok z prodlení a náhradu nákladů řízení, včetně nákladů právního zastoupení, čímž se Váš dluh dále zvýší. Upozorňujeme, že tato výzva je zároveň výzvou k plnění ve smyslu § 142a občanského soudního řádu.</p>'+
+    '<p>Pokud jste dlužnou částku již uhradili, považujte prosím tuto výzvu za bezpředmětnou a zašlete nám doklad o úhradě. Jste-li v dočasné platební neschopnosti, kontaktujte nás neprodleně — jsme připraveni jednat o splátkovém kalendáři, avšak pouze do uplynutí výše uvedené lhůty.</p>'+
+    '<p>Věříme, že dáte přednost smírnému vyřešení věci.</p><p>S pozdravem</p>';
+  $('#sJmeno').textContent=c.podpis.jmeno; $('#sFunkce').textContent=c.podpis.funkce||''; $('#sFirma').textContent=f.nazev;
+  $('#foot').innerHTML=esc(f.nazev)+' · '+esc(f.sidlo)+' · IČO '+esc(f.ico)+(f.dic?' · DIČ '+esc(f.dic):'')+' · '+esc(f.zapis);
+  const chybi=[]; if(!f.ucet)chybi.push('bankovní účet (nastavení eskalace v intranetu)'); if(!V.adresa)chybi.push('adresa zákazníka (doplňte do adresního pole a uložte)');
+  const w=$('#warn'); if(chybi.length){w.style.display='';w.textContent='Před tiskem doplňte: '+chybi.join('; ')+'.';}
+  const ods=V.stav.filter(s=>s&&s.vyzvaOdeslana).length; if(ods){$('#btnOdeslana').textContent='✓ Výzva odeslána ('+den(V.stav.find(s=>s&&s.vyzvaOdeslana).vyzvaOdeslana.kdy)+')';$('#btnOdeslana').disabled=true;}
+}
+$('#predtisk').onchange=e=>{$('#page').classList.toggle('predtisk',e.target.checked);};
+$('#btnPrint').onclick=()=>window.print();
+$('#btnAdresa').onclick=async()=>{const a=($('#adrEdit')||{}).textContent||'';try{const r=await fetch('/api/nakup-report/eskalace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({akce:'cfg',cfg:{adresy:{[org]:a.trim()}}})});const j=await r.json();if(!j.ok)throw new Error(j.error||'');$('#warn').style.display='none';alert('Adresa uložena.');}catch(e){alert('Nepovedlo se (adresu ukládá správce): '+e.message);}};
+$('#btnOdeslana').onclick=async()=>{if(!V||!confirm('Označit výzvu pro '+V.org+' jako odeslanou? Eskalace u těchto faktur tím končí.'))return;
+  try{for(const x of V.faktury){const r=await fetch('/api/nakup-report/eskalace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({akce:'vyzvaOdeslana',pz:x.pz})});const j=await r.json();if(!j.ok)throw new Error(j.error||'');}
+    $('#btnOdeslana').textContent='✓ Výzva odeslána';$('#btnOdeslana').disabled=true;}catch(e){alert('Nepovedlo se: '+e.message);}};
+load();
+</script>
+</body>
+</html>

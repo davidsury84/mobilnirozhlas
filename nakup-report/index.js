@@ -87,79 +87,115 @@ function mount(host) {
       });
     });
   }
-  // ---- UPOMÍNKY PO SPLATNOSTI PER STŘEDISKO (pokyn 2026-09-23: Doprava, 10 dní po splatnosti → vedoucí střediska) ----
-  // Konfigurace oddělení: které útvary z pohledávek k němu patří, komu psát, po kolika dnech.
-  // Stav per faktura (Párovací znak): kdy se oznámilo, kdy/kdo odškrtl „upomínka odeslána".
+  // ---- ESKALACE FAKTUR PO SPLATNOSTI (pokyn 2026-09-23) ----
+  //  10 dní  → e-mail obchodníkovi (vystavil fakturu): „máš po splatnosti fakturu … vyřeš to co nejrychleji"
+  //  20 dní  → totéž podruhé (a upozornění, že za 10 dní jde předžalobní výzva)
+  //  30 dní  → předžalobní výzva: připravená na tisk (hlavičkový papír, podpis Mgr. David Surý, LL.M.),
+  //            e-mailem Lucii Sedláčkové k odeslání, obchodník v kopii
+  //  Obchodník zatím nemůže posílat z intranetu přímo — proto e-mail a ruční odeslání.
+  //  Doprava navíc: promlčecí lhůta přepravních pohledávek je 1 rok → sloupec Promlčení a kopie vedoucímu střediska.
   const UPOM_F = path.join(host.dataDir || __dirname, 'pohledavky-upominky.json');
-  // Doprava má zvláštní režim: u přepravních pohledávek je promlčecí lhůta 1 rok (ne 3), takže se stávají
-  // nedobytnými dřív — proto upomínka už po 10 dnech a orientační datum promlčení (splatnost + 1 rok).
-  const UPOM_DEFAULT = { oddeleni: [ { key: 'doprava', nazev: 'Doprava', utvary: ['DOPRAVA', 'SPEDICE'], komu: [], dni: 10, modul: 'doprava', promlceniMes: 12,
-    duvod: 'U přepravních pohledávek je promlčecí lhůta 1 rok (u ostatních 3 roky) — dopravní pohledávky se stávají nedobytnými dřív, proto upomínka už po 10 dnech.' } ] };
+  const UPOM_DEFAULT = {
+    aktivni: false,                   // automatický denní běh zapíná správce (první běh pokryje celý backlog!)
+    kroky: { obchodnik: [10, 20], vyzva: 30 },
+    vyzvaKomu: ['lucie.sedlackova@elkoplast.cz'],
+    fallbackKomu: [],                 // obchodník bez e-mailu → sem (prázdné = správce)
+    obchodnici: {},                   // ruční přiřazení „jméno z faktury" → e-mail (přebíjí automatické párování)
+    firma: { nazev: 'ELKOPLAST CZ, s.r.o.', sidlo: 'Štefánikova 2664, 760 01 Zlín', ico: '25347942', dic: 'CZ25347942',
+      zapis: 'zapsaná v obchodním rejstříku vedeném Krajským soudem v Brně, sp. zn. C 27857', ucet: '', iban: '', email: '', tel: '' },
+    podpis: { jmeno: 'Mgr. David Surý, LL.M.', funkce: '' },
+    lhutaVyzvyDni: 7,                 // § 142a o. s. ř. — výzva nejméně 7 dní před podáním žaloby
+    oddeleni: [ { key: 'doprava', nazev: 'Doprava', utvary: ['DOPRAVA', 'SPEDICE'], komu: [], modul: 'doprava', promlceniMes: 12,
+      duvod: 'U přepravních pohledávek je promlčecí lhůta 1 rok (u ostatních 3 roky) — dopravní pohledávky se stávají nedobytnými dřív.' } ],
+  };
   const loadUpom = () => { let d = {}; try { d = JSON.parse(fs.readFileSync(UPOM_F, 'utf8')) || {}; } catch (_) {}
-    if (!d.cfg || !Array.isArray(d.cfg.oddeleni) || !d.cfg.oddeleni.length) d.cfg = JSON.parse(JSON.stringify(UPOM_DEFAULT));
-    d.stav = d.stav || {}; return d; };
+    const cfg = Object.assign({}, JSON.parse(JSON.stringify(UPOM_DEFAULT)), d.cfg || {});
+    cfg.kroky = Object.assign({}, UPOM_DEFAULT.kroky, (d.cfg && d.cfg.kroky) || {}); cfg.firma = Object.assign({}, UPOM_DEFAULT.firma, (d.cfg && d.cfg.firma) || {}); cfg.podpis = Object.assign({}, UPOM_DEFAULT.podpis, (d.cfg && d.cfg.podpis) || {});
+    if (!Array.isArray(cfg.oddeleni) || !cfg.oddeleni.length) cfg.oddeleni = JSON.parse(JSON.stringify(UPOM_DEFAULT.oddeleni));
+    return { cfg, stav: d.stav || {} }; };
   const saveUpom = d => { try { fs.writeFileSync(UPOM_F, JSON.stringify(d, null, 2)); } catch (_) {} };
   const utvarPatri = (utvar, vzory) => { const u = String(utvar || '').toUpperCase(); return (vzory || []).some(v => v && u.indexOf(String(v).toUpperCase()) >= 0); };
-  // Která oddělení smí člověk vidět: admin všechna; příjemce oznámení své; kdo má modul oddělení (doprava) své.
-  function upomOddeleniPro(email, jeAdmin) {
-    const d = loadUpom(), em = String(email || '').toLowerCase();
-    let mods = []; try { mods = (host.employeeModules && host.employeeModules(em)) || []; } catch (_) {}
-    return d.cfg.oddeleni.filter(o => jeAdmin || (o.komu || []).map(x => String(x).toLowerCase()).indexOf(em) >= 0 || (o.modul && mods.indexOf(o.modul) >= 0));
+  const bezDiak = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  // „Janča Petr" z faktury → e-mail zaměstnance (Příjmení Jméno vs. Jméno Příjmení → porovnání množin slov)
+  function obchodnikEmail(kdo, cfg) {
+    const k = String(kdo || '').trim(); if (!k) return null;
+    const rucne = cfg.obchodnici || {}; const rk = Object.keys(rucne).find(x => bezDiak(x) === bezDiak(k)); if (rk && rucne[rk]) return String(rucne[rk]).toLowerCase();
+    if (/^e-?shop$/i.test(k) || /^elkoplast/i.test(k)) return null;
+    let emps = []; try { emps = (host.getState && host.getState().employees) || []; } catch (_) {}
+    const tok = bezDiak(k).split(/\s+/).filter(Boolean).sort().join(' ');
+    const hit = emps.find(e => bezDiak(e.name || '').split(/\s+/).filter(Boolean).sort().join(' ') === tok);
+    return hit && hit.email ? String(hit.email).toLowerCase() : null;
   }
-  function upominkyPrehled(oddeleni) {
-    const d = loadUpom(), P = loadPoh().posledni; const out = [];
-    (oddeleni || d.cfg.oddeleni).forEach(o => {
-      const mes = o.promlceniMes || 12, dnes = new Date().toISOString().slice(0, 10);
-      const fa = (P ? P.faktury : []).filter(x => utvarPatri(x.utvar, o.utvary) && x.dni >= (o.dni || 10))
-        .map(x => { const pr = new Date(x.spl + 'T00:00:00Z'); pr.setUTCMonth(pr.getUTCMonth() + mes); const prom = pr.toISOString().slice(0, 10);
-          return Object.assign({}, x, { stav: d.stav[x.pz] || null, promlceni: prom, doPromlceni: Math.round((Date.parse(prom) - Date.parse(dnes)) / 86400000) }); }).sort((a, b) => b.dni - a.dni);
-      out.push(Object.assign({}, o, { den: P ? P.den : '', faktury: fa, celkem: Math.round(fa.reduce((a2, x) => a2 + x.saldo, 0)), bezUpominky: fa.filter(x => !(x.stav && x.stav.upominka)).length }));
+  const dnesISO = () => new Date().toISOString().slice(0, 10);
+  // Přehled eskalace pro stránku: každá faktura ≥ 1. práh s krokem, adresáty, promlčením u Dopravy
+  function eskalacePrehled(filtr) {
+    const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni, prah = Math.min.apply(null, cfg.kroky.obchodnik.concat([cfg.kroky.vyzva]));
+    const dnes = dnesISO(); const out = [];
+    (P ? P.faktury : []).forEach(x => { if (x.dni < prah) return;
+      const st = d.stav[x.pz] || {}; const em = obchodnikEmail(x.kdo, cfg);
+      const odd = cfg.oddeleni.find(o => utvarPatri(x.utvar, o.utvary)); let prom = null, doProm = null;
+      if (odd && odd.promlceniMes) { const pr = new Date(x.spl + 'T00:00:00Z'); pr.setUTCMonth(pr.getUTCMonth() + odd.promlceniMes); prom = pr.toISOString().slice(0, 10); doProm = Math.round((Date.parse(prom) - Date.parse(dnes)) / 86400000); }
+      const krok = x.dni >= cfg.kroky.vyzva ? 'vyzva' : x.dni >= cfg.kroky.obchodnik[1] ? 'k2' : 'k1';
+      const rec = Object.assign({}, x, { obchodnikEmail: em, oddeleni: odd ? odd.key : null, promlceni: prom, doPromlceni: doProm, krok, stav: st });
+      if (!filtr || filtr(rec)) out.push(rec); });
+    return { cfg, faktury: out.sort((a, b) => b.dni - a.dni), den: P ? P.den : '' };
+  }
+  // Data pro předžalobní výzvu: všechny neuhrazené faktury zákazníka (org) + IČO z výdejek, je-li
+  function vyzvaData(org) {
+    const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; if (!P) return null;
+    const fa = P.faktury.filter(x => x.org === org); if (!fa.length) return null;
+    let ico = '', orgId = fa[0].orgId || ''; try { const vd = loadVyd().dny || {}; Object.keys(vd).sort().reverse().some(dn => { const z = (vd[dn].zakaznici || {})[org]; if (z && z.ico) { ico = z.ico; return true; } return false; }); } catch (_) {}
+    const adresa = (cfg.adresy && cfg.adresy[org]) || '';
+    return { org, orgId, ico, adresa, faktury: fa.sort((a, b) => a.spl.localeCompare(b.spl)), celkem: fa.reduce((s2, x) => s2 + x.saldo, 0), mena: fa.some(x => x.mena && x.mena !== 'CZK') ? 'mix' : 'CZK', den: P.den, cfg, stav: fa.map(x => d.stav[x.pz] || {}) };
+  }
+  // Denní běh: rozešle, co je nové v daném kroku (jednou za fakturu a krok), seskupeno per adresát.
+  async function tickEskalace(force) {
+    const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; if (!P) return { ok: false, error: 'bez snímku pohledávek' };
+    const dnes = dnesISO(), publicUrl = ((host.mailFrom && host.mailFrom.publicUrl) || 'https://intranet.elkoplast.cz').replace(/\/$/, '');
+    const fallback = cleanEmails(cfg.fallbackKomu || []).length ? cleanEmails(cfg.fallbackKomu) : cleanEmails([process.env.SUPERADMIN || 'david.sury@elkoplast.cz']);
+    const kc2 = v => Math.round(v).toLocaleString('cs-CZ') + ' Kč';
+    const perAdresat = {}, vyzvy = {}, vysledky = [];
+    const pridej = (em, krok, x) => { const k = em.toLowerCase(); (perAdresat[k] = perAdresat[k] || { k1: [], k2: [] })[krok].push(x); };
+    P.faktury.forEach(x => { const st = d.stav[x.pz] = d.stav[x.pz] || {}; if (st.pozastaveno) return;
+      const odd = cfg.oddeleni.find(o => utvarPatri(x.utvar, o.utvary)); const oddKomu = odd ? cleanEmails(odd.komu || []) : [];
+      const em = obchodnikEmail(x.kdo, cfg); const adresati = [].concat(em ? [em] : fallback, oddKomu); const uniq = [...new Set(adresati)];
+      // Jen NEJVYŠŠÍ dosažený krok, každý jednou, nikdy zpět (po výzvě už žádné 10/20, po 20 už žádné 10).
+      const krok = x.dni >= cfg.kroky.vyzva ? 'k30' : x.dni >= cfg.kroky.obchodnik[1] ? 'k20' : x.dni >= cfg.kroky.obchodnik[0] ? 'k10' : null;
+      if (!krok || st.k30 || st.vyzvaOdeslana) return; if (krok === 'k10' && st.k20) return; if (st[krok]) return;
+      if (krok === 'k30') { (vyzvy[x.org] = vyzvy[x.org] || { org: x.org, faktury: [], cc: new Set() }).faktury.push(x); uniq.forEach(e => vyzvy[x.org].cc.add(e)); }
+      else uniq.forEach(e => pridej(e, krok === 'k20' ? 'k2' : 'k1', Object.assign({ _fallback: !em }, x)));
     });
-    return out;
-  }
-  // Denní kontrola: nové faktury přes práh → e-mail vedoucímu (jednou za fakturu). Bez příjemce → správci s výzvou k nastavení.
-  async function tickUpominky() {
-    const d = loadUpom(), P = loadPoh().posledni; if (!P) return { ok: false, error: 'bez snímku pohledávek' };
-    const dnes = new Date().toISOString().slice(0, 10), vysledky = [];
-    for (const o of d.cfg.oddeleni) {
-      const nove = P.faktury.filter(x => utvarPatri(x.utvar, o.utvary) && x.dni >= (o.dni || 10) && !(d.stav[x.pz] && d.stav[x.pz].ozn));
-      if (!nove.length) continue;
-      const komu = cleanEmails(o.komu || []); const fallback = !komu.length;
-      const to = komu.length ? komu : cleanEmails([process.env.SUPERADMIN || 'david.sury@elkoplast.cz']);
-      const kc2 = v => Math.round(v).toLocaleString('cs-CZ') + ' Kč';
-      const url = ((host.mailFrom && host.mailFrom.publicUrl) || 'https://intranet.elkoplast.cz').replace(/\/$/, '') + '/#modul=pohledavky';
-      const rows = nove.map(x => '<tr><td style="padding:5px 8px;border-bottom:1px solid #eee">' + esc(x.pz) + '</td><td style="padding:5px 8px;border-bottom:1px solid #eee"><b>' + esc(x.org) + '</b></td><td style="padding:5px 8px;border-bottom:1px solid #eee">' + esc(x.kdo) + '</td><td style="padding:5px 8px;border-bottom:1px solid #eee">' + esc(x.spl) + '</td><td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right;color:#b23"><b>' + x.dni + ' dní</b></td><td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right"><b>' + kc2(x.saldo) + '</b>' + (x.mena && x.mena !== 'CZK' ? ' ' + esc(x.mena) : '') + '</td></tr>').join('');
+    const radek = x => '<li style="margin:0 0 8px"><b>Faktura ' + esc(x.pz) + '</b> — ' + esc(x.org) + ' — <b>' + kc2(x.saldo) + (x.mena && x.mena !== 'CZK' ? ' ' + esc(x.mena) : '') + '</b>, splatná ' + esc(x.spl) + ' (<span style="color:#b23">' + x.dni + ' dní po splatnosti</span>)' + (x._fallback ? ' <i style="color:#888">— obchodník „' + esc(x.kdo || '—') + '" nemá v intranetu e-mail</i>' : '') + '</li>';
+    // 1) obchodníci: 10 a 20 dní
+    for (const em of Object.keys(perAdresat)) { const g = perAdresat[em]; const n = g.k1.length + g.k2.length; if (!n) continue;
+      const html = '<div style="font-family:system-ui,sans-serif;font-size:14px;color:#222;max-width:720px">' +
+        '<p>Dobrý den,</p><p><b>máte po splatnosti ' + (n === 1 ? 'fakturu' : 'faktury') + '</b> (stav pohledávek k ' + esc(P.den) + '). <b>Vyřešte to prosím co nejrychleji</b> — kontaktujte zákazníka a zajistěte úhradu.</p>' +
+        (g.k1.length ? '<h3 style="margin:14px 0 6px;font-size:15px">Nově po splatnosti ' + cfg.kroky.obchodnik[0] + '+ dní</h3><ul style="padding-left:18px">' + g.k1.map(radek).join('') + '</ul>' : '') +
+        (g.k2.length ? '<h3 style="margin:14px 0 6px;font-size:15px;color:#b23">Stále neuhrazeno ' + cfg.kroky.obchodnik[1] + '+ dní — druhé upozornění</h3><ul style="padding-left:18px">' + g.k2.map(radek).join('') + '</ul><p style="background:#fbeaea;border:1px solid #efc1c1;border-radius:8px;padding:8px 12px">Pokud nebude uhrazeno do <b>' + cfg.kroky.vyzva + ' dní po splatnosti</b>, odchází zákazníkovi <b>předžalobní výzva</b> (připraví intranet, odesílá ' + esc((cfg.vyzvaKomu || []).join(', ')) + ').</p>' : '') +
+        '<p style="margin:14px 0 0"><a href="' + publicUrl + '/#modul=pohledavky" style="background:#0e8a43;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:700">Otevřít pohledávky v intranetu</a></p>' +
+        '<p style="margin:14px 0 0;font-size:12px;color:#888">Automatické oznámení intranetu ELKOPLAST. Každá faktura se připomíná jednou v každém kroku (' + cfg.kroky.obchodnik.join(', ') + ' a ' + cfg.kroky.vyzva + ' dní).</p></div>';
+      const subject = 'Po splatnosti: ' + n + ' ' + (n === 1 ? 'faktura' : n < 5 ? 'faktury' : 'faktur') + (g.k2.length ? ' (druhé upozornění)' : '') + ' — vyřešte co nejrychleji';
+      let ok = true, err = ''; try { await host.deliver({ to: em, fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html }); } catch (e) { ok = false; err = e.message; }
+      if (ok) { g.k1.forEach(x => { d.stav[x.pz].k10 = { kdy: dnes, komu: em }; }); g.k2.forEach(x => { d.stav[x.pz].k20 = { kdy: dnes, komu: em }; }); }
+      vysledky.push({ krok: 'obchodnik', komu: em, k1: g.k1.length, k2: g.k2.length, ok, err });
+      console.log('[nakup-report] eskalace → ' + em + ': ' + g.k1.length + '× 10 dní, ' + g.k2.length + '× 20 dní' + (ok ? '' : ' CHYBA ' + err)); }
+    // 2) předžalobní výzvy: jeden e-mail Lucii se všemi zákazníky dne, obchodníci v kopii
+    const zak = Object.values(vyzvy);
+    if (zak.length) { const to = cleanEmails(cfg.vyzvaKomu || []).length ? cleanEmails(cfg.vyzvaKomu) : fallback; const cc = [...new Set(zak.flatMap(z => [...z.cc]))].filter(e => to.indexOf(e) < 0);
       const html = '<div style="font-family:system-ui,sans-serif;font-size:14px;color:#222;max-width:760px">' +
-        '<h2 style="margin:0 0 6px">' + esc(o.nazev) + ': ' + nove.length + ' ' + (nove.length === 1 ? 'faktura' : nove.length < 5 ? 'faktury' : 'faktur') + ' po splatnosti déle než ' + (o.dni || 10) + ' dní</h2>' +
-        '<p style="margin:0 0 12px;color:#555">Podle snímku pohledávek k ' + esc(P.den) + '. <b>Odešlete prosím upomínku</b> a v intranetu ji odškrtněte, ať se faktura nepřipomíná dál.</p>' +
-        (fallback ? '<p style="background:#fbeaea;border:1px solid #efc1c1;border-radius:8px;padding:8px 12px"><b>Oddělení ' + esc(o.nazev) + ' nemá nastaveného příjemce</b> — nastavte ho v intranetu (Finance → Pohledávky → Upomínky), do té doby chodí oznámení správci.</p>' : '') +
-        '<table style="border-collapse:collapse;width:100%"><thead><tr>' + ['Faktura', 'Zákazník', 'Vystavil', 'Splatnost', 'Po splatnosti', 'Saldo'].map((t, i) => '<th style="text-align:' + (i >= 4 ? 'right' : 'left') + ';padding:5px 8px;border-bottom:2px solid #ccc;font-size:12px;color:#555">' + t + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table>' +
-        '<p style="margin:14px 0 0"><a href="' + url + '" style="background:#0e8a43;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:700">Otevřít pohledávky v intranetu</a></p>' +
-        '<p style="margin:14px 0 0;font-size:12px;color:#888">Automatické oznámení intranetu. Faktura se oznamuje jednou; na nástěnce zůstává, dokud není odškrtnuta upomínka.</p></div>';
-      const subject = o.nazev + ': ' + nove.length + ' ' + (nove.length === 1 ? 'faktura' : nove.length < 5 ? 'faktury' : 'faktur') + ' po splatnosti ' + (o.dni || 10) + '+ dní — odeslat upomínku';
-      let ok = true, err = '';
-      try { await host.deliver({ to: to.join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html }); }
-      catch (e) { ok = false; err = e.message; }
-      if (ok) nove.forEach(x => { d.stav[x.pz] = Object.assign(d.stav[x.pz] || {}, { ozn: dnes, komu: to, oddeleni: o.key, org: x.org, saldo: x.saldo }); });
-      vysledky.push({ oddeleni: o.key, faktur: nove.length, to, ok, err, fallback });
-      console.log('[nakup-report] upomínky ' + o.nazev + ': ' + nove.length + ' faktur → ' + to.join(', ') + (ok ? '' : ' CHYBA ' + err) + (fallback ? ' (bez příjemce → správce)' : ''));
-    }
-    // stav: zahodit záznamy faktur, které už v pohledávkách nejsou (zaplaceno) starší 120 dnů
-    const ziva = new Set(P.faktury.map(x => x.pz)); Object.keys(d.stav).forEach(pz => { if (!ziva.has(pz) && d.stav[pz].ozn && (Date.now() - Date.parse(d.stav[pz].ozn)) > 120 * 86400000) delete d.stav[pz]; });
+        '<p>Dobrý den,</p><p>k odeslání ' + (zak.length === 1 ? 'je připravena <b>předžalobní výzva</b>' : 'jsou připraveny <b>předžalobní výzvy</b>') + ' — faktury po splatnosti ' + cfg.kroky.vyzva + '+ dní (stav k ' + esc(P.den) + '). Prosím: otevřít, <b>vytisknout na hlavičkový papír</b>, nechat podepsat (' + esc(cfg.podpis.jmeno) + ') a <b>odeslat doporučeně</b>; v intranetu pak odškrtnout „Výzva odeslána".</p>' +
+        '<ul style="padding-left:18px">' + zak.map(z => { const cel = z.faktury.reduce((s2, x) => s2 + x.saldo, 0); return '<li style="margin:0 0 10px"><b>' + esc(z.org) + '</b> — ' + z.faktury.length + ' ' + (z.faktury.length === 1 ? 'faktura' : 'faktur') + ', ' + kc2(cel) + ' (' + z.faktury.map(x => esc(x.pz) + ' · ' + x.dni + ' d').join(', ') + ')<br><a href="' + publicUrl + '/pohledavky/vyzva?org=' + encodeURIComponent(z.org) + '" style="color:#0e8a43;font-weight:700">Otevřít výzvu k tisku</a></li>'; }).join('') + '</ul>' +
+        (cfg.firma.ucet ? '' : '<p style="background:#fbeaea;border:1px solid #efc1c1;border-radius:8px;padding:8px 12px"><b>Ve výzvě chybí bankovní účet</b> — doplňte ho v intranetu (Pohledávky → Eskalace → nastavení), jinak ho dopište ručně.</p>') +
+        '<p style="margin:14px 0 0;font-size:12px;color:#888">Automatické oznámení intranetu ELKOPLAST. V kopii jsou obchodníci, kterých se faktury týkají.</p></div>';
+      const subject = 'Předžalobní výzva k odeslání: ' + zak.length + ' ' + (zak.length === 1 ? 'zákazník' : zak.length < 5 ? 'zákazníci' : 'zákazníků') + ' · ' + kc2(zak.reduce((s2, z) => s2 + z.faktury.reduce((t, x) => t + x.saldo, 0), 0));
+      let ok = true, err = ''; try { await host.deliver({ to: to.concat(cc).join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html }); } catch (e) { ok = false; err = e.message; }
+      if (ok) zak.forEach(z => z.faktury.forEach(x => { d.stav[x.pz].k30 = { kdy: dnes, komu: to, cc }; }));
+      vysledky.push({ krok: 'vyzva', komu: to, cc, zakazniku: zak.length, ok, err });
+      console.log('[nakup-report] předžalobní výzvy → ' + to.join(', ') + ': ' + zak.length + ' zákazníků' + (ok ? '' : ' CHYBA ' + err)); }
+    const ziva = new Set(P.faktury.map(x => x.pz)); Object.keys(d.stav).forEach(pz => { const st = d.stav[pz]; const posl = [st.k10, st.k20, st.k30].filter(Boolean).map(k => k.kdy).sort().pop(); if (!ziva.has(pz) && posl && (Date.now() - Date.parse(posl)) > 180 * 86400000) delete d.stav[pz]; });
     saveUpom(d); return { ok: true, vysledky };
   }
-  // Dlaždice na nástěnku intranetu: „Doprava: N faktur po splatnosti bez upomínky".
-  function notifikace(email) {
-    const em = String(email || '').toLowerCase(); if (!em) return [];
-    let jeAdmin = false; try { jeAdmin = host.isAdminEmp ? host.isAdminEmp(em) : false; } catch (_) {}
-    const out = [];
-    try { upominkyPrehled(upomOddeleniPro(em, jeAdmin)).forEach(o => { if (!o.bezUpominky) return;
-      const fa = o.faktury.filter(x => !(x.stav && x.stav.upominka));
-      out.push({ modul: 'pohledavky', modulNazev: 'Pohledávky — ' + o.nazev, ikona: 'file', urgent: fa.some(x => x.dni >= 30),
-        text: fa.length + ' ' + (fa.length === 1 ? 'faktura' : fa.length < 5 ? 'faktury' : 'faktur') + ' po splatnosti ' + (o.dni || 10) + '+ dní bez upomínky · ' + Math.round(fa.reduce((a2, x) => a2 + x.saldo, 0)).toLocaleString('cs-CZ') + ' Kč',
-        sub: fa.slice(0, 3).map(x => x.org).join(', ') + (fa.length > 3 ? '…' : '') }); }); } catch (_) {}
-    return out;
-  }
+  const VYZVA_HTML = path.join(__dirname, 'vyzva.html');
   const loadVyd = () => {
     let seed = { dny: {} }, live = null;
     try { seed = JSON.parse(fs.readFileSync(VYD_SEED, 'utf8')) || { dny: {} }; } catch (_) {}
@@ -1446,9 +1482,10 @@ function mount(host) {
     try { const s = await syncObjednavky(false); if (s && !s.ok && !s.skipped) console.warn('[nakup-report] Drive sync neproběhl:', s.error); } catch (e) { console.error('[nakup-report] Drive sync:', e.message); }
     try { const se = await syncExporty(); if (se && se.zpracovano && se.zpracovano.length) console.log('[nakup-report] exporty z Disku: ' + se.zpracovano.length + ' nový/é'); } catch (e) { console.error('[nakup-report] exporty sync:', e.message); }
     try { await syncPohledavky(); } catch (e) { console.error('[nakup-report] pohledávky sync:', e.message); }
-    try { const dstr = new Date().toISOString().slice(0, 10); let st2 = {}; try { st2 = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
-      if (st2.upomDay !== dstr && new Date().getHours() >= 7 && !(host.reportDisabled && host.reportDisabled('upominky'))) { const r = await tickUpominky(); if (r && r.ok) { st2.upomDay = dstr; try { fs.writeFileSync(STATE_F, JSON.stringify(st2, null, 2)); } catch (_) {} } }
-    } catch (e) { console.error('[nakup-report] upomínky:', e.message); }
+    try { const dstr = dnesISO(); let st2 = {}; try { st2 = JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) {}
+      if (loadUpom().cfg.aktivni === true && st2.eskDay !== dstr && new Date().getHours() >= 7 && !(host.reportDisabled && host.reportDisabled('eskalace'))) { const r = await tickEskalace(); if (r && r.ok) { st2.eskDay = dstr; try { fs.writeFileSync(STATE_F, JSON.stringify(st2, null, 2)); } catch (_) {} } }
+    } catch (e) { console.error('[nakup-report] eskalace:', e.message); }
+
     try { const sd = stavDat(); sd.varovani.forEach(v => console.warn('[nakup-report] ⚠ HLÍDAČ DAT: ' + v)); } catch (_) {}
     if (OBRAT_FOLDER) { try { const so = await syncObrat(false); if (so && !so.ok && !so.skipped) console.warn('[nakup-report] obrat plasty sync neproběhl:', so.error); } catch (e) { console.error('[nakup-report] obrat sync:', e.message); } }
     // 2) E-mailové reporty dle configu
@@ -1510,6 +1547,10 @@ function mount(host) {
   const POH_HTML = path.join(__dirname, 'pohledavky.html');
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true), p = u.pathname;
+    if (p === '/pohledavky/vyzva') {
+      if (!hasPohledavky(req)) return htmlOut(res, 403, '<h1 style="font-family:sans-serif">Bez přístupu.</h1>'), true;
+      try { return htmlOut(res, 200, fs.readFileSync(VYZVA_HTML, 'utf8')), true; } catch (_) { return htmlOut(res, 404, '<h1>Chybí vyzva.html</h1>'), true; }
+    }
     if (p === '/pohledavky') {
       if (!hasPohledavky(req)) return htmlOut(res, 403, '<h1 style="font-family:sans-serif">K modulu Pohledávky nemáte přístup.</h1>'), true;
       try { return htmlOut(res, 200, fs.readFileSync(POH_HTML, 'utf8')), true; } catch (_) { return htmlOut(res, 404, '<h1>Chybí pohledavky.html</h1>'), true; }
@@ -1577,35 +1618,40 @@ function mount(host) {
       saveAlt(alt);
       return json(res, 200, { ok: true }), true;
     }
-    if (p === '/api/nakup-report/upominky' && req.method === 'GET') {
+    if (p === '/api/nakup-report/eskalace' && req.method === 'GET') {
       if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu.' }); return true; }
-      const se = host.empSession && host.empSession(req), jeAdmin = host.isAdmin(req);
-      const odd = upomOddeleniPro(se && se.email, jeAdmin);
-      return json(res, 200, { ok: true, admin: jeAdmin, oddeleni: upominkyPrehled(odd), vsechna: jeAdmin ? loadUpom().cfg.oddeleni : undefined }), true;
+      const e = eskalacePrehled(); return json(res, 200, { ok: true, admin: host.isAdmin(req), den: e.den, faktury: e.faktury, cfg: e.cfg }), true;
     }
-    if (p === '/api/nakup-report/upominky' && req.method === 'POST') {
+    if (p === '/api/nakup-report/eskalace' && req.method === 'POST') {
       if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu.' }); return true; }
       let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
-      const se = host.empSession && host.empSession(req), kdo = (se && (se.jmeno || se.email)) || 'neznámý', jeAdmin = host.isAdmin(req), dnes = new Date().toISOString().slice(0, 10);
+      const se = host.empSession && host.empSession(req), kdo = (se && (se.jmeno || se.email)) || 'neznámý', jeAdmin = host.isAdmin(req), dnes = dnesISO();
       const d = loadUpom(), akce = String(b.akce || '');
-      if (akce === 'cfg') {
-        if (!jeAdmin) return json(res, 403, { error: 'Nastavení mění jen správce.' }), true;
-        const o = d.cfg.oddeleni.find(x => x.key === b.key); if (!o) return json(res, 404, { error: 'Neznámé oddělení.' }), true;
-        if (Array.isArray(b.komu)) o.komu = cleanEmails(b.komu); else if (typeof b.komu === 'string') o.komu = cleanEmails(b.komu);
-        if (b.dni != null && isFinite(+b.dni)) o.dni = Math.max(1, Math.min(365, Math.round(+b.dni)));
-        if (Array.isArray(b.utvary)) o.utvary = b.utvary.map(x => String(x).trim()).filter(Boolean).slice(0, 20); else if (typeof b.utvary === 'string') o.utvary = b.utvary.split(/[;,\n]/).map(x => x.trim()).filter(Boolean).slice(0, 20);
-        saveUpom(d); return json(res, 200, { ok: true, oddeleni: o }), true;
-      }
-      if (akce === 'upominka' || akce === 'zrusit') {
-        const pz = String(b.pz || ''); if (!pz) return json(res, 400, { error: 'Chybí faktura.' }), true;
-        const odd = upomOddeleniPro(se && se.email, jeAdmin); const P = loadPoh().posledni;
-        const f = P && P.faktury.find(x => x.pz === pz); if (!f || !odd.some(o => utvarPatri(f.utvar, o.utvary))) return json(res, 403, { error: 'Faktura nepatří k vašemu oddělení.' }), true;
-        d.stav[pz] = d.stav[pz] || {};
-        if (akce === 'upominka') d.stav[pz].upominka = { kdy: dnes, kdo, pozn: String(b.pozn || '').slice(0, 200) }; else delete d.stav[pz].upominka;
-        saveUpom(d); return json(res, 200, { ok: true }), true;
-      }
-      if (akce === 'test' && jeAdmin) { const r = await tickUpominky(); return json(res, 200, r), true; }
+      if (akce === 'cfg') { if (!jeAdmin) return json(res, 403, { error: 'Nastavení mění jen správce.' }), true;
+        const c = b.cfg || {};
+        if (c.kroky) { const o = Array.isArray(c.kroky.obchodnik) ? c.kroky.obchodnik.map(Number).filter(n => n > 0).slice(0, 2) : null; if (o && o.length === 2) d.cfg.kroky.obchodnik = o.sort((x, y) => x - y); if (c.kroky.vyzva > 0) d.cfg.kroky.vyzva = Math.round(+c.kroky.vyzva); }
+        if (c.vyzvaKomu != null) d.cfg.vyzvaKomu = cleanEmails(c.vyzvaKomu); if (c.fallbackKomu != null) d.cfg.fallbackKomu = cleanEmails(c.fallbackKomu);
+        if (c.firma) Object.keys(d.cfg.firma).forEach(k => { if (c.firma[k] != null) d.cfg.firma[k] = String(c.firma[k]).slice(0, 200); });
+        if (c.podpis) Object.keys(d.cfg.podpis).forEach(k => { if (c.podpis[k] != null) d.cfg.podpis[k] = String(c.podpis[k]).slice(0, 120); });
+        if (c.lhutaVyzvyDni > 0) d.cfg.lhutaVyzvyDni = Math.round(+c.lhutaVyzvyDni);
+        if (typeof c.aktivni === 'boolean') d.cfg.aktivni = c.aktivni;
+        if (c.obchodnici && typeof c.obchodnici === 'object') { d.cfg.obchodnici = d.cfg.obchodnici || {}; Object.keys(c.obchodnici).slice(0, 200).forEach(k => { const v = cleanEmails([c.obchodnici[k]])[0]; if (v) d.cfg.obchodnici[String(k).slice(0, 80)] = v; else delete d.cfg.obchodnici[k]; }); }
+        if (c.adresy && typeof c.adresy === 'object') { d.cfg.adresy = d.cfg.adresy || {}; Object.keys(c.adresy).slice(0, 500).forEach(k => { const v = String(c.adresy[k] || '').slice(0, 300); if (v) d.cfg.adresy[k] = v; else delete d.cfg.adresy[k]; }); }
+        if (Array.isArray(c.oddeleni)) c.oddeleni.forEach(o2 => { const o = d.cfg.oddeleni.find(x => x.key === o2.key); if (!o) return; if (o2.komu != null) o.komu = cleanEmails(o2.komu); if (Array.isArray(o2.utvary)) o.utvary = o2.utvary.map(String).filter(Boolean); else if (typeof o2.utvary === 'string') o.utvary = o2.utvary.split(/[;,\n]/).map(x => x.trim()).filter(Boolean); if (o2.promlceniMes > 0) o.promlceniMes = Math.round(+o2.promlceniMes); });
+        saveUpom(d); return json(res, 200, { ok: true, cfg: d.cfg }), true; }
+      const pz = String(b.pz || '');
+      if (akce === 'pozastavit' || akce === 'obnovit') { if (!pz) return json(res, 400, { error: 'Chybí faktura.' }), true; d.stav[pz] = d.stav[pz] || {};
+        if (akce === 'pozastavit') d.stav[pz].pozastaveno = { kdy: dnes, kdo, duvod: String(b.duvod || '').slice(0, 200) }; else delete d.stav[pz].pozastaveno;
+        saveUpom(d); return json(res, 200, { ok: true }), true; }
+      if (akce === 'vyzvaOdeslana' || akce === 'vyzvaZrusit') { if (!pz) return json(res, 400, { error: 'Chybí faktura.' }), true; d.stav[pz] = d.stav[pz] || {};
+        if (akce === 'vyzvaOdeslana') d.stav[pz].vyzvaOdeslana = { kdy: dnes, kdo }; else delete d.stav[pz].vyzvaOdeslana;
+        saveUpom(d); return json(res, 200, { ok: true }), true; }
+      if (akce === 'rozeslat' && jeAdmin) { const r = await tickEskalace(true); return json(res, 200, r), true; }
       return json(res, 400, { error: 'Neznámá akce.' }), true;
+    }
+    if (p === '/api/nakup-report/vyzva' && req.method === 'GET') {
+      if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu.' }); return true; }
+      const v = vyzvaData(String(u.query.org || '')); return json(res, v ? 200 : 404, v ? Object.assign({ ok: true }, v) : { ok: false, error: 'Zákazník nemá žádnou fakturu po splatnosti.' }), true;
     }
     if (p === '/api/nakup-report/pohledavky' && req.method === 'GET') {
       if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu k pohledávkám.' }); return true; }
@@ -1894,7 +1940,7 @@ function mount(host) {
     return reports().find(r => r.key === key) || null;
   }
 
-  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), syncExporty: () => syncExporty(), syncPohledavky: () => syncPohledavky(), tickUpominky, notifikace, reports, setReport };
+  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), syncExporty: () => syncExporty(), syncPohledavky: () => syncPohledavky(), tickEskalace, reports, setReport };
 }
 
 module.exports = { mount };
