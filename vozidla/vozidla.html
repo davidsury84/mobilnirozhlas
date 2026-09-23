@@ -170,7 +170,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cis=n=>(n==null||n==="")?"—":Number(n).toLocaleString("cs-CZ");
 const dat=s=>s?new Date(s+(s.length===10?"T00:00:00":"")).toLocaleDateString("cs-CZ"):"—";
-let D=null, ZALOZKA="prehled", FILTR={q:"",stredisko:"",jen:""};
+let D=null, ZALOZKA="prehled", FILTR={q:"",stredisko:"",jen:"",razeni:""};
 
 function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2600);}
 function zavri(){$("#modal").classList.remove("on");}
@@ -239,10 +239,31 @@ function filtrovana(){
   if(FILTR.jen==="nepotvrzeno")vs=vs.filter(v=>v.spravceEmail&&!v.spravcePotvrzen);
   if(FILTR.jen==="km")vs=vs.filter(v=>v.stav_.chybejiciRoky.length);
   if(FILTR.jen==="inv")vs=vs.filter(v=>v.stav_.inventura.potreba);
+  if(FILTR.razeni)return seradit(vs,FILTR.razeni);
   return vs.sort((a,b)=>{
     const ua=a.stav_.upozorneni.some(u=>u.urgent)?0:a.stav_.upozorneni.length?1:2;
     const ub=b.stav_.upozorneni.some(u=>u.urgent)?0:b.stav_.upozorneni.length?1:2;
     return ua-ub || String(a.spz||"").localeCompare(String(b.spz||""),"cs");
+  });
+}
+/* Řazení podle čísel. Vozidla bez údaje jdou vždycky na konec (v obou směrech) —
+   prázdný tachometr není „nula km". */
+const RAZENI={
+  "km-desc":{popis:"tachometr — nejvíc najeto",  hodnota:v=>tachometr(v), smer:-1},
+  "km-asc": {popis:"tachometr — nejmíň najeto",  hodnota:v=>tachometr(v), smer:1},
+  "rok-desc":{popis:"rok výroby — nejnovější",   hodnota:v=>Number(v.rokVyroby)||null, smer:-1},
+  "rok-asc": {popis:"rok výroby — nejstarší",    hodnota:v=>Number(v.rokVyroby)||null, smer:1},
+  "najezd-desc":{popis:"roční nájezd — nejvyšší",hodnota:v=>(v.stav_.prodej&&v.stav_.prodej.najezd)||null, smer:-1},
+};
+function tachometr(v){ const z=(v.km||[]).slice().sort((a,b)=>a.rok-b.rok).pop(); return z?Number(z.km):null; }
+function seradit(vs,klic){
+  const r=RAZENI[klic]; if(!r)return vs;
+  return vs.sort((a,b)=>{
+    const x=r.hodnota(a), y=r.hodnota(b);
+    if(x==null&&y==null)return String(a.spz||"").localeCompare(String(b.spz||""),"cs");
+    if(x==null)return 1;
+    if(y==null)return -1;
+    return (x-y)*r.smer || String(a.spz||"").localeCompare(String(b.spz||""),"cs");
   });
 }
 /* Dlaždice nahoře: číslo i seznam za ním se počítají ze stejné funkce,
@@ -341,6 +362,8 @@ function vykresliPrehled(){
     +'<select class="btn" style="font-weight:400" onchange="FILTR.jen=this.value;vykresli()">'
       +[["","vše"],["provoz","jen vozidla v provozu"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["nepotvrzeno","jen nepotvrzený správce"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
         .map(([k,t])=>'<option value="'+k+'" '+(FILTR.jen===k?"selected":"")+'>'+t+'</option>').join("")+'</select>'
+    +'<select class="btn" style="font-weight:400" onchange="FILTR.razeni=this.value;vykresli()"><option value="">řadit: nejdřív problémy</option>'
+      +Object.keys(RAZENI).map(k=>'<option value="'+k+'" '+(FILTR.razeni===k?"selected":"")+'>řadit: '+RAZENI[k].popis+'</option>').join("")+'</select>'
     +'<div class="sp"></div>'
     +'<a class="btn sm" href="/api/vozidla/export">⬇ CSV</a>'
     +(D.me.admin?'<button class="btn pri sm" onclick="editVuz(null)">+ Vozidlo</button>':'')
@@ -365,7 +388,8 @@ function vykresliPrehled(){
       +'<td>'+esc(v.stredisko||"—")+'</td>'
       +'<td>'+(e?'<input class="inl" id="in_'+v.id+'_stk" type="date" autocomplete="off" value="'+esc(v.stkDo||"")+'" onchange="ulozRadek(\''+v.id+'\')">'
              :stkPill(v))+(e&&v.stkDo?'<div class="mut">'+stkPill(v)+'</div>':'')+'</td>'
-      +'<td class="num">'+(pk?cis(pk.km)+' km<div class="mut">za '+pk.rok+'</div>':'<span class="mut">nezadán</span>')+'</td>'
+      +'<td class="num">'+(pk?cis(pk.km)+' km<div class="mut">za '+pk.rok+'</div>':'<span class="mut">nezadán</span>')
+             +(v.stav_.prodej&&v.stav_.prodej.najezd?'<div class="mut">'+cis(v.stav_.prodej.najezd)+' km/rok</div>':'')+'</td>'
       +'<td>'+stavPill(v)+(v.stav_.upozorneni.length?'<div class="upoz">'+v.stav_.upozorneni.map(u=>'<span class="u'+(u.urgent?" urg":"")+'">'+esc(u.text)+'</span>').join("")+'</div>':'')+'</td>'
       +'<td style="text-align:right;white-space:nowrap"><span class="radekStav" id="rs_'+v.id+'"></span> <button class="btn sm" onclick="detail(\''+v.id+'\')">Detail</button></td>'
       +'</tr>';

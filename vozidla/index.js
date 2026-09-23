@@ -242,8 +242,9 @@ function mount(host) {
     return k.length ? k[k.length - 1] : null;
   }
   // Roční nájezd: z rozdílu prvního a posledního zápisu, jinak z celkových km a stáří vozu.
+  // Nulový zápis je výplň, ne údaj — jinak z něj vyjde nesmyslný nájezd (0 → 318 519 za rok).
   function rocniNajezd(v) {
-    const k = (v.km || []).slice().sort((a, b) => a.rok - b.rok);
+    const k = (v.km || []).filter(x => Number(x.km) > 0).sort((a, b) => a.rok - b.rok);
     if (k.length >= 2) {
       const roky = k[k.length - 1].rok - k[0].rok;
       if (roky > 0) return Math.max(0, Math.round((k[k.length - 1].km - k[0].km) / roky));
