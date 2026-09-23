@@ -64,51 +64,56 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const kc=n=>Math.round(n||0).toLocaleString('cs-CZ');
 const den=d=>{if(!d)return '—';const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+'. '+(+m[2])+'. '+m[1]:d;};
 let P=null, U=null;
-// ---- ESKALACE: 10 / 20 dní obchodníkovi, 30 dní předžalobní výzva ----
+// ---- ESKALACE: 10 dní → obchodník rozhodne (3 dny) → upomínka přes Helios (Lucie) → po 7 dnech předžalobní výzva ----
 let E=null;
+const FAZE={nova:['čeká na denní běh','muted'],'ceka-obchodnik':['čeká na rozhodnutí obchodníka','amber'],'bez-rozhodnuti':['BEZ ROZHODNUTÍ přes 3 dny','red'],poznamka:['řeší obchodník','blue'],upominka:['k odeslání upomínky (Helios)','amber'],'po-upomince':['upomínka odeslána, běží 7 dní','blue'],'vyzva-ceka':['čeká na denní běh → výzva','red'],vyzva:['PŘEDŽALOBNÍ VÝZVA k odeslání','red'],'vyzva-odeslana':['výzva odeslána','blue'],pozastaveno:['pozastaveno','amber'],pred:['—','muted']};
 async function loadEsk(){
   try{const r=await fetch('/api/nakup-report/eskalace',{cache:'no-store'});E=await r.json();}catch(e){E=null;}
   const el=$('#upom'); if(!E||!E.ok){el.innerHTML='';return;}
-  const c=E.cfg, fa=E.faktury||[];
-  const st=f=>{const s=f.stav||{};if(s.pozastaveno)return '<span class="pill amber" title="'+esc(s.pozastaveno.duvod||'')+'">⏸ pozastaveno '+den(s.pozastaveno.kdy)+'</span>';
-    if(s.vyzvaOdeslana)return '<span class="pill blue">📮 výzva odeslána '+den(s.vyzvaOdeslana.kdy)+'</span>';
-    const k=[]; if(s.k10)k.push('10 d ✓ '+den(s.k10.kdy)); if(s.k20)k.push('20 d ✓ '+den(s.k20.kdy)); if(s.k30)k.push('<b style="color:var(--red)">výzva ✓ '+den(s.k30.kdy)+'</b>');
-    return k.length?k.join(' · '):'<span class="muted">čeká na denní běh</span>';};
-  const kroky=[c.kroky.obchodnik[0],c.kroky.obchodnik[1],c.kroky.vyzva];
-  const cfgHtml=E.admin?('<details class="cfg" style="margin:0 0 10px"><summary style="cursor:pointer">⚙️ Nastavení eskalace (jen správce)</summary><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:6px 14px;margin:8px 0">'
-      +'<label>Kroky obchodníkovi (dní): <input id="eK1" type="number" value="'+kroky[0]+'" style="width:56px"> a <input id="eK2" type="number" value="'+kroky[1]+'" style="width:56px"></label>'
-      +'<label>Předžalobní výzva po (dní): <input id="eK3" type="number" value="'+kroky[2]+'" style="width:56px"></label>'
-      +'<label>Výzvu odesílá (e-mail): <input id="eVK" value="'+esc((c.vyzvaKomu||[]).join(', '))+'" style="min-width:220px"></label>'
-      +'<label>Obchodník bez e-mailu → komu: <input id="eFB" value="'+esc((c.fallbackKomu||[]).join(', '))+'" placeholder="prázdné = správce" style="min-width:220px"></label>'
-      +'<label>Bankovní účet do výzvy: <input id="eUcet" value="'+esc(c.firma.ucet||'')+'" placeholder="č. účtu / kód banky" style="min-width:200px"></label>'
-      +'<label>IBAN: <input id="eIban" value="'+esc(c.firma.iban||'')+'" style="min-width:200px"></label>'
-      +'<label>Podepisuje: <input id="ePJ" value="'+esc(c.podpis.jmeno||'')+'" style="min-width:180px"> funkce <input id="ePF" value="'+esc(c.podpis.funkce||'')+'" placeholder="např. jednatel" style="min-width:120px"></label>'
-      +'<label>Lhůta ve výzvě (dní): <input id="eLh" type="number" value="'+(c.lhutaVyzvyDni||7)+'" style="width:56px"></label>'
+  const c=E.cfg, k=c.kroky, all=E.faktury||[];
+  const moje=all.filter(f=>f.obchodnikEmail&&f.obchodnikEmail===E.ja);
+  const fa=(E.admin||E.jeLucie)?all:moje;
+  const pill=f=>{const s=f.stav||{},z=FAZE[f.faze]||FAZE.pred;let t='<span class="pill '+z[1]+'">'+z[0]+'</span>';
+    if(s.k10)t+=' <span class="muted" style="font-size:11px">oznámeno '+den(s.k10.kdy)+'</span>'; if(s.rozhodnuti&&s.rozhodnuti.pozn)t+=' <span class="muted" style="font-size:11px" title="'+esc(s.rozhodnuti.kdo||'')+'">„'+esc(s.rozhodnuti.pozn)+'"</span>';
+    if(s.upominkaOdeslana)t+=' <span class="muted" style="font-size:11px">upomínka '+den(s.upominkaOdeslana.kdy)+'</span>'; if(s.vyzvaOdeslana)t+=' <span class="muted" style="font-size:11px">výzva '+den(s.vyzvaOdeslana.kdy)+'</span>';
+    if(s.pozastaveno)t+=' <span class="muted" style="font-size:11px" title="'+esc(s.pozastaveno.duvod||'')+'">'+esc(s.pozastaveno.duvod||'')+'</span>'; return t;};
+  const akce=f=>{const s=f.stav||{},pz=esc(f.pz),jeMoje=f.obchodnikEmail===E.ja||E.admin;let a='';
+    if(s.pozastaveno)return '<button class="btn" onclick="eskAkce(\'obnovit\',\''+pz+'\')">obnovit</button>';
+    if(['nova','ceka-obchodnik','bez-rozhodnuti','poznamka'].includes(f.faze)&&jeMoje)a+='<button class="btn ok" onclick="rozhodni(\''+pz+'\',true)" title="Lucie odešle upomínku přes Helios">📨 Poslat upomínku</button> <button class="btn" onclick="rozhodni(\''+pz+'\',false)" title="Neposílat — napište, jak to řešíte (např. zaplatí do týdne)">✎ Poznámka</button> ';
+    if(f.faze==='upominka'&&(E.jeLucie||E.admin))a+='<button class="btn ok" onclick="eskAkce(\'upominkaOdeslana\',\''+pz+'\')" title="Upomínka odeslána přes Helios — od dnešního dne běží 7 dní do výzvy">✓ Upomínka odeslána</button> ';
+    if(f.faze==='upominka'&&jeMoje&&!E.jeLucie)a+='<button class="btn" onclick="rozhodni(\''+pz+'\',false)" title="Vzít zpět">zrušit</button> ';
+    if(['vyzva','vyzva-ceka','po-upomince'].includes(f.faze)&&(E.jeLucie||E.admin))a+='<a class="btn" href="/pohledavky/vyzva?org='+encodeURIComponent(f.org)+'" target="_blank">📄 výzva</a> ';
+    if(f.faze==='po-upomince'&&(E.jeLucie||E.admin))a+='<a href="#" class="muted" style="font-size:11px" onclick="eskAkce(\'upominkaZrusit\',\''+pz+'\');return false">zrušit</a> ';
+    a+='<button class="btn" onclick="eskPozastav(\''+pz+'\')" title="Zastavit eskalaci (např. splátkový kalendář)">⏸</button>'; return a;};
+  const tbl=rows=>'<div class="tblwrap" style="max-height:440px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Útvar</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Promlčení</th><th>Stav</th><th></th></tr></thead><tbody>'
+    +rows.map(f=>'<tr'+(f.faze==='vyzva'||f.faze==='bez-rozhodnuti'?' style="background:#fdf2f2"':'')+'><td>'+esc(f.pz)+(f.mena&&f.mena!=='CZK'?' <span class="pill blue">'+esc(f.mena)+'</span>':'')+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+(f.obchodnikEmail?'':' <span class="err" style="font-size:11px" title="Bez e-mailu — chodí náhradnímu příjemci">bez e-mailu</span>')+'</td><td class="muted">'+esc(f.utvar)+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td>'
+      +'<td'+(f.doPromlceni!=null&&f.doPromlceni<=90?' class="err"':'')+'>'+(f.promlceni?den(f.promlceni)+' <span class="muted" style="font-size:11px">('+(f.doPromlceni<0?'promlčeno':'za '+f.doPromlceni+' d')+')</span>':'<span class="muted">—</span>')+'</td><td>'+pill(f)+'</td><td style="white-space:nowrap">'+akce(f)+'</td></tr>').join('')+'</tbody></table></div>';
+  const cnt=z=>fa.filter(f=>f.faze===z).length;
+  const cfgHtml=E.admin?('<details class="cfg" style="margin:0 0 10px"><summary style="cursor:pointer">⚙️ Nastavení (jen správce)</summary><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:6px 14px;margin:8px 0">'
+      +'<label>Obchodníkovi po (dní po splatnosti): <input id="eK1" type="number" value="'+k.obchodnik+'" style="width:56px"></label><label>Lhůta na rozhodnutí (dní): <input id="eK2" type="number" value="'+k.rozhodnuti+'" style="width:56px"></label><label>Výzva po upomínce (dní): <input id="eK3" type="number" value="'+k.vyzvaPoUpomince+'" style="width:56px"></label>'
+      +'<label>Upomínky + výzvy odesílá: <input id="eVK" value="'+esc((c.vyzvaKomu||[]).join(', '))+'" style="min-width:220px"></label><label>Obchodník bez e-mailu / nereaguje → komu: <input id="eFB" value="'+esc((c.fallbackKomu||[]).join(', '))+'" placeholder="prázdné = správce" style="min-width:220px"></label>'
+      +'<label>Bankovní účet do výzvy: <input id="eUcet" value="'+esc(c.firma.ucet||'')+'" style="min-width:200px"></label><label>IBAN: <input id="eIban" value="'+esc(c.firma.iban||'')+'" style="min-width:200px"></label>'
+      +'<label>Podepisuje: <input id="ePJ" value="'+esc(c.podpis.jmeno||'')+'" style="min-width:180px"> funkce <input id="ePF" value="'+esc(c.podpis.funkce||'')+'" placeholder="např. jednatel" style="min-width:120px"></label><label>Lhůta ve výzvě (dní): <input id="eLh" type="number" value="'+(c.lhutaVyzvyDni||7)+'" style="width:56px"></label>'
+      +(c.oddeleni||[]).map(o=>'<label>Kopie pro vedoucího '+esc(o.nazev)+': <input id="eO-'+esc(o.key)+'" value="'+esc((o.komu||[]).join(', '))+'" style="min-width:220px"></label>').join('')
       +'<label style="font-weight:700"><input type="checkbox" id="eAkt" '+(c.aktivni?'checked':'')+'> Automatický denní běh zapnut (od 7 h)</label>'
-      +(c.oddeleni||[]).map(o=>'<label>Kopie pro vedoucího '+esc(o.nazev)+' (útvary '+esc((o.utvary||[]).join(', '))+'): <input id="eO-'+esc(o.key)+'" value="'+esc((o.komu||[]).join(', '))+'" style="min-width:220px"></label>').join('')
-      +'</div><div><button class="btn ok" onclick="ulozEsk()">Uložit nastavení</button> <button class="btn" onclick="rozeslatEsk()" title="Hned prověřit a rozeslat vše, co je nové">Rozeslat teď</button> <span class="muted">Firma ve výzvě: '+esc(c.firma.nazev)+', '+esc(c.firma.sidlo)+', IČO '+esc(c.firma.ico)+'</span></div></details>')
-    :('<div class="cfg">Obchodníkovi po '+kroky[0]+' a '+kroky[1]+' dnech e-mail „vyřeš to co nejrychleji", po '+kroky[2]+' dnech předžalobní výzva (odesílá '+esc((c.vyzvaKomu||[]).join(', '))+'). Obchodník = kdo fakturu vystavil.</div>');
-  const bezEmail=fa.filter(f=>!f.obchodnikEmail&&f.kdo&&!/^e-?shop$|^elkoplast/i.test(f.kdo)); const nezn=[...new Set(bezEmail.map(f=>f.kdo))];
-  el.innerHTML='<div class="upom"><h2>⚖️ Eskalace faktur po splatnosti <span class="muted" style="font-weight:400;font-size:13px">· '+fa.length+' faktur ≥ '+kroky[0]+' dní · k '+den(E.den)+'</span></h2>'
-    +(c.aktivni?'<div class="cfg" style="color:var(--green)"><b>● Automatika zapnuta</b> — každý den od 7 h se rozešle, co je nové.</div>':'<div class="warn"><b>Automatika je zatím vypnutá.</b> Nic se neposílá samo — zapne ji správce v nastavení níže. Pozor: první běh rozešle i celý dosavadní backlog (všechny faktury, které už jsou přes prahy).</div>')
-    +'<div class="cfg">'+kroky[0]+' dní → obchodník · '+kroky[1]+' dní → obchodník podruhé · '+kroky[2]+' dní → <b>předžalobní výzva</b> (tisk na hlavičkový papír, podpis '+esc(c.podpis.jmeno)+', odesílá '+esc((c.vyzvaKomu||[]).join(', '))+'). Doprava: promlčení za 12 měsíců.</div>'+cfgHtml
-    +(nezn.length&&E.admin?('<div class="warn">Obchodníci bez e-mailu v intranetu (jejich upozornění chodí náhradnímu příjemci): '+nezn.map(n=>'<span style="white-space:nowrap">'+esc(n)+' → <input data-obch="'+esc(n)+'" placeholder="e-mail" style="width:200px;font-size:12px;padding:2px 6px"></span>').join(' ')+' <button class="btn" onclick="ulozObch()">Uložit přiřazení</button></div>'):'')
-    +'<div class="tblwrap" style="max-height:420px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Útvar</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Promlčení</th><th>Stav eskalace</th><th></th></tr></thead><tbody>'
-    +fa.map(f=>'<tr'+(f.krok==='vyzva'?' style="background:#fdf2f2"':'')+'><td>'+esc(f.pz)+(f.mena&&f.mena!=='CZK'?' <span class="pill blue">'+esc(f.mena)+'</span>':'')+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+(f.obchodnikEmail?' <span class="muted" style="font-size:11px">'+esc(f.obchodnikEmail)+'</span>':' <span class="err" style="font-size:11px" title="Bez e-mailu — chodí náhradnímu příjemci">bez e-mailu</span>')+'</td><td class="muted">'+esc(f.utvar)+'</td><td>'+den(f.spl)+'</td><td class="r'+(f.dni>=kroky[2]?' err':'')+'"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td>'
-      +'<td'+(f.doPromlceni!=null&&f.doPromlceni<=90?' class="err"':'')+'>'+(f.promlceni?den(f.promlceni)+' <span class="muted" style="font-size:11px">('+(f.doPromlceni<0?'promlčeno':'za '+f.doPromlceni+' d')+')</span>':'<span class="muted">—</span>')+'</td>'
-      +'<td>'+st(f)+'</td><td style="white-space:nowrap">'+(f.krok==='vyzva'?'<a class="btn" href="/pohledavky/vyzva?org='+encodeURIComponent(f.org)+'" target="_blank" title="Předžalobní výzva k tisku">📄 výzva</a> ':'')
-      +((f.stav||{}).pozastaveno?'<button class="btn" onclick="eskAkce(\'obnovit\',\''+esc(f.pz)+'\')">obnovit</button>':'<button class="btn" onclick="eskPozastav(\''+esc(f.pz)+'\')" title="Např. dohoda o splátkách — eskalace se zastaví">⏸</button>')+'</td></tr>').join('')
-    +'</tbody></table></div></div>';
+      +'</div><div><button class="btn ok" onclick="ulozEsk()">Uložit nastavení</button> <button class="btn" onclick="rozeslatEsk()" title="Hned prověřit a rozeslat, co je nové">Rozeslat teď</button></div></details>'):'';
+  const bezEmail=[...new Set(all.filter(f=>!f.obchodnikEmail&&f.kdo&&!/^e-?shop$|^elkoplast/i.test(f.kdo)).map(f=>f.kdo))];
+  el.innerHTML='<div class="upom"><h2>⚖️ Eskalace faktur po splatnosti <span class="muted" style="font-weight:400;font-size:13px">· '+(E.admin||E.jeLucie?all.length+' faktur ≥ '+k.obchodnik+' dní':'vaše: '+moje.length+' faktur')+' · k '+den(E.den)+'</span></h2>'
+    +(c.aktivni?'<div class="cfg" style="color:var(--green)"><b>● Automatika zapnuta</b> — každý den od 7 h.</div>':(E.admin?'<div class="warn"><b>Automatika je vypnutá.</b> Nic se neposílá samo — zapne ji správce v nastavení. První běh oznámí obchodníkům celý dosavadní backlog.</div>':''))
+    +'<div class="cfg"><b>Jak to běží:</b> '+k.obchodnik+' dní po splatnosti → e-mail obchodníkovi (<b>'+k.rozhodnuti+' dny na rozhodnutí</b>) → obchodník zvolí <b>📨 Poslat upomínku</b> nebo <b>✎ Poznámka</b> (řeší sám) → upomínky odesílá '+esc((c.vyzvaKomu||[]).join(', '))+' přes Helios a odškrtne odeslání → <b>'+k.vyzvaPoUpomince+' dní po upomínce</b> předžalobní výzva (tisk, podpis '+esc(c.podpis.jmeno)+').</div>'
+    +cfgHtml
+    +(E.admin&&bezEmail.length?('<div class="warn">Obchodníci bez e-mailu v intranetu: '+bezEmail.map(n=>'<span style="white-space:nowrap">'+esc(n)+' → <input data-obch="'+esc(n)+'" placeholder="e-mail" style="width:200px;font-size:12px;padding:2px 6px"></span>').join(' ')+' <button class="btn" onclick="ulozObch()">Uložit</button></div>'):'')
+    +'<div class="kpis" style="margin:8px 0">'+[['red',cnt('bez-rozhodnuti'),'bez rozhodnutí přes '+k.rozhodnuti+' dny'],['amber',cnt('ceka-obchodnik')+cnt('nova'),'čeká na obchodníka'],['amber',cnt('upominka'),'k odeslání upomínky (Helios)'],['blue',cnt('po-upomince'),'po upomínce, běží '+k.vyzvaPoUpomince+' dní'],['red',cnt('vyzva')+cnt('vyzva-ceka'),'předžalobní výzva k odeslání'],['blue',cnt('poznamka'),'řeší obchodník']].map(x=>'<div class="kpi '+x[0]+'"><div class="v">'+x[1]+'</div><div class="l">'+esc(x[2])+'</div></div>').join('')+'</div>'
+    +(fa.length?tbl(fa):'<div class="muted">Žádná faktura ≥ '+k.obchodnik+' dní po splatnosti'+(E.admin||E.jeLucie?'':' u vás')+'.</div>')+'</div>';
 }
 async function eskPost(body){const r=await fetch('/api/nakup-report/eskalace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
 async function eskAkce(akce,pz,extra){try{await eskPost(Object.assign({akce,pz},extra||{}));await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
-function eskPozastav(pz){const d=prompt('Důvod pozastavení eskalace (např. dohoda o splátkách):');if(d===null)return;eskAkce('pozastavit',pz,{duvod:d});}
-async function ulozEsk(){const g=id=>($('#'+id)||{}).value;const cfg={kroky:{obchodnik:[+g('eK1'),+g('eK2')],vyzva:+g('eK3')},vyzvaKomu:g('eVK'),fallbackKomu:g('eFB'),firma:{ucet:g('eUcet'),iban:g('eIban')},podpis:{jmeno:g('ePJ'),funkce:g('ePF')},lhutaVyzvyDni:+g('eLh'),oddeleni:(E.cfg.oddeleni||[]).map(o=>({key:o.key,komu:g('eO-'+o.key)}))};
-  cfg.aktivni=!!($('#eAkt')||{}).checked;
+function rozhodni(pz,upominka){const pozn=prompt(upominka?'Poznámka pro Lucii (nepovinné):':'Jak to řešíte? (např. „zaplatí do týdne")',''); if(pozn===null)return; if(!upominka&&!pozn.trim()){alert('Bez upomínky je poznámka povinná.');return;} eskAkce('rozhodnuti',pz,{upominka,pozn});}
+function eskPozastav(pz){const d=prompt('Důvod pozastavení eskalace (např. splátkový kalendář):');if(d===null)return;eskAkce('pozastavit',pz,{duvod:d});}
+async function ulozEsk(){const g=id=>($('#'+id)||{}).value;const cfg={kroky:{obchodnik:+g('eK1'),rozhodnuti:+g('eK2'),vyzvaPoUpomince:+g('eK3')},vyzvaKomu:g('eVK'),fallbackKomu:g('eFB'),firma:{ucet:g('eUcet'),iban:g('eIban')},podpis:{jmeno:g('ePJ'),funkce:g('ePF')},lhutaVyzvyDni:+g('eLh'),oddeleni:(E.cfg.oddeleni||[]).map(o=>({key:o.key,komu:g('eO-'+o.key)})),aktivni:!!($('#eAkt')||{}).checked};
   try{await eskPost({akce:'cfg',cfg});await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
-async function ulozObch(){const m={};document.querySelectorAll('input[data-obch]').forEach(i=>{if(i.value.trim())m[i.getAttribute('data-obch')]=i.value.trim();});
-  try{await eskPost({akce:'cfg',cfg:{obchodnici:m}});await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
-async function rozeslatEsk(){try{const j=await eskPost({akce:'rozeslat'});alert('Rozesláno:\n'+((j.vysledky||[]).map(v=>v.krok==='vyzva'?('předžalobní výzvy → '+v.komu.join(', ')+' ('+v.zakazniku+' zákazníků)'):(v.komu+': '+v.k1+'× 10 dní, '+v.k2+'× 20 dní')).join('\n')||'nic nového'));await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
+async function ulozObch(){const m={};document.querySelectorAll('input[data-obch]').forEach(i=>{if(i.value.trim())m[i.getAttribute('data-obch')]=i.value.trim();});try{await eskPost({akce:'cfg',cfg:{obchodnici:m}});await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
+async function rozeslatEsk(){try{const j=await eskPost({akce:'rozeslat'});alert('Rozesláno:\n'+((j.vysledky||[]).map(v=>v.krok+' → '+[].concat(v.komu).join(', ')+': '+(v.faktur!=null?v.faktur+' faktur':v.zakazniku+' zákazníků')).join('\n')||'nic nového'));await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
 async function load(){
   loadEsk();
   try{const r=await fetch('/api/nakup-report/pohledavky?dni=35',{cache:'no-store'});P=await r.json();}catch(e){P={ok:false,error:e.message};}
