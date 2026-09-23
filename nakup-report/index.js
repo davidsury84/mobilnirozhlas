@@ -119,14 +119,22 @@ function mount(host) {
   const saveUpom = d => { try { fs.writeFileSync(UPOM_F, JSON.stringify(d, null, 2)); } catch (_) {} };
   const utvarPatri = (utvar, vzory) => { const u = String(utvar || '').toUpperCase(); return (vzory || []).some(v => v && u.indexOf(String(v).toUpperCase()) >= 0); };
   const bezDiak = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  // „Rychlíková Jana" z faktury → e-mail zaměstnance. Postupně: ruční mapa → shoda množiny jmen (bez titulů,
+  // diakritiky a pořadí) → podmnožina (prostřední jméno, titul v DB) → jednoznačné příjmení → vzor jmeno.prijmeni@.
+  const TITULY = /\b(ing|mgr|bc|bca|mudr|judr|phdr|rndr|dis|ph\.?d|mba|ll\.?m|csc|dr|prof|doc)\b\.?/g;
+  const jmenoTok = n => bezDiak(n).replace(TITULY, ' ').replace(/[.,]/g, ' ').split(/\s+/).filter(Boolean);
   function obchodnikEmail(kdo, cfg) {
     const k = String(kdo || '').trim(); if (!k) return null;
     const rucne = cfg.obchodnici || {}; const rk = Object.keys(rucne).find(x => bezDiak(x) === bezDiak(k)); if (rk && rucne[rk]) return String(rucne[rk]).toLowerCase();
     if (/^e-?shop$/i.test(k) || /^elkoplast/i.test(k)) return null;
-    let emps = []; try { emps = (host.getState && host.getState().employees) || []; } catch (_) {}
-    const tok = bezDiak(k).split(/\s+/).filter(Boolean).sort().join(' ');
-    const hit = emps.find(e => bezDiak(e.name || '').split(/\s+/).filter(Boolean).sort().join(' ') === tok);
-    return hit && hit.email ? String(hit.email).toLowerCase() : null;
+    let emps = []; try { emps = ((host.getState && host.getState().employees) || []).filter(e => e && e.email); } catch (_) {}
+    const t = jmenoTok(k); if (!t.length) return null;
+    const key = t.slice().sort().join(' ');
+    let hit = emps.find(e => jmenoTok(e.name).sort().join(' ') === key);
+    if (!hit) { const c = emps.filter(e => { const et = jmenoTok(e.name); return t.every(x => et.indexOf(x) >= 0); }); if (c.length === 1) hit = c[0]; }
+    if (!hit && t.length >= 2) { const prij = t[0]; const c = emps.filter(e => jmenoTok(e.name).indexOf(prij) >= 0); if (c.length === 1) hit = c[0]; }   // na faktuře je příjmení první
+    if (!hit && t.length >= 2) { const guess = [t[1] + '.' + t[0], t[0] + '.' + t[1]].map(x => x + '@elkoplast.cz'); hit = emps.find(e => guess.indexOf(String(e.email).toLowerCase()) >= 0); }
+    return hit ? String(hit.email).toLowerCase() : null;
   }
   const dnesISO = () => new Date().toISOString().slice(0, 10);
   const dniOd = iso => iso ? Math.round((Date.now() - Date.parse(iso)) / 86400000) : null;
