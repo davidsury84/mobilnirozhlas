@@ -78,7 +78,11 @@ function mount(host) {
   const num = (v, def) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) ? n : (def == null ? 0 : def); };
   const dnesISO = () => new Date().toISOString().slice(0, 10);
   // sloupec Expedice v plánu výroby: cokoli s datem („27.02.26", „06.03.", „23.03", „tech 30.04", „21.05-8ks, 29.05.-2ks") = odjelo; „storno" = ne
-  function expediceZ(s) { const t = String(s == null ? '' : s).trim(); if (!t || /storno/i.test(t)) return ''; let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0]; m = t.match(/(\d{1,2})\s*\.\s*(\d{1,2})(?:\s*\.\s*(\d{4}|\d{2})(?!\d))?/); if (!m || +m[1] < 1 || +m[1] > 31 || +m[2] < 1 || +m[2] > 12) return ''; let y = m[3] || String(new Date().getFullYear()); if (y.length === 2) y = '20' + y; return y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); }
+  function expediceZ(s) { const t = String(s == null ? '' : s).trim(); if (!t || /storno/i.test(t)) return ''; let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0];
+    // „26.6.4,09.07.16" = 26.6. 4 ks + 9.7. 16 ks → číslo za dd.mm. je rok jen když je čtyřmístné nebo rovno letošku/loňsku (jinak kusy); bere se poslední (konečná) expedice
+    const rokNyni = new Date().getFullYear(); const re = /(\d{1,2})\s*\.\s*(\d{1,2})(?:\s*\.?\s*(\d{4}|\d{2})(?!\d))?/g; let out = ''; let x;
+    while ((x = re.exec(t))) { const dd = +x[1], mm = +x[2]; if (dd < 1 || dd > 31 || mm < 1 || mm > 12) continue; let y = rokNyni; if (x[3] && x[3].length === 4) y = +x[3]; else if (x[3] && (2000 + +x[3] === rokNyni || 2000 + +x[3] === rokNyni - 1)) y = 2000 + +x[3]; const iso = y + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0'); if (iso > out) out = iso; }
+    return out; }
   // značka ve sloupcích Výkresy knihy CONTRACT: '' / 'xx' / 'x' / '-' = nic (výkres není potřeba); 'OK' nebo datum (23.3., 16.9., 15.6) = ano
   function vykresZnacka(v) { const t = String(v == null ? '' : v).trim(); if (!t || /^[x\-–]+$/i.test(t)) return null; const m = t.match(/^(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*(\d{2,4})?$/); let datum = ''; if (m) { let y = m[3] || String(new Date().getFullYear()); if (y.length === 2) y = '20' + y; datum = y + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'); } return { datum }; }
   const newId = (p) => (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -125,6 +129,10 @@ function mount(host) {
     if (!d.migrace.expedice2) {   // sloupec Expedice se čte benevolentně (23.03, tech 30.04, 21.05-8ks) → barevné otisky pryč, další čtení plánu vše přehodnotí
       const ot = (d.legacySync || {}).otisky || {}; Object.keys(ot).forEach(k => { if (k.startsWith('barva:')) delete ot[k]; });
       d.migrace.expedice2 = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
+    }
+    if (!d.migrace.expedice3) {   // „10.09.11" = 10. 9. 11 ks, ne rok 2011 → barevné otisky pryč, datum expedice se přečte znovu
+      const ot = (d.legacySync || {}).otisky || {}; Object.keys(ot).forEach(k => { if (k.startsWith('barva:')) delete ot[k]; });
+      d.migrace.expedice3 = new Date().toISOString(); try { saveRaw(d); } catch (_) {}
     }
     if (!d.migrace.vykresXx) {   // „xx" ve sloupci Výkresy Posl. dřív znamenalo „poslán" → čekání na výkres u 300 standardních beden; ve skutečnosti = výkres není potřeba
       d.polozky.forEach(p => { if (p.vykres && p.vykres.stav === 'poslan' && !p.vykres.datum) p.vykres = { stav: 'neni', datum: '' }; });
@@ -291,6 +299,7 @@ function mount(host) {
     else if (b.lakovano || b.zinkovano) cil = 'hotovo';
     else if (b.svareno) cil = 'svarovna';
     if (!cil || p.stav === 'storno' || p.stav === 'pozastaveno') return false;
+    if (b.expedice && p.stav === 'expedovano' && p.expedovanoDne !== b.expedice && (!p.expedovanoDne || p.expedovanoDne < '2025-01-01' || (p.udalosti || []).some(u => /podle barvy v plánu výroby: expedice/.test(u.pozn || '')))) { p.expedovanoDne = b.expedice; return true; }   // datum expedice podle plánu (dřív se kusy četly jako rok)
     if (STAV_PORADI[cil] <= STAV_PORADI[p.stav]) return false;
     const pred = p.stav; p.stav = cil;
     if (cil === 'hotovo' || cil === 'expedovano') { p.hotovoKs = num(p.ks); p.hotovoDne = p.hotovoDne || dnesISO(); }

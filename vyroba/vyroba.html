@@ -272,11 +272,13 @@ function vykresli(){
 /* ---------- přehled (živý report) ---------- */
 function htmlPrehled(){
   const pol=vsechnyPolozky();
-  const skl=pol.filter(p=>p.skluzDni>0), kZad=pol.filter(p=>p.stav==="prijata"), veV=pol.filter(p=>["zadano","svarovna"].includes(p.stav)), koop=pol.filter(p=>["lakovna","zinkovna"].includes(p.stav));
+  const skl=pol.filter(p=>p.skluzDni>0&&!p.mimoBruntal&&p.stav!=="prijata"), cizi=pol.filter(p=>p.skluzDni>0&&p.mimoBruntal), nezad=pol.filter(p=>p.skluzDni>0&&!p.mimoBruntal&&p.stav==="prijata"), kZad=pol.filter(p=>p.stav==="prijata"), veV=pol.filter(p=>["zadano","svarovna"].includes(p.stav)), koop=pol.filter(p=>["lakovna","zinkovna"].includes(p.stav));
   const hot=pol.filter(p=>p.stav==="hotovo"), bezK=pol.filter(p=>p.cekaBezKamionu), vyk=pol.filter(p=>p.vykres&&p.vykres.stav==="poslan");
   const mes=D.dnes.slice(0,7); const exp=pol.filter(p=>p.stav==="expedovano"&&String(p.expedovanoDne||"").slice(0,7)===mes);
   let h='<div class="stat">'
-    +st(skl.length,"ve skluzu proti termínu",skl.length?"bad":"ok","skluz")
+    +st(skl.length,"Bruntál ve skluzu proti termínu",skl.length?"bad":"ok","skluz")
+    +st(nezad.length,"po termínu, do výroby nezadáno",nezad.length?"warn":"","nezadano")
+    +st(cizi.length,"cizí závody (S-, C-) po termínu",cizi.length?"warn":"","cizi")
     +st(kZad.length,"čeká na zadání",kZad.length?"warn":"","prijata")
     +st(veV.length,"zadáno / svařovna","","vyroba")
     +st(koop.length,"lakovna / zinkovna",koop.length?"warn":"","koop")
@@ -290,10 +292,10 @@ function htmlPrehled(){
     +'<input placeholder="🔍 ČVZ, produkt, zákazník, objednávka…" value="'+esc(FILTR.q)+'" oninput="FILTR.q=this.value;refTab()">'
     +'<select onchange="FILTR.stav=this.value;refTab()"><option value="">všechny stavy</option>'+D.stavy.map(s=>'<option value="'+s[0]+'"'+(FILTR.stav===s[0]?" selected":"")+'>'+esc(s[1])+'</option>').join("")+'</select>'
     +'<select onchange="FILTR.zak=this.value;refTab()"><option value="">všichni zákazníci</option>'+zak.map(z=>'<option'+(FILTR.zak===z?" selected":"")+'>'+esc(z)+'</option>').join("")+'</select>'
-    +'<select onchange="FILTR.jen=this.value;refTab()"><option value="">vše</option><option value="skluz"'+(FILTR.jen==="skluz"?" selected":"")+'>jen ve skluzu</option><option value="zive"'+(FILTR.jen==="zive"?" selected":"")+'>jen živé (bez expedovaných a storno)</option><option value="bezkamionu"'+(FILTR.jen==="bezkamionu"?" selected":"")+'>hotovo bez kamionu</option><option value="vykres"'+(FILTR.jen==="vykres"?" selected":"")+'>čeká na výkres</option><option value="koop"'+(FILTR.jen==="koop"?" selected":"")+'>lakovna / zinkovna</option></select>'
+    +'<select onchange="FILTR.jen=this.value;refTab()"><option value="">vše</option><option value="skluz"'+(FILTR.jen==="skluz"?" selected":"")+'>Bruntál ve skluzu</option><option value="nezadano"'+(FILTR.jen==="nezadano"?" selected":"")+'>po termínu, nezadáno</option><option value="cizi"'+(FILTR.jen==="cizi"?" selected":"")+'>cizí závody po termínu</option><option value="zive"'+(FILTR.jen==="zive"?" selected":"")+'>jen živé (bez expedovaných a storno)</option><option value="bezkamionu"'+(FILTR.jen==="bezkamionu"?" selected":"")+'>hotovo bez kamionu</option><option value="vykres"'+(FILTR.jen==="vykres"?" selected":"")+'>čeká na výkres</option><option value="koop"'+(FILTR.jen==="koop"?" selected":"")+'>lakovna / zinkovna</option></select>'
     +'</div></div><div class="tw" id="tabPol">'+tabPolozky()+'</div></div>';
   return h;
-  function st(n,l,cls,jen){return '<div class="s '+cls+'" onclick="FILTR={q:\'\',stav:\''+(["prijata","hotovo","expedovano"].includes(jen)?jen:"")+'\',zak:\'\',jen:\''+(["skluz","bezkamionu","vykres","koop","vyroba"].includes(jen)?jen:"")+'\'};refTab()"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';}
+  function st(n,l,cls,jen){return '<div class="s '+cls+'" onclick="FILTR={q:\'\',stav:\''+(["prijata","hotovo","expedovano"].includes(jen)?jen:"")+'\',zak:\'\',jen:\''+(["skluz","nezadano","cizi","bezkamionu","vykres","koop","vyroba"].includes(jen)?jen:"")+'\'};refTab()"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';}
 }
 function refTab(){const t=$("#tabPol");if(t)t.innerHTML=tabPolozky();}
 function filtrPol(){
@@ -301,7 +303,9 @@ function filtrPol(){
   return vsechnyPolozky().filter(p=>{
     if(FILTR.stav&&p.stav!==FILTR.stav)return false;
     if(FILTR.zak&&p._o.zakaznik!==FILTR.zak)return false;
-    if(FILTR.jen==="skluz"&&!(p.skluzDni>0))return false;
+    if(FILTR.jen==="skluz"&&!(p.skluzDni>0&&!p.mimoBruntal&&p.stav!=="prijata"))return false;
+    if(FILTR.jen==="nezadano"&&!(p.skluzDni>0&&!p.mimoBruntal&&p.stav==="prijata"))return false;
+    if(FILTR.jen==="cizi"&&!(p.skluzDni>0&&p.mimoBruntal))return false;
     if(FILTR.jen==="zive"&&["expedovano","doruceno","storno"].includes(p.stav))return false;
     if(FILTR.jen==="bezkamionu"&&!p.cekaBezKamionu)return false;
     if(FILTR.jen==="vykres"&&!(p.vykres&&p.vykres.stav==="poslan"))return false;
