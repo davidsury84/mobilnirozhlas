@@ -28,6 +28,7 @@
   .aging{display:grid;grid-template-columns:repeat(4,1fr);gap:8px} .aging div{border-radius:10px;padding:10px 12px;border:1px solid var(--line)} .aging b{display:block;font:700 18px/1.1 var(--cond)} .aging span{font-size:12px;color:var(--ink-soft)}
   .muted{color:var(--faint)} .err{color:var(--red)} .ok{color:var(--green)}
   .foot{font-size:12px;color:var(--faint);margin-top:16px;line-height:1.6}
+  .upom{background:var(--paper);border:2px solid #e2b96b;border-radius:12px;padding:14px 16px;margin:0 0 14px} .upom h2{margin:0 0 4px;font:700 17px/1.2 var(--cond)} .upom .cfg{font-size:12px;color:var(--ink-soft);margin:0 0 10px} .upom .cfg input{font-size:12px;padding:3px 7px;margin:0 4px} .btn{font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer} .btn.ok{background:var(--green);color:#fff;border-color:var(--green);font-weight:600} .done{color:var(--green);font-weight:600}
 </style>
 </head>
 <body>
@@ -35,6 +36,7 @@
   <h1>💸 Pohledávky po splatnosti</h1>
   <p class="sub" id="sub">Načítám denní snímek z ERP…</p>
   <div id="stav"></div>
+  <div id="upom"></div>
   <div class="kpis" id="kpis"></div>
   <div id="exp"></div>
   <div class="grid2">
@@ -61,8 +63,38 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const kc=n=>Math.round(n||0).toLocaleString('cs-CZ');
 const den=d=>{if(!d)return '—';const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+'. '+(+m[2])+'. '+m[1]:d;};
-let P=null;
+let P=null, U=null;
+async function loadUpom(){
+  try{const r=await fetch('/api/nakup-report/upominky',{cache:'no-store'});U=await r.json();}catch(e){U=null;}
+  const el=$('#upom'); if(!U||!U.ok||!(U.oddeleni||[]).length){el.innerHTML='';return;}
+  el.innerHTML=U.oddeleni.map(o=>{
+    const fa=o.faktury||[], bez=fa.filter(f=>!(f.stav&&f.stav.upominka));
+    const cfg=U.admin
+      ?('<div class="cfg">Příjemce oznámení (vedoucí střediska): <input id="ck-'+esc(o.key)+'" value="'+esc((o.komu||[]).join(', '))+'" placeholder="e-mail, e-mail" style="min-width:260px"> · po <input id="cd-'+esc(o.key)+'" type="number" min="1" max="365" value="'+(o.dni||10)+'" style="width:56px"> dnech po splatnosti · útvary v pohledávkách: <input id="cu-'+esc(o.key)+'" value="'+esc((o.utvary||[]).join(', '))+'" style="min-width:180px"> <button class="btn" onclick="ulozCfg(\''+esc(o.key)+'\')">Uložit</button> <button class="btn" onclick="testUpom()" title="Hned prověřit a rozeslat nová oznámení">Rozeslat teď</button></div>')
+      :('<div class="cfg">Oznámení chodí '+((o.komu||[]).length?('na '+esc(o.komu.join(', '))):'<b class="err">správci — příjemce zatím není nastaven</b>')+' · po '+(o.dni||10)+' dnech po splatnosti · útvary: '+esc((o.utvary||[]).join(', '))+'</div>');
+    return '<div class="upom"><h2>📨 Upomínky — '+esc(o.nazev)+' <span class="muted" style="font-weight:400;font-size:13px">· '+fa.length+' faktur '+(o.dni||10)+'+ dní po splatnosti · '+kc(o.celkem)+' Kč · <b style="color:var(--red)">'+bez.length+' bez upomínky</b>'+(o.den?' · snímek '+den(o.den):'')+'</span></h2>'+cfg
+      +(fa.length?('<div class="tblwrap" style="max-height:360px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Vystavil</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Oznámeno</th><th>Upomínka</th></tr></thead><tbody>'
+        +fa.map(f=>'<tr'+(f.stav&&f.stav.upominka?' style="opacity:.6"':'')+'><td>'+esc(f.pz)+(f.mena&&f.mena!=='CZK'?' <span class="pill blue">'+esc(f.mena)+'</span>':'')+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td class="muted">'+esc(f.kdo)+'</td><td>'+den(f.spl)+'</td><td class="r'+(f.dni>30?' err':'')+'"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td><td class="muted">'+(f.stav&&f.stav.ozn?den(f.stav.ozn):'—')+'</td>'
+          +'<td>'+(f.stav&&f.stav.upominka?('<span class="done">✓ odeslána '+den(f.stav.upominka.kdy)+' · '+esc(f.stav.upominka.kdo)+'</span> <a href="#" class="muted" style="font-size:11px" onclick="upomAkce(\'zrusit\',\''+esc(f.pz)+'\');return false">zrušit</a>'):('<button class="btn ok" onclick="upomAkce(\'upominka\',\''+esc(f.pz)+'\')">✓ Upomínka odeslána</button>'))+'</td></tr>').join('')
+        +'</tbody></table></div>'):'<div class="muted">Žádná faktura tohoto střediska není '+(o.dni||10)+'+ dní po splatnosti.</div>')+'</div>';
+  }).join('');
+}
+async function upomAkce(akce,pz){
+  try{const r=await fetch('/api/nakup-report/upominky',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({akce,pz})});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));await loadUpom();}
+  catch(e){alert('Nepovedlo se: '+e.message);}
+}
+async function ulozCfg(key){
+  const body={akce:'cfg',key,komu:$('#ck-'+key).value,dni:$('#cd-'+key).value,utvary:$('#cu-'+key).value};
+  try{const r=await fetch('/api/nakup-report/upominky',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));await loadUpom();}
+  catch(e){alert('Nepovedlo se: '+e.message);}
+}
+async function testUpom(){
+  try{const r=await fetch('/api/nakup-report/upominky',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({akce:'test'})});const j=await r.json();
+    alert(j.ok?('Prověřeno: '+(j.vysledky||[]).map(v=>v.oddeleni+' — '+v.faktur+' nových faktur → '+v.to.join(', ')+(v.fallback?' (bez příjemce → správce)':'')).join('\n')||'nic nového k oznámení'):('Chyba: '+(j.error||'')));await loadUpom();}
+  catch(e){alert('Nepovedlo se: '+e.message);}
+}
 async function load(){
+  loadUpom();
   try{const r=await fetch('/api/nakup-report/pohledavky?dni=35',{cache:'no-store'});P=await r.json();}catch(e){P={ok:false,error:e.message};}
   if(!P||!P.ok){$('#sub').innerHTML='<span class="err">'+esc((P&&P.error)||'Data nejsou k dispozici.')+'</span>';return;}
   $('#okno').textContent=P.oknoDni;
