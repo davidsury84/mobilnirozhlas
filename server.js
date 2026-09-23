@@ -968,6 +968,8 @@ function buildNotifikace(email) {
   try { out = out.concat(notifReklamace(email, mods, admin)); } catch (_) {}
   try { if (vozidlaMod && vozidlaMod.notifikace) out = out.concat(vozidlaMod.notifikace(email)); } catch (_) {}
   try { if (vyrobaMod && vyrobaMod.notifikace) out = out.concat(vyrobaMod.notifikace(email)); } catch (_) {}
+  // Pohledávky: faktury čekající na rozhodnutí obchodníka, fronta upomínek / výzev pro Lucii
+  try { if (nakupReportMod && nakupReportMod.notifikace) out = out.concat(nakupReportMod.notifikace(email)); } catch (_) {}
   return out.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0)).slice(0, 25);
 }
 function ensureEmployee(email, name) {

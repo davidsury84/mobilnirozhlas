@@ -175,7 +175,7 @@ function mount(host) {
     P.faktury.forEach(x => { const st = d.stav[x.pz] = d.stav[x.pz] || {}; const faze = fazeFaktury(x, st, cfg);
       const em = obchodnikEmail(x.kdo, cfg); const adr = [...new Set([].concat(em ? [em] : fallback, oddKomuPro(x)))];
       if (faze === 'nova') adr.forEach(e => (perObch[e] = perObch[e] || []).push(Object.assign({ _fallback: !em }, x)));
-      else if (faze === 'bez-rozhodnuti' && !st.k10b) adr.forEach(e => (perObch2[e] = perObch2[e] || []).push(Object.assign({ _fallback: !em }, x)));
+      else if (faze === 'bez-rozhodnuti' && !(st.nag && st.nag.posledni === dnes)) adr.forEach(e => (perObch2[e] = perObch2[e] || []).push(Object.assign({ _fallback: !em, _nag: (st.nag && st.nag.pocet) || 0 }, x)));
       else if (faze === 'upominka' && !st.kU) upomLucii.push(Object.assign({ _em: em }, x));
       else if (faze === 'vyzva-ceka') { (vyzvyLucii[x.org] = vyzvyLucii[x.org] || { org: x.org, faktury: [], cc: new Set() }).faktury.push(x); adr.forEach(e => vyzvyLucii[x.org].cc.add(e)); }
     });
@@ -186,12 +186,14 @@ function mount(host) {
       const subject = 'Po splatnosti: ' + fa.length + ' ' + (fa.length === 1 ? 'faktura' : fa.length < 5 ? 'faktury' : 'faktur') + ' — vyřešte do 3 dnů';
       const r = await posli(em, [], subject, html); if (r.ok) fa.forEach(x => { d.stav[x.pz].k10 = { kdy: dnes, komu: em }; });
       vysledky.push({ krok: 'obchodnik', komu: em, faktur: fa.length, ok: r.ok, err: r.err }); console.log('[nakup-report] eskalace 10 d → ' + em + ': ' + fa.length + ' faktur' + (r.ok ? '' : ' CHYBA ' + r.err)); }
-    // 2) obchodníci — bez rozhodnutí po 3 dnech (kopie náhradnímu příjemci)
-    for (const em of Object.keys(perObch2)) { const fa = perObch2[em];
-      const html = mailWrap('<p>Dobrý den,</p><p>u ' + (fa.length === 1 ? 'této faktury' : 'těchto faktur') + ' po splatnosti <b>chybí vaše rozhodnutí</b> déle než ' + cfg.kroky.rozhodnuti + ' dny od upozornění:</p><ul style="padding-left:18px">' + fa.map(radekFa).join('') + '</ul><p><b>Rozhodněte prosím ihned</b> v intranetu — poslat upomínku, nebo poznámka, jak to řešíte.</p>', publicUrl);
-      const subject = 'Po splatnosti bez rozhodnutí: ' + fa.length + ' ' + (fa.length === 1 ? 'faktura' : fa.length < 5 ? 'faktury' : 'faktur') + ' — připomínka';
-      const r = await posli(em, fallback.filter(f => f !== em), subject, html); if (r.ok) fa.forEach(x => { d.stav[x.pz].k10b = { kdy: dnes, komu: em }; });
-      vysledky.push({ krok: 'pripominka', komu: em, faktur: fa.length, ok: r.ok, err: r.err }); console.log('[nakup-report] eskalace připomínka → ' + em + ': ' + fa.length + ' faktur'); }
+    // 2) obchodníci — bez rozhodnutí po 3 dnech: KAŽDÝ DEN znovu, dokud nerozhodnou („šikana" na pokyn 2026-09-23),
+    //    od 3. připomínky navíc kopie náhradnímu příjemci (správce) — ať je vidět, kdo to ignoruje
+    for (const em of Object.keys(perObch2)) { const fa = perObch2[em]; const n = Math.max.apply(null, fa.map(x => x._nag)) + 1;
+      const html = mailWrap('<p>Dobrý den,</p><p style="background:#fbeaea;border:1px solid #efc1c1;border-radius:8px;padding:8px 12px"><b>' + n + '. připomínka.</b> U ' + (fa.length === 1 ? 'této faktury' : 'těchto faktur') + ' po splatnosti <b>stále chybí vaše rozhodnutí</b> (lhůta ' + cfg.kroky.rozhodnuti + ' dny uplynula). Tato připomínka bude chodit <b>každý den</b>, dokud v intranetu nezvolíte <b>poslat upomínku</b>, nebo nenapíšete <b>poznámku</b>, jak fakturu řešíte.' + (n >= 3 ? ' Od třetí připomínky dostává kopii vedení.' : '') + '</p><ul style="padding-left:18px">' + fa.map(radekFa).join('') + '</ul>', publicUrl);
+      const subject = n + '. připomínka — ' + fa.length + ' ' + (fa.length === 1 ? 'faktura' : fa.length < 5 ? 'faktury' : 'faktur') + ' po splatnosti bez vašeho rozhodnutí';
+      const cc = n >= 3 ? fallback.filter(f => f !== em) : [];
+      const r = await posli(em, cc, subject, html); if (r.ok) fa.forEach(x => { const st = d.stav[x.pz]; st.nag = { pocet: ((st.nag && st.nag.pocet) || 0) + 1, posledni: dnes, komu: em }; });
+      vysledky.push({ krok: 'pripominka', komu: em, faktur: fa.length, n, cc, ok: r.ok, err: r.err }); console.log('[nakup-report] eskalace ' + n + '. připomínka → ' + em + ': ' + fa.length + ' faktur' + (cc.length ? ' (cc ' + cc.join(',') + ')' : '')); }
     // 3) Lucie — upomínky k odeslání přes Helios (jen zaškrtnuté obchodníkem)
     if (upomLucii.length) { const cc = [...new Set(upomLucii.map(x => x._em).filter(Boolean))].filter(e => lucie.indexOf(e) < 0);
       const html = mailWrap('<p>Dobrý den,</p><p>obchodníci označili k odeslání <b>upomínky</b> (přes Helios) u ' + upomLucii.length + ' ' + (upomLucii.length === 1 ? 'faktury' : 'faktur') + ':</p><ul style="padding-left:18px">' + upomLucii.map(x => '<li style="margin:0 0 8px"><b>' + esc(x.org) + '</b> — faktura č. ' + esc(x.pz) + ', ' + kcM(x.saldo) + ', splatná ' + esc(x.spl) + ' (' + x.dni + ' dní), obchodník ' + esc(x.kdo || '—') + (d.stav[x.pz].rozhodnuti && d.stav[x.pz].rozhodnuti.pozn ? ' — <i>' + esc(d.stav[x.pz].rozhodnuti.pozn) + '</i>' : '') + '</li>').join('') + '</ul><p>Po odeslání prosím v intranetu odškrtněte <b>„upomínka odeslána"</b> — za ' + cfg.kroky.vyzvaPoUpomince + ' dní od odeslání se u neuhrazených připraví předžalobní výzva.</p>', publicUrl);
@@ -208,6 +210,19 @@ function mount(host) {
       vysledky.push({ krok: 'vyzva', komu: lucie, cc, zakazniku: zak.length, ok: r.ok, err: r.err }); console.log('[nakup-report] předžalobní výzvy → ' + lucie.join(', ') + ': ' + zak.length + ' zákazníků'); }
     const ziva = new Set(P.faktury.map(x => x.pz)); Object.keys(d.stav).forEach(pz => { const st = d.stav[pz]; const posl = [st.k10, st.kU, st.vyzvaOznamena].filter(Boolean).map(k => k.kdy).sort().pop(); if (!ziva.has(pz) && posl && (Date.now() - Date.parse(posl)) > 180 * 86400000) delete d.stav[pz]; });
     saveUpom(d); return { ok: true, vysledky };
+  }
+  function notifikace(email) {
+    const em = String(email || '').toLowerCase(); if (!em) return [];
+    const out = []; try { const e = eskalacePrehled(); const cfg = e.cfg;
+      const moje = e.faktury.filter(f => f.obchodnikEmail === em && ['nova', 'ceka-obchodnik', 'bez-rozhodnuti'].indexOf(f.faze) >= 0);
+      if (moje.length) { const bez = moje.filter(f => f.faze === 'bez-rozhodnuti').length;
+        out.push({ modul: 'pohledavky', modulNazev: 'Pohledávky', ikona: 'file', urgent: bez > 0, text: moje.length + ' ' + (moje.length === 1 ? 'faktura po splatnosti čeká' : moje.length < 5 ? 'faktury po splatnosti čekají' : 'faktur po splatnosti čeká') + ' na vaše rozhodnutí' + (bez ? ' — ' + bez + ' přes lhůtu!' : ''), sub: moje.slice(0, 3).map(f => f.org).join(', ') + ' · ' + Math.round(moje.reduce((a, f) => a + f.saldo, 0)).toLocaleString('cs-CZ') + ' Kč' }); }
+      if (cleanEmails(cfg.vyzvaKomu || []).indexOf(em) >= 0) {
+        const up = e.faktury.filter(f => f.faze === 'upominka'), vy = e.faktury.filter(f => f.faze === 'vyzva' || f.faze === 'vyzva-ceka');
+        if (up.length) out.push({ modul: 'pohledavky', modulNazev: 'Pohledávky', ikona: 'file', urgent: false, text: up.length + ' ' + (up.length === 1 ? 'faktura' : up.length < 5 ? 'faktury' : 'faktur') + ' k odeslání upomínky (Helios)', sub: Math.round(up.reduce((a, f) => a + f.saldo, 0)).toLocaleString('cs-CZ') + ' Kč' });
+        if (vy.length) out.push({ modul: 'pohledavky', modulNazev: 'Pohledávky', ikona: 'file', urgent: true, text: vy.length + ' ' + (vy.length === 1 ? 'faktura' : vy.length < 5 ? 'faktury' : 'faktur') + ' k odeslání předžalobní výzvy', sub: [...new Set(vy.map(f => f.org))].slice(0, 3).join(', ') }); }
+    } catch (_) {}
+    return out;
   }
   const VYZVA_HTML = path.join(__dirname, 'vyzva.html');
   const loadVyd = () => {
@@ -1963,7 +1978,7 @@ function mount(host) {
     return reports().find(r => r.key === key) || null;
   }
 
-  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), syncExporty: () => syncExporty(), syncPohledavky: () => syncPohledavky(), tickEskalace, reports, setReport };
+  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), syncExporty: () => syncExporty(), syncPohledavky: () => syncPohledavky(), tickEskalace, notifikace, reports, setReport };
 }
 
 module.exports = { mount };
