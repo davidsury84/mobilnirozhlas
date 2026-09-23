@@ -10217,5 +10217,26 @@ if(location.hash.match(/cti=/i)) boot();
 else if(isAdminPath()) boot();
 else initIntranet();
 </script>
+<script>
+/* Hlídání nové verze intranetu: po nasazení se v otevřené záložce objeví pruh „Obnovit" —
+   jinak lidé jedou dál na staré skořápce a nové položky v menu „nejsou". */
+(function(){
+  var prvni=null;
+  function zkus(){
+    fetch('/api/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+      if(!j||!j.commit)return;
+      if(prvni===null){prvni=j.commit;return;}
+      if(j.commit!==prvni&&!document.getElementById('mjNovaVerze')){
+        var d=document.createElement('div');d.id='mjNovaVerze';
+        d.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;background:#0f1512;color:#fff;padding:10px 16px;border-radius:12px;font:14px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);display:flex;gap:12px;align-items:center';
+        d.innerHTML='<span>Intranet má novou verzi.</span><button style="font:inherit;font-weight:700;background:#12a350;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer" onclick="location.reload()">Obnovit</button>';
+        document.body.appendChild(d);
+      }
+    }).catch(function(){});
+  }
+  zkus(); setInterval(zkus, 5*60*1000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) zkus(); });
+})();
+</script>
 </body>
 </html>
