@@ -57,7 +57,9 @@ function pct(a,b){return b?Math.round(a/b*100):0;}
 function render(){
   var d=DATA;
   var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap"><h1>Který mobiliář se líbí nejvíc?</h1>'+
-      '<button class="pill" style="border-color:var(--green);color:var(--green-d);font-weight:700" onclick="stahni()">⬇ Stáhnout výsledky (CSV)</button></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button class="pill" style="border-color:var(--green);color:var(--green-d);font-weight:700" onclick="stahni()">⬇ CSV</button>'+
+      '<button class="pill" id="btnPptx" style="border-color:var(--green);color:var(--green-d);font-weight:700" onclick="stahniPptx()">⬇ PowerPoint (PPTX)</button></div></div>'+
     '<p class="hint">Respondenti vybírají z šestic fotek vždy 2 nejhezčí. „% oblíbenosti" = jak často byl produkt vybrán, když se ukázal. Průběžné výsledky — aktualizují se při každém načtení stránky.</p>'+
     '<div class="tiles" style="margin-top:14px">'+
       '<div><b>'+d.respondentu+'</b><span>respondentů</span></div>'+
@@ -105,6 +107,51 @@ function stahni(){
     .forEach((p,i)=>r.push([i+1,'WD-'+p.kod.toUpperCase(),katnaz[p.kat]||p.kat,Math.round(p.rate*100),p.vybrano,p.zobrazeno]));
   stahniCSV('vysledky-mobiliar-'+new Date().toISOString().slice(0,10)+'.csv',r);
 }
+function nactiPptx(cb){
+  if(window.PptxGenJS){cb();return;}
+  var b=$('btnPptx'); if(b){b.disabled=true;b.textContent='Připravuji…';}
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+  s.onload=function(){ if(b){b.disabled=false;b.textContent='⬇ PowerPoint (PPTX)';} cb(); };
+  s.onerror=function(){ if(b){b.disabled=false;b.textContent='⬇ PowerPoint (PPTX)';} alert('Nepodařilo se načíst generátor prezentace. Zkuste to prosím znovu.'); };
+  document.head.appendChild(s);
+}
+var GRN='0E8A43', GRND='08612D', INK='111713';
+function stahniPptx(){ nactiPptx(function(){
+  var d=DATA, katnaz={}; d.kategorie.forEach(k=>katnaz[k.key]=k.nazev);
+  var p=new PptxGenJS(); p.defineLayout({name:'W',width:13.33,height:7.5}); p.layout='W';
+  // titulní
+  var s=p.addSlide(); s.background={color:GRN};
+  s.addText('Který mobiliář se líbí nejvíc?',{x:0.7,y:2.4,w:12,h:1.2,color:'FFFFFF',fontSize:40,bold:true});
+  s.addText('Hodnocení venkovního mobiliáře · ELKOPLAST CZ',{x:0.7,y:3.7,w:12,h:0.5,color:'D9F0E2',fontSize:18});
+  s.addText('Průběžné výsledky k '+new Date().toLocaleDateString('cs-CZ')+' · '+d.respondentu+' respondentů',{x:0.7,y:4.3,w:12,h:0.5,color:'D9F0E2',fontSize:14});
+  // přehled + demografie
+  s=p.addSlide(); nadpis(s,'Kdo hodnotil');
+  kpi(s,0.7,[[d.respondentu,'respondentů'],[d.sestic,'hodnocených šestic'],[d.vybrano,'hlasů pro oblíbené']]);
+  s.addChart(p.ChartType.bar,[{name:'Pozice',labels:d.pozice.map(x=>x.t),values:d.pozice.map(x=>x.pocet)}],
+    {x:0.7,y:2.5,w:6,h:4.4,barDir:'bar',showValue:true,chartColors:[GRN],catAxisLabelFontSize:10,valAxisHidden:true,showLegend:false,title:'Pozice respondentů',showTitle:true,titleFontSize:13});
+  s.addChart(p.ChartType.bar,[{name:'Obec',labels:d.obce.map(x=>x.t),values:d.obce.map(x=>x.pocet)}],
+    {x:7,y:2.5,w:5.6,h:4.4,barDir:'bar',showValue:true,chartColors:['18A957'],catAxisLabelFontSize:10,valAxisHidden:true,showLegend:false,title:'Velikost obce',showTitle:true,titleFontSize:13});
+  // TOP produkty s fotkami
+  var top=d.produkty.map(x=>Object.assign({},x,{rate:x.zobrazeno?x.vybrano/x.zobrazeno:0}))
+    .filter(x=>x.zobrazeno>=8).sort((a,b)=>b.rate-a.rate||b.vybrano-a.vybrano).slice(0,8);
+  s=p.addSlide(); nadpis(s,'Nejoblíbenější mobiliář (napříč kategoriemi)');
+  top.forEach(function(pr,i){ var col=i%4,row=Math.floor(i/4); var x=0.55+col*3.12,y=1.5+row*2.9;
+    s.addImage({path:'/mobiliar-foto/'+pr.kod+'.jpg',x:x,y:y,w:2.8,h:1.9,sizing:{type:'contain',w:2.8,h:1.9}});
+    s.addText([{text:Math.round(pr.rate*100)+' %',options:{fontSize:16,bold:true,color:GRND}},{text:'  WD-'+pr.kod.toUpperCase(),options:{fontSize:10,color:'8A948C'}}],{x:x,y:y+1.9,w:2.8,h:0.35,align:'center'});
+    s.addText(katnaz[pr.kat]||'',{x:x,y:y+2.25,w:2.8,h:0.3,align:'center',fontSize:9,color:'8A948C'});
+  });
+  // vítězové kategorií
+  s=p.addSlide(); nadpis(s,'Vítěz v každé kategorii');
+  var vit=d.kategorie.map(function(k){ var kp=d.produkty.map(x=>Object.assign({},x,{rate:x.zobrazeno?x.vybrano/x.zobrazeno:0})).filter(x=>x.kat===k.key&&x.zobrazeno>=8).sort((a,b)=>b.rate-a.rate)[0]; return kp?[k.nazev,'WD-'+kp.kod.toUpperCase(),Math.round(kp.rate*100)+' %']:[k.nazev,'—','—']; });
+  s.addTable([[{text:'Kategorie',options:th()},{text:'Vítězný model',options:th()},{text:'Oblíbenost',options:th()}]].concat(vit.map(r=>[{text:r[0],options:td()},{text:r[1],options:td()},{text:r[2],options:Object.assign(td(),{bold:true,color:GRND})}])),
+    {x:0.7,y:1.6,w:11.9,colW:[5.5,4,2.4],border:{type:'solid',color:'DCE4DC',pt:1}});
+  p.writeFile({fileName:'vysledky-mobiliar-'+new Date().toISOString().slice(0,10)+'.pptx'});
+});}
+function nadpis(s,t){ s.addText(t,{x:0.7,y:0.5,w:12,h:0.7,fontSize:24,bold:true,color:INK}); s.addShape('line',{x:0.7,y:1.25,w:12,h:0,line:{color:GRN,width:2}}); }
+function kpi(s,y0,arr){ arr.forEach(function(a,i){ var x=0.7+i*2.6; s.addText(String(a[0]),{x:x,y:y0,w:2.4,h:0.6,fontSize:30,bold:true,color:GRND}); s.addText(a[1],{x:x,y:y0+0.6,w:2.4,h:0.4,fontSize:11,color:'8A948C'}); }); }
+function th(){ return {bold:true,color:'FFFFFF',fill:GRN,fontSize:12,align:'left',valign:'middle'}; }
+function td(){ return {fontSize:12,color:INK,align:'left',valign:'middle'}; }
 fetch('/api/mobiliar/verejne-vysledky?k='+encodeURIComponent(location.pathname.slice(1)),{cache:'no-store'})
   .then(function(r){ if(!r.ok) throw 0; return r.json(); })
   .then(function(d){ DATA=d; render(); })

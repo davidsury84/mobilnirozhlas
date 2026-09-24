@@ -54,7 +54,9 @@ var DATA=null;
 function render(d){
   DATA=d;
   var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap"><h1>Jak jsou zákazníci spokojení se shop.elkoplast.cz?</h1>'+
-      '<button class="pill" style="border-color:var(--green);color:var(--green-d);font-weight:700" onclick="stahni()">⬇ Stáhnout výsledky (CSV)</button></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button class="pill" style="border-color:var(--green);color:var(--green-d);font-weight:700" onclick="stahni()">⬇ CSV</button>'+
+      '<button class="pill" id="btnPptx" style="border-color:var(--green);color:var(--green-d);font-weight:700" onclick="stahniPptx()">⬇ PowerPoint (PPTX)</button></div></div>'+
     '<p class="hint">Průběžné výsledky anonymního dotazníku (NPS, CSAT, Heureka standard). Kontakty ani volné odpovědi se ve veřejném náhledu nezobrazují.</p>'+
     '<div class="tiles" style="margin-top:14px">'+
       '<div><b>'+d.respondentu+'</b><span>respondentů</span></div>'+
@@ -109,6 +111,52 @@ function stahni(){
   var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}), u=URL.createObjectURL(blob);
   var a=document.createElement('a'); a.href=u; a.download='vysledky-spokojenost-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); URL.revokeObjectURL(u);
 }
+var GRN='0E8A43', GRND='08612D', INK='111713', MUT='8A948C';
+function nactiPptx(cb){
+  if(window.PptxGenJS){cb();return;}
+  var b=$('btnPptx'); if(b){b.disabled=true;b.textContent='Připravuji…';}
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+  s.onload=function(){ if(b){b.disabled=false;b.textContent='⬇ PowerPoint (PPTX)';} cb(); };
+  s.onerror=function(){ if(b){b.disabled=false;b.textContent='⬇ PowerPoint (PPTX)';} alert('Nepodařilo se načíst generátor prezentace. Zkuste to prosím znovu.'); };
+  document.head.appendChild(s);
+}
+function nadpis(s,t){ s.addText(t,{x:0.7,y:0.45,w:12,h:0.7,fontSize:22,bold:true,color:INK}); s.addShape('line',{x:0.7,y:1.2,w:11.9,h:0,line:{color:GRN,width:2}}); }
+function stahniPptx(){ nactiPptx(function(){
+  var d=DATA, p=new PptxGenJS(); p.defineLayout({name:'W',width:13.33,height:7.5}); p.layout='W';
+  // titulní
+  var s=p.addSlide(); s.background={color:GRN};
+  s.addText('Spokojenost zákazníků',{x:0.7,y:2.3,w:12,h:1.1,color:'FFFFFF',fontSize:40,bold:true});
+  s.addText('shop.elkoplast.cz · ELKOPLAST CZ',{x:0.7,y:3.5,w:12,h:0.5,color:'D9F0E2',fontSize:18});
+  s.addText('Průběžné výsledky k '+new Date().toLocaleDateString('cs-CZ')+' · '+d.respondentu+' respondentů ('+d.dokonceno+' dokončeno)',{x:0.7,y:4.1,w:12,h:0.5,color:'D9F0E2',fontSize:14});
+  // KPI
+  s=p.addSlide(); nadpis(s,'Hlavní metriky');
+  var kpis=[[(d.nps.n?((d.nps.score>0?'+':'')+d.nps.score):'—'),'NPS (ochota doporučit)'],[(d.csat.n?d.csat.avg.toFixed(2).replace('.',',')+' / 5':'—'),'Celková spokojenost (CSAT)'],[d.respondentu,'respondentů'],[d.dokonceno,'dokončených dotazníků']];
+  kpis.forEach(function(a,i){ var x=0.7+i*3.12; s.addShape('roundRect',{x:x,y:2,w:2.9,h:2.2,fill:{color:'E3F3E9'},line:{color:GRN,width:1},rectRadius:0.1}); s.addText(String(a[0]),{x:x,y:2.35,w:2.9,h:0.9,fontSize:34,bold:true,color:GRND,align:'center'}); s.addText(a[1],{x:x+0.15,y:3.35,w:2.6,h:0.7,fontSize:12,color:INK,align:'center'}); });
+  if(d.nps.n) s.addText('NPS = podíl promotérů (9–10) minus kritiků (0–6). '+d.nps.prom+' promotérů, '+d.nps.det+' kritiků z '+d.nps.n+' hodnotících.',{x:0.7,y:4.6,w:12,h:0.5,fontSize:12,color:MUT});
+  // všechny škály — porovnání průměrů
+  var skaly=[]; d.sekce.forEach(function(sek){ sek.otazky.forEach(function(q){ if(q.typ==='skala'&&q.n&&q.max<=5) skaly.push([q.text,q.avg]); }); });
+  if(skaly.length){ s=p.addSlide(); nadpis(s,'Spokojenost podle oblastí (průměr 1–5)');
+    s.addChart(p.ChartType.bar,[{name:'Ø',labels:skaly.map(x=>zkrat(x[0],42)),values:skaly.map(x=>Math.round(x[1]*100)/100)}],
+      {x:0.6,y:1.5,w:12.1,h:5.6,barDir:'bar',showValue:true,chartColors:[GRN],catAxisLabelFontSize:9,valAxisMinVal:0,valAxisMaxVal:5,showLegend:false,dataLabelFontSize:10,dataLabelColor:GRND}); }
+  // výběrové otázky — jeden graf na slide, po dvou vedle sebe pro top otázky
+  var vybery=[]; d.sekce.forEach(function(sek){ sek.otazky.forEach(function(q){ if(q.typ==='moznosti'&&q.n) vybery.push(q); }); });
+  vybery.forEach(function(q){
+    var pol=q.polozky.filter(x=>x.pocet>0).sort((a,b)=>b.pocet-a.pocet).slice(0,8); if(!pol.length) return;
+    var s=p.addSlide(); nadpis(s,zkrat(q.text,80));
+    s.addText('Odpovědí: '+q.n,{x:0.7,y:1.25,w:12,h:0.35,fontSize:12,color:MUT});
+    s.addChart(p.ChartType.bar,[{name:'počet',labels:pol.map(x=>zkrat(x.t,46)),values:pol.map(x=>x.pocet)}],
+      {x:0.6,y:1.7,w:12.1,h:5.3,barDir:'bar',showValue:true,chartColors:[GRN],catAxisLabelFontSize:11,valAxisHidden:true,showLegend:false,dataLabelFontSize:11,dataLabelColor:GRND});
+  });
+  // kategorie-skala
+  d.sekce.forEach(function(sek){ sek.otazky.forEach(function(q){ if(q.typ==='kategorie'&&q.polozky.length){
+    var s=p.addSlide(); nadpis(s,zkrat(q.text,80));
+    s.addChart(p.ChartType.bar,[{name:'Ø',labels:q.polozky.map(x=>zkrat(x.t,40)),values:q.polozky.map(x=>Math.round(x.avg*100)/100)}],
+      {x:0.6,y:1.6,w:12.1,h:5.4,barDir:'bar',showValue:true,chartColors:['18A957'],catAxisLabelFontSize:11,valAxisMinVal:0,valAxisMaxVal:5,showLegend:false,dataLabelFontSize:11,dataLabelColor:GRND});
+  }}); });
+  p.writeFile({fileName:'vysledky-spokojenost-'+new Date().toISOString().slice(0,10)+'.pptx'});
+});}
+function zkrat(t,n){ t=String(t).replace(/[\uD800-\uDFFF]./g,'').trim(); return t.length>n?t.slice(0,n-1)+'…':t; }
 fetch('/api/spokojenost/verejne-vysledky?k='+encodeURIComponent(location.pathname.slice(1)),{cache:'no-store'})
   .then(function(r){ if(!r.ok) throw 0; return r.json(); })
   .then(render)
