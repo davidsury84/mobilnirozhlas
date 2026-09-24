@@ -56,7 +56,8 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 function pct(a,b){return b?Math.round(a/b*100):0;}
 function render(){
   var d=DATA;
-  var h='<div class="card"><h1>Který mobiliář se líbí nejvíc?</h1>'+
+  var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap"><h1>Který mobiliář se líbí nejvíc?</h1>'+
+      '<button class="pill" style="border-color:var(--green);color:var(--green-d);font-weight:700" onclick="stahni()">⬇ Stáhnout výsledky (CSV)</button></div>'+
     '<p class="hint">Respondenti vybírají z šestic fotek vždy 2 nejhezčí. „% oblíbenosti" = jak často byl produkt vybrán, když se ukázal. Průběžné výsledky — aktualizují se při každém načtení stránky.</p>'+
     '<div class="tiles" style="margin-top:14px">'+
       '<div><b>'+d.respondentu+'</b><span>respondentů</span></div>'+
@@ -84,6 +85,25 @@ function render(){
   }
   h+='<p class="hint" style="text-align:center">ELKOPLAST CZ, s.r.o. · průzkum je anonymní, zobrazují se pouze souhrnné výsledky</p>';
   $('obsah').innerHTML=h;
+}
+function csvBunka(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"';}
+function stahniCSV(nazev,radky){
+  var csv=radky.map(r=>r.map(csvBunka).join(';')).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}), u=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=u; a.download=nazev; a.click(); URL.revokeObjectURL(u);
+}
+function stahni(){
+  var d=DATA, katnaz={}; d.kategorie.forEach(k=>katnaz[k.key]=k.nazev);
+  var r=[['Hodnocení venkovního mobiliáře — souhrn výsledků']];
+  r.push(['Staženo',new Date().toLocaleString('cs-CZ')]);
+  r.push(['Respondentů',d.respondentu],['Hodnocených šestic',d.sestic],['Hlasů pro oblíbené',d.vybrano],[]);
+  r.push(['Kdo hodnotil (pozice)','počet']); d.pozice.forEach(x=>r.push([x.t,x.pocet])); r.push([]);
+  r.push(['Velikost obce','počet']); d.obce.forEach(x=>r.push([x.t,x.pocet])); r.push([]);
+  r.push(['Pořadí','Kód (katalog)','Kategorie','% oblíbenosti','Vybráno','Zobrazeno']);
+  d.produkty.map(p=>({...p,rate:p.zobrazeno?p.vybrano/p.zobrazeno:0}))
+    .sort((a,b)=>b.rate-a.rate||b.vybrano-a.vybrano||b.zobrazeno-a.zobrazeno)
+    .forEach((p,i)=>r.push([i+1,'WD-'+p.kod.toUpperCase(),katnaz[p.kat]||p.kat,Math.round(p.rate*100),p.vybrano,p.zobrazeno]));
+  stahniCSV('vysledky-mobiliar-'+new Date().toISOString().slice(0,10)+'.csv',r);
 }
 fetch('/api/mobiliar/verejne-vysledky?k='+encodeURIComponent(location.pathname.slice(1)),{cache:'no-store'})
   .then(function(r){ if(!r.ok) throw 0; return r.json(); })

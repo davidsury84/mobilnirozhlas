@@ -50,8 +50,11 @@
 var $=function(id){return document.getElementById(id);};
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmt(x,des){return x.toFixed(des==null?2:des).replace('.',',');}
+var DATA=null;
 function render(d){
-  var h='<div class="card"><h1>Jak jsou zákazníci spokojení se shop.elkoplast.cz?</h1>'+
+  DATA=d;
+  var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap"><h1>Jak jsou zákazníci spokojení se shop.elkoplast.cz?</h1>'+
+      '<button class="pill" style="border-color:var(--green);color:var(--green-d);font-weight:700" onclick="stahni()">⬇ Stáhnout výsledky (CSV)</button></div>'+
     '<p class="hint">Průběžné výsledky anonymního dotazníku (NPS, CSAT, Heureka standard). Kontakty ani volné odpovědi se ve veřejném náhledu nezobrazují.</p>'+
     '<div class="tiles" style="margin-top:14px">'+
       '<div><b>'+d.respondentu+'</b><span>respondentů</span></div>'+
@@ -85,6 +88,27 @@ function render(d){
   $('obsah').innerHTML=h;
 }
 function blok(q,inner){ return '<div class="ot"><div class="t">'+esc(q.text)+' <small>('+(q.n||0)+' odp.)</small></div>'+inner+'</div>'; }
+function csvBunka(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"';}
+function stahni(){
+  var d=DATA, r=[['Spokojenost zákazníků shop.elkoplast.cz — souhrn výsledků']];
+  r.push(['Staženo',new Date().toLocaleString('cs-CZ')]);
+  r.push(['Respondentů',d.respondentu],['Dokončeno',d.dokonceno]);
+  r.push(['NPS',(d.nps.score>0?'+':'')+d.nps.score,'promotérů',d.nps.prom,'kritiků',d.nps.det,'z',d.nps.n]);
+  r.push(['CSAT (celková spokojenost, 1–5)',d.csat.n?d.csat.avg.toFixed(2).replace('.',','):'',' z '+d.csat.n]); r.push([]);
+  d.sekce.forEach(function(s){
+    r.push([]); r.push(['— '+s.nazev+(s.jen!=='vsichni'?' (jen '+(s.jen==='kupujici'?'kupující':'nekupující')+')':'')+' —']);
+    s.otazky.forEach(function(q){
+      if(q.typ==='moznosti'){ r.push([q.text,'odpovědí:',q.n]); q.polozky.forEach(p=>r.push(['',p.t,p.pocet,(q.n?Math.round(p.pocet/q.n*100)+' %':'')])); }
+      else if(q.typ==='skala'){ r.push([q.text,'Ø '+(q.n?q.avg.toFixed(2).replace('.',','):'—'),'odpovědí:',q.n,(q.nehodnotim?('nehodnotí: '+q.nehodnotim):'')]);
+        var lab=[]; for(var v=q.min;v<=q.max;v++) lab.push(v); r.push(['','rozdělení '+q.min+'–'+q.max].concat(q.dist.map((c,i)=>lab[i]+': '+c))); }
+      else if(q.typ==='kategorie'){ r.push([q.text]); q.polozky.forEach(p=>r.push(['',p.t,'Ø '+p.avg.toFixed(2).replace('.',','),'(n='+p.n+')'])); }
+      else { r.push([q.text,'volných odpovědí:',q.n,'(text se veřejně nezobrazuje)']); }
+    });
+  });
+  var csv=r.map(x=>x.map(csvBunka).join(';')).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}), u=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=u; a.download='vysledky-spokojenost-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); URL.revokeObjectURL(u);
+}
 fetch('/api/spokojenost/verejne-vysledky?k='+encodeURIComponent(location.pathname.slice(1)),{cache:'no-store'})
   .then(function(r){ if(!r.ok) throw 0; return r.json(); })
   .then(render)
