@@ -33,6 +33,7 @@ const SMERNICE_FILE = path.join(__dirname, 'smernice-sverene-vozidlo.html');
 
 // Role člověka zodpovědného za středisko — dle zadání.
 const ROLE = {
+  'reditel-spolecnosti': 'Ředitel společnosti',
   'reditel': 'Ředitel',
   'reditel-dopravy': 'Ředitel dopravy',
   'reditel-vyroby': 'Ředitel výroby',
@@ -428,8 +429,13 @@ function mount(host) {
       adresatiSmernice: (() => { const a = adresatiSmernice(d); return {
         tag: TAG_SMERNICE,
         spravci: a.spravci.map(kontakt), vedouci: a.vedouci.map(e => {
-          const z = d.zodpovedne.find(x => low(x.email) === e) || {};
-          return Object.assign({ role: z.role, stredisko: z.stredisko }, kontakt(e));
+          // Pozor na pořadí: kontakt() nese i domovské středisko zaměstnance a přepsalo by to,
+          // za která střediska člověk ve vozovém parku odpovídá (to je tady podstatné).
+          const zs = d.zodpovedne.filter(x => low(x.email) === e);
+          return Object.assign(kontakt(e), {
+            role: (zs[0] || {}).role,
+            stredisko: zs.map(x => x.stredisko).filter(Boolean).join(', '),
+          });
         }) }; })(),
       strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA,
       nastaveni: d.nastaveni,

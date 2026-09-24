@@ -104,7 +104,7 @@ td.num{font-family:var(--mono);white-space:nowrap}
 .inl{width:100%;border:1px solid transparent;border-radius:6px;padding:4px 6px;font-size:12.5px;background:transparent;font-family:inherit}
 .inl:hover{border-color:var(--line)}
 .inl:focus{outline:none;border-color:var(--green);background:var(--paper)}
-.inl.mono{font-family:var(--mono);font-size:11.5px}
+.inl.mono{font-family:var(--mono);font-size:12.5px;letter-spacing:.2px}
 /* tužka u editovatelného políčka — ať je poznat, že se do něj dá psát */
 .pero{position:relative;display:block}
 .pero .inl{padding-right:20px}
@@ -402,7 +402,7 @@ function vykresliPrehled(){
     +'</div>';
   if(!vs.length){h+='<div class="empty">Žádné vozidlo neodpovídá filtru.</div></div>';$("#obsah").innerHTML=h;return;}
   h+='<table><thead><tr>'
-    +thRadit("spz")+thRadit("vin","min-width:150px")+thRadit("rok","min-width:78px;width:78px")
+    +thRadit("spz")+thRadit("vin","min-width:205px")+thRadit("rok","min-width:78px;width:78px")
     +thRadit("spravce","min-width:190px")+thRadit("stredisko")+thRadit("stk","min-width:125px")
     +thRadit("km")+thRadit("najezd")+thRadit("stav")+'<th></th></tr></thead><tbody>';
   vs.forEach(v=>{
