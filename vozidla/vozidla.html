@@ -105,6 +105,14 @@ td.num{font-family:var(--mono);white-space:nowrap}
 .inl:hover{border-color:var(--line)}
 .inl:focus{outline:none;border-color:var(--green);background:var(--paper)}
 .inl.mono{font-family:var(--mono);font-size:11.5px}
+/* tužka u editovatelného políčka — ať je poznat, že se do něj dá psát */
+.pero{position:relative;display:block}
+.pero .inl{padding-right:20px}
+.pero .ic{position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--faint);pointer-events:none}
+.pero:hover .ic{color:var(--green)}
+.pero:focus-within .ic{opacity:0}
+.inl.num{text-align:right}
+td.num .pero{max-width:104px;margin-left:auto}
 /* šipky u number inputu ukrajovaly šířku, takže rok nebyl vidět celý */
 .inl[type=number]{-moz-appearance:textfield;appearance:textfield;text-align:center;min-width:54px}
 .inl[type=number]::-webkit-outer-spin-button,.inl[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -403,7 +411,9 @@ function vykresliPrehled(){
     h+='<tr>'
       +'<td><span class="spz">'+esc(v.spz||"bez SPZ")+'</span><div class="mut">'+esc([v.znacka,v.model].filter(Boolean).join(" ")||"—")+'</div></td>'
       // základní údaje jdou doplnit rovnou tady, bez otevírání detailu
-      +'<td>'+(e?'<input class="inl mono" id="in_'+v.id+'_vin" maxlength="17" autocomplete="off" placeholder="17 znaků" value="'+esc(v.vin||"")+'" oninput="ulozZa(\'r'+v.id+'\',800,function(){ulozRadek(\''+v.id+'\');})">'
+      +'<td>'+(e?'<label class="pero" title="Klikni a dopiš VIN z velkého technického průkazu (řádek E)">'
+               +'<input class="inl mono" id="in_'+v.id+'_vin" maxlength="17" autocomplete="off" placeholder="17 znaků" value="'+esc(v.vin||"")+'" oninput="ulozZa(\'r'+v.id+'\',800,function(){ulozRadek(\''+v.id+'\');})">'
+               +'<span class="ic">✎</span></label>'
              :'<span class="mono">'+esc(v.vin||"—")+'</span>')+'</td>'
       +'<td>'+(e?'<input class="inl" id="in_'+v.id+'_rok" type="number" min="1980" max="'+(new Date().getFullYear()+1)+'" autocomplete="off" value="'+(v.rokVyroby||"")+'" oninput="ulozZa(\'r'+v.id+'\',800,function(){ulozRadek(\''+v.id+'\');})">'
              :(v.rokVyroby||"—"))+'</td>'
@@ -414,7 +424,7 @@ function vykresliPrehled(){
       +'<td>'+esc(v.stredisko||"—")+'</td>'
       +'<td>'+(e?'<input class="inl" id="in_'+v.id+'_stk" type="date" autocomplete="off" value="'+esc(v.stkDo||"")+'" onchange="ulozRadek(\''+v.id+'\')">'
              :stkPill(v))+(e&&v.stkDo?'<div class="mut">'+stkPill(v)+'</div>':'')+'</td>'
-      +'<td class="num">'+(pk?cis(pk.km)+' km<div class="mut">za '+pk.rok+'</div>':'<span class="mut">nezadán</span>')+'</td>'
+      +'<td class="num">'+(e?kmBunka(v,pk):(pk?cis(pk.km)+' km<div class="mut">za '+pk.rok+'</div>':'<span class="mut">nezadán</span>'))+'</td>'
       +'<td class="num">'+(v.stav_.prodej&&v.stav_.prodej.najezd?cis(v.stav_.prodej.najezd)+'<div class="mut">km/rok</div>':'<span class="mut">—</span>')+'</td>'
       +'<td>'+stavPill(v)+(v.stav_.upozorneni.length?'<div class="upoz">'+v.stav_.upozorneni.map(u=>'<span class="u'+(u.urgent?" urg":"")+'">'+esc(u.text)+'</span>').join("")+'</div>':'')+'</td>'
       +'<td style="text-align:right;white-space:nowrap"><span class="radekStav" id="rs_'+v.id+'"></span> <button class="btn sm" onclick="detail(\''+v.id+'\')">Detail</button></td>'
@@ -510,6 +520,34 @@ document.addEventListener("mousedown",function(ev){
    U nového vozidla to neplatí — to by vznikl poloprázdný záznam po prvním písmenu. */
 const ULOZ_T={};
 function ulozZa(klic,ms,fn){ clearTimeout(ULOZ_T[klic]); ULOZ_T[klic]=setTimeout(fn,ms); }
+/* Tachometr rovnou v přehledu: políčko je za letošní rok, starší zápisy zůstávají.
+   Ukládá se až po opuštění políčka (onchange) — při psaní po číslicích by server
+   hlásil „nižší než loni". */
+function kmBunka(v,pk){
+  const letos=new Date().getFullYear();
+  const letosni=(v.km||[]).find(x=>Number(x.rok)===letos);
+  return '<label class="pero" title="Klikni a zapiš, kolik má vůz teď na tachometru (rok '+letos+')">'
+    +'<input class="inl num" id="in_'+v.id+'_km" type="number" min="0" step="1" autocomplete="off" inputmode="numeric"'
+    +' placeholder="'+(pk?cis(pk.km):"zapsat km")+'" value="'+(letosni?letosni.km:"")+'"'
+    +' onchange="ulozKmRadek(\''+v.id+'\',this)"><span class="ic">✎</span></label>'
+    +'<div class="mut">'+(letosni?('za '+letos):(pk?('naposled '+pk.rok):'letos nezapsáno'))+'</div>';
+}
+async function ulozKmRadek(id,el){
+  const hod=String(el.value||"").trim();
+  if(hod==="")return;                      // prázdné pole nic nemaže
+  // Překlep (5 místo 150 000) by server nechytil, když se opravuje letošní zápis.
+  const v=vuz(id), nej=Math.max(0,...(v.km||[]).map(x=>Number(x.km)||0));
+  if(nej&&Number(hod)<nej&&!confirm("Zapsali jste "+cis(Number(hod))+" km, ale poslední známý stav je "+cis(nej)+" km. Opravdu uložit?")){
+    el.value=((v.km||[]).find(x=>Number(x.rok)===new Date().getFullYear())||{}).km||""; return;
+  }
+  stavUlozeni("rs_"+id,"ukládám…");
+  try{
+    await api("/api/vozidla/km",{id,rok:new Date().getFullYear(),km:Number(hod)});
+    D=await api("/api/vozidla/data");
+    stavUlozeni("rs_"+id,"uloženo ✓","var(--green-d)");
+    setTimeout(vykresli,900);              // přepočítá nájezd, upozornění i dlaždice
+  }catch(e){ stavUlozeni("rs_"+id,"neuloženo","var(--red)"); alert(e.message); }
+}
 function stavUlozeni(id,text,barva){
   const e=document.getElementById(id); if(!e)return;
   e.textContent=text; e.style.color=barva||"var(--ink-soft)";
@@ -555,7 +593,13 @@ function detail(id){
   const letos=new Date().getFullYear();
   let h='<div class="grid3">'
     +'<div><div class="mut">Vozidlo</div><div class="spz">'+esc(v.spz||"—")+'</div><div>'+esc([v.znacka,v.model].filter(Boolean).join(" "))+'</div></div>'
-    +'<div><div class="mut">VIN</div><div class="mono">'+esc(v.vin||"—")+'</div><div class="mut">rok výroby '+(v.rokVyroby||"—")+'</div></div>'
+    +'<div><div class="mut">VIN <span class="mut" id="detVinStav"></span></div>'
+      +(v.smiEdit
+        ? '<label class="pero" style="max-width:230px" title="Klikni a dopiš VIN z velkého technického průkazu (řádek E)">'
+          +'<input class="inl mono" id="detVin" maxlength="17" autocomplete="off" placeholder="17 znaků" value="'+esc(v.vin||"")+'"'
+          +' oninput="ulozZa(\'detvin\',800,function(){ulozVin(\''+v.id+'\');})"><span class="ic">✎</span></label>'
+        : '<div class="mono">'+esc(v.vin||"—")+'</div>')
+      +'<div class="mut">rok výroby '+(v.rokVyroby||"—")+'</div></div>'
     +'<div><div class="mut">Správce vozu</div>'+spravceBunka(v)+'</div>'
     +'</div>'
     +'<div class="grid3" style="margin-top:10px">'
@@ -714,6 +758,16 @@ async function ulozStk(id){
     await api("/api/vozidla/stk",{id,provedeno:$("#stkProv").value,platiDo:$("#stkDo").value,poznamka:$("#stkPozn").value});
     toast("Technická prohlídka zapsána."); await nacti(); detail(id);
   }catch(e){alert(e.message);}
+}
+// VIN jde dopsat i v detailu — ukládá se samo, stejně jako v řádku přehledu.
+async function ulozVin(id){
+  const el=document.getElementById("detVin"); if(!el)return;
+  stavUlozeni("detVinStav","ukládám…");
+  try{
+    await api("/api/vozidla/vuz",{id,vin:el.value});
+    D=await api("/api/vozidla/data");
+    stavUlozeni("detVinStav","uloženo ✓","var(--green-d)");
+  }catch(e){ stavUlozeni("detVinStav","neuloženo","var(--red)"); alert(e.message); }
 }
 async function ulozKm(id){
   try{
