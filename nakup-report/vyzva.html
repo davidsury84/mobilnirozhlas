@@ -57,6 +57,9 @@
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const kc=n=>Math.round(n||0).toLocaleString('cs-CZ');
+const kc2=n=>(+n||0).toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2});
+// dlužná částka: faktura v Kč → saldo v Kč; v cizí měně → saldo v měně faktury (Kč jen orientačně dle kurzu)
+const dluh=x=>x.mena&&x.mena!=='CZK'?kc2(x.saldoMena)+' '+esc(x.mena)+' <span style="font-weight:400;font-size:10px;color:#555">(≈ '+kc(x.saldo)+' Kč)</span>':kc(x.saldo)+' Kč';
 const den=d=>{const m=String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+'. '+(+m[2])+'. '+m[1]:d;};
 const org=new URLSearchParams(location.search).get('org')||'';
 let V=null;
@@ -64,19 +67,21 @@ async function load(){
   try{const r=await fetch('/api/nakup-report/vyzva?org='+encodeURIComponent(org),{cache:'no-store'});V=await r.json();}catch(e){V={ok:false,error:e.message};}
   if(!V||!V.ok){$('#barInfo').textContent=(V&&V.error)||'chyba';$('#text').innerHTML='<p style="color:#b23">'+esc((V&&V.error)||'Data nejsou k dispozici.')+'</p>';return;}
   const c=V.cfg, f=c.firma, dnes=new Date(), datum=den(dnes.toISOString().slice(0,10));
-  $('#barInfo').textContent=V.org+' · '+V.faktury.length+' faktur · '+kc(V.celkem)+' Kč · stav pohledávek k '+den(V.den);
+  const cizi=V.mena&&V.mena!=='CZK'&&V.mena!=='mix';   // celá pohledávka v jedné cizí měně → výzva v této měně
+  const celkemTxt=cizi?(kc2(V.vMene[V.mena])+' '+esc(V.mena)+' (přepočteno cca '+kc(V.celkem)+' Kč)'):(kc(V.celkem)+' Kč');
+  $('#barInfo').textContent=V.org+' · '+V.faktury.length+' faktur · '+(cizi?kc2(V.vMene[V.mena])+' '+V.mena+' ≈ ':'')+kc(V.celkem)+' Kč · stav pohledávek k '+den(V.den);
   $('#hSidlo').textContent=f.sidlo; $('#hBrand').firstChild.textContent=f.nazev;
   $('#hIdent').innerHTML='IČO '+esc(f.ico)+(f.dic?' · DIČ '+esc(f.dic):'')+'<br>'+esc(f.zapis)+(f.tel||f.email?'<br>'+esc([f.tel,f.email].filter(Boolean).join(' · ')):'');
   $('#adr').innerHTML='<b>'+esc(V.org)+'</b>'+(V.ico?'IČO '+esc(V.ico)+'<br>':'')+'<span contenteditable="true" id="adrEdit" data-ph="[doplňte sídlo / adresu zákazníka]">'+esc(V.adresa||'')+'</span>';
   $('#mMisto').textContent='Ve Zlíně'; $('#mDatum').textContent=datum;
-  const rows=V.faktury.map(x=>'<tr><td>'+esc(x.pz)+'</td><td>'+den(x.dat)+'</td><td>'+den(x.spl)+'</td><td class="r">'+x.dni+'</td><td class="r">'+kc(x.hm)+(x.mena&&x.mena!=='CZK'?' '+esc(x.mena):' Kč')+'</td><td class="r"><b>'+kc(x.saldo)+(x.mena&&x.mena!=='CZK'?' '+esc(x.mena):' Kč')+'</b></td></tr>').join('');
+  const rows=V.faktury.map(x=>'<tr><td>'+esc(x.pz)+'</td><td>'+den(x.dat)+'</td><td>'+den(x.spl)+'</td><td class="r">'+x.dni+'</td><td class="r">'+kc(x.hm)+' Kč</td><td class="r"><b>'+dluh(x)+'</b></td></tr>').join('');
   const vice=V.faktury.length>1, lhuta=c.lhutaVyzvyDni||7;
   const ucet=f.ucet?('na bankovní účet č. <b>'+esc(f.ucet)+'</b>'+(f.iban?' (IBAN '+esc(f.iban)+')':'')):'na bankovní účet uvedený na faktuře';
   $('#text').innerHTML=
     '<p>Vážení,</p>'+
     '<p>naše společnost '+esc(f.nazev)+' eviduje vůči Vaší společnosti <b>'+esc(V.org)+'</b> neuhrazenou pohledávku z '+(vice?'níže uvedených faktur':'níže uvedené faktury')+', jejichž splatnost již marně uplynula:</p>'+
-    '<table><thead><tr><th>Faktura</th><th>Vystaveno</th><th>Splatnost</th><th class="r">Dní po splatnosti</th><th class="r">Fakturováno</th><th class="r">Dlužná částka</th></tr></thead><tbody>'+rows+'<tr class="sum"><td colspan="5">Celkem k úhradě'+(V.mena==='mix'?' (částky v různých měnách)':'')+'</td><td class="r">'+kc(V.celkem)+(V.mena==='mix'?'':' Kč')+'</td></tr></tbody></table>'+
-    '<p>Přes uplynutí lhůty splatnosti nebyla dlužná částka uhrazena, a to ani přes naše předchozí upozornění. Tímto Vás proto <b>vyzýváme k úhradě celé dlužné částky ve výši '+kc(V.celkem)+(V.mena==='mix'?'':' Kč')+'</b> '+ucet+', s uvedením čísla faktury jako variabilního symbolu,</p>'+
+    '<table><thead><tr><th>Faktura</th><th>Vystaveno</th><th>Splatnost</th><th class="r">Dní po splatnosti</th><th class="r">Fakturováno (Kč)</th><th class="r">Dlužná částka</th></tr></thead><tbody>'+rows+'<tr class="sum"><td colspan="5">Celkem k úhradě'+(V.mena==='mix'?' (faktury v různých měnách — cizí měna přepočtena na Kč)':'')+'</td><td class="r">'+celkemTxt+'</td></tr></tbody></table>'+
+    '<p>Přes uplynutí lhůty splatnosti nebyla dlužná částka uhrazena, a to ani přes naše předchozí upozornění. Tímto Vás proto <b>vyzýváme k úhradě celé dlužné částky ve výši '+celkemTxt+'</b> '+ucet+', s uvedením čísla faktury jako variabilního symbolu,</p>'+
     '<div class="lhuta"><b>nejpozději do '+lhuta+' dnů ode dne doručení této výzvy.</b></div>'+
     '<p>Nebude-li pohledávka v uvedené lhůtě uhrazena, <b>předáme věc bez dalšího upozornění k soudnímu vymáhání</b>. V takovém případě budeme vedle jistiny požadovat rovněž zákonný úrok z prodlení a náhradu nákladů řízení, včetně nákladů právního zastoupení, čímž se Váš dluh dále zvýší. Upozorňujeme, že tato výzva je zároveň výzvou k plnění ve smyslu § 142a občanského soudního řádu.</p>'+
     '<p>Pokud jste dlužnou částku již uhradili, považujte prosím tuto výzvu za bezpředmětnou a zašlete nám doklad o úhradě. Jste-li v dočasné platební neschopnosti, kontaktujte nás neprodleně — jsme připraveni jednat o splátkovém kalendáři, avšak pouze do uplynutí výše uvedené lhůty.</p>'+

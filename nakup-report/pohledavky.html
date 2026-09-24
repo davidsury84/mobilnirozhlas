@@ -58,12 +58,15 @@
     <h3>Všechny faktury po splatnosti</h3>
     <div class="tblwrap"><table id="fa"></table></div>
   </div>
-  <div class="foot">Zdroj: denní export neuhrazených faktur po splatnosti z ERP (složka „vydané faktury" na Disku, každý den). Částky = <b>saldo</b> (neuhrazený zbytek), měny se nepřepočítávají (EUR položky jsou označené). <b>„E-shop dál expeduje"</b> = zákazník je mezi dlužníky a zároveň má v expedičních příkazech e-shopu za posledních <span id="okno">35</span> dní zakázku — párováno přes název zákazníka z ERP. Na jednotlivé položky (SK/reg) se tento export párovat nedá — neobsahuje řádky faktur.</div>
+  <div class="foot">Zdroj: denní export neuhrazených faktur po splatnosti z ERP (složka „vydané faktury" na Disku, každý den). Částky = <b>neuhrazený zbytek v Kč</b>: u faktur v Kč sloupec Saldo; u faktur v cizí měně je Saldo v exportu v měně faktury (EUR…), proto se bere <b>HM celkem zaokr.</b> (fakturováno v Kč) a u částečně uhrazených saldo × kurz (medián kurzů dané měny v exportu). Původní saldo v měně je u faktury ve štítku. <b>„E-shop dál expeduje"</b> = zákazník je mezi dlužníky a zároveň má v expedičních příkazech e-shopu za posledních <span id="okno">35</span> dní zakázku — párováno přes název zákazníka z ERP. Na jednotlivé položky (SK/reg) se tento export párovat nedá — neobsahuje řádky faktur.</div>
 </div>
 <script>
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const kc=n=>Math.round(n||0).toLocaleString('cs-CZ');
+const kc2=n=>(+n||0).toLocaleString('cs-CZ',{minimumFractionDigits:2,maximumFractionDigits:2});
+// štítek u faktury v cizí měně: saldo v měně faktury (částky v tabulkách jsou vždy přepočtené na Kč)
+const mp=f=>f.mena&&f.mena!=='CZK'?' <span class="pill blue" title="Saldo v měně faktury; částka v tabulce je přepočet na Kč'+(f.castecne?' (částečně uhrazeno, saldo × kurz)':' (= HM celkem v Kč)')+'">'+kc2(f.saldoMena)+' '+esc(f.mena)+'</span>':'';
 const den=d=>{if(!d)return '—';const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+'. '+(+m[2])+'. '+m[1]:d;};
 let P=null, U=null;
 // ---- ESKALACE: 10 dní → obchodník rozhodne (3 dny) → upomínka přes Helios (Lucie) → po 7 dnech předžalobní výzva ----
@@ -88,7 +91,7 @@ async function loadEsk(){
     if(f.faze==='po-upomince'&&(E.jeLucie||E.admin))a+='<a href="#" class="muted" style="font-size:11px" onclick="eskAkce(\'upominkaZrusit\',\''+pz+'\');return false">zrušit</a> ';
     a+='<button class="btn" onclick="eskPozastav(\''+pz+'\')" title="Zastavit eskalaci (např. splátkový kalendář)">⏸</button>'; return a;};
   const tbl=rows=>'<div class="tblwrap" style="max-height:440px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Útvar</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Promlčení</th><th>Stav</th><th></th></tr></thead><tbody>'
-    +rows.map(f=>'<tr'+(f.faze==='vyzva'||f.faze==='bez-rozhodnuti'?' style="background:#fdf2f2"':'')+'><td>'+esc(f.pz)+(f.mena&&f.mena!=='CZK'?' <span class="pill blue">'+esc(f.mena)+'</span>':'')+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+(f.obchodnikEmail?'':' <span class="err" style="font-size:11px" title="Bez e-mailu — chodí náhradnímu příjemci">bez e-mailu</span>')+'</td><td class="muted">'+esc(f.utvar)+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td>'
+    +rows.map(f=>'<tr'+(f.faze==='vyzva'||f.faze==='bez-rozhodnuti'?' style="background:#fdf2f2"':'')+'><td>'+esc(f.pz)+mp(f)+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+(f.obchodnikEmail?'':' <span class="err" style="font-size:11px" title="Bez e-mailu — chodí náhradnímu příjemci">bez e-mailu</span>')+'</td><td class="muted">'+esc(f.utvar)+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td>'
       +'<td'+(f.doPromlceni!=null&&f.doPromlceni<=90?' class="err"':'')+'>'+(f.promlceni?den(f.promlceni)+' <span class="muted" style="font-size:11px">('+(f.doPromlceni<0?'promlčeno':'za '+f.doPromlceni+' d')+')</span>':'<span class="muted">—</span>')+'</td><td>'+pill(f)+'</td><td style="white-space:nowrap">'+akce(f)+'</td></tr>').join('')+'</tbody></table></div>';
   renderLucie(all,c);
   const cnt=z=>fa.filter(f=>f.faze===z).length;
@@ -120,10 +123,10 @@ function renderLucie(all,c){
   const up=all.filter(f=>f.faze==='upominka'), vy=all.filter(f=>f.faze==='vyzva'||f.faze==='vyzva-ceka'), po=all.filter(f=>f.faze==='po-upomince');
   const sum=a=>kc(a.reduce((s,f)=>s+f.saldo,0));
   const t1=up.length?('<div class="tblwrap" style="max-height:340px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Poznámka obchodníka</th><th>Rozhodnuto</th><th></th></tr></thead><tbody>'
-      +up.map(f=>{const r=f.stav.rozhodnuti||{};return '<tr><td>'+esc(f.pz)+(f.mena&&f.mena!=='CZK'?' <span class="pill blue">'+esc(f.mena)+'</span>':'')+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td><td class="wrap muted">'+esc(r.pozn||'')+'</td><td class="muted">'+den(r.kdy)+'</td><td style="white-space:nowrap"><button class="btn ok" onclick="eskAkce(\'upominkaOdeslana\',\''+esc(f.pz)+'\')">✓ Odeslána</button></td></tr>';}).join('')+'</tbody></table></div>')
+      +up.map(f=>{const r=f.stav.rozhodnuti||{};return '<tr><td>'+esc(f.pz)+mp(f)+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td><td class="wrap muted">'+esc(r.pozn||'')+'</td><td class="muted">'+den(r.kdy)+'</td><td style="white-space:nowrap"><button class="btn ok" onclick="eskAkce(\'upominkaOdeslana\',\''+esc(f.pz)+'\')">✓ Odeslána</button></td></tr>';}).join('')+'</tbody></table></div>')
     :'<div class="muted" style="margin:6px 0">Žádná faktura k odeslání upomínky — obchodníci zatím nic nezaškrtli.</div>';
   const t2=vy.length?('<div class="tblwrap" style="max-height:340px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Upomínka odeslána</th><th></th></tr></thead><tbody>'
-      +vy.map(f=>'<tr style="background:#fdf2f2"><td>'+esc(f.pz)+(f.mena&&f.mena!=='CZK'?' <span class="pill blue">'+esc(f.mena)+'</span>':'')+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td><td class="muted">'+den((f.stav.upominkaOdeslana||{}).kdy)+'</td><td style="white-space:nowrap"><a class="btn" href="/pohledavky/vyzva?org='+encodeURIComponent(f.org)+'" target="_blank">📄 Výzva k tisku</a> <button class="btn ok" onclick="eskAkce(\'vyzvaOdeslana\',\''+esc(f.pz)+'\')">✓ Odeslána</button></td></tr>').join('')+'</tbody></table></div>')
+      +vy.map(f=>'<tr style="background:#fdf2f2"><td>'+esc(f.pz)+mp(f)+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td><td class="muted">'+den((f.stav.upominkaOdeslana||{}).kdy)+'</td><td style="white-space:nowrap"><a class="btn" href="/pohledavky/vyzva?org='+encodeURIComponent(f.org)+'" target="_blank">📄 Výzva k tisku</a> <button class="btn ok" onclick="eskAkce(\'vyzvaOdeslana\',\''+esc(f.pz)+'\')">✓ Odeslána</button></td></tr>').join('')+'</tbody></table></div>')
     :'<div class="muted" style="margin:6px 0">Žádná faktura k předžalobní výzvě'+(po.length?' — '+po.length+' po upomínce, u nich běží '+c.kroky.vyzvaPoUpomince+' dní':'')+'.</div>';
   el.innerHTML='<div class="card" style="border:2px solid var(--blue)"><h2 style="margin:0 0 4px;font:700 17px/1.2 var(--cond)">📬 Pohled pro '+esc((c.vyzvaKomu||[]).join(', ')||'odesílatele')+' <span class="muted" style="font-weight:400;font-size:13px">· k '+den(E.den)+'</span></h2>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 4px"><h3 style="margin:0">1) Odeslat upomínku přes Helios <span class="muted">· '+up.length+' faktur · '+sum(up)+' Kč</span></h3><button class="btn" onclick="exportXlsx(\'upominky\')" '+(up.length?'':'disabled')+'>⬇ Export XLSX</button></div>'+t1
@@ -133,7 +136,7 @@ function renderLucie(all,c){
 function exportXlsx(typ){
   if(typeof XLSX==='undefined'){alert('Knihovna pro Excel se nenačetla.');return;}
   const all=E.faktury||[]; const rows=(typ==='upominky'?all.filter(f=>f.faze==='upominka'):all.filter(f=>f.faze==='vyzva'||f.faze==='vyzva-ceka'));
-  const data=rows.map(f=>({'Faktura':f.pz,'Zákazník':f.org,'Č. org.':f.orgId||'','Obchodník':f.kdo||'','Útvar':f.utvar||'','Vystaveno':f.dat,'Splatnost':f.spl,'Dní po splatnosti':f.dni,'Fakturováno':Math.round(f.hm),'Saldo':Math.round(f.saldo),'Měna':f.mena||'CZK',
+  const data=rows.map(f=>({'Faktura':f.pz,'Zákazník':f.org,'Č. org.':f.orgId||'','Obchodník':f.kdo||'','Útvar':f.utvar||'','Vystaveno':f.dat,'Splatnost':f.spl,'Dní po splatnosti':f.dni,'Fakturováno Kč':Math.round(f.hm),'Saldo Kč':Math.round(f.saldo),'Saldo v měně':f.mena&&f.mena!=='CZK'?Math.round((f.saldoMena||0)*100)/100:Math.round(f.saldo),'Měna':f.mena||'CZK',
     'Poznámka obchodníka':(f.stav.rozhodnuti||{}).pozn||'','Rozhodnuto':(f.stav.rozhodnuti||{}).kdy||'','Upomínka odeslána':(f.stav.upominkaOdeslana||{}).kdy||'','Promlčení':f.promlceni||''}));
   const ws=XLSX.utils.json_to_sheet(data); ws['!cols']=Object.keys(data[0]||{}).map(k=>({wch:Math.max(12,Math.min(40,k.length+4))}));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,typ==='upominky'?'Upomínky':'Předžalobní výzvy');
@@ -152,7 +155,8 @@ async function load(){
   try{const r=await fetch('/api/nakup-report/pohledavky?dni=35',{cache:'no-store'});P=await r.json();}catch(e){P={ok:false,error:e.message};}
   if(!P||!P.ok){$('#sub').innerHTML='<span class="err">'+esc((P&&P.error)||'Data nejsou k dispozici.')+'</span>';return;}
   $('#okno').textContent=P.oknoDni;
-  $('#sub').innerHTML='Snímek k <b>'+den(P.den)+'</b> (soubor '+esc(P.soubor||'')+') · '+P.faktur+' faktur · saldo <b>'+kc(P.saldo)+' Kč</b>'+(P.dnesDatum&&P.dnesDatum!==P.den?' · dnes '+den(P.dnesDatum):'');
+  const vm=Object.keys(P.vMene||{}).map(m=>{const v=P.vMene[m];return v.n+'× '+m+': '+kc2(v.saldoMena)+' '+m+' ≈ '+kc(v.saldo)+' Kč'+(P.kurzy&&P.kurzy[m]?' (kurz '+P.kurzy[m].toLocaleString('cs-CZ')+')':'');});
+  $('#sub').innerHTML='Snímek k <b>'+den(P.den)+'</b> (soubor '+esc(P.soubor||'')+') · '+P.faktur+' faktur · po splatnosti <b>'+kc(P.saldo)+' Kč</b>'+(P.dnesDatum&&P.dnesDatum!==P.den?' · dnes '+den(P.dnesDatum):'')+(vm.length?'<br><span class="muted">v cizí měně: '+esc(vm.join(' · '))+' — částky níže jsou přepočtené na Kč</span>':'');
   const es=P.utvary.find(u=>/e\s*-?\s*shop/i.test(u.utvar)); const b=P.buckets;
   $('#kpis').innerHTML=[['red',kc(P.saldo)+' Kč','Po splatnosti celkem · '+P.faktur+' faktur'],['blue',es?kc(es.saldo)+' Kč':'—','útvar E-shop'+(es?' · '+es.n+' fa':'')],['',P.dluznici.length,'dlužníků'],['amber',P.expedujeme.length,'dlužníků, kterým e-shop dál expeduje'],['red',kc(b[3].saldo)+' Kč','přes 90 dní · '+b[3].n+' fa']]
     .map(k=>'<div class="kpi '+k[0]+'"><div class="v">'+k[1]+'</div><div class="l">'+esc(k[2])+'</div></div>').join('');
@@ -167,8 +171,8 @@ async function load(){
   $('#kdo').innerHTML='<thead><tr><th>Obchodník / vystavil</th><th class="r">Faktur</th><th class="r">Saldo</th><th class="r">Max. dní</th></tr></thead><tbody>'+(P.obchodnici||[]).map(u=>'<tr><td>'+esc(u.kdo||'(neuvedeno)')+'</td><td class="r">'+u.n+'</td><td class="r"><b>'+kc(u.saldo)+' Kč</b></td><td class="r'+(u.maxDni>90?' err':'')+'">'+u.maxDni+'</td></tr>').join('')+'</tbody>';
   const sel=$('#fUtv'); [...new Set(P.utvary.map(u=>u.utvar))].forEach(u=>{const o=document.createElement('option');o.textContent=u;sel.appendChild(o);});
   ['q','fUtv','fEs'].forEach(id=>{$('#'+id).oninput=$('#'+id).onchange=drawDl;}); drawDl();
-  $('#fa').innerHTML='<thead><tr><th>Faktura</th><th>Zákazník</th><th>Útvar</th><th>Vystavil</th><th>Vystaveno</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Celkem</th><th class="r">Saldo</th></tr></thead><tbody>'
-    +(P.faktury||[]).slice().sort((a,b)=>b.dni-a.dni).map(f=>'<tr><td>'+esc(f.pz)+(f.mena&&f.mena!=='CZK'?' <span class="pill blue">'+esc(f.mena)+'</span>':'')+'</td><td class="wrap">'+esc(f.org)+'</td><td class="muted">'+esc(f.utvar)+'</td><td class="muted">'+esc(f.kdo)+'</td><td>'+den(f.dat)+'</td><td>'+den(f.spl)+'</td><td class="r'+(f.dni>90?' err':'')+'">'+f.dni+'</td><td class="r muted">'+kc(f.hm)+'</td><td class="r"><b>'+kc(f.saldo)+'</b></td></tr>').join('')+'</tbody>';
+  $('#fa').innerHTML='<thead><tr><th>Faktura</th><th>Zákazník</th><th>Útvar</th><th>Vystavil</th><th>Vystaveno</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Fakturováno Kč</th><th class="r">Saldo Kč</th></tr></thead><tbody>'
+    +(P.faktury||[]).slice().sort((a,b)=>b.dni-a.dni).map(f=>'<tr><td>'+esc(f.pz)+mp(f)+'</td><td class="wrap">'+esc(f.org)+'</td><td class="muted">'+esc(f.utvar)+'</td><td class="muted">'+esc(f.kdo)+'</td><td>'+den(f.dat)+'</td><td>'+den(f.spl)+'</td><td class="r'+(f.dni>90?' err':'')+'">'+f.dni+'</td><td class="r muted">'+kc(f.hm)+'</td><td class="r"><b>'+kc(f.saldo)+'</b></td></tr>').join('')+'</tbody>';
 }
 function drawDl(){
   const q=($('#q').value||'').toLowerCase(), u=$('#fUtv').value, onlyEs=$('#fEs').checked;

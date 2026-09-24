@@ -169,13 +169,16 @@ function mount(host) {
     const fa = P.faktury.filter(x => x.org === org); if (!fa.length) return null;
     let ico = '', orgId = fa[0].orgId || ''; try { const vd = loadVyd().dny || {}; Object.keys(vd).sort().reverse().some(dn => { const z = (vd[dn].zakaznici || {})[org]; if (z && z.ico) { ico = z.ico; return true; } return false; }); } catch (_) {}
     const adresa = (cfg.adresy && cfg.adresy[org]) || '';
-    return { org, orgId, ico, adresa, faktury: fa.sort((a, b) => a.spl.localeCompare(b.spl)), celkem: fa.reduce((s2, x) => s2 + x.saldo, 0), mena: fa.some(x => x.mena && x.mena !== 'CZK') ? 'mix' : 'CZK', den: P.den, cfg, stav: fa.map(x => d.stav[x.pz] || {}) };
+    const meny = [...new Set(fa.map(x => x.mena || 'CZK'))], vMene = {}; fa.forEach(x => { vMene[x.mena || 'CZK'] = (vMene[x.mena || 'CZK'] || 0) + (x.mena === 'CZK' ? x.saldo : (x.saldoMena || 0)); });
+    // celkem = vždy v Kč (přepočet); je-li celá pohledávka v jedné cizí měně, výzva ji uvádí v této měně a Kč jen orientačně
+    return { org, orgId, ico, adresa, faktury: fa.sort((a, b) => a.spl.localeCompare(b.spl)), celkem: fa.reduce((s2, x) => s2 + x.saldo, 0), mena: meny.length === 1 ? meny[0] : 'mix', vMene, kurzy: P.kurzy || {}, den: P.den, cfg, stav: fa.map(x => d.stav[x.pz] || {}) };
   }
   const mailWrap = (obsah, publicUrl) => '<div style="font-family:system-ui,sans-serif;font-size:14px;color:#222;max-width:760px">' + obsah +
     '<p style="margin:14px 0 0"><a href="' + publicUrl + '/#modul=pohledavky" style="background:#0e8a43;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:700">Otevřít pohledávky v intranetu</a></p>' +
     '<p style="margin:14px 0 0;font-size:12px;color:#888">Automatické oznámení intranetu ELKOPLAST.</p></div>';
   const kcM = v => Math.round(v).toLocaleString('cs-CZ') + ' Kč';
-  const radekFa = x => '<li style="margin:0 0 8px"><b>Faktura č. ' + esc(x.pz) + '</b> u zákazníka <b>' + esc(x.org) + '</b> na částku <b>' + kcM(x.saldo) + (x.mena && x.mena !== 'CZK' ? ' ' + esc(x.mena) : '') + '</b>, splatná ' + esc(x.spl) + ' (<span style="color:#b23">' + x.dni + ' dní po splatnosti</span>)' + (x._fallback ? ' <i style="color:#888">— obchodník „' + esc(x.kdo || '—') + '" nemá v intranetu e-mail</i>' : '') + '</li>';
+  const castkaM = x => kcM(x.saldo) + (x.mena && x.mena !== 'CZK' ? ' (' + (+x.saldoMena || 0).toLocaleString('cs-CZ', { maximumFractionDigits: 2 }) + ' ' + esc(x.mena) + ')' : '');
+  const radekFa = x => '<li style="margin:0 0 8px"><b>Faktura č. ' + esc(x.pz) + '</b> u zákazníka <b>' + esc(x.org) + '</b> na částku <b>' + castkaM(x) + '</b>, splatná ' + esc(x.spl) + ' (<span style="color:#b23">' + x.dni + ' dní po splatnosti</span>)' + (x._fallback ? ' <i style="color:#888">— obchodník „' + esc(x.kdo || '—') + '" nemá v intranetu e-mail</i>' : '') + '</li>';
   async function posli(to, cc, subject, html) { try { await host.deliver({ to: [].concat(to, cc || []).join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html }); return { ok: true }; } catch (e) { return { ok: false, err: e.message }; } }
   // Denní běh (každá faktura v každé fázi jednou)
   async function tickEskalace() {
@@ -209,7 +212,7 @@ function mount(host) {
       vysledky.push({ krok: 'pripominka', komu: em, faktur: fa.length, n, cc, ok: r.ok, err: r.err }); console.log('[nakup-report] eskalace ' + n + '. připomínka → ' + em + ': ' + fa.length + ' faktur' + (cc.length ? ' (cc ' + cc.join(',') + ')' : '')); }
     // 3) Lucie — upomínky k odeslání přes Helios (jen zaškrtnuté obchodníkem)
     if (upomLucii.length) { const cc = [...new Set(upomLucii.map(x => x._em).filter(Boolean))].filter(e => lucie.indexOf(e) < 0);
-      const html = mailWrap('<p>Dobrý den,</p><p>obchodníci označili k odeslání <b>upomínky</b> (přes Helios) u ' + upomLucii.length + ' ' + (upomLucii.length === 1 ? 'faktury' : 'faktur') + ':</p><ul style="padding-left:18px">' + upomLucii.map(x => '<li style="margin:0 0 8px"><b>' + esc(x.org) + '</b> — faktura č. ' + esc(x.pz) + ', ' + kcM(x.saldo) + ', splatná ' + esc(x.spl) + ' (' + x.dni + ' dní), obchodník ' + esc(x.kdo || '—') + (d.stav[x.pz].rozhodnuti && d.stav[x.pz].rozhodnuti.pozn ? ' — <i>' + esc(d.stav[x.pz].rozhodnuti.pozn) + '</i>' : '') + '</li>').join('') + '</ul><p>Po odeslání prosím v intranetu odškrtněte <b>„upomínka odeslána"</b> — za ' + cfg.kroky.vyzvaPoUpomince + ' dní od odeslání se u neuhrazených připraví předžalobní výzva.</p>', publicUrl);
+      const html = mailWrap('<p>Dobrý den,</p><p>obchodníci označili k odeslání <b>upomínky</b> (přes Helios) u ' + upomLucii.length + ' ' + (upomLucii.length === 1 ? 'faktury' : 'faktur') + ':</p><ul style="padding-left:18px">' + upomLucii.map(x => '<li style="margin:0 0 8px"><b>' + esc(x.org) + '</b> — faktura č. ' + esc(x.pz) + ', ' + castkaM(x) + ', splatná ' + esc(x.spl) + ' (' + x.dni + ' dní), obchodník ' + esc(x.kdo || '—') + (d.stav[x.pz].rozhodnuti && d.stav[x.pz].rozhodnuti.pozn ? ' — <i>' + esc(d.stav[x.pz].rozhodnuti.pozn) + '</i>' : '') + '</li>').join('') + '</ul><p>Po odeslání prosím v intranetu odškrtněte <b>„upomínka odeslána"</b> — za ' + cfg.kroky.vyzvaPoUpomince + ' dní od odeslání se u neuhrazených připraví předžalobní výzva.</p>', publicUrl);
       const subject = 'Upomínky k odeslání (Helios): ' + upomLucii.length + ' ' + (upomLucii.length === 1 ? 'faktura' : upomLucii.length < 5 ? 'faktury' : 'faktur') + ' · ' + kcM(upomLucii.reduce((a, x) => a + x.saldo, 0));
       const r = await posli(lucie, cc, subject, html); if (r.ok) upomLucii.forEach(x => { d.stav[x.pz].kU = { kdy: dnes, komu: lucie }; });
       vysledky.push({ krok: 'upominky', komu: lucie, faktur: upomLucii.length, ok: r.ok, err: r.err }); console.log('[nakup-report] upomínky → ' + lucie.join(', ') + ': ' + upomLucii.length + ' faktur'); }
@@ -551,6 +554,25 @@ function mount(host) {
   const POH_FOLDER = process.env.POHLEDAVKY_DRIVE_FOLDER || '1g66yE03YnaZ3Jk_rIAx6Fa3YrL50qoxp';
   const POH_F = path.join(host.dataDir || __dirname, 'pohledavky.json');
   const loadPoh = () => { try { return JSON.parse(fs.readFileSync(POH_F, 'utf8')) || { dny: {} }; } catch (_) { return { dny: {} }; } };
+  // Sloupce exportu: „HM celkem zaokr." = fakturovaná částka VŽDY v Kč; „Saldo" = neuhrazený zbytek V MĚNĚ FAKTURY (EUR…).
+  // Proto se saldo v Kč dopočítává: u faktury v Kč = Saldo; u cizí měny = HM celkem, pokud je faktura neuhrazená celá
+  // (HM/Saldo ≈ kurz dne vystavení), u částečně uhrazené = Saldo × kurz (medián kurzů dané měny v exportu), strop HM.
+  const KURZ_NOUZE = { EUR: 24.3, PLN: 5.7, USD: 21, GBP: 28, HUF: 0.062, CHF: 26 };
+  function kurzyZRadku(fa) {
+    const by = {}; fa.forEach(x => { if (x.mena !== 'CZK' && x.hm > 0 && x.saldoMena > 0) (by[x.mena] || (by[x.mena] = [])).push(x.hm / x.saldoMena); });
+    const out = {}; Object.keys(by).forEach(m => { const v = by[m].sort((a, b) => a - b); let k = v[Math.floor(v.length / 2)];
+      const ok = v.filter(r => r >= k * 0.94 && r <= k * 1.06); if (ok.length) k = ok[Math.floor(ok.length / 2)];   // medián bez částečně uhrazených
+      if (KURZ_NOUZE[m] && (k < KURZ_NOUZE[m] * 0.7 || k > KURZ_NOUZE[m] * 1.3)) k = KURZ_NOUZE[m];
+      out[m] = Math.round(k * 1000) / 1000; });
+    return out;
+  }
+  function prepocetNaKc(fa) {
+    const kurzy = kurzyZRadku(fa);
+    fa.forEach(x => { if (x.mena === 'CZK') { x.saldo = x.saldoMena; return; }
+      const k = kurzy[x.mena] || KURZ_NOUZE[x.mena] || 0, plna = x.hm > 0 && x.saldoMena > 0 && Math.abs(x.hm / x.saldoMena - k) <= k * 0.06;
+      x.saldo = plna ? x.hm : Math.round(Math.min(x.hm > 0 ? x.hm : Infinity, x.saldoMena * k)); x.kurz = k; if (!plna) x.castecne = true; });
+    return kurzy;
+  }
   function parsePohledavkyRows(rows, den) {
     const H = rows[0].map(x => String(x == null ? '' : x).trim()), c = n => H.indexOf(n);
     const I = { pz: c('Párovací znak'), kdo: c('Příjmení a jméno'), orgId: c('Č. org.'), org: c('Název'), rada: c('Řada'), dat: c('Datum případu (DMR)'), spl: c('Splatnost'), hm: c('HM celkem zaokr.'), saldo: c('Saldo'), mena: c('Měna'), utvar: H.lastIndexOf('Název') };
@@ -558,26 +580,32 @@ function mount(host) {
     const out = [];
     for (let i = 1; i < rows.length; i++) { const r = rows[i]; const saldo = +r[I.saldo] || 0; if (!(saldo > 0)) continue;
       const spl = xlDen(r[I.spl]), dat = xlDen(r[I.dat]); if (!spl || spl >= den) continue;   // jen po splatnosti k danému dni
-      out.push({ pz: String(r[I.pz] || ''), kdo: String(r[I.kdo] || '').trim().slice(0, 60), orgId: String(r[I.orgId] || '').trim(), org: String(r[I.org] || '').trim().slice(0, 120), rada: String(r[I.rada] || ''), dat, spl,
-        hm: +r[I.hm] || 0, saldo, mena: String(r[I.mena] || 'CZK'), utvar: String(r[I.utvar] || '').trim().slice(0, 60), dni: Math.round((Date.parse(den) - Date.parse(spl)) / 86400000) }); }
+      out.push({ pz: String(r[I.pz] || ''), kdo: String(r[I.kdo] || '').replace(/\s+/g, ' ').trim().slice(0, 60), orgId: String(r[I.orgId] || '').trim(), org: String(r[I.org] || '').replace(/\s+/g, ' ').trim().slice(0, 120), rada: String(r[I.rada] || ''), dat, spl,
+        hm: +r[I.hm] || 0, saldoMena: saldo, mena: String(r[I.mena] || 'CZK').trim().toUpperCase() || 'CZK', utvar: String(r[I.utvar] || '').trim().slice(0, 60), dni: Math.round((Date.parse(den) - Date.parse(spl)) / 86400000) }); }
+    out.kurzy = prepocetNaKc(out);   // doplní x.saldo (Kč), x.kurz, x.castecne
     return out;
   }
   async function syncPohledavky() {
     if (!drive || !drive.configured() || !POH_FOLDER) return { ok: false };
     let files; try { files = await drive.listFolder(POH_FOLDER); } catch (e) { return { ok: false, error: e.message }; }
     let st = { seen: {} }; try { st = JSON.parse(fs.readFileSync(EXP_STATE, 'utf8')) || { seen: {} }; } catch (_) {} st.seen = st.seen || {};
+    let poh = loadPoh(); poh.dny = poh.dny || {};
+    if (!st.pohCzkV2) {   // 2026-09-24: saldo dřív sčítalo EUR s Kč → znovu načíst celou historii ze složky s přepočtem na Kč
+      Object.keys(st.seen).forEach(id => { if (st.seen[id] && st.seen[id].slozka === 'pohledavky') delete st.seen[id]; });
+      poh = { dny: {} }; st.pohCzkV2 = new Date().toISOString(); console.log('[nakup-report] pohledávky: přepočet na Kč (V2) — znovu načítám historii'); }
     const kand = (files || []).filter(f => isSnapFile(f) && !st.seen[f.id]).sort((a, b) => String(a.name).localeCompare(String(b.name))).slice(0, 40);   // první běh vezme celou historii najednou
-    if (!kand.length) return { ok: true, zpracovano: [] };
-    const poh = loadPoh(); poh.dny = poh.dny || {}; const done = [];
+    if (!kand.length) { try { fs.writeFileSync(EXP_STATE, JSON.stringify(st, null, 2)); } catch (_) {} return { ok: true, zpracovano: [] }; }
+    const done = [];
     for (const f of kand) { let info = '', typ = 'pohledavky';
       try { const den = dateOfName(f.name); const dl = await drive.downloadFileBase64(f.id, 20 * 1024 * 1024); const rows = xlsxMini.parse(Buffer.from(dl.base64, 'base64'));
         const fa = parsePohledavkyRows(rows, den);
         if (!fa) { typ = 'neznamy'; info = 'chybí sloupce Párovací znak / Saldo / Splatnost'; }
         else { const byU = {}; fa.forEach(x => { const e = byU[x.utvar || '—'] || (byU[x.utvar || '—'] = { n: 0, saldo: 0 }); e.n++; e.saldo += x.saldo; });
           const es = fa.filter(x => /e\s*-?\s*shop/i.test(x.utvar) || /^E-SHOP$/i.test(x.kdo));
-          poh.dny[den] = { n: fa.length, saldo: Math.round(fa.reduce((a, x) => a + x.saldo, 0)), esN: es.length, esSaldo: Math.round(es.reduce((a, x) => a + x.saldo, 0)), byUtvar: byU };
-          if (!poh.posledni || den >= poh.posledni.den) poh.posledni = { den, soubor: f.name, faktury: fa };
-          info = fa.length + ' faktur po splatnosti, saldo ' + Math.round(fa.reduce((a, x) => a + x.saldo, 0)); } }
+          poh.dny[den] = { n: fa.length, saldo: Math.round(fa.reduce((a, x) => a + x.saldo, 0)), esN: es.length, esSaldo: Math.round(es.reduce((a, x) => a + x.saldo, 0)), byUtvar: byU, kurzy: fa.kurzy || {} };
+          if (!poh.posledni || den >= poh.posledni.den) poh.posledni = { den, soubor: f.name, faktury: fa, kurzy: fa.kurzy || {} };
+          const cizi = fa.filter(x => x.mena !== 'CZK');
+          info = fa.length + ' faktur po splatnosti, saldo ' + Math.round(fa.reduce((a, x) => a + x.saldo, 0)) + ' Kč' + (cizi.length ? ' (z toho ' + cizi.length + ' v cizí měně, kurzy ' + JSON.stringify(fa.kurzy) + ')' : ''); } }
       catch (e) { typ = 'chyba'; info = e.message; }
       st.seen[f.id] = { name: f.name, typ, at: new Date().toISOString(), info, slozka: 'pohledavky' }; done.push({ name: f.name, typ, info });
       console.log('[nakup-report] pohledávky z Disku: ' + f.name + ' → ' + typ + ' · ' + info); }
@@ -595,7 +623,8 @@ function mount(host) {
     const buckets = [[0, 30], [31, 60], [61, 90], [91, 99999]].map(([a, b]) => { const r = P.faktury.filter(x => x.dni >= a && x.dni <= b); return { od: a, do: b, n: r.length, saldo: Math.round(r.reduce((s2, x) => s2 + x.saldo, 0)) }; });
     const trend = Object.keys(poh.dny).sort().slice(-60).map(d => Object.assign({ den: d }, poh.dny[d]));
     const ob = {}; P.faktury.forEach(x => { const k = x.kdo || ''; const e = ob[k] || (ob[k] = { kdo: k, n: 0, saldo: 0, maxDni: 0 }); e.n++; e.saldo += x.saldo; if (x.dni > e.maxDni) e.maxDni = x.dni; });
-    return { ok: true, den: P.den, soubor: P.soubor, dnesDatum: new Date().toISOString().slice(0, 10), faktur: P.faktury.length, saldo: Math.round(P.faktury.reduce((s2, x) => s2 + x.saldo, 0)), buckets, dluznici, expedujeme: dluznici.filter(d => d.eshop), trend,
+    const vMene = {}; P.faktury.forEach(x => { if (x.mena !== 'CZK') { const e = vMene[x.mena] || (vMene[x.mena] = { n: 0, saldoMena: 0, saldo: 0 }); e.n++; e.saldoMena += x.saldoMena || 0; e.saldo += x.saldo; } });
+    return { ok: true, den: P.den, soubor: P.soubor, dnesDatum: new Date().toISOString().slice(0, 10), faktur: P.faktury.length, saldo: Math.round(P.faktury.reduce((s2, x) => s2 + x.saldo, 0)), buckets, dluznici, expedujeme: dluznici.filter(d => d.eshop), trend, kurzy: P.kurzy || {}, vMene,
       faktury: P.faktury, obchodnici: Object.values(ob).map(e => Object.assign(e, { saldo: Math.round(e.saldo) })).sort((a, b) => b.saldo - a.saldo),
       utvary: Object.entries(poh.dny[P.den] ? poh.dny[P.den].byUtvar : {}).map(([u, v]) => ({ utvar: u, n: v.n, saldo: Math.round(v.saldo) })).sort((a, b) => b.saldo - a.saldo), oknoDni: dniZpet || 35 };
   }
