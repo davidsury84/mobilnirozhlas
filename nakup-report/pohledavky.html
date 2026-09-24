@@ -23,6 +23,11 @@
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px} .grid2>*{min-width:0} @media(max-width:980px){.grid2{grid-template-columns:1fr}}
   table{border-collapse:collapse;width:100%;font-size:13px} th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap} th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);background:#f5f7f3;position:sticky;top:0} td.r,th.r{text-align:right} td.wrap{white-space:normal;min-width:180px}
   .tblwrap{overflow:auto;max-height:460px;border:1px solid var(--line);border-radius:10px}
+  table.act td:last-child,table.act th:last-child{position:sticky;right:0;background:#fff;box-shadow:-6px 0 8px -6px rgba(0,0,0,.25)} table.act tr[style] td:last-child{background:#fdf2f2}
+  .moje{background:#fff8e6;border:2px solid var(--amber,#d98c00);border-radius:12px;padding:14px 16px;margin:0 0 14px} .moje h2{margin:0 0 8px;font:700 19px/1.2 var(--cond)}
+  .moje .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;margin:0 0 8px}
+  .moje .row.late{border-color:var(--red);background:#fff4f4} .moje .row .who{flex:1 1 280px;min-width:0} .moje .row .kc{font:700 18px/1.2 var(--cond);white-space:nowrap}
+  .moje .btn{font-size:14px;padding:8px 14px}
   .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px} input,select{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:#fff}
   .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11.5px;font-weight:600} .pill.red{background:var(--red-soft);color:var(--red)} .pill.amber{background:var(--amber-soft);color:var(--amber)} .pill.blue{background:var(--blue-soft);color:var(--blue)}
   .bars{display:flex;align-items:flex-end;gap:3px;height:120px;padding:6px 0 0} .bars i{display:block;flex:1;background:#c9d8e6;border-radius:3px 3px 0 0;min-width:4px;position:relative} .bars i.last{background:var(--blue)} .bars i:hover::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#243;color:#fff;font-size:11px;padding:3px 7px;border-radius:6px;white-space:nowrap;margin-bottom:4px}
@@ -37,6 +42,7 @@
   <h1>💸 Pohledávky po splatnosti</h1>
   <p class="sub" id="sub">Načítám denní snímek z ERP…</p>
   <div id="stav"></div>
+  <div id="moje"></div>
   <div id="lucie"></div>
   <div id="upom"></div>
   <div class="kpis" id="kpis"></div>
@@ -78,6 +84,7 @@ async function loadEsk(){
   const c=E.cfg, k=c.kroky, all=E.faktury||[];
   const moje=all.filter(f=>f.obchodnikEmail&&f.obchodnikEmail===E.ja);
   const fa=(E.admin||E.jeLucie)?all:moje;
+  renderMoje(moje,k);
   const pill=f=>{const s=f.stav||{},z=FAZE[f.faze]||FAZE.pred;let t='<span class="pill '+z[1]+'">'+z[0]+'</span>';
     if(s.k10)t+=' <span class="muted" style="font-size:11px">oznámeno '+den(s.k10.kdy)+'</span>'; if(s.rozhodnuti&&s.rozhodnuti.pozn)t+=' <span class="muted" style="font-size:11px" title="'+esc(s.rozhodnuti.kdo||'')+'">„'+esc(s.rozhodnuti.pozn)+'"</span>';
     if(s.upominkaOdeslana)t+=' <span class="muted" style="font-size:11px">upomínka '+den(s.upominkaOdeslana.kdy)+'</span>'; if(s.vyzvaOdeslana)t+=' <span class="muted" style="font-size:11px">výzva '+den(s.vyzvaOdeslana.kdy)+'</span>';
@@ -90,7 +97,7 @@ async function loadEsk(){
     if(['vyzva','vyzva-ceka','po-upomince'].includes(f.faze)&&(E.jeLucie||E.admin))a+='<a class="btn" href="/pohledavky/vyzva?org='+encodeURIComponent(f.org)+'" target="_blank">📄 výzva</a> ';
     if(f.faze==='po-upomince'&&(E.jeLucie||E.admin))a+='<a href="#" class="muted" style="font-size:11px" onclick="eskAkce(\'upominkaZrusit\',\''+pz+'\');return false">zrušit</a> ';
     a+='<button class="btn" onclick="eskPozastav(\''+pz+'\')" title="Zastavit eskalaci (např. splátkový kalendář)">⏸</button>'; return a;};
-  const tbl=rows=>'<div class="tblwrap" style="max-height:440px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Útvar</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Promlčení</th><th>Stav</th><th></th></tr></thead><tbody>'
+  const tbl=rows=>'<div class="tblwrap" style="max-height:440px"><table class="act"><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Útvar</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Promlčení</th><th>Stav</th><th></th></tr></thead><tbody>'
     +rows.map(f=>'<tr'+(f.faze==='vyzva'||f.faze==='bez-rozhodnuti'?' style="background:#fdf2f2"':'')+'><td>'+esc(f.pz)+mp(f)+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+(f.obchodnikEmail?'':' <span class="err" style="font-size:11px" title="Bez e-mailu — chodí náhradnímu příjemci">bez e-mailu</span>')+'</td><td class="muted">'+esc(f.utvar)+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td>'
       +'<td'+(f.doPromlceni!=null&&f.doPromlceni<=90?' class="err"':'')+'>'+(f.promlceni?den(f.promlceni)+' <span class="muted" style="font-size:11px">('+(f.doPromlceni<0?'promlčeno':'za '+f.doPromlceni+' d')+')</span>':'<span class="muted">—</span>')+'</td><td>'+pill(f)+'</td><td style="white-space:nowrap">'+akce(f)+'</td></tr>').join('')+'</tbody></table></div>';
   renderLucie(all,c);
@@ -122,10 +129,10 @@ function renderLucie(all,c){
   const el=$('#lucie'); if(!el)return; if(!(E.jeLucie||E.admin)){el.innerHTML='';return;}
   const up=all.filter(f=>f.faze==='upominka'), vy=all.filter(f=>f.faze==='vyzva'||f.faze==='vyzva-ceka'), po=all.filter(f=>f.faze==='po-upomince');
   const sum=a=>kc(a.reduce((s,f)=>s+f.saldo,0));
-  const t1=up.length?('<div class="tblwrap" style="max-height:340px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Poznámka obchodníka</th><th>Rozhodnuto</th><th></th></tr></thead><tbody>'
+  const t1=up.length?('<div class="tblwrap" style="max-height:340px"><table class="act"><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Poznámka obchodníka</th><th>Rozhodnuto</th><th></th></tr></thead><tbody>'
       +up.map(f=>{const r=f.stav.rozhodnuti||{};return '<tr><td>'+esc(f.pz)+mp(f)+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td><td class="wrap muted">'+esc(r.pozn||'')+'</td><td class="muted">'+den(r.kdy)+'</td><td style="white-space:nowrap"><button class="btn ok" onclick="eskAkce(\'upominkaOdeslana\',\''+esc(f.pz)+'\')">✓ Odeslána</button></td></tr>';}).join('')+'</tbody></table></div>')
     :'<div class="muted" style="margin:6px 0">Žádná faktura k odeslání upomínky — obchodníci zatím nic nezaškrtli.</div>';
-  const t2=vy.length?('<div class="tblwrap" style="max-height:340px"><table><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Upomínka odeslána</th><th></th></tr></thead><tbody>'
+  const t2=vy.length?('<div class="tblwrap" style="max-height:340px"><table class="act"><thead><tr><th>Faktura</th><th>Zákazník</th><th>Obchodník</th><th>Splatnost</th><th class="r">Dní</th><th class="r">Saldo</th><th>Upomínka odeslána</th><th></th></tr></thead><tbody>'
       +vy.map(f=>'<tr style="background:#fdf2f2"><td>'+esc(f.pz)+mp(f)+'</td><td class="wrap"><b>'+esc(f.org)+'</b></td><td>'+esc(f.kdo||'—')+'</td><td>'+den(f.spl)+'</td><td class="r"><b>'+f.dni+'</b></td><td class="r"><b>'+kc(f.saldo)+'</b></td><td class="muted">'+den((f.stav.upominkaOdeslana||{}).kdy)+'</td><td style="white-space:nowrap"><a class="btn" href="/pohledavky/vyzva?org='+encodeURIComponent(f.org)+'" target="_blank">📄 Výzva k tisku</a> <button class="btn ok" onclick="eskAkce(\'vyzvaOdeslana\',\''+esc(f.pz)+'\')">✓ Odeslána</button></td></tr>').join('')+'</tbody></table></div>')
     :'<div class="muted" style="margin:6px 0">Žádná faktura k předžalobní výzvě'+(po.length?' — '+po.length+' po upomínce, u nich běží '+c.kroky.vyzvaPoUpomince+' dní':'')+'.</div>';
   el.innerHTML='<div class="card" style="border:2px solid var(--blue)"><h2 style="margin:0 0 4px;font:700 17px/1.2 var(--cond)">📬 Pohled pro '+esc((c.vyzvaKomu||[]).join(', ')||'odesílatele')+' <span class="muted" style="font-weight:400;font-size:13px">· k '+den(E.den)+'</span></h2>'
@@ -144,6 +151,17 @@ function exportXlsx(typ){
 }
 async function eskPost(body){const r=await fetch('/api/nakup-report/eskalace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
 async function eskAkce(akce,pz,extra){try{await eskPost(Object.assign({akce,pz},extra||{}));await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
+// ---- K VAŠEMU ROZHODNUTÍ: jen faktury přiřazené přihlášenému, kde se čeká na jeho krok — velká tlačítka, úplně nahoře ----
+function renderMoje(moje,k){
+  const el=$('#moje'); const rows=moje.filter(f=>['nova','ceka-obchodnik','bez-rozhodnuti'].includes(f.faze)).sort((a,b)=>(b.faze==='bez-rozhodnuti')-(a.faze==='bez-rozhodnuti')||b.dni-a.dni);
+  if(!rows.length){el.innerHTML='';return;}
+  const late=rows.filter(f=>f.faze==='bez-rozhodnuti').length;
+  el.innerHTML='<div class="moje"><h2>🔔 K vašemu rozhodnutí · '+rows.length+' '+(rows.length===1?'faktura':rows.length<5?'faktury':'faktur')+' · '+kc(rows.reduce((s,f)=>s+f.saldo,0))+' Kč'+(late?' <span class="pill red">'+late+' přes lhůtu '+k.rozhodnuti+' dnů</span>':'')+'</h2>'
+    +'<div class="cfg" style="margin:0 0 10px;font-size:12.5px;color:var(--ink-soft)">U každé faktury zvolte: <b>📨 Poslat upomínku</b> (odešle Lucie přes Helios, po 7 dnech následuje předžalobní výzva) nebo <b>✎ Poznámka</b> (řešíte sami — napište jak). Dokud nerozhodnete, chodí vám denní připomínka.</div>'
+    +rows.map(f=>{const pz=esc(f.pz);return '<div class="row'+(f.faze==='bez-rozhodnuti'?' late':'')+'"><div class="who"><b>'+esc(f.org)+'</b><br><span class="muted">faktura '+pz+mp(f)+' · splatná '+den(f.spl)+' · <b class="'+(f.dni>90?'err':'')+'">'+f.dni+' dní po splatnosti</b>'+(f.utvar?' · '+esc(f.utvar):'')+(f.faze==='bez-rozhodnuti'?' · <span class="err">bez rozhodnutí přes lhůtu</span>':'')+'</span></div>'
+      +'<div class="kc">'+kc(f.saldo)+' Kč</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ok" onclick="rozhodni(\''+pz+'\',true)">📨 Poslat upomínku</button><button class="btn" onclick="rozhodni(\''+pz+'\',false)">✎ Poznámka</button><button class="btn" onclick="eskPozastav(\''+pz+'\')" title="Zastavit eskalaci (např. splátkový kalendář)">⏸</button></div></div>';}).join('')
+    +'</div>';
+}
 function rozhodni(pz,upominka){const pozn=prompt(upominka?'Poznámka pro Lucii (nepovinné):':'Jak to řešíte? (např. „zaplatí do týdne")',''); if(pozn===null)return; if(!upominka&&!pozn.trim()){alert('Bez upomínky je poznámka povinná.');return;} eskAkce('rozhodnuti',pz,{upominka,pozn});}
 function eskPozastav(pz){const d=prompt('Důvod pozastavení eskalace (např. splátkový kalendář):');if(d===null)return;eskAkce('pozastavit',pz,{duvod:d});}
 async function ulozEsk(){const g=id=>($('#'+id)||{}).value;const cfg={kroky:{obchodnik:+g('eK1'),rozhodnuti:+g('eK2'),vyzvaPoUpomince:+g('eK3')},vyzvaKomu:g('eVK'),fallbackKomu:g('eFB'),firma:{ucet:g('eUcet'),iban:g('eIban')},podpis:{jmeno:g('ePJ'),funkce:g('ePF')},lhutaVyzvyDni:+g('eLh'),oddeleni:(E.cfg.oddeleni||[]).map(o=>({key:o.key,komu:g('eO-'+o.key)})),aktivni:!!($('#eAkt')||{}).checked,vylouceni:(($('#eVyl')||{}).value||'')};
