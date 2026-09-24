@@ -357,6 +357,8 @@ select.dq2-opt{width:100%;max-width:560px}
 .ot-step{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;width:74px}
 .ot-conn{flex:1 1 auto;min-width:14px;height:3px;background:var(--line);margin-top:12px;border-radius:2px}
 .ot-conn.on{background:var(--g)}
+.ot-conn.ot-loop{background:#c98500;position:relative;min-width:30px}
+.ot-conn.ot-loop span{position:absolute;left:50%;top:5px;transform:translateX(-50%);font-size:12px;line-height:1;color:#c98500;font-weight:900}
 .ot-conn.ot-split{background:linear-gradient(90deg,var(--line) 0,var(--line) 40%,#c98500 40%,#c98500 60%,var(--line) 60%);min-width:26px;position:relative}
 .ot-conn.ot-split.on{background:linear-gradient(90deg,var(--g) 0,var(--g) 40%,#c98500 40%,#c98500 60%,var(--g) 60%)}
 .ot-faze{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.4px;padding:1px 7px;border-radius:999px;margin-right:6px;vertical-align:middle}
@@ -2689,7 +2691,22 @@ function orderTrack(z){
   var cap= zam?'<span style="color:var(--red);font-weight:700">✕ Zamítnuto / storno</span>'
     : cur==='podklady'?'<span style="color:var(--amber);font-weight:700">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</span>'
     : '<b>'+esc(z.stavLabel)+'</b>'+loc+(z.deadline?(' · termín '+fdate(z.deadline)):'');
-  var parts=[], doby=stepDurations(z);
+  var parts=[], seq=zam?null:trackSmycky(z,stages,order);
+  if(seq){
+    // zakázka se vrátila (revize / vrácení) → strom je protažený: každý průchod krokem je vlastní bod
+    seq.forEach(function(s,i){
+      if(i>0)parts.push(s.loop
+        ?('<div class="ot-conn on ot-loop" title="'+esc(s.stav==='revize'?'Revize — výkres se překresluje':'Vráceno k přepracování')+'"><span>↺</span></div>')
+        :('<div class="ot-conn'+(!s.fut?' on':'')+(s.f==='objednavka'&&seq[i-1].f==='nabidka'?' ot-split':'')+'"></div>'));
+      var cls=s.fut?'fut':(s.cur?'cur':'done');
+      if(cls==='cur'&&(z.semafor==='red'||z.semafor==='amber'))cls+=' '+z.semafor;
+      var lab=s.l; if(s.k==='zavod'&&z.strediskoName)lab='Závod: '+z.strediskoName;
+      var doba=(s.dur!=null)?('<div class="ot-days">('+dnyText(s.dur)+')</div>'):'';
+      parts.push('<div class="ot-step"><div class="ot-dot '+cls+'">'+(cls==='done'?'✓':'')+'</div><div class="ot-lab'+(s.cur?' cur':'')+'">'+esc(lab)+'</div>'+doba+'</div>');
+    });
+    return '<div class="ot-cap">'+fazeLbl+' · Aktuální krok: '+cap+'</div><div class="ot-track">'+parts.join('')+'</div>';
+  }
+  var doby=stepDurations(z);
   stages.forEach(function(s,i){
     if(i>0)parts.push('<div class="ot-conn'+((!zam&&i<=ci)?' on':'')+(s.f==='objednavka'&&stages[i-1].f==='nabidka'?' ot-split':'')+'"></div>');
     var cls=(!zam&&i<ci)?'done':((!zam&&i===ci)?'cur':'fut');
@@ -2701,6 +2718,48 @@ function orderTrack(z){
     parts.push('<div class="ot-step"><div class="ot-dot '+cls+'">'+(cls==='done'?'✓':'')+'</div><div class="ot-lab'+(i===ci&&!zam?' cur':'')+'">'+esc(lab)+'</div>'+doba+'</div>');
   });
   return '<div class="ot-cap">'+fazeLbl+' · Aktuální krok: '+cap+'</div><div class="ot-track">'+parts.join('')+'</div>';
+}
+/* Body protaženého stromu. Z historie kroků se vezmou skutečné průchody; když se
+   zakázka vrátila zpět (revize po připomínkách či změně zadání, vrácení z kontroly
+   nebo od obchodníka), začne nová smyčka a kroky se vykreslí znovu jako nové body,
+   každý s vlastní dobou. Bez návratu vrací null = kanonický strom jako dosud.
+   Pozastavení (podklady) je pauza, do kroků se nepočítá. */
+function trackSmycky(z,stages,order){
+  var hist=z.stepHistory||[]; if(hist.length<2)return null;
+  var byK={}; stages.forEach(function(s){byK[s.k]=s});
+  var now=(D&&D.now)||Date.now(), vis=[];
+  for(var i=0;i<hist.length;i++){
+    var e=hist[i]; if(!e||!e.stav)continue;
+    var end=(i+1<hist.length)?hist[i+1].at:now, dur=Math.max(0,(end-e.at)/86400000);
+    if(e.stav==='podklady'||e.stav==='zamitnuto')continue;
+    var k=(e.stav==='revize')?'prace':e.stav; if(!byK[k])continue;
+    var last=vis[vis.length-1];
+    if(last&&last.k===k&&last.stav===e.stav){last.dur+=dur;continue}   // návrat z pauzy = týž průchod
+    vis.push({k:k,stav:e.stav,at:e.at,dur:dur});
+  }
+  var smycka=false;
+  for(var j=1;j<vis.length;j++){if(order.indexOf(vis[j].k)<=order.indexOf(vis[j-1].k)){smycka=true;break}}
+  if(!smycka)return null;
+  var seq=[], pos=-1, nRev=0;
+  var pridej=function(k,o){var st=byK[k];seq.push(Object.assign({k:k,l:st.l,f:st.f,dur:null,loop:false,fut:false,cur:false},o||{}))};
+  vis.forEach(function(v,idx){
+    var oi=order.indexOf(v.k), navrat=(idx>0&&oi<=pos);
+    if(!navrat){for(var q=pos+1;q<oi;q++)pridej(order[q]);}         // kroky bez záznamu (starší zakázky)
+    var lab=byK[v.k].l;
+    if(v.stav==='revize'){nRev++;lab='Revize v'+(verzeUCasu(z,v.at)||(nRev+1));}
+    else if(navrat&&v.k==='prace')lab='Výkres (oprava)';
+    pridej(v.k,{l:lab,dur:Math.round(v.dur*10)/10,loop:navrat,stav:v.stav,cur:(idx===vis.length-1)});
+    pos=oi;
+  });
+  if(vis.length&&(vis[vis.length-1].k==='dokonceno'))seq[seq.length-1].dur=null;   // koncový krok dobu nemá
+  for(var q2=pos+1;q2<order.length;q2++)pridej(order[q2],{fut:true});
+  return seq;
+}
+/* Verze založená v okamžiku návratu do revize (podle času vzniku verze). */
+function verzeUCasu(z,at){
+  var best=null;
+  (z.versions||[]).forEach(function(v){if(v.createdAt!=null&&Math.abs(v.createdAt-at)<300000&&(!best||Math.abs(v.createdAt-at)<Math.abs(best.createdAt-at)))best=v});
+  return best?best.v:null;
 }
 function stepFlow(z){
   var stages=[{k:'prideleni',l:'Přidělení',r:'sef'},{k:'prace',l:'Obchodní výkres',r:'kon'},{k:'kontrola',l:'Kontrola',r:'sef'},{k:'obchodnik',l:'Obchodník',r:'obch'},{k:'klient',l:'U klienta',r:'kli'},{k:'zavod',l:'Výběr závodu',r:'vyr'},{k:'schvaleno',l:'Výrobní dok.',r:'kon'},{k:'dokonceno',l:'Ve výrobě',r:'sys'}];
