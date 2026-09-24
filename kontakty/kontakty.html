@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zahraniční pobočky a partneři · Intranet ELKOPLAST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#0e8a43; --green-2:#12a350; --green-d:#0a6b34; --green-soft:#e6f6ec;
+  --ink:#0f1512; --ink-soft:#5b635c; --faint:#8b938c;
+  --bg:#eef1ec; --bg-2:#f7f9f5; --paper:#fff; --line:#e3e7e0; --line-strong:#cdd3ca;
+  --yellow-soft:#fff6d2; --amber:#7a5c0e; --red:#c23636; --red-soft:#fbe9e7;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --cond:'IBM Plex Sans Condensed','IBM Plex Sans',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(15,21,18,.04),0 10px 30px rgba(15,21,18,.07);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg-2);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.55}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+a{color:var(--green-d)}
+.wrap{max-width:1240px;margin:0 auto;padding:20px}
+.mono{font-family:var(--mono)}
+
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.top .ic{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#15ab57,#0a6b34);display:grid;place-items:center;color:#fff;font-size:22px;box-shadow:0 6px 16px rgba(10,107,52,.28)}
+.top h1{font-family:var(--cond);font-weight:700;font-size:22px;margin:0}
+.top .sub{font-size:12.5px;color:var(--ink-soft)}
+.top .sp{flex:1}
+
+.btn{border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);padding:8px 14px;border-radius:9px;font-weight:600;font-size:13.5px}
+.btn:hover{border-color:var(--green);color:var(--green-d)}
+.btn.pri{background:var(--green);border-color:var(--green);color:#fff}
+.btn.pri:hover{background:var(--green-d);color:#fff}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:7px}
+.btn.danger{color:var(--red);border-color:#e7c3c0}
+.btn.danger:hover{background:var(--red-soft);color:var(--red)}
+
+.tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:5px;flex-wrap:wrap}
+.tabs button{border:0;background:transparent;padding:8px 15px;border-radius:8px;font-weight:600;font-size:13.5px;color:var(--ink-soft)}
+.tabs button.on{background:var(--green-soft);color:var(--green-d)}
+
+.lista{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.lista input[type=search]{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line-strong);border-radius:10px;background:var(--paper)}
+.lista input[type=search]:focus{outline:none;border-color:var(--green)}
+
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.card .h{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#fbfdfb,#f6faf6);flex-wrap:wrap}
+.card .h h2{font-family:var(--cond);font-weight:700;font-size:16px;margin:0}
+.card .h .sp{flex:1}
+.card .b{padding:16px 18px}
+
+.mriz{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+@media(max-width:780px){.mriz{grid-template-columns:1fr}}
+.pob .zeme{font-family:var(--cond);font-weight:700;font-size:17px}
+.pob .kod{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.5px}
+.firma{font-weight:600;font-size:13.5px}
+.adr{white-space:pre-line;color:var(--ink-soft);font-size:12.5px;margin-top:4px}
+.ident{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:pre-line;margin-top:4px}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--faint);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line-strong)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:hover td{background:#fafcf9}
+td.akce{text-align:right;white-space:nowrap;width:1%}
+
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--green-soft);color:var(--green-d)}
+.pill.mute{background:#eef1ec;color:var(--ink-soft)}
+.mut{color:var(--ink-soft);font-size:12.5px}
+.f{display:block;margin-bottom:10px}
+.f span{display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;font-weight:600}
+.f input,.f select,.f textarea{width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper)}
+.f textarea{min-height:70px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 14px}
+@media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+
+.modal{position:fixed;inset:0;background:rgba(15,21,18,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:24px 14px}
+.modal.on{display:flex}
+.modal .box{background:var(--paper);border-radius:16px;max-width:820px;width:100%;box-shadow:0 20px 60px rgba(15,21,18,.3)}
+.modal .box .h{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.modal .box .h h2{font-family:var(--cond);font-size:18px;margin:0;flex:1}
+.modal .box .b{padding:18px}
+.modal .box .f2{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+.hint{font-size:12px;color:var(--ink-soft);line-height:1.5}
+.empty{padding:30px;text-align:center;color:var(--ink-soft)}
+.zmena{font-size:11px;color:var(--faint);margin-top:10px;border-top:1px dashed var(--line);padding-top:7px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13.5px;z-index:90;opacity:0;transition:.25s;pointer-events:none}
+.toast.on{opacity:1}
+@media print{ .top,.tabs,.btn,.lista,.card .h .btn,td.akce{display:none!important} .card{border:0;box-shadow:none;break-inside:avoid} .wrap{padding:0} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="ic">🌍</div>
+    <div>
+      <h1>Zahraniční pobočky a partneři</h1>
+      <div class="sub" id="podtitul">Načítám…</div>
+    </div>
+    <div class="sp"></div>
+    <div class="tabs" id="zalozky"></div>
+  </div>
+
+  <div class="lista">
+    <input type="search" id="hledat" placeholder="Hledat zemi, firmu, jméno, e-mail, telefon…" autocomplete="off" oninput="Q=this.value;vykresli()">
+    <a class="btn sm" href="/api/kontakty/export">⬇ CSV</a>
+    <button class="btn sm" onclick="window.print()">🖨 Tisk</button>
+  </div>
+
+  <div id="obsah"><div class="card"><div class="empty">Načítám data…</div></div></div>
+</div>
+
+<div class="modal" id="modal"><div class="box">
+  <div class="h"><h2 id="mTitul">—</h2><button class="btn sm" onclick="zavri()">Zavřít</button></div>
+  <div class="b" id="mObsah"></div>
+  <div class="f2" id="mPaticka"></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+let D=null, USEK="pobocky", Q="";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+function bezDiak(s){ return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase(); }
+function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); setTimeout(()=>el.classList.remove("on"),2200); }
+function zavri(){ $("#modal").classList.remove("on"); }
+function modal(titul,obsah,paticka){ $("#mTitul").textContent=titul; $("#mObsah").innerHTML=obsah; $("#mPaticka").innerHTML=paticka||'<button class="btn" onclick="zavri()">Zavřít</button>'; $("#modal").classList.add("on"); }
+async function api(cesta,telo){
+  const o=telo?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(telo)}:{cache:"no-store"};
+  const r=await fetch(cesta,o); const j=await r.json().catch(()=>({}));
+  if(!r.ok||j.chyba) throw new Error(j.chyba||("Chyba "+r.status));
+  return j;
+}
+async function nacti(){
+  try{ D=await api("/api/kontakty/data"); vykresli(); }
+  catch(e){ $("#obsah").innerHTML='<div class="card"><div class="empty">'+esc(e.message)+'</div></div>'; }
+}
+
+/* ---------- pomocné ---------- */
+const mailto=e=>e?'<a href="mailto:'+esc(e)+'">'+esc(e)+'</a>':'<span class="mut">—</span>';
+const tel=t=>t?'<a href="tel:'+esc(String(t).replace(/\s/g,""))+'">'+esc(t)+'</a>':'<span class="mut">—</span>';
+const web=w=>w?'<a href="'+esc(w)+'" target="_blank" rel="noopener">'+esc(String(w).replace(/^https?:\/\//,"").replace(/\/$/,""))+'</a>':"";
+function sedi(obj,extra){
+  if(!Q.trim()) return true;
+  const seno=bezDiak(JSON.stringify(obj)+" "+(extra||""));
+  return bezDiak(Q).split(/\s+/).filter(Boolean).every(t=>seno.indexOf(t)>=0);
+}
+function zmenaText(z){
+  if(!z||!z.kdo) return '<div class="zmena">Zatím nikdo needitoval — data převzatá z tabulky <em>_Elkoplast Divisions</em>.</div>';
+  return '<div class="zmena">Naposledy upravil(a) '+esc(z.kdo)+' · '+new Date(z.ts).toLocaleString("cs-CZ")+'</div>';
+}
+
+/* ---------- vykreslení ---------- */
+function vykresli(){
+  if(!D) return;
+  $("#podtitul").textContent=D.pobocky.length+" poboček · "+D.partneri.length+" partnerů · "
+    +D.specialiste.length+" specialistů · "+D.provozy.length+" provozů — seznam upravuje kdokoli z firmy";
+  $("#zalozky").innerHTML=Object.keys(D.useky).map(k=>
+    '<button class="'+(USEK===k?"on":"")+'" onclick="USEK=\''+k+'\';vykresli()">'+esc(D.useky[k])+' ('+D[k].length+')</button>').join("");
+  if(USEK==="pobocky") vykresliPobocky();
+  else if(USEK==="partneri") vykresliPartnery();
+  else if(USEK==="specialiste") vykresliSpecialisty();
+  else vykresliProvozy();
+}
+
+function vykresliPobocky(){
+  const vs=D.pobocky.filter(p=>sedi(p));
+  let h='<div class="card"><div class="h"><h2>Zahraniční pobočky ELKOPLAST</h2>'
+    +'<span class="mut">'+vs.length+' z '+D.pobocky.length+'</span><div class="sp"></div>'
+    +'<button class="btn pri sm" onclick="editPobocka(null)">+ Pobočka</button></div>'
+    +'<div class="b">'+(vs.length?'<div class="mriz">'+vs.map(kartaPobocky).join("")+'</div>':'<div class="empty">Nic neodpovídá hledání.</div>')+'</div></div>';
+  $("#obsah").innerHTML=h;
+}
+function kartaPobocky(p){
+  const lide=(p.lide||[]);
+  // adresa začíná názvem firmy — v kartě už je nad ní, nepiš ho dvakrát
+  const adr=(p.adresa||"").split("\n").filter((r,i)=>!(i===0&&r.trim()===String(p.spolecnost||"").trim())).join("\n");
+  return '<div class="card pob" style="margin:0"><div class="h">'
+    +'<div><div class="zeme">'+esc(p.zeme||"—")+'</div>'+(p.kod?'<div class="kod">'+esc(p.kod)+'</div>':'')+'</div>'
+    +'<div class="sp"></div>'
+    +'<button class="btn sm" onclick="editPobocka(\''+p.id+'\')">Upravit</button></div>'
+    +'<div class="b">'
+    +(p.spolecnost?'<div class="firma">'+esc(p.spolecnost)+'</div>':'')
+    +(adr?'<div class="adr">'+esc(adr)+'</div>':'')
+    +(p.adresa2?'<div class="adr" style="margin-top:6px">'+esc(p.adresa2)+'</div>':'')
+    +(p.identifikace?'<div class="ident">'+esc(p.identifikace)+'</div>':'')
+    +(p.web?'<div style="margin-top:6px;font-size:13px">'+web(p.web)+'</div>':'')
+    +(p.poznamka?'<div class="mut" style="margin-top:6px">'+esc(p.poznamka)+'</div>':'')
+    +'<table style="margin-top:12px"><thead><tr><th>Jméno</th><th>Pozice</th><th>Kontakt</th><th></th></tr></thead><tbody>'
+    +(lide.length?lide.map(o=>'<tr><td><strong>'+esc(o.jmeno||"—")+'</strong></td><td class="mut">'+esc(o.role||"—")+'</td>'
+        +'<td style="font-size:12.5px">'+mailto(o.email)+'<br>'+tel(o.telefon)+'</td>'
+        +'<td class="akce"><button class="btn sm" onclick="editOsoba(\''+p.id+'\',\''+o.id+'\')">✎</button></td></tr>').join("")
+      :'<tr><td colspan="4" class="mut">Zatím bez kontaktů.</td></tr>')
+    +'</tbody></table>'
+    +'<button class="btn sm" style="margin-top:10px" onclick="editOsoba(\''+p.id+'\',null)">+ Kontakt</button>'
+    +zmenaText(p.zmena)+'</div></div>';
+}
+
+function vykresliPartnery(){
+  const vs=D.partneri.filter(p=>sedi(p));
+  $("#obsah").innerHTML='<div class="card"><div class="h"><h2>Obchodní partneři a distributoři</h2>'
+    +'<span class="mut">'+vs.length+' z '+D.partneri.length+'</span><div class="sp"></div>'
+    +'<button class="btn pri sm" onclick="editPartner(null)">+ Partner</button></div><div class="b">'
+    +(vs.length?'<table><thead><tr><th>Země</th><th>Společnost</th><th>Kontaktní osoba</th><th>E-mail</th><th>Telefon</th><th>Web</th><th></th></tr></thead><tbody>'
+      +vs.map(p=>'<tr><td><strong>'+esc(p.zeme||"—")+'</strong></td><td>'+esc(p.spolecnost||"—")+'</td>'
+        +'<td>'+esc(p.osoba||"—")+'</td><td>'+mailto(p.email)+'</td><td>'+tel(p.telefon)+'</td><td>'+(web(p.web)||'<span class="mut">—</span>')+'</td>'
+        +'<td class="akce"><button class="btn sm" onclick="editPartner(\''+p.id+'\')">Upravit</button></td></tr>'
+        +(p.poznamka?'<tr><td></td><td colspan="6" class="mut">'+esc(p.poznamka)+'</td></tr>':'')).join("")
+      +'</tbody></table>':'<div class="empty">Nic neodpovídá hledání.</div>')
+    +'</div></div>';
+}
+
+function vykresliSpecialisty(){
+  const vs=D.specialiste.filter(s=>sedi(s));
+  $("#obsah").innerHTML='<div class="card"><div class="h"><h2>Produktoví specialisté — na koho se obrátit</h2>'
+    +'<span class="mut">'+vs.length+' z '+D.specialiste.length+'</span><div class="sp"></div>'
+    +'<button class="btn pri sm" onclick="editSpecialista(null)">+ Specialista</button></div><div class="b">'
+    +(vs.length?'<table><thead><tr><th>Oblast / produkt</th><th>Jméno</th><th>E-mail</th><th>Telefon</th><th></th></tr></thead><tbody>'
+      +vs.map(s=>'<tr><td><strong>'+esc(s.oblast||"—")+'</strong></td><td>'+esc(s.jmeno||"—")+'</td>'
+        +'<td>'+mailto(s.email)+'</td><td>'+tel(s.telefon)+'</td>'
+        +'<td class="akce"><button class="btn sm" onclick="editSpecialista(\''+s.id+'\')">Upravit</button></td></tr>').join("")
+      +'</tbody></table>':'<div class="empty">Nic neodpovídá hledání.</div>')
+    +'</div></div>';
+}
+
+function vykresliProvozy(){
+  const vs=D.provozy.filter(v=>sedi(v));
+  $("#obsah").innerHTML='<div class="card"><div class="h"><h2>Provozy, výroba a doprava</h2>'
+    +'<span class="mut">'+vs.length+' z '+D.provozy.length+'</span><div class="sp"></div>'
+    +'<button class="btn pri sm" onclick="editProvoz(null)">+ Provoz</button></div><div class="b">'
+    +(vs.length?'<table><thead><tr><th>Druh</th><th>Zaměření</th><th>Odpovídá</th><th>Adresa</th><th>Kontakt</th><th></th></tr></thead><tbody>'
+      +vs.map(v=>'<tr><td><strong>'+esc(v.druh||"—")+'</strong></td><td class="mut">'+esc(v.typ||"—")+'</td>'
+        +'<td>'+esc(v.osoba||"—")+'</td><td class="mut">'+esc(v.adresa||"—")+'</td>'
+        +'<td style="font-size:12.5px">'+(v.email?mailto(v.email):"")+(v.email&&v.telefon?'<br>':"")+(v.telefon?tel(v.telefon):"")+(!v.email&&!v.telefon?'<span class="mut">—</span>':"")+'</td>'
+        +'<td class="akce"><button class="btn sm" onclick="editProvoz(\''+v.id+'\')">Upravit</button></td></tr>').join("")
+      +'</tbody></table>':'<div class="empty">Nic neodpovídá hledání.</div>')
+    +'</div></div>';
+}
+
+/* ---------- formuláře ---------- */
+function pole(id,popis,hodnota,typ){
+  return '<label class="f"><span>'+esc(popis)+'</span>'
+    +(typ==="area"?'<textarea id="'+id+'">'+esc(hodnota||"")+'</textarea>'
+      :'<input id="'+id+'" autocomplete="off" value="'+esc(hodnota||"")+'">')+'</label>';
+}
+function paticka(ulozit,smazat){
+  return (smazat?'<button class="btn danger" style="margin-right:auto" onclick="'+smazat+'">Smazat</button>':'')
+    +'<button class="btn" onclick="zavri()">Zrušit</button>'
+    +'<button class="btn pri" onclick="'+ulozit+'">Uložit</button>';
+}
+const V=id=>{ const el=document.getElementById(id); return el?el.value.trim():""; };
+
+function editPobocka(pid){
+  const p=pid?D.pobocky.find(x=>x.id===pid):{};
+  modal(pid?"Úprava pobočky":"Nová pobočka",
+    '<div class="grid2">'+pole("pZeme","Země",p.zeme)+pole("pKod","Kód (SVK, ROM…)",p.kod)+'</div>'
+    +pole("pFirma","Společnost",p.spolecnost)
+    +'<div class="grid2">'+pole("pAdr","Adresa",p.adresa,"area")+pole("pAdr2","Druhá adresa (sklad…)",p.adresa2,"area")+'</div>'
+    +'<div class="grid2">'+pole("pIdent","IČ / VAT / registrace",p.identifikace,"area")+pole("pWeb","Web / e-shop",p.web)+'</div>'
+    +pole("pPozn","Poznámka",p.poznamka,"area")
+    +'<div class="hint">Kontaktní osoby se přidávají přímo na kartě pobočky.</div>',
+    paticka("ulozPobocka('"+(pid||"")+"')", pid?"smazPobocka('"+pid+"')":null));
+}
+async function ulozPobocka(pid){
+  const t={id:pid||undefined, zeme:V("pZeme"), kod:V("pKod"), spolecnost:V("pFirma"), adresa:V("pAdr"),
+           adresa2:V("pAdr2"), identifikace:V("pIdent"), web:V("pWeb"), poznamka:V("pPozn")};
+  if(!t.zeme&&!t.spolecnost){ alert("Vyplňte aspoň zemi nebo společnost."); return; }
+  try{ await api("/api/kontakty/pobocky",t); zavri(); await nacti(); toast("Uloženo"); }catch(e){ alert(e.message); }
+}
+async function smazPobocka(pid){
+  const p=D.pobocky.find(x=>x.id===pid);
+  if(!confirm("Opravdu smazat pobočku "+(p.zeme||p.spolecnost)+" včetně "+((p.lide||[]).length)+" kontaktů?")) return;
+  try{ await api("/api/kontakty/pobocky/smazat",{id:pid}); zavri(); await nacti(); toast("Smazáno"); }catch(e){ alert(e.message); }
+}
+
+function editOsoba(pid,oid){
+  const p=D.pobocky.find(x=>x.id===pid);
+  const o=oid?(p.lide||[]).find(x=>x.id===oid):{};
+  modal(oid?"Úprava kontaktu":"Nový kontakt — "+(p.zeme||p.spolecnost),
+    '<div class="grid2">'+pole("oJmeno","Jméno",o.jmeno)+pole("oRole","Pozice",o.role)+'</div>'
+    +'<div class="grid2">'+pole("oMail","E-mail",o.email)+pole("oTel","Telefon",o.telefon)+'</div>',
+    paticka("ulozOsobu('"+pid+"','"+(oid||"")+"')", oid?"smazOsobu('"+pid+"','"+oid+"')":null));
+}
+async function ulozOsobu(pid,oid){
+  try{ await api("/api/kontakty/osoba",{pobocka:pid,id:oid||undefined,jmeno:V("oJmeno"),role:V("oRole"),email:V("oMail"),telefon:V("oTel")});
+    zavri(); await nacti(); toast("Uloženo"); }catch(e){ alert(e.message); }
+}
+async function smazOsobu(pid,oid){
+  if(!confirm("Opravdu smazat tento kontakt?")) return;
+  try{ await api("/api/kontakty/osoba",{pobocka:pid,id:oid,smazat:true}); zavri(); await nacti(); toast("Smazáno"); }catch(e){ alert(e.message); }
+}
+
+function editPartner(id){
+  const p=id?D.partneri.find(x=>x.id===id):{};
+  modal(id?"Úprava partnera":"Nový partner",
+    '<div class="grid2">'+pole("qZeme","Země",p.zeme)+pole("qFirma","Společnost",p.spolecnost)+'</div>'
+    +'<div class="grid3">'+pole("qOsoba","Kontaktní osoba",p.osoba)+pole("qMail","E-mail",p.email)+pole("qTel","Telefon",p.telefon)+'</div>'
+    +pole("qWeb","Web",p.web)+pole("qPozn","Poznámka",p.poznamka,"area"),
+    paticka("ulozPartner('"+(id||"")+"')", id?"smazPartner('"+id+"')":null));
+}
+async function ulozPartner(id){
+  const t={id:id||undefined, zeme:V("qZeme"), spolecnost:V("qFirma"), osoba:V("qOsoba"), email:V("qMail"), telefon:V("qTel"), web:V("qWeb"), poznamka:V("qPozn")};
+  if(!t.zeme&&!t.spolecnost){ alert("Vyplňte aspoň zemi nebo společnost."); return; }
+  try{ await api("/api/kontakty/partneri",t); zavri(); await nacti(); toast("Uloženo"); }catch(e){ alert(e.message); }
+}
+async function smazPartner(id){
+  if(!confirm("Opravdu smazat tohoto partnera?")) return;
+  try{ await api("/api/kontakty/partneri/smazat",{id}); zavri(); await nacti(); toast("Smazáno"); }catch(e){ alert(e.message); }
+}
+
+function editSpecialista(id){
+  const s=id?D.specialiste.find(x=>x.id===id):{};
+  modal(id?"Úprava specialisty":"Nový specialista",
+    '<div class="grid2">'+pole("sJmeno","Jméno",s.jmeno)+pole("sOblast","Oblast / produkt",s.oblast)+'</div>'
+    +'<div class="grid2">'+pole("sMail","E-mail",s.email)+pole("sTel","Telefon",s.telefon)+'</div>',
+    paticka("ulozSpecialistu('"+(id||"")+"')", id?"smazSpecialistu('"+id+"')":null));
+}
+async function ulozSpecialistu(id){
+  const t={id:id||undefined, jmeno:V("sJmeno"), oblast:V("sOblast"), email:V("sMail"), telefon:V("sTel")};
+  if(!t.jmeno){ alert("Vyplňte jméno."); return; }
+  try{ await api("/api/kontakty/specialiste",t); zavri(); await nacti(); toast("Uloženo"); }catch(e){ alert(e.message); }
+}
+async function smazSpecialistu(id){
+  if(!confirm("Opravdu smazat tento záznam?")) return;
+  try{ await api("/api/kontakty/specialiste/smazat",{id}); zavri(); await nacti(); toast("Smazáno"); }catch(e){ alert(e.message); }
+}
+
+function editProvoz(id){
+  const v=id?D.provozy.find(x=>x.id===id):{};
+  modal(id?"Úprava provozu":"Nový provoz",
+    '<div class="grid2">'+pole("vDruh","Druh (FACTORY, TRANSPORT…)",v.druh)+pole("vTyp","Zaměření (METAL, HDPE…)",v.typ)+'</div>'
+    +pole("vOsoba","Odpovídá",v.osoba)+pole("vAdr","Adresa",v.adresa,"area")
+    +'<div class="grid2">'+pole("vMail","E-mail",v.email)+pole("vTel","Telefon",v.telefon)+'</div>',
+    paticka("ulozProvoz('"+(id||"")+"')", id?"smazProvoz('"+id+"')":null));
+}
+async function ulozProvoz(id){
+  const t={id:id||undefined, druh:V("vDruh"), typ:V("vTyp"), osoba:V("vOsoba"), adresa:V("vAdr"), email:V("vMail"), telefon:V("vTel")};
+  if(!t.druh&&!t.osoba){ alert("Vyplňte aspoň druh nebo odpovědnou osobu."); return; }
+  try{ await api("/api/kontakty/provozy",t); zavri(); await nacti(); toast("Uloženo"); }catch(e){ alert(e.message); }
+}
+async function smazProvoz(id){
+  if(!confirm("Opravdu smazat tento záznam?")) return;
+  try{ await api("/api/kontakty/provozy/smazat",{id}); zavri(); await nacti(); toast("Smazáno"); }catch(e){ alert(e.message); }
+}
+
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") zavri(); });
+nacti();
+</script>
+</body>
+</html>

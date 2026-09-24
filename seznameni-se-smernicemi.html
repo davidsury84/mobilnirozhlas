@@ -1463,6 +1463,7 @@ window.addEventListener("hashchange", route);
 let MUJ = { data:null, email:"", name:"", view:"dash", libFolder:null, modules:[], admin:false };
 function mujIcon(p){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>'; }
 const MUJ_IC = {
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/>',
   dash:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="11" width="7" height="10" rx="1.5"/><rect x="3" y="15" width="7" height="6" rx="1.5"/>',
   file:'<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>',
   book:'<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2V5z"/><path d="M19 18H6a2 2 0 0 0-2 2"/>',
@@ -1496,6 +1497,7 @@ const MUJ_MODS = [
   { key:"bozp", icon:MUJ_IC.shield, label:"BOZP" },
   { grp:"Kontakty" },
   { key:"telefon", icon:MUJ_IC.phone, label:"Telefonní seznam" },
+  { key:"kontaktysvet", icon:MUJ_IC.globe, label:"Zahraniční pobočky a partneři" },
   { grp:"Provozy" },
   { key:"sklady", icon:MUJ_IC.warehouse, label:"Sklady", gated:true },
   { key:"plasty", icon:MUJ_IC.droplet, label:"Plasty", gated:true },
@@ -1988,6 +1990,7 @@ function mjGo(key){
   else if(key==="bozp") showBozp();
   else if(key==="ukoly") showUkoly();
   else if(key==="telefon") showTelefon();
+  else if(key==="kontaktysvet") showKontaktySvet();
   else if(key==="zapisy") showZapisy();
   else if(key==="qooling") showQooling();
   else if(key==="skoleni") showSkoleni();
@@ -3093,6 +3096,12 @@ function showVozidla(){
   const body=document.getElementById("mujBody");
   if(!moduleVisible({key:"vozidla",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu Vozový park nemáte přístup. Uvidí ho správce vozu, zodpovědná osoba za středisko a správce intranetu.</div>'; return; }
   body.innerHTML='<iframe src="/vozidla" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f7f9f5" title="Vozový park — svěřená vozidla, technické prohlídky, inventarizace"></iframe>';
+  window.scrollTo(0,0);
+}
+function showKontaktySvet(){
+  MUJ.view="kontaktysvet"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  body.innerHTML='<iframe src="/kontakty" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f7f9f5" title="Zahraniční pobočky a partneři"></iframe>';
   window.scrollTo(0,0);
 }
 function tlCeleOkno(){

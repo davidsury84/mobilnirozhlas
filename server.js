@@ -3624,6 +3624,16 @@ try {
   console.error('[reklamace] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Zahraniční pobočky a partneři" (sekce Kontakty; vidí i edituje celá firma) ----
+let kontaktyMod = null;
+try {
+  kontaktyMod = require('./kontakty').mount({
+    send, readBody, empSession, isAdmin, getState, logActivity, dataDir: DATA_DIR,
+  });
+} catch (e) {
+  console.error('[kontakty] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 // ---- Modul „Vozový park" (svěřená vozidla, technické prohlídky, inventarizace) ----
 let vozidlaMod = null;
 try {
@@ -3933,6 +3943,8 @@ const server = http.createServer(async (req, res) => {
     if (konstrukceMod && await konstrukceMod.handle(req, res)) return;
     // Modul „Reklamace" si obslouží vlastní cesty (/reklamace*, /api/reklamace*).
     if (reklamaceMod && await reklamaceMod.handle(req, res)) return;
+    // Modul „Zahraniční pobočky a partneři" si obslouží vlastní cesty (/kontakty*, /api/kontakty*).
+    if (kontaktyMod && await kontaktyMod.handle(req, res)) return;
     // Modul „Vozový park" si obslouží vlastní cesty (/vozidla*, /api/vozidla*).
     if (vozidlaMod && await vozidlaMod.handle(req, res)) return;
     // Modul „Výroba Popelnice" si obslouží vlastní cesty (/vyroba*, /api/vyroba*).
