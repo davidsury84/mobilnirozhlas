@@ -111,16 +111,11 @@ async function loadEsk(){
       +'<label style="grid-column:1/-1">Zákazníci mimo eskalaci (vnitroskupinové firmy; jeden na řádek, přesný název z faktury): <textarea id="eVyl" rows="2" style="width:100%;font:inherit;font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:8px">'+esc((c.vylouceni||[]).join('\n'))+'</textarea></label>'
       +'<label style="font-weight:700"><input type="checkbox" id="eAkt" '+(c.aktivni?'checked':'')+'> Automatický denní běh zapnut (od 7 h)</label>'
       +'</div><div><button class="btn ok" onclick="ulozEsk()">Uložit nastavení</button> <button class="btn" onclick="rozeslatEsk()" title="Hned prověřit a rozeslat, co je nové">Rozeslat teď</button></div></details>'):'';
-  const bezEmail=[...new Set(all.filter(f=>!f.obchodnikEmail&&f.kdo).map(f=>f.kdo))];
-  const bezUtvar=[...new Set(all.filter(f=>!f.obchodnikEmail&&!f.kdo).map(f=>f.utvar||'(bez útvaru)'))];
   el.innerHTML='<div class="upom"><h2>⚖️ Eskalace faktur po splatnosti <span class="muted" style="font-weight:400;font-size:13px">· '+(E.admin||E.jeLucie?all.length+' faktur ≥ '+k.obchodnik+' dní':'vaše: '+moje.length+' faktur')+' · k '+den(E.den)+'</span></h2>'
     +(c.aktivni?'<div class="cfg" style="color:var(--green)"><b>● Automatika zapnuta</b> — každý den od 7 h.</div>':(E.admin?'<div class="warn"><b>Automatika je vypnutá.</b> Nic se neposílá samo — zapne ji správce v nastavení. První běh oznámí obchodníkům celý dosavadní backlog.</div>':''))
     +'<div class="cfg"><b>Jak to běží:</b> '+k.obchodnik+' dní po splatnosti → e-mail obchodníkovi (<b>'+k.rozhodnuti+' dny na rozhodnutí</b>) → obchodník zvolí <b>📨 Poslat upomínku</b> nebo <b>✎ Poznámka</b> (řeší sám) → upomínky odesílá '+esc((c.vyzvaKomu||[]).join(', '))+' přes Helios a odškrtne odeslání → <b>'+k.vyzvaPoUpomince+' dní po upomínce</b> předžalobní výzva (tisk, podpis '+esc(c.podpis.jmeno)+').</div>'
     +cfgHtml
-    +(E.admin&&(bezEmail.length||bezUtvar.length)?('<div class="warn"><b>Faktury bez vlastníka — chodí náhradnímu příjemci ('+esc((c.fallbackKomu||[]).join(', ')||'správci')+'). Přiřaď, komu mají chodit:</b><div style="margin:6px 0 0;line-height:2.2">'
-      +(bezEmail.length?('<div><b>Podle vystavitele</b> <span class="muted">(„E-SHOP" = faktury e-shopu, „ELKOPLAST CZ" = vystaveno firmou bez obchodníka):</span><br>'+bezEmail.map(n=>'<span style="white-space:nowrap;margin-right:10px">'+esc(n)+' → <input data-obch="'+esc(n)+'" value="'+esc((c.obchodnici||{})[n]||'')+'" placeholder="e-mail" style="width:210px;font-size:12px;padding:2px 6px"></span>').join('')+'</div>'):'')
-      +(bezUtvar.length?('<div><b>Bez vystavitele — podle útvaru:</b><br>'+bezUtvar.map(u=>'<span style="white-space:nowrap;margin-right:10px">'+esc(u)+' → <input data-utvar="'+esc(u)+'" value="'+esc((c.utvary||{})[u]||'')+'" placeholder="e-mail vedoucího" style="width:210px;font-size:12px;padding:2px 6px"></span>').join('')+'</div>'):'')
-      +'</div><button class="btn ok" style="margin-top:6px" onclick="ulozObch()">Uložit přiřazení</button></div>'):'')
+    +kdoSpravuje(all,c)
     +'<div class="kpis" style="margin:8px 0">'+[['red',cnt('bez-rozhodnuti'),'bez rozhodnutí přes '+k.rozhodnuti+' dny'],['amber',cnt('ceka-obchodnik')+cnt('nova'),'čeká na obchodníka'],['amber',cnt('upominka'),'k odeslání upomínky (Helios)'],['blue',cnt('po-upomince'),'po upomínce, běží '+k.vyzvaPoUpomince+' dní'],['red',cnt('vyzva')+cnt('vyzva-ceka'),'předžalobní výzva k odeslání'],['blue',cnt('poznamka'),'řeší obchodník']].map(x=>'<div class="kpi '+x[0]+'"><div class="v">'+x[1]+'</div><div class="l">'+esc(x[2])+'</div></div>').join('')+'</div>'
     +(fa.length?tbl(fa):'<div class="muted">Žádná faktura ≥ '+k.obchodnik+' dní po splatnosti'+(E.admin||E.jeLucie?'':' u vás')+'.</div>')+'</div>';
 }
@@ -151,6 +146,26 @@ function exportXlsx(typ){
 }
 async function eskPost(body){const r=await fetch('/api/nakup-report/eskalace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
 async function eskAkce(akce,pz,extra){try{await eskPost(Object.assign({akce,pz},extra||{}));await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
+// ---- KDO CO SPRAVUJE: evidence příjemců eskalace. Vystavitel na faktuře (Helios, sloupec „Příjmení a jméno") → e-mail:
+//  ručně (⚙️ mapa vystavitel → e-mail) › E-SHOP / ELKOPLAST CZ / prázdný → vedoucí útvaru (mapa útvar → e-mail) › DB zaměstnanců › nikdo = náhradní příjemce
+const ZDROJ={rucne:['ručně v nastavení','blue'],zamestnanec:['DB zaměstnanců (podle jména)','green'],utvar:['vedoucí útvaru (nastavení)','amber'],null:['NIKDO → náhradní příjemce','red']};
+function kdoSpravuje(all,c){
+  const spec=k=>!k||/^e-?shop$/i.test(k)||/^elkoplast/i.test(k);
+  // bez obchodníka (E-SHOP / ELKOPLAST CZ / prázdný vystavitel) = jeden řádek na ÚTVAR (vystavitelé se vypíší spolu), aby pole pro vedoucího útvaru bylo jen jednou
+  const g={}; all.forEach(f=>{const sp=spec(f.kdo); const key=sp?'\u00b7'+(f.utvar||'(bez útvaru)'):f.kdo; const e=g[key]||(g[key]={kdo:sp?'':f.kdo,kdos:new Set(),utvar:sp?(f.utvar||'(bez útvaru)'):null,utvary:new Set(),n:0,saldo:0,email:f.obchodnikEmail,zdroj:f.zdroj,zam:f.zamestnanec,ceka:0}); e.n++; e.saldo+=f.saldo; e.kdos.add(f.kdo||'(bez vystavitele)'); if(f.utvar)e.utvary.add(f.utvar); if(['nova','ceka-obchodnik','bez-rozhodnuti'].includes(f.faze))e.ceka++; if(f.obchodnikEmail&&!e.email){e.email=f.obchodnikEmail;e.zdroj=f.zdroj;}});
+  const rows=Object.values(g).sort((a,b)=>(!!a.email-!!b.email)||b.saldo-a.saldo);
+  const bez=rows.filter(r=>!r.email); const nahr=(E.nahradni||[]).join(', ');
+  const inp=(attr,key,val,ph)=>E.admin?'<input '+attr+'="'+esc(key)+'" value="'+esc(val||'')+'" placeholder="'+esc(ph)+'" style="width:220px;font-size:12px;padding:2px 6px">':'';
+  const trs=rows.map(r=>{const z=ZDROJ[r.zdroj||'null'];
+    const edit=r.utvar!=null?inp('data-utvar',r.utvar,(c.utvary||{})[r.utvar],'e-mail vedoucího útvaru'):inp('data-obch',r.kdo,(c.obchodnici||{})[r.kdo],r.email||'e-mail (přepíše párování)');
+    return '<tr'+(r.email?'':' style="background:#fdf2f2"')+'><td class="wrap"><b>'+esc(r.utvar!=null?[...r.kdos].join(' / '):r.kdo)+'</b>'+(r.zam&&r.zam!==r.kdo?'<br><span class="muted" style="font-size:11px">= '+esc(r.zam)+'</span>':'')+'</td><td class="muted wrap">'+esc(r.utvar!=null?r.utvar:[...r.utvary].join(', '))+'</td><td class="r">'+r.n+(r.ceka?' <span class="pill amber" title="čeká na rozhodnutí">'+r.ceka+'</span>':'')+'</td><td class="r"><b>'+kc(r.saldo)+'</b></td>'
+      +'<td>'+(r.email?'<b>'+esc(r.email)+'</b>':'<span class="err">'+esc(nahr||'správce')+'</span>')+(E.admin?'<br>'+edit:'')+'</td><td><span class="pill '+z[1]+'">'+z[0]+'</span></td></tr>';}).join('');
+  const specRows=E.admin?['E-SHOP','ELKOPLAST CZ'].filter(k=>all.some(f=>f.kdo===k)).map(k=>'<span style="white-space:nowrap;margin-right:14px">'+esc(k)+' (všechny útvary) → '+inp('data-obch',k,(c.obchodnici||{})[k],'e-mail — má přednost před útvarem')+'</span>').join(''):'';
+  return '<details class="cfg" '+(bez.length?'open':'')+' style="margin:0 0 10px"><summary style="cursor:pointer;font-size:13px"><b>👤 Kdo co spravuje</b> — evidence příjemců eskalace · '+rows.length+' vystavitelů'+(bez.length?' · <span class="err">'+bez.length+' bez vlastníka → náhradní příjemce '+esc(nahr||'správce')+'</span>':'')+'</summary>'
+    +'<div class="muted" style="margin:6px 0">Kdo fakturu spravuje, se bere ze sloupce <b>„Příjmení a jméno" na faktuře v Heliu</b> (vystavitel) a páruje s DB zaměstnanců intranetu. Vystavitel <b>E-SHOP</b>, <b>ELKOPLAST CZ</b> nebo prázdný nemá obchodníka — chodí <b>vedoucímu útvaru</b> (útvar z faktury). Kde nikdo není, chodí to náhradnímu příjemci. Správce může kohokoli přepsat ručně.</div>'
+    +'<div class="tblwrap" style="max-height:380px"><table><thead><tr><th>Vystavitel na faktuře (Helios)</th><th>Útvar</th><th class="r">Faktur</th><th class="r">Saldo Kč</th><th>Příjemce eskalace</th><th>Jak určeno</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
+    +(E.admin?'<div style="margin:8px 0 0;line-height:2.2">'+specRows+'<br><button class="btn ok" onclick="ulozObch()">Uložit přiřazení</button> <span class="muted" style="font-size:11px">prázdné pole = zrušit ruční přiřazení</span></div>':'')+'</details>';
+}
 // ---- K VAŠEMU ROZHODNUTÍ: jen faktury přiřazené přihlášenému, kde se čeká na jeho krok — velká tlačítka, úplně nahoře ----
 function renderMoje(moje,k){
   const el=$('#moje'); const rows=moje.filter(f=>['nova','ceka-obchodnik','bez-rozhodnuti'].includes(f.faze)).sort((a,b)=>(b.faze==='bez-rozhodnuti')-(a.faze==='bez-rozhodnuti')||b.dni-a.dni);

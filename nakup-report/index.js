@@ -126,19 +126,25 @@ function mount(host) {
   const TITULY = /\b(ing|mgr|bc|bca|mudr|judr|phdr|rndr|dis|ph\.?d|mba|ll\.?m|csc|dr|prof|doc)\b\.?/g;
   const jmenoTok = n => bezDiak(n).replace(TITULY, ' ').replace(/[.,]/g, ' ').split(/\s+/).filter(Boolean);
   function vlastnikUtvaru(utvar, cfg) { const u = bezDiak(utvar); const m = cfg.utvary || {}; const k = Object.keys(m).find(x => x && u.indexOf(bezDiak(x)) >= 0); return k && m[k] ? String(m[k]).toLowerCase() : null; }
-  function obchodnikEmail(kdo, cfg, utvar) {
-    const k = String(kdo || '').trim(); if (!k) return vlastnikUtvaru(utvar, cfg);
-    const rucne = cfg.obchodnici || {}; const rk = Object.keys(rucne).find(x => bezDiak(x) === bezDiak(k)); if (rk && rucne[rk]) return String(rucne[rk]).toLowerCase();
-    if (/^e-?shop$/i.test(k) || /^elkoplast/i.test(k)) return vlastnikUtvaru(utvar, cfg);
+  // Kdo fakturu spravuje (evidence): 1) ruční mapa „vystavitel → e-mail" (⚙️ nastavení), 2) vystavitel E-SHOP / ELKOPLAST CZ
+  // nebo prázdný → vedoucí útvaru (mapa „útvar → e-mail"), 3) jméno vystavitele z Helia spárované s DB zaměstnanců intranetu,
+  // 4) nikdo → náhradní příjemce (fallbackKomu, jinak správce). Vrací i zdroj, aby šlo v appce ukázat, PROČ to komu chodí.
+  const zUtvaru = (utvar, cfg) => { const e = vlastnikUtvaru(utvar, cfg); return e ? { email: e, zdroj: 'utvar' } : { email: null, zdroj: null }; };
+  function obchodnikInfo(kdo, cfg, utvar) {
+    const k = String(kdo || '').trim(); if (!k) return zUtvaru(utvar, cfg);
+    const rucne = cfg.obchodnici || {}; const rk = Object.keys(rucne).find(x => bezDiak(x) === bezDiak(k)); if (rk && rucne[rk]) return { email: String(rucne[rk]).toLowerCase(), zdroj: 'rucne' };
+    if (/^e-?shop$/i.test(k) || /^elkoplast/i.test(k)) return zUtvaru(utvar, cfg);
     let emps = []; try { emps = ((host.getState && host.getState().employees) || []).filter(e => e && e.email); } catch (_) {}
-    const t = jmenoTok(k); if (!t.length) return null;
+    const t = jmenoTok(k); if (!t.length) return { email: null, zdroj: null };
     const key = t.slice().sort().join(' ');
     let hit = emps.find(e => jmenoTok(e.name).sort().join(' ') === key);
     if (!hit) { const c = emps.filter(e => { const et = jmenoTok(e.name); return t.every(x => et.indexOf(x) >= 0); }); if (c.length === 1) hit = c[0]; }
     if (!hit && t.length >= 2) { const prij = t[0]; const c = emps.filter(e => jmenoTok(e.name).indexOf(prij) >= 0); if (c.length === 1) hit = c[0]; }   // na faktuře je příjmení první
     if (!hit && t.length >= 2) { const guess = [t[1] + '.' + t[0], t[0] + '.' + t[1]].map(x => x + '@elkoplast.cz'); hit = emps.find(e => guess.indexOf(String(e.email).toLowerCase()) >= 0); }
-    return hit ? String(hit.email).toLowerCase() : vlastnikUtvaru(utvar, cfg);
+    return hit ? { email: String(hit.email).toLowerCase(), zdroj: 'zamestnanec', zamestnanec: hit.name } : zUtvaru(utvar, cfg);
   }
+  function obchodnikEmail(kdo, cfg, utvar) { return obchodnikInfo(kdo, cfg, utvar).email; }
+  function nahradniPrijemci(cfg) { const f = cleanEmails(cfg.fallbackKomu || []); return f.length ? f : cleanEmails([process.env.SUPERADMIN || 'david.sury@elkoplast.cz']); }
   const vyloucen = (x, cfg) => (cfg.vylouceni || []).some(v => v && bezDiak(x.org) === bezDiak(v));
   const dnesISO = () => new Date().toISOString().slice(0, 10);
   const dniOd = iso => iso ? Math.round((Date.now() - Date.parse(iso)) / 86400000) : null;
@@ -157,12 +163,12 @@ function mount(host) {
     const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; const dnes = dnesISO(); const out = [];
     (P ? P.faktury : []).forEach(x => { if (x.dni < cfg.kroky.obchodnik) return;
       if (vyloucen(x, cfg)) return;
-      const st = d.stav[x.pz] || {}; const em = obchodnikEmail(x.kdo, cfg, x.utvar);
+      const st = d.stav[x.pz] || {}; const oi = obchodnikInfo(x.kdo, cfg, x.utvar), em = oi.email;
       const odd = cfg.oddeleni.find(o => utvarPatri(x.utvar, o.utvary)); let prom = null, doProm = null;
       if (odd && odd.promlceniMes) { const pr = new Date(x.spl + 'T00:00:00Z'); pr.setUTCMonth(pr.getUTCMonth() + odd.promlceniMes); prom = pr.toISOString().slice(0, 10); doProm = Math.round((Date.parse(prom) - Date.parse(dnes)) / 86400000); }
-      const rec = Object.assign({}, x, { obchodnikEmail: em, oddeleni: odd ? odd.key : null, promlceni: prom, doPromlceni: doProm, faze: fazeFaktury(x, st, cfg), stav: st });
+      const rec = Object.assign({}, x, { obchodnikEmail: em, zdroj: oi.zdroj, zamestnanec: oi.zamestnanec || null, oddeleni: odd ? odd.key : null, promlceni: prom, doPromlceni: doProm, faze: fazeFaktury(x, st, cfg), stav: st });
       if (!filtr || filtr(rec)) out.push(rec); });
-    return { cfg, faktury: out.sort((a, b) => b.dni - a.dni), den: P ? P.den : '' };
+    return { cfg, faktury: out.sort((a, b) => b.dni - a.dni), den: P ? P.den : '', nahradni: nahradniPrijemci(cfg) };
   }
   function vyzvaData(org) {
     const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; if (!P) return null;
@@ -184,7 +190,7 @@ function mount(host) {
   async function tickEskalace() {
     const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; if (!P) return { ok: false, error: 'bez snímku pohledávek' };
     const dnes = dnesISO(), publicUrl = ((host.mailFrom && host.mailFrom.publicUrl) || 'https://intranet.elkoplast.cz').replace(/\/$/, '');
-    const fallback = cleanEmails(cfg.fallbackKomu || []).length ? cleanEmails(cfg.fallbackKomu) : cleanEmails([process.env.SUPERADMIN || 'david.sury@elkoplast.cz']);
+    const fallback = nahradniPrijemci(cfg);
     const lucie = cleanEmails(cfg.vyzvaKomu || []).length ? cleanEmails(cfg.vyzvaKomu) : fallback;
     const vysledky = [], perObch = {}, perObch2 = {}, upomLucii = [], vyzvyLucii = {};
     const oddKomuPro = x => { const o = cfg.oddeleni.find(o2 => utvarPatri(x.utvar, o2.utvary)); return o ? cleanEmails(o.komu || []) : []; };
@@ -1693,7 +1699,7 @@ function mount(host) {
       if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu.' }); return true; }
       const e = eskalacePrehled(), se = host.empSession && host.empSession(req), em = ((se && se.email) || '').toLowerCase();
       const jeLucie = cleanEmails(e.cfg.vyzvaKomu || []).indexOf(em) >= 0;
-      return json(res, 200, { ok: true, admin: host.isAdmin(req), ja: em, jeLucie, den: e.den, faktury: e.faktury, cfg: e.cfg }), true;
+      return json(res, 200, { ok: true, admin: host.isAdmin(req), ja: em, jeLucie, den: e.den, faktury: e.faktury, cfg: e.cfg, nahradni: e.nahradni }), true;
     }
     if (p === '/api/nakup-report/eskalace' && req.method === 'POST') {
       if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu.' }); return true; }
