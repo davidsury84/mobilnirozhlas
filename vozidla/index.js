@@ -341,10 +341,11 @@ function mount(host) {
     return out;
   }
   // Komu poslat: správci vozu; když není, zodpovědné osobě za středisko.
-  function zadostiPrehled(d, r) {
+  function zadostiPrehled(d, r, jenId) {
     const lide = new Map();      // email → { email, jmeno, duvod, vozidla: [] }
     const bezAdresata = [];
     d.vozidla.filter(v => v.stav === 'aktivni').forEach(v => {
+      if (jenId && v.id !== jenId) return;          // žádost jen k jednomu vozidlu
       if (r && !smiEditovat(v, r)) return;          // vedoucí řeší jen svoje středisko
       const chybi = chybejiciUdaje(v);
       if (!chybi.length) return;
@@ -466,6 +467,7 @@ function mount(host) {
     const d = load(), r = role(req);
     const vozy = viditelna(d, r).map(v => Object.assign({}, v, {
       stav_: stavVozu(v, d.nastaveni),
+      chybi: chybejiciUdaje(v),      // pro tlačítko „žádost o doplnění" u řádku
       smiEdit: smiEditovat(v, r),
       spravceKontakt: kontakt(v.spravceEmail),                    // živě z databáze zaměstnanců
       zodpovednyKontakt: (() => { const z = d.zodpovedne.find(x => x.stredisko === v.stredisko); return z ? Object.assign({ role: z.role }, kontakt(z.email)) : null; })(),
@@ -798,7 +800,7 @@ function mount(host) {
     const d = load(), r = role(req);
     if (!r.admin && !r.zodpovedny) { json(res, 403, { chyba: 'Žádost rozesílá správce modulu nebo zodpovědná osoba za středisko.' }); return true; }
     const b = JSON.parse(await host.readBody(req) || '{}');
-    const prehled = zadostiPrehled(d, r.admin ? null : r);
+    const prehled = zadostiPrehled(d, r.admin ? null : r, String(b.id || '') || null);
     if (b.nahled) {
       const ukazka = prehled.lide.length ? zadostText(prehled.lide[0], r.name || '') : '';
       json(res, 200, Object.assign({ ok: true, ukazka }, prehled)); return true;

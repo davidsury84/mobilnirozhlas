@@ -428,7 +428,10 @@ function vykresliPrehled(){
       +'<td class="num">'+(e?kmBunka(v,pk):(pk?cis(pk.km)+' km<div class="mut">za '+pk.rok+'</div>':'<span class="mut">nezadán</span>'))+'</td>'
       +'<td class="num">'+(v.stav_.prodej&&v.stav_.prodej.najezd?cis(v.stav_.prodej.najezd)+'<div class="mut">km/rok</div>':'<span class="mut">—</span>')+'</td>'
       +'<td>'+stavPill(v)+(v.stav_.upozorneni.length?'<div class="upoz">'+v.stav_.upozorneni.map(u=>'<span class="u'+(u.urgent?" urg":"")+'">'+esc(u.text)+'</span>').join("")+'</div>':'')+'</td>'
-      +'<td style="text-align:right;white-space:nowrap"><span class="radekStav" id="rs_'+v.id+'"></span> <button class="btn sm" onclick="detail(\''+v.id+'\')">Detail</button></td>'
+      +'<td style="text-align:right;white-space:nowrap"><span class="radekStav" id="rs_'+v.id+'"></span> '
+      +(((D.me.admin||D.me.zodpovedny)&&(v.chybi||[]).length)
+        ?'<button class="btn sm" title="Poslat žádost o doplnění: '+esc((v.chybi||[]).join(", "))+'" onclick="zadostVuz(\''+v.id+'\')">✉</button> ':'')
+      +'<button class="btn sm" onclick="detail(\''+v.id+'\')">Detail</button></td>'
       +'</tr>';
   });
   h+='</tbody></table></div>';
@@ -602,6 +605,26 @@ async function zadostNahled(){
   modal("Žádost o doplnění údajů",h,
     (L.length?'<button class="btn pri" onclick="zadostOdeslat()">Odeslat ('+L.length+')</button>':'')
     +'<button class="btn" onclick="zavri()">Zavřít</button>');
+}
+// Žádost k jednomu vozidlu — rovnou z řádku přehledu nebo z detailu.
+async function zadostVuz(id){
+  let n; try{ n=await api("/api/vozidla/zadost",{nahled:true,id}); }catch(e){ alert(e.message); return; }
+  if(!n.lide.length){
+    alert(n.bezAdresata.length
+      ? "Tomuhle vozidlu není komu žádost poslat — nemá správce ani zodpovědnou osobu za středisko."
+      : "U tohoto vozidla nic nechybí.");
+    return;
+  }
+  const z=n.lide[0], v=z.vozidla[0];
+  if(!confirm("Poslat žádost o doplnění?\n\nKomu: "+(z.jmeno||z.email)+" ("+z.duvod+")\nVozidlo: "+v.spz+(v.popis?" "+v.popis:"")
+    +"\nChybí: "+v.chybi.join(", ")
+    +(z.naposled?("\n\nPoslední žádost: "+new Date(z.naposled).toLocaleDateString("cs-CZ")):"")))return;
+  try{
+    const r=await api("/api/vozidla/zadost",{id,komu:[z.email]});
+    zavri();
+    toast(r.odeslano?("Žádost odeslána — "+(z.jmeno||z.email)):"E-mail se nepodařilo odeslat");
+    await nacti();
+  }catch(e){ alert(e.message); }
 }
 async function zadostOdeslat(){
   const komu=[...document.querySelectorAll(".zadostChk")].filter(c=>c.checked).map(c=>c.value);
@@ -782,6 +805,8 @@ function detail(id){
   }
   h+='</div></div>';
   const paticka=(D.me.admin?'<button class="btn danger" onclick="smazVuz(\''+v.id+'\')">Smazat vozidlo</button><button class="btn" onclick="editVuz(\''+v.id+'\')">Upravit údaje</button>':'')
+    +(((D.me.admin||D.me.zodpovedny)&&(v.chybi||[]).length)
+      ?'<button class="btn" onclick="zadostVuz(\''+v.id+'\')">✉ Žádost o doplnění</button>':'')
     +'<button class="btn" onclick="zavri()">Zavřít</button>';
   modal((v.spz||v.vin||"Vozidlo")+" · "+[v.znacka,v.model].filter(Boolean).join(" "),h,paticka);
 }
