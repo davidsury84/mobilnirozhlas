@@ -498,6 +498,88 @@ function extNoveHeslo() {
   const kus = () => Array.from(crypto.randomBytes(4)).map(b => abc[b % abc.length]).join('');
   return kus() + '-' + kus() + '-' + kus();
 }
+// Odkaz z pozvánky: platí 7 dní a jen dokud sedí razítko uložené u účtu
+// (po nastavení hesla se razítko smaže → odkaz přestane platit).
+const POZV_PLATNOST = 7 * 24 * 3600 * 1000;
+function pozvSign(email, ts) {
+  const data = b64url(JSON.stringify({ e: (email || '').toLowerCase(), t: ts }));
+  const sig = crypto.createHmac('sha256', SEC.secret).update('pinv:' + data).digest('hex').slice(0, 32);
+  return data + '.' + sig;
+}
+function pozvVerify(str) {
+  if (!str) return null;
+  const i = String(str).lastIndexOf('.'); if (i < 0) return null;
+  const data = str.slice(0, i), sig = str.slice(i + 1);
+  const exp = crypto.createHmac('sha256', SEC.secret).update('pinv:' + data).digest('hex').slice(0, 32);
+  if (sig !== exp) return null;
+  let o = null; try { o = JSON.parse(b64urlDecode(data)); } catch (_) { return null; }
+  if (!o || !o.e || !o.t) return null;
+  if (Date.now() - o.t > POZV_PLATNOST) return null;                 // prošlá
+  const d = readExterni();
+  const u = d.ucty.find(x => (x.email || '').toLowerCase() === o.e);
+  if (!u || u.aktivni === false || u.pozvankaVydana !== o.t) return null;   // použitá nebo zrušená
+  return u;
+}
+// Text pozvánky — slovensky nebo česky podle jazyka účtu. Heslo se NEPOSÍLÁ:
+// v odkazu si ho člověk nastaví sám, takže e-mailem neputuje.
+function pozvankaText(u, odkaz, odesilatel) {
+  const sk = (u.jazyk || 'sk') === 'sk';
+  const jmeno = u.jmeno || u.email;
+  if (sk) {
+    return 'Dobrý deň, ' + jmeno + ',\n\n'
+      + 'zriadili sme Vám prístup do intranetu ELKOPLAST. Keďže nemáte firemný účet Google, '
+      + 'prihlasovať sa budete e-mailom a vlastným heslom.\n\n'
+      + 'AKO SI ÚČET ZALOŽÍTE (3 kroky)\n'
+      + '1. Otvorte tento odkaz (platí 7 dní):\n   ' + odkaz + '\n'
+      + '2. Zvoľte si heslo (aspoň 8 znakov) a potvrďte ho.\n'
+      + '3. Hotovo — systém Vás rovno prihlási.\n\n'
+      + 'NABUDÚCE sa prihlásite na https://intranet.elkoplast.cz — dole na prihlasovacej obrazovke '
+      + 'vyplňte e-mail (' + u.email + ') a svoje heslo.\n\n'
+      + 'Čo uvidíte: ' + (u.moduly || []).length + ' sekcií — školenia, konštrukcia, zadanie do výroby, '
+      + 'rozdelenie obchodníkov, výroba Popelnice a kalkulačky. Firemné dokumenty a personálne veci sa Vám nezobrazujú.\n\n'
+      + 'Ak odkaz vypršal, napíšte mi a pošlem nový.\n\nS pozdravom,\n' + (odesilatel || 'správca intranetu ELKOPLAST');
+  }
+  return 'Dobrý den, ' + jmeno + ',\n\n'
+    + 'zřídili jsme vám přístup do intranetu ELKOPLAST. Protože nemáte firemní účet Google, '
+    + 'budete se hlásit e-mailem a vlastním heslem.\n\n'
+    + 'JAK SI ÚČET ZALOŽÍTE (3 kroky)\n'
+    + '1. Otevřete tento odkaz (platí 7 dní):\n   ' + odkaz + '\n'
+    + '2. Zvolte si heslo (aspoň 8 znaků) a potvrďte ho.\n'
+    + '3. Hotovo — systém vás rovnou přihlásí.\n\n'
+    + 'PŘÍŠTĚ se přihlásíte na https://intranet.elkoplast.cz — dole na přihlašovací obrazovce '
+    + 'vyplňte e-mail (' + u.email + ') a svoje heslo.\n\n'
+    + 'Co uvidíte: ' + (u.moduly || []).length + ' sekcí — školení, konstrukce, zadání do výroby, '
+    + 'rozdělení obchodníků, výroba Popelnice a kalkulačky. Firemní dokumenty a personální agenda se vám nezobrazují.\n\n'
+    + 'Pokud odkaz vypršel, napište mi a pošlu nový.\n\nS pozdravem,\n' + (odesilatel || 'správce intranetu ELKOPLAST');
+}
+// Vydá (nebo obnoví) pozvánku a pošle ji e-mailem. Vrací { ok, odkaz, chyba }.
+async function pozvankaPoslat(u, baseUrl, odesilatel) {
+  const d = readExterni();
+  const zaznam = d.ucty.find(x => (x.email || '').toLowerCase() === (u.email || '').toLowerCase());
+  if (!zaznam) return { ok: false, chyba: 'Účet nenalezen.' };
+  zaznam.pozvankaVydana = Date.now();
+  writeExterni(d);
+  const odkaz = baseUrl + '/partner/zalozeni?t=' + encodeURIComponent(pozvSign(zaznam.email, zaznam.pozvankaVydana));
+  const predmet = (zaznam.jazyk || 'sk') === 'sk'
+    ? 'Prístup do intranetu ELKOPLAST — založenie účtu'
+    : 'Přístup do intranetu ELKOPLAST — založení účtu';
+  const text = pozvankaText(zaznam, odkaz, odesilatel);
+  try {
+    await deliver({
+      to: zaznam.email, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST',
+      subject: predmet, text,
+      html: '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.65;color:#0f1512">'
+        + esc(text).replace(/\n/g, '<br>').replace(esc(odkaz), '<a href="' + esc(odkaz) + '">' + esc(odkaz) + '</a>')
+        + '</div>',
+    });
+    const d2 = readExterni();
+    const z2 = d2.ucty.find(x => (x.email || '').toLowerCase() === (u.email || '').toLowerCase());
+    if (z2) { z2.pozvankaOdeslana = Date.now(); writeExterni(d2); }
+    return { ok: true, odkaz };
+  } catch (e) {
+    return { ok: false, chyba: e.message, odkaz };   // odkaz vrátíme i tak — dá se předat ručně
+  }
+}
 function extUcet(email) {
   email = (email || '').toLowerCase().trim(); if (!email) return null;
   const u = readExterni().ucty.find(x => (x.email || '').toLowerCase() === email);
@@ -3985,6 +4067,71 @@ const server = http.createServer(async (req, res) => {
   // Healthcheck (veřejný, vždy 200) – pro Railway healthcheck a jednoznačnou identifikaci běžícího nasazení.
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
+    // Založení hesla z pozvánky (veřejné, ale jen s platným podepsaným odkazem)
+    if (p === '/partner/zalozeni' && req.method === 'GET') {
+      const ucet = pozvVerify(u.query.t || '');
+      const sk = !ucet || (ucet.jazyk || 'sk') === 'sk';
+      const css = 'body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;display:grid;place-items:center;'
+        + 'background:radial-gradient(900px 480px at 100% -8%,#e6f6ec,transparent 62%),#eef1ec;color:#0f1512}'
+        + '.card{width:min(94vw,440px);background:#fff;border:1px solid #e3e7e0;border-radius:16px;box-shadow:0 10px 30px rgba(15,21,18,.08);padding:30px 28px}'
+        + 'h1{font-size:19px;margin:0 0 6px}p{color:#5b635c;font-size:13.5px;line-height:1.6;margin:0 0 14px}'
+        + 'ol{color:#5b635c;font-size:13.5px;line-height:1.7;padding-left:20px;margin:0 0 16px}'
+        + 'label{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#5b635c;margin:0 0 4px}'
+        + 'input{width:100%;padding:12px 14px;border:1px solid #cdd3ca;border-radius:10px;font-size:15px;margin-bottom:12px;font-family:inherit;box-sizing:border-box}'
+        + 'input:focus{outline:none;border-color:#12a350}button{width:100%;padding:12px;border:none;border-radius:10px;'
+        + 'background:linear-gradient(135deg,#15ab57,#0a6b34);color:#fff;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit}'
+        + '.err{color:#c23636;font-size:13px;min-height:18px;margin-top:8px}.mono{font-family:ui-monospace,Menlo,monospace}';
+      if (!ucet) {
+        return send(res, 200, '<!doctype html><html lang="sk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+          + '<title>Odkaz neplatí</title><style>' + css + '</style></head><body><div class="card">'
+          + '<h1>Odkaz už neplatí</h1><p>Pozvánka platí 7 dní a dá sa použiť raz. Napíšte správcovi intranetu, pošle Vám novú.<br><br>'
+          + 'Pozvánka platí 7 dní a lze ji použít jednou. Napište správci intranetu, pošle vám novou.</p>'
+          + '<p><a href="/">← intranet.elkoplast.cz</a></p></div></body></html>',
+          { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      }
+      const t = esc(u.query.t || '');
+      return send(res, 200, '<!doctype html><html lang="' + (sk ? 'sk' : 'cs') + '"><head><meta charset="utf-8">'
+        + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>' + (sk ? 'Založenie účtu' : 'Založení účtu') + ' — ELKOPLAST</title>'
+        + '<style>' + css + '</style></head><body><div class="card">'
+        + '<h1>' + (sk ? 'Vitajte v intranete ELKOPLAST' : 'Vítejte v intranetu ELKOPLAST') + '</h1>'
+        + '<p>' + (sk ? 'Účet' : 'Účet') + ' <b class="mono">' + esc(ucet.email) + '</b>'
+        + (sk ? ' — zvoľte si heslo a ste vnútri.' : ' — zvolte si heslo a jste uvnitř.') + '</p>'
+        + '<ol><li>' + (sk ? 'Zadajte heslo (aspoň 8 znakov) a zopakujte ho.' : 'Zadejte heslo (aspoň 8 znaků) a zopakujte ho.') + '</li>'
+        + '<li>' + (sk ? 'Kliknite na „Založiť účet“ — rovno Vás prihlásime.' : 'Klikněte na „Založit účet“ — rovnou vás přihlásíme.') + '</li>'
+        + '<li>' + (sk ? 'Nabudúce sa hlásite na intranet.elkoplast.cz týmto e-mailom a heslom.' : 'Příště se hlásíte na intranet.elkoplast.cz tímto e-mailem a heslem.') + '</li></ol>'
+        + '<form onsubmit="return go(event)">'
+        + '<label>' + (sk ? 'Nové heslo' : 'Nové heslo') + '</label><input id="h1" type="password" autocomplete="new-password">'
+        + '<label>' + (sk ? 'Heslo znova' : 'Heslo znovu') + '</label><input id="h2" type="password" autocomplete="new-password">'
+        + '<button type="submit">' + (sk ? 'Založiť účet' : 'Založit účet') + '</button><div class="err" id="e"></div></form>'
+        + '<script>var T=' + JSON.stringify(t) + ';async function go(ev){ev.preventDefault();'
+        + 'var e=document.getElementById("e"),a=document.getElementById("h1").value,b=document.getElementById("h2").value;e.textContent="";'
+        + 'if(a.length<8){e.textContent=' + JSON.stringify(sk ? 'Heslo musí mať aspoň 8 znakov.' : 'Heslo musí mít aspoň 8 znaků.') + ';return false;}'
+        + 'if(a!==b){e.textContent=' + JSON.stringify(sk ? 'Heslá sa nezhodujú.' : 'Hesla se neshodují.') + ';return false;}'
+        + 'try{var r=await fetch("/partner/heslo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({t:T,heslo:a})});'
+        + 'var j=await r.json().catch(function(){return {}});'
+        + 'if(r.ok&&j.ok){location.href="/";}else{e.textContent=j.chyba||"Chyba.";}}catch(x){e.textContent="Chyba spojenia.";}return false;}<\/script>'
+        + '</div></body></html>',
+        { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    }
+    if (p === '/partner/heslo' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
+      const ucet = pozvVerify(b.t || '');
+      if (!ucet) return send(res, 400, { chyba: 'Odkaz už neplatí. / Odkaz už neplatí.' });
+      const heslo = String(b.heslo || '');
+      if (heslo.length < 8) return send(res, 400, { chyba: 'Heslo musí mít aspoň 8 znaků.' });
+      const d = readExterni();
+      const z = d.ucty.find(x => (x.email || '').toLowerCase() === (ucet.email || '').toLowerCase());
+      if (!z) return send(res, 404, { chyba: 'Účet nenalezen.' });
+      z.salt = crypto.randomBytes(16).toString('hex');
+      z.hash = extHash(heslo, z.salt);
+      z.hesloVydano = Date.now();
+      delete z.pozvankaVydana;                    // odkaz je tím spotřebovaný
+      writeExterni(d);
+      logActivity('partner-ucet', { email: z.email, name: z.jmeno || '' }, 'Partner si založil heslo');
+      const sess = empSign({ email: z.email, name: z.jmeno || z.email, x: 1 });
+      const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
+      return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=43200' + secure });
+    }
     // Přihlášení partnerského účtu (kolegové bez firemního Google účtu)
     if (p === '/auth/partner' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -4008,8 +4155,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=43200' + secure });
     }
 
+  // Pozvánka partnera (založení hesla) musí být dostupná bez přihlášení — chrání ji podepsaný odkaz.
+  const partnerPublic = (p === '/partner/zalozeni' && req.method === 'GET') || (p === '/partner/heslo' && req.method === 'POST');
+
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !spokojenostPublic && !libraryIngestPublic && !garantiPublic && !vyrobaIngestPublic) {
+  if (!gatePassed(req) && !partnerPublic && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !spokojenostPublic && !libraryIngestPublic && !garantiPublic && !vyrobaIngestPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -4284,6 +4434,7 @@ const server = http.createServer(async (req, res) => {
           email: u.email, jmeno: u.jmeno || '', firma: u.firma || '', jazyk: u.jazyk || 'sk', mena: u.mena || 'EUR',
           moduly: u.moduly || [], aktivni: u.aktivni !== false, vytvoreno: u.vytvoreno || null,
           posledniPrihlaseni: u.posledniPrihlaseni || null, hesloVydano: u.hesloVydano || null,
+          maHeslo: !!u.hash, pozvankaOdeslana: u.pozvankaOdeslana || null, pozvankaCeka: !!u.pozvankaVydana,
         })),
       });
     }
@@ -4316,8 +4467,9 @@ const server = http.createServer(async (req, res) => {
       if (b.mena !== undefined) u.mena = String(b.mena || 'EUR').slice(0, 3).toUpperCase();
       if (Array.isArray(b.moduly)) u.moduly = b.moduly.map(String);
       if (!Array.isArray(u.moduly)) u.moduly = EXT_VYCHOZI_MODULY.slice();
+      // Heslo si člověk nastaví sám z pozvánky; vygenerované heslo je jen nouzová cesta.
       let heslo = null;
-      if (i < 0 || b.noveHeslo) {
+      if (b.noveHeslo) {
         heslo = extNoveHeslo();
         u.salt = crypto.randomBytes(16).toString('hex');
         u.hash = extHash(heslo, u.salt);
@@ -4325,9 +4477,15 @@ const server = http.createServer(async (req, res) => {
       }
       if (i < 0) d.ucty.push(u);
       writeExterni(d);
-      logActivity('externi', empSession(req) || { email: 'správce' }, (i < 0 ? 'Založen' : 'Upraven') + ' partnerský účet ' + email + (heslo ? ' (nové heslo)' : ''));
+      logActivity('externi', empSession(req) || { email: 'správce' }, (i < 0 ? 'Založen' : 'Upraven') + ' partnerský účet ' + email + (heslo ? ' (nouzové heslo)' : ''));
+      // Nový účet (nebo výslovné přání) → pozvánka s návodem a odkazem na založení hesla.
+      let pozvanka = null;
+      if (b.pozvanka || (i < 0 && !b.bezPozvanky && !heslo)) {
+        const kdo = empSession(req);
+        pozvanka = await pozvankaPoslat(u, baseUrl(req), (kdo && kdo.name) || '');
+      }
       // Heslo se vrací JEN teď — uložené je pouze jeho otisk, podruhé ho nikdo nepřečte.
-      return send(res, 200, { ok: true, heslo });
+      return send(res, 200, { ok: true, heslo, pozvanka });
     }
     if (p === '/api/activity' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); const log = readJson(ACTLOG_F, []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 200); return send(res, 200, { events: log }); }
     if (p === '/api/invites' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, { invites: readInvites() }); }

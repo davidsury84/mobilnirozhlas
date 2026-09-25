@@ -6037,10 +6037,12 @@ async function extLoad(){
         '<div class="muted mono" style="font-size:12px">'+esc(x.email)+'</div>'+
         (x.firma?'<div class="muted" style="font-size:12px">'+esc(x.firma)+' · '+esc(x.jazyk||"sk")+' · '+esc(x.mena||"EUR")+'</div>':'')+'</td>'+
       '<td class="muted" style="font-size:12px">'+esc((x.moduly||[]).map(extLabel).join(", ")||"—")+'</td>'+
-      '<td class="muted" style="font-size:12px">'+(x.posledniPrihlaseni?new Date(x.posledniPrihlaseni).toLocaleString("cs-CZ"):"nikdy")+'</td>'+
+      '<td class="muted" style="font-size:12px">'+(x.posledniPrihlaseni?new Date(x.posledniPrihlaseni).toLocaleString("cs-CZ")
+        :(x.pozvankaCeka?'<span class="pill amber">čeká na založení hesla</span>':(x.maHeslo?"nikdy":'<span class="pill">bez hesla</span>')))+
+        (x.pozvankaOdeslana?'<div class="muted" style="font-size:11px">pozvánka '+new Date(x.pozvankaOdeslana).toLocaleDateString("cs-CZ")+'</div>':'')+'</td>'+
       '<td style="text-align:right;white-space:nowrap">'+
         '<button class="btn ghost sm" onclick="extUprav(\''+esc(x.email)+'\')">Upravit</button> '+
-        '<button class="btn ghost sm" onclick="extHeslo(\''+esc(x.email)+'\')">Nové heslo</button> '+
+        '<button class="btn ghost sm" onclick="extPozvanka(\''+esc(x.email)+'\')">Poslat pozvánku</button> '+
         '<button class="btn ghost sm" onclick="extPrepnout(\''+esc(x.email)+'\','+(x.aktivni?'false':'true')+')">'+(x.aktivni?'Vypnout':'Zapnout')+'</button>'+
       '</td></tr>').join("")+'</tbody></table>';
 }
@@ -6059,11 +6061,12 @@ function extFormular(u){
         '<input type="checkbox" class="exMod" value="'+m[0]+'"'+(moduly.indexOf(m[0])>=0?" checked":"")+'> '+esc(m[1])+'</label>').join("")+
     '</div></div>';
 }
-function extNovy(){ extModal("Nový partnerský účet", extFormular(null), '<button class="btn ghost" onclick="closeModal()">Zrušit</button><button class="btn" onclick="extUlozit(true)">Založit a vygenerovat heslo</button>'); }
+function extNovy(){ extModal("Nový partnerský účet", extFormular(null), '<button class="btn ghost" onclick="closeModal()">Zrušit</button><button class="btn" onclick="extUlozit(true)">Založit a poslat pozvánku</button>'); }
 function extUprav(email){
   const u=(EXT_DATA.ucty||[]).find(x=>x.email===email); if(!u)return;
   extModal("Partnerský účet — "+(u.jmeno||u.email), extFormular(u),
     '<button class="btn ghost" style="margin-right:auto;color:#b3261e" onclick="extSmazat(\''+esc(email)+'\')">Smazat</button>'+
+    '<button class="btn ghost" onclick="extHeslo(\''+esc(email)+'\')">Nouzové heslo</button>'+
     '<button class="btn ghost" onclick="closeModal()">Zrušit</button><button class="btn" onclick="extUlozit(false)">Uložit</button>');
 }
 async function extPosli(telo){
@@ -6080,12 +6083,35 @@ async function extUlozit(novy){
       firma:document.getElementById("exFirma").value, jazyk:document.getElementById("exJazyk").value,
       mena:document.getElementById("exMena").value, moduly});
     closeModal(); await extLoad();
-    if(j.heslo) extUkazHeslo(email,j.heslo); else toast("Uloženo");
+    if(j.pozvanka) extVysledekPozvanky(email,j.pozvanka);
+    else if(j.heslo) extUkazHeslo(email,j.heslo);
+    else toast("Uloženo");
   }catch(e){ alert(e.message); }
 }
+async function extPozvanka(email){
+  if(!confirm("Poslat pozvánku na "+email+"?\n\nDostane odkaz (platí 7 dní), kde si sám nastaví heslo."))return;
+  try{ const j=await extPosli({email, pozvanka:true}); await extLoad(); extVysledekPozvanky(email,j.pozvanka); }
+  catch(e){ alert(e.message); }
+}
+function extVysledekPozvanky(email,v){
+  if(v&&v.ok){
+    extModal("Pozvánka odeslána",
+      '<p style="margin:0 0 10px">Na <strong>'+esc(email)+'</strong> odešel e-mail s návodem a odkazem, kde si nastaví vlastní heslo. Odkaz platí <strong>7 dní</strong> a dá se použít jednou.</p>'+
+      '<p class="muted" style="margin:0;font-size:13px">Heslo e-mailem neputuje — zvolí si ho sám.</p>',
+      '<button class="btn" onclick="closeModal()">Hotovo</button>');
+    return;
+  }
+  // pošta neprošla — odkaz předá správce ručně
+  extModal("Pozvánku se nepodařilo odeslat",
+    '<p style="margin:0 0 10px">E-mail neodešel'+(v&&v.chyba?(' ('+esc(v.chyba)+')'):'')+'. Odkaz můžete poslat ručně — platí 7 dní:</p>'+
+    '<div class="mono" style="font-size:12px;word-break:break-all;background:var(--paper);border:1px solid var(--line-strong);border-radius:10px;padding:12px">'+esc((v&&v.odkaz)||"—")+'</div>',
+    ((v&&v.odkaz)?'<button class="btn" onclick="copyText(\''+esc((v&&v.odkaz)||"")+'\');toast(\'Odkaz zkopírován\')">Zkopírovat odkaz</button>':'')+
+    '<button class="btn ghost" onclick="closeModal()">Zavřít</button>');
+}
+// Nouzová cesta, když někomu nechodí pošta — heslo vygeneruje správce a předá ho osobně.
 async function extHeslo(email){
-  if(!confirm("Vygenerovat nové heslo? Staré přestane platit."))return;
-  try{ const j=await extPosli({email, noveHeslo:true}); await extLoad(); extUkazHeslo(email,j.heslo); }
+  if(!confirm("Vygenerovat heslo za něj?\n\nBěžně si heslo nastavuje člověk sám z pozvánky. Tohle použij, jen když mu nedorazil e-mail — heslo mu pak musíš předat bezpečně ty. Staré heslo přestane platit."))return;
+  try{ const j=await extPosli({email, noveHeslo:true}); closeModal(); await extLoad(); extUkazHeslo(email,j.heslo); }
   catch(e){ alert(e.message); }
 }
 async function extPrepnout(email,zapnout){
