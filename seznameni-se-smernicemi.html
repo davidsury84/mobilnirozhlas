@@ -4017,12 +4017,30 @@ function vykCvzRender(){
   const q=(VYK.cvzQ||'').toLowerCase(); const C=(VYK.det.cvz||[]).filter(c=>!q||(c.cvz+' '+c.zak+' '+(c.plan?c.plan.vyrobek+' '+c.plan.zakaznik:'')).toLowerCase().indexOf(q)>=0);
   const faze=p=>p&&p.faze&&p.faze.length?p.faze.map(f=>'<span title="'+esc(f.n)+'" style="display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:2px;background:'+(f.ok?'var(--green-2)':'#e6e9e3')+'"></span>').join(''):'';
   box.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>'+['ČVZ','Zakázka (Helios)','Výrobek (plán)','Ks plán','Zákazník','Termín','Fáze','Operací','Ks odvedeno','Lidí','Režie h','Odvádění'].map((h,i)=>'<th style="text-align:'+(i>=7&&i<=10?'right':'left')+';'+vykTh+'">'+h+'</th>').join('')+'</tr></thead><tbody>'
-    +C.slice(0,120).map(c=>'<tr><td style="'+vykTd+'"><b>'+esc(c.cvz)+'</b></td><td style="'+vykTd+';max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(c.zak)+'">'+esc(c.zak||'—')+'</td>'
+    +C.slice(0,120).map(c=>'<tr id="vykRow-'+esc(c.cvz)+'"><td style="'+vykTd+';white-space:nowrap">'+(c.plan?'<a href="#" onclick="vykCvzDetail(\''+esc(c.cvz)+'\');return false" title="Načíst řádek z plánu výroby" style="font-weight:700;color:var(--green-d);text-decoration:underline dotted">'+esc(c.cvz)+'</a> <a href="'+esc(c.plan.url)+'" target="_blank" rel="noopener" title="Otevřít řádek '+c.plan.row+' v Google tabulce" style="text-decoration:none;font-size:12px">↗</a>':'<b>'+esc(c.cvz)+'</b>')+'</td><td style="'+vykTd+';max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(c.zak)+'">'+esc(c.zak||'—')+'</td>'
       +'<td style="'+vykTd+'">'+(c.plan?esc(c.plan.vyrobek||'—'):'<span class="muted">—</span>')+'</td><td style="'+vykTd+';text-align:right">'+(c.plan&&c.plan.ks!=null?vykF(c.plan.ks):'')+'</td>'
       +'<td style="'+vykTd+';max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c.plan?esc(c.plan.zakaznik||''):'')+'</td><td style="'+vykTd+';white-space:nowrap">'+(c.plan?esc(c.plan.termin||''):'')+'</td><td style="'+vykTd+'">'+faze(c.plan)+'</td>'
       +'<td style="'+vykTd+';text-align:right"><b>'+vykF(c.rows)+'</b></td><td style="'+vykTd+';text-align:right">'+vykF(c.ks)+'</td><td style="'+vykTd+';text-align:right">'+c.lide+'</td><td style="'+vykTd+';text-align:right">'+(c.rezieH?vykF(c.rezieH):'—')+'</td>'
       +'<td style="'+vykTd+';white-space:nowrap;font-size:12px;color:var(--ink-soft)">'+vykD(c.first)+' – '+vykD(c.last)+'</td></tr>').join('')+'</tbody></table>'
-    +'<p class="muted" style="font-size:12px;margin:8px 2px 0">'+C.length+' zakázek s odváděním v období'+(C.length>120?' (zobrazeno 120 podle počtu operací)':'')+' · fáze = zelené = v plánu odškrtnuto ('+esc(((VYK.det.plan||{}).faze||[]).join(' / '))+').</p>';
+    +'<p class="muted" style="font-size:12px;margin:8px 2px 0">'+C.length+' zakázek s odváděním v období'+(C.length>120?' (zobrazeno 120 podle počtu operací)':'')+' · fáze = zelené = v plánu odškrtnuto ('+esc(((VYK.det.plan||{}).faze||[]).join(' / '))+')'+(VYK.det.plan&&VYK.det.plan.url?' · <a href="'+esc(VYK.det.plan.url)+'" target="_blank" rel="noopener">↗ otevřít plán výroby</a>':'')+' · kliknutím na ČVZ načtete řádek z tabulky.</p>';
+}
+// Rozbalí pod zakázkou celý řádek z Google tabulky (živě přes Sheets API; při chybě hodnoty z posledního syncu).
+async function vykCvzDetail(cvz){
+  const tr=document.getElementById('vykRow-'+cvz); if(!tr) return;
+  const ex=document.getElementById('vykRowDet-'+cvz); if(ex){ ex.remove(); return; }
+  const det=document.createElement('tr'); det.id='vykRowDet-'+cvz;
+  det.innerHTML='<td colspan="12" style="padding:10px 14px;background:var(--bg-2);border-bottom:1px solid var(--line)"><span class="muted">Načítám řádek z plánu výroby…</span></td>';
+  tr.after(det);
+  try{
+    const r=await fetch('/api/vykonnost/plan/'+VYK.zavod+'/'+encodeURIComponent(cvz),{cache:'no-store'}); const j=await r.json();
+    if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status));
+    let pole=j.pole;
+    if(!pole){ const it=j.item||{}; pole=[['Výrobek',it.vyrobek],['Ks',it.ks],['RAL',it.ral],['Zákazník',it.zakaznik],['Kontakt',it.kontakt],['Termín',it.termin],['Skutečný',it.skutecny],['Expedice',it.exp]].map(x=>({label:x[0],value:x[1]==null?'':String(x[1])})).concat((it.faze||[]).map(f=>({label:f.n,value:f.ok?'✔':''}))); }
+    const cells=pole.filter(x=>String(x.value).trim()!=='').map(x=>'<div style="min-width:0"><div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.03em">'+esc(x.label||'—')+'</div><div style="font-size:13px;word-break:break-word">'+esc(x.value)+'</div></div>').join('');
+    det.firstChild.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b>'+esc(cvz)+'</b><span class="muted" style="font-size:12px">list „'+esc(j.tab)+'", řádek '+j.row+' · '+(j.live?'živě z Google tabulky':'z posledního syncu '+(j.syncedAt?new Date(j.syncedAt).toLocaleString('cs-CZ'):''))+'</span><a class="btn sm ghost" href="'+esc(j.url)+'" target="_blank" rel="noopener">↗ Otevřít v tabulce</a><button class="btn sm ghost" onclick="vykCvzDetail(\''+esc(cvz)+'\')">Zavřít</button></div>'
+      +(j.warn?'<div style="color:#a86a00;font-size:12px;margin-bottom:6px">'+esc(j.warn)+'</div>':'')
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 14px">'+(cells||'<span class="muted">Řádek je prázdný.</span>')+'</div>';
+  }catch(e){ det.firstChild.innerHTML='<span style="color:#a03a2c">Řádek se nepodařilo načíst: '+esc(e.message)+'</span>'; }
 }
 function vykKvalitaRender(){
   const box=document.getElementById('vykKvalita'), K=VYK.det.kvalita||{}, A=VYK.det.autori||[];

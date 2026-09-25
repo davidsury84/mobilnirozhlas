@@ -2902,6 +2902,20 @@ async function sheetsUpdate(spreadsheetId, range, rows) {
   });
 }
 // Názvy všech listů tabulky (aby šly načítat i další listy, ne jen první).
+// Listy tabulky s jejich gid (kvůli odkazu na konkrétní řádek: #gid=…&range=A12).
+async function sheetsTabs(spreadsheetId) {
+  if (!GOOGLE_SA_CLIENT_EMAIL || !GOOGLE_SA_PRIVATE_KEY) throw new Error('Service account (GOOGLE_SA_*) není nastaven.');
+  const token = await sheetsGetToken();
+  const apiPath = '/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '?fields=sheets.properties(title,sheetId)';
+  return await new Promise((resolve, reject) => {
+    const r = https.request({ method: 'GET', hostname: 'sheets.googleapis.com', path: apiPath, headers: { 'Authorization': 'Bearer ' + token } }, resp => {
+      let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(((j || {}).sheets || []).map(s => s.properties || {}).filter(x => x.title).map(x => ({ title: x.title, gid: x.sheetId }))); reject(new Error('Sheets tabs ' + resp.statusCode + ': ' + d.slice(0, 200))); });
+    });
+    r.on('error', e => reject(new Error('Spojení se Sheets: ' + e.message)));
+    r.setTimeout(20000, () => { try { r.destroy(new Error('Sheets: časový limit spojení.')); } catch (_) {} });
+    r.end();
+  });
+}
 async function sheetsMeta(spreadsheetId) {
   if (!GOOGLE_SA_CLIENT_EMAIL || !GOOGLE_SA_PRIVATE_KEY) throw new Error('Service account (GOOGLE_SA_*) není nastaven.');
   const token = await sheetsGetToken();
@@ -3941,7 +3955,7 @@ try {
 let vykonnostMod = null;
 try {
   vykonnostMod = require('./vykonnost').mount({
-    send, readBody, isAdmin, empSession, employeeModules, getState, sheetsGet, sheetsMeta,
+    send, readBody, isAdmin, empSession, employeeModules, getState, sheetsGet, sheetsMeta, sheetsTabs,
     dataDir: DATA_DIR,
   });
 } catch (e) {

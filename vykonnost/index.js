@@ -144,20 +144,26 @@ function mount(host) {
       const S = i => i >= 0 ? String(row[i] == null ? '' : row[i]).trim() : '';
       const ks = parseFloat(String(S(c.ks)).replace(',', '.'));
       items[cvz] = { vyrobek: S(c.vyr), ks: isFinite(ks) ? ks : null, ral: S(c.ral), zakaznik: S(c.zak), termin: S(c.termin), skutecny: S(c.skut), exp: S(c.exp), kontakt: S(c.kontakt),
-        faze: faze.map(f => ({ n: f.n, ok: !!String(row[f.i] == null ? '' : row[f.i]).trim() })) };
+        faze: faze.map(f => ({ n: f.n, ok: !!String(row[f.i] == null ? '' : row[f.i]).trim() })), row: r + 1 };  // row = číslo řádku v tabulce (1-based)
     }
-    return { items, header: H, faze: faze.map(f => f.n) };
+    // hlavička pro zobrazení celého řádku: kde je 2. řádek prázdný, doplní se skupinový název z 1. řádku
+    const labels = H.map((h, i) => h || H0[i] || '');
+    return { items, header: H, labels, faze: faze.map(f => f.n) };
   }
   async function syncPlan(z) {
     if (!host.sheetsGet || !z.plan || !z.plan.sheetId) return { ok: false, error: 'plán není nastaven' };
-    let tab = '';
-    try { const titles = host.sheetsMeta ? await host.sheetsMeta(z.plan.sheetId) : []; tab = (titles || []).find(t => z.plan.tabRe.test(String(t))) || ''; if (!tab && titles && titles.length) tab = titles[0]; } catch (e) { return { ok: false, error: 'listy: ' + e.message }; }
+    let tab = '', gid = null;
+    try {
+      const tabs = host.sheetsTabs ? await host.sheetsTabs(z.plan.sheetId) : (host.sheetsMeta ? (await host.sheetsMeta(z.plan.sheetId) || []).map(t => ({ title: t, gid: null })) : []);
+      const hit = (tabs || []).find(t => z.plan.tabRe.test(String(t.title))) || (tabs || [])[0];
+      if (hit) { tab = hit.title; gid = hit.gid; }
+    } catch (e) { return { ok: false, error: 'listy: ' + e.message }; }
     const range = (tab ? "'" + tab.replace(/'/g, "''") + "'!" : '') + 'A1:AZ5000';
     const r = await host.sheetsGet(z.plan.sheetId, range);
     const p = parsePlanValues((r && r.values) || []);
     const n = Object.keys(p.items).length;
     if (!n) return { ok: false, error: 'list „' + tab + '": ' + (p.warn || 'žádné zakázky') };
-    fs.writeFileSync(PLAN_F(z.key), JSON.stringify({ zavod: z.key, tab, syncedAt: new Date().toISOString(), faze: p.faze, items: p.items }));
+    fs.writeFileSync(PLAN_F(z.key), JSON.stringify({ zavod: z.key, sheetId: z.plan.sheetId, tab, gid, syncedAt: new Date().toISOString(), faze: p.faze, header: p.header, labels: p.labels, items: p.items }));
     return { ok: true, tab, items: n };
   }
   async function syncPlans() {
@@ -206,7 +212,8 @@ function mount(host) {
       .sort((a, b) => b.rows - a.rows);
     // párování na plán
     const plan = loadPlan(z.key); const P = (plan && plan.items) || {};
-    const cvzArr = Object.values(cvzs).map(C => { const p = P[C.cvz]; return { cvz: C.cvz, zak: C.zak, rows: C.rows, ks: Math.round(C.ks), rezieH: Math.round(C.rezieH), lide: C.lide.size, ops: C.ops.size, first: C.first, last: C.last, plan: p ? { vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, skutecny: p.skutecny, exp: p.exp, faze: p.faze } : null }; })
+    const planUrl = row => plan && plan.sheetId ? 'https://docs.google.com/spreadsheets/d/' + plan.sheetId + '/edit#gid=' + (plan.gid != null ? plan.gid : 0) + (row ? '&range=A' + row + ':AZ' + row : '') : '';
+    const cvzArr = Object.values(cvzs).map(C => { const p = P[C.cvz]; return { cvz: C.cvz, zak: C.zak, rows: C.rows, ks: Math.round(C.ks), rezieH: Math.round(C.rezieH), lide: C.lide.size, ops: C.ops.size, first: C.first, last: C.last, plan: p ? { vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, skutecny: p.skutecny, exp: p.exp, faze: p.faze, row: p.row, url: planUrl(p.row) } : null }; })
       .sort((a, b) => b.rows - a.rows);
     const sparovano = cvzArr.filter(c => c.plan).length;
     return {
@@ -218,7 +225,7 @@ function mount(host) {
       rezie: { kategorie: Object.values(rezKat).sort((a, b) => b.h - a.h).map(k => ({ kat: k.kat, h: Math.round(k.h), rows: k.rows, lide: k.lide.size })), polozky: Object.values(rezPol).sort((a, b) => b.h - a.h).slice(0, 15).map(p => ({ text: p.text, h: Math.round(p.h), rows: p.rows, lide: [...p.lide].slice(0, 4) })) },
       cvz: cvzArr.slice(0, 200), sparovano, autori: Object.entries(autori).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, rows: n })),
       kvalita: { future, nulKs, bezCvz, bezJmena },
-      plan: plan ? { tab: plan.tab, items: Object.keys(P).length, syncedAt: plan.syncedAt, faze: plan.faze || [] } : null
+      plan: plan ? { tab: plan.tab, items: Object.keys(P).length, syncedAt: plan.syncedAt, faze: plan.faze || [], url: planUrl(0) } : null
     };
   }
   // Přehled všech závodů (poslední 4 týdny do snímku + celý rok)
@@ -255,6 +262,21 @@ function mount(host) {
       const s = statsZavod(z, parseAnyDate(u.query.od) || '', parseAnyDate(u.query.do) || '');
       if (!s) { json(res, 200, { zavod: z.key, name: z.name, data: false, error: ((loadState().zavody || {})[z.key] || {}).error || 'Zatím nesynchronizováno — server si export stáhne při nejbližší hodinové kontrole.' }); return true; }
       json(res, 200, Object.assign({ data: true }, s)); return true;
+    }
+    // Živé načtení řádku zakázky z Google tabulky (plán výroby) — čerstvé hodnoty všech sloupců.
+    const mp = /^\/api\/vykonnost\/plan\/([a-z]+)\/([A-Za-z0-9]+)$/.exec(p);
+    if (mp && req.method === 'GET') {
+      const z = zavodOf(mp[1]); const plan = z && loadPlan(z.key); const cvz = String(mp[2]).toUpperCase();
+      if (!z || !plan) { json(res, 404, { error: 'Plán výroby pro tento závod není načten.' }); return true; }
+      const it = plan.items[cvz]; if (!it) { json(res, 404, { error: 'Zakázka ' + cvz + ' v plánu není.' }); return true; }
+      const labels = plan.labels || plan.header || [];
+      const url = 'https://docs.google.com/spreadsheets/d/' + plan.sheetId + '/edit#gid=' + (plan.gid != null ? plan.gid : 0) + '&range=A' + it.row + ':AZ' + it.row;
+      let values = null, live = false, warn = '';
+      try { if (host.sheetsGet && it.row) { const rg = "'" + String(plan.tab).replace(/'/g, "''") + "'!A" + it.row + ':AZ' + it.row; const r = await host.sheetsGet(plan.sheetId, rg); values = ((r && r.values) || [])[0] || null; live = !!values; } }
+      catch (e) { warn = 'Živé načtení selhalo (' + e.message + ') — zobrazeny hodnoty z posledního syncu.'; }
+      const pole = labels.map((l, i) => ({ label: l, value: values ? String(values[i] == null ? '' : values[i]) : '' })).filter(x => x.label || x.value);
+      json(res, 200, { cvz, zavod: z.key, tab: plan.tab, row: it.row, url, live, warn, syncedAt: plan.syncedAt, pole: live ? pole : null, item: it });
+      return true;
     }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
     if (p === '/api/vykonnost/sync' && req.method === 'POST') {
