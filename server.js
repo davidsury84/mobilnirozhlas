@@ -1395,15 +1395,24 @@ const MOBILIAR_OBEC_TEXTY = { do1000: 'do 1 000 obyvatel', '1000-5000': '1–5 t
 function mobiliarVerejneVysledky() {
   const res = readJson(MOBILIAR_F, []);
   const prod = {};
-  MOBILIAR_KATEGORIE.forEach(k => { for (let i = 1; i <= k.pocet; i++) prod[k.key + '-' + String(i).padStart(3, '0')] = { kod: k.key + '-' + String(i).padStart(3, '0'), kat: k.key, zobrazeno: 0, vybrano: 0 }; });
+  // u každého produktu držíme i rozpad hlasů po segmentech (role / velikost obce) jako {klíč:[zobrazeno,vybráno]}
+  MOBILIAR_KATEGORIE.forEach(k => { for (let i = 1; i <= k.pocet; i++) { const kod = k.key + '-' + String(i).padStart(3, '0'); prod[kod] = { kod, kat: k.key, zobrazeno: 0, vybrano: 0, role: {}, obec: {} }; } });
   let sestic = 0, vybrano = 0;
   const pocty = pole => { const c = {}; res.forEach(r => { const v = r[pole] || 'neuvedeno'; c[v] = (c[v] || 0) + 1; }); return c; };
-  res.forEach(r => { Object.entries(r.votes || {}).forEach(([kod, v]) => { const p = prod[kod]; if (!p) return; p.zobrazeno++; sestic++; if (v > 0) { p.vybrano++; vybrano++; } }); });
+  res.forEach(r => {
+    const rk = r.role || 'neuvedeno', ok = r.obec || 'neuvedeno';
+    Object.entries(r.votes || {}).forEach(([kod, v]) => {
+      const p = prod[kod]; if (!p) return;
+      p.zobrazeno++; sestic++;
+      (p.role[rk] = p.role[rk] || [0, 0])[0]++; (p.obec[ok] = p.obec[ok] || [0, 0])[0]++;
+      if (v > 0) { p.vybrano++; vybrano++; p.role[rk][1]++; p.obec[ok][1]++; }
+    });
+  });
   const roleC = pocty('role'), obecC = pocty('obec');
   return {
     respondentu: res.length, sestic: Math.floor(sestic / 6), vybrano,
-    pozice: Object.keys(roleC).map(k => ({ t: MOBILIAR_ROLE_TEXTY[k] || k, pocet: roleC[k] })).sort((a, b) => b.pocet - a.pocet),
-    obce: Object.keys(obecC).map(k => ({ t: MOBILIAR_OBEC_TEXTY[k] || k, pocet: obecC[k] })).sort((a, b) => b.pocet - a.pocet),
+    pozice: Object.keys(roleC).map(k => ({ k, t: MOBILIAR_ROLE_TEXTY[k] || k, pocet: roleC[k] })).sort((a, b) => b.pocet - a.pocet),
+    obce: Object.keys(obecC).map(k => ({ k, t: MOBILIAR_OBEC_TEXTY[k] || k, pocet: obecC[k] })).sort((a, b) => b.pocet - a.pocet),
     kategorie: MOBILIAR_KATEGORIE,
     produkty: Object.values(prod).filter(p => p.zobrazeno > 0),
   };

@@ -61,6 +61,11 @@ var STUPNE=[
   {id:3,lbl:'3. stupeň — nízká obliba',pod:'vybírá je méně než polovina (< 50 %)',barva:'#9aa39b',min:0,max:0.50}
 ];
 function stupenId(rate){ for(var i=0;i<STUPNE.length;i++){ if(rate>=STUPNE[i].min && rate<STUPNE[i].max) return STUPNE[i].id; } return 3; }
+/* segment: '' = všichni; jinak 'role:<klíč>' nebo 'obec:<klíč>'. Rozdělovník obliby dle pozice/obce. */
+var SEG='', KROSTYP='role', MIN_SEG=5;
+function segData(p){ if(!SEG) return [p.zobrazeno,p.vybrano]; var a=SEG.split(':'); var m=(p[a[0]]||{})[a[1]]; return m?[m[0],m[1]]:[0,0]; }
+function segNazev(){ if(!SEG) return 'všichni respondenti'; var a=SEG.split(':'); var list=a[0]==='role'?DATA.pozice:DATA.obce; var it=(list||[]).filter(x=>x.k===a[1])[0]; return (a[0]==='role'?'pozice — ':'velikost obce — ')+(it?it.t:a[1]); }
+function topProSegment(typ,klic,n){ var arr=DATA.produkty.map(function(p){ var m=(p[typ]||{})[klic]||[0,0]; return {kod:p.kod,kat:p.kat,z:m[0],v:m[1],rate:m[0]?m[1]/m[0]:0}; }).filter(x=>x.z>=Math.min(MIN_SEG,3)); arr.sort((a,b)=>b.rate-a.rate||b.v-a.v); return arr.slice(0,n); }
 function render(){
   var d=DATA;
   var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap"><h1>Který mobiliář se líbí nejvíc?</h1>'+
@@ -79,16 +84,37 @@ function render(){
     '<div class="card"><strong style="display:block;margin-bottom:8px;font-size:14px">Velikost obce</strong>'+
       d.obce.map(x=>'<div class="radek"><span class="t">'+esc(x.t)+'</span><span class="bar"><i style="width:'+pct(x.pocet,maxO)+'%"></i></span><span class="c">'+x.pocet+'</span></div>').join('')+'</div></div>';
   var katNazvy={}; d.kategorie.forEach(k=>katNazvy[k.key]=k.nazev);
-  var vsePr=d.produkty.map(p=>({...p,rate:p.zobrazeno?p.vybrano/p.zobrazeno:0}));
-  var nad50=vsePr.filter(p=>p.rate>=0.5).length;
+  /* ---- rozšířený rozpad: co se líbí komu (obliba podle pozice / velikosti obce) ---- */
+  h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">'+
+      '<strong style="font-size:15px">Co se líbí komu — obliba podle '+(KROSTYP==='role'?'pozice respondenta':'velikosti obce')+'</strong>'+
+      '<div style="display:flex;gap:6px"><button class="pill'+(KROSTYP==='role'?' on':'')+'" onclick="KROSTYP=\'role\';render()">podle pozice</button>'+
+        '<button class="pill'+(KROSTYP==='obec'?' on':'')+'" onclick="KROSTYP=\'obec\';render()">podle velikosti obce</button></div></div>'+
+    '<p class="hint" style="margin-bottom:10px">Nejoblíbenější kousky u jednotlivých skupin respondentů (jen skupiny s dostatkem odpovědí). Klepnutím na skupinu zobrazíte celý žebříček jen za ni.</p>';
+  var skupiny=(KROSTYP==='role'?d.pozice:d.obce).filter(x=>x.pocet>=3 && x.k!=='neuvedeno');
+  if(!skupiny.length){ h+='<p class="hint">Zatím málo dat pro rozpad podle skupin.</p>'; }
+  else{
+    h+='<div style="display:flex;flex-direction:column;gap:10px">'+skupiny.map(function(g){
+      var top=topProSegment(KROSTYP,g.k,3);
+      var aktivni=(SEG===KROSTYP+':'+g.k);
+      var karty=top.length?top.map(function(p){ return '<div style="flex:0 0 92px;text-align:center"><div style="position:relative;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;aspect-ratio:1/0.8"><img loading="lazy" src="/mobiliar-foto/'+p.kod+'.jpg" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"><span style="position:absolute;bottom:0;right:0;background:var(--green-d);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:6px 0 0 0">'+Math.round(p.rate*100)+' %</span></div><div class="hint" style="font-size:9.5px;margin-top:2px">WD-'+p.kod.toUpperCase()+'</div></div>'; }).join(''):'<span class="hint">málo dat</span>';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:8px;border:1.5px solid '+(aktivni?'var(--green)':'var(--line)')+';border-radius:12px;background:'+(aktivni?'var(--green-soft)':'var(--paper)')+';cursor:pointer" onclick="SEG=SEG===\''+KROSTYP+':'+g.k+'\'?\'\':\''+KROSTYP+':'+g.k+'\';render()">'+
+        '<div style="flex:0 0 160px"><div style="font-weight:700;font-size:13.5px">'+esc(g.t)+'</div><div class="hint">'+g.pocet+' respondentů'+(aktivni?' · zobrazeno níže':'')+'</div></div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">'+karty+'</div></div>';
+    }).join('')+'</div></div>';
+  }
+  /* ---- hlavní žebříček (respektuje segment + kategorii + stupně) ---- */
+  var vsePr=d.produkty.map(function(p){ var sd=segData(p); return {...p,z:sd[0],v:sd[1],rate:sd[0]?sd[1]/sd[0]:0}; });
+  var minZ=SEG?MIN_SEG:1;
+  var nad50=vsePr.filter(p=>p.z>=minZ && p.rate>=0.5).length;
   h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
-      '<strong style="font-size:15px">Produkty rozdělené do 3 stupňů obliby <span class="hint" style="font-weight:400">· '+nad50+' produktů nad 50 %</span></strong>'+
-      '<label style="font-size:13px;color:var(--ink-soft);cursor:pointer;user-select:none"><input type="checkbox" '+(ZOBRAZIT_C?'checked':'')+' onclick="ZOBRAZIT_C=this.checked;render()" style="vertical-align:-2px;margin-right:5px">zobrazit i 3. stupeň (pod 50 %)</label></div>'+
-    '<div class="pills">'+
+      '<strong style="font-size:15px">Žebříček — obliba nad 50 % ve 2 stupních <span class="hint" style="font-weight:400">· '+nad50+' produktů · '+esc(segNazev())+'</span></strong>'+
+      '<label style="font-size:13px;color:var(--ink-soft);cursor:pointer;user-select:none"><input type="checkbox" '+(ZOBRAZIT_C?'checked':'')+' onclick="ZOBRAZIT_C=this.checked;render()" style="vertical-align:-2px;margin-right:5px">zobrazit i 3. stupeň (pod 50 %)</label></div>';
+  if(SEG) h+='<p class="hint" style="margin:-4px 0 10px">Zobrazeno jen za skupinu <b>'+esc(segNazev())+'</b> (min. '+MIN_SEG+' zobrazení produktu v této skupině). <a href="#" onclick="SEG=\'\';render();return false" style="color:var(--green-d)">zrušit filtr</a></p>';
+  h+='<div class="pills">'+
     '<button class="pill'+(KAT===''?' on':'')+'" onclick="KAT=\'\';render()">Vše</button>'+
     d.kategorie.map(k=>'<button class="pill'+(KAT===k.key?' on':'')+'" onclick="KAT=\''+k.key+'\';render()">'+esc(k.nazev)+'</button>').join('')+'</div>';
-  var prods=vsePr.filter(p=>(!KAT||p.kat===KAT)&&p.zobrazeno>0);
-  prods.sort((a,b)=>b.rate-a.rate||b.vybrano-a.vybrano||b.zobrazeno-a.zobrazeno);
+  var prods=vsePr.filter(p=>(!KAT||p.kat===KAT)&&p.z>=minZ);
+  prods.sort((a,b)=>b.rate-a.rate||b.v-a.v||b.z-a.z);
   var vykresleno=0;
   STUPNE.forEach(function(st){
     if(st.id===3 && !ZOBRAZIT_C) return;
@@ -103,7 +129,7 @@ function render(){
       '<div class="prod"><div class="foto"><img loading="lazy" src="/mobiliar-foto/'+p.kod+'.jpg" alt=""><span class="poradi" style="background:'+st.barva+'">'+Math.round(p.rate*100)+' %</span></div>'+
       '<div class="info"><span class="rate">WD-'+p.kod.toUpperCase()+'</span>'+
       '<div class="bar"><i style="width:'+Math.round(p.rate*100)+'%;background:'+st.barva+'"></i></div>'+
-      '<div class="hint">vybráno '+p.vybrano+'× z '+p.zobrazeno+' zobrazení · '+esc(katNazvy[p.kat]||'')+'</div></div></div>').join('')+'</div>';
+      '<div class="hint">vybráno '+p.v+'× z '+p.z+' zobrazení · '+esc(katNazvy[p.kat]||'')+'</div></div></div>').join('')+'</div>';
   });
   if(!vykresleno) h+='<p class="hint">Zatím žádná data'+(KAT?' v této kategorii':'')+'.</p>';
   h+='</div>';
@@ -127,6 +153,14 @@ function stahni(){
   d.produkty.map(p=>({...p,rate:p.zobrazeno?p.vybrano/p.zobrazeno:0})).filter(p=>p.zobrazeno>0)
     .sort((a,b)=>b.rate-a.rate||b.vybrano-a.vybrano||b.zobrazeno-a.zobrazeno)
     .forEach((p,i)=>r.push([i+1,stupenId(p.rate),'WD-'+p.kod.toUpperCase(),katnaz[p.kat]||p.kat,Math.round(p.rate*100),p.vybrano,p.zobrazeno]));
+  // rozpad obliby podle pozice a velikosti obce (top 5 v každé skupině)
+  [['role','Nejoblíbenější podle pozice respondenta',d.pozice],['obec','Nejoblíbenější podle velikosti obce',d.obce]].forEach(function(dim){
+    r.push([]); r.push([dim[1],'(1. až 5. nej v dané skupině)']);
+    dim[2].filter(g=>g.pocet>=3 && g.k!=='neuvedeno').forEach(function(g){
+      var top=topProSegment(dim[0],g.k,5);
+      r.push([g.t+' ('+g.pocet+' resp.)'].concat(top.map(p=>'WD-'+p.kod.toUpperCase()+' — '+Math.round(p.rate*100)+' %')));
+    });
+  });
   stahniCSV('vysledky-mobiliar-'+new Date().toISOString().slice(0,10)+'.csv',r);
 }
 function nactiPptx(cb){
@@ -183,6 +217,15 @@ function stahniPptx(){ nactiPptx(function(){
   var vit=d.kategorie.map(function(k){ var kp=d.produkty.map(x=>Object.assign({},x,{rate:x.zobrazeno?x.vybrano/x.zobrazeno:0})).filter(x=>x.kat===k.key&&x.zobrazeno>=8).sort((a,b)=>b.rate-a.rate)[0]; return kp?[k.nazev,'WD-'+kp.kod.toUpperCase(),Math.round(kp.rate*100)+' %']:[k.nazev,'—','—']; });
   s.addTable([[{text:'Kategorie',options:th()},{text:'Vítězný model',options:th()},{text:'Oblíbenost',options:th()}]].concat(vit.map(r=>[{text:r[0],options:td()},{text:r[1],options:td()},{text:r[2],options:Object.assign(td(),{bold:true,color:GRND})}])),
     {x:0.7,y:1.6,w:11.9,colW:[5.5,4,2.4],border:{type:'solid',color:'DCE4DC',pt:1}});
+  // obliba podle pozice / velikosti obce — tabulka top 3 v každé skupině
+  [['role','Obliba podle pozice respondenta',d.pozice],['obec','Obliba podle velikosti obce',d.obce]].forEach(function(dim){
+    var grp=dim[2].filter(g=>g.pocet>=3 && g.k!=='neuvedeno'); if(!grp.length) return;
+    var sx=p.addSlide(); nadpis(sx,dim[1]);
+    var rows=[[{text:(dim[0]==='role'?'Pozice':'Velikost obce'),options:th()},{text:'Resp.',options:th()},{text:'1. nejoblíbenější',options:th()},{text:'2.',options:th()},{text:'3.',options:th()}]];
+    grp.forEach(function(g){ var t=topProSegment(dim[0],g.k,3);
+      rows.push([{text:g.t,options:Object.assign(td(),{bold:true})},{text:String(g.pocet),options:td()}].concat([0,1,2].map(function(i){ return {text:t[i]?('WD-'+t[i].kod.toUpperCase()+'  ('+Math.round(t[i].rate*100)+' %)'):'—',options:td()}; }))); });
+    sx.addTable(rows,{x:0.7,y:1.6,w:11.9,colW:[3.6,1.1,2.73,2.73,2.73],border:{type:'solid',color:'DCE4DC',pt:1},valign:'middle'});
+  });
   p.writeFile({fileName:'vysledky-mobiliar-'+new Date().toISOString().slice(0,10)+'.pptx'});
 });}
 function nadpis(s,t){ s.addText(t,{x:0.7,y:0.5,w:12,h:0.7,fontSize:24,bold:true,color:INK}); s.addShape('line',{x:0.7,y:1.25,w:12,h:0,line:{color:GRN,width:2}}); }
