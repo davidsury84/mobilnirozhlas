@@ -397,6 +397,7 @@ function vykresliPrehled(){
       +[["","vše"],["provoz","jen vozidla v provozu"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["nepotvrzeno","jen nepotvrzený správce"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
         .map(([k,t])=>'<option value="'+k+'" '+(FILTR.jen===k?"selected":"")+'>'+t+'</option>').join("")+'</select>'
     +'<div class="sp"></div>'
+    +((D.me.admin||D.me.zodpovedny)?'<button class="btn sm" onclick="zadostNahled()" title="Rozeslat lidem, kterým chybí údaje u jejich vozidla, jeden souhrnný e-mail">✉ Žádost o doplnění</button>':'')
     +'<a class="btn sm" href="/api/vozidla/export">⬇ CSV</a>'
     +(D.me.admin?'<button class="btn pri sm" onclick="editVuz(null)">+ Vozidlo</button>':'')
     +'</div>';
@@ -569,6 +570,50 @@ async function ulozRadek(id,znovuVykreslit){
     stavUlozeni("rs_"+id,"uloženo ✓","var(--green-d)");
     if(znovuVykreslit)setTimeout(vykresli,900);   // změna správce mění i odznaky a upozornění
   }catch(e){ stavUlozeni("rs_"+id,"neuloženo","var(--red)"); alert(e.message); }
+}
+
+/* ---------- žádost o doplnění chybějících údajů ---------- */
+let ZADOST=null;
+async function zadostNahled(){
+  try{ ZADOST=await api("/api/vozidla/zadost",{nahled:true}); }
+  catch(e){ alert(e.message); return; }
+  const L=ZADOST.lide||[], B=ZADOST.bezAdresata||[];
+  if(!L.length&&!B.length){ modal("Žádost o doplnění","<div class=\"empty\">Není co doplňovat — u všech vozidel jsou údaje vyplněné.</div>"); return; }
+  let h='<div class="hint">Každý dostane <strong>jeden e-mail</strong> se seznamem svých vozidel a toho, co u nich chybí. '
+    +'Odškrtni, komu se posílat nemá.</div>';
+  if(L.length){
+    h+='<table style="margin-top:10px"><thead><tr><th style="width:30px"></th><th>Komu</th><th>Vozidla a co u nich chybí</th><th>Naposledy</th></tr></thead><tbody>'
+      +L.map((z,i)=>'<tr><td><input type="checkbox" class="zadostChk" value="'+esc(z.email)+'" checked></td>'
+        +'<td><strong>'+esc(z.jmeno||z.email)+'</strong><div class="mut">'+esc(z.email)+'</div><div class="mut">'+esc(z.duvod)+'</div></td>'
+        +'<td>'+z.vozidla.map(v=>'<div style="margin-bottom:3px"><span class="spz">'+esc(v.spz)+'</span> '
+          +'<span class="mut">'+esc(v.popis)+'</span><div class="mut">'+esc(v.chybi.join(", "))+'</div></div>').join("")+'</td>'
+        +'<td class="mut">'+(z.naposled?dat(new Date(z.naposled).toISOString().slice(0,10)):"—")+'</td></tr>').join("")
+      +'</tbody></table>';
+  } else h+='<div class="mut" style="margin-top:10px">Nikomu není co poslat.</div>';
+  if(B.length){
+    h+='<div class="hint" style="margin-top:12px;color:var(--amber)"><strong>'+B.length+' vozidel nemá komu žádost poslat</strong> — nemají správce ani zodpovědnou osobu za středisko: '
+      +B.map(v=>esc(v.spz)).join(", ")+'</div>';
+  }
+  if(ZADOST.ukazka){
+    h+='<details style="margin-top:12px"><summary class="mut" style="cursor:pointer">Jak e-mail vypadá</summary>'
+      +'<pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:8px">'
+      +esc(ZADOST.ukazka)+'</pre></details>';
+  }
+  modal("Žádost o doplnění údajů",h,
+    (L.length?'<button class="btn pri" onclick="zadostOdeslat()">Odeslat ('+L.length+')</button>':'')
+    +'<button class="btn" onclick="zavri()">Zavřít</button>');
+}
+async function zadostOdeslat(){
+  const komu=[...document.querySelectorAll(".zadostChk")].filter(c=>c.checked).map(c=>c.value);
+  if(!komu.length){ alert("Nikdo není vybraný."); return; }
+  if(!confirm("Odeslat žádost o doplnění údajů "+komu.length+" lidem?"))return;
+  try{
+    const r=await api("/api/vozidla/zadost",{komu});
+    zavri();
+    toast("Odesláno "+r.odeslano+" lidem"+(r.selhalo&&r.selhalo.length?(" · "+r.selhalo.length+" se nepodařilo"):""));
+    if(r.selhalo&&r.selhalo.length)alert("Nepodařilo se odeslat na: "+r.selhalo.join(", "));
+    await nacti();
+  }catch(e){ alert(e.message); }
 }
 
 /* ---------- detail vozidla ---------- */

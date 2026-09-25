@@ -329,6 +329,59 @@ function mount(host) {
     return { dnyStk, inventura: inv, chybejiciRoky: chybi, upozorneni: upoz, prodej: doporuceniProdeje(v, nast) };
   }
 
+  // ---- žádost o doplnění chybějících údajů ----------------------------------
+  //  Cíl je jeden e-mail na člověka se seznamem jeho vozidel, ne jeden e-mail na vozidlo.
+  function chybejiciUdaje(v) {
+    const out = [];
+    if (!String(v.vin || '').trim()) out.push('VIN (velký technický průkaz, řádek E)');
+    if (!Number(v.rokVyroby)) out.push('rok výroby');
+    if (!v.stkDo) out.push('datum platnosti technické prohlídky');
+    const letos = dnes().getFullYear();
+    if (!(v.km || []).some(x => Number(x.rok) === letos)) out.push('stav tachometru za rok ' + letos);
+    return out;
+  }
+  // Komu poslat: správci vozu; když není, zodpovědné osobě za středisko.
+  function zadostiPrehled(d, r) {
+    const lide = new Map();      // email → { email, jmeno, duvod, vozidla: [] }
+    const bezAdresata = [];
+    d.vozidla.filter(v => v.stav === 'aktivni').forEach(v => {
+      if (r && !smiEditovat(v, r)) return;          // vedoucí řeší jen svoje středisko
+      const chybi = chybejiciUdaje(v);
+      if (!chybi.length) return;
+      const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko && z.email);
+      const komu = v.spravceEmail ? { email: low(v.spravceEmail), duvod: 'správce vozu' }
+        : (zod ? { email: low(zod.email), duvod: 'zodpovědná osoba za středisko ' + v.stredisko } : null);
+      const radek = { spz: v.spz || v.vin || '—', popis: [v.znacka, v.model].filter(Boolean).join(' '), stredisko: v.stredisko || '', chybi };
+      if (!komu) { bezAdresata.push(radek); return; }
+      const zaznam = lide.get(komu.email) || { email: komu.email, jmeno: (kontakt(komu.email) || {}).jmeno || komu.email, duvod: komu.duvod, vozidla: [] };
+      zaznam.vozidla.push(radek);
+      lide.set(komu.email, zaznam);
+    });
+    const naposled = d.zadostiOdeslano || {};
+    return {
+      lide: Array.from(lide.values())
+        .map(z => Object.assign(z, { naposled: naposled[z.email] || null }))
+        .sort((a, b) => b.vozidla.length - a.vozidla.length || String(a.jmeno).localeCompare(String(b.jmeno), 'cs')),
+      bezAdresata,
+    };
+  }
+  function zadostText(z, odesilatel) {
+    const n = z.vozidla.length;
+    const spravce = String(z.duvod || '').indexOf('správce') === 0;
+    const cich = spravce
+      ? (n === 1 ? 'u vozidla, které máte svěřené' : 'u ' + n + ' vozidel, která máte svěřená')
+      : (n === 1 ? 'u vozidla vašeho střediska, které nemá přiděleného správce' : 'u ' + n + ' vozidel vašeho střediska, která nemají přiděleného správce');
+    return 'Dobrý den,\n\n'
+      + 'v evidenci vozového parku chybí pár údajů ' + cich
+      + (spravce ? ' — vyplní je jen ten, kdo s vozem jezdí' : '') + ':\n\n'
+      + z.vozidla.map(v => '• ' + v.spz + (v.popis ? ' (' + v.popis + ')' : '') + ': ' + v.chybi.join(', ')).join('\n')
+      + '\n\nDoplníte je přímo v přehledu, stačí kliknout do políčka:\n'
+      + 'https://intranet.elkoplast.cz/#modul=vozidla\n\n'
+      + 'VIN je ve velkém technickém průkazu na řádku E, platnost technické prohlídky na zadní straně malého technického průkazu. '
+      + 'U tachometru stačí opsat dnešní stav — kolik se za rok najelo, spočítá evidence sama.\n\n'
+      + 'Děkuji,\n' + (odesilatel || 'vozový park ELKOPLAST');
+  }
+
   // ---- adresáti směrnice ----------------------------------------------------
   //  Směrnice se neposílá celé firmě: týká se lidí, kteří auto skutečně mají,
   //  a vedoucích, kteří za vozidla střediska odpovídají.
@@ -395,6 +448,7 @@ function mount(host) {
       if (p === '/api/vozidla/skoda' && req.method === 'POST') return apiSkoda(req, res);
       if (p === '/api/vozidla/predat' && req.method === 'POST') return apiPredat(req, res);
       if (p === '/api/vozidla/potvrdit' && req.method === 'POST') return apiPotvrdit(req, res);
+      if (p === '/api/vozidla/zadost' && req.method === 'POST') return apiZadost(req, res);
       if (p === '/api/vozidla/zodpovedny' && req.method === 'POST') return apiZodpovedny(req, res);
       if (p === '/api/vozidla/nastaveni' && req.method === 'POST') return apiNastaveni(req, res);
       if (p === '/api/vozidla/export' && req.method === 'GET') return apiExport(req, res);
@@ -739,6 +793,30 @@ function mount(host) {
   }
 
   // ---- zodpovědné osoby za střediska a nastavení ---------------------------
+  // Žádost o doplnění údajů: bez „nahled" se opravdu rozešle.
+  async function apiZadost(req, res) {
+    const d = load(), r = role(req);
+    if (!r.admin && !r.zodpovedny) { json(res, 403, { chyba: 'Žádost rozesílá správce modulu nebo zodpovědná osoba za středisko.' }); return true; }
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const prehled = zadostiPrehled(d, r.admin ? null : r);
+    if (b.nahled) {
+      const ukazka = prehled.lide.length ? zadostText(prehled.lide[0], r.name || '') : '';
+      json(res, 200, Object.assign({ ok: true, ukazka }, prehled)); return true;
+    }
+    const jen = Array.isArray(b.komu) && b.komu.length ? b.komu.map(low) : null;
+    const vybrani = prehled.lide.filter(z => !jen || jen.indexOf(z.email) >= 0);
+    if (!vybrani.length) { json(res, 400, { chyba: 'Není komu poslat — všechny údaje jsou vyplněné.' }); return true; }
+    d.zadostiOdeslano = d.zadostiOdeslano || {};
+    let odeslano = 0; const selhalo = [];
+    for (const z of vybrani) {
+      const ok = await mail(z.email, 'Vozový park — prosím doplňte údaje u svěřeného vozidla', zadostText(z, r.name || ''));
+      if (ok !== true) selhalo.push(z.email); else { odeslano++; d.zadostiOdeslano[z.email] = Date.now(); }
+    }
+    save(d);
+    logAct('vozidla', req, 'Žádost o doplnění údajů — odesláno ' + odeslano + ' lidem');
+    json(res, 200, { ok: true, odeslano, selhalo });
+    return true;
+  }
   async function apiZodpovedny(req, res) {
     if (!spravceModulu(req)) { json(res, 403, { chyba: 'Zodpovědnou osobu nastavuje správce modulu.' }); return true; }
     const b = JSON.parse(await host.readBody(req) || '{}');
