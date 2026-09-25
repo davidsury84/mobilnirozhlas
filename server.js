@@ -3975,7 +3975,7 @@ const server = http.createServer(async (req, res) => {
   // Veřejné cesty modulu Adaptace: magic-link pozvánka, guest plnění, import z náboru.
   const adaptacePublic = p.startsWith('/adaptace/uvod/') || p === '/api/adaptace/guest' || p === '/api/adaptace/guest-flag' || p === '/api/adaptace/import-user';
   // Veřejné cesty modulu Konstrukce: klientský náhled výkresu (token, bez přihlášení).
-  const konstrukcePublic = p.startsWith('/konstrukce/nahled/') || p.startsWith('/api/konstrukce/nahled/');
+  const konstrukcePublic = p.startsWith('/konstrukce/nahled/') || p.startsWith('/api/konstrukce/nahled/') || p.startsWith('/konstrukce/prehled/') || p.startsWith('/api/konstrukce/prehled/');
   // Veřejné cesty modulu Reklamace: klientský reklamační formulář na token (bez přihlášení).
   const reklamacePublic = p.startsWith('/reklamace/r/') || p.startsWith('/api/reklamace/verejny/');
   // Veřejné cesty klientské kalkulačky překladiště (lead-gen mimo přihlašovací závoru): stránka + odeslání leadu.

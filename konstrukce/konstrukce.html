@@ -1169,6 +1169,10 @@ var K_L10N = {
 'Odkaz odeslán':['Link sent','Link gesendet','Link wysłany','Посилання надіслано','Link trimis'],
 'Klient odkaz zatím neotevřel.':['The customer has not opened the link yet.','Der Kunde hat den Link noch nicht geöffnet.','Klient jeszcze nie otworzył linku.','Замовник ще не відкривав посилання.','Clientul nu a deschis încă linkul.'],
 'zobrazit log':['show log','Protokoll anzeigen','pokaż log','показати журнал','afișează jurnalul'],
+'Přehled všech čekajících výkresů tohoto klienta:':['Overview of all pending drawings of this customer:','Übersicht aller offenen Zeichnungen dieses Kunden:','Przegląd wszystkich oczekujących rysunków tego klienta:','Огляд усіх креслень цього замовника, що очікують:','Lista tuturor desenelor în așteptare ale acestui client:'],
+'další čeká na rozhodnutí':['more awaiting a decision','weitere warten auf Entscheidung','kolejne oczekują na decyzję','ще очікують на рішення','altele așteaptă o decizie'],
+'otevřít':['open','öffnen','otwórz','відкрити','deschide'],
+'kopírovat odkaz':['copy link','Link kopieren','kopiuj link','копіювати посилання','copiază linkul'],
 'Výkres konstrukce je vložen — orientační standardní výkres ani podobné výkresy z archivu se už nezobrazují.':['The design drawing has been uploaded — the reference standard drawing and similar archive drawings are no longer shown.','Die Konstruktionszeichnung ist hochgeladen — Referenz-Standardzeichnung und ähnliche Archivzeichnungen werden nicht mehr angezeigt.','Rysunek konstrukcyjny został wgrany — orientacyjny rysunek standardowy ani podobne rysunki z archiwum nie są już wyświetlane.','Креслення конструкції завантажено — орієнтовне стандартне креслення та схожі креслення з архіву більше не показуються.','Desenul de construcție a fost încărcat — desenul standard orientativ și desenele similare din arhivă nu se mai afișează.'],
 'zobrazení':['viewed','Aufruf','wyświetlenie','перегляд','vizualizare'],
 'Komu poslat připomínku?':['Send the reminder to whom?','An wen soll die Erinnerung gehen?','Do kogo wysłać przypomnienie?','Кому надіслати нагадування?','Cui să trimit reamintirea?'],
@@ -3040,7 +3044,7 @@ function obchodnikBlock(z){
     '<label>Volitelný PIN (pošlete zvlášť)</label><input id="clPin_'+z.id+'" placeholder="např. 4827">'+
     '<label>Jazyk e-mailu a stránky pro klienta</label>'+
     '<select id="clLang_'+z.id+'" onchange="mailLangZmena(\''+z.id+'\')">'+
-      ['cs|Čeština','en|English','de|Deutsch','pl|Polski','ua|Українська','ro|Română'].map(function(o){var q=o.split('|');
+      ['cs|Čeština','en|English','de|Deutsch','fr|Français','pl|Polski','ua|Українська','ro|Română'].map(function(o){var q=o.split('|');
         return '<option value="'+q[0]+'">'+q[1]+'</option>'}).join('')+'</select>'+
     '<label>Text e-mailu</label><textarea id="clText_'+z.id+'" rows="5">'+esc(defaultMail(z,'cs'))+'</textarea>'+
     '<div class="actions"><button class="btn blue sm" '+(ready?'':'disabled')+' onclick="sendClient(\''+z.id+'\')">✉ Potvrdit a odeslat klientovi</button>'+
@@ -3051,17 +3055,28 @@ function obchodnikBlock(z){
 /* Text e-mailu klientovi — klient nemusí umět česky, jazyk se vybírá u odeslání
    a stejný jazyk pak dostane i stránka náhledu. */
 var MAIL_L10N={
- cs:{p:'Předmět: Výkres ke schválení',t:'Dobrý den,\n\nzasíláme Vám ke schválení výkres k zakázce {C} ({Z}).\nProhlédnout a schválit jej můžete zde:\n{ODKAZ}\n\nS pozdravem'},
- en:{p:'Drawing for approval',t:'Dear Sir or Madam,\n\nplease find the drawing for order {C} ({Z}) for your approval.\nYou can review and approve it here:\n{ODKAZ}\n\nKind regards'},
- de:{p:'Zeichnung zur Freigabe',t:'Sehr geehrte Damen und Herren,\n\nanbei senden wir Ihnen die Zeichnung zum Auftrag {C} ({Z}) zur Freigabe.\nSie können sie hier ansehen und freigeben:\n{ODKAZ}\n\nMit freundlichen Grüßen'},
- pl:{p:'Rysunek do zatwierdzenia',t:'Dzień dobry,\n\nprzesyłamy do zatwierdzenia rysunek do zlecenia {C} ({Z}).\nMożna go obejrzeć i zatwierdzić tutaj:\n{ODKAZ}\n\nZ poważaniem'},
- ua:{p:'Креслення на затвердження',t:'Доброго дня,\n\nнадсилаємо вам на затвердження креслення до замовлення {C} ({Z}).\nПереглянути та затвердити його можна тут:\n{ODKAZ}\n\nЗ повагою'},
- ro:{p:'Desen spre aprobare',t:'Bună ziua,\n\nvă trimitem spre aprobare desenul pentru comanda {C} ({Z}).\nÎl puteți vedea și aproba aici:\n{ODKAZ}\n\nCu stimă'},
+ cs:{p:'Předmět: Výkres ke schválení',t:'Dobrý den,\n\nzasíláme Vám ke schválení výkres k zakázce {C} ({Z}).\nProhlédnout a schválit jej můžete zde:\n{ODKAZ}\nPřehled všech Vašich výkresů čekajících na rozhodnutí: {PREHLED}\n\nS pozdravem'},
+ en:{p:'Drawing for approval',t:'Dear Sir or Madam,\n\nplease find the drawing for order {C} ({Z}) for your approval.\nYou can review and approve it here:\n{ODKAZ}\nOverview of all your drawings awaiting a decision: {PREHLED}\n\nKind regards'},
+ de:{p:'Zeichnung zur Freigabe',t:'Sehr geehrte Damen und Herren,\n\nanbei senden wir Ihnen die Zeichnung zum Auftrag {C} ({Z}) zur Freigabe.\nSie können sie hier ansehen und freigeben:\n{ODKAZ}\nÜbersicht aller Ihrer Zeichnungen, die auf eine Entscheidung warten: {PREHLED}\n\nMit freundlichen Grüßen'},
+ pl:{p:'Rysunek do zatwierdzenia',t:'Dzień dobry,\n\nprzesyłamy do zatwierdzenia rysunek do zlecenia {C} ({Z}).\nMożna go obejrzeć i zatwierdzić tutaj:\n{ODKAZ}\nPrzegląd wszystkich Państwa rysunków oczekujących na decyzję: {PREHLED}\n\nZ poważaniem'},
+ ua:{p:'Креслення на затвердження',t:'Доброго дня,\n\nнадсилаємо вам на затвердження креслення до замовлення {C} ({Z}).\nПереглянути та затвердити його можна тут:\n{ODKAZ}\nОгляд усіх ваших креслень, що очікують на рішення: {PREHLED}\n\nЗ повагою'},
+ ro:{p:'Desen spre aprobare',t:'Bună ziua,\n\nvă trimitem spre aprobare desenul pentru comanda {C} ({Z}).\nÎl puteți vedea și aproba aici:\n{ODKAZ}\nLista tuturor desenelor dumneavoastră care așteaptă o decizie: {PREHLED}\n\nCu stimă'},
+ fr:{p:'Dessin à approuver',t:'Bonjour,\n\nnous vous adressons pour approbation le dessin de la commande {C} ({Z}).\nVous pouvez le consulter et l’approuver ici :\n{ODKAZ}\nListe de tous vos dessins en attente de décision : {PREHLED}\n\nCordialement'},
 };
 function mailLang(id){return (document.getElementById('clLang_'+id)||{}).value||'cs'}
 function defaultMail(z,lang){
   var m=MAIL_L10N[lang||'cs']||MAIL_L10N.cs;
-  return m.t.replace('{C}',z.cislo).replace('{Z}',z.zakaznik);
+  var t=m.t.replace('{C}',z.cislo).replace('{Z}',z.zakaznik);
+  // řádek s přehledem všech výkresů má smysl, jen když klient čeká na víc výkresů najednou
+  if(!dalsiCekajici(z))t=t.split('\n').filter(function(l){return l.indexOf('{PREHLED}')<0}).join('\n');
+  return t;
+}
+/* Kolik dalších výkresů téhož klienta (dle e-mailu) právě čeká na rozhodnutí.
+   Po načtení to říká server; jinak se spočítá z načtených zakázek. */
+function dalsiCekajici(z){
+  if(z.dalsiCekajici!=null)return z.dalsiCekajici;
+  var e=String(z.kontaktEmail||'').trim().toLowerCase(); if(!e)return 0;
+  return (D.zakazky||[]).filter(function(x){return x.id!==z.id&&x.stav==='klient'&&x.link&&x.link.active&&String(x.kontaktEmail||'').trim().toLowerCase()===e}).length;
 }
 function mailPredmet(z,lang){
   var m=MAIL_L10N[lang||'cs']||MAIL_L10N.cs;
@@ -3086,7 +3101,9 @@ function linkBox(z){
     '<input readonly value="'+esc(full)+'" onclick="this.select()" style="margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px">'+
     '<div class="actions" style="margin-top:8px"><button class="btn ghost sm" onclick="copyMailKlient(\''+z.id+'\')">⧉ Kopírovat celý text e-mailu</button>'+
       ((z.stav==='klient'&&z.link.active)?('<button class="btn sm" onclick="poslatZnovu(\''+z.id+'\')" title="Pošle stejný odkaz znovu — token se nemění">✉ Poslat klientovi znovu</button>'):'')+'</div>'+
-    '<div class="muted" style="font-size:12px;margin-top:4px">Odkaz můžete klientovi poslat i z vlastní pošty — rozhodnutí se do systému propíše stejně.</div></div>';
+    '<div class="muted" style="font-size:12px;margin-top:4px">Odkaz můžete klientovi poslat i z vlastní pošty — rozhodnutí se do systému propíše stejně.</div>'+
+    (z.link.prehledUrl?('<div class="muted" style="font-size:12px;margin-top:6px;border-top:1px solid var(--line);padding-top:6px">📋 <span>Přehled všech čekajících výkresů tohoto klienta:</span> <a href="'+esc(location.origin+z.link.prehledUrl)+'" target="_blank" rel="noopener">otevřít</a> · <a href="#" onclick="copyTxtToast(\''+esc(location.origin+z.link.prehledUrl)+'\',\'✓ Odkaz na přehled zkopírován\');return false">kopírovat odkaz</a>'+
+      (z.dalsiCekajici?(' · <b>'+z.dalsiCekajici+'</b> <span>další čeká na rozhodnutí</span>'):'')+'</div>'):'')+'</div>';
 }
 
 /* ---- akce (API) ---- */
@@ -3179,12 +3196,13 @@ function pristupyView(z){
 }
 /* Připomínka klientovi — stejný odkaz, jiný text; jazyk podle původního odeslání. */
 var REMIND_L10N={
- cs:{p:'Připomínka: výkres ke schválení',t:'Dobrý den,\n\ndovolujeme si připomenout, že výkres k zakázce {C} ({Z}) stále čeká na Vaše schválení.\nProhlédnout a schválit jej můžete zde:\n{ODKAZ}\n\nDěkujeme a jsme s pozdravem'},
- en:{p:'Reminder: drawing awaiting your approval',t:'Dear Sir or Madam,\n\nthis is a friendly reminder that the drawing for order {C} ({Z}) is still awaiting your approval.\nYou can review and approve it here:\n{ODKAZ}\n\nThank you and kind regards'},
- de:{p:'Erinnerung: Zeichnung wartet auf Ihre Freigabe',t:'Sehr geehrte Damen und Herren,\n\nwir möchten Sie daran erinnern, dass die Zeichnung zum Auftrag {C} ({Z}) noch auf Ihre Freigabe wartet.\nSie können sie hier ansehen und freigeben:\n{ODKAZ}\n\nVielen Dank und freundliche Grüße'},
- pl:{p:'Przypomnienie: rysunek czeka na zatwierdzenie',t:'Dzień dobry,\n\nuprzejmie przypominamy, że rysunek do zlecenia {C} ({Z}) nadal czeka na Państwa zatwierdzenie.\nMożna go obejrzeć i zatwierdzić tutaj:\n{ODKAZ}\n\nDziękujemy i pozdrawiamy'},
- ua:{p:'Нагадування: креслення очікує на затвердження',t:'Доброго дня,\n\nнагадуємо, що креслення до замовлення {C} ({Z}) досі очікує на ваше затвердження.\nПереглянути та затвердити його можна тут:\n{ODKAZ}\n\nДякуємо, з повагою'},
- ro:{p:'Reamintire: desenul așteaptă aprobarea dumneavoastră',t:'Bună ziua,\n\nvă reamintim că desenul pentru comanda {C} ({Z}) așteaptă în continuare aprobarea dumneavoastră.\nÎl puteți vedea și aproba aici:\n{ODKAZ}\n\nVă mulțumim, cu stimă'},
+ cs:{p:'Připomínka: výkres ke schválení',t:'Dobrý den,\n\ndovolujeme si připomenout, že výkres k zakázce {C} ({Z}) stále čeká na Vaše schválení.\nProhlédnout a schválit jej můžete zde:\n{ODKAZ}\nPřehled všech Vašich výkresů čekajících na rozhodnutí: {PREHLED}\n\nDěkujeme a jsme s pozdravem'},
+ en:{p:'Reminder: drawing awaiting your approval',t:'Dear Sir or Madam,\n\nthis is a friendly reminder that the drawing for order {C} ({Z}) is still awaiting your approval.\nYou can review and approve it here:\n{ODKAZ}\nOverview of all your drawings awaiting a decision: {PREHLED}\n\nThank you and kind regards'},
+ de:{p:'Erinnerung: Zeichnung wartet auf Ihre Freigabe',t:'Sehr geehrte Damen und Herren,\n\nwir möchten Sie daran erinnern, dass die Zeichnung zum Auftrag {C} ({Z}) noch auf Ihre Freigabe wartet.\nSie können sie hier ansehen und freigeben:\n{ODKAZ}\nÜbersicht aller Ihrer Zeichnungen, die auf eine Entscheidung warten: {PREHLED}\n\nVielen Dank und freundliche Grüße'},
+ pl:{p:'Przypomnienie: rysunek czeka na zatwierdzenie',t:'Dzień dobry,\n\nuprzejmie przypominamy, że rysunek do zlecenia {C} ({Z}) nadal czeka na Państwa zatwierdzenie.\nMożna go obejrzeć i zatwierdzić tutaj:\n{ODKAZ}\nPrzegląd wszystkich Państwa rysunków oczekujących na decyzję: {PREHLED}\n\nDziękujemy i pozdrawiamy'},
+ ua:{p:'Нагадування: креслення очікує на затвердження',t:'Доброго дня,\n\nнагадуємо, що креслення до замовлення {C} ({Z}) досі очікує на ваше затвердження.\nПереглянути та затвердити його можна тут:\n{ODKAZ}\nОгляд усіх ваших креслень, що очікують на рішення: {PREHLED}\n\nДякуємо, з повагою'},
+ ro:{p:'Reamintire: desenul așteaptă aprobarea dumneavoastră',t:'Bună ziua,\n\nvă reamintim că desenul pentru comanda {C} ({Z}) așteaptă în continuare aprobarea dumneavoastră.\nÎl puteți vedea și aproba aici:\n{ODKAZ}\nLista tuturor desenelor dumneavoastră care așteaptă o decizie: {PREHLED}\n\nVă mulțumim, cu stimă'},
+ fr:{p:'Rappel : dessin en attente de votre approbation',t:'Bonjour,\n\nnous nous permettons de vous rappeler que le dessin de la commande {C} ({Z}) attend toujours votre approbation.\nVous pouvez le consulter et l’approuver ici :\n{ODKAZ}\nListe de tous vos dessins en attente de décision : {PREHLED}\n\nMerci et cordialement'},
 };
 function poslatPripominku(id){
   var z=(D.zakazky||[]).find(function(x){return x.id===id}); if(!z||!z.link)return;
@@ -3201,7 +3219,8 @@ function poslatPripominku(id){
 /* hotový text e-mailu i s odkazem — když si obchodník posílá poštu sám */
 function copyMailKlient(id){
   var z=(D.zakazky||[]).find(function(x){return x.id===id}); if(!z||!z.link)return;
-  var t=defaultMail(z,(z.link.lang||'cs')).replace('{ODKAZ}',location.origin+z.link.url);
+  var t=defaultMail(z,(z.link.lang||'cs')).replace(/\{ODKAZ\}/g,location.origin+z.link.url);
+  t=z.link.prehledUrl?t.replace(/\{PREHLED\}/g,location.origin+z.link.prehledUrl):t.split('\n').filter(function(l){return l.indexOf('{PREHLED}')<0}).join('\n');
   copyTxtToast(t,'✓ Text e-mailu zkopírován');
 }
 /* kopírování s potvrzením (bez otravného prompt okna) */
