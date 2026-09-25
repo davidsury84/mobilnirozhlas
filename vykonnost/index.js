@@ -172,6 +172,71 @@ function mount(host) {
     saveState(st); return st.plany;
   }
 
+  // ---------- automatická analýza (vzor: ruční analýza Chomutov 08/2026) ----------
+  // Bez Kč: měříme řádky, kusy, hodiny režie, dávkovost, terminál. Každé zjištění má štítek
+  // crit / warn / good / info a je podložené číslem z dat; doporučení jen tam, kde má smysl.
+  const fmt0 = n => Math.round(+n || 0).toLocaleString('cs-CZ');
+  const jm = (arr, n) => arr.slice(0, n || 4).join(', ') + (arr.length > (n || 4) ? ' a další' : '');
+  const lidi = n => n === 1 ? '1 člověk' : (n >= 2 && n <= 4 ? n + ' lidé' : n + ' lidí');
+  const ma = n => (n >= 2 && n <= 4) ? 'mají' : 'má';            // 1 člověk má · 3 lidé mají · 7 lidí má
+  const odvadeli = n => n === 1 ? 'odváděl' : ((n >= 2 && n <= 4) ? 'odváděli' : 'odvádělo');
+  function buildAnalyza(X) {
+    const Z = [], U = [], V = [], D = [];
+    const kap = X.pracDnu * 8; // hodiny jednoho úvazku v období
+    const uvazky = kap ? X.rezieH / kap : 0;
+    const rezPct = X.rows ? Math.round(X.rezRows / X.rows * 100) : 0;
+    const termPct = X.rows ? Math.round(X.term / X.rows * 100) : 0;
+    const top3 = X.rows ? Math.round(X.topDny.reduce((s, d) => s + d.rows, 0) / X.rows * 100) : 0;
+    const patekPct = X.rows ? Math.round(X.patek / X.rows * 100) : 0;
+    const bezNormy = X.rezKat.find(k => k.kat === 'Ostatní / bez normy'), poruchy = X.rezKat.find(k => k.kat === 'Poruchy a údržba'), stehov = X.rezKat.find(k => k.kat === 'Stěhování a manipulace'), viceprace = X.rezKat.find(k => k.kat === 'Vícepráce a opravy'), uklid = X.rezKat.find(k => k.kat === 'Úklid a čištění');
+    const topPol = X.rezPol[0];
+    if (!X.rows) return { zjisteni: [{ tag: 'info', titul: 'V období nejsou žádné odvedené operace.', text: 'Zvolte jiné období nebo počkejte na další snímek exportu.' }], uzka: [], vycnivaji: [], doporuceni: [], shrnuti: '' };
+    // --- zjištění ---
+    if (X.rezieH > 0) Z.push({ tag: uvazky >= 3 ? 'crit' : (uvazky >= 1 || rezPct >= 10 ? 'warn' : 'info'), titul: 'Režie: ' + fmt0(X.rezieH) + ' h zapsaných jako úkol, to je zhruba ' + (uvazky >= 1 ? uvazky.toFixed(1).replace('.', ',') + ' plných úvazků' : Math.round(uvazky * 100) + ' % úvazku') + ' za období.',
+      text: 'Režijní položky tvoří ' + rezPct + ' % řádků. Největší příčina: ' + (X.rezKat[0] ? X.rezKat[0].kat.toLowerCase() + ' (' + fmt0(X.rezKat[0].h) + ' h)' : '—') + (topPol ? '; nejdražší jednotlivá položka „' + topPol.text + '" ' + fmt0(topPol.h) + ' h (' + jm([...topPol.lide], 3) + ')' : '') + '. Režie neměří výkon — dorovnává čas, který se nevešel do normy.' });
+    else Z.push({ tag: 'good', titul: 'V období není zapsaná žádná režie.', text: 'Všechny řádky jsou skutečné operace.' });
+    if (top3 >= 35 || patekPct >= 30) Z.push({ tag: top3 >= 45 ? 'crit' : 'warn', titul: 'Odvádí se po dávkách, ne průběžně: ' + top3 + ' % řádků vzniklo ve 3 dnech' + (patekPct >= 25 ? ', ' + patekPct + ' % v pátek' : '') + '.',
+      text: 'Špičky: ' + X.topDny.map(d => d.date.split('-').reverse().join('. ') + ' (' + d.rows + ')').join(', ') + '. Z dat pak nejde zjistit, kdy se co skutečně dělalo ani jak dlouho to trvalo.' + (X.dvojice.length ? ' Dvojice se zápisy identické do řádku: ' + X.dvojice.map(p => p[0] + ' – ' + p[1]).join('; ') + ' — odvádí se sdíleně.' : '') });
+    else Z.push({ tag: 'good', titul: 'Odvádění je rozložené v čase (3 nejsilnější dny = ' + top3 + ' % řádků).', text: 'Odvedené operace zhruba kopírují rytmus výroby.' });
+    const rucni = X.autori.filter(a => a[0] !== 'terminalETH' && a[0] !== '—');
+    if (termPct < 80) Z.push({ tag: termPct < 50 ? 'crit' : 'warn', titul: (100 - termPct) + ' % řádků zapsal mistr ručně, ne terminál.', text: 'Ručně zadávají: ' + rucni.slice(0, 4).map(a => a[0] + ' (' + fmt0(a[1]) + ')').join(', ') + '. Ruční zápis = odvádění po dávkách a bez skutečného času; typicky pracoviště bez terminálu.' });
+    else Z.push({ tag: 'good', titul: termPct + ' % řádků jde z terminálu.', text: rucni.length ? 'Ručně jen ' + rucni.slice(0, 3).map(a => a[0] + ' (' + fmt0(a[1]) + ')').join(', ') + '.' : 'Vše z terminálu.' });
+    const konc = X.lideArr[0]; if (konc && X.rows >= 50 && konc.rows / X.rows >= 0.25) Z.push({ tag: 'warn', titul: konc.name + ' má na sobě ' + Math.round(konc.rows / X.rows * 100) + ' % všech řádků (' + fmt0(konc.rows) + ', ' + konc.ops + ' různých operací).', text: 'Pravděpodobně odvádí kolektivně za celé pracoviště. Číslo nevypovídá o něm, ale o tom, že ostatní jsou v datech neviditelní.' });
+    if (X.bezOdvadeni.length) Z.push({ tag: X.bezOdvadeni.length >= 0.3 * (X.bezOdvadeni.length + X.lideArr.length) ? 'crit' : 'warn', titul: lidi(X.bezOdvadeni.length) + ' v roce ' + odvadeli(X.bezOdvadeni.length) + ', v tomto období nic.', text: jm(X.bezOdvadeni.map(b => b.name + ' (naposledy ' + b.last.split('-').reverse().join('. ') + ')'), 6) + '. Buď mimo (dovolená, nemoc, odchod), nebo pracují bez odvádění — v obou případech u nich chybí vazba na výstup.' });
+    const rezLide = X.lideArr.filter(L => L.reziePct >= 50 && L.rezieH >= 16); if (rezLide.length) Z.push({ tag: rezLide.length >= 3 ? 'crit' : 'warn', titul: lidi(rezLide.length) + ' ' + ma(rezLide.length) + ' výkon z poloviny a více v režii.', text: jm(rezLide.map(L => L.name + ' (' + fmt0(L.rezieH) + ' h)'), 5) + '. Buď dělají práci bez normy, nebo režie dorovnává časovou mzdu.' });
+    if (bezNormy && bezNormy.h >= 40) Z.push({ tag: 'warn', titul: 'Výroba bez normy: ' + fmt0(bezNormy.h) + ' h běžné práce končí v režii.', text: jm(X.rezPol.filter(p => kategorieRezie(p.text) === 'Ostatní / bez normy').map(p => p.text + ' (' + fmt0(p.h) + ' h, ' + jm([...p.lide], 2) + ')'), 3) + '. Operace, které by měly mít úkolovou cenu.' });
+    if (X.nulKs >= 20) Z.push({ tag: 'warn', titul: fmt0(X.nulKs) + ' výrobních řádků s nulou kusů.', text: 'Nejčastěji: ' + X.nulTop.map(o => o.op + ' (' + o.n + ')').join(', ') + '. Práce je zapsaná, ale bez množství — pro normu i pro výkon neviditelná.' });
+    if (X.jediny.length) Z.push({ tag: 'info', titul: 'Operace, které odvádí jediný člověk: ' + X.jediny.length + '.', text: X.jediny.slice(0, 3).map(j => j.op + ' — ' + j.name + ' (' + j.rows + ' ř., ' + fmt0(j.ks) + ' ks)').join('; ') + '. Pokud vypadne, zastaví se navazující pracoviště.' });
+    const bezCvzPct = X.rows ? Math.round(X.bezCvz / X.rows * 100) : 0; if (bezCvzPct >= 5) Z.push({ tag: 'info', titul: bezCvzPct + ' % řádků bez ČVZ.', text: fmt0(X.bezCvz) + ' řádků nejde přiřadit k zakázce — párování s plánem výroby je o to slabší.' });
+    if (X.future) Z.push({ tag: 'info', titul: fmt0(X.future) + ' řádků má datum po datu snímku.', text: 'Překlepy v datu při ručním zápisu; v přehledu jsou vynechané.' });
+    // --- úzká hrdla (režie podle položky) ---
+    const signal = kat => ({ 'Vícepráce a opravy': 'Opakovaná vada nebo chybějící norma — pokud se opakuje každý týden, je to procesní problém, ne jednorázová oprava.', 'Úklid a čištění': 'Čas placený z výkonu lidí místo plánované údržby mimo směnu.', 'Poruchy a údržba': 'Zařízení bere kapacitu — preventivní údržba místo hašení; úzké hrdlo pro navazující pracoviště.', 'Stěhování a manipulace': 'Problém toku a layoutu (mezisklad, jeřáb, doprava), ne lidí.', 'Ostatní / bez normy': 'Běžná výrobní operace bez ceníku — patří do normy, ne do režie.' }[kat] || '');
+    X.rezPol.slice(0, 10).forEach(p => { const kat = kategorieRezie(p.text); U.push({ text: p.text, kat, h: Math.round(p.h), rows: p.rows, lide: [...p.lide].slice(0, 4), naOsobu: p.lide.size ? Math.round(p.h / p.lide.size) : 0, signal: signal(kat) }); });
+    // --- kdo vyčnívá ---
+    const byKs = X.lideArr.filter(L => L.rows >= 10).slice().sort((a, b) => b.ks - a.ks);
+    const ref = X.lideArr.filter(L => L.rows >= 15 && L.reziePct === 0 && L.termPct >= 90 && L.dny >= 5 && L.davkaPct < 50 && L.rows / X.rows < 0.2 && L.ops <= 40).sort((a, b) => b.rows - a.rows)[0];
+    if (ref) V.push({ name: ref.name, tag: 'good', text: 'referenční profil — ' + fmt0(ref.rows) + ' operací v ' + ref.dny + ' dnech, bez hodiny režie, vše z terminálu. Nejčastěji ' + ref.topOp + '.' });
+    if (byKs[0]) V.push({ name: byKs[0].name, tag: 'info', text: 'nejvíc kusů (' + fmt0(byKs[0].ks) + ') — ' + fmt0(byKs[0].rows) + ' operací, ' + byKs[0].ops + ' různých; těžiště ' + byKs[0].topOp + '.' });
+    if (konc && konc.rows / X.rows >= 0.2 && (!byKs[0] || byKs[0].name !== konc.name)) V.push({ name: konc.name, tag: 'warn', text: fmt0(konc.rows) + ' řádků, ' + konc.ops + ' různých operací v ' + konc.dny + ' dnech — fakticky administrátor odvádění pracoviště.' });
+    X.lideArr.filter(L => L.rezieH >= 40).sort((a, b) => b.rezieH - a.rezieH).slice(0, 3).forEach(L => V.push({ name: L.name, tag: L.reziePct >= 50 ? 'crit' : 'warn', text: fmt0(L.rezieH) + ' h režie (' + L.reziePct + ' % výkonu)' + (L.ks ? ', vedle toho ' + fmt0(L.ks) + ' ks v ' + fmt0(L.rows - 0) + ' řádcích' : ', v úkolu nic') + '. Čím delší režie, tím méně o jeho výkonu víme.' }));
+    X.lideArr.filter(L => L.rows >= 30 && L.dny <= 3).slice(0, 3).forEach(L => V.push({ name: L.name, tag: 'warn', text: fmt0(L.rows) + ' operací zapsaných jen ve ' + L.dny + ' ' + (L.dny === 1 ? 'dni' : 'dnech') + ' (' + L.davkaPct + ' % v jediném dni) — dávkové odvádění.' }));
+    X.jediny.slice(0, 2).forEach(j => { if (!V.some(v => v.name === j.name)) V.push({ name: j.name, tag: 'info', text: 'jediný, kdo odvádí „' + j.op + '" (' + j.rows + ' ř.). Bez zastupitelnosti.' }); });
+    // --- co s tím ---
+    let n = 0; const rec = (titul, text, efekt) => D.push({ no: String.fromCharCode(65 + n++), titul, text, efekt });
+    if (X.rezieH >= 40) rec('Oddělit režii od úkolu a vyžadovat důvod z číselníku.', 'Režijní hodiny nechat zapisovat dál, ale u každé položky konkrétní důvod (porucha stroje, reklamace, chybí norma, úklid, stěhování) a nesčítat je do odvedeného úkolu. Týdenní report: kolik hodin šlo na kterou příčinu.', 'efekt: okamžitá viditelnost ' + fmt0(X.rezieH) + ' h za období · náročnost: nulová, jen rozhodnutí');
+    if (bezNormy && bezNormy.h >= 40) rec('Dodělat normy na operace, které dnes končí v režii.', jm(X.rezPol.filter(p => kategorieRezie(p.text) === 'Ostatní / bez normy').map(p => p.text), 5) + (X.nulTop.length ? '. Zároveň nacenit operace s nulou kusů (' + X.nulTop.slice(0, 3).map(o => o.op).join(', ') + ').' : '.'), 'efekt: +' + fmt0(bezNormy.h) + ' h měřitelného úkolu · náročnost: technolog, ~2 týdny');
+    if (viceprace && viceprace.h >= 40 && topPol && kategorieRezie(topPol.text) === 'Vícepráce a opravy') rec('Řešit „' + topPol.text + '" jako procesní vadu, ne příplatek.', fmt0(topPol.h) + ' h u ' + jm([...topPol.lide], 3) + ' — největší jednotlivá položka. Zjistit příčinu (deformace po svařování, tolerance dílů, přípravky, parametry). Pokud je to nutná součást operace, patří do normy; pokud ne, je to nejdražší symptom kvality v datech.', 'efekt: až ' + fmt0(topPol.h) + ' h za období · náročnost: technolog + mistr, týden analýzy');
+    if (poruchy && poruchy.h >= 30) rec('Poruchy a údržba: preventivně místo hašení.', fmt0(poruchy.h) + ' h zapsaných na poruchy a údržbu (' + jm(X.rezPol.filter(p => kategorieRezie(p.text) === 'Poruchy a údržba').map(p => p.text), 3) + '). Plán preventivní údržby a čištění mimo směnu.', 'efekt: ' + fmt0(poruchy.h) + ' h/období + průchodnost · náročnost: údržba');
+    if (uklid && uklid.h >= 60) rec('Úklid a čištění mimo výkon.', fmt0(uklid.h) + ' h úklidu placených z výkonu lidí. Plánované čištění na konci směny / mimo směnu, ne jako režijní položka výrobních dělníků.', 'efekt: ' + fmt0(uklid.h) + ' h/období · náročnost: organizace směn');
+    if (stehov && stehov.h >= 30) rec('Stěhování: mezisklad a tok místo přesouvání.', fmt0(stehov.h) + ' h manipulace (' + jm(X.rezPol.filter(p => kategorieRezie(p.text) === 'Stěhování a manipulace').map(p => p.text), 3) + '). Ověřit, kde se díly skladují mezi operacemi a kdo je přesouvá — jde o layout, ne o lidi.', 'efekt: ' + fmt0(stehov.h) + ' h/období · náročnost: layout');
+    if (top3 >= 35 || X.lideArr.some(L => L.rows >= 30 && L.dny <= 3) || X.dvojice.length) rec('Odvádět průběžně, po jednotlivcích.', 'Pravidlo „odvádí se týž den" a odvádění na jméno i u dvojic (nebo párové operace explicitně označit). Bez toho nikdy nepůjde spočítat skutečnou dobu operace a porovnat ji s normou.' + (konc && konc.rows / X.rows >= 0.25 ? ' Na pracovišti, kde odvádí ' + konc.name + ' za ostatní, odvádět po lidech.' : ''), 'efekt: poprvé měřitelná produktivita · náročnost: disciplína mistrů' + (termPct < 80 ? ', další terminál' : ''));
+    if (termPct < 80) rec('Terminál tam, kde mistr zapisuje ručně.', rucni.slice(0, 3).map(a => a[0] + ' zadal ' + fmt0(a[1]) + ' řádků').join(', ') + '. Ruční přepis bere mistrovi čas na řízení výroby a zpožďuje data.', 'efekt: ' + fmt0(rucni.reduce((s, a) => s + a[1], 0)) + ' řádků/období bez přepisování · náročnost: terminál');
+    if (X.bezOdvadeni.length || rezLide.length) rec('Vyjasnit lidi bez dat.', (X.bezOdvadeni.length ? jm(X.bezOdvadeni.map(b => b.name), 5) + ' v období neodvedli nic. ' : '') + (rezLide.length ? jm(rezLide.map(L => L.name), 4) + ' mají výkon převážně v režii. ' : '') + 'U každého: na jaké pozici skutečně pracuje a proč není v odvádění.', 'efekt: vazba mzdy na výstup u ' + (X.bezOdvadeni.length + rezLide.length) + ' lidí · náročnost: mistr, 1 den');
+    if (X.jediny.length) rec('Zastupitelnost klíčových operací.', X.jediny.slice(0, 3).map(j => j.op + ' — jen ' + j.name).join('; ') + '. Zaučit druhého člověka.', 'efekt: bez výpadku při nemoci/dovolené · náročnost: zaučení');
+    const shrnuti = fmt0(X.rows) + ' odvedených operací, ' + fmt0(X.ks) + ' ks, ' + fmt0(X.rezieH) + ' h režie, ' + X.lideArr.length + ' lidí' + (X.pracDnu ? ' · ' + X.pracDnu + ' pracovních dnů' : '') + '. ' + (Z.filter(z => z.tag === 'crit').length ? Z.filter(z => z.tag === 'crit').length + ' kritická zjištění.' : 'Bez kritických zjištění.');
+    return { zjisteni: Z, uzka: U, vycnivaji: V.slice(0, 10), doporuceni: D, shrnuti, uvazky: Math.round(uvazky * 10) / 10 };
+  }
+
   // ---------- statistiky ----------
   function inRange(d, od, do_) { return (!od || d >= od) && (!do_ || d <= do_); }
   const top = (m, n, key) => Object.values(m).sort((a, b) => b[key] - a[key]).slice(0, n);
@@ -196,7 +261,7 @@ function mount(host) {
       L.rows++; L.dnySet.add(day); L.opsSet.add(r[R.op]); L.perDay[day] = (L.perDay[day] || 0) + 1; if (r[R.aut] === 'terminalETH') L.term++;
       if (!L.last || day > L.last) L.last = day; if (!L.first || day < L.first) L.first = day;
       if (rez) { L.rezieH += r[R.ks]; rezieH += r[R.ks]; rezRows++; const kat = kategorieRezie(r[R.dil] + ' ' + r[R.pozn]); rezKat[kat] = rezKat[kat] || { kat, h: 0, rows: 0, lide: new Set() }; rezKat[kat].h += r[R.ks]; rezKat[kat].rows++; rezKat[kat].lide.add(r[R.name]);
-        const pk = (r[R.pozn] || r[R.dil]).slice(0, 80); rezPol[pk] = rezPol[pk] || { text: pk, h: 0, rows: 0, lide: new Set() }; rezPol[pk].h += r[R.ks]; rezPol[pk].rows++; rezPol[pk].lide.add(r[R.name]); }
+        const pk = (r[R.pozn] || (r[R.dil] + ' (bez poznámky)')).slice(0, 80); rezPol[pk] = rezPol[pk] || { text: pk, h: 0, rows: 0, lide: new Set() }; rezPol[pk].h += r[R.ks]; rezPol[pk].rows++; rezPol[pk].lide.add(r[R.name]); }
       else { L.ks += r[R.ks]; ks += r[R.ks]; L.opCount[r[R.op]] = (L.opCount[r[R.op]] || 0) + 1; }
       if (r[R.aut] === 'terminalETH') term++; autori[r[R.aut] || '—'] = (autori[r[R.aut] || '—'] || 0) + 1;
       if (!rez && r[R.ks] === 0) nulKs++; if (!r[R.cvz]) bezCvz++; if (!r[R.id]) bezJmena++;
@@ -216,7 +281,28 @@ function mount(host) {
     const cvzArr = Object.values(cvzs).map(C => { const p = P[C.cvz]; return { cvz: C.cvz, zak: C.zak, rows: C.rows, ks: Math.round(C.ks), rezieH: Math.round(C.rezieH), lide: C.lide.size, ops: C.ops.size, first: C.first, last: C.last, plan: p ? { vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, skutecny: p.skutecny, exp: p.exp, faze: p.faze, row: p.row, url: planUrl(p.row) } : null }; })
       .sort((a, b) => b.rows - a.rows);
     const sparovano = cvzArr.filter(c => c.plan).length;
+    // --- vstupy pro analýzu ---
+    // úsek podle názvu operace (heuristika): dělírna / svařovna / lakovna / ostatní
+    const usekOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen/.test(o)) return 'Lakovna a příprava'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|stříh|strih/.test(o)) return 'Dělírna'; if (/svař|svar|navař|navar|dovař|dovar|skl[aá]d|osaz|mont|stehov|bodov|trámec|tramec|podlah|bočnic|bocnic|vrat|střech|strech/.test(o)) return 'Svařovna'; return 'Ostatní'; };
+    const usekLide = {};
+    rows.forEach(r => { if (isRezie(r[R.dil])) return; const k = r[R.id] || r[R.name]; const u = usekOf(r[R.op]); (usekLide[k] = usekLide[k] || {})[u] = (usekLide[k][u] || 0) + 1; });
+    lideArr.forEach(L => { const m = usekLide[L.id || L.name]; L.usek = m ? Object.entries(m).sort((a, b) => b[1] - a[1])[0][0] : (L.rezieH ? 'Ostatní' : 'Ostatní'); });
+    const useky = {}; lideArr.forEach(L => { const U = useky[L.usek] = useky[L.usek] || { usek: L.usek, lide: 0, rows: 0, ks: 0, rezieH: 0, term: 0 }; U.lide++; U.rows += L.rows; U.ks += L.ks; U.rezieH += L.rezieH; U.term += L.termPct * L.rows; });
+    const usekyArr = Object.values(useky).map(U => ({ usek: U.usek, lide: U.lide, rows: U.rows, ks: U.ks, rezieH: U.rezieH, termPct: U.rows ? Math.round(U.term / U.rows) : 0, rezieNaOsobu: U.lide ? Math.round(U.rezieH / U.lide) : 0 })).sort((a, b) => b.rows - a.rows);
+    // dvojice s identickými zápisy (stejný počet řádků, kusů i dnů) — odvádění sdíleně
+    const dvojice = []; for (let i = 0; i < lideArr.length; i++) for (let j = i + 1; j < lideArr.length; j++) { const a = lideArr[i], b = lideArr[j]; if (a.rows >= 12 && a.rows === b.rows && a.ks === b.ks && a.dny === b.dny) dvojice.push([a.name, b.name, a.rows]); }
+    // lidé, kteří v roce odváděli, ale v období nic (jen když je období užší než rok)
+    const rokLide = {}; all.forEach(r => { const k = r[R.id] || r[R.name]; rokLide[k] = rokLide[k] || { name: r[R.name], last: '' }; if (r[R.date] > rokLide[k].last) rokLide[k].last = r[R.date]; });
+    const vObdobi = new Set(lideArr.map(L => L.id || L.name));
+    const bezOdvadeni = (od || do_) ? Object.entries(rokLide).filter(([k, v]) => !vObdobi.has(k) && v.last < (od || '0')).map(([k, v]) => ({ name: v.name, last: v.last })).sort((a, b) => b.last.localeCompare(a.last)) : [];
+    // operace, které odvádí jediný člověk (klíčové know-how)
+    const jediny = Object.values(ops).filter(o => o.rows >= 10 && o.lide.size === 1).sort((a, b) => b.rows - a.rows).slice(0, 5).map(o => ({ op: o.op, rows: o.rows, ks: Math.round(o.ks), name: [...o.lide][0] }));
+    const nulOps = {}; rows.forEach(r => { if (!isRezie(r[R.dil]) && r[R.ks] === 0) nulOps[r[R.op]] = (nulOps[r[R.op]] || 0) + 1; });
+    const nulTop = Object.entries(nulOps).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([op, n]) => ({ op, n }));
+    const pracDnu = (() => { if (!od || !do_) return dnyArr.length; let n = 0; for (const d = new Date(od + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= do_; d.setUTCDate(d.getUTCDate() + 1)) { const w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; } return n; })();
+    const ana = buildAnalyza({ name: z.name, rows: rows.length, ks, rezieH, rezRows, term, lideArr, usekyArr, dvojice, bezOdvadeni, jediny, nulTop, nulKs, bezCvz, future, topDny, patek, dnyArr, pracDnu, rezKat: Object.values(rezKat).sort((a, b) => b.h - a.h), rezPol: Object.values(rezPol).sort((a, b) => b.h - a.h), autori: Object.entries(autori).sort((a, b) => b[1] - a[1]), snapshot, od, do_ });
     return {
+      analyza: ana, useky: usekyArr,
       zavod: z.key, name: z.name, snapshot, source: D.source, syncedAt: D.syncedAt, od: od || '', do: do_ || '', mesice, tydny,
       kpi: { rows: rows.length, ks: Math.round(ks), rezieH: Math.round(rezieH), rezRows, reziePodil: rows.length ? Math.round(rezRows / rows.length * 100) : 0, lide: lideArr.length, ops: Object.keys(ops).length, cvz: cvzArr.length,
         termPct: rows.length ? Math.round(term / rows.length * 100) : 0, dnu: dnyArr.length, top3Pct: rows.length ? Math.round(topDny.reduce((s, d) => s + d.rows, 0) / rows.length * 100) : 0, patekPct: rows.length ? Math.round(patek / rows.length * 100) : 0 },
