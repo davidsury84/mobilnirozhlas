@@ -1505,6 +1505,7 @@ const MUJ_MODS = [
   { key:"eshop", icon:MUJ_IC.cart, label:"E-shop", gated:true },
   { key:"doprava", icon:MUJ_IC.truck, label:"Doprava", gated:true },
   { key:"qooling", icon:MUJ_IC.shield, label:"Qooling — kvalita", gated:true },
+  { key:"vykonnost", icon:MUJ_IC.gear, label:"Výkonnost středisek", gated:true },
   { key:"loznyplan", icon:MUJ_IC.truck, label:"Ložný plán", gated:true },
   { key:"vozidla", icon:MUJ_IC.truck, label:"Vozový park", gated:true },
   { key:"vyroba", icon:MUJ_IC.gear, label:"Výroba Popelnice", gated:true },
@@ -2004,6 +2005,7 @@ function mjGo(key){
   else if(key==="kontaktysvet") showKontaktySvet();
   else if(key==="zapisy") showZapisy();
   else if(key==="qooling") showQooling();
+  else if(key==="vykonnost") showVykonnost();
   else if(key==="skoleni") showSkoleni();
   else if(MUJ_PROVOZ[key]) showProvoz(key);
   else showDashboard();
@@ -3851,6 +3853,192 @@ async function qooTestSend(){
     const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Odeslání selhalo.'); return; }
     toast('Odesláno: '+(j.to||[]).join(', '));
   }catch(e){ toast('Odeslání selhalo: '+e.message); }
+}
+
+/* ---------- Modul Výkonnost středisek — odvádění z Heliosu (4 výrobní závody) ---------- */
+let VYK={ov:null,det:null,zavod:'chomutov',preset:'4t',mesic:'',sort:'rows',dir:-1,q:'',cvzQ:''};
+const vykF=n=>Math.round(+n||0).toLocaleString('cs-CZ');
+const vykD=d=>d?d.split('-').reverse().join('. '):'—';
+const vykTd='padding:7px 10px;border-bottom:1px solid var(--line)';
+const vykTh='padding:8px 10px;border-bottom:2px solid var(--line);font-size:12px;color:var(--ink-soft);white-space:nowrap';
+function vykPill(t,c){const m={crit:['#fbecea','#a03a2c'],warn:['#fbf0dc','#a86a00'],good:['#e7f5e9','#1f5e22'],mute:['#eef1ec','#5b635c'],info:['#e6eefb','#274b8f']}[c]||['#eef1ec','#5b635c'];return '<span style="background:'+m[0]+';color:'+m[1]+';border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;white-space:nowrap">'+esc(t)+'</span>';}
+async function showVykonnost(){
+  MUJ.view="vykonnost"; renderSidebar();
+  try{ history.replaceState(null,'','#modul=vykonnost'); }catch(e){}
+  const body=document.getElementById("mujBody");
+  if(!MUJ.admin && (MUJ.modules||[]).indexOf("vykonnost")<0){ body.innerHTML='<div class="card pad" style="margin:26px">K tomuto modulu nemáte přístup.</div>'; return; }
+  body.innerHTML='<div class="dash-hero"><h2>Výkonnost středisek</h2><p>Načítám…</p></div>';
+  try{
+    const r=await fetch('/api/vykonnost',{cache:'no-store'}); if(!r.ok) throw new Error(((await r.json())||{}).error||('HTTP '+r.status));
+    VYK.ov=await r.json();
+  }catch(e){ body.innerHTML='<div class="card pad" style="margin:26px">Výkonnost středisek se nepodařilo načíst: '+esc(e.message)+'</div>'; return; }
+  const first=(VYK.ov.zavody||[]).find(z=>z.key===VYK.zavod)||(VYK.ov.zavody||[])[0]; if(first) VYK.zavod=first.key;
+  vykRenderShell(); await vykLoadZavod(); window.scrollTo(0,0);
+}
+function vykRenderShell(){
+  const body=document.getElementById("mujBody"), ov=VYK.ov;
+  body.innerHTML=
+    '<div class="dash-hero" style="margin-bottom:16px"><h2>Výkonnost středisek</h2><p>Odvedené operace z Heliosu pro čtyři výrobní závody — kolik se odvádí, kým, kdy a kolik z toho je režie. Data se stahují automaticky ze sdílené složky na Disku (export je kumulativní od 1. 1., nový snímek přibývá týdně).</p></div>'
+    +'<div class="kpis" id="vykZavody" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))"></div>'
+    +'<div id="vykDetail"></div>'
+    +(ov.admin?'<div class="card pad" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between"><span class="muted" style="font-size:12.5px">Service account: '+esc(ov.saEmail||'—')+' · Drive '+(ov.driveConfigured?'nastaven':'<b style="color:#a03a2c">není nastaven</b>')+'</span><span class="inline-actions" style="gap:8px"><button class="btn sm ghost" onclick="vykSync()">🔄 Obnovit z Drive (exporty + plány)</button></span></div>':'');
+  vykRenderZavody();
+}
+function vykRenderZavody(){
+  const box=document.getElementById('vykZavody'); if(!box) return;
+  box.innerHTML=(VYK.ov.zavody||[]).map(z=>{
+    const on=z.key===VYK.zavod;
+    if(!z.data) return '<div class="kpi" style="cursor:pointer;opacity:.75'+(on?';outline:2px solid var(--green-2)':'')+'" onclick="vykPick(\''+z.key+'\')"><div class="l" style="margin:0 0 6px;font-weight:600;color:var(--ink)">'+esc(z.name)+'</div><div class="muted" style="font-size:12.5px">'+esc(z.error||'bez dat')+'</div></div>';
+    const spark=(z.tydny4||[]); const mx=Math.max(1,...spark.map(t=>t.rows));
+    return '<div class="kpi" style="cursor:pointer'+(on?';outline:2px solid var(--green-2)':'')+'" onclick="vykPick(\''+z.key+'\')">'
+      +'<div class="l" style="margin:0 0 4px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;font-size:13.5px">'+esc(z.name)+'</div>'
+      +'<div style="display:flex;align-items:baseline;gap:8px"><span class="v" style="font-size:26px">'+vykF(z.t4.rows)+'</span><span class="muted" style="font-size:12px">operací / 4 týdny</span></div>'
+      +'<div style="display:flex;align-items:flex-end;gap:3px;height:26px;margin:6px 0 4px">'+spark.map(t=>'<div title="'+esc(t.week)+': '+t.rows+'" style="flex:1;height:'+Math.max(3,Math.round(t.rows/mx*26))+'px;background:var(--green-2);border-radius:2px;opacity:.8"></div>').join('')+'</div>'
+      +'<div class="muted" style="font-size:11.5px">'+z.t4.lide+' lidí · '+vykF(z.t4.ks)+' ks · režie '+vykF(z.t4.rezieH)+' h · terminál '+z.t4.termPct+' %</div>'
+      +'<div class="muted" style="font-size:11px;margin-top:3px">snímek '+vykD(z.snapshot)+(z.error?' · <span style="color:#a03a2c">'+esc(z.error)+'</span>':'')+'</div></div>';
+  }).join('');
+}
+function vykPick(k){ VYK.zavod=k; VYK.mesic=''; vykRenderZavody(); vykLoadZavod(); }
+function vykRange(){
+  const z=(VYK.ov.zavody||[]).find(x=>x.key===VYK.zavod); if(!z||!z.data) return {};
+  if(VYK.preset==='rok') return {};
+  if(VYK.preset==='mesic'&&VYK.mesic){ const [y,m]=VYK.mesic.split('-').map(Number); const last=new Date(Date.UTC(y,m,0)).getUTCDate(); return {od:VYK.mesic+'-01',do:VYK.mesic+'-'+String(last).padStart(2,'0')}; }
+  return {od:z.od4,do:z.snapshot};
+}
+async function vykLoadZavod(){
+  const box=document.getElementById('vykDetail'); if(!box) return;
+  box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám '+esc(VYK.zavod)+'…</p></div>';
+  const r=vykRange(); const qs=(r.od?'?od='+r.od+'&do='+r.do:'');
+  try{
+    const res=await fetch('/api/vykonnost/zavod/'+VYK.zavod+qs,{cache:'no-store'}); const j=await res.json();
+    if(!res.ok||j.error) throw new Error(j.error||('HTTP '+res.status));
+    VYK.det=j;
+  }catch(e){ box.innerHTML='<div class="card pad">Detail se nepodařilo načíst: '+esc(e.message)+'</div>'; return; }
+  if(!VYK.det.data){ box.innerHTML='<div class="card pad"><b>'+esc(VYK.det.name)+'</b><p class="muted" style="margin:6px 0 0">'+esc(VYK.det.error||'Zatím bez dat.')+'</p></div>'; return; }
+  vykRenderDetail();
+}
+function vykMesLabel(m){ const M=['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec']; const p=m.split('-'); return (M[+p[1]-1]||m)+' '+p[0]; }
+function vykRenderDetail(){
+  const d=VYK.det, k=d.kpi, box=document.getElementById('vykDetail');
+  const sel='padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff';
+  const obdobi=VYK.preset==='rok'?'celý rok '+d.snapshot.slice(0,4):(VYK.preset==='mesic'&&VYK.mesic?vykMesLabel(VYK.mesic):'posledních 4 týdny do snímku');
+  box.innerHTML=
+    '<div class="card pad" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
+      +'<b style="font-size:16px;margin-right:6px">'+esc(d.name)+'</b>'
+      +'<button class="btn sm'+(VYK.preset==='4t'?'':' ghost')+'" onclick="VYK.preset=\'4t\';vykLoadZavod()">Posledních 4 týdny</button>'
+      +'<select id="vykMes" style="'+sel+'"><option value="">Měsíc…</option>'+(d.mesice||[]).slice().reverse().map(m=>'<option value="'+m+'"'+(VYK.preset==='mesic'&&VYK.mesic===m?' selected':'')+'>'+vykMesLabel(m)+'</option>').join('')+'</select>'
+      +'<button class="btn sm'+(VYK.preset==='rok'?'':' ghost')+'" onclick="VYK.preset=\'rok\';vykLoadZavod()">Celý rok</button>'
+      +'<span class="muted" style="font-size:12.5px;margin-left:auto">Zdroj: '+esc(d.source||'')+' · snímek '+vykD(d.snapshot)+' · období: '+esc(obdobi)+(d.od?' ('+vykD(d.od)+' – '+vykD(d.do)+')':'')+'</span></div>'
+    +'<div class="kpis">'
+      +'<div class="kpi"><div class="v">'+vykF(k.rows)+'</div><div class="l">Odvedených operací (řádků)</div></div>'
+      +'<div class="kpi"><div class="v">'+vykF(k.ks)+'</div><div class="l">Kusů (bez režie)</div></div>'
+      +'<div class="kpi"><div class="v">'+vykF(k.rezieH)+' h</div><div class="l">Režie zapsaná jako úkol · '+k.reziePodil+' % řádků</div></div>'
+      +'<div class="kpi"><div class="v">'+k.lide+'</div><div class="l">Lidí s odváděním · '+k.cvz+' zakázek · '+k.ops+' operací</div></div>'
+      +'<div class="kpi"><div class="v">'+k.termPct+' %</div><div class="l">Z terminálu (zbytek zapsal mistr ručně)</div></div>'
+      +'<div class="kpi"><div class="v">'+k.top3Pct+' %</div><div class="l">Řádků ve 3 nejsilnějších dnech (dávkovost) · pátek '+k.patekPct+' %</div></div>'
+    +'</div>'
+    +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Odvádění po týdnech (celý rok)</b><span class="muted" style="font-size:12px;margin-left:8px">modře operace, oranžově hodiny režie · kliknutím vyberete měsíc</span><div id="vykWeeks" style="margin-top:10px"></div></div>'
+    +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Kdy se odvádí (dny v období)</b><span class="muted" style="font-size:12px;margin-left:8px">špičky = odvádění po dávkách, ne skutečný rytmus výroby</span><div id="vykDays" style="margin-top:10px"></div></div>'
+    +'<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:14px">Lidé</b><input id="vykQ" placeholder="🔍 Hledat jméno / operaci…" value="'+esc(VYK.q)+'" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit"><span class="muted" style="font-size:12px">kliknutím na hlavičku řadíte</span></div><div id="vykLide" style="overflow-x:auto;margin-top:10px"></div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-bottom:14px">'
+      +'<div class="card pad"><b style="font-size:14px">Režie podle příčiny</b><div class="muted" style="font-size:12px;margin:3px 0 8px">Hodiny zapsané mistrem jako režijní položka — jediné místo, kde jsou vidět poruchy, vícepráce a práce bez normy.</div><div id="vykRezie"></div></div>'
+      +'<div class="card pad"><b style="font-size:14px">Nejčastější operace</b><div id="vykOps" style="overflow-x:auto;margin-top:8px"></div></div>'
+    +'</div>'
+    +'<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:14px">Zakázky (ČVZ)</b><input id="vykCvzQ" placeholder="🔍 ČVZ / zakázka / zákazník…" value="'+esc(VYK.cvzQ)+'" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
+      +'<span class="muted" style="font-size:12px">'+(d.plan?'spárováno s plánem výroby: <b>'+d.sparovano+' z '+d.cvz.length+'</b> (list „'+esc(d.plan.tab)+'", '+d.plan.items+' zakázek)':'<span style="color:#a86a00">plán výroby zatím nenačten</span>')+'</span></div><div id="vykCvz" style="overflow-x:auto;margin-top:10px"></div></div>'
+    +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Kvalita dat</b><div id="vykKvalita" style="margin-top:8px;font-size:13px;line-height:1.7"></div></div>';
+  document.getElementById('vykMes').onchange=function(){ if(this.value){ VYK.preset='mesic'; VYK.mesic=this.value; vykLoadZavod(); } };
+  document.getElementById('vykQ').oninput=function(){ VYK.q=this.value; vykLideRender(); };
+  document.getElementById('vykCvzQ').oninput=function(){ VYK.cvzQ=this.value; vykCvzRender(); };
+  vykWeeksRender(); vykDaysRender(); vykLideRender(); vykRezieRender(); vykOpsRender(); vykCvzRender(); vykKvalitaRender();
+}
+function vykWeeksRender(){
+  const box=document.getElementById('vykWeeks'), d=VYK.det, T=d.tydny||[]; if(!T.length){ box.innerHTML='<span class="muted">Bez dat.</span>'; return; }
+  const mx=Math.max(1,...T.map(t=>t.rows)), mxR=Math.max(1,...T.map(t=>t.rezieH));
+  const inR=w=>{ if(!d.od) return true; const m=T.find(t=>t.week===w); return true; };
+  box.innerHTML='<div style="display:flex;align-items:flex-end;gap:3px;height:120px">'+T.map(t=>{
+    const h=Math.max(3,Math.round(t.rows/mx*100)), hr=Math.round(t.rezieH/mxR*100);
+    return '<div title="'+esc(t.week)+': '+t.rows+' operací · '+t.ks+' ks · režie '+t.rezieH+' h · '+t.lide+' lidí · '+t.cvz+' ČVZ" style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:100%;position:relative;cursor:pointer" onclick="vykWeekClick(\''+t.week+'\')">'
+      +'<div style="height:'+Math.max(2,Math.round(hr*0.35))+'px;background:#eb6834;border-radius:2px 2px 0 0;opacity:.85;margin-bottom:1px"></div>'
+      +'<div style="height:'+h+'px;background:var(--green-2);border-radius:2px;opacity:.85"></div></div>';
+  }).join('')+'</div><div style="display:flex;gap:3px;margin-top:4px">'+T.map((t,i)=>'<div style="flex:1;min-width:0;font-size:9.5px;color:var(--ink-soft);text-align:center;overflow:hidden">'+(i%4===0?t.week.slice(5):'')+'</div>').join('')+'</div>';
+}
+function vykWeekClick(w){ const t=(VYK.det.tydny||[]).find(x=>x.week===w); if(!t) return; const y=+w.slice(0,4), n=+w.slice(6); const d=new Date(Date.UTC(y,0,4)); d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7)+(n-1)*7); const m=d.toISOString().slice(0,7); if((VYK.det.mesice||[]).indexOf(m)>=0){ VYK.preset='mesic'; VYK.mesic=m; vykLoadZavod(); } }
+function vykDaysRender(){
+  const box=document.getElementById('vykDays'), D=VYK.det.dny||[]; if(!D.length){ box.innerHTML='<span class="muted">Bez dat.</span>'; return; }
+  const mx=Math.max(1,...D.map(x=>x.rows)); const many=D.length>40;
+  box.innerHTML='<div style="display:flex;align-items:flex-end;gap:'+(many?1:3)+'px;height:90px">'+D.map(x=>{ const wd=new Date(x.date+'T00:00:00Z').getUTCDay(); const fri=wd===5;
+    return '<div title="'+vykD(x.date)+': '+x.rows+' operací · '+x.ks+' ks · režie '+x.rezieH+' h" style="flex:1;min-width:0;height:'+Math.max(2,Math.round(x.rows/mx*88))+'px;background:'+(fri?'#b57400':'var(--green-2)')+';border-radius:2px;opacity:.85"></div>'; }).join('')
+    +'</div>'+(many?'':'<div style="display:flex;gap:3px;margin-top:4px">'+D.map(x=>'<div style="flex:1;min-width:0;font-size:9.5px;color:var(--ink-soft);text-align:center;overflow:hidden">'+x.date.slice(8)+'.</div>').join('')+'</div>')
+    +'<div class="muted" style="font-size:11.5px;margin-top:4px">oranžově = pátek · '+D.length+' dnů s odváděním v období</div>';
+}
+function vykBadge(L){
+  const snap=VYK.det.snapshot; const diff=Math.round((new Date(snap)-new Date(L.last))/86400000);
+  if(diff>14 && VYK.preset!=='mesic') return ['warn','neodvádí '+diff+' dní'];
+  if(L.reziePct>=50) return ['crit','výkon z poloviny v režii'];
+  if(L.rows>=30 && L.dny<=3) return ['warn','odvádí dávkově ('+L.dny+' dny)'];
+  if(L.termPct<50) return ['info','zapisuje mistr ručně'];
+  if(L.reziePct>=25) return ['warn','výrazná režie'];
+  return ['good','v pořádku'];
+}
+function vykLideRender(){
+  const box=document.getElementById('vykLide'); if(!box) return;
+  const q=(VYK.q||'').toLowerCase();
+  let L=(VYK.det.lide||[]).filter(x=>!q||(x.name+' '+x.id+' '+x.topOp).toLowerCase().indexOf(q)>=0);
+  const s=VYK.sort, dir=VYK.dir; L=L.slice().sort((a,b)=>{ const va=a[s], vb=b[s]; return (typeof va==='string'?va.localeCompare(vb,'cs'):(va-vb))*dir; });
+  const H=[['name','Zaměstnanec',0],['rows','Operací',1],['ks','Ks',1],['rezieH','Režie h',1],['dny','Dnů',1],['ops','Různých operací',1],['termPct','Terminál',1],['davkaPct','Max. 1 den',1],['last','Poslední odvedení',0],['topOp','Nejčastější operace',0]];
+  box.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>'+H.map(h=>'<th style="text-align:'+(h[2]?'right':'left')+';'+vykTh+';cursor:pointer'+(VYK.sort===h[0]?';color:var(--ink)':'')+'" onclick="vykSortBy(\''+h[0]+'\')">'+h[1]+(VYK.sort===h[0]?(VYK.dir<0?' ▼':' ▲'):'')+'</th>').join('')+'<th style="'+vykTh+'">Hodnocení</th></tr></thead><tbody>'
+    +L.map(x=>{ const [c,t]=vykBadge(x); return '<tr>'
+      +'<td style="'+vykTd+'"><b>'+esc(x.name)+'</b><br><span class="muted" style="font-size:11px">'+esc(x.id||'—')+'</span></td>'
+      +'<td style="'+vykTd+';text-align:right"><b>'+vykF(x.rows)+'</b></td><td style="'+vykTd+';text-align:right">'+vykF(x.ks)+'</td>'
+      +'<td style="'+vykTd+';text-align:right;color:'+(x.rezieH?'#b57400':'var(--ink-soft)')+'">'+(x.rezieH?vykF(x.rezieH):'—')+'</td>'
+      +'<td style="'+vykTd+';text-align:right">'+x.dny+'</td><td style="'+vykTd+';text-align:right">'+x.ops+'</td>'
+      +'<td style="'+vykTd+';text-align:right">'+x.termPct+' %</td><td style="'+vykTd+';text-align:right" title="podíl řádků zapsaných v jediném dni">'+x.davkaPct+' %</td>'
+      +'<td style="'+vykTd+';white-space:nowrap">'+vykD(x.last)+'</td><td style="'+vykTd+';font-size:12px;color:var(--ink-soft);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(x.topOp)+'">'+esc(x.topOp||'—')+'</td>'
+      +'<td style="'+vykTd+'">'+vykPill(t,c)+'</td></tr>'; }).join('')+'</tbody></table>'
+    +'<p class="muted" style="font-size:12px;margin:8px 2px 0">'+L.length+' lidí · „Max. 1 den" = kolik % svých řádků člověk zapsal v jediném dni (vysoké číslo = dávkové odvádění) · Režie h = hodiny režijních položek (kusy = hodiny).</p>';
+}
+function vykSortBy(k){ if(VYK.sort===k) VYK.dir=-VYK.dir; else { VYK.sort=k; VYK.dir=(k==='name'||k==='last'||k==='topOp')?1:-1; } vykLideRender(); }
+function vykRezieRender(){
+  const box=document.getElementById('vykRezie'), Rz=VYK.det.rezie||{kategorie:[],polozky:[]};
+  if(!Rz.kategorie.length){ box.innerHTML='<span class="muted">V období není zapsaná žádná režie.</span>'; return; }
+  const mx=Math.max(1,...Rz.kategorie.map(k=>k.h));
+  box.innerHTML=Rz.kategorie.map(k=>'<div style="display:grid;grid-template-columns:170px 1fr 70px;gap:8px;align-items:center;margin:4px 0;font-size:13px"><span>'+esc(k.kat)+'</span><div style="height:14px;background:#eb6834;opacity:.85;border-radius:3px;width:'+Math.max(2,Math.round(k.h/mx*100))+'%"></div><span style="text-align:right;white-space:nowrap"><b>'+vykF(k.h)+' h</b></span></div>').join('')
+    +'<table style="border-collapse:collapse;width:100%;font-size:12.5px;margin-top:10px"><thead><tr><th style="text-align:left;'+vykTh+'">Položka / poznámka mistra</th><th style="text-align:right;'+vykTh+'">Hodin</th><th style="text-align:left;'+vykTh+'">Kdo</th></tr></thead><tbody>'
+    +Rz.polozky.map(p=>'<tr><td style="'+vykTd+'">'+esc(p.text)+'</td><td style="'+vykTd+';text-align:right"><b>'+vykF(p.h)+'</b></td><td style="'+vykTd+';font-size:12px;color:var(--ink-soft)">'+esc(p.lide.join(', '))+'</td></tr>').join('')+'</tbody></table>';
+}
+function vykOpsRender(){
+  const box=document.getElementById('vykOps'), O=VYK.det.operace||[];
+  box.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr><th style="text-align:left;'+vykTh+'">Operace</th><th style="text-align:right;'+vykTh+'">Řádků</th><th style="text-align:right;'+vykTh+'">Ks</th><th style="text-align:right;'+vykTh+'">Lidí</th></tr></thead><tbody>'
+    +O.slice(0,15).map(o=>'<tr><td style="'+vykTd+'">'+esc(o.op||'—')+'</td><td style="'+vykTd+';text-align:right"><b>'+vykF(o.rows)+'</b></td><td style="'+vykTd+';text-align:right">'+vykF(o.ks)+'</td><td style="'+vykTd+';text-align:right">'+o.lide+'</td></tr>').join('')+'</tbody></table>';
+}
+function vykCvzRender(){
+  const box=document.getElementById('vykCvz'); if(!box) return;
+  const q=(VYK.cvzQ||'').toLowerCase(); const C=(VYK.det.cvz||[]).filter(c=>!q||(c.cvz+' '+c.zak+' '+(c.plan?c.plan.vyrobek+' '+c.plan.zakaznik:'')).toLowerCase().indexOf(q)>=0);
+  const faze=p=>p&&p.faze&&p.faze.length?p.faze.map(f=>'<span title="'+esc(f.n)+'" style="display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:2px;background:'+(f.ok?'var(--green-2)':'#e6e9e3')+'"></span>').join(''):'';
+  box.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>'+['ČVZ','Zakázka (Helios)','Výrobek (plán)','Ks plán','Zákazník','Termín','Fáze','Operací','Ks odvedeno','Lidí','Režie h','Odvádění'].map((h,i)=>'<th style="text-align:'+(i>=7&&i<=10?'right':'left')+';'+vykTh+'">'+h+'</th>').join('')+'</tr></thead><tbody>'
+    +C.slice(0,120).map(c=>'<tr><td style="'+vykTd+'"><b>'+esc(c.cvz)+'</b></td><td style="'+vykTd+';max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(c.zak)+'">'+esc(c.zak||'—')+'</td>'
+      +'<td style="'+vykTd+'">'+(c.plan?esc(c.plan.vyrobek||'—'):'<span class="muted">—</span>')+'</td><td style="'+vykTd+';text-align:right">'+(c.plan&&c.plan.ks!=null?vykF(c.plan.ks):'')+'</td>'
+      +'<td style="'+vykTd+';max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(c.plan?esc(c.plan.zakaznik||''):'')+'</td><td style="'+vykTd+';white-space:nowrap">'+(c.plan?esc(c.plan.termin||''):'')+'</td><td style="'+vykTd+'">'+faze(c.plan)+'</td>'
+      +'<td style="'+vykTd+';text-align:right"><b>'+vykF(c.rows)+'</b></td><td style="'+vykTd+';text-align:right">'+vykF(c.ks)+'</td><td style="'+vykTd+';text-align:right">'+c.lide+'</td><td style="'+vykTd+';text-align:right">'+(c.rezieH?vykF(c.rezieH):'—')+'</td>'
+      +'<td style="'+vykTd+';white-space:nowrap;font-size:12px;color:var(--ink-soft)">'+vykD(c.first)+' – '+vykD(c.last)+'</td></tr>').join('')+'</tbody></table>'
+    +'<p class="muted" style="font-size:12px;margin:8px 2px 0">'+C.length+' zakázek s odváděním v období'+(C.length>120?' (zobrazeno 120 podle počtu operací)':'')+' · fáze = zelené = v plánu odškrtnuto ('+esc(((VYK.det.plan||{}).faze||[]).join(' / '))+').</p>';
+}
+function vykKvalitaRender(){
+  const box=document.getElementById('vykKvalita'), K=VYK.det.kvalita||{}, A=VYK.det.autori||[];
+  const it=(n,t,ok)=>'<div>'+(ok?'✅':'⚠️')+' <b>'+vykF(n)+'</b> '+t+'</div>';
+  box.innerHTML=it(K.future,'řádků s datem po datu snímku (překlepy) — v přehledu vynechány',!K.future)+it(K.bezCvz,'řádků bez ČVZ (nelze přiřadit k zakázce)',K.bezCvz===0)+it(K.nulKs,'výrobních řádků s 0 ks (operace bez ceny/normy?)',K.nulKs===0)+it(K.bezJmena,'řádků bez osobního čísla',K.bezJmena===0)
+    +'<div style="margin-top:6px"><b>Kdo zapisuje:</b> '+A.map(a=>esc(a.autor==='terminalETH'?'terminál':a.autor)+' <span class="muted">('+vykF(a.rows)+')</span>').join(' · ')+'</div>'
+    +'<div class="muted" style="font-size:12px;margin-top:6px">Export z Heliosu neobsahuje Kč (Mzda/Cena, Doplatek) — proto se měří operace, kusy a hodiny; korunová vrstva přibude, až bude cena v exportu.</div>';
+}
+async function vykSync(){
+  toast('Stahuji exporty a plány z Drive…');
+  try{
+    const r=await fetch('/api/vykonnost/sync',{method:'POST'}); const j=await r.json();
+    if(!r.ok||j.error){ toast(j.error||'Sync selhal.'); return; }
+    const parts=Object.entries(j.zavody||{}).map(([k,v])=>k+': '+(v.ok?(v.skipped?'beze změny':v.file+' ('+v.rows+' ř.)'):'CHYBA '+v.error));
+    toast(parts.join(' · ')); await showVykonnost();
+  }catch(e){ toast('Sync selhal: '+e.message); }
 }
 
 async function showTelefon(){
@@ -5915,11 +6103,11 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
-  ["Provoz",["sklady","plasty","kovo","eshop","qooling"]],
+  ["Provoz",["sklady","plasty","kovo","eshop","qooling","vykonnost"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
   ["Vývoj projektů",["eshopmodel"]],
   ["Finance",["pohledavky"]],

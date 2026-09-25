@@ -3937,6 +3937,17 @@ try {
   console.error('[qooling] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Výkonnost středisek“ (odvádění z Heliosu pro 4 závody + plány výroby) ----
+let vykonnostMod = null;
+try {
+  vykonnostMod = require('./vykonnost').mount({
+    send, readBody, isAdmin, empSession, employeeModules, getState, sheetsGet, sheetsMeta,
+    dataDir: DATA_DIR,
+  });
+} catch (e) {
+  console.error('[vykonnost] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true); const p = u.pathname;
   if (req.method === 'OPTIONS') return send(res, 204, '', { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
@@ -4211,6 +4222,8 @@ const server = http.createServer(async (req, res) => {
     if (nakupReportMod && await nakupReportMod.handle(req, res)) return;
     // Modul „Qooling" si obslouží vlastní cesty (/api/qooling*).
     if (qoolingMod && await qoolingMod.handle(req, res)) return;
+    // Modul „Výkonnost středisek“ si obslouží vlastní cesty (/api/vykonnost*).
+    if (vykonnostMod && await vykonnostMod.handle(req, res)) return;
 
     // Centrální přehled rozesílek (správce) — agreguje descriptory z modulů, které je vystavují.
     if (p === '/api/admin/reports' && req.method === 'GET') {
@@ -5996,6 +6009,11 @@ if (require.main === module) {
     if (qoolingMod) {
       qoolingMod.tick();
       setInterval(() => qoolingMod.tick(), 3600 * 1000);
+    }
+    // Výkonnost středisek: hodinový sync exportů Heliosu (4 závody) + plány výroby á 6 h (uvnitř tick).
+    if (vykonnostMod) {
+      vykonnostMod.tick();
+      setInterval(() => vykonnostMod.tick(), 3600 * 1000);
     }
   });
 }
