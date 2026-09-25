@@ -1699,7 +1699,8 @@ function mount(host) {
       if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu.' }); return true; }
       const e = eskalacePrehled(), se = host.empSession && host.empSession(req), em = ((se && se.email) || '').toLowerCase();
       const jeLucie = cleanEmails(e.cfg.vyzvaKomu || []).indexOf(em) >= 0;
-      return json(res, 200, { ok: true, admin: host.isAdmin(req), ja: em, jeLucie, den: e.den, faktury: e.faktury, cfg: e.cfg, nahradni: e.nahradni }), true;
+      let zam = []; if (host.isAdmin(req)) { try { zam = ((host.getState && host.getState().employees) || []).filter(x => x && x.email && x.name).map(x => ({ name: String(x.name), email: String(x.email).toLowerCase() })).sort((x, y) => x.name.localeCompare(y.name, 'cs')); } catch (_) {} }   // našeptávač jmen pro přiřazení
+      return json(res, 200, { ok: true, admin: host.isAdmin(req), ja: em, jeLucie, den: e.den, faktury: e.faktury, cfg: e.cfg, nahradni: e.nahradni, zamestnanci: zam }), true;
     }
     if (p === '/api/nakup-report/eskalace' && req.method === 'POST') {
       if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu.' }); return true; }
