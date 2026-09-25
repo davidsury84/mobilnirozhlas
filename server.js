@@ -5622,11 +5622,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ---- Školení Průmysl (obchodník: skladování, Li-Ion, ADR): za přihlášením (zaměstnanec nebo správce) ----
+    // Jazyková verze školení: existuje-li vedle souboru i „…​.en.html", pošle se při ?lang=en.
+    // Díky tomu stačí přeložený soubor přidat — v kódu se nic měnit nemusí.
+    const kurzSoubor = (f) => {
+      try {
+        const lang = String((u.query && u.query.lang) || '').toLowerCase();
+        if (/^[a-z]{2}$/.test(lang) && lang !== 'cz' && lang !== 'cs') {
+          const alt = f.replace(/\.html$/, '.' + lang + '.html');
+          if (fs.existsSync(alt)) return alt;
+        }
+      } catch (_) {}
+      return f;
+    };
     if (p === '/prumysl-app') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Průmysl je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(PRUMYSL_FILE)) return send(res, 404, '<h1>Chybí prumysl-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(PRUMYSL_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, fs.readFileSync(kurzSoubor(PRUMYSL_FILE), 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     // ---- Školení LOXXER (obchodník: protipožární skříně na Li-Ion baterie): za přihlášením (zaměstnanec nebo správce) ----
@@ -5634,7 +5646,7 @@ const server = http.createServer(async (req, res) => {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení LOXXER je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(LOXXER_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí loxxer-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(LOXXER_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, fs.readFileSync(kurzSoubor(LOXXER_SKOLENI_FILE), 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     // ---- Školení ACTS (železniční abroll kontejnery): za přihlášením (zaměstnanec nebo správce) ----
@@ -5642,38 +5654,38 @@ const server = http.createServer(async (req, res) => {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení ACTS je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(ACTS_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí acts-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(ACTS_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, fs.readFileSync(kurzSoubor(ACTS_SKOLENI_FILE), 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/vykresy-skoleni-app') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Čtení výkresů je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(VYKRESY_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí vykresy-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(VYKRESY_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, fs.readFileSync(kurzSoubor(VYKRESY_SKOLENI_FILE), 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/svarovani-skoleni-app') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Průvodce svařováním je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(SVAROVANI_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí svarovani-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(SVAROVANI_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, fs.readFileSync(kurzSoubor(SVAROVANI_SKOLENI_FILE), 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/zentex-skoleni-app') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení ZENTEX je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(ZENTEX_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí zentex-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(ZENTEX_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, fs.readFileSync(kurzSoubor(ZENTEX_SKOLENI_FILE), 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
     if (p === '/tridici-linky-skoleni-app') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení Třídicí linky je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(TRIDICI_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí tridici-linky-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(TRIDICI_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, fs.readFileSync(kurzSoubor(TRIDICI_SKOLENI_FILE), 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     if (p === '/bramidan-skoleni-app') {
       const e = empSession(req);
       if (!e && !isAdmin(req)) return send(res, 403, '<h1>Školení BRAMIDAN je dostupné po přihlášení.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       if (!fs.existsSync(BRAMIDAN_SKOLENI_FILE)) return send(res, 404, '<h1>Chybí bramidan-skoleni.html</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
-      return send(res, 200, fs.readFileSync(BRAMIDAN_SKOLENI_FILE, 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
+      return send(res, 200, fs.readFileSync(kurzSoubor(BRAMIDAN_SKOLENI_FILE), 'utf8'), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, must-revalidate' });
     }
 
     // ---- SMI aplikace (modul E-shop): servírovaná z našeho serveru, za přihlášením ----

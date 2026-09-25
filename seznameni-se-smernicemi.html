@@ -1704,6 +1704,14 @@ const MJ_L10N = {
   'do': ['by','bis','do','до','până la'],
   'povinné do': ['required by','Pflicht bis','wymagane do','обов’язково до','obligatoriu până la'],
   'povinné — po termínu': ['required — overdue','Pflicht — überfällig','wymagane — po terminie','обов’язково — прострочено','obligatoriu — restant'],
+  'ZENTEX — lisovací kontejnery (výběr vhodného lisu)': ['ZENTEX — compacting containers (choosing the right compactor)','ZENTEX — Presscontainer (Auswahl der passenden Presse)','ZENTEX — kontenery prasujące (dobór odpowiedniej prasy)','ZENTEX — пресуючі контейнери (вибір відповідного преса)','ZENTEX — containere de compactare (alegerea presei potrivite)'],
+  '27 lekcí (~100 normostran) + interaktivní prvky: průvodce výběrem lisu, kalkulačka úspor, hry a odznaky · závěrečný test (20 náhodných otázek z 50)': ['27 lessons (~100 standard pages) plus interactive features: a compactor selection guide, a savings calculator, games and badges · final test (20 random questions out of 50)','27 Lektionen (~100 Normseiten) plus interaktive Elemente: Auswahlassistent für Pressen, Einsparrechner, Spiele und Abzeichen · Abschlusstest (20 Zufallsfragen aus 50)','27 lekcji (~100 stron znormalizowanych) plus elementy interaktywne: przewodnik doboru prasy, kalkulator oszczędności, gry i odznaki · test końcowy (20 losowych pytań z 50)','27 уроків (~100 нормосторінок) та інтерактивні елементи: підбір преса, калькулятор економії, ігри та значки · підсумковий тест (20 випадкових питань із 50)','27 lecții (~100 pagini standard) plus elemente interactive: ghid de alegere a presei, calculator de economii, jocuri și insigne · test final (20 întrebări aleatorii din 50)'],
+  'BRAMIDAN — stacionární (vertikální) lisy': ['BRAMIDAN — stationary (vertical) balers','BRAMIDAN — stationäre (vertikale) Ballenpressen','BRAMIDAN — prasy stacjonarne (pionowe)','BRAMIDAN — стаціонарні (вертикальні) преси','BRAMIDAN — prese staționare (verticale)'],
+  '27 lekcí: celý sortiment 14 modelů řad B a X, výběr podle materiálu, elektro, stropu a množství, balík a manipulace, cenotvorba a argumentář · interaktivní kalkulačka úspor, průvodce výběrem lisu, hry a odznaky · závěrečný test (20 náhodných otázek z 50)': ['27 lessons: the full range of 14 models in the B and X series, choosing by material, power supply, ceiling height and volume, the bale and its handling, pricing and sales arguments · interactive savings calculator, compactor selection guide, games and badges · final test (20 random questions out of 50)','27 Lektionen: das gesamte Sortiment von 14 Modellen der Baureihen B und X, Auswahl nach Material, Stromanschluss, Raumhöhe und Menge, Ballen und Handling, Preisgestaltung und Argumentation · interaktiver Einsparrechner, Auswahlassistent, Spiele und Abzeichen · Abschlusstest (20 Zufallsfragen aus 50)','27 lekcji: pełna gama 14 modeli serii B i X, dobór według materiału, zasilania, wysokości stropu i ilości, bela i jej obsługa, ceny i argumentacja · interaktywny kalkulator oszczędności, przewodnik doboru prasy, gry i odznaki · test końcowy (20 losowych pytań z 50)','27 уроків: увесь асортимент 14 моделей серій B і X, вибір за матеріалом, живленням, висотою стелі та обсягом, кіпа та поводження з нею, ціноутворення й аргументи · інтерактивний калькулятор економії, підбір преса, ігри та значки · підсумковий тест (20 випадкових питань із 50)','27 lecții: întreaga gamă de 14 modele din seriile B și X, alegerea după material, alimentare, înălțimea tavanului și cantitate, balotul și manipularea, prețuri și argumentar · calculator interactiv de economii, ghid de alegere a presei, jocuri și insigne · test final (20 întrebări aleatorii din 50)'],
+  'Zbývá': ['Remaining','Verbleibend','Pozostało','Залишилось','Rămas'],
+  'Pozvat': ['Invite','Einladen','Zaproś','Запросити','Invită'],
+  'Pozvat zaměstnance k absolvování': ['Invite an employee to complete this training','Mitarbeiter zur Schulung einladen','Zaproś pracownika do ukończenia szkolenia','Запросити працівника пройти навчання','Invită un angajat să parcurgă instruirea'],
+  'Jako správce můžete tlačítkem „✉ Pozvat" poslat komukoli e-mailovou pozvánku k absolvování.': ['As an administrator you can use the „✉ Invite" button to e-mail anyone an invitation to complete a training.','Als Administrator können Sie mit der Schaltfläche „✉ Einladen" jedem eine E-Mail-Einladung zur Schulung senden.','Jako administrator możesz przyciskiem „✉ Zaproś" wysłać każdemu zaproszenie e-mailem.','Як адміністратор можете кнопкою „✉ Запросити" надіслати будь-кому запрошення електронною поштою.','Ca administrator puteți trimite oricui, cu butonul „✉ Invită", o invitație prin e-mail.'],
   'Pozvánka od správce': ['Invitation from the administrator','Einladung vom Administrator','Zaproszenie od administratora','Запрошення від адміністратора','Invitație de la administrator'],
   'Termín už uplynul': ['The deadline has passed','Die Frist ist abgelaufen','Termin minął','Термін минув','Termenul a expirat'],
   'Středisko': ['Department','Abteilung','Dział','Підрозділ','Departament'],
@@ -3257,13 +3265,13 @@ async function showSkoleni(){
   // Svařování má jednorázový test (1 pokus) — po prvním pokusu rovnou Splněno/Nesplněno, žádné počítadlo pokusů
   if(!sst.passed && (sst.attemptsUsed||0)>=1){ sb.badge='<span class="pill red">✕ '+mjT('Nesplněno')+' ('+(sst.best||0)+' %)</span>'; sb.label=mjT('Prohlédnout'); }
   // Správce může kohokoli pozvat k absolvování (e-mailová pozvánka) — u všech školení.
-  const inv=(key,nazev)=>MUJ.admin?'<button class="btn ghost sm" title="Pozvat zaměstnance k absolvování" onclick="skolPozvat(\''+key+'\',\''+nazev.replace(/'/g,"\\'")+'\')">✉ Pozvat</button>':'';
+  const inv=(key,nazev)=>MUJ.admin?'<button class="btn ghost sm" title="'+mjT('Pozvat zaměstnance k absolvování')+'" onclick="skolPozvat(\''+key+'\',\''+nazev.replace(/'/g,"\\'")+'\')">✉ '+mjT('Pozvat')+'</button>':'';
   // Štítek „povinné do …" u školení, ke kterému jsem byl pozván
   const pov=(key)=>{ const z=skolPozvankaPro(key); if(!z) return '';
     return z.poLhute
       ? '<span class="pill red" title="'+mjT('Termín už uplynul')+'">'+mjT('povinné — po termínu')+'</span> '
       : '<span class="pill amber" title="'+mjT('Pozvánka od správce')+'">'+mjT('povinné do')+' '+skolDatum(z.termin)+'</span> '; };
-  let h='<div class="dash-hero"><h2>'+mjT('Školení')+'</h2><p>'+(MJ_LANG==='cz'?'Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).':mjT('__skolIntro'))+(MUJ.admin?' Jako správce můžete tlačítkem „✉ Pozvat" poslat komukoli e-mailovou pozvánku k absolvování.':'')+'</p></div>';
+  let h='<div class="dash-hero"><h2>'+mjT('Školení')+'</h2><p>'+(MJ_LANG==='cz'?'Interaktivní školení a jejich závěrečné testy. U každého vidíte stav svého testu (hranice splnění 80 %, max 3 pokusy).':mjT('__skolIntro'))+(MUJ.admin?' '+mjT('Jako správce můžete tlačítkem „✉ Pozvat" poslat komukoli e-mailovou pozvánku k absolvování.'):'')+'</p></div>';
   h+=skolPozvankyHtml();
   h+='<div class="dash-sec">'+mjT('Dostupná školení')+'</div>';
   h+='<div class="li-item"><div class="li-left"><div class="li-ic">'+mujIcon(MUJ_IC.school)+'</div><div>'+
@@ -3350,7 +3358,7 @@ function openSvarovaniSkoleni(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=svarovani'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const q='?lang='+MJ_LANG+'#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+MJ_LANG;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>Průvodce svařováním</b> — v záložce Test je závěrečný test. Je <b>jednorázový</b> (jediný pokus, hranice 80 %) a výsledek se hned ukládá.</span></div>'+
@@ -3362,7 +3370,7 @@ function openVykresySkoleni(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=vykresy'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const q='?lang='+MJ_LANG+'#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+MJ_LANG;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>Čtení technických výkresů</b> — na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
@@ -3441,7 +3449,7 @@ function openAbroll(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=abroll'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const q='?lang='+MJ_LANG+'#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+MJ_LANG;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy.</span></div>'+
@@ -3453,7 +3461,7 @@ function openPrumysl(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=prumysl'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const q='?lang='+MJ_LANG+'#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+MJ_LANG;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>Průmysl</b> — na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
@@ -3465,7 +3473,7 @@ function openLoxxerSkoleni(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=loxxer'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const q='?lang='+MJ_LANG+'#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+MJ_LANG;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>LOXXER</b> — na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
@@ -3477,7 +3485,7 @@ function openActsSkoleni(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=acts'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const q='?lang='+MJ_LANG+'#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+MJ_LANG;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>ACTS</b> — na konci je závěrečný test. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
@@ -3489,7 +3497,7 @@ function openZentexSkoleni(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=zentex'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const q='?lang='+MJ_LANG+'#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+MJ_LANG;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>ZENTEX</b> — na konci je závěrečný test: losuje se 20 otázek z 50, každý pokus jiné. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
@@ -3501,7 +3509,7 @@ function openTridiciSkoleni(){
   try{ history.replaceState(null,'','#modul=skoleni&kurz=tridici-linky'); }catch(e){}
   const main=document.querySelector(".mj-main"); if(main) main.classList.add("mj-full");
   const body=document.getElementById("mujBody");
-  const q='#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'');
+  const q='?lang='+MJ_LANG+'#kdo='+encodeURIComponent(MUJ.email)+'&jmeno='+encodeURIComponent(MUJ.name||'')+'&lang='+MJ_LANG;
   body.innerHTML='<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line,#e6e9e4);background:#fff">'+
       '<button class="btn ghost sm" onclick="showSkoleni()">'+mjT('← Zpět na školení')+'</button>'+
       '<span class="muted" style="font-size:13px">Školení <b>Třídicí linky</b> — 12 kapitol, kapitoly se odemykají postupně. Na konci je závěrečný test: losuje se 24 otázek z 60, každý pokus jiné. Výsledek se ukládá, máte max 3 pokusy (hranice 80 %).</span></div>'+
