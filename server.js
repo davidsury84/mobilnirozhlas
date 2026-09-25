@@ -252,6 +252,7 @@ const GARANTI_F  = path.join(DATA_DIR, 'garanti-navrhy.json'); // návrhy garant
 const PREKLAD_LEADY_F = path.join(DATA_DIR, 'preklad-leady.json'); // Obchod → Leady: kontakty z veřejné kalkulačky překladiště (lead-gen)
 const AKTUALITY_F = path.join(DATA_DIR, 'aktuality.json');    // aktuality (novinky) na intranetu: {posts:[{id,title,body,image,author,authorEmail,ts,likes:{email:ts}}]}
 const SITE_F      = path.join(DATA_DIR, 'site.json');         // nastavení vzhledu intranetu (např. vlastní hero banner)
+const EXT_F       = path.join(DATA_DIR, 'externi-ucty.json'); // partnerské účty (přihlášení heslem, bez Google SSO)
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');           // nahrané obrázky (aktuality, banner) — persistentní volume
 for (const d of [DATA_DIR, PUB_DIR, UPLOADS_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 
@@ -447,6 +448,13 @@ function gatePage() {
     ? '<form onsubmit="return go(event)"><input id="p" type="password" placeholder="Přístupové heslo" autocomplete="current-password"><button type="submit">Vstoupit</button><div class="err" id="e"></div></form>'
     : '';
   const hint = ssoEnabled() ? 'Přihlaste se firemním účtem ELKOPLAST.' : 'Zadejte přístupové heslo.';
+  // Partneři a kolegové bez firemního Google účtu (Slovensko) — e-mail + heslo od správce.
+  const partner = '<div class="sep">nebo</div>'
+    + '<form onsubmit="return goP(event)" autocomplete="on">'
+    + '<input id="pe" type="email" placeholder="E-mail / e-mail" autocomplete="username">'
+    + '<input id="pp" type="password" placeholder="Heslo / heslo" autocomplete="current-password">'
+    + '<button type="submit">Prihlásiť sa · Přihlásit</button><div class="err" id="pe2"></div></form>'
+    + '<p style="margin:10px 0 0;font-size:12px">Pre kolegov bez firemného Google účtu. Heslo vydáva správca intranetu.</p>';
   return '<!doctype html><html lang="cs"><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Intranet ELKOPLAST CZ — přihlášení</title>'
     + '<style>*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;display:grid;place-items:center;'
@@ -460,10 +468,67 @@ function gatePage() {
     + 'input:focus{outline:none;border-color:#12a350}button{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#15ab57,#0a6b34);color:#fff;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit}'
     + '.err{color:#c23636;font-size:13px;min-height:18px;margin-top:8px}</style></head><body>'
     + '<div class="card"><div class="logo">✓</div><h1>Intranet ELKOPLAST CZ</h1><p>' + hint + '</p>'
-    + google + sep + pass + '</div>'
+    + google + sep + pass + partner + '</div>'
     + '<script>async function go(ev){ev.preventDefault();var e=document.getElementById("e");e.textContent="";'
     + 'try{var r=await fetch("/gate-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:document.getElementById("p").value})});'
-    + 'if(r.ok){location.reload();}else{e.textContent="Nesprávné heslo.";}}catch(x){e.textContent="Chyba spojení.";}return false;}</script></body></html>';
+    + 'if(r.ok){location.reload();}else{e.textContent="Nesprávné heslo.";}}catch(x){e.textContent="Chyba spojení.";}return false;}'
+    + 'async function goP(ev){ev.preventDefault();var e=document.getElementById("pe2");e.textContent="";'
+    + 'try{var r=await fetch("/auth/partner",{method:"POST",headers:{"Content-Type":"application/json"},'
+    + 'body:JSON.stringify({email:document.getElementById("pe").value,heslo:document.getElementById("pp").value})});'
+    + 'var j=await r.json().catch(function(){return {}});'
+    + 'if(r.ok&&j.ok){location.href="/";}else{e.textContent=j.chyba||"Nesprávný e-mail nebo heslo.";}}'
+    + 'catch(x){e.textContent="Chyba spojení.";}return false;}</script></body></html>';
+}
+
+/* ============================================================
+   PARTNERSKÉ ÚČTY (kolegové bez Google účtu — např. Slovensko)
+   ------------------------------------------------------------
+   Přihlašují se e-mailem a heslem, které jim vygeneruje správce.
+   Heslo se NIKDY neukládá — jen scrypt otisk se solí. Účet vidí
+   pouze moduly ze svého seznamu; do administrace se nedostane.
+   ============================================================ */
+const EXT_VYCHOZI_MODULY = ['skoleni', 'konstrukce', 'zadanikonstrukce', 'obchod', 'vyroba',
+  'kalkulace', 'loxxerkalk', 'svozesa', 'tridicilinka', 'prekladiste', 'kovokalk', 'kontejnerykalk'];
+function readExterni() { const d = readJson(EXT_F, { ucty: [] }); if (!Array.isArray(d.ucty)) d.ucty = []; return d; }
+function writeExterni(d) { writeJson(EXT_F, d); }
+function extHash(heslo, salt) { return crypto.scryptSync(String(heslo), salt, 32).toString('hex'); }
+function extNoveHeslo() {
+  // Čitelné heslo bez znaků, které se pletou (0/O, 1/l/I): 4-4-4 skupiny.
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const kus = () => Array.from(crypto.randomBytes(4)).map(b => abc[b % abc.length]).join('');
+  return kus() + '-' + kus() + '-' + kus();
+}
+function extUcet(email) {
+  email = (email || '').toLowerCase().trim(); if (!email) return null;
+  const u = readExterni().ucty.find(x => (x.email || '').toLowerCase() === email);
+  return (u && u.aktivni !== false) ? u : null;
+}
+function extOveritHeslo(u, heslo) {
+  if (!u || !u.hash || !u.salt || !heslo) return false;
+  const a = Buffer.from(u.hash, 'hex'), b = Buffer.from(extHash(heslo, u.salt), 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+// Relace partnera = běžná sm_emp cookie s příznakem x:1; účet musí pořád existovat a být aktivní.
+function extSession(req) {
+  const e = empVerify(cookieVal(req, 'sm_emp'));
+  if (!e || !e.x) return null;
+  const u = extUcet(e.email);
+  return u ? { email: u.email, name: u.jmeno || u.email, ucet: u } : null;
+}
+function jeExterni(req) { return !!extSession(req); }
+// Brzda na hádání hesla: 5 pokusů / 15 minut na dvojici IP+e-mail.
+const EXT_POKUSY = new Map();
+function extBrzda(klic) {
+  const z = EXT_POKUSY.get(klic);
+  if (!z) return false;
+  if (Date.now() - z.od > 15 * 60 * 1000) { EXT_POKUSY.delete(klic); return false; }
+  return z.n >= 5;
+}
+function extPokus(klic, ok) {
+  if (ok) { EXT_POKUSY.delete(klic); return; }
+  const z = EXT_POKUSY.get(klic) || { n: 0, od: Date.now() };
+  if (Date.now() - z.od > 15 * 60 * 1000) { z.n = 0; z.od = Date.now(); }
+  z.n++; EXT_POKUSY.set(klic, z);
 }
 
 /* ---------- SSO zaměstnanců (Google OIDC, bez závislostí) ---------- */
@@ -2062,7 +2127,11 @@ function employeeModules(email) {
   email = (email || '').toLowerCase();
   const s = readJson(STATE_F, { employees: [] });
   const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
-  return (e && Array.isArray(e.modules)) ? e.modules : [];
+  if (e && Array.isArray(e.modules)) return e.modules;
+  // Partnerský účet (bez Google SSO) — moduly má ve vlastní evidenci, aby kontroly
+  // přístupu v modulech fungovaly beze změny.
+  const u = extUcet(email);
+  return (u && Array.isArray(u.moduly)) ? u.moduly : [];
 }
 // Smí uživatel zadávat aktuality a měnit banner? = má modul „aktuality" nebo je správce.
 function canPostAktuality(req) {
@@ -3907,6 +3976,29 @@ const server = http.createServer(async (req, res) => {
   // Healthcheck (veřejný, vždy 200) – pro Railway healthcheck a jednoznačnou identifikaci běžícího nasazení.
   if (p === '/healthz') return send(res, 200, { ok: true, commit: GIT_COMMIT, deploymentId: process.env.RAILWAY_DEPLOYMENT_ID || null, uptimeS: Math.round(process.uptime()) }, { 'Cache-Control': 'no-store' });
 
+    // Přihlášení partnerského účtu (kolegové bez firemního Google účtu)
+    if (p === '/auth/partner' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
+      const email = String(b.email || '').toLowerCase().trim();
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
+      const klic = ip + '|' + email;
+      if (extBrzda(klic)) return send(res, 429, { chyba: 'Příliš mnoho pokusů. Zkuste to za 15 minut. / Príliš veľa pokusov.' });
+      const u = extUcet(email);
+      const ok = !!u && extOveritHeslo(u, b.heslo);
+      extPokus(klic, ok);
+      if (!ok) return send(res, 401, { chyba: 'Nesprávný e-mail nebo heslo. / Nesprávny e-mail alebo heslo.' });
+      try {
+        const d = readExterni();
+        const zaznam = d.ucty.find(x => (x.email || '').toLowerCase() === email);
+        if (zaznam) { zaznam.posledniPrihlaseni = Date.now(); writeExterni(d); }
+      } catch (_) {}
+      logActivity('partner-login', { email: u.email, name: u.jmeno || '' }, 'Přihlášení partnerského účtu');
+      const sess = empSign({ email: u.email, name: u.jmeno || u.email, x: 1 });
+      const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : '';
+      // Kratší platnost než u zaměstnanců (12 h) — externí přístup má být těsnější.
+      return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_emp=' + encodeURIComponent(sess) + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=43200' + secure });
+    }
+
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
   if (!gatePassed(req) && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !spokojenostPublic && !libraryIngestPublic && !garantiPublic && !vyrobaIngestPublic) {
     // přihlášení sdíleným heslem
@@ -3919,7 +4011,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 401, { error: 'Nesprávné heslo.' });
     }
     // Google SSO přihlašovací tok propustíme (jinak by se nešlo přihlásit)
-    const authFlow = (p === '/auth/google/login' || p === '/auth/google/callback' || p === '/auth/logout' || p === '/auth/dev');
+    const authFlow = (p === '/auth/google/login' || p === '/auth/google/callback' || p === '/auth/logout' || p === '/auth/dev' || p === '/auth/partner');
     if (!authFlow) {
       if (req.method === 'GET' && (req.headers.accept || '').indexOf('text/html') >= 0)
         return send(res, 200, gatePage(), { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -4172,6 +4264,61 @@ const server = http.createServer(async (req, res) => {
       const b = JSON.parse(await readBody(req));
       if ((b.password || '') === SEC.password) { const secure = (req.headers['x-forwarded-proto'] === 'https') ? '; Secure' : ''; logActivity('admin-login', { email: '', name: 'Správce (heslo)' }, ''); return send(res, 200, { ok: true }, { 'Set-Cookie': 'sm_auth=' + token() + '; HttpOnly; Path=/; SameSite=Lax; Max-Age=2592000' + secure }); }
       return send(res, 401, { error: 'Nesprávné heslo.' });
+    }
+    // ---- partnerské účty: seznam / založení / nové heslo / vypnutí (jen správce) ----
+    if (p === '/api/externi' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const d = readExterni();
+      return send(res, 200, {
+        vychoziModuly: EXT_VYCHOZI_MODULY,
+        ucty: d.ucty.map(u => ({
+          email: u.email, jmeno: u.jmeno || '', firma: u.firma || '', jazyk: u.jazyk || 'sk', mena: u.mena || 'EUR',
+          moduly: u.moduly || [], aktivni: u.aktivni !== false, vytvoreno: u.vytvoreno || null,
+          posledniPrihlaseni: u.posledniPrihlaseni || null, hesloVydano: u.hesloVydano || null,
+        })),
+      });
+    }
+    if (p === '/api/externi' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const b = JSON.parse(await readBody(req) || '{}');
+      const akce = String(b.akce || '');
+      const email = String(b.email || '').toLowerCase().trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return send(res, 400, { chyba: 'Neplatný e-mail.' });
+      const d = readExterni();
+      const i = d.ucty.findIndex(x => (x.email || '').toLowerCase() === email);
+      if (akce === 'smazat') {
+        if (i < 0) return send(res, 404, { chyba: 'Účet nenalezen.' });
+        d.ucty.splice(i, 1); writeExterni(d);
+        logActivity('externi', empSession(req) || { email: 'správce' }, 'Smazán partnerský účet ' + email);
+        return send(res, 200, { ok: true });
+      }
+      if (akce === 'vypnout' || akce === 'zapnout') {
+        if (i < 0) return send(res, 404, { chyba: 'Účet nenalezen.' });
+        d.ucty[i].aktivni = (akce === 'zapnout'); writeExterni(d);
+        logActivity('externi', empSession(req) || { email: 'správce' }, (akce === 'zapnout' ? 'Zapnut' : 'Vypnut') + ' partnerský účet ' + email);
+        return send(res, 200, { ok: true });
+      }
+      // založení nebo změna
+      if (i < 0 && findEmployeeByEmail(email)) return send(res, 400, { chyba: 'Tenhle e-mail je zaměstnanec — ten se hlásí přes Google.' });
+      const u = i >= 0 ? d.ucty[i] : { email, vytvoreno: Date.now(), aktivni: true };
+      if (b.jmeno !== undefined) u.jmeno = String(b.jmeno || '').trim();
+      if (b.firma !== undefined) u.firma = String(b.firma || '').trim();
+      if (b.jazyk !== undefined) u.jazyk = String(b.jazyk || 'sk').slice(0, 5);
+      if (b.mena !== undefined) u.mena = String(b.mena || 'EUR').slice(0, 3).toUpperCase();
+      if (Array.isArray(b.moduly)) u.moduly = b.moduly.map(String);
+      if (!Array.isArray(u.moduly)) u.moduly = EXT_VYCHOZI_MODULY.slice();
+      let heslo = null;
+      if (i < 0 || b.noveHeslo) {
+        heslo = extNoveHeslo();
+        u.salt = crypto.randomBytes(16).toString('hex');
+        u.hash = extHash(heslo, u.salt);
+        u.hesloVydano = Date.now();
+      }
+      if (i < 0) d.ucty.push(u);
+      writeExterni(d);
+      logActivity('externi', empSession(req) || { email: 'správce' }, (i < 0 ? 'Založen' : 'Upraven') + ' partnerský účet ' + email + (heslo ? ' (nové heslo)' : ''));
+      // Heslo se vrací JEN teď — uložené je pouze jeho otisk, podruhé ho nikdo nepřečte.
+      return send(res, 200, { ok: true, heslo });
     }
     if (p === '/api/activity' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); const log = readJson(ACTLOG_F, []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 200); return send(res, 200, { events: log }); }
     if (p === '/api/invites' && req.method === 'GET') { if (!isAdmin(req)) return send(res, 401, { error: 'Nepřihlášeno.' }); return send(res, 200, { invites: readInvites() }); }
@@ -4802,6 +4949,18 @@ const server = http.createServer(async (req, res) => {
 
     if (p === '/api/my' && req.method === 'GET') {
       const e = empSession(req); if (!e) return send(res, 401, { error: 'Nepřihlášeno.' });
+      // Partnerský účet: jen vlastní moduly, nic z firemní agendy (směrnice, knihovna, dovolená…).
+      const ext = extSession(req);
+      if (ext) {
+        return send(res, 200, {
+          employee: { email: ext.email, name: ext.name },
+          externi: true, jazyk: ext.ucet.jazyk || 'sk', mena: ext.ucet.mena || 'EUR', firma: ext.ucet.firma || '',
+          directives: [], library: { docs: [], folders: [] }, surveys: [], skolPozvanky: [],
+          modules: Array.isArray(ext.ucet.moduly) ? ext.ucet.moduly : [],
+          surveyToken: '', isApprover: false, vacPending: 0, canPostAktuality: false,
+          isNakupci: false, isKontejnery: false, isLisy: false, aktualityNew: 0, heroImage: null,
+        });
+      }
       const emps = getState().employees || []; const eml = e.email.toLowerCase();
       const me = emps.find(x => (x.email || '').toLowerCase() === eml);
       // Je schvalovatelem? = je něčí přímý nadřízený, ředitel střediska, nebo jednatel.

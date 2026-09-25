@@ -1862,7 +1862,10 @@ async function refreshMy(){
   if(!MUJ.data.library) MUJ.data.library = {folders:[],docs:[]};
   MUJ.modules = MUJ.data.modules || [];
 }
-function moduleVisible(m){ if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="pohledavky") return ["eshop","obchod","obchodexp","doprava"].some(k=>mods.indexOf(k)>=0); if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kontejnery")>=0||mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery)||!!(MUJ.data&&MUJ.data.isLisy); if(m.key==="kontejnerykalk") return mods.indexOf("kontejnerykalk")>=0||mods.indexOf("kontejnery")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
+function moduleVisible(m){
+  // Partnerský účet (kolega bez firemního Google účtu) vidí jen to, co má v seznamu.
+  if(MUJ.data&&MUJ.data.externi){ const mm=MUJ.modules||[]; return m.key==="dash"||mm.indexOf(m.key)>=0||(m.key==="kovo"&&mm.indexOf("kovokalk")>=0); }
+  if(!m.gated) return true; const mods=MUJ.modules||[]; if(MUJ.admin||mods.indexOf(m.key)>=0) return true; if(m.key==="pohledavky") return ["eshop","obchod","obchodexp","doprava"].some(k=>mods.indexOf(k)>=0); if(m.key==="kovo"&&mods.indexOf("kovokalk")>=0) return true; if(m.key==="pozadavky") return mods.indexOf("eshop")>=0||!!(MUJ.data&&MUJ.data.isNakupci); if(m.key==="poptavky") return mods.indexOf("kontejnery")>=0||mods.indexOf("kalkulace")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery)||!!(MUJ.data&&MUJ.data.isLisy); if(m.key==="kontejnerykalk") return mods.indexOf("kontejnerykalk")>=0||mods.indexOf("kontejnery")>=0||mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||!!(MUJ.data&&MUJ.data.isKontejnery); return m.key==="zadanikonstrukce"&&(mods.indexOf("obchod")>=0||mods.indexOf("obchodexp")>=0||mods.indexOf("konstrukce")>=0); }
 function mujCounts(){
   const d = MUJ.data||{}; const dirs=d.directives||[]; const libDocs=(d.library&&d.library.docs)||[]; const survs=d.surveys||[];
   return { dirs, libDocs, survs, dirTodo:dirs.filter(x=>!x.ack).length, libTodo:libDocs.filter(x=>x.requireAck && !x.acked).length, survTodo:survs.filter(x=>!x.filled).length };
@@ -4269,7 +4272,9 @@ function showDashboard(){
     '</div></div>';
 
   // Rychlé akce — ploché barevné dlaždice (SharePoint hub)
-  const qacts=[["directives","Směrnice",MUJ_IC.file],["ukoly","Úkoly",MUJ_IC.tasks],["library","Knihovna",MUJ_IC.book],["bozp","BOZP",MUJ_IC.shield],["skoleni","Školení",MUJ_IC.school],["dovolena","Dovolená",MUJ_IC.cal],["telefon","Telefony",MUJ_IC.phone],["pruzkumy","Průzkumy",MUJ_IC.poll]];
+  let qacts=[["directives","Směrnice",MUJ_IC.file],["ukoly","Úkoly",MUJ_IC.tasks],["library","Knihovna",MUJ_IC.book],["bozp","BOZP",MUJ_IC.shield],["skoleni","Školení",MUJ_IC.school],["dovolena","Dovolená",MUJ_IC.cal],["telefon","Telefony",MUJ_IC.phone],["pruzkumy","Průzkumy",MUJ_IC.poll]];
+  // Partner má jen svoje sekce — firemní agenda (směrnice, dovolená, telefony…) se mu neukazuje.
+  if(MUJ.data&&MUJ.data.externi){ const mm=MUJ.modules||[]; qacts=qacts.filter(q=>mm.indexOf(q[0])>=0); }
   h += '<div class="mj-quick">'+qacts.map(q=>'<button onclick="mjGo(\''+q[0]+'\')">'+
     (q[0]==="directives"&&c.dirTodo?'<span class="badge todo qbadge">'+c.dirTodo+'</span>':'')+
     '<span class="qic"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">'+q[2]+'</svg></span><span class="lbl">'+mjT(q[1])+'</span></button>').join('')+'</div>';
@@ -4287,7 +4292,8 @@ function showDashboard(){
   const aktN=(MUJ.data&&MUJ.data.aktualityNew)||0;
   if(aktN>0){ pend.push({ icon:MUJ_IC.book, t:'🆕 '+aktN+' '+plural(aktN,"nová aktualita","nové aktuality","nových aktualit"), sub:"Nástěnka — novinky ve firmě", act:'<button class="btn sm" onclick="aktScroll()">Zobrazit</button>' }); }
   // ----- Levý sloupec hubu: Aktuality + K vyřízení + Rychlý přístup + Provozy -----
-  let mainH = '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>'+mjT('Aktuality')+(aktN>0?' <span style="background:#e0a400;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;vertical-align:2px">'+aktN+' '+mjT('NOVÉ')+'</span>':'')+'</h3>'+
+  const jeExterni = !!(MUJ.data&&MUJ.data.externi);
+  let mainH = jeExterni ? '' : '<section class="webpart" id="aktWrap"><div class="webpart-head"><h3>'+mjT('Aktuality')+(aktN>0?' <span style="background:#e0a400;color:#fff;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;vertical-align:2px">'+aktN+' '+mjT('NOVÉ')+'</span>':'')+'</h3>'+
     (canPostAkt?'<button class="btn sm" type="button" onclick="aktNew()">+ Přidat</button>':'')+
     '</div><div class="webpart-body" id="aktBody"><div class="muted">Načítám aktuality…</div></div></section>';
   mainH += '<section class="webpart" id="notifWrap" style="display:none"><div class="webpart-head"><h3>'+mjT('Z vašich modulů')+'</h3>'+
@@ -5998,10 +6004,109 @@ function renderAccess(){
   h+= ACCESS_VIEW==="moduly" ? accessModulyHtml(emps) : accessMatrixHtml(emps);
   h+='<div class="card pad" style="margin-top:16px"><strong>🌍 Přístup z ostatních firemních domén</strong>'+
     '<div id="pdomBox" style="margin-top:8px"><p class="muted" style="margin:0">Načítám…</p></div></div>';
+  h+='<div class="card pad" style="margin-top:16px"><div class="spread"><strong>🔑 Partnerské účty (bez Google)</strong>'+
+    '<button class="btn sm" onclick="extNovy()">+ Nový účet</button></div>'+
+    '<p class="muted" style="margin:6px 0 0;font-size:13px">Pro kolegy bez firemního účtu Google (Slovensko). Přihlašují se e-mailem a heslem, '+
+    'které jim vygenerujete tady, a vidí jen moduly, které jim přidělíte — nic z firemní agendy.</p>'+
+    '<div id="extBox" style="margin-top:10px"><p class="muted" style="margin:0">Načítám…</p></div></div>';
   box.innerHTML=h;
-  pdomLoad();
+  pdomLoad(); extLoad();
   if(wasSearch){ const s=document.getElementById("accessSearch"); if(s){ s.focus(); try{ s.setSelectionRange(s.value.length,s.value.length); }catch(_){} } }
 }
+/* ---------- partnerské účty (přihlášení e-mailem a heslem) ---------- */
+let EXT_DATA=null;
+// Klíče, které nejsou v matici přístupů (dostává je každý zaměstnanec), ale partnerovi se přidělují ručně.
+const EXT_MODULY_NAVIC=[["skoleni","Školení"],["zadanikonstrukce","Zadání do výroby / nabídky"],["kontaktysvet","Zahraniční pobočky a partneři"]];
+function extModuly(){ return ACCESS_MODULES.concat(EXT_MODULY_NAVIC); }
+function extLabel(k){ const m=extModuly().find(x=>x[0]===k); return m?m[1]:k; }
+function extModal(titul,telo,paticka){
+  document.getElementById("modalTitle").textContent=titul;
+  document.getElementById("modalBody").innerHTML=telo;
+  document.getElementById("modalFoot").innerHTML=paticka||'<button class="btn ghost" onclick="closeModal()">Zavřít</button>';
+  showModal();
+}
+async function extLoad(){
+  const box=document.getElementById("extBox"); if(!box)return;
+  try{ const r=await fetch("/api/externi",{cache:"no-store"}); EXT_DATA=await r.json(); }
+  catch(e){ box.innerHTML='<p class="muted" style="margin:0">Nepodařilo se načíst.</p>'; return; }
+  const u=EXT_DATA.ucty||[];
+  if(!u.length){ box.innerHTML='<p class="muted" style="margin:0">Zatím žádný partnerský účet.</p>'; return; }
+  box.innerHTML='<table class="tbl"><thead><tr><th>Kdo</th><th>Moduly</th><th>Naposledy přihlášen</th><th></th></tr></thead><tbody>'+
+    u.map(x=>'<tr'+(x.aktivni?'':' style="opacity:.5"')+'>'+
+      '<td><strong>'+esc(x.jmeno||x.email)+'</strong>'+(x.aktivni?'':' <span class="pill">vypnuto</span>')+
+        '<div class="muted mono" style="font-size:12px">'+esc(x.email)+'</div>'+
+        (x.firma?'<div class="muted" style="font-size:12px">'+esc(x.firma)+' · '+esc(x.jazyk||"sk")+' · '+esc(x.mena||"EUR")+'</div>':'')+'</td>'+
+      '<td class="muted" style="font-size:12px">'+esc((x.moduly||[]).map(extLabel).join(", ")||"—")+'</td>'+
+      '<td class="muted" style="font-size:12px">'+(x.posledniPrihlaseni?new Date(x.posledniPrihlaseni).toLocaleString("cs-CZ"):"nikdy")+'</td>'+
+      '<td style="text-align:right;white-space:nowrap">'+
+        '<button class="btn ghost sm" onclick="extUprav(\''+esc(x.email)+'\')">Upravit</button> '+
+        '<button class="btn ghost sm" onclick="extHeslo(\''+esc(x.email)+'\')">Nové heslo</button> '+
+        '<button class="btn ghost sm" onclick="extPrepnout(\''+esc(x.email)+'\','+(x.aktivni?'false':'true')+')">'+(x.aktivni?'Vypnout':'Zapnout')+'</button>'+
+      '</td></tr>').join("")+'</tbody></table>';
+}
+function extFormular(u){
+  const vych=(EXT_DATA&&EXT_DATA.vychoziModuly)||[];
+  const moduly=u?(u.moduly||[]):vych;
+  return '<label class="field"><span>E-mail</span><input id="exEmail" type="email" value="'+esc(u?u.email:"")+'"'+(u?' readonly':'')+'></label>'+
+    '<label class="field"><span>Jméno a příjmení</span><input id="exJmeno" value="'+esc(u?(u.jmeno||""):"")+'"></label>'+
+    '<label class="field"><span>Firma / pobočka</span><input id="exFirma" value="'+esc(u?(u.firma||""):"ELKOPLAST SK")+'"></label>'+
+    '<div class="row"><label class="field"><span>Jazyk</span><select id="exJazyk">'+
+      ["sk","cz","en"].map(j=>'<option value="'+j+'"'+((u&&u.jazyk||"sk")===j?" selected":"")+'>'+j.toUpperCase()+'</option>').join("")+'</select></label>'+
+    '<label class="field"><span>Měna</span><select id="exMena">'+
+      ["EUR","CZK"].map(m=>'<option'+((u&&u.mena||"EUR")===m?" selected":"")+'>'+m+'</option>').join("")+'</select></label></div>'+
+    '<div class="field"><span>Moduly, které uvidí</span><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'+
+      extModuly().map(m=>'<label style="font-size:12.5px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer">'+
+        '<input type="checkbox" class="exMod" value="'+m[0]+'"'+(moduly.indexOf(m[0])>=0?" checked":"")+'> '+esc(m[1])+'</label>').join("")+
+    '</div></div>';
+}
+function extNovy(){ extModal("Nový partnerský účet", extFormular(null), '<button class="btn ghost" onclick="closeModal()">Zrušit</button><button class="btn" onclick="extUlozit(true)">Založit a vygenerovat heslo</button>'); }
+function extUprav(email){
+  const u=(EXT_DATA.ucty||[]).find(x=>x.email===email); if(!u)return;
+  extModal("Partnerský účet — "+(u.jmeno||u.email), extFormular(u),
+    '<button class="btn ghost" style="margin-right:auto;color:#b3261e" onclick="extSmazat(\''+esc(email)+'\')">Smazat</button>'+
+    '<button class="btn ghost" onclick="closeModal()">Zrušit</button><button class="btn" onclick="extUlozit(false)">Uložit</button>');
+}
+async function extPosli(telo){
+  const r=await fetch("/api/externi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(telo)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||j.chyba) throw new Error(j.chyba||("Chyba "+r.status));
+  return j;
+}
+async function extUlozit(novy){
+  const email=document.getElementById("exEmail").value.trim().toLowerCase();
+  const moduly=[...document.querySelectorAll(".exMod")].filter(c=>c.checked).map(c=>c.value);
+  try{
+    const j=await extPosli({email, jmeno:document.getElementById("exJmeno").value,
+      firma:document.getElementById("exFirma").value, jazyk:document.getElementById("exJazyk").value,
+      mena:document.getElementById("exMena").value, moduly});
+    closeModal(); await extLoad();
+    if(j.heslo) extUkazHeslo(email,j.heslo); else toast("Uloženo");
+  }catch(e){ alert(e.message); }
+}
+async function extHeslo(email){
+  if(!confirm("Vygenerovat nové heslo? Staré přestane platit."))return;
+  try{ const j=await extPosli({email, noveHeslo:true}); await extLoad(); extUkazHeslo(email,j.heslo); }
+  catch(e){ alert(e.message); }
+}
+async function extPrepnout(email,zapnout){
+  try{ await extPosli({email, akce:zapnout?"zapnout":"vypnout"}); await extLoad(); toast(zapnout?"Účet zapnut":"Účet vypnut"); }
+  catch(e){ alert(e.message); }
+}
+async function extSmazat(email){
+  if(!confirm("Opravdu smazat účet "+email+"?"))return;
+  try{ await extPosli({email, akce:"smazat"}); closeModal(); await extLoad(); toast("Účet smazán"); }
+  catch(e){ alert(e.message); }
+}
+function extUkazHeslo(email,heslo){
+  const adresa=location.origin+"/";
+  extModal("Heslo pro "+email,
+    '<p style="margin:0 0 10px">Heslo se ukazuje <strong>jen teď</strong> — uložený je pouze jeho otisk. Pošlete ho kolegovi bezpečnou cestou.</p>'+
+    '<div class="mono" style="font-size:22px;letter-spacing:1px;background:var(--paper);border:1px solid var(--line-strong);border-radius:10px;padding:14px;text-align:center">'+esc(heslo)+'</div>'+
+    '<p class="muted" style="margin:10px 0 0;font-size:13px">Přihlášení: '+esc(adresa)+' → formulář „Prihlásiť sa" dole na přihlašovací obrazovce.</p>',
+    '<button class="btn" onclick="copyText(\''+esc(heslo)+'\');toast(\'Heslo zkopírováno\')">Zkopírovat heslo</button>'+
+    '<button class="btn ghost" onclick="closeModal()">Hotovo</button>');
+}
+
 /* Pohled „Podle modulů": vyber sekci → lidi přiřazuješ klikáním na jména */
 function accessModulyHtml(emps){
   const grouped=accessGrouped();
