@@ -51,9 +51,16 @@
 <script>
 'use strict';
 var $=function(id){return document.getElementById(id);};
-var DATA=null, KAT='';
+var DATA=null, KAT='', ZOBRAZIT_C=false;
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function pct(a,b){return b?Math.round(a/b*100):0;}
+/* 3 stupně obliby: 1. ≥66 %, 2. 50–65 %, 3. <50 % */
+var STUPNE=[
+  {id:1,lbl:'1. stupeň — vysoká obliba',pod:'vybírá je většina (≥ 66 %) — jasně do nabídky',barva:'#0e8a43',min:0.66,max:1.01},
+  {id:2,lbl:'2. stupeň — dobrá obliba',pod:'líbí se nadpoloviční většině (50–65 %)',barva:'#c79a10',min:0.50,max:0.66},
+  {id:3,lbl:'3. stupeň — nízká obliba',pod:'vybírá je méně než polovina (< 50 %)',barva:'#9aa39b',min:0,max:0.50}
+];
+function stupenId(rate){ for(var i=0;i<STUPNE.length;i++){ if(rate>=STUPNE[i].min && rate<STUPNE[i].max) return STUPNE[i].id; } return 3; }
 function render(){
   var d=DATA;
   var h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap"><h1>Který mobiliář se líbí nejvíc?</h1>'+
@@ -71,20 +78,35 @@ function render(){
       d.pozice.map(x=>'<div class="radek"><span class="t">'+esc(x.t)+'</span><span class="bar"><i style="width:'+pct(x.pocet,maxP)+'%"></i></span><span class="c">'+x.pocet+'</span></div>').join('')+'</div>'+
     '<div class="card"><strong style="display:block;margin-bottom:8px;font-size:14px">Velikost obce</strong>'+
       d.obce.map(x=>'<div class="radek"><span class="t">'+esc(x.t)+'</span><span class="bar"><i style="width:'+pct(x.pocet,maxO)+'%"></i></span><span class="c">'+x.pocet+'</span></div>').join('')+'</div></div>';
-  h+='<div class="card"><div class="pills">'+
+  var katNazvy={}; d.kategorie.forEach(k=>katNazvy[k.key]=k.nazev);
+  var vsePr=d.produkty.map(p=>({...p,rate:p.zobrazeno?p.vybrano/p.zobrazeno:0}));
+  var nad50=vsePr.filter(p=>p.rate>=0.5).length;
+  h+='<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">'+
+      '<strong style="font-size:15px">Produkty rozdělené do 3 stupňů obliby <span class="hint" style="font-weight:400">· '+nad50+' produktů nad 50 %</span></strong>'+
+      '<label style="font-size:13px;color:var(--ink-soft);cursor:pointer;user-select:none"><input type="checkbox" '+(ZOBRAZIT_C?'checked':'')+' onclick="ZOBRAZIT_C=this.checked;render()" style="vertical-align:-2px;margin-right:5px">zobrazit i 3. stupeň (pod 50 %)</label></div>'+
+    '<div class="pills">'+
     '<button class="pill'+(KAT===''?' on':'')+'" onclick="KAT=\'\';render()">Vše</button>'+
     d.kategorie.map(k=>'<button class="pill'+(KAT===k.key?' on':'')+'" onclick="KAT=\''+k.key+'\';render()">'+esc(k.nazev)+'</button>').join('')+'</div>';
-  var katNazvy={}; d.kategorie.forEach(k=>katNazvy[k.key]=k.nazev);
-  var prods=d.produkty.filter(p=>!KAT||p.kat===KAT).map(p=>({...p,rate:p.zobrazeno?p.vybrano/p.zobrazeno:0}));
+  var prods=vsePr.filter(p=>(!KAT||p.kat===KAT)&&p.zobrazeno>0);
   prods.sort((a,b)=>b.rate-a.rate||b.vybrano-a.vybrano||b.zobrazeno-a.zobrazeno);
-  if(!prods.length){ h+='<p class="hint">Zatím žádná data'+(KAT?' v této kategorii':'')+'.</p></div>'; }
-  else{
-    h+='<div class="grid">'+prods.map((p,i)=>
-      '<div class="prod"><div class="foto"><img loading="lazy" src="/mobiliar-foto/'+p.kod+'.jpg" alt=""><span class="poradi">'+(i+1)+'.</span></div>'+
-      '<div class="info"><span class="rate">'+Math.round(p.rate*100)+' %</span>'+
-      '<div class="bar"><i style="width:'+Math.round(p.rate*100)+'%"></i></div>'+
-      '<div class="hint">vybráno '+p.vybrano+'× z '+p.zobrazeno+' zobrazení · '+esc(katNazvy[p.kat]||'')+'</div></div></div>').join('')+'</div></div>';
-  }
+  var vykresleno=0;
+  STUPNE.forEach(function(st){
+    if(st.id===3 && !ZOBRAZIT_C) return;
+    var arr=prods.filter(p=>stupenId(p.rate)===st.id);
+    if(!arr.length) return;
+    vykresleno+=arr.length;
+    h+='<div style="display:flex;align-items:center;gap:10px;margin:18px 0 10px">'+
+       '<span style="flex:none;width:30px;height:30px;border-radius:50%;background:'+st.barva+';color:#fff;font-weight:800;font-size:15px;line-height:30px;text-align:center">'+st.id+'</span>'+
+       '<div><div style="font-weight:700;font-size:14px">'+esc(st.lbl)+' <span class="hint" style="font-weight:400">· '+arr.length+' produktů</span></div>'+
+       '<div class="hint">'+esc(st.pod)+'</div></div></div>';
+    h+='<div class="grid">'+arr.map((p,i)=>
+      '<div class="prod"><div class="foto"><img loading="lazy" src="/mobiliar-foto/'+p.kod+'.jpg" alt=""><span class="poradi" style="background:'+st.barva+'">'+Math.round(p.rate*100)+' %</span></div>'+
+      '<div class="info"><span class="rate">WD-'+p.kod.toUpperCase()+'</span>'+
+      '<div class="bar"><i style="width:'+Math.round(p.rate*100)+'%;background:'+st.barva+'"></i></div>'+
+      '<div class="hint">vybráno '+p.vybrano+'× z '+p.zobrazeno+' zobrazení · '+esc(katNazvy[p.kat]||'')+'</div></div></div>').join('')+'</div>';
+  });
+  if(!vykresleno) h+='<p class="hint">Zatím žádná data'+(KAT?' v této kategorii':'')+'.</p>';
+  h+='</div>';
   h+='<p class="hint" style="text-align:center">ELKOPLAST CZ, s.r.o. · průzkum je anonymní, zobrazují se pouze souhrnné výsledky</p>';
   $('obsah').innerHTML=h;
 }
@@ -101,10 +123,10 @@ function stahni(){
   r.push(['Respondentů',d.respondentu],['Hodnocených šestic',d.sestic],['Hlasů pro oblíbené',d.vybrano],[]);
   r.push(['Kdo hodnotil (pozice)','počet']); d.pozice.forEach(x=>r.push([x.t,x.pocet])); r.push([]);
   r.push(['Velikost obce','počet']); d.obce.forEach(x=>r.push([x.t,x.pocet])); r.push([]);
-  r.push(['Pořadí','Kód (katalog)','Kategorie','% oblíbenosti','Vybráno','Zobrazeno']);
-  d.produkty.map(p=>({...p,rate:p.zobrazeno?p.vybrano/p.zobrazeno:0}))
+  r.push(['Pořadí','Stupeň','Kód (katalog)','Kategorie','% oblíbenosti','Vybráno','Zobrazeno']);
+  d.produkty.map(p=>({...p,rate:p.zobrazeno?p.vybrano/p.zobrazeno:0})).filter(p=>p.zobrazeno>0)
     .sort((a,b)=>b.rate-a.rate||b.vybrano-a.vybrano||b.zobrazeno-a.zobrazeno)
-    .forEach((p,i)=>r.push([i+1,'WD-'+p.kod.toUpperCase(),katnaz[p.kat]||p.kat,Math.round(p.rate*100),p.vybrano,p.zobrazeno]));
+    .forEach((p,i)=>r.push([i+1,stupenId(p.rate),'WD-'+p.kod.toUpperCase(),katnaz[p.kat]||p.kat,Math.round(p.rate*100),p.vybrano,p.zobrazeno]));
   stahniCSV('vysledky-mobiliar-'+new Date().toISOString().slice(0,10)+'.csv',r);
 }
 function nactiPptx(cb){
@@ -141,6 +163,21 @@ function stahniPptx(){ nactiPptx(function(){
     s.addText([{text:Math.round(pr.rate*100)+' %',options:{fontSize:16,bold:true,color:GRND}},{text:'  WD-'+pr.kod.toUpperCase(),options:{fontSize:10,color:'8A948C'}}],{x:x,y:y+1.9,w:2.8,h:0.35,align:'center'});
     s.addText(katnaz[pr.kat]||'',{x:x,y:y+2.25,w:2.8,h:0.3,align:'center',fontSize:9,color:'8A948C'});
   });
+  // rozdělení do 3 stupňů obliby
+  var vsePr=d.produkty.map(x=>Object.assign({},x,{rate:x.zobrazeno?x.vybrano/x.zobrazeno:0})).filter(x=>x.zobrazeno>0);
+  var poStup=STUPNE.map(function(st){ return {st:st,arr:vsePr.filter(x=>stupenId(x.rate)===st.id).sort((a,b)=>b.rate-a.rate)}; });
+  s=p.addSlide(); nadpis(s,'Rozdělení do 3 stupňů obliby');
+  s.addTable([[{text:'Stupeň',options:th()},{text:'Hranice obliby',options:th()},{text:'Počet produktů',options:th()},{text:'Doporučení',options:th()}]].concat(
+    poStup.map(function(g){ return [
+      {text:g.st.id+'. stupeň',options:Object.assign(td(),{bold:true,color:g.st.barva.replace('#','')})},
+      {text:g.st.id===1?'≥ 66 %':g.st.id===2?'50–65 %':'< 50 %',options:td()},
+      {text:String(g.arr.length),options:Object.assign(td(),{bold:true})},
+      {text:g.st.id===1?'jasně do nabídky':g.st.id===2?'vhodné do nabídky':'spíše nezařazovat',options:td()}]; })),
+    {x:0.7,y:1.6,w:11.9,colW:[2.6,3,2.3,4],border:{type:'solid',color:'DCE4DC',pt:1}});
+  // 1. stupeň — výčet kódů
+  var s1=poStup[0].arr;
+  if(s1.length) s.addText([{text:'1. stupeň (≥ 66 %): ',options:{bold:true,color:GRND}},{text:s1.map(x=>'WD-'+x.kod.toUpperCase()+' ('+Math.round(x.rate*100)+' %)').join(',  '),options:{color:INK}}],
+    {x:0.7,y:4.5,w:11.9,h:1.6,fontSize:12,valign:'top'});
   // vítězové kategorií
   s=p.addSlide(); nadpis(s,'Vítěz v každé kategorii');
   var vit=d.kategorie.map(function(k){ var kp=d.produkty.map(x=>Object.assign({},x,{rate:x.zobrazeno?x.vybrano/x.zobrazeno:0})).filter(x=>x.kat===k.key&&x.zobrazeno>=8).sort((a,b)=>b.rate-a.rate)[0]; return kp?[k.nazev,'WD-'+kp.kod.toUpperCase(),Math.round(kp.rate*100)+' %']:[k.nazev,'—','—']; });
