@@ -3975,13 +3975,14 @@ function vykRenderDetail(){
   box.innerHTML=
     '<div class="card pad" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
       +'<b style="font-size:16px;margin-right:6px">'+esc(d.name)+'</b>'
-      +'<span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;margin-right:8px"><button class="btn sm" style="border-radius:0;'+(VYK.tab!=='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'prehled\';vykRenderDetail()">Přehled</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'ind\';vykRenderDetail()">Měsíční indikátory</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='normy'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'normy\';vykRenderDetail()">Normy</button></span>'
-      +(VYK.tab==='ind'?'':'<button class="btn sm'+(VYK.preset==='4t'?'':' ghost')+'" onclick="VYK.preset=\'4t\';vykLoadZavod()">Posledních 4 týdny</button>'
+      +'<span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;margin-right:8px"><button class="btn sm" style="border-radius:0;'+(VYK.tab!=='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'prehled\';vykRenderDetail()">Přehled</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'ind\';vykRenderDetail()">Měsíční indikátory</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='normy'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'normy\';vykRenderDetail()">Normy</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='plan6'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'plan6\';vykRenderDetail()">Plán 6 ABR/den</button></span>'
+      +(VYK.tab==='ind'||VYK.tab==='normy'?'':'<button class="btn sm'+(VYK.preset==='4t'?'':' ghost')+'" onclick="VYK.preset=\'4t\';vykLoadZavod()">Posledních 4 týdny</button>'
       +'<select id="vykMes" style="'+sel+'"><option value="">Měsíc…</option>'+(d.mesice||[]).slice().reverse().map(m=>'<option value="'+m+'"'+(VYK.preset==='mesic'&&VYK.mesic===m?' selected':'')+'>'+vykMesLabel(m)+'</option>').join('')+'</select>'
       +'<button class="btn sm'+(VYK.preset==='rok'?'':' ghost')+'" onclick="VYK.preset=\'rok\';vykLoadZavod()">Celý rok</button>')
       +'<span class="muted" style="font-size:12.5px;margin-left:auto">Zdroj: '+esc(d.source||'')+' · snímek '+vykD(d.snapshot)+(VYK.tab==='ind'?'':' · období: '+esc(obdobi)+(d.od?' ('+vykD(d.od)+' – '+vykD(d.do)+')':''))+'</span></div>'
     +(VYK.tab==='ind'?'<div id="vykInd"><div class="card pad"><p class="muted" style="margin:0">Načítám indikátory…</p></div></div>':'')
     +(VYK.tab==='normy'?'<div id="vykNormy"></div>':'')
+    +(VYK.tab==='plan6'?'<div id="vykPlan6"><div class="card pad"><p class="muted" style="margin:0">Načítám plán…</p></div></div>':'')
     +(VYK.tab!=='prehled'?'':'<div class="kpis">'
       +'<div class="kpi"><div class="v">'+vykF(k.rows)+'</div><div class="l">Odvedených operací (řádků)</div></div>'
       +'<div class="kpi"><div class="v">'+vykF(k.ks)+'</div><div class="l">Kusů (bez režie)</div></div>'
@@ -4005,6 +4006,7 @@ function vykRenderDetail(){
     +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Kvalita dat</b><div id="vykKvalita" style="margin-top:8px;font-size:13px;line-height:1.7"></div></div>');
   if(VYK.tab==='ind'){ vykIndLoad(); return; }
   if(VYK.tab==='normy'){ vykNormyRender(); return; }
+  if(VYK.tab==='plan6'){ vykPlan6Load(); return; }
   document.getElementById('vykMes').onchange=function(){ if(this.value){ VYK.preset='mesic'; VYK.mesic=this.value; vykLoadZavod(); } };
   document.getElementById('vykQ').oninput=function(){ VYK.q=this.value; vykLideRender(); };
   document.getElementById('vykCvzQ').oninput=function(){ VYK.cvzQ=this.value; vykCvzRender(); };
@@ -4050,6 +4052,55 @@ function vykVystupRender(){
   h+='</div>'; box.innerHTML=h;
 }
 async function vykCilSave(){ const v=document.getElementById('vykCil').value; try{ const r=await fetch('/api/vykonnost/cil',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zavod:VYK.zavod,cil:v===''?null:+v})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení selhalo.'); return; } toast('Cíl uložen'); await showVykonnost(); }catch(e){ toast('Uložení selhalo: '+e.message); } }
+/* ---- Plán N ABR/den: kolik operací musí být odvedeno v úkolu, osobosměny, porovnání se skutečností ---- */
+async function vykPlan6Load(){
+  const box=document.getElementById('vykPlan6'); if(!box) return; const r0=vykRange(); const qs=r0.od?'?od='+r0.od+'&do='+r0.do:'';
+  try{ const r=await fetch('/api/vykonnost/plan6/'+VYK.zavod+qs,{cache:'no-store'}); const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status)); VYK.plan6=j; }
+  catch(e){ box.innerHTML='<div class="card pad">Plán se nepodařilo načíst: '+esc(e.message)+'</div>'; return; }
+  vykPlan6Render();
+}
+function vykPlan6Render(){
+  const box=document.getElementById('vykPlan6'), P=VYK.plan6; if(!box||!P||!P.data) return; const adm=!!P.admin;
+  const f1=x=>x==null?'—':String(Math.round(x*10)/10).replace('.',',');
+  const semC=p=>p>=100?'#0a7a0a':(p>=80?'#b57400':'#c93a39'), semB=p=>p>=100?'#e6f3e4':(p>=80?'#fbf1dc':'#fbe9e8');
+  const lide1=P.osobosmenSvar, lide2=P.osobosmenSvar/2, lide3=P.osobosmenSvar/3;
+  let h='<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:15px">Operační plán pro '+f1(P.cil)+' ABR / den (standard DSD / AFS)</b><span class="muted" style="font-size:12px">skutečnost za '+vykD(P.od)+' – '+vykD(P.do)+' ('+P.pracDny+' prac. dnů) · měsíc '+esc(vykMesLabel(P.mesic))+' = '+P.pracDnyMes+' prac. dnů</span>'
+    +(adm?'<span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center;font-size:12.5px">cíl <input id="vykP6cil" type="number" step="0.5" min="0.5" value="'+P.cil+'" style="width:56px;padding:5px 8px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px"> ks/den · směna <input id="vykP6sm" type="number" step="10" min="60" value="'+P.smenaMin+'" style="width:62px;padding:5px 8px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px"> min <button class="btn sm ghost" onclick="vykPlan6Save()">Uložit</button></span>':'')+'</div>'
+    +'<div class="kpis" style="margin-top:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">'
+      +'<div class="kpi"><div class="v">'+vykF(P.kontMes)+'</div><div class="l">ABR za měsíc '+esc(vykMesLabel(P.mesic))+' při '+f1(P.cil)+'/den</div></div>'
+      +'<div class="kpi"><div class="v">'+f1(P.osobosmenSvar)+'</div><div class="l">Osobosměn / den ve svařovně</div></div>'
+      +'<div class="kpi"><div class="v">'+f1(lide1)+' · '+f1(lide2)+' · '+f1(lide3)+'</div><div class="l">Lidí ve svařovně při 1 · 2 · 3 směnách</div></div>'
+      +'<div class="kpi"><div class="v">'+f1(P.osobosmenLak)+'</div><div class="l">Osobosměn / den v přípravě a lakovně</div></div>'
+      +'<div class="kpi"><div class="v" style="font-size:20px;color:#c93a39">'+esc(P.hrdlo||'—')+'</div><div class="l">Nejslabší fáze svařovny (% plánu)</div></div></div>'
+    +'<p class="muted" style="font-size:12.5px;margin:8px 0 0">Potřeba = cíl × počet operací na kontejner. Osobosměny = potřeba × čas ÷ '+P.smenaMin+' min. Skutečnost = odvedené kusy dané operace v Heliosu za pracovní den (jen standardní ABR operace; bez režie). Norma = čas z katalogu norem pro standardní DSD 6500×2300×2350. „must be“ = fáze, které vedení označilo jako nutné pro 6/den.</p></div>';
+  const thS='padding:8px 8px;border-bottom:2px solid var(--line);font-size:11.5px;color:var(--ink-soft);white-space:nowrap', tdS='padding:7px 8px;border-bottom:1px solid var(--line)';
+  const inp=(f,k,v)=>adm?'<input type="number" min="1" data-p6="'+k+'" data-f="'+f.k+'" value="'+v+'" style="width:64px;padding:4px 6px;border:1.5px solid var(--line);border-radius:7px;font:inherit;font-size:12.5px;text-align:right">':String(v);
+  const row=(f,u)=>f.usek!==u?'':'<tr><td style="'+tdS+'"><b>'+esc(f.nazev)+'</b>'+(f.must?' '+vykPill('must be','crit'):'')+'<br><span class="muted" style="font-size:11px">'+esc(f.pozn||'')+'</span></td>'
+    +'<td style="'+tdS+';text-align:right">'+inp(f,'min',f.min)+'</td><td style="'+tdS+';text-align:right">'+inp(f,'ks',f.ks)+'</td>'
+    +'<td style="'+tdS+';text-align:right;color:var(--ink-soft)">'+(f.norma?f.norma.min+' min':'—')+'</td>'
+    +'<td style="'+tdS+';text-align:right"><b>'+f.potrebaDen+'</b></td><td style="'+tdS+';text-align:right">'+vykF(f.potrebaMes)+'</td><td style="'+tdS+';text-align:right">'+f1(f.osobosmen)+'</td>'
+    +'<td style="'+tdS+';text-align:right;background:'+semB(f.plneni)+';color:'+semC(f.plneni)+';font-weight:700">'+f1(f.skutDen)+'</td><td style="'+tdS+';text-align:right">'+f1(f.skutKont)+'</td><td style="'+tdS+';text-align:right;color:'+semC(f.plneni)+';font-weight:700">'+f.plneni+' %</td>'
+    +'<td style="'+tdS+';text-align:right">'+f.lide+'</td><td style="'+tdS+';font-size:11.5px;color:var(--ink-soft)">'+esc((f.topLide||[]).join(', '))+'</td></tr>';
+  const head='<tr>'+['Fáze','min / kont','ops / kont','Norma','Potřeba ops / den','/ měsíc','Osobosměn / den','Skutečně ops / den','= kont / den','% plánu','Lidí','Kdo odvádí (ks)'].map((t,i)=>'<th style="text-align:'+(i===0||i===11?'left':'right')+';'+thS+'">'+t+'</th>').join('')+'</tr>';
+  const sec=(t,u,sum)=>'<tr><td colspan="12" style="padding:10px 8px 4px;font-weight:600;font-size:12.5px;color:var(--ink-soft);background:var(--bg-2)">'+t+' <span style="font-weight:400">· '+f1(sum)+' osobosměn / den</span></td></tr>';
+  h+='<div class="card pad" style="margin-bottom:14px"><div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead>'+head+'</thead><tbody>'
+    +sec('Svařovna','svar',P.osobosmenSvar)+P.faze.map(f=>row(f,'svar')).join('')+sec('Příprava před lakem a lakovna','lak',P.osobosmenLak)+P.faze.map(f=>row(f,'lak')).join('')+'</tbody></table></div>'
+    +(adm?'<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button class="btn sm" onclick="vykPlan6Save()">Uložit časy a počty</button><button class="btn sm ghost" onclick="vykPlan6Reset()">Vrátit výchozí odhady</button><span class="muted" style="font-size:12px">změny platí pro všechny závody</span></div>':'')+'</div>';
+  // co říká porovnání
+  const svar=P.faze.filter(f=>f.usek==='svar'); const pod=svar.filter(f=>f.plneni<80).sort((a,b)=>a.plneni-b.plneni);
+  const normVsOdhad=P.faze.filter(f=>f.norma&&Math.abs(f.norma.min-f.min)/f.min>=0.2);
+  h+='<div class="card pad" style="font-size:13px;line-height:1.6"><b>Co z toho plyne</b>'
+    +'<ul style="margin:6px 0 0;padding-left:20px">'
+    +'<li>Na '+f1(P.cil)+' ABR/den potřebuje svařovna <b>'+f1(P.osobosmenSvar)+' osobosměn denně</b> — to je '+f1(lide1)+' lidí plně v úkolu na jednu směnu, nebo '+f1(lide3)+' lidí ve třech směnách. Fáze označené „must be“ jsou v jednosměnném provozu nad kapacitou jednoho pracoviště (podlahy 3,3, skládání 2,9, bočnice a vrata 2,5 osobosměn), proto vychází třísměnný provoz.</li>'
+    +(pod.length?'<li>Pod 80 % plánu je ve svařovně '+pod.length+' fází: '+pod.map(f=>'<b>'+esc(f.nazev)+'</b> '+f.plneni+' % ('+f1(f.skutKont)+' z '+f1(P.cil)+' kont/den, '+f.lide+' lidí)').join(', ')+'. Řetězec je tak rychlý jako nejpomalejší článek — nejdřív '+esc(pod[0].nazev.toLowerCase())+'.</li>':'<li>Všechny fáze svařovny jsou nad 80 % plánu.</li>')
+    +(normVsOdhad.length?'<li>Odhad času se od normy liší o víc než 20 % u: '+normVsOdhad.map(f=>esc(f.nazev)+' (odhad '+f.min+' vs. norma '+f.norma.min+' min)').join(', ')+'. Kde je norma vyšší než odhad, plán podhodnocuje potřebné lidi.</li>':'')
+    +'<li>Skládání: při '+P.faze.find(f=>f.k==='skladani').min+' min/kont dá 1 člověk '+f1(P.smenaMin/P.faze.find(f=>f.k==='skladani').min)+' kont/směna → na '+f1(P.cil)+'/den jsou potřeba <b>'+f1(P.faze.find(f=>f.k==='skladani').osobosmen)+' lidé</b> (ano, ve dvou). Natahování a trámce jsou dohromady '+f1(P.faze.filter(f=>f.k==='natahovani'||f.k==='tramec').reduce((s,f)=>s+f.osobosmen,0))+' osobosměny/den — nákup polotovarů by uvolnil ~1,5 svářeče.</li>'
+    +'</ul></div>';
+  box.innerHTML=h;
+}
+async function vykPlan6Save(){ const faze={}; document.querySelectorAll('[data-p6]').forEach(i=>{ const k=i.dataset.f; faze[k]=faze[k]||{}; faze[k][i.dataset.p6]=+i.value; }); const cil=document.getElementById('vykP6cil'), sm=document.getElementById('vykP6sm');
+  try{ const r=await fetch('/api/vykonnost/plan6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cil:cil?+cil.value:undefined,smenaMin:sm?+sm.value:undefined,faze})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení selhalo.'); return; } toast('Plán uložen'); await vykPlan6Load(); }catch(e){ toast('Uložení selhalo: '+e.message); } }
+async function vykPlan6Reset(){ if(!confirm('Vrátit časy a počty na výchozí odhady?')) return; const faze={}; (VYK.plan6.faze||[]).forEach(f=>faze[f.k]={reset:true}); try{ await fetch('/api/vykonnost/plan6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({faze})}); await vykPlan6Load(); }catch(e){ toast('Selhalo: '+e.message); } }
 /* ---- Normy: katalog z Drive, pokrytí, spárované / nespárované operace, ruční přiřazení (správce) ---- */
 let VYK_NQ='';
 function vykNormyRender(){

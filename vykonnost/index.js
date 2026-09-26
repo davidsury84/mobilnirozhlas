@@ -638,6 +638,58 @@ function mount(host) {
     return { zavod: z.key, name: z.name, snapshot: snap, cil, weeks, kpi, hrdlo: hrdlo ? hrdlo.n : '', proc, faze: z.key === 'popelnice' ? { skl: 'sestavení vany', dov: 'dovaření vany', lak: 'lakování' } : { skl: 'skládání ABR/CITY', dov: 'dovaření', lak: 'lakování' } };
   }
 
+  // ---------- operační plán: kolik operací musí být odvedeno pro N hotových ABR (standard DSD/AFS) ----------
+  // Výchozí časy = odhad vedení (tabulka 2026-09), ks/kont = kolikrát se operace odvádí na 1 kontejner,
+  // směna = 440 min čistého času. Správce může časy a ks upravit (data/vykonnost-plan6.json).
+  const PLAN6_DEFAULT = { cil: 6, smenaMin: 440, faze: [
+    { k: 'natahovani', usek: 'svar', nazev: 'Natahování', min: 60, ks: 1, pozn: '1 osoba 12 ks/směna' },
+    { k: 'tramec', usek: 'svar', nazev: 'Trámec rolen', min: 50, ks: 1, pozn: 'Budeme vozit? (čepy, trubka, výpalky, vedení centrálu…)' },
+    { k: 'podlaha', usek: 'svar', nazev: 'Svaření podlahy vč. 2 lyžin', min: 240, ks: 1, must: true, pozn: '2 osoby dají 3 podlahy denně; lyžiny ~40 min' },
+    { k: 'bocnice', usek: 'svar', nazev: 'Bočnice (stůl)', min: 90, ks: 2, must: true, pozn: 'cca 1,5 h/ks, kapacita 5–6 bočnic/směna' },
+    { k: 'vrata', usek: 'svar', nazev: 'Výroba vrat', min: 90, ks: 2, must: true, pozn: '1 osoba 6 vrat denně' },
+    { k: 'skladani', usek: 'svar', nazev: 'Skládání', min: 210, ks: 1, must: true, pozn: '1 osoba 3 kont/směna — budou muset být ve 2?' },
+    { k: 'dovareni', usek: 'svar', nazev: 'Dovařování', min: 450, ks: 1, pozn: 'po 2 lidech 6–8 h; bočnice dovařeny robotem' },
+    { k: 'osazeni', usek: 'svar', nazev: 'Věšení / osazení vrat', min: 210, ks: 1, pozn: 'montáž vrat po 2 lidech' },
+    { k: 'tryskani', usek: 'lak', nazev: 'Mycí box / tryskání', min: 90, ks: 1, pozn: '2-směnný provoz · v odvádění se počítá odkuličkování ABR (1 na kontejner)' },
+    { k: 'lakovani', usek: 'lak', nazev: 'Základování a lakování', min: 180, ks: 1, pozn: '3-směnný provoz' }
+  ] };
+  // Jak poznat fázi v odvádění Heliosu (produkční operace) — kusy = počet odvedených jednotek fáze
+  const PLAN6_RE = {
+    natahovani: /^natahování(?!.*(řezání|stojn))/i, tramec: /^trámec rolen (afs|dsd|domat)/i, podlaha: /^podlaha (asf|afs|dsd|abr|s t|t profil|zhušt)/i,
+    bocnice: /^bočnice (\d{3,4}-\d{3,4} mm|alst|dsd|hbi)/i, vrata: /^výroba vrat/i, skladani: /^skládání abr|^skládání$|^skládání včetně/i,
+    dovareni: /^dovaření abr \d|^dovaření abr-|^dovaření$|^dovařování$/i, osazeni: /^osazení vrat (afs|l |domat|s l)|^osazení vrat$/i,
+    tryskani: /^odkuličkování abr/i, lakovani: /^lakování abr/i
+  };
+  // reprezentativní název operace pro dohledání normy z katalogu (standard DSD 6500×2300×2350)
+  const PLAN6_NORMA = { natahovani: ['natahování NS 1570/50 + NS 1570/60 bez háku', ''], tramec: ['trámec rolen AFS/DSD vč. 2 ks rolen a centrálu CE', ''], podlaha: ['podlaha AFS/DSD/ALST', 'Podlaha DSD 6500'], bocnice: ['bočnice DSD 1550-2500 mm', 'Bočnice DSD 6500-2350'], vrata: ['výroba vrat 2050-2500 mm', ''], skladani: ['skládání ABR 45/90st 1550-2500 mm', 'ABR-DSD 6500x2300x2350'], dovareni: ['dovaření ABR 2050-2500 mm/rozestup 750 mm', 'ABR-DSD 6500x2300x2350'], osazeni: ['osazení vrat AFS/DSD/ECL/LWC/WD/HBI 2050-2500 mm', ''], tryskani: ['odkuličkování ABR 2050-2500 mm/rozestup 750 mm', 'ABR-DSD 6500x2300x2350'], lakovani: ['lakování ABR 2050-2500 mm/rozestup 750 mm', 'ABR-DSD 6500x2300x2350'] };
+  const PLAN6_F = path.join(dataDir, 'vykonnost-plan6.json');
+  function loadPlan6() { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} const faze = PLAN6_DEFAULT.faze.map(f => Object.assign({}, f, (c.faze || {})[f.k] || {})); return { cil: c.cil > 0 ? +c.cil : PLAN6_DEFAULT.cil, smenaMin: c.smenaMin > 0 ? +c.smenaMin : PLAN6_DEFAULT.smenaMin, faze }; }
+  function savePlan6(b) { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} if (b.cil != null) c.cil = +b.cil > 0 ? Math.round(+b.cil * 10) / 10 : PLAN6_DEFAULT.cil; if (b.smenaMin != null && +b.smenaMin > 0) c.smenaMin = +b.smenaMin; if (b.faze && typeof b.faze === 'object') { c.faze = c.faze || {}; Object.keys(b.faze).forEach(k => { if (!PLAN6_DEFAULT.faze.some(f => f.k === k)) return; const v = b.faze[k] || {}; const o = c.faze[k] || {}; if (v.min != null && +v.min > 0) o.min = +v.min; if (v.ks != null && +v.ks > 0) o.ks = +v.ks; if (v.reset) delete c.faze[k]; else c.faze[k] = o; }); } try { fs.writeFileSync(PLAN6_F, JSON.stringify(c, null, 2)); } catch (_) {} return loadPlan6(); }
+  const pracDnyRozsah = (od, do_) => { let n = 0; for (const d = new Date(od + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= do_; d.setUTCDate(d.getUTCDate() + 1)) { const w = d.getUTCDay(); if (w && w < 6) n++; } return n; };
+  function planOperaci(z, od, do_) {
+    const D = loadData(z.key); if (!D) return null;
+    const P = loadPlan6(); const snap = D.snapshot;
+    if (!od) { const d = new Date(snap + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 27); od = d.toISOString().slice(0, 10); } if (!do_) do_ = snap;
+    const rows = D.rows.filter(r => r[R.date] >= od && r[R.date] <= do_ && !isRezie(r[R.dil])); const pd = Math.max(1, pracDnyRozsah(od, do_));
+    // pracovní dny aktuálního měsíce snímku (pro „měsíčně“)
+    const ym = snap.slice(0, 7); const pdMes = pracDnyMesice(ym);
+    const maN = normIndex().items.length > 0;
+    const faze = P.faze.map(f => {
+      const re = PLAN6_RE[f.k]; const rs = rows.filter(r => re.test(r[R.op])); const ks = rs.reduce((s, r) => s + r[R.ks], 0);
+      const lide = {}; rs.forEach(r => { lide[r[R.name]] = (lide[r[R.name]] || 0) + r[R.ks]; });
+      const potrebaDen = P.cil * f.ks, osobosmen = potrebaDen * f.min / P.smenaMin;
+      const skutDen = ks / pd, skutKont = skutDen / f.ks;
+      let norma = null; if (maN) { const [op, dil] = PLAN6_NORMA[f.k] || []; const n = op ? matchNorma(z.key, op, dil) : null; if (n) norma = { min: n.min, kc: n.kc, op: n.op }; }
+      return Object.assign({}, f, { potrebaDen, potrebaMes: potrebaDen * pdMes, osobosmen: Math.round(osobosmen * 100) / 100, minDen: potrebaDen * f.min, skutDen: Math.round(skutDen * 10) / 10, skutKont: Math.round(skutKont * 10) / 10, plneni: Math.round(skutKont / P.cil * 100), skutKs: Math.round(ks), rows: rs.length, lide: Object.keys(lide).length, topLide: Object.entries(lide).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([n, k]) => n + ' (' + Math.round(k) + ')'), norma,
+        // kolik lidí to dnes reálně dělá vs. kolik by při daném čase bylo potřeba na plnou směnu
+        potrebaLidi: Math.round(osobosmen * 10) / 10, chybi: Math.round((potrebaDen - skutDen) * 10) / 10 });
+    });
+    const sumU = u => faze.filter(f => f.usek === u).reduce((s, f) => s + f.osobosmen, 0);
+    const hrdlo = faze.filter(f => f.usek === 'svar').slice().sort((a, b) => a.plneni - b.plneni)[0];
+    return { zavod: z.key, name: z.name, snapshot: snap, od, do: do_, pracDny: pd, mesic: ym, pracDnyMes: pdMes, cil: P.cil, smenaMin: P.smenaMin, kontMes: P.cil * pdMes,
+      faze, osobosmenSvar: Math.round(sumU('svar') * 10) / 10, osobosmenLak: Math.round(sumU('lak') * 10) / 10, hrdlo: hrdlo ? hrdlo.nazev : '', maNormy: maN };
+  }
+
   // Přehled všech závodů (poslední 4 týdny do snímku + celý rok)
   function overview() {
     const st = loadState();
@@ -769,6 +821,8 @@ function mount(host) {
       json(res, 200, { cvz, zavod: z.key, tab: plan.tab, row: it.row, url, live, warn, syncedAt: plan.syncedAt, pole: live ? pole : null, item: it });
       return true;
     }
+    const mp6 = /^\/api\/vykonnost\/plan6\/([a-z]+)$/.exec(p);
+    if (mp6 && req.method === 'GET') { const z = zavodOf(mp6[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; } const Pp = planOperaci(z, parseAnyDate(u.query.od) || '', parseAnyDate(u.query.do) || ''); json(res, 200, Pp ? Object.assign({ data: true, admin: !!host.isAdmin(req) }, Pp) : { data: false, zavod: z.key, name: z.name }); return true; }
     const mv = /^\/api\/vykonnost\/vystup\/([a-z]+)$/.exec(p);
     if (mv && req.method === 'GET') { const z = zavodOf(mv[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; } const V = vystup(z); json(res, 200, V ? Object.assign({ data: true, admin: !!host.isAdmin(req) }, V) : { data: false, zavod: z.key, name: z.name }); return true; }
     // Indikátory všech závodů najednou (společný graf v přehledu); ?bez=popelnice vynechá závod
@@ -789,6 +843,7 @@ function mount(host) {
       json(res, 200, { katalog: I.items.length, syncedAt: I.syncedAt, diag: I.diag, folder: NORMY_FOLDER, items: list.slice(0, 300).map(n => ({ id: normId(n), op: n.op, varianta: n.varianta, del: n.del, vys: n.vys, min: n.min, kc: n.kc, file: n.file, sheet: n.sheet, kod: n.kod })), total: list.length, mapa: host.isAdmin(req) ? I.mapa : undefined }); return true;
     }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
+    if (p === '/api/vykonnost/plan6' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } return json(res, 200, { ok: true, plan: savePlan6(b) }), true; }
     if (p === '/api/vykonnost/cil' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } if (!zavodOf(b.zavod)) { json(res, 400, { error: 'Neznámý závod.' }); return true; } let c = {}; try { c = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {} const v = b.cil === null || b.cil === '' ? null : +b.cil; c[b.zavod] = (v != null && isFinite(v) && v > 0) ? Math.round(v * 10) / 10 : null; try { fs.writeFileSync(CIL_F, JSON.stringify(c, null, 2)); } catch (_) {} return json(res, 200, { ok: true, cile: loadCile() }), true; }
     if (p === '/api/vykonnost/normy/sync' && req.method === 'POST') { try { const r = await syncNormy(); return json(res, r.ok ? 200 : 500, r), true; } catch (e) { return json(res, 500, { ok: false, error: e.message }), true; } }
     if (p === '/api/vykonnost/normy/mapa' && req.method === 'POST') {
@@ -808,7 +863,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, sync: () => sync(false), syncPlans, syncNormy, vystup, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };
