@@ -317,6 +317,18 @@ function mount(host) {
     }
     return { items, sazba, layout: found ? 'B' : 'none', warn: found ? '' : 'nerozpoznané rozvržení' };
   }
+  // Známé neshody názvů Helios ↔ normy (překlepy, jiný zápis) — vestavěné aliasy, platí pro všechny závody.
+  // Klíč = normalizovaný název operace z Heliosu (nrm), hodnota = normalizovaný název normy bez závorek (nrmBez).
+  const ALIASY = {
+    'podlaha asf/dsd kulatou/rovna 4500-7500': 'podlaha afs/dsd/alst',                       // překlep ASF vs. AFS
+    'skladani abr 45/90st 1550-2500 mm dsd/afs/wd': 'skladani abr 45/90st 1550-2500 mm',     // norma má navíc /ALST (páruje se i bez závorek)
+    'skladani abr 45/90st 500-1500 mm dsd/afs/wd': 'skladani abr 45/90st 500-1500 mm',
+    'natahovani nh 1570/50+60 vyztuzene': 'natahovani nh 1570/50 + nh 1570/60 vyztuzene',
+    'dovareni abr s t- profilem za 2 ks': 'dovareni abr s t-profilem priplatek'
+  };
+  // Rodina výrobku z názvu dílu — rozhoduje mezi variantami normy (bočnice DSD vs. ALST/ECL vs. HBI).
+  const RODINY = ['dsd', 'afs', 'alst', 'ecl', 'hbi', 'hbs', 'lwc', 'wd', 'sth', 'domat', 'city', 'wdg', 'wdc', 'sit', 'csd', 'renewi', 'veolia'];
+  const rodinaOf = dil => { const d = nrm(dil).replace(/-/g, ' '); return RODINY.filter(f => new RegExp('(^|[^a-z])' + f + '([^a-z]|$)').test(d)); };
   const loadNormy = () => { try { return JSON.parse(fs.readFileSync(NORMY_F, 'utf8')); } catch (_) { return null; } };
   const loadNMap = () => { try { return JSON.parse(fs.readFileSync(NMAP_F, 'utf8')) || {}; } catch (_) { return {}; } };
   const normId = n => [n.file, n.sheet, n.kod, n.opN, n.varianta, (n.del || []).join('-'), (n.vys || []).join('-')].join('|');
@@ -351,20 +363,28 @@ function mount(host) {
     const tok = {}; keys.forEach(k => tok[k] = new Set(k.split(' ').filter(w => w.length > 1)));
     return (_nIdx = { items, byN, byB, byId, keys, tok, syncedAt: N ? N.syncedAt : '', diag: (N && N.diag) || [], mapa: loadNMap(), cache: new Map() });
   }
-  function pickVariant(c, dil) { if (c.length === 1) return c[0]; const d = dimsOf(dil); if (d) { const f = c.filter(n => (!n.del || (d.L >= n.del[0] && d.L <= n.del[1])) && (!n.vys || (d.H >= n.vys[0] && d.H <= n.vys[1]))); if (f.length) return f[0]; } const noDim = c.find(n => !n.del && !n.vys); return noDim || c[0]; }
+  function pickVariant(c, dil) {
+    if (c.length === 1) return c[0];
+    const rod = rodinaOf(dil); if (rod.length) { const f = c.filter(n => rod.some(r => new RegExp('(^|[^a-z])' + r + '([^a-z]|$)').test(n.opN.replace(/-/g, ' ')))); if (f.length) c = f; }
+    if (c.length === 1) return c[0];
+    const d = dimsOf(dil); if (d) { const f = c.filter(n => (!n.del || (d.L >= n.del[0] && d.L <= n.del[1])) && (!n.vys || (d.H >= n.vys[0] && d.H <= n.vys[1]))); if (f.length) return f[0]; }
+    const noDim = c.find(n => !n.del && !n.vys); return noDim || c[0];
+  }
   function matchNorma(zavodKey, op, dil) {
     const I = normIndex(); if (!I.items.length) return null;
-    const d = dimsOf(dil); const ck = zavodKey + '|' + op + '|' + (d ? d.L + 'x' + d.H : '');
+    const d = dimsOf(dil); const ck = zavodKey + '|' + op + '|' + (d ? d.L + 'x' + d.H : '') + '|' + rodinaOf(dil).join(',');
     if (I.cache.has(ck)) return I.cache.get(ck);
     let res = null; const man = (I.mapa[zavodKey] || {})[op] || (I.mapa['*'] || {})[op];
     if (man === '__none__') res = null;
     else if (man && I.byId[man]) res = Object.assign({}, I.byId[man], { how: 'ručně' });
     else {
       const o = nrm(op), ob = nrmBez(op); let c = I.byN[o] || I.byB[ob]; let how = 'přesně';
+      if (!c && ALIASY[o]) { c = I.byB[ALIASY[o]] || I.byN[ALIASY[o]]; if (c) how = 'alias'; }
       if (!c && ob.length >= 12) { const k = I.keys.find(k => k.startsWith(ob) || ob.startsWith(k)); if (k) { c = I.byB[k]; how = 'prefix'; } }
       if (!c && ob.length >= 8) { const t = new Set(ob.split(' ').filter(w => w.length > 1)); const first = ob.split(' ')[0]; let best = null, bs = 0;
-        for (const k of I.keys) { if (!k.startsWith(first)) continue; const T = I.tok[k]; let inter = 0; t.forEach(w => { if (T.has(w)) inter++; }); const j = inter / (t.size + T.size - inter); if (j > bs) { bs = j; best = k; } }
-        if (best && bs >= 0.7) { c = I.byB[best]; how = 'podobnost ' + Math.round(bs * 100) + ' %'; } }
+        const cands = [];
+        for (const k of I.keys) { if (!k.startsWith(first)) continue; const T = I.tok[k]; let inter = 0; t.forEach(w => { if (T.has(w)) inter++; }); const j = inter / (t.size + T.size - inter); if (j >= 0.7) cands.push([k, j]); if (j > bs) { bs = j; best = k; } }
+        if (best && bs >= 0.7) { c = cands.filter(x => x[1] >= bs - 0.05).flatMap(x => I.byB[x[0]]); how = 'podobnost ' + Math.round(bs * 100) + ' %'; } }
       if (c) res = Object.assign({}, pickVariant(c, dil), { how });
     }
     I.cache.set(ck, res); return res;
