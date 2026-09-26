@@ -3954,9 +3954,10 @@ try {
 // ---- Modul „Výkonnost středisek“ (odvádění z Heliosu pro 4 závody + plány výroby) ----
 let vykonnostMod = null;
 try {
-  vykonnostMod = require('./vykonnost').mount({
-    send, readBody, isAdmin, empSession, employeeModules, getState, sheetsGet, sheetsMeta, sheetsTabs,
+  vykonnostMod = require('./vykonnost').mount({ reportDisabled,
+    send, readBody, deliver, isAdmin, empSession, employeeModules, getState, sheetsGet, sheetsMeta, sheetsTabs,
     dataDir: DATA_DIR,
+    mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet ELKOPLAST — Výkonnost středisek', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
   });
 } catch (e) {
   console.error('[vykonnost] modul se nenačetl, intranet pokračuje bez něj:', e.message);
@@ -4242,7 +4243,7 @@ const server = http.createServer(async (req, res) => {
     // Centrální přehled rozesílek (správce) — agreguje descriptory z modulů, které je vystavují.
     if (p === '/api/admin/reports' && req.method === 'GET') {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
-      const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod, qoolingMod];
+      const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod, qoolingMod, vykonnostMod];
       let out = [];
       // Jádro intranetu: měsíční vyhodnocení seznámení se směrnicemi.
       try {
@@ -4282,7 +4283,7 @@ const server = http.createServer(async (req, res) => {
         else if (b.enabled === false) { off[key] = true; rozesilkyOffWrite(off); }
         return send(res, 200, { ok: true, report: { key, module: 'Dovolená', name: 'Měsíční přehled čerpání dovolené', to: vc.to, enabled: vc.enabled, den: vc.day, schedule: 'měsíčně (' + vc.day + '. den, za předchozí měsíc)' } });
       }
-      const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod, qoolingMod];
+      const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod, qoolingMod, vykonnostMod];
       for (const m of mods) {
         if (!m || typeof m.setReport !== 'function') continue;
         let r = null; try { r = m.setReport(key, b); } catch (e) { return send(res, 500, { error: e.message }); }

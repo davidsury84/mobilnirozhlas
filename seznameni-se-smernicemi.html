@@ -3856,7 +3856,7 @@ async function qooTestSend(){
 }
 
 /* ---------- Modul Výkonnost středisek — odvádění z Heliosu (4 výrobní závody) ---------- */
-let VYK={ov:null,det:null,zavod:'chomutov',preset:'4t',mesic:'',sort:'rows',dir:-1,q:'',cvzQ:''};
+let VYK={ov:null,det:null,ind:null,tab:'prehled',zavod:'chomutov',preset:'4t',mesic:'',sort:'rows',dir:-1,q:'',cvzQ:''};
 const vykF=n=>Math.round(+n||0).toLocaleString('cs-CZ');
 const vykD=d=>d?d.split('-').reverse().join('. '):'—';
 const vykTd='padding:7px 10px;border-bottom:1px solid var(--line)';
@@ -3925,11 +3925,13 @@ function vykRenderDetail(){
   box.innerHTML=
     '<div class="card pad" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
       +'<b style="font-size:16px;margin-right:6px">'+esc(d.name)+'</b>'
-      +'<button class="btn sm'+(VYK.preset==='4t'?'':' ghost')+'" onclick="VYK.preset=\'4t\';vykLoadZavod()">Posledních 4 týdny</button>'
+      +'<span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;margin-right:8px"><button class="btn sm" style="border-radius:0;'+(VYK.tab!=='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'prehled\';vykRenderDetail()">Přehled</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'ind\';vykRenderDetail()">Měsíční indikátory</button></span>'
+      +(VYK.tab==='ind'?'':'<button class="btn sm'+(VYK.preset==='4t'?'':' ghost')+'" onclick="VYK.preset=\'4t\';vykLoadZavod()">Posledních 4 týdny</button>'
       +'<select id="vykMes" style="'+sel+'"><option value="">Měsíc…</option>'+(d.mesice||[]).slice().reverse().map(m=>'<option value="'+m+'"'+(VYK.preset==='mesic'&&VYK.mesic===m?' selected':'')+'>'+vykMesLabel(m)+'</option>').join('')+'</select>'
-      +'<button class="btn sm'+(VYK.preset==='rok'?'':' ghost')+'" onclick="VYK.preset=\'rok\';vykLoadZavod()">Celý rok</button>'
-      +'<span class="muted" style="font-size:12.5px;margin-left:auto">Zdroj: '+esc(d.source||'')+' · snímek '+vykD(d.snapshot)+' · období: '+esc(obdobi)+(d.od?' ('+vykD(d.od)+' – '+vykD(d.do)+')':'')+'</span></div>'
-    +'<div class="kpis">'
+      +'<button class="btn sm'+(VYK.preset==='rok'?'':' ghost')+'" onclick="VYK.preset=\'rok\';vykLoadZavod()">Celý rok</button>')
+      +'<span class="muted" style="font-size:12.5px;margin-left:auto">Zdroj: '+esc(d.source||'')+' · snímek '+vykD(d.snapshot)+(VYK.tab==='ind'?'':' · období: '+esc(obdobi)+(d.od?' ('+vykD(d.od)+' – '+vykD(d.do)+')':''))+'</span></div>'
+    +(VYK.tab==='ind'?'<div id="vykInd"><div class="card pad"><p class="muted" style="margin:0">Načítám indikátory…</p></div></div>':'')
+    +(VYK.tab==='ind'?'':'<div class="kpis">'
       +'<div class="kpi"><div class="v">'+vykF(k.rows)+'</div><div class="l">Odvedených operací (řádků)</div></div>'
       +'<div class="kpi"><div class="v">'+vykF(k.ks)+'</div><div class="l">Kusů (bez režie)</div></div>'
       +'<div class="kpi"><div class="v">'+vykF(k.rezieH)+' h</div><div class="l">Režie zapsaná jako úkol · '+k.reziePodil+' % řádků</div></div>'
@@ -3947,12 +3949,54 @@ function vykRenderDetail(){
     +'</div>'
     +'<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:14px">Zakázky (ČVZ)</b><input id="vykCvzQ" placeholder="🔍 ČVZ / zakázka / zákazník…" value="'+esc(VYK.cvzQ)+'" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
       +'<span class="muted" style="font-size:12px">'+(d.plan?'spárováno s plánem výroby: <b>'+d.sparovano+' z '+d.cvz.length+'</b> (list „'+esc(d.plan.tab)+'", '+d.plan.items+' zakázek)':'<span style="color:#a86a00">plán výroby zatím nenačten</span>')+'</span></div><div id="vykCvz" style="overflow-x:auto;margin-top:10px"></div></div>'
-    +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Kvalita dat</b><div id="vykKvalita" style="margin-top:8px;font-size:13px;line-height:1.7"></div></div>';
+    +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Kvalita dat</b><div id="vykKvalita" style="margin-top:8px;font-size:13px;line-height:1.7"></div></div>');
+  if(VYK.tab==='ind'){ vykIndLoad(); return; }
   document.getElementById('vykMes').onchange=function(){ if(this.value){ VYK.preset='mesic'; VYK.mesic=this.value; vykLoadZavod(); } };
   document.getElementById('vykQ').oninput=function(){ VYK.q=this.value; vykLideRender(); };
   document.getElementById('vykCvzQ').oninput=function(){ VYK.cvzQ=this.value; vykCvzRender(); };
   vykAnaRender(); vykWeeksRender(); vykDaysRender(); vykLideRender(); vykRezieRender(); vykOpsRender(); vykCvzRender(); vykKvalitaRender();
 }
+/* ---- Měsíční indikátory: tabulka indikátory × měsíce se semaforem, sparklinou a legendou ---- */
+const VYK_SEM={g:['#e6f3e4','#0a7a0a'],y:['#fbf1dc','#b57400'],r:['#fbe9e8','#c93a39'],'':['transparent','var(--ink)']};
+function vykIndVal(def,v){ if(v==null) return '—'; const t=(def.k==='A3'||def.k==='B3')?String(v).replace('.',','):Number(v).toLocaleString('cs-CZ'); return t+(def.jedn==='%'?' %':''); }
+async function vykIndLoad(){
+  const box=document.getElementById('vykInd'); if(!box) return;
+  try{ const r=await fetch('/api/vykonnost/indikatory/'+VYK.zavod,{cache:'no-store'}); const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status)); VYK.ind=j; }
+  catch(e){ box.innerHTML='<div class="card pad">Indikátory se nepodařilo načíst: '+esc(e.message)+'</div>'; return; }
+  vykIndRender();
+}
+function vykIndRender(){
+  const box=document.getElementById('vykInd'), I=VYK.ind; if(!box||!I) return;
+  if(!I.data){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Zatím bez dat.</p></div>'; return; }
+  const M=I.mesice.slice(-12); const last=M[M.length-1], prev=M[M.length-2];
+  const lab=ym=>{const [y,m]=ym.split('-');return ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][+m-1]+'/'+y.slice(2);};
+  const spark=(def)=>{ const vals=M.map(x=>x[def.k]).filter(v=>v!=null); if(vals.length<2) return ''; const mn=Math.min(...vals), mx=Math.max(...vals); const W=90,H=22; const pts=M.map((x,i)=>{const v=x[def.k]; if(v==null) return null; const px=(i/(M.length-1))*W, py=H-2-(mx===mn?H/2:(v-mn)/(mx-mn)*(H-4)); return px.toFixed(1)+','+py.toFixed(1);}).filter(Boolean).join(' '); return '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" style="display:block"><polyline points="'+pts+'" fill="none" stroke="var(--green-2)" stroke-width="1.6"/></svg>'; };
+  // klíčové karty za poslední uzavřený měsíc
+  const closed=last&&last.neuplny?prev:last, before=closed?M[M.indexOf(closed)-1]:null;
+  const klic=(I.legenda||[]).flatMap(g=>g.items).filter(d=>d.klic);
+  let h='<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">'+klic.map(def=>{ const v=closed?closed[def.k]:null, sm=closed?(closed.sem[def.k]||''):''; const pv=before?before[def.k]:null; const d=(v!=null&&pv!=null)?v-pv:null; const ok=d==null||d===0?null:(def.smer==='up'?d>0:d<0);
+      return '<div class="kpi" style="border-left:5px solid '+VYK_SEM[sm][1]+'"><div class="v" style="font-size:26px;color:'+VYK_SEM[sm][1]+'">'+vykIndVal(def,v)+'</div><div class="l">'+esc(def.k+' · '+def.label)+'</div><div class="muted" style="font-size:11.5px;margin-top:4px">'+(closed?vykMesLabel(closed.m):'')+(d!=null&&d!==0?' · <span style="color:'+(ok?'#0a7a0a':'#c93a39')+'">'+(d>0?'▲ +':'▼ ')+vykIndVal(def,Math.abs(d)).replace(/^/,d<0?'−':'')+'</span> vs. '+(before?lab(before.m):'')+'':'')+'</div></div>'; }).join('')+'</div>';
+  // tabulka
+  const thS='padding:8px 8px;border-bottom:2px solid var(--line);font-size:11.5px;color:var(--ink-soft);white-space:nowrap', tdS='padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap';
+  h+='<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Indikátory po měsících</b><span class="muted" style="font-size:12px">barva = semafor (jen u indikátorů s cílem) · šipka = změna proti předchozímu měsíci, zelená = zlepšení · * = neúplný měsíc (do snímku '+vykD(I.snapshot)+')</span></div><div style="overflow-x:auto;margin-top:10px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr><th style="text-align:left;'+thS+';min-width:260px">Indikátor</th>'+M.map(x=>'<th style="text-align:right;'+thS+(x.neuplny?';color:#a86a00':'')+'">'+lab(x.m)+(x.neuplny?'*':'')+'</th>').join('')+'<th style="'+thS+'">Vývoj</th><th style="text-align:right;'+thS+'" title="medián předchozích 6 měsíců">Medián 6 m</th></tr></thead><tbody>';
+  (I.legenda||[]).forEach(g=>{ h+='<tr><td colspan="'+(M.length+3)+'" style="padding:10px 8px 4px;font-weight:600;font-size:12.5px;color:var(--ink-soft);background:var(--bg-2)">'+esc(g.skup+' · '+g.nazev)+'</td></tr>';
+    g.items.forEach(def=>{ h+='<tr><td style="'+tdS+'"><b>'+def.k+'</b> '+esc(def.label)+(def.klic?' <span title="klíčový indikátor" style="color:var(--green-2)">★</span>':'')+(def.prah?'<br><span class="muted" style="font-size:11px">cíl '+(def.smer==='up'?'≥ ':'≤ ')+String(def.prah[0]).replace('.',',')+(def.jedn==='%'?' %':'')+'</span>':'')+'</td>'
+        +M.map((x,i)=>{ const v=x[def.k], sm=x.sem[def.k]||'', tr=x.trend[def.k]; const ok=tr==null||tr===0?null:(def.smer==='watch'?null:(def.smer==='up'?tr>0:tr<0)); return '<td style="'+tdS+';text-align:right;background:'+VYK_SEM[sm][0]+';color:'+VYK_SEM[sm][1]+(sm?';font-weight:600':'')+'">'+vykIndVal(def,v)+(tr!=null&&tr!==0&&def.smer!=='watch'?' <span style="font-size:10px;color:'+(ok?'#0a7a0a':'#c93a39')+'">'+(tr>0?'▲':'▼')+'</span>':'')+'</td>'; }).join('')
+        +'<td style="'+tdS+'">'+spark(def)+'</td><td style="'+tdS+';text-align:right;color:var(--ink-soft)">'+(last&&last.med[def.k]!=null?vykIndVal(def,Math.round(last.med[def.k]*10)/10):'—')+'</td></tr>'; }); });
+  h+='</tbody></table></div></div>';
+  // legenda přímo v aplikaci
+  h+='<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Legenda indikátorů</b><p class="muted" style="font-size:12.5px;margin:4px 0 10px">Semafor: <span style="background:#e6f3e4;color:#0a7a0a;padding:1px 7px;border-radius:3px">zelená</span> v cíli · <span style="background:#fbf1dc;color:#b57400;padding:1px 7px;border-radius:3px">žlutá</span> sledovat · <span style="background:#fbe9e8;color:#c93a39;padding:1px 7px;border-radius:3px">červená</span> mimo cíl. ★ = šest klíčových indikátorů, které chodí v měsíčním e-mailu. Hodnoty srovnávejte v čase v rámci závodu, ne mezi závody — kusy ani operace nejsou mezi závody stejné. Vše počítáno ze skutečně odvedených operací v Heliosu; export neobsahuje Kč, proto režie v hodinách a % fondu, ne v korunách.</p>'
+    +(I.legenda||[]).map(g=>'<div style="margin-top:10px"><div style="font-weight:600;font-size:13px;padding:6px 0;border-top:2px solid var(--ink)">'+esc(g.skup+' · '+g.nazev)+'</div>'+g.items.map(def=>'<div style="display:grid;grid-template-columns:44px 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13px"><b>'+def.k+(def.klic?' ★':'')+'</b><div><b>'+esc(def.label)+'</b>'+(def.prah?' <span class="muted" style="font-size:12px">· cíl '+(def.smer==='up'?'≥ ':'≤ ')+String(def.prah[0]).replace('.',',')+(def.jedn==='%'?' %':'')+', žlutá do '+String(def.prah[1]).replace('.',',')+(def.jedn==='%'?' %':'')+'</span>':(def.smer==='watch'?' <span class="muted" style="font-size:12px">· jen sledovat</span>':' <span class="muted" style="font-size:12px">· trend vs. vlastní medián</span>'))+'<div class="muted" style="font-size:12.5px;margin-top:2px"><i>Výpočet:</i> '+esc(def.vzorec)+'</div><div style="font-size:12.5px;margin-top:2px;color:var(--ink-soft)">'+esc(def.proc)+'</div></div></div>').join('')+'</div>').join('')+'</div>';
+  // admin: měsíční e-mail
+  if(I.config){ const c=I.config, st=I.reportState||{};
+    h+='<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">📧 Měsíční e-mail s indikátory (správce)</b><p class="muted" style="font-size:12.5px;margin:6px 0 10px">Odesílá se 1. pracovní den měsíce od '+c.hour+':00 za předchozí měsíc — šest klíčových indikátorů všech čtyř závodů se semaforem, tři největší změny a legenda.'+(st.lastAt?' Naposledy odesláno '+new Date(st.lastAt).toLocaleString('cs-CZ')+'.':'')+(st.lastError?' <span style="color:#c93a39">Poslední pokus selhal: '+esc(st.lastError)+'</span>':'')+' Vypnout jde i centrálně v Rozesílkách (klíč vykonnost-mesicni).</p>'
+      +'<label style="display:block;font-size:13px;margin-bottom:6px">Příjemci (oddělení čárkou):</label><textarea id="vykTo" rows="2" style="width:100%;padding:9px 13px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'+esc((c.to||[]).join(', '))+'</textarea>'
+      +'<label style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13.5px"><input type="checkbox" id="vykEn"'+(c.enabled?' checked':'')+' style="width:17px;height:17px;accent-color:var(--green-2)"> Odesílat každý měsíc</label>'
+      +'<div class="inline-actions" style="gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="vykCfgSave()">Uložit</button><a class="btn sm ghost" href="/api/vykonnost/preview" target="_blank" rel="noopener">Náhled e-mailu</a><button class="btn sm ghost" onclick="vykTestSend()">Odeslat teď (na příjemce)</button></div></div>'; }
+  box.innerHTML=h;
+}
+async function vykCfgSave(){ try{ const r=await fetch('/api/vykonnost/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:document.getElementById('vykTo').value,enabled:document.getElementById('vykEn').checked})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení selhalo.'); return; } toast('Nastavení uloženo'); if(VYK.ind&&j.report){ VYK.ind.config={to:j.report.to,enabled:j.report.enabled,hour:VYK.ind.config.hour}; } }catch(e){ toast('Uložení selhalo: '+e.message); } }
+async function vykTestSend(){ if(!confirm('Odeslat měsíční report hned teď všem nastaveným příjemcům?')) return; try{ const r=await fetch('/api/vykonnost/send',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Odeslání selhalo.'); return; } toast('Odesláno: '+(j.to||[]).join(', ')); }catch(e){ toast('Odeslání selhalo: '+e.message); } }
 // Analýza ve stylu ruční zprávy: zjištění se štítky → úzká hrdla v režii → kdo vyčnívá → úseky → co s tím.
 let VYK_ANA_OPEN={uzka:true,lide:true,useky:true,rec:true};
 function vykAnaRender(){

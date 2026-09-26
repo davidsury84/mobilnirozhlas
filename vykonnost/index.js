@@ -237,6 +237,84 @@ function mount(host) {
     return { zjisteni: Z, uzka: U, vycnivaji: V.slice(0, 10), doporuceni: D, shrnuti, uvazky: Math.round(uvazky * 10) / 10 };
   }
 
+  // ---------- měsíční indikátory (legenda = jediný zdroj pravdy pro app i e-mail) ----------
+  // smer: 'down' = nižší lepší, 'up' = vyšší lepší, 'watch' = jen sledovat. prah: [zelená do, žlutá do] (pro 'up' obráceně).
+  // klic: true = jeden ze 6 klíčových indikátorů se semaforem v e-mailu.
+  const LEGENDA = [
+    { skup: 'A', nazev: 'Efektivita — kolik výkonu polyká režie', items: [
+      { k: 'A1', klic: true, label: 'Režie jako % fondu pracovní doby', jedn: '%', smer: 'down', prah: [10, 20], vzorec: 'režijní hodiny ÷ (lidé s odváděním × pracovní dny × 8 h)', proc: 'Nejbližší náhrada „režie vs. mzda“ bez mzdových dat. Kolik procent odpracovaného času se zapsalo jako režie místo úkolu.' },
+      { k: 'A2', label: 'Režie h na 1 000 vyrobených ks', jedn: 'h', smer: 'down', vzorec: 'režijní hodiny ÷ kusy × 1000', proc: 'Režie vztažená k výstupu. Srovnávat jen v čase v rámci závodu (kusy nejsou mezi závody stejné).' },
+      { k: 'A3', label: 'Režie h na produkční operaci', jedn: 'h', smer: 'down', vzorec: 'režijní hodiny ÷ počet produkčních řádků', proc: 'Kolik režie připadá na jednu odvedenou výrobní operaci.' },
+      { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé s odváděním', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' }
+    ] },
+    { skup: 'B', nazev: 'Struktura režie — co se v ní schovává', items: [
+      { k: 'B1', klic: true, label: '% režie, která je výroba bez normy', jedn: '%', smer: 'down', prah: [25, 50], vzorec: 'hodiny v režijních operacích výrobního typu (úprava/příprava materiálu, spojování vrat, polepování, přehazování nástrojů, montáž po laku, výměna filtrů…) ÷ režijní hodiny', proc: 'Práce, která by měla mít úkolovou cenu. Každá dodělaná norma toto číslo sníží — přímé měřítko postupu.' },
+      { k: 'B2', klic: true, label: '% režie nepopsané', jedn: '%', smer: 'down', prah: [20, 40], vzorec: 'hodiny v operaci „Ostatní“ nebo bez poznámky mistra ÷ režijní hodiny', proc: 'Bez důvodu se nedá nic řídit. Jediný indikátor, který se dá srazit pouhou disciplínou zápisu.' },
+      { k: 'B3', label: 'Rework h na 1 000 ks', jedn: 'h', smer: 'down', prah: [0.5, 2], vzorec: 'hodiny v operacích „Reklamace / oprava kontejnerů“ ÷ kusy × 1000', proc: 'Jediný signál kvality v datech. Opakující se hodnota = opakující se vada.' },
+      { k: 'B4', label: '% režie = zaučení a školení', jedn: '%', smer: 'watch', vzorec: 'hodiny v operacích zaučení/zapracování/školení ÷ režijní hodiny', proc: 'Náklad náboru, ne výroby. Sledovat, ne trestat — ale vysvětluje skoky v A1.' }
+    ] },
+    { skup: 'C', nazev: 'Disciplína odvádění — jestli datům věřit', items: [
+      { k: 'C1', klic: true, label: '% řádků z terminálu', jedn: '%', smer: 'up', prah: [90, 70], vzorec: 'řádky s autorem terminalETH ÷ všechny řádky', proc: 'Zbytek zapsal mistr ručně — zpětně, po dávkách, bez skutečného času.' },
+      { k: 'C2', klic: true, label: '% řádků ve 3 nejsilnějších dnech', jedn: '%', smer: 'down', prah: [25, 35], vzorec: 'řádky zapsané ve 3 dnech s nejvíce zápisy ÷ všechny řádky', proc: 'Dávkovost. Rovnoměrné odvádění je ~15 %. Nad 35 % nejde z dat určit, kdy se co dělalo.' },
+      { k: 'C3', label: '% lidí odvádějících ≥ 8 dní v měsíci', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'lidé s odváděním v ≥ 8 různých dnech ÷ lidé s odváděním', proc: 'Pravidlo „odvádí se týž den“ v praxi.' },
+      { k: 'C4', label: '% produkčních řádků bez ČVZ', jedn: '%', smer: 'down', prah: [3, 8], vzorec: 'produkční řádky bez ČVZ ÷ produkční řádky', proc: 'Bez ČVZ nejde operaci přiřadit k zakázce ani k plánu výroby.' },
+      { k: 'C5', label: 'Produkční řádky s 0 ks', jedn: 'ř.', smer: 'down', prah: [0, 5], vzorec: 'počet výrobních řádků s nulovým množstvím', proc: 'Práce zapsaná bez množství — pro normu i výkon neviditelná.' }
+    ] },
+    { skup: 'D', nazev: 'Lidé a kapacita', items: [
+      { k: 'D1', label: 'Lidí s odváděním', jedn: '', smer: 'watch', vzorec: 'počet různých osobních čísel v měsíci', proc: 'Základ pro A1 a A4.' },
+      { k: 'D2', klic: true, label: 'Lidí z roku bez odvádění v měsíci', jedn: '', smer: 'down', prah: [15, 30], vzorec: 'lidé, kteří odváděli dřív v roce, ale v měsíci nic; semafor podle podílu z (D1 + D2)', proc: 'Buď mimo (dovolená, nemoc, odchod), nebo pracují neviditelně. Párovat s docházkou.' }
+    ] }
+  ];
+  const LEG_FLAT = LEGENDA.flatMap(g => g.items);
+  const RE_PROD = /úklid|uklid|zaučen|zaucen|zapracov|školen|skolen|transport|manipul|stěhov|stehov|prostoj|čekán|cekan|poruch|údržb|udrzb|likvidac|inventur|sníh|snih|zeleň|zelen|sečen|secen|ostatní|ostatni/i;
+  const RE_REKL = /reklam|oprava kontejner/i, RE_ZAUC = /zaučen|zaucen|zapracov|školen|skolen/i, RE_OST = /^ostatní|^ostatni/i;
+  const pracDnyMesice = ym => { const [y, m] = ym.split('-').map(Number); let n = 0; for (let d = 1; d <= 31; d++) { const t = new Date(Date.UTC(y, m - 1, d)); if (t.getUTCMonth() !== m - 1) break; const w = t.getUTCDay(); if (w && w < 6) n++; } return n; };
+  // semafor: 'g' | 'y' | 'r' | '' (bez semaforu)
+  function semafor(def, v, ctx) {
+    if (!def.prah || v == null) return '';
+    let x = v; if (def.k === 'D2') { const tot = (ctx && ctx.D1 || 0) + v; x = tot ? v / tot * 100 : 0; }
+    if (def.smer === 'up') return x >= def.prah[0] ? 'g' : (x >= def.prah[1] ? 'y' : 'r');
+    return x <= def.prah[0] ? 'g' : (x <= def.prah[1] ? 'y' : 'r');
+  }
+  function indikatoryMesice(rows, ym, rokRows) {
+    const pd = pracDnyMesice(ym); const rez = rows.filter(r => isRezie(r[R.dil])), prod = rows.filter(r => !isRezie(r[R.dil]));
+    const rezH = rez.reduce((s, r) => s + r[R.ks], 0), ks = prod.reduce((s, r) => s + r[R.ks], 0);
+    const lide = new Set(rows.map(r => r[R.id] || r[R.name])); const fond = lide.size * pd * 8;
+    const sum = (arr, f) => arr.filter(f).reduce((s, r) => s + r[R.ks], 0);
+    const rezProd = sum(rez, r => !RE_PROD.test(r[R.op])), rezOst = sum(rez, r => RE_OST.test(r[R.op]) || !r[R.pozn]), rekH = sum(rez, r => RE_REKL.test(r[R.op])), zaH = sum(rez, r => RE_ZAUC.test(r[R.op]));
+    const term = rows.filter(r => r[R.aut] === 'terminalETH').length;
+    const byD = {}; rows.forEach(r => byD[r[R.date]] = (byD[r[R.date]] || 0) + 1); const top3 = Object.values(byD).sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0);
+    const perL = {}; rows.forEach(r => { const k = r[R.id] || r[R.name]; (perL[k] = perL[k] || new Set()).add(r[R.date]); }); const prub = Object.values(perL).filter(s => s.size >= 8).length;
+    const drive = new Set(rokRows.filter(r => r[R.date] < ym).map(r => r[R.id] || r[R.name])); const bez = [...drive].filter(k => !lide.has(k)).length;
+    const p = (a, b) => b ? Math.round(a / b * 100) : 0, r1 = x => Math.round(x * 10) / 10;
+    return { m: ym, rows: rows.length, ks: Math.round(ks), rezH: Math.round(rezH), pracDny: pd,
+      A1: p(rezH, fond), A2: ks ? Math.round(rezH / ks * 1000) : 0, A3: prod.length ? Math.round(rezH / prod.length * 100) / 100 : 0, A4: lide.size ? Math.round(ks / lide.size) : 0,
+      B1: p(rezProd, rezH), B2: p(rezOst, rezH), B3: ks ? r1(rekH / ks * 1000) : 0, B4: p(zaH, rezH),
+      C1: p(term, rows.length), C2: p(top3, rows.length), C3: p(prub, lide.size), C4: p(prod.filter(r => !r[R.cvz]).length, prod.length), C5: prod.filter(r => r[R.ks] === 0).length,
+      D1: lide.size, D2: bez };
+  }
+  // Všechny měsíce roku pro závod + semafory, trend vs. předchozí měsíc a vs. medián předchozích 6.
+  function indikatory(z) {
+    const D = loadData(z.key); if (!D) return null;
+    const all = D.rows.filter(r => r[R.date] <= D.snapshot);
+    const mesice = [...new Set(all.map(r => r[R.date].slice(0, 7)))].sort();
+    const out = mesice.map(ym => indikatoryMesice(all.filter(r => r[R.date].startsWith(ym)), ym, all));
+    const snapM = D.snapshot.slice(0, 7);
+    out.forEach((M, i) => {
+      M.neuplny = M.m === snapM && !/-(2[89]|3[01])$/.test(D.snapshot);
+      M.sem = {}; M.trend = {}; M.med = {};
+      LEG_FLAT.forEach(def => {
+        M.sem[def.k] = semafor(def, M[def.k], M);
+        const prev = out[i - 1]; if (prev && prev[def.k] != null) { const d = M[def.k] - prev[def.k]; M.trend[def.k] = d === 0 ? 0 : (d > 0 ? 1 : -1); }
+        const hist = out.slice(Math.max(0, i - 6), i).map(x => x[def.k]).filter(v => v != null).sort((a, b) => a - b);
+        if (hist.length >= 3) M.med[def.k] = hist.length % 2 ? hist[(hist.length - 1) / 2] : (hist[hist.length / 2 - 1] + hist[hist.length / 2]) / 2;
+      });
+    });
+    return { zavod: z.key, name: z.name, snapshot: D.snapshot, mesice: out };
+  }
+  // Text pro trend: zlepšení/zhoršení podle směru indikátoru
+  const lepsi = (def, d) => def.smer === 'watch' ? null : (def.smer === 'up' ? d > 0 : d < 0);
+
   // ---------- statistiky ----------
   function inRange(d, od, do_) { return (!od || d >= od) && (!do_ || d <= do_); }
   const top = (m, n, key) => Object.values(m).sort((a, b) => b[key] - a[key]).slice(0, n);
@@ -328,11 +406,91 @@ function mount(host) {
     });
   }
 
+  // ---------- měsíční e-mail „Indikátory výkonnosti středisek“ ----------
+  const CFG_F = path.join(dataDir, 'vykonnost-report.json'), RSTATE_F = path.join(dataDir, 'vykonnost-report-state.json');
+  const DEF_TO = ['david.sury@elkoplast.cz', 'tomas.krajca@elkoplast.cz'];
+  const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
+  function loadCfg() { let c = {}; try { c = JSON.parse(fs.readFileSync(CFG_F, 'utf8')) || {}; } catch (_) {} return { to: Array.isArray(c.to) ? c.to : DEF_TO.slice(), enabled: c.enabled !== undefined ? !!c.enabled : true, hour: (c.hour >= 0 && c.hour <= 23) ? c.hour : 7 }; }
+  const saveCfg = c => { try { fs.writeFileSync(CFG_F, JSON.stringify(c, null, 2)); } catch (e) { console.error('[vykonnost] zápis config:', e.message); } };
+  const loadRState = () => { try { return JSON.parse(fs.readFileSync(RSTATE_F, 'utf8')) || {}; } catch (_) { return {}; } };
+  const esc = x => String(x == null ? '' : x).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const MES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
+  const mesLabel = ym => { const [y, m] = ym.split('-'); return MES[+m - 1] + ' ' + y; };
+  const fmtV = (def, v) => v == null ? '—' : (def.k === 'A3' || def.k === 'B3' ? String(v).replace('.', ',') : fmt0(v)) + (def.jedn === '%' ? ' %' : (def.jedn ? ' ' + def.jedn : ''));
+  const SEM_BG = { g: '#e6f3e4', y: '#fbf1dc', r: '#fbe9e8', '': 'transparent' }, SEM_FG = { g: '#0a7a0a', y: '#b57400', r: '#c93a39', '': '#1c1d1a' };
+  // Report za poslední UZAVŘENÝ měsíc (ym); když není zadán, vezme měsíc před měsícem snímku.
+  function buildReport(ymArg) {
+    const zav = ZAVODY.map(z => indikatory(z)).filter(Boolean);
+    if (!zav.length) return { subject: 'Indikátory výkonnosti středisek — zatím bez dat', html: '<p>Zatím nejsou načtené exporty.</p>', ym: '' };
+    let ym = ymArg; if (!ym) { const snap = zav[0].snapshot; const d = new Date(snap.slice(0, 7) + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1); ym = d.toISOString().slice(0, 7); }
+    const th = (t, r) => '<th style="text-align:' + (r ? 'right' : 'left') + ';border-bottom:2px solid #d8dee7;padding:6px 8px;font-size:11.5px;color:#55605a;white-space:nowrap">' + esc(t) + '</th>';
+    const klic = LEG_FLAT.filter(d => d.klic);
+    let body = '';
+    const zmeny = [];
+    zav.forEach(Z => {
+      const i = Z.mesice.findIndex(M => M.m === ym); const M = Z.mesice[i], P = i > 0 ? Z.mesice[i - 1] : null;
+      body += '<h3 style="margin:18px 0 6px;font-size:15px">' + esc(Z.name) + (M ? ' <span style="color:#8a938a;font-weight:400;font-size:12.5px">· ' + fmt0(M.rows) + ' operací · ' + fmt0(M.ks) + ' ks · ' + fmt0(M.rezH) + ' h režie · ' + M.D1 + ' lidí</span>' : '') + '</h3>';
+      if (!M) { body += '<p style="color:#8a938a">Za ' + mesLabel(ym) + ' nejsou data.</p>'; return; }
+      body += '<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>' + th('Indikátor') + th(mesLabel(ym), 1) + th(P ? mesLabel(P.m) : 'předchozí', 1) + th('Trend', 1) + '</tr></thead><tbody>' +
+        klic.map(def => { const v = M[def.k], pv = P ? P[def.k] : null, sm = M.sem[def.k] || ''; const d = pv != null ? v - pv : null; const ok = d == null || d === 0 ? null : lepsi(def, d);
+          if (d != null && d !== 0 && pv) zmeny.push({ zavod: Z.name, def, v, pv, rel: Math.abs(d) / Math.max(1, Math.abs(pv)), ok });
+          return '<tr><td style="padding:6px 8px;border-bottom:1px solid #eef1ec"><b>' + def.k + '</b> ' + esc(def.label) + '</td>' +
+            '<td style="padding:6px 8px;border-bottom:1px solid #eef1ec;text-align:right;background:' + SEM_BG[sm] + ';color:' + SEM_FG[sm] + ';font-weight:700;white-space:nowrap">' + fmtV(def, v) + '</td>' +
+            '<td style="padding:6px 8px;border-bottom:1px solid #eef1ec;text-align:right;color:#8a938a;white-space:nowrap">' + fmtV(def, pv) + '</td>' +
+            '<td style="padding:6px 8px;border-bottom:1px solid #eef1ec;text-align:right;white-space:nowrap;color:' + (ok == null ? '#8a938a' : (ok ? '#0a7a0a' : '#c93a39')) + '">' + (d == null ? '—' : (d === 0 ? '=' : (d > 0 ? '▲ +' : '▼ ') + fmtV(def, d).replace(/^-/, '−'))) + '</td></tr>'; }).join('') + '</tbody></table>';
+    });
+    zmeny.sort((a, b) => b.rel - a.rel);
+    const topZ = zmeny.slice(0, 3);
+    const zmenyHtml = topZ.length ? '<div style="background:#eef4fb;border:1px solid #d3e0f2;border-radius:10px;padding:12px 16px;margin:0 0 6px;font-size:13.5px;line-height:1.6"><b>Tři největší změny proti předchozímu měsíci</b>' +
+      topZ.map(c => '<div style="margin-top:4px">' + (c.ok ? '<span style="color:#0a7a0a">▲ zlepšení</span>' : '<span style="color:#c93a39">▼ zhoršení</span>') + ' · <b>' + esc(c.zavod) + '</b> — ' + esc(c.def.label) + ': ' + fmtV(c.def, c.pv) + ' → <b>' + fmtV(c.def, c.v) + '</b></div>').join('') + '</div>' : '';
+    const legHtml = '<hr style="border:0;border-top:1px solid #e6e9e3;margin:20px 0"><div style="font-size:12px;color:#55605a;line-height:1.55"><b>Legenda</b> — semafor: <span style="background:#e6f3e4;color:#0a7a0a;padding:1px 6px;border-radius:3px">zelená</span> v cíli · <span style="background:#fbf1dc;color:#b57400;padding:1px 6px;border-radius:3px">žlutá</span> sledovat · <span style="background:#fbe9e8;color:#c93a39;padding:1px 6px;border-radius:3px">červená</span> mimo. Hodnoty srovnávejte v čase v rámci závodu, ne mezi závody.<br>' +
+      klic.map(d => '<b>' + d.k + '</b> ' + esc(d.label) + ' = ' + esc(d.vzorec) + (d.prah ? ' (cíl ' + (d.smer === 'up' ? '≥ ' + d.prah[0] : '≤ ' + d.prah[0]) + (d.jedn === '%' ? ' %' : '') + ')' : '')).join('<br>') + '</div>';
+    const url = (host.mailFrom && host.mailFrom.publicUrl || '') + '/#modul=vykonnost';
+    const html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c1d1a;line-height:1.5;max-width:900px">' +
+      '<h2 style="margin:0 0 4px">Indikátory výkonnosti středisek — ' + esc(mesLabel(ym)) + '</h2>' +
+      '<p style="color:#6b736c;margin:0 0 14px;font-size:13px">Šest klíčových ukazatelů ze skutečně odvedených operací v Heliosu (bez Kč — export neobsahuje cenu operací). Podrobnosti, všech 15 indikátorů a vývoj po měsících: <a href="' + esc(url) + '" style="color:#1f4e79">Intranet → Výkonnost středisek → Měsíční indikátory</a>.</p>' +
+      zmenyHtml + body + legHtml +
+      '<div style="font-size:12px;color:#8a938a;margin-top:12px">Automatický měsíční report · odesílá se první pracovní den měsíce. Příjemce a zapnutí spravuje správce v modulu nebo v přehledu Rozesílky.</div></div>';
+    return { subject: 'Výkonnost středisek — indikátory za ' + mesLabel(ym) + (topZ.length ? ' · ' + topZ.filter(c => !c.ok).length + '× zhoršení, ' + topZ.filter(c => c.ok).length + '× zlepšení v top 3' : ''), html, ym };
+  }
+  async function sendReport(toList, ym) {
+    const to = cleanEmails(toList); if (!to.length) return { ok: false, error: 'žádný příjemce' };
+    if (!host.deliver) return { ok: false, error: 'odesílání pošty není k dispozici' };
+    const rep = buildReport(ym);
+    try { await host.deliver({ to: to.join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — Výkonnost', subject: rep.subject, text: rep.subject, html: rep.html }); return { ok: true, to, ym: rep.ym }; }
+    catch (e) { return { ok: false, error: e.message }; }
+  }
+  // První pracovní den v měsíci (po–pá; státní svátky neřešíme), od zvolené hodiny; pojistka 1×/měsíc, při chybě max 3 pokusy.
+  function prvniPracovniDen(d) { for (let i = 1; i <= 7; i++) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), i)); const w = t.getUTCDay(); if (w && w < 6) return i; } return 1; }
+  async function tickReport() {
+    try {
+      const cfg = loadCfg(); const now = new Date();
+      if (!cfg.enabled) return;
+      if (host.reportDisabled && host.reportDisabled('vykonnost-mesicni')) return;
+      if (now.getDate() !== prvniPracovniDen(now) || now.getHours() < cfg.hour) return;
+      const st = loadRState(); const cur = now.toISOString().slice(0, 7);
+      if (st.lastMonth === cur) return;
+      if (st.failMonth === cur && (st.failCount || 0) >= 3) return;
+      const r = await sendReport(cfg.to);
+      if (r.ok) { st.lastMonth = cur; st.lastAt = now.toISOString(); st.lastError = ''; delete st.failMonth; delete st.failCount; }
+      else { st.failCount = (st.failMonth === cur ? (st.failCount || 0) : 0) + 1; st.failMonth = cur; st.lastError = r.error || 'odeslání selhalo'; }
+      st.lastResult = r; try { fs.writeFileSync(RSTATE_F, JSON.stringify(st, null, 2)); } catch (_) {}
+      console.log('[vykonnost] měsíční report: ' + (r.ok ? 'odesláno (' + r.to.join(', ') + ')' : 'CHYBA (pokus ' + st.failCount + '/3) ' + st.lastError));
+    } catch (e) { console.error('[vykonnost] report tick:', e.message); }
+  }
+  function reportDescriptor() {
+    const c = loadCfg(), st = loadRState();
+    return { key: 'vykonnost-mesicni', module: 'Výkonnost středisek', name: 'Měsíční indikátory výkonnosti (4 závody)', to: c.to || [], enabled: !!c.enabled, schedule: 'měsíčně, 1. pracovní den od ' + c.hour + ':00', lastAt: st.lastAt || null, lastError: st.lastError || '', preview: '/api/vykonnost/preview', send: { url: '/api/vykonnost/send', body: {} }, configHint: 'Modul Výkonnost středisek → Měsíční indikátory → 📧' };
+  }
+  function reports() { return [reportDescriptor()]; }
+  function setReport(key, b) { if (key !== 'vykonnost-mesicni') return null; const next = Object.assign({}, loadCfg()); if (b.to != null) next.to = cleanEmails(b.to); if (b.enabled != null) next.enabled = !!b.enabled; if (b.hour != null && b.hour >= 0 && b.hour <= 23) next.hour = +b.hour; saveCfg(next); return reportDescriptor(); }
+
   // ---------- plánovač ----------
   let lastPlanAt = 0;
   async function tick() {
     try { const s = await sync(false); if (s && !s.ok) console.warn('[vykonnost] sync:', s.error); } catch (e) { console.error('[vykonnost] sync:', e.message); }
     if (Date.now() - lastPlanAt > 6 * 3600 * 1000) { lastPlanAt = Date.now(); try { await syncPlans(); } catch (e) { console.warn('[vykonnost] plány:', e.message); } }
+    await tickReport();
   }
 
   // ---------- router ----------
@@ -364,7 +522,16 @@ function mount(host) {
       json(res, 200, { cvz, zavod: z.key, tab: plan.tab, row: it.row, url, live, warn, syncedAt: plan.syncedAt, pole: live ? pole : null, item: it });
       return true;
     }
+    const mi = /^\/api\/vykonnost\/indikatory\/([a-z]+)$/.exec(p);
+    if (mi && req.method === 'GET') {
+      const z = zavodOf(mi[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; }
+      const I = indikatory(z); if (!I) { json(res, 200, { data: false, zavod: z.key, name: z.name, legenda: LEGENDA }); return true; }
+      json(res, 200, Object.assign({ data: true, legenda: LEGENDA, config: host.isAdmin(req) ? loadCfg() : undefined, reportState: host.isAdmin(req) ? loadRState() : undefined }, I)); return true;
+    }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
+    if (p === '/api/vykonnost/preview' && req.method === 'GET') { const rep = buildReport(/^\d{4}-\d{2}$/.test(u.query.m || '') ? u.query.m : ''); return host.send(res, 200, rep.html, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }), true; }
+    if (p === '/api/vykonnost/send' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {} const r = await sendReport(b.to ? b.to : loadCfg().to, /^\d{4}-\d{2}$/.test(b.m || '') ? b.m : ''); return json(res, r.ok ? 200 : 500, r), true; }
+    if (p === '/api/vykonnost/config' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } return json(res, 200, { ok: true, report: setReport('vykonnost-mesicni', b) }), true; }
     if (p === '/api/vykonnost/sync' && req.method === 'POST') {
       try { const r = await sync(true); let pl = null; try { pl = await syncPlans(); } catch (e) { pl = { error: e.message }; } return json(res, r.ok ? 200 : 500, Object.assign(r, { plany: pl })), true; }
       catch (e) { return json(res, 500, { ok: false, error: e.message }), true; }
@@ -373,7 +540,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, sync: () => sync(false), syncPlans, parseExport, parsePlanValues, ZAVODY };
+  return { handle, tick, sync: () => sync(false), syncPlans, parseExport, parsePlanValues, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };
