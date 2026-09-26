@@ -771,6 +771,12 @@ function mount(host) {
     }
     const mv = /^\/api\/vykonnost\/vystup\/([a-z]+)$/.exec(p);
     if (mv && req.method === 'GET') { const z = zavodOf(mv[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; } const V = vystup(z); json(res, 200, V ? Object.assign({ data: true, admin: !!host.isAdmin(req) }, V) : { data: false, zavod: z.key, name: z.name }); return true; }
+    // Indikátory všech závodů najednou (společný graf v přehledu); ?bez=popelnice vynechá závod
+    if (p === '/api/vykonnost/indikatory' && req.method === 'GET') {
+      const bez = String(u.query.bez || '').split(',').filter(Boolean);
+      const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, snapshot: I.snapshot, mesice: I.mesice.map(M => { const o = { m: M.m, neuplny: M.neuplny }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
+      json(res, 200, { zavody: zav, legenda: LEGENDA }); return true;
+    }
     const mi = /^\/api\/vykonnost\/indikatory\/([a-z]+)$/.exec(p);
     if (mi && req.method === 'GET') {
       const z = zavodOf(mi[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; }
