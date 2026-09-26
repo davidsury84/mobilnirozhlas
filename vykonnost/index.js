@@ -214,6 +214,14 @@ function mount(host) {
       Z.push({ tag: silna ? 'crit' : 'info', titul: rr == null ? 'Vztah úkol ↔ režie po lidech nejde z období spočítat (málo lidí s oběma čísly).' : (silna ? 'Režie doplňuje chybějící úkol: čím méně kdo odvede, tím víc má režie (korelace ' + rs + ').' : (kladna ? 'Režie roste s výkonem (korelace ' + rs + ') — režijní položky jsou tu součást běžné práce, ne dorovnání.' : 'Vztah úkol ↔ režie po lidech je v tomto období slabý (korelace ' + rs + ').')),
         text: (a0 ? 'Režii zapisuje ' + (a0.autor === 'terminál' ? 'terminál' : a0.autor) + ' (' + a0.pct + ' % řádků)' + (d0 ? ', nejčastěji ' + d0.den + ' (' + d0.pct + ' %)' : '') + '. ' : '') + 'Počítáno z odvedených operací u ' + sRez.length + ' lidí s režií' + (r != null ? ' (všech ' + lid.length + ' lidí: ' + String(r).replace('.', ',') + ')' : '') + '. Skutečný test — zda režie dorovnává rozdíl mezi časovou mzdou a úkolem v Kč — vyžaduje cenu operací a mzdový přehled, které v exportu nejsou.', korelace: true });
     }
+    // Normy: normohodiny vs. fond, úkol v Kč z norem vs. režie v Kč, korelace po lidech
+    if (X.normy && X.normy.katalog) {
+      const Nn = X.normy; const fondH = X.lideArr.length * X.pracDnu * 8; const vyuz = fondH ? Math.round(Nn.normH / fondH * 100) : 0;
+      Z.push({ tag: Nn.pokrytiRows < 50 ? 'warn' : 'info', titul: 'Normy pokrývají ' + Nn.pokrytiRows + ' % odvedených výrobních řádků (' + fmt0(Nn.normH) + ' normohodin, ' + fmt0(Nn.normKc) + ' Kč úkolu podle norem).',
+        text: 'Normohodiny odpovídají ' + vyuz + ' % fondu pracovní doby lidí s odváděním; režie zapsaná jako úkol je ' + fmt0(X.rezieH) + ' h ≈ ' + fmt0(Nn.rezieKc) + ' Kč při ' + Nn.rezieSazba + ' Kč/h. ' + (Nn.pokrytiRows < 50 ? 'Pokrytí je nízké — ' + fmt0(Nn.nesparovane.slice(0, 3).reduce((s, u) => s + u.rows, 0)) + ' řádků leží ve třech nejčastějších operacích bez normy (' + Nn.nesparovane.slice(0, 3).map(u => u.op).join(', ') + '); část jde dopárovat ručně v záložce Normy.' : 'Kč jsou z norem (čas × sazba listu), ne ze skutečné výplaty.'), normy: true });
+      if (Nn.pokrytiRows >= 40) { const lid = X.lideArr.filter(L => L.rezieH > 0 && (X.rows < 50 || L.rows / X.rows < 0.25)); const rK = pearson(lid.map(L => L.normKc), lid.map(L => L.rezieH * Nn.rezieSazba));
+        if (rK != null) Z.push({ tag: rK <= -0.5 ? 'crit' : 'info', titul: rK <= -0.5 ? 'Čím méně úkolu v Kč podle norem, tím více režie v Kč (korelace ' + String(rK).replace('.', ',') + ') — režie dorovnává úkol.' : 'Úkol v Kč podle norem a režie v Kč po lidech: korelace ' + String(rK).replace('.', ',') + '.', text: 'Počítáno u ' + lid.length + ' lidí s režií z normovaného úkolu (čas × sazba listu norem) a režie × ' + Nn.rezieSazba + ' Kč/h. Chybí pořád časová mzda — bez ní nejde říct, zda součet sedí na výplatu.', normy: true }); }
+    }
     const refZ = REFERENCE[X.key]; if (refZ) Z.push({ tag: 'crit', titul: refZ.titul, text: refZ.text, ref: true, zdroj: refZ.zdroj + ' · ' + refZ.obdobi + ' · přepočítá se automaticky, až budou v exportu Mzda/Cena a k dispozici hrubé mzdy' });
     if (top3 >= 35 || patekPct >= 30) Z.push({ tag: top3 >= 45 ? 'crit' : 'warn', titul: 'Odvádí se po dávkách, ne průběžně: ' + top3 + ' % řádků vzniklo ve 3 dnech' + (patekPct >= 25 ? ', ' + patekPct + ' % v pátek' : '') + '.',
       text: 'Špičky: ' + X.topDny.map(d => d.date.split('-').reverse().join('. ') + ' (' + d.rows + ')').join(', ') + '. Z dat pak nejde zjistit, kdy se co skutečně dělalo ani jak dlouho to trvalo.' + (X.dvojice.length ? ' Dvojice se zápisy identické do řádku: ' + X.dvojice.map(p => p[0] + ' – ' + p[1]).join('; ') + ' — odvádí se sdíleně.' : '') });
@@ -257,6 +265,112 @@ function mount(host) {
     return { zjisteni: Z, uzka: U, vycnivaji: V.slice(0, 10), doporuceni: D, shrnuti, uvazky: Math.round(uvazky * 10) / 10, korelace };
   }
 
+  // ---------- výrobní normy (Drive složka „Normy" T. Krajči: Google Sheets + xlsx) ----------
+  // Katalog se skládá ze všech listů všech souborů (mimo podsložky Archiv). Tři rozvržení:
+  //  A) tabulka „Operace | délka | výška | čas (min) | hrubá mzda | ks/kont" (ABR svařovna/lakovna/drobné dílce, CITY, GSK, SLD),
+  //     prázdný název = pokračování předchozí operace s jiným rozměrem;
+  //  B) sekce dělírny „střih | ks | osob | min | celkem čas | norma/ks | norma/kont" (název sekce + řádek = operace);
+  //  C) matice variant (Muldy, Popelnice xlsx): skupiny sloupců „min/čas/ks … norma/ks" pod názvem varianty.
+  // Párování na Helios: ruční mapa > přesný název > název bez závorek > prefix > shoda tokenů; rozměr z dílu rozhodne variantu.
+  const NORMY_FOLDER = process.env.VYKON_NORMY_FOLDER || '0B7bVERxmHKlSTVVKejJQZThsWUE';
+  const NORMY_F = path.join(dataDir, 'vykonnost-normy.json'), NMAP_F = path.join(dataDir, 'vykonnost-normy-mapa.json');
+  const REZIE_SAZBA = +process.env.VYKON_REZIE_SAZBA || 210;   // Kč/h režie dle mzdového přehledu (ruční analýza 08/2026)
+  const nrm = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9+/.,\- ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const nrmBez = s => nrm(String(s).replace(/\([^)]*\)/g, ' ')).replace(/[.,]+$/, '').trim();
+  const numN = v => { const m = String(v == null ? '' : v).replace(/[\s ]/g, '').replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
+  const rangeN = v => { const s = String(v == null ? '' : v); let m = s.match(/(\d{3,4})\s*[-–]\s*(\d{3,4})/); if (m) return [+m[1], +m[2]]; m = s.match(/^\s*(\d{3,4})\s*(mm)?\s*$/); if (m) return [+m[1], +m[1]]; m = s.match(/^\s*do\s*(\d{3,4})/i); if (m) return [0, +m[1]]; return null; };
+  const dimsOf = dil => { const m = String(dil || '').match(/(\d{4})\s*[x×]\s*(\d{4})(?:\s*\/\s*\d{4})?\s*[x×]\s*(\d{3,4})/); return m ? { L: +m[1], H: +m[3] } : null; };
+  const isPLN = v => /pln|z[łl]/i.test(String(v || ''));
+  function parseNormyGrid(values, meta) {
+    const V = (values || []).map(r => (r || []).map(c => String(c == null ? '' : c).trim()));
+    const items = []; let sazba = null;
+    for (let i = 0; i < Math.min(8, V.length); i++) { const r = V[i]; const j = r.findIndex(c => /sazba|k[čc]\s*\/\s*hod|mzda normovan/i.test(c)); if (j >= 0) { const n = numN(r[j + 1]) != null ? numN(r[j + 1]) : numN(r[j]); if (n && !isPLN(r[j + 1] || '')) { sazba = n; break; } } }
+    const mk = (o, extra) => { const op = String(o.op || '').replace(/\s+/g, ' ').trim(); if (!op || (o.min == null && o.kc == null)) return; if (/^(celkem|rekapitulace|pozn|poznámka)/i.test(op)) return; items.push(Object.assign({ file: meta.file, sheet: meta.sheet, kod: o.kod || '', op, opN: nrm(op), opB: nrmBez(op), varianta: o.varianta || '', del: o.del || null, vys: o.vys || null, min: o.min, kc: o.kc, ksKont: o.ks || null, sazba }, extra || {})); };
+    // A) klasická tabulka
+    let hi = V.findIndex(r => r.some(c => /^(operace|popis operace)$/i.test(c)) && r.some(c => /čas|time|^min|minut/i.test(c)));
+    if (hi >= 0) {
+      const H = V[hi].map(c => c.toLowerCase());
+      const ci = { op: H.map((h, i) => (/^(operace|popis operace)$/.test(h) ? i : -1)).filter(i => i >= 0).pop(), del: H.findIndex(h => /délka|delka|lenght|length|^typ$/.test(h)), vys: H.findIndex(h => /výška|vyska|height/.test(h)), min: H.findIndex(h => /čas|time|^min|minut/.test(h)), kc: H.findIndex(h => /hrubá mzda|hruba mzda|norma\/ks|^celkem$/.test(h)), ks: H.findIndex(h => /ks\/kont|ks\/bedna|dílů|dilu/.test(h)) };
+      const kodCol = ci.op > 0 && /^(číslo|cislo|kód|kod|operace)?$/.test(H[ci.op - 1] || '') ? ci.op - 1 : -1;
+      // matice? (více sloupců „čas") → C
+      const casCols = H.map((h, i) => (/čas|^min$|minut/.test(h) ? i : -1)).filter(i => i >= 0);
+      if (casCols.length <= 1) {
+        let last = '';
+        for (let r = hi + 1; r < V.length; r++) { const row = V[r]; const op = row[ci.op] || ''; const min = numN(row[ci.min]); const kcRaw = ci.kc >= 0 ? row[ci.kc] : ''; const kc = isPLN(kcRaw) ? null : numN(kcRaw);
+          if (!op && min == null) { if (row.every(c => !c)) last = ''; continue; }
+          if (op) last = op; if (!last) continue;
+          mk({ kod: kodCol >= 0 ? row[kodCol] : '', op: last, del: rangeN(row[ci.del]), vys: rangeN(row[ci.vys]), min, kc, ks: numN(row[ci.ks]) }); }
+        return { items, sazba, layout: 'A' };
+      }
+      // C) matice: skupiny podle sloupců s časem; varianta = text nad skupinou
+      // skupina = sloupce mezi předchozím a následujícím sloupcem „čas"; varianta = nejbližší text nad skupinou (sloučené buňky mají hodnotu jen v 1. sloupci)
+      const groups = casCols.map((c, gi) => { const from = gi === 0 ? ci.op + 1 : casCols[gi - 1] + 1, to = gi + 1 < casCols.length ? casCols[gi + 1] - 1 : H.length - 1; let kcCol = -1; for (let j = from; j <= to; j++) if (/norma\/ks|norma celkem|hrubá mzda/.test(H[j])) { kcCol = j; break; } let varianta = ''; for (let up = 1; up <= 3 && !varianta; up++) { const rr = V[hi - up] || []; for (let j = c; j >= from; j--) if (rr[j]) { varianta = rr[j]; break; } if (!varianta) for (let j = c + 1; j <= to; j++) if (rr[j]) { varianta = rr[j]; break; } } return { min: c, kc: kcCol, varianta }; });
+      const seen = new Set();
+      for (let r = hi + 1; r < V.length; r++) { const row = V[r]; const op = row[ci.op] || row[0] || ''; if (!op || /^celkem/i.test(op)) continue; groups.forEach(g => { const min = numN(row[g.min]); const kcRaw = g.kc >= 0 ? row[g.kc] : ''; const kc = isPLN(kcRaw) ? null : numN(kcRaw); if (min == null && kc == null) return; const key = nrm(op) + '|' + g.varianta; if (seen.has(key)) return; seen.add(key); mk({ op, varianta: g.varianta, min, kc }); }); }
+      return { items, sazba, layout: 'C' };
+    }
+    // B) sekce dělírny
+    let found = false;
+    for (let r = 0; r < V.length; r++) { const row = V[r]; const L = row.map(c => c.toLowerCase()); const iKs = L.indexOf('ks'), iMin = L.indexOf('min'), iNk = L.findIndex(c => /norma\/ks/.test(c));
+      if (iKs < 0 || iMin < 0 || iNk < 0) continue; found = true; const sekce = row[0] || '';
+      for (let q = r + 1; q < V.length; q++) { const rr = V[q]; if (!rr[0] && !rr[iMin]) break; if (rr.map(c => c.toLowerCase()).indexOf('min') >= 0) break; const min = numN(rr[iMin]), kc = numN(rr[iNk]); if (!rr[0] || (min == null && kc == null)) continue; mk({ op: (sekce ? sekce + ' ' : '') + rr[0], min, kc, ks: numN(rr[iKs]) }); }
+    }
+    return { items, sazba, layout: found ? 'B' : 'none', warn: found ? '' : 'nerozpoznané rozvržení' };
+  }
+  const loadNormy = () => { try { return JSON.parse(fs.readFileSync(NORMY_F, 'utf8')); } catch (_) { return null; } };
+  const loadNMap = () => { try { return JSON.parse(fs.readFileSync(NMAP_F, 'utf8')) || {}; } catch (_) { return {}; } };
+  const normId = n => [n.file, n.sheet, n.kod, n.opN, n.varianta, (n.del || []).join('-'), (n.vys || []).join('-')].join('|');
+  async function syncNormy() {
+    if (!drive || !drive.configured()) return { ok: false, error: 'Service account (GOOGLE_SA_*) není nastavený.' };
+    const files = (await drive.listFolder(NORMY_FOLDER)).filter(f => !/archiv/i.test(f.folder || ''));
+    const items = [], diag = [];
+    for (const f of files) {
+      try {
+        if (f.mimeType === 'application/vnd.google-apps.spreadsheet') {
+          if (!host.sheetsGet) throw new Error('Sheets API není k dispozici');
+          const tabs = host.sheetsTabs ? await host.sheetsTabs(f.id) : (await host.sheetsMeta(f.id) || []).map(t => ({ title: t }));
+          for (const t of tabs) { if (/archiv|úkoly|ukoly|délky svárů/i.test(t.title)) continue; const r = await host.sheetsGet(f.id, "'" + String(t.title).replace(/'/g, "''") + "'!A1:AZ400"); const p = parseNormyGrid((r && r.values) || [], { file: f.name, sheet: t.title }); items.push(...p.items); diag.push({ file: f.name, sheet: t.title, items: p.items.length, layout: p.layout, sazba: p.sazba, warn: p.warn || '', url: 'https://docs.google.com/spreadsheets/d/' + f.id }); }
+        } else if (/\.xlsx?$/i.test(f.name || '') || /spreadsheetml/.test(f.mimeType || '')) {
+          const dl = await drive.downloadFileBase64(f.id, 10 * 1024 * 1024); const sheets = parseAll(Buffer.from(dl.base64, 'base64'));
+          for (const [sh, rows] of Object.entries(sheets)) { const p = parseNormyGrid(rows, { file: f.name, sheet: sh }); items.push(...p.items); diag.push({ file: f.name, sheet: sh, items: p.items.length, layout: p.layout, sazba: p.sazba, warn: p.warn || '', url: f.webViewLink || '' }); }
+        }
+      } catch (e) { diag.push({ file: f.name, sheet: '', items: 0, layout: '', warn: e.message }); }
+    }
+    fs.writeFileSync(NORMY_F, JSON.stringify({ syncedAt: new Date().toISOString(), folder: NORMY_FOLDER, items, diag }));
+    _nIdx = null;
+    console.log('[vykonnost] normy: ' + items.length + ' položek z ' + diag.length + ' listů');
+    return { ok: true, items: items.length, listy: diag.length };
+  }
+  // index pro párování (líně, invalidace po syncu / změně mapy)
+  let _nIdx = null;
+  function normIndex() {
+    if (_nIdx) return _nIdx;
+    const N = loadNormy(); const items = (N && N.items) || [];
+    const byN = {}, byB = {}, byId = {}; items.forEach(n => { (byN[n.opN] = byN[n.opN] || []).push(n); (byB[n.opB] = byB[n.opB] || []).push(n); byId[normId(n)] = n; });
+    const keys = Object.keys(byB).filter(k => k.length >= 10).sort((a, b) => b.length - a.length);
+    const tok = {}; keys.forEach(k => tok[k] = new Set(k.split(' ').filter(w => w.length > 1)));
+    return (_nIdx = { items, byN, byB, byId, keys, tok, syncedAt: N ? N.syncedAt : '', diag: (N && N.diag) || [], mapa: loadNMap(), cache: new Map() });
+  }
+  function pickVariant(c, dil) { if (c.length === 1) return c[0]; const d = dimsOf(dil); if (d) { const f = c.filter(n => (!n.del || (d.L >= n.del[0] && d.L <= n.del[1])) && (!n.vys || (d.H >= n.vys[0] && d.H <= n.vys[1]))); if (f.length) return f[0]; } const noDim = c.find(n => !n.del && !n.vys); return noDim || c[0]; }
+  function matchNorma(zavodKey, op, dil) {
+    const I = normIndex(); if (!I.items.length) return null;
+    const d = dimsOf(dil); const ck = zavodKey + '|' + op + '|' + (d ? d.L + 'x' + d.H : '');
+    if (I.cache.has(ck)) return I.cache.get(ck);
+    let res = null; const man = (I.mapa[zavodKey] || {})[op] || (I.mapa['*'] || {})[op];
+    if (man === '__none__') res = null;
+    else if (man && I.byId[man]) res = Object.assign({}, I.byId[man], { how: 'ručně' });
+    else {
+      const o = nrm(op), ob = nrmBez(op); let c = I.byN[o] || I.byB[ob]; let how = 'přesně';
+      if (!c && ob.length >= 12) { const k = I.keys.find(k => k.startsWith(ob) || ob.startsWith(k)); if (k) { c = I.byB[k]; how = 'prefix'; } }
+      if (!c && ob.length >= 8) { const t = new Set(ob.split(' ').filter(w => w.length > 1)); const first = ob.split(' ')[0]; let best = null, bs = 0;
+        for (const k of I.keys) { if (!k.startsWith(first)) continue; const T = I.tok[k]; let inter = 0; t.forEach(w => { if (T.has(w)) inter++; }); const j = inter / (t.size + T.size - inter); if (j > bs) { bs = j; best = k; } }
+        if (best && bs >= 0.7) { c = I.byB[best]; how = 'podobnost ' + Math.round(bs * 100) + ' %'; } }
+      if (c) res = Object.assign({}, pickVariant(c, dil), { how });
+    }
+    I.cache.set(ck, res); return res;
+  }
+  function setNormaMapa(zavodKey, op, id) { const m = loadNMap(); m[zavodKey] = m[zavodKey] || {}; if (id) m[zavodKey][op] = id; else delete m[zavodKey][op]; try { fs.writeFileSync(NMAP_F, JSON.stringify(m, null, 2)); } catch (_) {} _nIdx = null; }
+
   // ---------- měsíční indikátory (legenda = jediný zdroj pravdy pro app i e-mail) ----------
   // smer: 'down' = nižší lepší, 'up' = vyšší lepší, 'watch' = jen sledovat. prah: [zelená do, žlutá do] (pro 'up' obráceně).
   // klic: true = jeden ze 6 klíčových indikátorů se semaforem v e-mailu.
@@ -265,7 +379,9 @@ function mount(host) {
       { k: 'A1', klic: true, label: 'Režie jako % fondu pracovní doby', jedn: '%', smer: 'down', prah: [10, 20], vzorec: 'režijní hodiny ÷ (lidé s odváděním × pracovní dny × 8 h)', proc: 'Nejbližší náhrada „režie vs. mzda“ bez mzdových dat. Kolik procent odpracovaného času se zapsalo jako režie místo úkolu.' },
       { k: 'A2', label: 'Režie h na 1 000 vyrobených ks', jedn: 'h', smer: 'down', vzorec: 'režijní hodiny ÷ kusy × 1000', proc: 'Režie vztažená k výstupu. Srovnávat jen v čase v rámci závodu (kusy nejsou mezi závody stejné).' },
       { k: 'A3', label: 'Režie h na produkční operaci', jedn: 'h', smer: 'down', vzorec: 'režijní hodiny ÷ počet produkčních řádků', proc: 'Kolik režie připadá na jednu odvedenou výrobní operaci.' },
-      { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé s odváděním', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' }
+      { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé s odváděním', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' },
+      { k: 'A5', label: 'Normohodiny jako % fondu', jedn: '%', smer: 'up', vzorec: 'Σ (čas normy × ks) u spárovaných operací ÷ fond pracovní doby lidí s odváděním', proc: 'Kolik fondu je kryto normovaným úkolem. Závisí na pokrytí normami (A6) — číst spolu.' },
+      { k: 'A6', label: '% výrobních řádků s normou', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'výrobní řádky spárované s položkou v katalogu norem ÷ výrobní řádky', proc: 'Pokrytí normami. Co není spárované, nemá cenu ani čas — buď chybí norma, nebo jen ruční přiřazení v záložce Normy.' }
     ] },
     { skup: 'B', nazev: 'Struktura režie — co se v ní schovává', items: [
       { k: 'B1', klic: true, label: '% režie, která je výroba bez normy', jedn: '%', smer: 'down', prah: [25, 50], vzorec: 'hodiny v režijních operacích výrobního typu (úprava/příprava materiálu, spojování vrat, polepování, přehazování nástrojů, montáž po laku, výměna filtrů…) ÷ režijní hodiny', proc: 'Práce, která by měla mít úkolovou cenu. Každá dodělaná norma toto číslo sníží — přímé měřítko postupu.' },
@@ -296,8 +412,9 @@ function mount(host) {
     if (def.smer === 'up') return x >= def.prah[0] ? 'g' : (x >= def.prah[1] ? 'y' : 'r');
     return x <= def.prah[0] ? 'g' : (x <= def.prah[1] ? 'y' : 'r');
   }
-  function indikatoryMesice(rows, ym, rokRows) {
+  function indikatoryMesice(rows, ym, rokRows, zavodKey) {
     const pd = pracDnyMesice(ym); const rez = rows.filter(r => isRezie(r[R.dil])), prod = rows.filter(r => !isRezie(r[R.dil]));
+    let nMin = 0, nRows = 0; if (normIndex().items.length) prod.forEach(r => { const n = matchNorma(zavodKey, r[R.op], r[R.dil]); if (n) { nMin += (n.min || 0) * r[R.ks]; nRows++; } });
     const rezH = rez.reduce((s, r) => s + r[R.ks], 0), ks = prod.reduce((s, r) => s + r[R.ks], 0);
     const lide = new Set(rows.map(r => r[R.id] || r[R.name])); const fond = lide.size * pd * 8;
     const sum = (arr, f) => arr.filter(f).reduce((s, r) => s + r[R.ks], 0);
@@ -309,6 +426,7 @@ function mount(host) {
     const p = (a, b) => b ? Math.round(a / b * 100) : 0, r1 = x => Math.round(x * 10) / 10;
     return { m: ym, rows: rows.length, ks: Math.round(ks), rezH: Math.round(rezH), pracDny: pd,
       A1: p(rezH, fond), A2: ks ? Math.round(rezH / ks * 1000) : 0, A3: prod.length ? Math.round(rezH / prod.length * 100) / 100 : 0, A4: lide.size ? Math.round(ks / lide.size) : 0,
+      A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null,
       B1: p(rezProd, rezH), B2: p(rezOst, rezH), B3: ks ? r1(rekH / ks * 1000) : 0, B4: p(zaH, rezH),
       C1: p(term, rows.length), C2: p(top3, rows.length), C3: p(prub, lide.size), C4: p(prod.filter(r => !r[R.cvz]).length, prod.length), C5: prod.filter(r => r[R.ks] === 0).length,
       D1: lide.size, D2: bez };
@@ -318,7 +436,7 @@ function mount(host) {
     const D = loadData(z.key); if (!D) return null;
     const all = D.rows.filter(r => r[R.date] <= D.snapshot);
     const mesice = [...new Set(all.map(r => r[R.date].slice(0, 7)))].sort();
-    const out = mesice.map(ym => indikatoryMesice(all.filter(r => r[R.date].startsWith(ym)), ym, all));
+    const out = mesice.map(ym => indikatoryMesice(all.filter(r => r[R.date].startsWith(ym)), ym, all, z.key));
     const snapM = D.snapshot.slice(0, 7);
     out.forEach((M, i) => {
       M.neuplny = M.m === snapM && !/-(2[89]|3[01])$/.test(D.snapshot);
@@ -370,8 +488,20 @@ function mount(host) {
     const dnyArr = Object.values(dny).sort((a, b) => a.date.localeCompare(b.date));
     const topDny = dnyArr.slice().sort((a, b) => b.rows - a.rows).slice(0, 3);
     const patek = rows.filter(r => new Date(r[R.date] + 'T00:00:00Z').getUTCDay() === 5).length;
+    // --- normy: normohodiny a Kč úkolu z norem po řádcích, pokrytí, nespárované operace ---
+    const NI = normIndex(); const maNormy = NI.items.length > 0;
+    let normMin = 0, normKc = 0, normRows = 0, normKs = 0; const nesp = {}, spar = {};
+    if (maNormy) rows.forEach(r => { if (isRezie(r[R.dil])) return; const n = matchNorma(z.key, r[R.op], r[R.dil]); const key = r[R.id] || r[R.name]; const L = lide[key];
+      if (n) { const mn = (n.min || 0) * r[R.ks], kc = (n.kc || 0) * r[R.ks]; normMin += mn; normKc += kc; normRows++; normKs += r[R.ks]; if (L) { L.normMin = (L.normMin || 0) + mn; L.normKc = (L.normKc || 0) + kc; L.normRows = (L.normRows || 0) + 1; }
+        const S = spar[r[R.op]] = spar[r[R.op]] || { op: r[R.op], norma: n.op, varianta: n.varianta, min: n.min, kc: n.kc, how: n.how, file: n.file, sheet: n.sheet, rows: 0, ks: 0 }; S.rows++; S.ks += r[R.ks]; }
+      else { const U = nesp[r[R.op]] = nesp[r[R.op]] || { op: r[R.op], rows: 0, ks: 0, lide: new Set(), dil: {} }; U.rows++; U.ks += r[R.ks]; U.lide.add(r[R.name]); U.dil[r[R.dil]] = (U.dil[r[R.dil]] || 0) + 1; } });
+    const prodRowsAll = rows.length - rezRows;
+    const normy = maNormy ? { katalog: NI.items.length, syncedAt: NI.syncedAt, listy: NI.diag.length, normH: Math.round(normMin / 60), normKc: Math.round(normKc), rows: normRows, ks: Math.round(normKs), prodRows: prodRowsAll,
+      pokrytiRows: prodRowsAll ? Math.round(normRows / prodRowsAll * 100) : 0, pokrytiKs: ks ? Math.round(normKs / ks * 100) : 0, rezieKc: Math.round(rezieH * REZIE_SAZBA), rezieSazba: REZIE_SAZBA,
+      nesparovane: Object.values(nesp).sort((a, b) => b.rows - a.rows).slice(0, 60).map(u => ({ op: u.op, rows: u.rows, ks: Math.round(u.ks), lide: u.lide.size, dil: Object.entries(u.dil).sort((a, b) => b[1] - a[1])[0][0] })),
+      sparovane: Object.values(spar).sort((a, b) => b.rows - a.rows).slice(0, 80).map(s => Object.assign({}, s, { ks: Math.round(s.ks), normH: Math.round((s.min || 0) * s.ks / 60) })) } : null;
     const lideArr = Object.values(lide).map(L => { const maxDay = Math.max(0, ...Object.values(L.perDay)); const topOp = Object.entries(L.opCount).sort((a, b) => b[1] - a[1])[0];
-      return { id: L.id, name: L.name, rows: L.rows, prodRows: L.rows - (L.rezRows || 0), ks: Math.round(L.ks), rezieH: Math.round(L.rezieH), dny: L.dnySet.size, ops: L.opsSet.size, termPct: L.rows ? Math.round(L.term / L.rows * 100) : 0, last: L.last, first: L.first, davkaPct: L.rows ? Math.round(maxDay / L.rows * 100) : 0, reziePct: (L.rows ? Math.round(L.rezieH > 0 ? (L.rezieH / (L.rezieH + Math.max(1, L.ks))) * 100 : 0) : 0), topOp: topOp ? topOp[0] : '' }; })
+      return { id: L.id, name: L.name, rows: L.rows, prodRows: L.rows - (L.rezRows || 0), ks: Math.round(L.ks), rezieH: Math.round(L.rezieH), normH: Math.round((L.normMin || 0) / 60), normKc: Math.round(L.normKc || 0), normPokryti: (L.rows - (L.rezRows || 0)) ? Math.round((L.normRows || 0) / (L.rows - (L.rezRows || 0)) * 100) : 0, dny: L.dnySet.size, ops: L.opsSet.size, termPct: L.rows ? Math.round(L.term / L.rows * 100) : 0, last: L.last, first: L.first, davkaPct: L.rows ? Math.round(maxDay / L.rows * 100) : 0, reziePct: (L.rows ? Math.round(L.rezieH > 0 ? (L.rezieH / (L.rezieH + Math.max(1, L.ks))) * 100 : 0) : 0), topOp: topOp ? topOp[0] : '' }; })
       .sort((a, b) => b.rows - a.rows);
     // párování na plán
     const plan = loadPlan(z.key); const P = (plan && plan.items) || {};
@@ -402,9 +532,9 @@ function mount(host) {
     const rezAut = {}, rezDen = {}; let rezN = 0;
     rows.forEach(r => { if (!isRezie(r[R.dil])) return; rezN++; const a = r[R.aut] === 'terminalETH' ? 'terminál' : (r[R.aut] || '—'); rezAut[a] = (rezAut[a] || 0) + 1; const d = DNY_CZ[new Date(r[R.date] + 'T00:00:00Z').getUTCDay()]; rezDen[d] = (rezDen[d] || 0) + 1; });
     const rezZapis = { n: rezN, autori: Object.entries(rezAut).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, pct: Math.round(n / Math.max(1, rezN) * 100) })), dny: Object.entries(rezDen).sort((a, b) => b[1] - a[1]).map(([d, n]) => ({ den: d, pct: Math.round(n / Math.max(1, rezN) * 100) })) };
-    const ana = buildAnalyza({ name: z.name, key: z.key, rezZapis, rows: rows.length, ks, rezieH, rezRows, term, lideArr, usekyArr, dvojice, bezOdvadeni, jediny, nulTop, nulKs, bezCvz, future, topDny, patek, dnyArr, pracDnu, rezKat: Object.values(rezKat).sort((a, b) => b.h - a.h), rezPol: Object.values(rezPol).sort((a, b) => b.h - a.h), autori: Object.entries(autori).sort((a, b) => b[1] - a[1]), snapshot, od, do_ });
+    const ana = buildAnalyza({ name: z.name, key: z.key, rezZapis, normy, rows: rows.length, ks, rezieH, rezRows, term, lideArr, usekyArr, dvojice, bezOdvadeni, jediny, nulTop, nulKs, bezCvz, future, topDny, patek, dnyArr, pracDnu, rezKat: Object.values(rezKat).sort((a, b) => b.h - a.h), rezPol: Object.values(rezPol).sort((a, b) => b.h - a.h), autori: Object.entries(autori).sort((a, b) => b[1] - a[1]), snapshot, od, do_ });
     return {
-      analyza: ana, useky: usekyArr,
+      analyza: ana, useky: usekyArr, normy,
       zavod: z.key, name: z.name, snapshot, source: D.source, syncedAt: D.syncedAt, od: od || '', do: do_ || '', mesice, tydny,
       kpi: { rows: rows.length, ks: Math.round(ks), rezieH: Math.round(rezieH), rezRows, reziePodil: rows.length ? Math.round(rezRows / rows.length * 100) : 0, lide: lideArr.length, ops: Object.keys(ops).length, cvz: cvzArr.length,
         termPct: rows.length ? Math.round(term / rows.length * 100) : 0, dnu: dnyArr.length, top3Pct: rows.length ? Math.round(topDny.reduce((s, d) => s + d.rows, 0) / rows.length * 100) : 0, patekPct: rows.length ? Math.round(patek / rows.length * 100) : 0 },
@@ -513,7 +643,7 @@ function mount(host) {
   let lastPlanAt = 0;
   async function tick() {
     try { const s = await sync(false); if (s && !s.ok) console.warn('[vykonnost] sync:', s.error); } catch (e) { console.error('[vykonnost] sync:', e.message); }
-    if (Date.now() - lastPlanAt > 6 * 3600 * 1000) { lastPlanAt = Date.now(); try { await syncPlans(); } catch (e) { console.warn('[vykonnost] plány:', e.message); } }
+    if (Date.now() - lastPlanAt > 6 * 3600 * 1000) { lastPlanAt = Date.now(); try { await syncPlans(); } catch (e) { console.warn('[vykonnost] plány:', e.message); } try { await syncNormy(); } catch (e) { console.warn('[vykonnost] normy:', e.message); } }
     await tickReport();
   }
 
@@ -552,7 +682,19 @@ function mount(host) {
       const I = indikatory(z); if (!I) { json(res, 200, { data: false, zavod: z.key, name: z.name, legenda: LEGENDA }); return true; }
       json(res, 200, Object.assign({ data: true, legenda: LEGENDA, config: host.isAdmin(req) ? loadCfg() : undefined, reportState: host.isAdmin(req) ? loadRState() : undefined }, I)); return true;
     }
+    if (p === '/api/vykonnost/normy' && req.method === 'GET') {
+      const I = normIndex(); const q = nrm(u.query.q || ''); let list = I.items;
+      if (q) list = list.filter(n => n.opB.includes(q) || nrm(n.varianta).includes(q) || nrm(n.sheet).includes(q));
+      json(res, 200, { katalog: I.items.length, syncedAt: I.syncedAt, diag: I.diag, folder: NORMY_FOLDER, items: list.slice(0, 300).map(n => ({ id: normId(n), op: n.op, varianta: n.varianta, del: n.del, vys: n.vys, min: n.min, kc: n.kc, file: n.file, sheet: n.sheet, kod: n.kod })), total: list.length, mapa: host.isAdmin(req) ? I.mapa : undefined }); return true;
+    }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
+    if (p === '/api/vykonnost/normy/sync' && req.method === 'POST') { try { const r = await syncNormy(); return json(res, r.ok ? 200 : 500, r), true; } catch (e) { return json(res, 500, { ok: false, error: e.message }), true; } }
+    if (p === '/api/vykonnost/normy/mapa' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; }
+      const zk = zavodOf(b.zavod) ? b.zavod : '*'; if (!b.op) { json(res, 400, { error: 'Chybí operace.' }); return true; }
+      setNormaMapa(zk, String(b.op), b.id === null ? null : (b.id === '__none__' ? '__none__' : String(b.id || '')) || null);
+      return json(res, 200, { ok: true, mapa: loadNMap() }), true;
+    }
     if (p === '/api/vykonnost/preview' && req.method === 'GET') { const rep = buildReport(/^\d{4}-\d{2}$/.test(u.query.m || '') ? u.query.m : ''); return host.send(res, 200, rep.html, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }), true; }
     if (p === '/api/vykonnost/send' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {} const r = await sendReport(b.to ? b.to : loadCfg().to, /^\d{4}-\d{2}$/.test(b.m || '') ? b.m : ''); return json(res, r.ok ? 200 : 500, r), true; }
     if (p === '/api/vykonnost/config' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } return json(res, 200, { ok: true, report: setReport('vykonnost-mesicni', b) }), true; }
@@ -564,7 +706,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, sync: () => sync(false), syncPlans, parseExport, parsePlanValues, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, sync: () => sync(false), syncPlans, syncNormy, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };

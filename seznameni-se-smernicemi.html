@@ -3925,19 +3925,21 @@ function vykRenderDetail(){
   box.innerHTML=
     '<div class="card pad" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
       +'<b style="font-size:16px;margin-right:6px">'+esc(d.name)+'</b>'
-      +'<span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;margin-right:8px"><button class="btn sm" style="border-radius:0;'+(VYK.tab!=='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'prehled\';vykRenderDetail()">Přehled</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'ind\';vykRenderDetail()">Měsíční indikátory</button></span>'
+      +'<span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;margin-right:8px"><button class="btn sm" style="border-radius:0;'+(VYK.tab!=='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'prehled\';vykRenderDetail()">Přehled</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='ind'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'ind\';vykRenderDetail()">Měsíční indikátory</button><button class="btn sm" style="border-radius:0;'+(VYK.tab==='normy'?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.tab=\'normy\';vykRenderDetail()">Normy</button></span>'
       +(VYK.tab==='ind'?'':'<button class="btn sm'+(VYK.preset==='4t'?'':' ghost')+'" onclick="VYK.preset=\'4t\';vykLoadZavod()">Posledních 4 týdny</button>'
       +'<select id="vykMes" style="'+sel+'"><option value="">Měsíc…</option>'+(d.mesice||[]).slice().reverse().map(m=>'<option value="'+m+'"'+(VYK.preset==='mesic'&&VYK.mesic===m?' selected':'')+'>'+vykMesLabel(m)+'</option>').join('')+'</select>'
       +'<button class="btn sm'+(VYK.preset==='rok'?'':' ghost')+'" onclick="VYK.preset=\'rok\';vykLoadZavod()">Celý rok</button>')
       +'<span class="muted" style="font-size:12.5px;margin-left:auto">Zdroj: '+esc(d.source||'')+' · snímek '+vykD(d.snapshot)+(VYK.tab==='ind'?'':' · období: '+esc(obdobi)+(d.od?' ('+vykD(d.od)+' – '+vykD(d.do)+')':''))+'</span></div>'
     +(VYK.tab==='ind'?'<div id="vykInd"><div class="card pad"><p class="muted" style="margin:0">Načítám indikátory…</p></div></div>':'')
-    +(VYK.tab==='ind'?'':'<div class="kpis">'
+    +(VYK.tab==='normy'?'<div id="vykNormy"></div>':'')
+    +(VYK.tab!=='prehled'?'':'<div class="kpis">'
       +'<div class="kpi"><div class="v">'+vykF(k.rows)+'</div><div class="l">Odvedených operací (řádků)</div></div>'
       +'<div class="kpi"><div class="v">'+vykF(k.ks)+'</div><div class="l">Kusů (bez režie)</div></div>'
       +'<div class="kpi"><div class="v">'+vykF(k.rezieH)+' h</div><div class="l">Režie zapsaná jako úkol · '+k.reziePodil+' % řádků</div></div>'
       +'<div class="kpi"><div class="v">'+k.lide+'</div><div class="l">Lidí s odváděním · '+k.cvz+' zakázek · '+k.ops+' operací</div></div>'
       +'<div class="kpi"><div class="v">'+k.termPct+' %</div><div class="l">Z terminálu (zbytek zapsal mistr ručně)</div></div>'
       +'<div class="kpi"><div class="v">'+k.top3Pct+' %</div><div class="l">Řádků ve 3 nejsilnějších dnech (dávkovost) · pátek '+k.patekPct+' %</div></div>'
+      +(d.normy?'<div class="kpi"><div class="v">'+vykF(d.normy.normH)+' h</div><div class="l">Normohodin podle norem · '+vykF(d.normy.normKc)+' Kč úkolu</div></div><div class="kpi"><div class="v">'+d.normy.pokrytiRows+' %</div><div class="l">Výrobních řádků s normou · režie ≈ '+vykF(d.normy.rezieKc)+' Kč</div></div>':'')
     +'</div>'
     +'<div class="card pad" style="margin-bottom:14px" id="vykAnaCard"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:15px">Analýza — co data říkají</b><span class="muted" style="font-size:12px">automaticky z odvádění za zvolené období · bez Kč (export nemá cenu operací)</span></div><div id="vykAna" style="margin-top:8px"></div></div>'
     +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Odvádění po týdnech (celý rok)</b><span class="muted" style="font-size:12px;margin-left:8px">modře operace, oranžově hodiny režie · kliknutím vyberete měsíc</span><div id="vykWeeks" style="margin-top:10px"></div></div>'
@@ -3951,11 +3953,53 @@ function vykRenderDetail(){
       +'<span class="muted" style="font-size:12px">'+(d.plan?'spárováno s plánem výroby: <b>'+d.sparovano+' z '+d.cvz.length+'</b> (list „'+esc(d.plan.tab)+'", '+d.plan.items+' zakázek)':'<span style="color:#a86a00">plán výroby zatím nenačten</span>')+'</span></div><div id="vykCvz" style="overflow-x:auto;margin-top:10px"></div></div>'
     +'<div class="card pad" style="margin-bottom:14px"><b style="font-size:14px">Kvalita dat</b><div id="vykKvalita" style="margin-top:8px;font-size:13px;line-height:1.7"></div></div>');
   if(VYK.tab==='ind'){ vykIndLoad(); return; }
+  if(VYK.tab==='normy'){ vykNormyRender(); return; }
   document.getElementById('vykMes').onchange=function(){ if(this.value){ VYK.preset='mesic'; VYK.mesic=this.value; vykLoadZavod(); } };
   document.getElementById('vykQ').oninput=function(){ VYK.q=this.value; vykLideRender(); };
   document.getElementById('vykCvzQ').oninput=function(){ VYK.cvzQ=this.value; vykCvzRender(); };
   vykAnaRender(); vykWeeksRender(); vykDaysRender(); vykLideRender(); vykRezieRender(); vykOpsRender(); vykCvzRender(); vykKvalitaRender();
 }
+/* ---- Normy: katalog z Drive, pokrytí, spárované / nespárované operace, ruční přiřazení (správce) ---- */
+let VYK_NQ='';
+function vykNormyRender(){
+  const box=document.getElementById('vykNormy'), d=VYK.det, N=d.normy; if(!box) return;
+  if(!N){ box.innerHTML='<div class="card pad"><b>Katalog norem zatím není načten.</b><p class="muted" style="margin:6px 0 0">Server si ho stáhne ze složky Normy na Disku při nejbližší kontrole (á 6 h)'+(VYK.ov.admin?' — nebo hned tlačítkem níže.':'.')+'</p>'+(VYK.ov.admin?'<div style="margin-top:10px"><button class="btn sm" onclick="vykNormySync()">🔄 Načíst normy z Drive</button></div>':'')+'</div>'; return; }
+  const period=d.od?vykD(d.od)+' – '+vykD(d.do):'celý rok';
+  let h='<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">'
+    +'<div class="kpi"><div class="v">'+N.pokrytiRows+' %</div><div class="l">Výrobních řádků s normou · '+N.pokrytiKs+' % kusů</div></div>'
+    +'<div class="kpi"><div class="v">'+vykF(N.normH)+' h</div><div class="l">Normohodin (čas normy × ks)</div></div>'
+    +'<div class="kpi"><div class="v">'+vykF(N.normKc)+'</div><div class="l">Kč úkolu podle norem</div></div>'
+    +'<div class="kpi"><div class="v">'+vykF(N.rezieKc)+'</div><div class="l">Kč režie ('+vykF(d.kpi.rezieH)+' h × '+N.rezieSazba+' Kč/h)</div></div>'
+    +'<div class="kpi"><div class="v">'+vykF(N.katalog)+'</div><div class="l">Položek v katalogu · '+N.listy+' listů · '+(N.syncedAt?new Date(N.syncedAt).toLocaleDateString('cs-CZ'):'—')+'</div></div></div>'
+    +'<div class="card pad" style="margin-bottom:14px;font-size:13px;line-height:1.6"><b>Jak to funguje.</b> Katalog norem se skládá ze všech listů ve složce <a href="https://drive.google.com/drive/folders/0B7bVERxmHKlSTVVKejJQZThsWUE" target="_blank" rel="noopener">Normy</a> (Google Sheets i xlsx, mimo Archiv). Každý výrobní řádek z Heliosu se páruje podle názvu operace (přesně → bez závorek → prefix → podobnost slov); u operací s více rozměrovými variantami rozhoduje rozměr dílu (např. 6500x2300x2350 → délka 6500, výška 2350). Co se nespáruje, je buď <b>operace bez normy</b>, nebo jen jiný zápis názvu — správce ji může ručně přiřadit níže. Kč = čas normy × sazba z listu, ne skutečná výplata.'
+    +(VYK.ov.admin?' <button class="btn sm ghost" style="margin-left:8px" onclick="vykNormySync()">🔄 Načíst normy z Drive</button>':'')+'</div>';
+  // nespárované
+  h+='<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Operace bez normy</b><span class="muted" style="font-size:12px">'+period+' · seřazeno podle počtu řádků'+(VYK.ov.admin?' · vyberte normu a přiřaďte (platí pro tento závod)':'')+'</span></div>'
+    +'<div style="overflow-x:auto;margin-top:10px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr><th style="text-align:left;'+vykTh+'">Operace (Helios)</th><th style="text-align:right;'+vykTh+'">Řádků</th><th style="text-align:right;'+vykTh+'">Ks</th><th style="text-align:right;'+vykTh+'">Lidí</th><th style="text-align:left;'+vykTh+'">Nejčastější díl</th>'+(VYK.ov.admin?'<th style="text-align:left;'+vykTh+'">Přiřadit normu</th>':'')+'</tr></thead><tbody>'
+    +(N.nesparovane||[]).map((u,i)=>'<tr><td style="'+vykTd+'"><b>'+esc(u.op)+'</b></td><td style="'+vykTd+';text-align:right">'+vykF(u.rows)+'</td><td style="'+vykTd+';text-align:right">'+vykF(u.ks)+'</td><td style="'+vykTd+';text-align:right">'+u.lide+'</td><td style="'+vykTd+';font-size:12px;color:var(--ink-soft);max-width:240px;overflow:hidden;text-overflow:ellipsis" title="'+esc(u.dil)+'">'+esc(u.dil||'—')+'</td>'
+      +(VYK.ov.admin?'<td style="'+vykTd+';min-width:280px"><div style="display:flex;gap:6px;align-items:center"><input list="vykNormyList" id="vykNsel-'+i+'" placeholder="hledat normu…" style="flex:1;padding:6px 9px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:12px" oninput="vykNormyHledat(this.value)"><button class="btn sm" onclick="vykNormyPrirad('+i+')">✓</button><button class="btn sm ghost" title="označit jako operaci bez normy (nepárovat)" onclick="vykNormyPrirad('+i+',\'__none__\')">∅</button></div></td>':'')+'</tr>').join('')
+    +'</tbody></table></div>'+(VYK.ov.admin?'<datalist id="vykNormyList"></datalist>':'')+'</div>';
+  // spárované
+  h+='<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Spárované operace</b><span class="muted" style="font-size:12px">'+(N.sparovane||[]).length+' operací · způsob párování v posledním sloupci</span></div>'
+    +'<div style="overflow-x:auto;margin-top:10px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr><th style="text-align:left;'+vykTh+'">Operace (Helios)</th><th style="text-align:left;'+vykTh+'">Norma</th><th style="text-align:right;'+vykTh+'">min/ks</th><th style="text-align:right;'+vykTh+'">Kč/ks</th><th style="text-align:right;'+vykTh+'">Řádků</th><th style="text-align:right;'+vykTh+'">Ks</th><th style="text-align:right;'+vykTh+'">Normoh.</th><th style="text-align:left;'+vykTh+'">Zdroj</th><th style="text-align:left;'+vykTh+'">Párování</th>'+(VYK.ov.admin?'<th style="'+vykTh+'"></th>':'')+'</tr></thead><tbody>'
+    +(N.sparovane||[]).map((x,i)=>'<tr><td style="'+vykTd+'">'+esc(x.op)+'</td><td style="'+vykTd+'">'+esc(x.norma)+(x.varianta?' <span class="muted">['+esc(x.varianta)+']</span>':'')+'</td><td style="'+vykTd+';text-align:right">'+(x.min!=null?String(x.min).replace('.',','):'—')+'</td><td style="'+vykTd+';text-align:right">'+(x.kc!=null?vykF(x.kc):'—')+'</td><td style="'+vykTd+';text-align:right"><b>'+vykF(x.rows)+'</b></td><td style="'+vykTd+';text-align:right">'+vykF(x.ks)+'</td><td style="'+vykTd+';text-align:right">'+vykF(x.normH)+'</td><td style="'+vykTd+';font-size:11.5px;color:var(--ink-soft)">'+esc(x.sheet)+'</td><td style="'+vykTd+'">'+vykPill(x.how,x.how==='přesně'||x.how==='ručně'?'good':'info')+'</td>'
+      +(VYK.ov.admin?'<td style="'+vykTd+'"><button class="btn sm ghost" title="zrušit párování této operace" onclick="vykNormyZrus(\''+esc(x.op).replace(/'/g,"\\'")+'\')">✕</button></td>':'')+'</tr>').join('')+'</tbody></table></div></div>';
+  // katalog
+  h+='<div class="card pad"><b style="font-size:14px">Katalog norem — načtené listy</b><div id="vykNormyDiag" class="muted" style="font-size:12.5px;margin-top:6px">Načítám…</div></div>';
+  box.innerHTML=h;
+  fetch('/api/vykonnost/normy',{cache:'no-store'}).then(r=>r.json()).then(j=>{ const dg=document.getElementById('vykNormyDiag'); if(!dg) return; VYK.normyKatalog=j;
+    dg.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr><th style="text-align:left;'+vykTh+'">Soubor</th><th style="text-align:left;'+vykTh+'">List</th><th style="text-align:right;'+vykTh+'">Položek</th><th style="text-align:left;'+vykTh+'">Rozvržení</th><th style="text-align:right;'+vykTh+'">Sazba Kč/h</th><th style="text-align:left;'+vykTh+'">Poznámka</th></tr></thead><tbody>'
+      +(j.diag||[]).map(x=>'<tr><td style="'+vykTd+'">'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener">'+esc(x.file)+'</a>':esc(x.file))+'</td><td style="'+vykTd+'">'+esc(x.sheet||'—')+'</td><td style="'+vykTd+';text-align:right">'+vykF(x.items)+'</td><td style="'+vykTd+'">'+esc(x.layout||'—')+'</td><td style="'+vykTd+';text-align:right">'+(x.sazba?vykF(x.sazba):'—')+'</td><td style="'+vykTd+';color:'+(x.warn?'#a03a2c':'var(--ink-soft)')+'">'+esc(x.warn||'')+'</td></tr>').join('')+'</tbody></table>'; }).catch(()=>{});
+}
+let vykNormyT=null;
+function vykNormyHledat(q){ clearTimeout(vykNormyT); vykNormyT=setTimeout(async()=>{ try{ const r=await fetch('/api/vykonnost/normy?q='+encodeURIComponent(q),{cache:'no-store'}); const j=await r.json(); const dl=document.getElementById('vykNormyList'); if(!dl) return; VYK.normyHledani=j.items||[]; dl.innerHTML=VYK.normyHledani.slice(0,60).map(n=>'<option value="'+esc(n.op+(n.varianta?' ['+n.varianta+']':'')+(n.del?' '+n.del.join('-'):'')+(n.vys?'/'+n.vys.join('-'):'')+' · '+n.sheet)+'"></option>').join(''); }catch(e){} },250); }
+async function vykNormyPrirad(i,forceId){
+  const u=(VYK.det.normy.nesparovane||[])[i]; if(!u) return; let id=forceId||null;
+  if(!id){ const v=(document.getElementById('vykNsel-'+i)||{}).value||''; const n=(VYK.normyHledani||[]).find(n=>v.startsWith(n.op)&&v.includes(n.sheet)); if(!n){ toast('Vyberte normu ze seznamu (začněte psát název).'); return; } id=n.id; }
+  try{ const r=await fetch('/api/vykonnost/normy/mapa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zavod:VYK.zavod,op:u.op,id})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení selhalo.'); return; } toast(id==='__none__'?'Označeno jako operace bez normy':'Norma přiřazena'); await vykLoadZavod(); }catch(e){ toast('Uložení selhalo: '+e.message); }
+}
+async function vykNormyZrus(op){ if(!confirm('Zrušit párování operace „'+op+'"? Automatické párování se pak neuplatní (operace zůstane bez normy), dokud ji nepřiřadíte znovu.')) return; try{ const r=await fetch('/api/vykonnost/normy/mapa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zavod:VYK.zavod,op,id:'__none__'})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Selhalo.'); return; } await vykLoadZavod(); }catch(e){ toast('Selhalo: '+e.message); } }
+async function vykNormySync(){ toast('Načítám normy z Drive…'); try{ const r=await fetch('/api/vykonnost/normy/sync',{method:'POST'}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Sync selhal.'); return; } toast('Katalog: '+j.items+' položek z '+j.listy+' listů'); await vykLoadZavod(); }catch(e){ toast('Sync selhal: '+e.message); } }
 /* ---- Měsíční indikátory: tabulka indikátory × měsíce se semaforem, sparklinou a legendou ---- */
 const VYK_SEM={g:['#e6f3e4','#0a7a0a'],y:['#fbf1dc','#b57400'],r:['#fbe9e8','#c93a39'],'':['transparent','var(--ink)']};
 function vykIndVal(def,v){ if(v==null) return '—'; const t=(def.k==='A3'||def.k==='B3')?String(v).replace('.',','):Number(v).toLocaleString('cs-CZ'); return t+(def.jedn==='%'?' %':''); }
@@ -4065,11 +4109,13 @@ function vykLideRender(){
   const q=(VYK.q||'').toLowerCase();
   let L=(VYK.det.lide||[]).filter(x=>!q||(x.name+' '+x.id+' '+x.topOp).toLowerCase().indexOf(q)>=0);
   const s=VYK.sort, dir=VYK.dir; L=L.slice().sort((a,b)=>{ const va=a[s], vb=b[s]; return (typeof va==='string'?va.localeCompare(vb,'cs'):(va-vb))*dir; });
-  const H=[['name','Zaměstnanec',0],['rows','Operací',1],['ks','Ks',1],['rezieH','Režie h',1],['dny','Dnů',1],['ops','Různých operací',1],['termPct','Terminál',1],['davkaPct','Max. 1 den',1],['last','Poslední odvedení',0],['topOp','Nejčastější operace',0]];
+  const hasN=!!VYK.det.normy;
+  const H=[['name','Zaměstnanec',0],['rows','Operací',1],['ks','Ks',1]].concat(hasN?[['normH','Normoh.',1],['normKc','Úkol Kč (normy)',1]]:[]).concat([['rezieH','Režie h',1],['dny','Dnů',1],['ops','Různých operací',1],['termPct','Terminál',1],['davkaPct','Max. 1 den',1],['last','Poslední odvedení',0],['topOp','Nejčastější operace',0]]);
   box.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>'+H.map(h=>'<th style="text-align:'+(h[2]?'right':'left')+';'+vykTh+';cursor:pointer'+(VYK.sort===h[0]?';color:var(--ink)':'')+'" onclick="vykSortBy(\''+h[0]+'\')">'+h[1]+(VYK.sort===h[0]?(VYK.dir<0?' ▼':' ▲'):'')+'</th>').join('')+'<th style="'+vykTh+'">Hodnocení</th></tr></thead><tbody>'
     +L.map(x=>{ const [c,t]=vykBadge(x); return '<tr>'
       +'<td style="'+vykTd+'"><b>'+esc(x.name)+'</b><br><span class="muted" style="font-size:11px">'+esc(x.id||'—')+'</span></td>'
       +'<td style="'+vykTd+';text-align:right"><b>'+vykF(x.rows)+'</b></td><td style="'+vykTd+';text-align:right">'+vykF(x.ks)+'</td>'
+      +(hasN?'<td style="'+vykTd+';text-align:right" title="pokrytí normami '+x.normPokryti+' % řádků">'+(x.normH?vykF(x.normH):'—')+(x.normPokryti&&x.normPokryti<60?' <span style="color:#b57400;font-size:10px" title="jen '+x.normPokryti+' % řádků má normu">'+x.normPokryti+'%</span>':'')+'</td><td style="'+vykTd+';text-align:right">'+(x.normKc?vykF(x.normKc):'—')+'</td>':'')
       +'<td style="'+vykTd+';text-align:right;color:'+(x.rezieH?'#b57400':'var(--ink-soft)')+'">'+(x.rezieH?vykF(x.rezieH):'—')+'</td>'
       +'<td style="'+vykTd+';text-align:right">'+x.dny+'</td><td style="'+vykTd+';text-align:right">'+x.ops+'</td>'
       +'<td style="'+vykTd+';text-align:right">'+x.termPct+' %</td><td style="'+vykTd+';text-align:right" title="podíl řádků zapsaných v jediném dni">'+x.davkaPct+' %</td>'
