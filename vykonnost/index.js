@@ -23,6 +23,14 @@ const ZAVODY = [
     plan: { sheetId: process.env.VYKON_PLAN_SUPIKOVICE || '19ZskN-LJssZvGwRuEJ7rjfn19dsQqzZs-2z_sbXi-yY', tabRe: /zak[aá]zk/i } }
 ];
 
+// Hotový výrobek = poslední operace řetězce (lakování). Svařovna hotovo = dovaření. Skládání = vstup do svařovny.
+// Popelnice vyrábí bedny (stovky/týden) — cíl 6 ks/den se na ně nevztahuje.
+const FAZE_VYSTUPU = {
+  default: { skl: op => /^sklád[aá]n[ií]\b/i.test(op) && !/n[aá]razn|krabi|rám|USB|SP \d/i.test(op), dov: op => /^dova[řr]|^dovár/i.test(op) && !/SP \d|žeb[řr]|rám|vany|horizont|p[řr][ií]platek|t-? ?profil/i.test(op), lak: op => /^lakov[aá]n[ií]/i.test(op) && !/rámeč|polep|vrstva|díl|dil/i.test(op) },
+  popelnice: { skl: op => /^sestaven[ií] vany/i.test(op), dov: op => /^dova[řr]en[ií] vany/i.test(op), lak: op => /^lakov[aá]n[ií]$/i.test(op) }
+};
+const CIL_DEFAULT = { chomutov: 6, abroly: 6, supikovice: 6, popelnice: null };  // hotových výrobků za pracovní den
+
 // Excel serial → ISO datum
 const serialToIso = n => { const d = new Date(Date.UTC(1899, 11, 30) + Math.round(+n) * 86400000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); };
 const parseAnyDate = v => {
@@ -401,7 +409,8 @@ function mount(host) {
       { k: 'A3', label: 'Režie h na produkční operaci', jedn: 'h', smer: 'down', vzorec: 'režijní hodiny ÷ počet produkčních řádků', proc: 'Kolik režie připadá na jednu odvedenou výrobní operaci.' },
       { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé s odváděním', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' },
       { k: 'A5', label: 'Normohodiny jako % fondu', jedn: '%', smer: 'up', vzorec: 'Σ (čas normy × ks) u spárovaných operací ÷ fond pracovní doby lidí s odváděním', proc: 'Kolik fondu je kryto normovaným úkolem. Závisí na pokrytí normami (A6) — číst spolu.' },
-      { k: 'A6', label: '% výrobních řádků s normou', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'výrobní řádky spárované s položkou v katalogu norem ÷ výrobní řádky', proc: 'Pokrytí normami. Co není spárované, nemá cenu ani čas — buď chybí norma, nebo jen ruční přiřazení v záložce Normy.' }
+      { k: 'A6', label: '% výrobních řádků s normou', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'výrobní řádky spárované s položkou v katalogu norem ÷ výrobní řádky', proc: 'Pokrytí normami. Co není spárované, nemá cenu ani čas — buď chybí norma, nebo jen ruční přiřazení v záložce Normy.' },
+      { k: 'A7', klic: true, label: 'Hotových výrobků za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v operaci lakování (poslední operace řetězce; u Popelnice „Lakování“ beden) ÷ pracovní dny měsíce', proc: 'Skutečný výstup závodu proti cíli (výchozí 6 kontejnerů/den; správce může změnit). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' }
     ] },
     { skup: 'B', nazev: 'Struktura režie — co se v ní schovává', items: [
       { k: 'B1', klic: true, label: '% režie, která je výroba bez normy', jedn: '%', smer: 'down', prah: [25, 50], vzorec: 'hodiny v režijních operacích výrobního typu (úprava/příprava materiálu, spojování vrat, polepování, přehazování nástrojů, montáž po laku, výměna filtrů…) ÷ režijní hodiny', proc: 'Práce, která by měla mít úkolovou cenu. Každá dodělaná norma toto číslo sníží — přímé měřítko postupu.' },
@@ -427,6 +436,7 @@ function mount(host) {
   const pracDnyMesice = ym => { const [y, m] = ym.split('-').map(Number); let n = 0; for (let d = 1; d <= 31; d++) { const t = new Date(Date.UTC(y, m - 1, d)); if (t.getUTCMonth() !== m - 1) break; const w = t.getUTCDay(); if (w && w < 6) n++; } return n; };
   // semafor: 'g' | 'y' | 'r' | '' (bez semaforu)
   function semafor(def, v, ctx) {
+    if (def.cil) { const c = ctx && ctx.cil; if (!c || v == null) return ''; return v >= c ? 'g' : (v >= c * 0.8 ? 'y' : 'r'); }
     if (!def.prah || v == null) return '';
     let x = v; if (def.k === 'D2') { const tot = (ctx && ctx.D1 || 0) + v; x = tot ? v / tot * 100 : 0; }
     if (def.smer === 'up') return x >= def.prah[0] ? 'g' : (x >= def.prah[1] ? 'y' : 'r');
@@ -435,6 +445,7 @@ function mount(host) {
   function indikatoryMesice(rows, ym, rokRows, zavodKey) {
     const pd = pracDnyMesice(ym); const rez = rows.filter(r => isRezie(r[R.dil])), prod = rows.filter(r => !isRezie(r[R.dil]));
     let nMin = 0, nRows = 0; if (normIndex().items.length) prod.forEach(r => { const n = matchNorma(zavodKey, r[R.op], r[R.dil]); if (n) { nMin += (n.min || 0) * r[R.ks]; nRows++; } });
+    const FZ = FAZE_VYSTUPU[zavodKey] || FAZE_VYSTUPU.default; const lakKs = prod.filter(r => FZ.lak(r[R.op])).reduce((s, r) => s + r[R.ks], 0);
     const rezH = rez.reduce((s, r) => s + r[R.ks], 0), ks = prod.reduce((s, r) => s + r[R.ks], 0);
     const lide = new Set(rows.map(r => r[R.id] || r[R.name])); const fond = lide.size * pd * 8;
     const sum = (arr, f) => arr.filter(f).reduce((s, r) => s + r[R.ks], 0);
@@ -446,7 +457,7 @@ function mount(host) {
     const p = (a, b) => b ? Math.round(a / b * 100) : 0, r1 = x => Math.round(x * 10) / 10;
     return { m: ym, rows: rows.length, ks: Math.round(ks), rezH: Math.round(rezH), pracDny: pd,
       A1: p(rezH, fond), A2: ks ? Math.round(rezH / ks * 1000) : 0, A3: prod.length ? Math.round(rezH / prod.length * 100) / 100 : 0, A4: lide.size ? Math.round(ks / lide.size) : 0,
-      A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null,
+      A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null, A7: pd ? Math.round(lakKs / pd * 10) / 10 : null,
       B1: p(rezProd, rezH), B2: p(rezOst, rezH), B3: ks ? r1(rekH / ks * 1000) : 0, B4: p(zaH, rezH),
       C1: p(term, rows.length), C2: p(top3, rows.length), C3: p(prub, lide.size), C4: p(prod.filter(r => !r[R.cvz]).length, prod.length), C5: prod.filter(r => r[R.ks] === 0).length,
       D1: lide.size, D2: bez };
@@ -457,9 +468,11 @@ function mount(host) {
     const all = D.rows.filter(r => r[R.date] <= D.snapshot);
     const mesice = [...new Set(all.map(r => r[R.date].slice(0, 7)))].sort();
     const out = mesice.map(ym => indikatoryMesice(all.filter(r => r[R.date].startsWith(ym)), ym, all, z.key));
-    const snapM = D.snapshot.slice(0, 7);
+    const snapM = D.snapshot.slice(0, 7); const cilZ = loadCile()[z.key];
     out.forEach((M, i) => {
+      M.cil = cilZ;
       M.neuplny = M.m === snapM && !/-(2[89]|3[01])$/.test(D.snapshot);
+      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && (FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default).lak(r[R.op])).reduce((s, r) => s + r[R.ks], 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; }
       M.sem = {}; M.trend = {}; M.med = {};
       LEG_FLAT.forEach(def => {
         M.sem[def.k] = semafor(def, M[def.k], M);
@@ -468,7 +481,7 @@ function mount(host) {
         if (hist.length >= 3) M.med[def.k] = hist.length % 2 ? hist[(hist.length - 1) / 2] : (hist[hist.length / 2 - 1] + hist[hist.length / 2]) / 2;
       });
     });
-    return { zavod: z.key, name: z.name, snapshot: D.snapshot, mesice: out };
+    return { zavod: z.key, name: z.name, snapshot: D.snapshot, cil: cilZ, mesice: out };
   }
   // Text pro trend: zlepšení/zhoršení podle směru indikátoru
   const lepsi = (def, d) => def.smer === 'watch' ? null : (def.smer === 'up' ? d > 0 : d < 0);
@@ -566,6 +579,65 @@ function mount(host) {
       plan: plan ? { tab: plan.tab, items: Object.keys(P).length, syncedAt: plan.syncedAt, faze: plan.faze || [], url: planUrl(0) } : null
     };
   }
+  // ---------- výstup: hotové výrobky vs. cíl, úzké hrdlo v řetězci, proč cíl neplníme ----------
+  const CIL_F = path.join(dataDir, 'vykonnost-cile.json');
+  const loadCile = () => { let c = {}; try { c = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {} return Object.assign({}, CIL_DEFAULT, c); };
+  const pracDnyTydne = wk => { const y = +wk.slice(0, 4), n = +wk.slice(6); const d = new Date(Date.UTC(y, 0, 4)); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + (n - 1) * 7); return { od: d.toISOString().slice(0, 10), do: new Date(d.getTime() + 4 * 86400000).toISOString().slice(0, 10) }; };
+  function vystup(z) {
+    const D = loadData(z.key); if (!D) return null;
+    const F = FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default; const cil = loadCile()[z.key];
+    const all = D.rows.filter(r => r[R.date] <= D.snapshot); const snap = D.snapshot;
+    const usekOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen|odkulič|odkulic/.test(o)) return 'lak'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl[ií]rna|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|stříh|strih|loch|obrobna|soustruh/.test(o)) return 'del'; return 'svar'; };
+    const W = {};
+    all.forEach(r => { const w = W[r[R.week]] = W[r[R.week]] || { week: r[R.week], skl: 0, dov: 0, lak: 0, lide: new Set(), svar: new Set(), rezieH: 0, rezieSvar: 0, normH: 0, normSvar: 0, rows: 0, dny: new Set(), rework: 0 };
+      w.rows++; w.lide.add(r[R.id] || r[R.name]); w.dny.add(r[R.date]);
+      if (isRezie(r[R.dil])) { w.rezieH += r[R.ks]; if (RE_REKL.test(r[R.op])) w.rework += r[R.ks]; if (usekOf(r[R.pozn] + ' ' + r[R.op]) === 'svar' && !/lak|trysk/.test(String(r[R.pozn]).toLowerCase())) w.rezieSvar += r[R.ks]; return; }
+      const op = r[R.op]; if (F.skl(op)) w.skl += r[R.ks]; if (F.dov(op)) w.dov += r[R.ks]; if (F.lak(op)) w.lak += r[R.ks];
+      const u = usekOf(op); if (u === 'svar') { w.svar.add(r[R.id] || r[R.name]); w.svarRows = (w.svarRows || 0) + 1; }
+      if (normIndex().items.length) { const n = matchNorma(z.key, op, r[R.dil]); if (n) { const mn = (n.min || 0) * r[R.ks] / 60; w.normH += mn; if (u === 'svar') { w.normSvar += mn; w.svarMatched = (w.svarMatched || 0) + 1; } } } });
+    const weeks = Object.values(W).sort((a, b) => a.week.localeCompare(b.week)).map(w => { const pd = w.week === isoWeekOf(snap) ? Math.max(1, [...w.dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length) : 5;
+      return { week: w.week, od: pracDnyTydne(w.week).od, rows: w.rows, svarRows: w.svarRows || 0, svarMatched: w.svarMatched || 0, skl: Math.round(w.skl), dov: Math.round(w.dov), lak: Math.round(w.lak), lide: w.lide.size, svar: w.svar.size, rezieH: Math.round(w.rezieH), rezieSvar: Math.round(w.rezieSvar), rework: Math.round(w.rework), normH: Math.round(w.normH), normSvar: Math.round(w.normSvar), pd, lakDen: Math.round(w.lak / pd * 10) / 10, dovDen: Math.round(w.dov / pd * 10) / 10, neuplny: w.week === isoWeekOf(snap) }; });
+    // odstávka (celozávodní dovolená, svátky) = týden s méně než polovinou obvyklého počtu lidí → do průměrů nepočítat
+    const lideSorted = weeks.filter(w => !w.neuplny).map(w => w.lide).sort((a, b) => a - b); const medLide = lideSorted.length ? lideSorted[Math.floor(lideSorted.length / 2)] : 0;
+    weeks.forEach(w => { w.odstavka = !w.neuplny && w.lide < medLide * 0.5; });
+    const full = weeks.filter(w => !w.neuplny && !w.odstavka && w.rows > 20);   // bez rozjezdu roku, odstávek a neúplného týdne
+    const last4 = full.slice(-4), rok = full;
+    const avg = (arr, k) => arr.length ? arr.reduce((s, w) => s + w[k], 0) / arr.length : 0;
+    const sum = (arr, k) => arr.reduce((s, w) => s + w[k], 0);
+    const kpi = { cil, lakDen4: Math.round(avg(last4, 'lakDen') * 10) / 10, dovDen4: Math.round(avg(last4, 'dovDen') * 10) / 10, lakDenRok: Math.round(sum(rok, 'lak') / Math.max(1, sum(rok, 'pd')) * 10) / 10, dovDenRok: Math.round(sum(rok, 'dov') / Math.max(1, sum(rok, 'pd')) * 10) / 10,
+      lakRok: sum(rok, 'lak'), dovRok: sum(rok, 'dov'), sklRok: sum(rok, 'skl'), tydnuPod: cil ? rok.filter(w => w.lakDen < cil).length : null, tydnu: rok.length, plneni4: cil && last4.length ? Math.round(avg(last4, 'lakDen') / cil * 100) : null, plneniRok: cil ? Math.round(sum(rok, 'lak') / Math.max(1, sum(rok, 'pd')) / cil * 100) : null,
+      wip: Math.max(0, sum(rok, 'dov') - sum(rok, 'lak')), wipSkl: Math.max(0, sum(rok, 'skl') - sum(rok, 'dov')) };
+    // úzké hrdlo v řetězci = fáze s nejnižší roční průchodností
+    // úzké hrdlo: srovnatelné jsou dovaření a lakování (obě = 1 na výrobek); skládání je jen pro ABR/CITY (bez muld)
+    const hrdlo = kpi.lakRok < kpi.dovRok * 0.9 ? { n: 'lakovna — hotové výrobky zaostávají za svařovnou o ' + (kpi.dovRok - kpi.lakRok) + ' ks' } : (kpi.dovRok < kpi.lakRok * 0.9 ? { n: 'svařovna — lakovna doháněla rozpracované kusy z dřívějška' } : { n: 'svařovna a lakovna jdou v rovnováze — limit je tempo svařovny' });
+    kpi.pokrytiSvar = sum(rok, 'svarRows') ? Math.round(sum(rok, 'svarMatched') / sum(rok, 'svarRows') * 100) : 0;
+    // proč cíl neplníme: týdny pod cílem vs. nad cílem — co se liší; + korelace výstupu s faktory
+    const proc = [];
+    if (cil && rok.length >= 6) {
+      const pod = rok.filter(w => w.lakDen < cil), nad = rok.filter(w => w.lakDen >= cil);
+      const fak = [['svar', 'lidí ve svařovně s odváděním', 'up', ''], ['lide', 'lidí s odváděním celkem', 'up', ''], ['rezieH', 'hodin režie', 'down', ' h'], ['rezieSvar', 'hodin režie ve svařovně', 'down', ' h'], ['rework', 'hodin oprav a reklamací', 'down', ' h'], ['skl', 'skládání (vstup)', 'up', ' ks'], ['dov', 'dovaření', 'up', ' ks'], ['normH', 'normohodin celkem', 'up', ' h']];
+      const rs = [];
+      fak.forEach(([k, lbl, smer, jed]) => { const a = avg(pod, k), b = avg(nad, k); const r = pearson(rok.map(w => w[k]), rok.map(w => w.lakDen)); rs.push({ k, lbl, smer, jed, pod: Math.round(a * 10) / 10, nad: Math.round(b * 10) / 10, r }); });
+      // předstih: skládání v týdnu w-1 vs. lakování v w (nedostatek koster)
+      const lag = pearson(rok.slice(1).map((w, i) => rok[i].skl), rok.slice(1).map(w => w.lakDen)); rs.push({ k: 'sklLag', lbl: 'skládání v předchozím týdnu', smer: 'up', jed: ' ks', pod: null, nad: null, r: lag });
+      rs.forEach(x => { if (x.r == null) return; const ok = x.smer === 'up' ? x.r >= 0.35 : x.r <= -0.35; const rel = x.pod != null && x.nad ? Math.round((x.pod - x.nad) / x.nad * 100) : null;
+        let vysv = '';
+        if (x.k === 'svar' || x.k === 'lide') vysv = 'Výstup kolísá s počtem lidí, kteří odvádějí — kapacita, ne tempo. Kontrola: docházka vs. odvádění (D2).';
+        else if (x.k === 'rezieH' || x.k === 'rezieSvar') vysv = 'Když roste režie, klesá výstup — hodiny odcházejí do víceprací, úklidu a čekání místo do kontejnerů.';
+        else if (x.k === 'rework') vysv = 'Opravy a reklamace berou kapacitu svařovny.';
+        else if (x.k === 'skl' || x.k === 'sklLag') vysv = 'Svařovna čeká na kostry — úzké hrdlo je ve skládání nebo v dodávkách dílů z dělírny.';
+        else if (x.k === 'dov') vysv = 'Lakovna kopíruje svařovnu — hotové výrobky limituje dovaření.';
+        else if (x.k === 'normH') vysv = 'Výstup kopíruje odvedené normohodiny — problém je v objemu odvedené práce, ne v mixu.';
+        proc.push({ k: x.k, lbl: x.lbl, r: x.r, pod: x.pod, nad: x.nad, jed: x.jed, rel, silny: ok, vysv }); });
+      proc.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+      // kapacitní odhad z norem: normohodiny svařovny na 1 hotový výrobek × cíl vs. fond svařovny
+      const nsPerKs = kpi.dovRok ? sum(rok, 'normSvar') / kpi.dovRok : 0; const svarAvg = avg(rok, 'svar');
+      if (nsPerKs > 0 && svarAvg > 0 && kpi.pokrytiSvar >= 50) { const fondDen = svarAvg * 8; const rezDen = avg(rok, 'rezieSvar') / 5; const kapacita = (fondDen - rezDen) / nsPerKs; const kapacitaBezRezie = fondDen / nsPerKs;
+        kpi.kapacita = { normSvarNaKs: Math.round(nsPerKs * 10) / 10, svarLide: Math.round(svarAvg * 10) / 10, fondDen: Math.round(fondDen), rezieDen: Math.round(rezDen * 10) / 10, kusuDen: Math.round(kapacita * 10) / 10, kusuDenBezRezie: Math.round(kapacitaBezRezie * 10) / 10, potrebaLidi: Math.round(cil * nsPerKs / 8 * 10) / 10 }; }
+    }
+    return { zavod: z.key, name: z.name, snapshot: snap, cil, weeks, kpi, hrdlo: hrdlo ? hrdlo.n : '', proc, faze: z.key === 'popelnice' ? { skl: 'sestavení vany', dov: 'dovaření vany', lak: 'lakování' } : { skl: 'skládání ABR/CITY', dov: 'dovaření', lak: 'lakování' } };
+  }
+
   // Přehled všech závodů (poslední 4 týdny do snímku + celý rok)
   function overview() {
     const st = loadState();
@@ -576,7 +648,8 @@ function mount(host) {
       const all = D.rows.filter(r => r[R.date] <= snap); const last4 = all.filter(r => r[R.date] >= od4);
       const agg = rs => { let ks = 0, rez = 0, term = 0; const l = new Set(), c = new Set(); rs.forEach(r => { if (isRezie(r[R.dil])) rez += r[R.ks]; else ks += r[R.ks]; if (r[R.aut] === 'terminalETH') term++; l.add(r[R.id] || r[R.name]); if (r[R.cvz]) c.add(r[R.cvz]); }); return { rows: rs.length, ks: Math.round(ks), rezieH: Math.round(rez), lide: l.size, cvz: c.size, termPct: rs.length ? Math.round(term / rs.length * 100) : 0 }; };
       const tyd = {}; last4.forEach(r => { tyd[r[R.week]] = (tyd[r[R.week]] || 0) + 1; });
-      return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: snap, source: D.source, syncedAt: D.syncedAt, error: zs.error || '', rok: agg(all), t4: agg(last4), od4, tydny4: Object.entries(tyd).sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ week: w, rows: n })), plan: pl };
+      let vy = null; try { const V = vystup(z); if (V) vy = { cil: V.cil, lakDen4: V.kpi.lakDen4, lakDenRok: V.kpi.lakDenRok, plneni4: V.kpi.plneni4, plneniRok: V.kpi.plneniRok, lakRok: V.kpi.lakRok, hrdlo: V.hrdlo, tydnuPod: V.kpi.tydnuPod, tydnu: V.kpi.tydnu }; } catch (_) {}
+      return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: snap, source: D.source, syncedAt: D.syncedAt, error: zs.error || '', rok: agg(all), t4: agg(last4), od4, tydny4: Object.entries(tyd).sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ week: w, rows: n })), plan: pl, vystup: vy };
     });
   }
 
@@ -696,6 +769,8 @@ function mount(host) {
       json(res, 200, { cvz, zavod: z.key, tab: plan.tab, row: it.row, url, live, warn, syncedAt: plan.syncedAt, pole: live ? pole : null, item: it });
       return true;
     }
+    const mv = /^\/api\/vykonnost\/vystup\/([a-z]+)$/.exec(p);
+    if (mv && req.method === 'GET') { const z = zavodOf(mv[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; } const V = vystup(z); json(res, 200, V ? Object.assign({ data: true, admin: !!host.isAdmin(req) }, V) : { data: false, zavod: z.key, name: z.name }); return true; }
     const mi = /^\/api\/vykonnost\/indikatory\/([a-z]+)$/.exec(p);
     if (mi && req.method === 'GET') {
       const z = zavodOf(mi[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; }
@@ -708,6 +783,7 @@ function mount(host) {
       json(res, 200, { katalog: I.items.length, syncedAt: I.syncedAt, diag: I.diag, folder: NORMY_FOLDER, items: list.slice(0, 300).map(n => ({ id: normId(n), op: n.op, varianta: n.varianta, del: n.del, vys: n.vys, min: n.min, kc: n.kc, file: n.file, sheet: n.sheet, kod: n.kod })), total: list.length, mapa: host.isAdmin(req) ? I.mapa : undefined }); return true;
     }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
+    if (p === '/api/vykonnost/cil' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } if (!zavodOf(b.zavod)) { json(res, 400, { error: 'Neznámý závod.' }); return true; } let c = {}; try { c = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {} const v = b.cil === null || b.cil === '' ? null : +b.cil; c[b.zavod] = (v != null && isFinite(v) && v > 0) ? Math.round(v * 10) / 10 : null; try { fs.writeFileSync(CIL_F, JSON.stringify(c, null, 2)); } catch (_) {} return json(res, 200, { ok: true, cile: loadCile() }), true; }
     if (p === '/api/vykonnost/normy/sync' && req.method === 'POST') { try { const r = await syncNormy(); return json(res, r.ok ? 200 : 500, r), true; } catch (e) { return json(res, 500, { ok: false, error: e.message }), true; } }
     if (p === '/api/vykonnost/normy/mapa' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; }
@@ -726,7 +802,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, sync: () => sync(false), syncPlans, syncNormy, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, sync: () => sync(false), syncPlans, syncNormy, vystup, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };
