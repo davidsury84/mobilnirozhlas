@@ -3929,7 +3929,7 @@ function vykCmpRender(){
   // tabulka posledních 3 měsíců pro rychlé čtení
   const last3=months.filter(m=>!Z.every(z=>{const M=z.mesice.find(q=>q.m===m);return !M||M.neuplny})).slice(-3);
   h+='<div style="overflow-x:auto;margin-top:8px"><table style="border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;'+vykTh+'">Závod</th>'+last3.map(m=>'<th style="text-align:right;'+vykTh+'">'+lab(m)+'/'+m.slice(2,4)+'</th>').join('')+'<th style="text-align:right;'+vykTh+'">Změna</th></tr></thead><tbody>'
-    +Z.map(z=>{ const vs=last3.map(m=>{const M=z.mesice.find(q=>q.m===m);return M?M[def.k]:null;}); const a=vs[vs.length-2],b=vs[vs.length-1]; const d=(a!=null&&b!=null)?b-a:null; const ok=d==null||d===0||def.smer==='watch'?null:(def.smer==='up'?d>0:d<0);
+    +Z.map(z=>{ const vs=last3.map(m=>{const M=z.mesice.find(q=>q.m===m);return M?M[def.k]:null;}); const a=vs[vs.length-2],b=vs[vs.length-1]; const d=(a!=null&&b!=null)?Math.round((b-a)*100)/100:null; const ok=d==null||d===0||def.smer==='watch'?null:(def.smer==='up'?d>0:d<0);
       return '<tr><td style="'+vykTd+'"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+(VYK_BARVY[z.key]||'#555')+';margin-right:6px;vertical-align:-1px"></i>'+esc(z.name)+'</td>'+vs.map(v=>'<td style="'+vykTd+';text-align:right">'+fmtv(v)+'</td>').join('')+'<td style="'+vykTd+';text-align:right;color:'+(ok==null?'var(--ink-soft)':(ok?'#0a7a0a':'#c93a39'))+'">'+(d==null?'—':(d===0?'=':(d>0?'▲ +':'▼ ')+fmtv(Math.abs(d))))+'</td></tr>'; }).join('')+'</tbody></table></div>';
   box.innerHTML=h;
 }
