@@ -180,6 +180,14 @@ function mount(host) {
   const lidi = n => n === 1 ? '1 člověk' : (n >= 2 && n <= 4 ? n + ' lidé' : n + ' lidí');
   const ma = n => (n >= 2 && n <= 4) ? 'mají' : 'má';            // 1 člověk má · 3 lidé mají · 7 lidí má
   const odvadeli = n => n === 1 ? 'odváděl' : ((n >= 2 && n <= 4) ? 'odváděli' : 'odvádělo');
+  // Zjištění, která vyžadují data mimo export (časová mzda, Kč úkolu) — z ruční analýzy, zobrazují se jako označená reference,
+  // dokud nebude v exportu Mzda/Cena a k dispozici hrubé mzdy (pak se přepočítají automaticky).
+  const REFERENCE = {
+    chomutov: { obdobi: 'srpen 2026', zdroj: 'ruční analýza s mzdovým přehledem (Chomutov 08-2026.xlsx, list CH 08-26)',
+      titul: 'Režie funguje jako dorovnání časové mzdy, ne jako evidence víceprací.',
+      text: 'U 13 dělníků, kteří mají obě čísla (bez Salazara), chybí mezi časovou mzdou a skutečným úkolem 254 tis. Kč. Režijní hodiny (210 Kč/h, zapisuje mistr Archman jednou týdně, typicky v pátek) tuto díru vyplňují téměř přesně: korelace 0,87. Čím méně někdo odvede v úkolu, tím více má režie (korelace −0,70). Odpípaný úkol tedy neměří výkon, ale zpětně kopíruje výplatu.' }
+  };
+  const pearson = (xs, ys) => { const n = xs.length; if (n < 5) return null; const mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n; let sxy = 0, sxx = 0, syy = 0; for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; syy += (ys[i] - my) ** 2; } return sxx && syy ? Math.round(sxy / Math.sqrt(sxx * syy) * 100) / 100 : null; };
   function buildAnalyza(X) {
     const Z = [], U = [], V = [], D = [];
     const kap = X.pracDnu * 8; // hodiny jednoho úvazku v období
@@ -195,6 +203,18 @@ function mount(host) {
     if (X.rezieH > 0) Z.push({ tag: uvazky >= 3 ? 'crit' : (uvazky >= 1 || rezPct >= 10 ? 'warn' : 'info'), titul: 'Režie: ' + fmt0(X.rezieH) + ' h zapsaných jako úkol, to je zhruba ' + (uvazky >= 1 ? uvazky.toFixed(1).replace('.', ',') + ' plných úvazků' : Math.round(uvazky * 100) + ' % úvazku') + ' za období.',
       text: 'Režijní položky tvoří ' + rezPct + ' % řádků. Největší příčina: ' + (X.rezKat[0] ? X.rezKat[0].kat.toLowerCase() + ' (' + fmt0(X.rezKat[0].h) + ' h)' : '—') + (topPol ? '; nejdražší jednotlivá položka „' + topPol.text + '" ' + fmt0(topPol.h) + ' h (' + jm([...topPol.lide], 3) + ')' : '') + '. Režie neměří výkon — dorovnává čas, který se nevešel do normy.' });
     else Z.push({ tag: 'good', titul: 'V období není zapsaná žádná režie.', text: 'Všechny řádky jsou skutečné operace.' });
+    // Úkol vs. režie po lidech (bez koncentrátora odvádění): záporná korelace = režie doplňuje chybějící úkol.
+    let korelace = null;
+    if (X.rezieH > 0) {
+      const lid = X.lideArr.filter(L => X.rows < 50 || L.rows / X.rows < 0.25); const sRez = lid.filter(L => L.rezieH > 0);
+      const r = pearson(lid.map(L => L.prodRows), lid.map(L => L.rezieH)), r2 = pearson(sRez.map(L => L.prodRows), sRez.map(L => L.rezieH));
+      const zap = X.rezZapis || { autori: [], dny: [] }; const a0 = zap.autori[0], d0 = zap.dny[0];
+      korelace = { r, r2, n: lid.length, nRez: sRez.length, autor: a0 ? a0.autor : '', autorPct: a0 ? a0.pct : 0, den: d0 ? d0.den : '', denPct: d0 ? d0.pct : 0 };
+      const rr = r2 != null ? r2 : r; const silna = rr != null && rr <= -0.5, kladna = rr != null && rr >= 0.5; const rs = rr == null ? '' : (rr > 0 ? '+' : '') + String(rr).replace('.', ',');
+      Z.push({ tag: silna ? 'crit' : 'info', titul: rr == null ? 'Vztah úkol ↔ režie po lidech nejde z období spočítat (málo lidí s oběma čísly).' : (silna ? 'Režie doplňuje chybějící úkol: čím méně kdo odvede, tím víc má režie (korelace ' + rs + ').' : (kladna ? 'Režie roste s výkonem (korelace ' + rs + ') — režijní položky jsou tu součást běžné práce, ne dorovnání.' : 'Vztah úkol ↔ režie po lidech je v tomto období slabý (korelace ' + rs + ').')),
+        text: (a0 ? 'Režii zapisuje ' + (a0.autor === 'terminál' ? 'terminál' : a0.autor) + ' (' + a0.pct + ' % řádků)' + (d0 ? ', nejčastěji ' + d0.den + ' (' + d0.pct + ' %)' : '') + '. ' : '') + 'Počítáno z odvedených operací u ' + sRez.length + ' lidí s režií' + (r != null ? ' (všech ' + lid.length + ' lidí: ' + String(r).replace('.', ',') + ')' : '') + '. Skutečný test — zda režie dorovnává rozdíl mezi časovou mzdou a úkolem v Kč — vyžaduje cenu operací a mzdový přehled, které v exportu nejsou.', korelace: true });
+    }
+    const refZ = REFERENCE[X.key]; if (refZ) Z.push({ tag: 'crit', titul: refZ.titul, text: refZ.text, ref: true, zdroj: refZ.zdroj + ' · ' + refZ.obdobi + ' · přepočítá se automaticky, až budou v exportu Mzda/Cena a k dispozici hrubé mzdy' });
     if (top3 >= 35 || patekPct >= 30) Z.push({ tag: top3 >= 45 ? 'crit' : 'warn', titul: 'Odvádí se po dávkách, ne průběžně: ' + top3 + ' % řádků vzniklo ve 3 dnech' + (patekPct >= 25 ? ', ' + patekPct + ' % v pátek' : '') + '.',
       text: 'Špičky: ' + X.topDny.map(d => d.date.split('-').reverse().join('. ') + ' (' + d.rows + ')').join(', ') + '. Z dat pak nejde zjistit, kdy se co skutečně dělalo ani jak dlouho to trvalo.' + (X.dvojice.length ? ' Dvojice se zápisy identické do řádku: ' + X.dvojice.map(p => p[0] + ' – ' + p[1]).join('; ') + ' — odvádí se sdíleně.' : '') });
     else Z.push({ tag: 'good', titul: 'Odvádění je rozložené v čase (3 nejsilnější dny = ' + top3 + ' % řádků).', text: 'Odvedené operace zhruba kopírují rytmus výroby.' });
@@ -234,7 +254,7 @@ function mount(host) {
     if (X.bezOdvadeni.length || rezLide.length) rec('Vyjasnit lidi bez dat.', (X.bezOdvadeni.length ? jm(X.bezOdvadeni.map(b => b.name), 5) + ' v období neodvedli nic. ' : '') + (rezLide.length ? jm(rezLide.map(L => L.name), 4) + ' mají výkon převážně v režii. ' : '') + 'U každého: na jaké pozici skutečně pracuje a proč není v odvádění.', 'efekt: vazba mzdy na výstup u ' + (X.bezOdvadeni.length + rezLide.length) + ' lidí · náročnost: mistr, 1 den');
     if (X.jediny.length) rec('Zastupitelnost klíčových operací.', X.jediny.slice(0, 3).map(j => j.op + ' — jen ' + j.name).join('; ') + '. Zaučit druhého člověka.', 'efekt: bez výpadku při nemoci/dovolené · náročnost: zaučení');
     const shrnuti = fmt0(X.rows) + ' odvedených operací, ' + fmt0(X.ks) + ' ks, ' + fmt0(X.rezieH) + ' h režie, ' + X.lideArr.length + ' lidí' + (X.pracDnu ? ' · ' + X.pracDnu + ' pracovních dnů' : '') + '. ' + (Z.filter(z => z.tag === 'crit').length ? Z.filter(z => z.tag === 'crit').length + ' kritická zjištění.' : 'Bez kritických zjištění.');
-    return { zjisteni: Z, uzka: U, vycnivaji: V.slice(0, 10), doporuceni: D, shrnuti, uvazky: Math.round(uvazky * 10) / 10 };
+    return { zjisteni: Z, uzka: U, vycnivaji: V.slice(0, 10), doporuceni: D, shrnuti, uvazky: Math.round(uvazky * 10) / 10, korelace };
   }
 
   // ---------- měsíční indikátory (legenda = jediný zdroj pravdy pro app i e-mail) ----------
@@ -336,7 +356,7 @@ function mount(host) {
       const rez = isRezie(r[R.dil]); const day = r[R.date];
       const key = r[R.id] || r[R.name];
       const L = lide[key] = lide[key] || { id: r[R.id], name: r[R.name], rows: 0, ks: 0, rezieH: 0, dnySet: new Set(), opsSet: new Set(), term: 0, last: '', first: '', perDay: {}, opCount: {} };
-      L.rows++; L.dnySet.add(day); L.opsSet.add(r[R.op]); L.perDay[day] = (L.perDay[day] || 0) + 1; if (r[R.aut] === 'terminalETH') L.term++;
+      L.rows++; L.dnySet.add(day); L.opsSet.add(r[R.op]); L.perDay[day] = (L.perDay[day] || 0) + 1; if (r[R.aut] === 'terminalETH') L.term++; if (rez) L.rezRows = (L.rezRows || 0) + 1;
       if (!L.last || day > L.last) L.last = day; if (!L.first || day < L.first) L.first = day;
       if (rez) { L.rezieH += r[R.ks]; rezieH += r[R.ks]; rezRows++; const kat = kategorieRezie(r[R.dil] + ' ' + r[R.pozn]); rezKat[kat] = rezKat[kat] || { kat, h: 0, rows: 0, lide: new Set() }; rezKat[kat].h += r[R.ks]; rezKat[kat].rows++; rezKat[kat].lide.add(r[R.name]);
         const pk = (r[R.pozn] || (r[R.dil] + ' (bez poznámky)')).slice(0, 80); rezPol[pk] = rezPol[pk] || { text: pk, h: 0, rows: 0, lide: new Set() }; rezPol[pk].h += r[R.ks]; rezPol[pk].rows++; rezPol[pk].lide.add(r[R.name]); }
@@ -351,7 +371,7 @@ function mount(host) {
     const topDny = dnyArr.slice().sort((a, b) => b.rows - a.rows).slice(0, 3);
     const patek = rows.filter(r => new Date(r[R.date] + 'T00:00:00Z').getUTCDay() === 5).length;
     const lideArr = Object.values(lide).map(L => { const maxDay = Math.max(0, ...Object.values(L.perDay)); const topOp = Object.entries(L.opCount).sort((a, b) => b[1] - a[1])[0];
-      return { id: L.id, name: L.name, rows: L.rows, ks: Math.round(L.ks), rezieH: Math.round(L.rezieH), dny: L.dnySet.size, ops: L.opsSet.size, termPct: L.rows ? Math.round(L.term / L.rows * 100) : 0, last: L.last, first: L.first, davkaPct: L.rows ? Math.round(maxDay / L.rows * 100) : 0, reziePct: (L.rows ? Math.round(L.rezieH > 0 ? (L.rezieH / (L.rezieH + Math.max(1, L.ks))) * 100 : 0) : 0), topOp: topOp ? topOp[0] : '' }; })
+      return { id: L.id, name: L.name, rows: L.rows, prodRows: L.rows - (L.rezRows || 0), ks: Math.round(L.ks), rezieH: Math.round(L.rezieH), dny: L.dnySet.size, ops: L.opsSet.size, termPct: L.rows ? Math.round(L.term / L.rows * 100) : 0, last: L.last, first: L.first, davkaPct: L.rows ? Math.round(maxDay / L.rows * 100) : 0, reziePct: (L.rows ? Math.round(L.rezieH > 0 ? (L.rezieH / (L.rezieH + Math.max(1, L.ks))) * 100 : 0) : 0), topOp: topOp ? topOp[0] : '' }; })
       .sort((a, b) => b.rows - a.rows);
     // párování na plán
     const plan = loadPlan(z.key); const P = (plan && plan.items) || {};
@@ -378,7 +398,11 @@ function mount(host) {
     const nulOps = {}; rows.forEach(r => { if (!isRezie(r[R.dil]) && r[R.ks] === 0) nulOps[r[R.op]] = (nulOps[r[R.op]] || 0) + 1; });
     const nulTop = Object.entries(nulOps).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([op, n]) => ({ op, n }));
     const pracDnu = (() => { if (!od || !do_) return dnyArr.length; let n = 0; for (const d = new Date(od + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= do_; d.setUTCDate(d.getUTCDate() + 1)) { const w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; } return n; })();
-    const ana = buildAnalyza({ name: z.name, rows: rows.length, ks, rezieH, rezRows, term, lideArr, usekyArr, dvojice, bezOdvadeni, jediny, nulTop, nulKs, bezCvz, future, topDny, patek, dnyArr, pracDnu, rezKat: Object.values(rezKat).sort((a, b) => b.h - a.h), rezPol: Object.values(rezPol).sort((a, b) => b.h - a.h), autori: Object.entries(autori).sort((a, b) => b[1] - a[1]), snapshot, od, do_ });
+    const DNY_CZ = ['v neděli', 'v pondělí', 'v úterý', 've středu', 've čtvrtek', 'v pátek', 'v sobotu'];
+    const rezAut = {}, rezDen = {}; let rezN = 0;
+    rows.forEach(r => { if (!isRezie(r[R.dil])) return; rezN++; const a = r[R.aut] === 'terminalETH' ? 'terminál' : (r[R.aut] || '—'); rezAut[a] = (rezAut[a] || 0) + 1; const d = DNY_CZ[new Date(r[R.date] + 'T00:00:00Z').getUTCDay()]; rezDen[d] = (rezDen[d] || 0) + 1; });
+    const rezZapis = { n: rezN, autori: Object.entries(rezAut).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, pct: Math.round(n / Math.max(1, rezN) * 100) })), dny: Object.entries(rezDen).sort((a, b) => b[1] - a[1]).map(([d, n]) => ({ den: d, pct: Math.round(n / Math.max(1, rezN) * 100) })) };
+    const ana = buildAnalyza({ name: z.name, key: z.key, rezZapis, rows: rows.length, ks, rezieH, rezRows, term, lideArr, usekyArr, dvojice, bezOdvadeni, jediny, nulTop, nulKs, bezCvz, future, topDny, patek, dnyArr, pracDnu, rezKat: Object.values(rezKat).sort((a, b) => b.h - a.h), rezPol: Object.values(rezPol).sort((a, b) => b.h - a.h), autori: Object.entries(autori).sort((a, b) => b[1] - a[1]), snapshot, od, do_ });
     return {
       analyza: ana, useky: usekyArr,
       zavod: z.key, name: z.name, snapshot, source: D.source, syncedAt: D.syncedAt, od: od || '', do: do_ || '', mesice, tydny,
