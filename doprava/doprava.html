@@ -315,6 +315,7 @@ function tabNafta(){
     let b='<div><h2 style="margin:0 0 8px">'+titul+' <span class="muted">('+pozn+')</span></h2>';
     zdroj.points.forEach(pt=>{
       b+='<div class="muted" style="margin:6px 0 4px;font-weight:600">'+esc(pt.bod)+'</div>';
+      if(pt.chyba){ b+='<p class="muted" style="font-size:12px;margin:0">nenačteno ('+esc(pt.chyba)+') — zkusí se při další obnově</p>'; return; }
       if(!pt.stanice.length){ b+='<p class="muted" style="font-size:12px;margin:0">žádná otevřená pumpa s cenou v okruhu</p>'; return; }
       b+='<table><thead><tr><th style="text-align:left">Pumpa</th><th>km</th><th>€/l</th><th>Kč/l</th></tr></thead><tbody>'
         +pt.stanice.map(s=>'<tr><td style="text-align:left">'+esc(s.name)+(s.place?' <span class="muted">'+esc(s.place)+'</span>':'')+'</td><td>'+(s.dist!=null?d2(s.dist):'—')+'</td><td>'+s.eurPerL.toFixed(3).replace('.',',')+'</td><td><b>'+(s.czkPerL!=null?d2(s.czkPerL):'—')+'</b></td></tr>').join('')
@@ -322,7 +323,7 @@ function tabNafta(){
     });
     return b+'</div>';
   };
-  const blokDe=pumpyBlok(N.de,'Pumpy u hranic — Německo','MTS-K, živě, s DPH'), blokAt=pumpyBlok(N.at,'Pumpy u hranic — Rakousko','E-Control, 5 nejlevnějších, s DPH');
+  const blokDe=pumpyBlok(N.de,'Pumpy u hranic — Německo','data: <a href="https://www.tankerkoenig.de" target="_blank" rel="noopener">Tankerkönig</a>, CC BY 4.0 · MTS-K, s DPH'), blokAt=pumpyBlok(N.at,'Pumpy u hranic — Rakousko','E-Control, 5 nejlevnějších, s DPH');
   if(blokDe||blokAt){
     h+='<h2 style="margin:16px 0 8px">Nejlevnější nafta u hraničních přechodů</h2><div class="grid2">'+(blokDe||'<div></div>')+(blokAt||'<div></div>')+'</div>';
   }
@@ -347,7 +348,7 @@ function tabNafta(){
   }
   if(ADMIN) h+='<div class="chartbox" id="kartyAdmin" style="margin-top:12px"></div>';
   if(N.chyby&&N.chyby.length) h+=alertHtml('warn','Nedostupné zdroje při posledním stažení: '+N.chyby.map(esc).join(' · '));
-  h+='<p class="muted" style="font-size:12px">Staženo '+new Date(N.ts).toLocaleString('cs-CZ')+' · zdroje: ČSÚ (týdenní šetření PHM), cenaphm.cz (kraje), EU Weekly Oil Bulletin (země vč. daní), Tankerkönig/MTS-K (pumpy DE), E-Control (pumpy AT), Orlen (velkoobchod PL), ČNB (kurzy). Obnovuje se automaticky 2× denně, ručně tlačítkem v patičce.</p>';
+  h+='<p class="muted" style="font-size:12px">Staženo '+new Date(N.ts).toLocaleString('cs-CZ')+' · zdroje: ČSÚ (týdenní šetření PHM), cenaphm.cz (kraje), EU Weekly Oil Bulletin (země vč. daní), <a href="https://www.tankerkoenig.de" target="_blank" rel="noopener">Tankerkönig</a>/MTS-K (pumpy DE, CC BY 4.0), E-Control (pumpy AT), Orlen (velkoobchod PL), ČNB (kurzy). Obnovuje se automaticky 2× denně, ručně tlačítkem v patičce.</p>';
   $('#app').innerHTML=h;
   if(ADMIN) kartyEditor(kZaznamy);
 }

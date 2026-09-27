@@ -213,15 +213,22 @@ function parseWob(sheets, wanted) {
 /* ---------- nejlevnější pumpy u hranic: Tankerkönig (DE) + E-Control (AT) ---------- */
 // Body zájmu (hraniční přechody / trasy): [{ name, lat, lon }]
 async function fetchTankerkoenig(points, klic) {
+  // AGB: rate limit na klíč, doporučené šetrné tempo — body sekvenčně s rozestupem,
+  // chyba jednoho bodu (např. rate limit) neshodí ostatní; zkusí se při další obnově.
   const out = [];
-  for (const b of points) {   // sekvenčně — bezplatné API chce šetrné tempo
-    const u = TK_URL + '?lat=' + b.lat + '&lng=' + b.lon + '&rad=25&sort=price&type=diesel&apikey=' + encodeURIComponent(klic);
-    const j = await fetchJson(u);
-    if (!j.ok) throw new Error('Tankerkönig: ' + (j.message || 'odpověď není ok'));
-    const stanice = (j.stations || []).filter((s) => s.isOpen !== false && Number.isFinite(Number(s.price)) && Number(s.price) > 0)
-      .slice(0, 5).map((s) => ({ name: [s.brand, s.name].filter(Boolean).join(' — ').slice(0, 60) || 'pumpa', place: s.place || '', dist: s.dist != null ? Number(s.dist) : null, eurPerL: Number(s.price) }));
-    out.push({ bod: b.name, stanice });
+  for (let i = 0; i < points.length; i++) {
+    const b = points[i];
+    if (i) await new Promise((r) => setTimeout(r, 3000));
+    try {
+      const u = TK_URL + '?lat=' + b.lat + '&lng=' + b.lon + '&rad=25&sort=price&type=diesel&apikey=' + encodeURIComponent(klic);
+      const j = await fetchJson(u);
+      if (!j.ok) throw new Error(j.message || 'odpověď není ok');
+      const stanice = (j.stations || []).filter((s) => s.isOpen !== false && Number.isFinite(Number(s.price)) && Number(s.price) > 0)
+        .slice(0, 5).map((s) => ({ name: [s.brand, s.name].filter(Boolean).join(' — ').slice(0, 60) || 'pumpa', place: s.place || '', dist: s.dist != null ? Number(s.dist) : null, eurPerL: Number(s.price) }));
+      out.push({ bod: b.name, stanice });
+    } catch (e) { out.push({ bod: b.name, stanice: [], chyba: e.message }); }
   }
+  if (out.length && out.every((p) => p.chyba)) throw new Error(out[0].chyba);
   return out;
 }
 async function fetchEcontrol(points) {
@@ -315,7 +322,7 @@ async function fetchNafta({ kraje, zeme, kartyJson, bodyDe, bodyAt, tkKlic } = {
   } else out.chyby.push('EU bulletin: ' + wobHtml.reason.message);
   if (kurzy.status === 'rejected') out.chyby.push('ČNB: ' + kurzy.reason.message);
 
-  const prevodBodu = (v) => v ? { points: v.map((p) => ({ bod: p.bod, stanice: p.stanice.map((s) => ({ ...s, czkPerL: kurzEur ? +(s.eurPerL * kurzEur).toFixed(2) : null })) })) } : null;
+  const prevodBodu = (v) => v ? { points: v.map((p) => ({ bod: p.bod, chyba: p.chyba || undefined, stanice: p.stanice.map((s) => ({ ...s, czkPerL: kurzEur ? +(s.eurPerL * kurzEur).toFixed(2) : null })) })) } : null;
   if (de.status === 'fulfilled') out.de = prevodBodu(de.value); else out.chyby.push('Tankerkönig (DE): ' + de.reason.message);
   if (!tkKlic) out.de = { chybiKlic: true, points: [] };   // klíč není → není to chyba, jen nenastavený zdroj
   if (at.status === 'fulfilled') out.at = prevodBodu(at.value); else out.chyby.push('E-Control (AT): ' + at.reason.message);
