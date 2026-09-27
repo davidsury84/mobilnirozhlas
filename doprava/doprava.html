@@ -267,10 +267,6 @@ function tabNafta(){
   // upozornění
   if(csu&&csu.change!=null&&Math.abs(csu.change)>=0.5)
     h+=alertHtml(csu.change>0?'warn':'ok','Nafta v ČR mezitýdně '+(csu.change>0?'zdražila':'zlevnila')+' o <b>'+d2(Math.abs(csu.change))+' Kč/l</b> ('+esc(csu.weekLabel||'')+': '+d2(csu.price)+' Kč/l s DPH). '+(csu.change>0?'Promítni do cen — v Citlivosti vidíš dopad na zisk.':''));
-  if(ucto&&csu){
-    const trhBezDph=csu.price/DPH, delta=trhBezDph-ucto.cena;
-    h+=alertHtml(delta>0?'ok':'warn','Nakupujeme za <b>'+d2(ucto.cena)+' Kč/l bez DPH</b> (účetnictví '+esc(ucto.obdobi)+', '+Math.round(ucto.litry).toLocaleString('cs-CZ')+' l) — národní průměr bez DPH je '+d2(trhBezDph)+' Kč/l, tedy '+(delta>0?'nakupujeme o <b>'+d2(delta)+' Kč/l výhodněji</b> než pumpový průměr.':'<b>platíme o '+d2(-delta)+' Kč/l víc</b> než pumpový průměr — prověřit ceníky karet.'));
-  }
   if(eu&&csu){
     const levnejsi=eu.countries.filter(c=>c.czkPerL!=null&&c.czkPerL<csu.price-0.5).sort((a,b)=>a.czkPerL-b.czkPerL);
     if(levnejsi.length){
@@ -283,13 +279,13 @@ function tabNafta(){
   // KPI
   h+='<div class="cards" style="margin-bottom:14px">'
     +'<div class="card"><div class="muted">ČR průměr (ČSÚ'+(csu?', '+esc(csu.weekLabel||''):'')+')</div><div class="metr">'+(csu?czk2(csu.price):'—')+'</div><div class="muted">'+(csu&&csu.change!=null?('mezitýdně '+sgn(csu.change,x=>d2(x)+' Kč')+' · bez DPH '+d2(csu.price/DPH)+' Kč'):'s DPH')+'</div></div>'
-    +'<div class="card"><div class="muted">Naše nákupní cena</div><div class="metr">'+(ucto?czk2(ucto.cena):'—')+'</div><div class="muted">'+(ucto?('bez DPH · účetnictví '+esc(ucto.obdobi)):'účetní data nejsou')+'</div></div>'
+    +'<div class="card"><div class="muted">Účetní průměr PHM</div><div class="metr">'+(ucto?czk2(ucto.cena):'—')+'</div><div class="muted">'+(ucto?('PHM ÷ litry, '+esc(ucto.obdobi)+' · jen orientační (posun faktur)'):'účetní data nejsou')+'</div></div>'
     +'<div class="card"><div class="muted">Nejlevněji v okolí</div><div class="metr">'+(eu&&eu.countries.length?(()=>{const t=eu.countries.filter(c=>c.czkPerL!=null).sort((a,b)=>a.czkPerL-b.czkPerL)[0];return t?t.name+' '+d2(t.czkPerL):'—';})():'—')+'</div><div class="muted">Kč/l s DPH · EU bulletin '+(eu?esc(eu.date||''):'')+'</div></div>'
     +'<div class="card"><div class="muted">Orlen hurt (PL)</div><div class="metr">'+(N.plHurt&&N.plHurt.czkPerL!=null?czk2(N.plHurt.czkPerL):'—')+'</div><div class="muted">'+(N.plHurt?('ON Ekodiesel bez DPH · '+esc(N.plHurt.date||'')+' · základ cen karet v PL'):'velkoobchodní cena')+'</div></div>'
     +'<div class="card"><div class="muted">Kurz ČNB</div><div class="metr">'+(eu&&eu.rate?d2(eu.rate)+' Kč/€':'—')+'</div><div class="muted">'+(N.plHurt&&N.plHurt.kurzPln?('PLN '+d2(N.plHurt.kurzPln)+' Kč · '):'')+'pro přepočet zahraničních cen</div></div>'
     +'</div>';
-  if(N.plHurt&&N.plHurt.czkPerL!=null&&ucto&&N.plHurt.czkPerL<ucto.cena-1)
-    h+=alertHtml('ok','Polský velkoobchod (Orlen hurt '+d2(N.plHurt.czkPerL)+' Kč/l bez DPH) je o <b>'+d2(ucto.cena-N.plHurt.czkPerL)+' Kč/l pod naší nákupní cenou</b> — karetní ceny v PL se od hurtu odvíjejí, na trasách přes Polsko stojí za to tankovat tam.');
+  if(N.plHurt&&N.plHurt.czkPerL!=null&&csu&&N.plHurt.czkPerL<csu.price/DPH-1)
+    h+=alertHtml('ok','Polský velkoobchod (Orlen hurt '+d2(N.plHurt.czkPerL)+' Kč/l bez DPH) je o <b>'+d2(csu.price/DPH-N.plHurt.czkPerL)+' Kč/l pod českým pumpovým průměrem bez DPH</b> — karetní ceny v PL se od hurtu odvíjejí, na trasách přes Polsko stojí za to tankovat tam.');
   // kraje
   if(N.kraje&&N.kraje.regions.length){
     h+='<div class="grid2">'
@@ -1042,9 +1038,13 @@ function tabCitlivost(){
     });
     if(km>0&&l>0&&phm>0) real={cena:phm/l, spotr:l/km*100, mzdy:mzdy/km, myto:myto/km, varKm:varTot/km, km};
   })();
+  // Cena nafty = REÁLNÁ TRŽNÍ cena bez DPH (ČSÚ); účetní poměr PHM÷litry je zkreslený
+  // posunem faktur a přeúčtováním mezi vozy, slouží jen jako poslední fallback.
+  const trh=(DATA.nafta&&DATA.nafta.csu)||null;
+  const trhBezDph=trh?Math.round(trh.price/1.21*10)/10:null;
   const def= real
-    ? {cena:Math.round(real.cena*10)/10, spotr:Math.round(real.spotr*10)/10, myto:Math.round(real.myto*100)/100, mzdy:Math.round(real.mzdy*100)/100, saz:0, naj:0}
-    : {cena:N.cenaPhm||28, spotr:N.spotreba||29.3, myto:N.myto||0, mzdy:N.mzdyRidicu||0, saz:0, naj:0};
+    ? {cena:trhBezDph!=null?trhBezDph:Math.round(real.cena*10)/10, spotr:Math.round(real.spotr*10)/10, myto:Math.round(real.myto*100)/100, mzdy:Math.round(real.mzdy*100)/100, saz:0, naj:0}
+    : {cena:trhBezDph!=null?trhBezDph:(N.cenaPhm||28), spotr:N.spotreba||29.3, myto:N.myto||0, mzdy:N.mzdyRidicu||0, saz:0, naj:0};
   const nafta0=Math.round(def.spotr*def.cena)/100;
   // Ostatní variabilní (opravy, pneu, AdBlue, autopotřeby, parkovné…) = zbytek do skutečných variabilních nákladů
   const OST= real? Math.max(0, real.varKm-nafta0-def.mzdy-def.myto) : (N.pneu||0)+(N.adblue||0)+(N.opravy||0);
@@ -1053,12 +1053,8 @@ function tabCitlivost(){
   const sl=(id,lab,min,max,step,val)=>'<div class="sl"><label>'+lab+'</label><input type="range" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+val+'"><output id="o'+id+'"></output></div>';
   let h='<h1>Citlivostní analýza <span class="muted">(hodnocené období: '+mes+' měsíců)</span></h1>';
   h+= real
-    ? alertHtml('info','Výchozí hodnoty = <b>účetní skutečnost</b> (1–'+((DATA.ekonomika.mesiceSdaty||[]).slice(-1)[0]||'')+'/'+String(DATA.ekonomika.rok||'').slice(2)+'): nafta <b>'+d2(real.cena)+' Kč/l</b> (skutečná nákupní), spotřeba <b>'+real.spotr.toFixed(1).replace('.',',')+' l/100 km</b>, mzdy řidičů '+d2(real.mzdy)+' Kč/km, mýto '+d2(real.myto)+' Kč/km, fixy dle vozů. Posuvníky měří odchylku od reality, ne od teoretické kalkulace.')
-    : alertHtml('warn','Účetní data nejsou k dispozici — výchozí hodnoty jsou z nákladové kalkulace (modelové).');
-  if(DATA.nafta&&DATA.nafta.csu){
-    const trh=DATA.nafta.csu, bezDph=trh.price/1.21;
-    h+=alertHtml('info','Aktuální tržní cena nafty ('+esc(trh.weekLabel||'ČSÚ')+'): <b>'+d2(trh.price)+' Kč/l s DPH = '+d2(bezDph)+' Kč/l bez DPH</b>'+(trh.change!=null?' (mezitýdně '+sgn(trh.change,x=>d2(x)+' Kč')+')':'')+(real?' — naše nákupní je '+d2(real.cena)+' Kč/l; scénář zdražení nákupu na tržní úroveň si nastavíš posuvníkem Cena nafty na '+d2(bezDph)+'.':'')+' Detail v záložce Nafta.');
-  }
+    ? alertHtml('info','Výchozí hodnoty = <b>reálná data</b>: nafta <b>'+d2(def.cena)+' Kč/l bez DPH</b> ('+(trhBezDph!=null?('aktuální tržní cena, '+esc(trh.weekLabel||'ČSÚ')+(trh.change!=null?', mezitýdně '+sgn(trh.change,x=>d2(x)+' Kč'):'')):'účetní průměr — tržní cena se nenačetla')+'), spotřeba <b>'+real.spotr.toFixed(1).replace('.',',')+' l/100 km</b>, mzdy řidičů '+d2(real.mzdy)+' Kč/km a mýto '+d2(real.myto)+' Kč/km z účetnictví 1–'+((DATA.ekonomika.mesiceSdaty||[]).slice(-1)[0]||'')+'/'+String(DATA.ekonomika.rok||'').slice(2)+', fixy dle vozů. Posuvníky měří odchylku od reality, ne od teoretické kalkulace. Detail cen v záložce Nafta.')
+    : alertHtml('warn','Účetní data nejsou k dispozici — výchozí hodnoty jsou '+(trhBezDph!=null?'tržní cena nafty (ČSÚ) a ':'')+'nákladová kalkulace (modelové).');
   h+='<div class="chartbox"><div class="sliders">'
     +sl('cCena','Cena nafty',Math.max(15,def.cena-8),def.cena+14,0.5,def.cena)
     +sl('cSpotr','Spotřeba',def.spotr-5,def.spotr+4,0.1,def.spotr)
