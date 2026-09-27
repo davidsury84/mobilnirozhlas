@@ -13,6 +13,7 @@ const path = require('path');
 const fs = require('fs');
 const urlLib = require('url');
 const sheets = require('./lib/sheets');
+const naftaLib = require('./lib/nafta');
 
 const HTML_FILE = path.join(__dirname, 'doprava.html');
 // Výkony můžou být ve více souborech (ročníky „Daily report ECZ"); čte se ze všech
@@ -303,6 +304,30 @@ function mount(host) {
     } catch (_) {}
   }
   let lastFail = 0;   // neúspěšná obnova → další automatický pokus nejdřív za 10 minut
+  /* ---------- ceny nafty (port projektu nafta-report; ČSÚ + kraje + EU bulletin + ČNB) ---------- */
+  const NAFTA_F = path.join(host.dataDir || __dirname, 'doprava-nafta.json');
+  let naftaCache = null;
+  try { naftaCache = JSON.parse(fs.readFileSync(NAFTA_F, 'utf8')); } catch (_) {}
+  let naftaFail = 0;
+  const naftaCfg = () => ({
+    kraje: (process.env.DOPRAVA_NAFTA_KRAJE || 'Zlínský,Moravskoslezský,Olomoucký').split(',').map((s) => s.trim()).filter(Boolean),
+    zeme: (process.env.DOPRAVA_NAFTA_ZEME || 'SK,PL,DE,AT,HU,RO').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
+  });
+  let _naftaBezi = null;
+  async function naftaRefresh(force) {
+    const stari = naftaCache ? Date.now() - (naftaCache.ts || 0) : Infinity;
+    if (!force && stari < 12 * 3600 * 1000) return naftaCache;                    // data se mění max 1× denně (ČSÚ týdně)
+    if (!force && Date.now() - naftaFail < 15 * 60 * 1000) return naftaCache;     // backoff po chybě
+    if (_naftaBezi) return _naftaBezi;
+    _naftaBezi = (async () => {
+      const out = await naftaLib.fetchNafta(naftaCfg());
+      if (!out.csu && !out.kraje && !out.eu) { naftaFail = Date.now(); throw new Error(out.chyby.join('; ') || 'žádný zdroj nedostupný'); }
+      naftaCache = out;
+      try { fs.writeFileSync(NAFTA_F, JSON.stringify(out)); } catch (_) {}
+      return out;
+    })();
+    try { return await _naftaBezi; } finally { _naftaBezi = null; }
+  }
   // Účetní skutečnost: přibalený snapshot jako výchozí zdroj (živý zdroj přes env viz výše).
   let seedEkonomika = null;
   try { seedEkonomika = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed-ekonomika.json'), 'utf8')); } catch (_) {}
@@ -469,6 +494,8 @@ function mount(host) {
     }
 
     if (p === '/api/doprava/data' && req.method === 'GET') {
+      // Ceny nafty jsou nezávislé na Google Sheets — obnovit vždy (vlastní cache 12 h + backoff).
+      try { await naftaRefresh(u.query.refresh === '1'); } catch (e) { console.error('[doprava] ceny nafty:', e.message); }
       // Odpověď z cache + případná upozornění (nedostupná nákladová tabulka, stará data…)
       const zCache = (varovani) => {
         // Výkaz starší než ~2 měsíce = nejspíš je nasdílený jen starý ročník souboru.
@@ -483,7 +510,7 @@ function mount(host) {
           cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
           cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
         ].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, plan: seedPlan || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, plan: seedPlan || null, nafta: naftaCache || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
@@ -649,6 +676,8 @@ function mount(host) {
       try { await refresh(); console.log('[doprava] data obnovena, vozidel: ' + cache.vozidla.length); }
       catch (e) { console.error('[doprava] obnova dat selhala:', e.message); }
     }
+    try { const nf = await naftaRefresh(); if (nf) console.log('[doprava] ceny nafty: ČR ' + (nf.csu ? nf.csu.price : '—') + ' Kč/l' + (nf.chyby.length ? ' (chybí: ' + nf.chyby.length + ' zdrojů)' : '')); }
+    catch (e) { console.error('[doprava] ceny nafty se nenačetly:', e.message); }
     try { await cenikEmail(); } catch (e) { console.error('[doprava] ceník e-mail chyba:', e.message); }
   }
 
