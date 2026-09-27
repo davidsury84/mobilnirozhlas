@@ -324,9 +324,17 @@ function mount(host) {
     } catch (_) { return null; }
   }
   if (naftaCache) { const fk0 = kartyZeSouboru(); if (fk0) naftaCache.karty = fk0; }   // po startu překrýt karty ručním ceníkem
+  // Body u hranic pro hledání nejlevnějších pump (formát „Název|lat|lon;…")
+  const naftaBody = (env, vychozi) => (env || vychozi).split(';').map((s) => {
+    const [name, lat, lon] = s.split('|').map((x) => x.trim());
+    return { name, lat: Number(lat), lon: Number(lon) };
+  }).filter((b) => b.name && Number.isFinite(b.lat) && Number.isFinite(b.lon));
   const naftaCfg = () => ({
     kraje: (process.env.DOPRAVA_NAFTA_KRAJE || 'Zlínský,Moravskoslezský,Olomoucký').split(',').map((s) => s.trim()).filter(Boolean),
     zeme: (process.env.DOPRAVA_NAFTA_ZEME || 'SK,PL,DE,AT,HU,RO').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
+    bodyDe: naftaBody(process.env.DOPRAVA_NAFTA_BODY_DE, 'Waidhaus (D5→A6)|49.641|12.494;Breitenau (D8→A17)|50.850|13.900'),
+    bodyAt: naftaBody(process.env.DOPRAVA_NAFTA_BODY_AT, 'Drasenhofen (Mikulov)|48.756|16.654;Kleinhaugsdorf (Hatě)|48.739|16.066'),
+    tkKlic: (process.env.TANKERKOENIG_API_KEY || '').trim(),
   });
   let _naftaBezi = null;
   async function naftaRefresh(force) {

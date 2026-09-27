@@ -285,8 +285,11 @@ function tabNafta(){
     +'<div class="card"><div class="muted">ČR průměr (ČSÚ'+(csu?', '+esc(csu.weekLabel||''):'')+')</div><div class="metr">'+(csu?czk2(csu.price):'—')+'</div><div class="muted">'+(csu&&csu.change!=null?('mezitýdně '+sgn(csu.change,x=>d2(x)+' Kč')+' · bez DPH '+d2(csu.price/DPH)+' Kč'):'s DPH')+'</div></div>'
     +'<div class="card"><div class="muted">Naše nákupní cena</div><div class="metr">'+(ucto?czk2(ucto.cena):'—')+'</div><div class="muted">'+(ucto?('bez DPH · účetnictví '+esc(ucto.obdobi)):'účetní data nejsou')+'</div></div>'
     +'<div class="card"><div class="muted">Nejlevněji v okolí</div><div class="metr">'+(eu&&eu.countries.length?(()=>{const t=eu.countries.filter(c=>c.czkPerL!=null).sort((a,b)=>a.czkPerL-b.czkPerL)[0];return t?t.name+' '+d2(t.czkPerL):'—';})():'—')+'</div><div class="muted">Kč/l s DPH · EU bulletin '+(eu?esc(eu.date||''):'')+'</div></div>'
-    +'<div class="card"><div class="muted">Kurz ČNB</div><div class="metr">'+(eu&&eu.rate?d2(eu.rate)+' Kč/€':'—')+'</div><div class="muted">pro přepočet zahraničních cen</div></div>'
+    +'<div class="card"><div class="muted">Orlen hurt (PL)</div><div class="metr">'+(N.plHurt&&N.plHurt.czkPerL!=null?czk2(N.plHurt.czkPerL):'—')+'</div><div class="muted">'+(N.plHurt?('ON Ekodiesel bez DPH · '+esc(N.plHurt.date||'')+' · základ cen karet v PL'):'velkoobchodní cena')+'</div></div>'
+    +'<div class="card"><div class="muted">Kurz ČNB</div><div class="metr">'+(eu&&eu.rate?d2(eu.rate)+' Kč/€':'—')+'</div><div class="muted">'+(N.plHurt&&N.plHurt.kurzPln?('PLN '+d2(N.plHurt.kurzPln)+' Kč · '):'')+'pro přepočet zahraničních cen</div></div>'
     +'</div>';
+  if(N.plHurt&&N.plHurt.czkPerL!=null&&ucto&&N.plHurt.czkPerL<ucto.cena-1)
+    h+=alertHtml('ok','Polský velkoobchod (Orlen hurt '+d2(N.plHurt.czkPerL)+' Kč/l bez DPH) je o <b>'+d2(ucto.cena-N.plHurt.czkPerL)+' Kč/l pod naší nákupní cenou</b> — karetní ceny v PL se od hurtu odvíjejí, na trasách přes Polsko stojí za to tankovat tam.');
   // kraje
   if(N.kraje&&N.kraje.regions.length){
     h+='<div class="grid2">'
@@ -306,6 +309,25 @@ function tabNafta(){
       +'</tbody></table></div>';
   } else h+='<div></div>';
   h+='</div>';
+  // nejlevnější pumpy u hranic (Tankerkönig DE — nutný klíč; E-Control AT — veřejné)
+  const pumpyBlok=(zdroj,titul,pozn)=>{
+    if(!zdroj||!zdroj.points||!zdroj.points.length) return null;
+    let b='<div><h2 style="margin:0 0 8px">'+titul+' <span class="muted">('+pozn+')</span></h2>';
+    zdroj.points.forEach(pt=>{
+      b+='<div class="muted" style="margin:6px 0 4px;font-weight:600">'+esc(pt.bod)+'</div>';
+      if(!pt.stanice.length){ b+='<p class="muted" style="font-size:12px;margin:0">žádná otevřená pumpa s cenou v okruhu</p>'; return; }
+      b+='<table><thead><tr><th style="text-align:left">Pumpa</th><th>km</th><th>€/l</th><th>Kč/l</th></tr></thead><tbody>'
+        +pt.stanice.map(s=>'<tr><td style="text-align:left">'+esc(s.name)+(s.place?' <span class="muted">'+esc(s.place)+'</span>':'')+'</td><td>'+(s.dist!=null?d2(s.dist):'—')+'</td><td>'+s.eurPerL.toFixed(3).replace('.',',')+'</td><td><b>'+(s.czkPerL!=null?d2(s.czkPerL):'—')+'</b></td></tr>').join('')
+        +'</tbody></table>';
+    });
+    return b+'</div>';
+  };
+  const blokDe=pumpyBlok(N.de,'Pumpy u hranic — Německo','MTS-K, živě, s DPH'), blokAt=pumpyBlok(N.at,'Pumpy u hranic — Rakousko','E-Control, 5 nejlevnějších, s DPH');
+  if(blokDe||blokAt){
+    h+='<h2 style="margin:16px 0 8px">Nejlevnější nafta u hraničních přechodů</h2><div class="grid2">'+(blokDe||'<div></div>')+(blokAt||'<div></div>')+'</div>';
+  }
+  if(N.de&&N.de.chybiKlic&&ADMIN)
+    h+=alertHtml('info','Německé pumpy (živá data všech ~14 000 stanic ze státního MTS-K) se zapnou bezplatným klíčem: registrace na <a href="https://creativecommons.tankerkoenig.de/" target="_blank" rel="noopener">creativecommons.tankerkoenig.de</a>, klíč vložit na Railway jako <b>TANKERKOENIG_API_KEY</b>.');
   // tankovací karty — ruční ceník z klientských portálů (Eurowag/DKV…), edituje správce přímo tady
   const kZaznamy=(N.karty||[]).flatMap(k=>k.prices.map(p=>({card:k.card,station:p.station||'',country:p.country||'CZ',price:p.price,currency:p.currency||'CZK',note:p.note||''})));
   const kTs=(N.karty&&N.karty.length&&N.karty[0].ts)||null, kKdo=(N.karty&&N.karty.length&&N.karty[0].kdo)||'';
@@ -325,7 +347,7 @@ function tabNafta(){
   }
   if(ADMIN) h+='<div class="chartbox" id="kartyAdmin" style="margin-top:12px"></div>';
   if(N.chyby&&N.chyby.length) h+=alertHtml('warn','Nedostupné zdroje při posledním stažení: '+N.chyby.map(esc).join(' · '));
-  h+='<p class="muted" style="font-size:12px">Staženo '+new Date(N.ts).toLocaleString('cs-CZ')+' · zdroje: ČSÚ (týdenní šetření PHM), cenaphm.cz (kraje), EU Weekly Oil Bulletin (země vč. daní), ČNB (kurz). Obnovuje se automaticky 2× denně, ručně tlačítkem v patičce.</p>';
+  h+='<p class="muted" style="font-size:12px">Staženo '+new Date(N.ts).toLocaleString('cs-CZ')+' · zdroje: ČSÚ (týdenní šetření PHM), cenaphm.cz (kraje), EU Weekly Oil Bulletin (země vč. daní), Tankerkönig/MTS-K (pumpy DE), E-Control (pumpy AT), Orlen (velkoobchod PL), ČNB (kurzy). Obnovuje se automaticky 2× denně, ručně tlačítkem v patičce.</p>';
   $('#app').innerHTML=h;
   if(ADMIN) kartyEditor(kZaznamy);
 }

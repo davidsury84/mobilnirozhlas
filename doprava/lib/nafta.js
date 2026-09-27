@@ -4,7 +4,10 @@
 //   ČSÚ (týdenní šetření)            celostátní průměr + změna proti minulému týdnu
 //   cenaphm.cz (přebírá ČSÚ)         průměry po krajích
 //   EU Weekly Oil Bulletin + ČNB     nafta vč. daní v okolních zemích (EUR/l → Kč/l)
-//   Tankovací karty                  ruční ceník z FUELCARD_PRICES_JSON (API adaptéry až budou přístupy)
+//   Tankerkönig (DE, MTS-K)          nejlevnější pumpy u hranic — nutný bezplatný klíč TANKERKOENIG_API_KEY
+//   E-Control (AT)                   nejlevnější pumpy u hranic — veřejné API bez klíče
+//   Orlen (PL)                       denní velkoobchodní cena ON Ekodiesel (od ní se odvíjejí karetní ceny)
+//   Tankovací karty                  ruční ceník z modulu / FUELCARD_PRICES_JSON
 
 const zlib = require('zlib');
 
@@ -13,6 +16,9 @@ const CSU_URL = 'https://data.csu.gov.cz/api/dotaz/v1/data/vybery/CENPHMTT01?for
 const CENAPHM_URL = 'https://cenaphm.cz/data.json';
 const WOB_PAGE = 'https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en';
 const CNB_URL = 'https://api.cnb.cz/cnbapi/exrates/daily?lang=EN';
+const TK_URL = 'https://creativecommons.tankerkoenig.de/json/list.php';
+const EC_URL = 'https://api.e-control.at/sprit/1.0/search/gas-stations/by-address';
+const ORLEN_URL = 'https://tool.orlen.pl/api/wholesalefuelprices';
 
 async function fetchText(url, timeoutMs) {
   const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(timeoutMs || 30000) });
@@ -204,6 +210,59 @@ function parseWob(sheets, wanted) {
   return wanted.filter((c) => out.has(c)).map((c) => out.get(c));
 }
 
+/* ---------- nejlevnější pumpy u hranic: Tankerkönig (DE) + E-Control (AT) ---------- */
+// Body zájmu (hraniční přechody / trasy): [{ name, lat, lon }]
+async function fetchTankerkoenig(points, klic) {
+  const out = [];
+  for (const b of points) {   // sekvenčně — bezplatné API chce šetrné tempo
+    const u = TK_URL + '?lat=' + b.lat + '&lng=' + b.lon + '&rad=25&sort=price&type=diesel&apikey=' + encodeURIComponent(klic);
+    const j = await fetchJson(u);
+    if (!j.ok) throw new Error('Tankerkönig: ' + (j.message || 'odpověď není ok'));
+    const stanice = (j.stations || []).filter((s) => s.isOpen !== false && Number.isFinite(Number(s.price)) && Number(s.price) > 0)
+      .slice(0, 5).map((s) => ({ name: [s.brand, s.name].filter(Boolean).join(' — ').slice(0, 60) || 'pumpa', place: s.place || '', dist: s.dist != null ? Number(s.dist) : null, eurPerL: Number(s.price) }));
+    out.push({ bod: b.name, stanice });
+  }
+  return out;
+}
+async function fetchEcontrol(points) {
+  const out = [];
+  for (const b of points) {
+    const u = EC_URL + '?latitude=' + b.lat + '&longitude=' + b.lon + '&fuelType=DIE&includeClosed=false';
+    const arr = await fetchJson(u);
+    if (!Array.isArray(arr)) throw new Error('E-Control: neočekávaná odpověď');
+    // ceny smí ze zákona zobrazit jen 5 nejlevnějších — ostatní přijdou bez prices
+    const stanice = arr.map((s) => {
+      const p = (s.prices || []).find((x) => (x.fuelType || '').toUpperCase() === 'DIE');
+      if (!p || !Number.isFinite(Number(p.amount))) return null;
+      const loc = s.location || {};
+      return { name: String(s.name || loc.name || 'pumpa').slice(0, 60), place: [loc.postalCode, loc.city].filter(Boolean).join(' '), dist: s.distance != null ? Number(s.distance) : null, eurPerL: Number(p.amount) };
+    }).filter(Boolean).sort((a, c) => a.eurPerL - c.eurPerL).slice(0, 5);
+    out.push({ bod: b.name, stanice });
+  }
+  return out;
+}
+
+/* ---------- Orlen (PL): denní velkoobchodní cena — základ karetních cen v Polsku ---------- */
+function parseOrlen(arr) {
+  if (!Array.isArray(arr)) throw new Error('Orlen: neočekávaná odpověď');
+  const on = arr.find((p) => /ekodiesel/i.test(p.productName || ''));
+  if (!on || !Number.isFinite(Number(on.value))) throw new Error('Orlen: ON Ekodiesel v datech není');
+  return { plnM3: Number(on.value), date: String(on.effectiveDate || '').slice(0, 10) };
+}
+async function fetchOrlen() {
+  // WAF pouští jen prohlížečové hlavičky (obyčejný fetch vrací „Request Rejected")
+  const res = await fetch(ORLEN_URL, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*', 'Accept-Language': 'pl,en;q=0.9',
+      'Referer': 'https://www.orlen.pl/', 'Origin': 'https://www.orlen.pl',
+    },
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + ORLEN_URL);
+  return parseOrlen(await res.json());
+}
+
 /* ---------- tankovací karty (ruční ceník) ---------- */
 function parseKarty(jsonText) {
   if (!jsonText || !jsonText.trim()) return [];
@@ -221,36 +280,48 @@ function parseKarty(jsonText) {
 
 /* ---------- agregace ---------- */
 // Stáhne všechny zdroje; každý selhává nezávisle (chybějící zdroj skončí v poli `chyby`).
-async function fetchNafta({ kraje, zeme, kartyJson } = {}) {
+async function fetchNafta({ kraje, zeme, kartyJson, bodyDe, bodyAt, tkKlic } = {}) {
   const wantedKraje = kraje && kraje.length ? kraje : ['Zlínský', 'Moravskoslezský', 'Olomoucký'];
   const wantedZeme = zeme && zeme.length ? zeme : ['SK', 'PL', 'DE', 'AT', 'HU', 'RO'];
-  const out = { ts: Date.now(), csu: null, kraje: null, eu: null, karty: [], chyby: [] };
+  const out = { ts: Date.now(), csu: null, kraje: null, eu: null, de: null, at: null, plHurt: null, karty: [], chyby: [] };
 
-  const [csu, kr, wobHtml, kurz] = await Promise.allSettled([
+  const [csu, kr, wobHtml, kurzy, de, at, pl] = await Promise.allSettled([
     fetchText(CSU_URL).then(parseCsuCsv),
     fetchJson(CENAPHM_URL).then((j) => parseCenaphm(j, wantedKraje)),
     fetchText(WOB_PAGE),
     fetchJson(CNB_URL).then((j) => {
-      const eur = (j.rates || []).find((r) => r.currencyCode === 'EUR');
+      const najdi = (kod) => { const r = (j.rates || []).find((x) => x.currencyCode === kod); return r ? Number(r.rate) / Number(r.amount || 1) : null; };
+      const eur = najdi('EUR');
       if (!eur) throw new Error('kurz EUR nenalezen');
-      return Number(eur.rate) / Number(eur.amount || 1);
+      return { EUR: eur, PLN: najdi('PLN') };
     }),
+    tkKlic && bodyDe && bodyDe.length ? fetchTankerkoenig(bodyDe, tkKlic) : Promise.resolve(null),
+    bodyAt && bodyAt.length ? fetchEcontrol(bodyAt) : Promise.resolve(null),
+    fetchOrlen(),
   ]);
   if (csu.status === 'fulfilled') out.csu = csu.value; else out.chyby.push('ČSÚ: ' + csu.reason.message);
   if (kr.status === 'fulfilled') out.kraje = kr.value; else out.chyby.push('kraje: ' + kr.reason.message);
+  const kurzEur = kurzy.status === 'fulfilled' ? kurzy.value.EUR : null;
+  const kurzPln = kurzy.status === 'fulfilled' ? kurzy.value.PLN : null;
 
   if (wobHtml.status === 'fulfilled') {
     try {
       const latest = findLatestXlsxUrl(wobHtml.value);
       const buf = await fetchBuffer(latest.url);
       const countries = parseWob(xlsxRows(buf), wantedZeme);
-      const rate = kurz.status === 'fulfilled' ? kurz.value : null;
-      for (const c of countries) c.czkPerL = rate ? +(c.eurPerL * rate).toFixed(2) : null;
-      out.eu = { date: latest.date, rate, countries };
+      for (const c of countries) c.czkPerL = kurzEur ? +(c.eurPerL * kurzEur).toFixed(2) : null;
+      out.eu = { date: latest.date, rate: kurzEur, countries };
     } catch (e) { out.chyby.push('EU bulletin: ' + e.message); }
   } else out.chyby.push('EU bulletin: ' + wobHtml.reason.message);
-  if (kurz.status === 'rejected') out.chyby.push('ČNB: ' + kurz.reason.message);
-  if (out.eu && kurz.status === 'fulfilled') out.eu.rate = kurz.value;
+  if (kurzy.status === 'rejected') out.chyby.push('ČNB: ' + kurzy.reason.message);
+
+  const prevodBodu = (v) => v ? { points: v.map((p) => ({ bod: p.bod, stanice: p.stanice.map((s) => ({ ...s, czkPerL: kurzEur ? +(s.eurPerL * kurzEur).toFixed(2) : null })) })) } : null;
+  if (de.status === 'fulfilled') out.de = prevodBodu(de.value); else out.chyby.push('Tankerkönig (DE): ' + de.reason.message);
+  if (!tkKlic) out.de = { chybiKlic: true, points: [] };   // klíč není → není to chyba, jen nenastavený zdroj
+  if (at.status === 'fulfilled') out.at = prevodBodu(at.value); else out.chyby.push('E-Control (AT): ' + at.reason.message);
+  if (pl.status === 'fulfilled') {
+    out.plHurt = { ...pl.value, kurzPln, czkPerL: kurzPln ? +(pl.value.plnM3 / 1000 * kurzPln).toFixed(2) : null };   // bez DPH
+  } else out.chyby.push('Orlen (PL): ' + pl.reason.message);
 
   try { out.karty = parseKarty(kartyJson || process.env.FUELCARD_PRICES_JSON || ''); }
   catch (e) { out.chyby.push('karty: ' + e.message); }
@@ -258,4 +329,4 @@ async function fetchNafta({ kraje, zeme, kartyJson } = {}) {
   return out;
 }
 
-module.exports = { fetchNafta, parseCsuCsv, parseCenaphm, parseWob, parseKarty, xlsxRows, findLatestXlsxUrl };
+module.exports = { fetchNafta, parseCsuCsv, parseCenaphm, parseWob, parseKarty, parseOrlen, fetchOrlen, fetchEcontrol, fetchTankerkoenig, xlsxRows, findLatestXlsxUrl };
