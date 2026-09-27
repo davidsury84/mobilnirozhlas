@@ -309,6 +309,21 @@ function mount(host) {
   let naftaCache = null;
   try { naftaCache = JSON.parse(fs.readFileSync(NAFTA_F, 'utf8')); } catch (_) {}
   let naftaFail = 0;
+  // Ruční ceník karet z modulu (soubor má přednost před env FUELCARD_PRICES_JSON).
+  const KARTY_F = path.join(host.dataDir || __dirname, 'doprava-karty.json');
+  function kartyZeSouboru() {
+    try {
+      const z = JSON.parse(fs.readFileSync(KARTY_F, 'utf8'));
+      const byCard = new Map();
+      for (const it of (z.polozky || [])) {
+        const list = byCard.get(it.card) || [];
+        list.push({ station: it.station, country: it.country, price: it.price, currency: it.currency, note: it.note });
+        byCard.set(it.card, list);
+      }
+      return [...byCard.entries()].map(([card, prices]) => ({ card, prices, ts: z.ts, kdo: z.kdo }));
+    } catch (_) { return null; }
+  }
+  if (naftaCache) { const fk0 = kartyZeSouboru(); if (fk0) naftaCache.karty = fk0; }   // po startu překrýt karty ručním ceníkem
   const naftaCfg = () => ({
     kraje: (process.env.DOPRAVA_NAFTA_KRAJE || 'Zlínský,Moravskoslezský,Olomoucký').split(',').map((s) => s.trim()).filter(Boolean),
     zeme: (process.env.DOPRAVA_NAFTA_ZEME || 'SK,PL,DE,AT,HU,RO').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
@@ -322,6 +337,7 @@ function mount(host) {
     _naftaBezi = (async () => {
       const out = await naftaLib.fetchNafta(naftaCfg());
       if (!out.csu && !out.kraje && !out.eu) { naftaFail = Date.now(); throw new Error(out.chyby.join('; ') || 'žádný zdroj nedostupný'); }
+      const fk = kartyZeSouboru(); if (fk) out.karty = fk;   // ruční ceník z modulu má přednost před env
       naftaCache = out;
       try { fs.writeFileSync(NAFTA_F, JSON.stringify(out)); } catch (_) {}
       return out;
@@ -528,6 +544,25 @@ function mount(host) {
         else json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), chyba: 'Nepodařilo se načíst data z Google Sheets: ' + e.message + ' Nasdíleli jste tabulky účtu ' + sheets.saEmail() + '?' });
       }
       return true;
+    }
+
+    // Ceník tankovacích karet (Eurowag/DKV…): edituje správce v záložce Nafta.
+    // Ceny se přepisují ručně z klientských portálů, dokud vydavatelé nedají B2B export.
+    if (p === '/api/doprava/nafta-karty' && req.method === 'POST') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Ceník karet upravuje jen správce.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+      const polozky = (Array.isArray(b.polozky) ? b.polozky : []).map((it) => ({
+        card: String(it.card || '').trim().slice(0, 30),
+        station: String(it.station || '').trim().slice(0, 60),
+        country: String(it.country || 'CZ').trim().toUpperCase().slice(0, 2),
+        price: Number(it.price),
+        currency: String(it.currency || 'CZK').trim().toUpperCase().slice(0, 3),
+        note: String(it.note || '').trim().slice(0, 60),
+      })).filter((it) => it.card && Number.isFinite(it.price) && it.price > 0).slice(0, 50);
+      const zaznam = { ts: Date.now(), kdo: (host.empSession(req) || {}).email || '', polozky };
+      try { fs.writeFileSync(KARTY_F, JSON.stringify(zaznam, null, 2)); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
+      if (naftaCache) { naftaCache.karty = kartyZeSouboru(); }   // promítnout hned, bez čekání na obnovu
+      json(res, 200, { ok: true, ts: zaznam.ts, polozek: polozky.length }); return true;
     }
 
     // Správa denní rozesílky ceníku (jen správce): číst / uložit nastavení / poslat teď.

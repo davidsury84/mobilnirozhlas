@@ -306,17 +306,67 @@ function tabNafta(){
       +'</tbody></table></div>';
   } else h+='<div></div>';
   h+='</div>';
-  // tankovací karty
-  if(N.karty&&N.karty.length){
-    h+='<h2 style="margin:16px 0 8px">Tankovací karty (ruční ceník)</h2><table><thead><tr><th style="text-align:left">Karta</th><th style="text-align:left">Stanice</th><th>Země</th><th>Cena</th></tr></thead><tbody>'
-      +N.karty.flatMap(k=>k.prices.map(p=>'<tr><td style="text-align:left">'+esc(k.card)+'</td><td style="text-align:left">'+esc(p.station)+(p.note?' <span class="muted">('+esc(p.note)+')</span>':'')+'</td><td>'+esc(p.country)+'</td><td>'+d2(p.price)+' '+esc(p.currency)+'</td></tr>')).join('')
-      +'</tbody></table>';
+  // tankovací karty — ruční ceník z klientských portálů (Eurowag/DKV…), edituje správce přímo tady
+  const kZaznamy=(N.karty||[]).flatMap(k=>k.prices.map(p=>({card:k.card,station:p.station||'',country:p.country||'CZ',price:p.price,currency:p.currency||'CZK',note:p.note||''})));
+  const kTs=(N.karty&&N.karty.length&&N.karty[0].ts)||null, kKdo=(N.karty&&N.karty.length&&N.karty[0].kdo)||'';
+  h+='<h2 style="margin:16px 0 8px">Tankovací karty (ruční ceník)</h2>';
+  if(kTs&&Date.now()-kTs>3*24*3600*1000) h+=alertHtml('warn','Ceník karet je starší než 3 dny (naposledy '+new Date(kTs).toLocaleString('cs-CZ')+') — ceny na portálech se mění denně, nechte ho aktualizovat.');
+  if(kZaznamy.length){
+    h+='<table><thead><tr><th style="text-align:left">Karta</th><th style="text-align:left">Stanice</th><th>Země</th><th>Cena</th>'+(csu?'<th>vs. ČR průměr</th>':'')+'</tr></thead><tbody>'
+      +kZaznamy.map(p=>{
+        const vsCr=(csu&&p.currency==='CZK')?p.price-csu.price:null;
+        return '<tr><td style="text-align:left">'+esc(p.card)+'</td><td style="text-align:left">'+esc(p.station)+(p.note?' <span class="muted">('+esc(p.note)+')</span>':'')+'</td><td>'+esc(p.country)+'</td><td><b>'+d2(p.price)+' '+esc(p.currency)+'</b></td>'
+          +(csu?'<td class="'+(vsCr==null?'':(vsCr<0?'pos':'neg'))+'">'+(vsCr!=null?sgn(vsCr,x=>d2(x)+' Kč'):'—')+'</td>':'')+'</tr>';
+      }).join('')
+      +'</tbody></table>'
+      +(kTs?'<p class="muted" style="font-size:12px">Poslední úprava ceníku: '+new Date(kTs).toLocaleString('cs-CZ')+(kKdo?' · '+esc(kKdo):'')+'</p>':'');
   } else {
-    h+='<p class="muted" style="font-size:12px;margin-top:14px">Ceny z tankovacích karet (Eurowag/DKV/Shell) zatím nejsou napojené — vydavatelé nemají veřejné API. Ruční denní ceník lze vložit do proměnné FUELCARD_PRICES_JSON na Railway; jakmile obchodní zástupce zpřístupní B2B export, napojí se automaticky.</p>';
+    h+='<p class="muted" style="font-size:12px;margin-top:6px">Ceny z tankovacích karet (Eurowag, DKV, Shell…) zatím nejsou vyplněné — vydavatelé nemají veřejné API a ceny vidí jen přihlášený klient na svém portálu.'+(ADMIN?' Vyplňte je v editoru níže — zobrazí se všem uživatelům modulu.':' Správce je může vyplnit přímo v této záložce.')+'</p>';
   }
+  if(ADMIN) h+='<div class="chartbox" id="kartyAdmin" style="margin-top:12px"></div>';
   if(N.chyby&&N.chyby.length) h+=alertHtml('warn','Nedostupné zdroje při posledním stažení: '+N.chyby.map(esc).join(' · '));
   h+='<p class="muted" style="font-size:12px">Staženo '+new Date(N.ts).toLocaleString('cs-CZ')+' · zdroje: ČSÚ (týdenní šetření PHM), cenaphm.cz (kraje), EU Weekly Oil Bulletin (země vč. daní), ČNB (kurz). Obnovuje se automaticky 2× denně, ručně tlačítkem v patičce.</p>';
   $('#app').innerHTML=h;
+  if(ADMIN) kartyEditor(kZaznamy);
+}
+// Editor ceníku karet (jen správce): ceny se opisují z klientských portálů, dokud není B2B export.
+function kartyEditor(zaznamy){
+  const box=document.getElementById('kartyAdmin'); if(!box) return;
+  const radek=z=>'<tr>'
+    +'<td><input class="kaKar" value="'+esc(z.card)+'" placeholder="Eurowag" style="width:110px"></td>'
+    +'<td><input class="kaSta" value="'+esc(z.station)+'" placeholder="stanice / síť" style="width:150px"></td>'
+    +'<td><input class="kaZem" value="'+esc(z.country)+'" maxlength="2" style="width:46px;text-transform:uppercase"></td>'
+    +'<td><input class="kaCen" inputmode="decimal" value="'+(z.price!=null?String(z.price).replace('.',','):'')+'" placeholder="Kč/l" style="width:84px"></td>'
+    +'<td><input class="kaMen" value="'+esc(z.currency)+'" maxlength="3" style="width:56px;text-transform:uppercase"></td>'
+    +'<td><input class="kaPoz" value="'+esc(z.note)+'" placeholder="bez DPH / s DPH…" style="width:150px"></td>'
+    +'<td><button class="btn sec kaDel" type="button" title="smazat řádek">×</button></td></tr>';
+  const prazdny={card:'',station:'',country:'CZ',price:'',currency:'CZK',note:''};
+  box.innerHTML='<h2 style="margin:0 0 8px">Správa ceníku karet</h2>'
+    +'<p class="muted" style="margin:0 0 8px">Opište aktuální ceny z klientského portálu (Eurowag, DKV…). Do poznámky uveďte, zda je cena bez DPH — srovnání „vs. ČR průměr" počítá s cenou s DPH v Kč.</p>'
+    +'<table><thead><tr><th style="text-align:left">Karta</th><th style="text-align:left">Stanice</th><th>Země</th><th>Cena</th><th>Měna</th><th style="text-align:left">Poznámka</th><th></th></tr></thead>'
+    +'<tbody id="kaTelo">'+(zaznamy.length?zaznamy.map(radek).join(''):radek(prazdny))+'</tbody></table>'
+    +'<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">'
+    +'<button class="btn sec" id="kaPridat" type="button">+ Přidat řádek</button>'
+    +'<button class="btn" id="kaUloz" type="button">Uložit ceník</button>'
+    +'<span class="muted" id="kaStav"></span></div>';
+  const telo=document.getElementById('kaTelo'), stav=t=>{document.getElementById('kaStav').textContent=t;};
+  const zapniMazani=()=>{telo.querySelectorAll('.kaDel').forEach(b=>{b.onclick=()=>{b.closest('tr').remove();};});};
+  zapniMazani();
+  document.getElementById('kaPridat').onclick=()=>{ telo.insertAdjacentHTML('beforeend',radek(prazdny)); zapniMazani(); };
+  document.getElementById('kaUloz').onclick=async()=>{
+    const polozky=[...telo.querySelectorAll('tr')].map(tr=>({
+      card:tr.querySelector('.kaKar').value.trim(), station:tr.querySelector('.kaSta').value.trim(),
+      country:tr.querySelector('.kaZem').value.trim().toUpperCase(), price:parseFloat(String(tr.querySelector('.kaCen').value).replace(',','.')),
+      currency:tr.querySelector('.kaMen').value.trim().toUpperCase(), note:tr.querySelector('.kaPoz').value.trim(),
+    })).filter(p=>p.card&&isFinite(p.price)&&p.price>0);
+    stav('Ukládám…');
+    try{
+      const r=await fetch('/api/doprava/nafta-karty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({polozky})});
+      const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status);
+      stav('Uloženo ✓ ('+j.polozek+' položek)');
+      await načti();   // překreslí záložku s novým ceníkem
+    }catch(e){ stav('Chyba: '+e.message); }
+  };
 }
 
 /* ================= FINANČNÍ PLÁN (Plán tržeb aktuální) ================= */
