@@ -105,6 +105,7 @@ function mount(host) {
     fallbackKomu: [],                 // obchodník bez e-mailu / nereaguje → sem (prázdné = správce)
     obchodnici: {},                   // ruční přiřazení „jméno z faktury" → e-mail (funguje i pro „E-SHOP", „ELKOPLAST CZ")
     utvary: {},                       // faktury BEZ vystavitele: „útvar" → e-mail (Stř. DOPRAVA, Spedice…)
+    zakaznici: { 'ROMOLD': 'hana.faltynkova@elkoplast.cz' },   // výjimka podle ZÁKAZNÍKA (část názvu) → e-mail; má přednost před vystavitelem i útvarem
     vylouceni: [],                    // zákazníci mimo eskalaci (vnitroskupinové firmy — Elkoplast Slušovice, ELKOPLAST PARTNERS…)
     firma: { nazev: 'ELKOPLAST CZ, s.r.o.', sidlo: 'Štefánikova 2664, 760 01 Zlín', ico: '25347942', dic: 'CZ25347942',
       zapis: 'zapsaná v obchodním rejstříku vedeném Krajským soudem v Brně, sp. zn. C 27857', ucet: '43-7051540287/0100', iban: '', email: '', tel: '' },
@@ -130,7 +131,9 @@ function mount(host) {
   // nebo prázdný → vedoucí útvaru (mapa „útvar → e-mail"), 3) jméno vystavitele z Helia spárované s DB zaměstnanců intranetu,
   // 4) nikdo → náhradní příjemce (fallbackKomu, jinak správce). Vrací i zdroj, aby šlo v appce ukázat, PROČ to komu chodí.
   const zUtvaru = (utvar, cfg) => { const e = vlastnikUtvaru(utvar, cfg); return e ? { email: e, zdroj: 'utvar' } : { email: null, zdroj: null }; };
-  function obchodnikInfo(kdo, cfg, utvar) {
+  function obchodnikInfo(kdo, cfg, utvar, org) {
+    const zk = cfg.zakaznici || {}, o = bezDiak(org); const zkk = o ? Object.keys(zk).find(x => x && zk[x] && o.indexOf(bezDiak(x)) >= 0) : null;
+    if (zkk) return { email: String(zk[zkk]).toLowerCase(), zdroj: 'zakaznik', pravidlo: zkk };
     const k = String(kdo || '').trim(); if (!k) return zUtvaru(utvar, cfg);
     const rucne = cfg.obchodnici || {}; const rk = Object.keys(rucne).find(x => bezDiak(x) === bezDiak(k)); if (rk && rucne[rk]) return { email: String(rucne[rk]).toLowerCase(), zdroj: 'rucne' };
     if (/^e-?shop$/i.test(k) || /^elkoplast/i.test(k)) return zUtvaru(utvar, cfg);
@@ -143,7 +146,7 @@ function mount(host) {
     if (!hit && t.length >= 2) { const guess = [t[1] + '.' + t[0], t[0] + '.' + t[1]].map(x => x + '@elkoplast.cz'); hit = emps.find(e => guess.indexOf(String(e.email).toLowerCase()) >= 0); }
     return hit ? { email: String(hit.email).toLowerCase(), zdroj: 'zamestnanec', zamestnanec: hit.name } : zUtvaru(utvar, cfg);
   }
-  function obchodnikEmail(kdo, cfg, utvar) { return obchodnikInfo(kdo, cfg, utvar).email; }
+  function obchodnikEmail(kdo, cfg, utvar, org) { return obchodnikInfo(kdo, cfg, utvar, org).email; }
   function nahradniPrijemci(cfg) { const f = cleanEmails(cfg.fallbackKomu || []); return f.length ? f : cleanEmails([process.env.SUPERADMIN || 'david.sury@elkoplast.cz']); }
   const vyloucen = (x, cfg) => (cfg.vylouceni || []).some(v => v && bezDiak(x.org) === bezDiak(v));
   const dnesISO = () => new Date().toISOString().slice(0, 10);
@@ -163,10 +166,10 @@ function mount(host) {
     const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; const dnes = dnesISO(); const out = [];
     (P ? P.faktury : []).forEach(x => { if (x.dni < cfg.kroky.obchodnik) return;
       if (vyloucen(x, cfg)) return;
-      const st = d.stav[x.pz] || {}; const oi = obchodnikInfo(x.kdo, cfg, x.utvar), em = oi.email;
+      const st = d.stav[x.pz] || {}; const oi = obchodnikInfo(x.kdo, cfg, x.utvar, x.org), em = oi.email;
       const odd = cfg.oddeleni.find(o => utvarPatri(x.utvar, o.utvary)); let prom = null, doProm = null;
       if (odd && odd.promlceniMes) { const pr = new Date(x.spl + 'T00:00:00Z'); pr.setUTCMonth(pr.getUTCMonth() + odd.promlceniMes); prom = pr.toISOString().slice(0, 10); doProm = Math.round((Date.parse(prom) - Date.parse(dnes)) / 86400000); }
-      const rec = Object.assign({}, x, { obchodnikEmail: em, zdroj: oi.zdroj, zamestnanec: oi.zamestnanec || null, oddeleni: odd ? odd.key : null, promlceni: prom, doPromlceni: doProm, faze: fazeFaktury(x, st, cfg), stav: st });
+      const rec = Object.assign({}, x, { obchodnikEmail: em, zdroj: oi.zdroj, zamestnanec: oi.zamestnanec || null, pravidlo: oi.pravidlo || null, oddeleni: odd ? odd.key : null, promlceni: prom, doPromlceni: doProm, faze: fazeFaktury(x, st, cfg), stav: st });
       if (!filtr || filtr(rec)) out.push(rec); });
     return { cfg, faktury: out.sort((a, b) => b.dni - a.dni), den: P ? P.den : '', nahradni: nahradniPrijemci(cfg) };
   }
@@ -195,7 +198,7 @@ function mount(host) {
     const vysledky = [], perObch = {}, perObch2 = {}, upomLucii = [], vyzvyLucii = {};
     const oddKomuPro = x => { const o = cfg.oddeleni.find(o2 => utvarPatri(x.utvar, o2.utvary)); return o ? cleanEmails(o.komu || []) : []; };
     P.faktury.forEach(x => { if (vyloucen(x, cfg)) return; const st = d.stav[x.pz] = d.stav[x.pz] || {}; const faze = fazeFaktury(x, st, cfg);
-      const em = obchodnikEmail(x.kdo, cfg, x.utvar); const adr = [...new Set([].concat(em ? [em] : fallback, oddKomuPro(x)))];
+      const em = obchodnikEmail(x.kdo, cfg, x.utvar, x.org); const adr = [...new Set([].concat(em ? [em] : fallback, oddKomuPro(x)))];
       if (faze === 'nova') adr.forEach(e => (perObch[e] = perObch[e] || []).push(Object.assign({ _fallback: !em }, x)));
       else if (faze === 'bez-rozhodnuti' && !(st.nag && st.nag.posledni === dnes)) adr.forEach(e => (perObch2[e] = perObch2[e] || []).push(Object.assign({ _fallback: !em, _nag: (st.nag && st.nag.pocet) || 0 }, x)));
       else if (faze === 'upominka' && !st.kU) upomLucii.push(Object.assign({ _em: em }, x));
@@ -1716,6 +1719,7 @@ function mount(host) {
         if (c.lhutaVyzvyDni > 0) d.cfg.lhutaVyzvyDni = Math.round(+c.lhutaVyzvyDni);
         if (typeof c.aktivni === 'boolean') d.cfg.aktivni = c.aktivni;
         if (c.obchodnici && typeof c.obchodnici === 'object') { d.cfg.obchodnici = d.cfg.obchodnici || {}; Object.keys(c.obchodnici).slice(0, 200).forEach(k => { const v = cleanEmails([c.obchodnici[k]])[0]; if (v) d.cfg.obchodnici[String(k).slice(0, 80)] = v; else delete d.cfg.obchodnici[k]; }); }
+        if (c.zakaznici && typeof c.zakaznici === 'object') { d.cfg.zakaznici = d.cfg.zakaznici || {}; Object.keys(c.zakaznici).slice(0, 200).forEach(k => { const kk = String(k).replace(/\s+/g, ' ').trim().slice(0, 80); if (kk.length < 3) return; const v = cleanEmails([c.zakaznici[k]])[0]; if (v) d.cfg.zakaznici[kk] = v; else delete d.cfg.zakaznici[kk]; }); }
         if (c.utvary && typeof c.utvary === 'object') { d.cfg.utvary = d.cfg.utvary || {}; Object.keys(c.utvary).slice(0, 100).forEach(k => { const v = cleanEmails([c.utvary[k]])[0]; if (v) d.cfg.utvary[String(k).slice(0, 80)] = v; else delete d.cfg.utvary[k]; }); }
         if (Array.isArray(c.vylouceni)) d.cfg.vylouceni = c.vylouceni.map(x => String(x).trim()).filter(Boolean).slice(0, 200); else if (typeof c.vylouceni === 'string') d.cfg.vylouceni = c.vylouceni.split(/[;\n]/).map(x => x.trim()).filter(Boolean).slice(0, 200);
         if (c.adresy && typeof c.adresy === 'object') { d.cfg.adresy = d.cfg.adresy || {}; Object.keys(c.adresy).slice(0, 500).forEach(k => { const v = String(c.adresy[k] || '').slice(0, 300); if (v) d.cfg.adresy[k] = v; else delete d.cfg.adresy[k]; }); }
