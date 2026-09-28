@@ -2218,7 +2218,11 @@ function employeeModules(email) {
   email = (email || '').toLowerCase();
   const s = readJson(STATE_F, { employees: [] });
   const e = (s.employees || []).find(x => (x.email || '').toLowerCase() === email);
-  if (e && Array.isArray(e.modules)) return e.modules;
+  if (e && Array.isArray(e.modules)) {
+    // příjemce eskalace pohledávek (vedoucí útvaru, výjimka podle zákazníka…) vidí modul Pohledávky i bez ručně přiděleného přístupu
+    try { if (e.modules.indexOf('pohledavky') < 0 && nakupReportMod && nakupReportMod.jePrijemcePohledavek && nakupReportMod.jePrijemcePohledavek(email)) return e.modules.concat(['pohledavky']); } catch (_) {}
+    return e.modules;
+  }
   // Partnerský účet (bez Google SSO) — moduly má ve vlastní evidenci, aby kontroly
   // přístupu v modulech fungovaly beze změny.
   const u = extUcet(email);

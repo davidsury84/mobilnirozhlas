@@ -113,13 +113,33 @@ function mount(host) {
     lhutaVyzvyDni: 7,
     oddeleni: [ { key: 'doprava', nazev: 'Doprava', utvary: ['DOPRAVA', 'SPEDICE'], komu: [], modul: 'doprava', promlceniMes: 12 } ],
   };
+  // Přiřazení zadaná správcem „přes chat" — doplní se JEDNOU do uloženého nastavení (příznak v d.seed), pak už je mění jen správce v appce
+  // (smazání i přepsání v appce pak platí). Při prvním použití přepíše i dřívější hodnotu — je to výslovný pokyn správce.
+  const SEED_PRIRAZENI = [
+    { id: 'roto-ladislav-krajca', mapa: 'utvary', klic: 'DIVIZE ROTO', email: 'ladislav.krajca@elkoplast.cz' },   // 2026-09-28: vedoucí Rota
+  ];
   const loadUpom = () => { let d = {}; try { d = JSON.parse(fs.readFileSync(UPOM_F, 'utf8')) || {}; } catch (_) {}
     const cfg = Object.assign({}, JSON.parse(JSON.stringify(UPOM_DEFAULT)), d.cfg || {});
     cfg.kroky = Object.assign({}, UPOM_DEFAULT.kroky, (d.cfg && d.cfg.kroky) || {}); cfg.firma = Object.assign({}, UPOM_DEFAULT.firma, (d.cfg && d.cfg.firma) || {}); cfg.podpis = Object.assign({}, UPOM_DEFAULT.podpis, (d.cfg && d.cfg.podpis) || {});
     if (!cfg.firma.ucet) cfg.firma.ucet = UPOM_DEFAULT.firma.ucet;
     if (!Array.isArray(cfg.oddeleni) || !cfg.oddeleni.length) cfg.oddeleni = JSON.parse(JSON.stringify(UPOM_DEFAULT.oddeleni));
-    return { cfg, stav: d.stav || {} }; };
-  const saveUpom = d => { try { fs.writeFileSync(UPOM_F, JSON.stringify(d, null, 2)); } catch (_) {} };
+    const seed = Object.assign({}, d.seed || {});
+    SEED_PRIRAZENI.forEach(x => { if (seed[x.id]) return; cfg[x.mapa] = Object.assign({}, cfg[x.mapa] || {}); cfg[x.mapa][x.klic] = x.email; seed[x.id] = new Date().toISOString().slice(0, 10); });
+    return { cfg, stav: d.stav || {}, seed }; };
+  const saveUpom = d => { try { fs.writeFileSync(UPOM_F, JSON.stringify(d, null, 2)); } catch (_) {} prijemciCache = null; };
+  // Kdo je příjemcem eskalace (přiřazený vedoucí útvaru, výjimka podle zákazníka, obchodník, Lucie, náhradní příjemce),
+  // má do modulu Pohledávky přístup automaticky — jinak by ho dlaždice a e-mail vedly na „nemáte přístup". Cache 60 s.
+  let prijemciCache = null;
+  function jePrijemcePohledavek(email) {
+    const em = String(email || '').toLowerCase(); if (!em) return false;
+    try { if (!prijemciCache || Date.now() - prijemciCache.at > 60000) { const e = eskalacePrehled(), c = e.cfg, set = new Set();
+        [c.obchodnici, c.utvary, c.zakaznici].forEach(m => Object.values(m || {}).forEach(v => v && set.add(String(v).toLowerCase())));
+        cleanEmails(c.vyzvaKomu || []).concat(cleanEmails(c.fallbackKomu || [])).forEach(v => set.add(v));
+        (c.oddeleni || []).forEach(o => cleanEmails(o.komu || []).forEach(v => set.add(v)));
+        e.faktury.forEach(f => f.obchodnikEmail && set.add(f.obchodnikEmail));
+        prijemciCache = { at: Date.now(), set }; }
+      return prijemciCache.set.has(em); } catch (_) { return false; }
+  }
   const utvarPatri = (utvar, vzory) => { const u = String(utvar || '').toUpperCase(); return (vzory || []).some(v => v && u.indexOf(String(v).toUpperCase()) >= 0); };
   const bezDiak = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   // „Rychlíková Jana" z faktury → e-mail zaměstnance. Postupně: ruční mapa → shoda množiny jmen (bez titulů,
@@ -2033,7 +2053,7 @@ function mount(host) {
     return reports().find(r => r.key === key) || null;
   }
 
-  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), syncExporty: () => syncExporty(), syncPohledavky: () => syncPohledavky(), tickEskalace, notifikace, reports, setReport };
+  return { handle, tick, sync: () => syncObjednavky(false), syncObrat: () => syncObrat(false), syncExporty: () => syncExporty(), syncPohledavky: () => syncPohledavky(), tickEskalace, notifikace, jePrijemcePohledavek, reports, setReport };
 }
 
 module.exports = { mount };
