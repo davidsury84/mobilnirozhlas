@@ -3883,7 +3883,8 @@ function vykRenderShell(){
     +'<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Srovnání závodů — hotové výrobky za pracovní den</b><span class="muted" style="font-size:12px">hotový výrobek = poslední operace (lakování) · cíl výchozí 6 kontejnerů/den · odstávky a neúplný týden mimo průměry</span></div><div style="overflow-x:auto;margin-top:8px"><table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>'+['Závod','Cíl / den','Posledních 4 týdny','Celý rok','Plnění (rok)','Týdnů pod cílem','Hotovo za rok','Úzké hrdlo'].map((h,i)=>'<th style="text-align:'+(i>0&&i<7?'right':'left')+';'+vykTh+'">'+h+'</th>').join('')+'</tr></thead><tbody>'
       +(ov.zavody||[]).map(z=>{ const v=z.vystup; if(!v) return '<tr><td style="'+vykTd+'"><b>'+esc(z.name)+'</b></td><td colspan="7" class="muted" style="'+vykTd+'">bez dat</td></tr>'; const col=x=>!v.cil||x==null?'var(--ink)':(x>=v.cil?'#0a7a0a':(x>=v.cil*0.8?'#b57400':'#c93a39')); const f=x=>x==null?'—':String(x).replace('.',',');
         return '<tr style="cursor:pointer" onclick="vykPick(\''+z.key+'\')"><td style="'+vykTd+'"><b>'+esc(z.name)+'</b></td><td style="'+vykTd+';text-align:right">'+(v.cil||'—')+'</td><td style="'+vykTd+';text-align:right;font-weight:700;color:'+col(v.lakDen4)+'">'+f(v.lakDen4)+'</td><td style="'+vykTd+';text-align:right;color:'+col(v.lakDenRok)+'">'+f(v.lakDenRok)+'</td><td style="'+vykTd+';text-align:right">'+(v.plneniRok!=null?v.plneniRok+' %':'—')+'</td><td style="'+vykTd+';text-align:right">'+(v.tydnuPod!=null?v.tydnuPod+' / '+v.tydnu:'—')+'</td><td style="'+vykTd+';text-align:right">'+vykF(v.lakRok)+'</td><td style="'+vykTd+';font-size:12px;color:var(--ink-soft)">'+esc(v.hrdlo||'')+'</td></tr>'; }).join('')+'</tbody></table></div></div>'
-    +'<div class="card pad" style="margin-bottom:14px" id="vykCmpCard"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Indikátory napříč závody</b><span class="muted" style="font-size:12px">jeden indikátor, všechny výrobní závody po měsících · Popelnice vynechána (bedny, jiná měřítka)</span><label style="margin-left:auto;font-size:12px;display:inline-flex;gap:6px;align-items:center;color:var(--ink-soft)"><input type="checkbox" id="vykCmpPop" onchange="VYK.cmpPop=this.checked;vykCmpLoad()"> zahrnout Popelnice</label></div><div id="vykCmp" style="margin-top:8px"><p class="muted" style="margin:0">Načítám…</p></div></div>'
+    +'<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Změny po měsících</b><span class="muted" style="font-size:12px">hodnota za měsíc a pod ní změna proti předchozímu měsíci · * = běžící neúplný měsíc</span></div><div id="vykMes" style="margin-top:8px" class="muted">Načítám…</div></div>'
+    +'<div class="card pad" style="margin-bottom:14px" id="vykCmpCard"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Indikátory napříč závody</b><span class="muted" style="font-size:12px">jeden indikátor, všechny výrobní závody po měsících · Popelnice vynechána (bedny, jiná měřítka)</span><label style="margin-left:auto;font-size:12px;display:inline-flex;gap:6px;align-items:center;color:var(--ink-soft)"><input type="checkbox" id="vykCmpPop" onchange="VYK.cmpPop=this.checked;vykCmpRender()"> zahrnout Popelnice</label></div><div id="vykCmp" style="margin-top:8px"><p class="muted" style="margin:0">Načítám…</p></div></div>'
     +'<div id="vykDetail"></div>'
     +(ov.admin?'<div class="card pad" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between"><span class="muted" style="font-size:12.5px">Service account: '+esc(ov.saEmail||'—')+' · Drive '+(ov.driveConfigured?'nastaven':'<b style="color:#a03a2c">není nastaven</b>')+'</span><span class="inline-actions" style="gap:8px"><button class="btn sm ghost" onclick="vykSync()">🔄 Obnovit z Drive (exporty + plány)</button></span></div>':'');
   vykRenderZavody(); vykCmpLoad();
@@ -3892,13 +3893,47 @@ function vykRenderShell(){
 const VYK_BARVY={chomutov:'#2a78d6',abroly:'#eb6834',supikovice:'#0a7a0a',popelnice:'#8a4baf'};
 async function vykCmpLoad(){
   const box=document.getElementById('vykCmp'); if(!box) return;
-  try{ const r=await fetch('/api/vykonnost/indikatory'+(VYK.cmpPop?'':'?bez=popelnice'),{cache:'no-store'}); const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status)); VYK.cmp=j; }
-  catch(e){ box.innerHTML='<span class="muted">Indikátory se nepodařilo načíst: '+esc(e.message)+'</span>'; return; }
-  if(!VYK.cmpK) VYK.cmpK='A7'; vykCmpRender();
+  try{ const r=await fetch('/api/vykonnost/indikatory',{cache:'no-store'}); const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status)); VYK.cmp=j; }
+  catch(e){ box.innerHTML='<span class="muted">Indikátory se nepodařilo načíst: '+esc(e.message)+'</span>'; const mb=document.getElementById('vykMes'); if(mb) mb.textContent='Data se nepodařilo načíst.'; return; }
+  if(!VYK.cmpK) VYK.cmpK='A7'; vykCmpRender(); vykMesRender();
+}
+/* ---- Změny po měsících: závody × měsíce, hodnota + změna proti předchozímu měsíci ---- */
+const VYK_MES_M=[
+  {k:'A7',l:'Hotových / den',smer:'up',des:1,cil:true,den:true,pop:'hotový výrobek = operace lakování ÷ pracovní dny'},
+  {k:'A8',l:'Hlavních operací / den',smer:'up',des:1,cil:true,den:true,pop:'kusy v 10 hlavních fázích kontejneru ÷ pracovní dny (cíl 72)'},
+  {k:'rows',l:'Odvedených operací',smer:'',des:0,pop:'počet zápisů odvedení v Heliosu za měsíc'},
+  {k:'ks',l:'Kusů',smer:'',des:0,pop:'součet odvedených kusů ve výrobních operacích'},
+  {k:'D1',l:'Lidí',smer:'',des:0,pop:'počet lidí, kteří v měsíci odvedli aspoň jednu operaci'},
+  {k:'rezH',l:'Režie h',smer:'down',des:0,pop:'hodiny zapsané do režijních položek'},
+  {k:'A1',l:'Režie % fondu',smer:'down',des:0,jedn:' %',den:true,pop:'režijní hodiny ÷ fond pracovní doby lidí s odváděním'},
+  {k:'C1',l:'Terminál %',smer:'up',des:0,jedn:' %',den:true,pop:'podíl zápisů pořízených na terminálu'}
+];
+function vykMesRender(){
+  const box=document.getElementById('vykMes'), J=VYK.cmp; if(!box||!J) return;
+  const Z=(J.zavody||[]).filter(z=>z.mesice); if(!Z.length){ box.textContent='Zatím nejsou data.'; return; }
+  const D=VYK_MES_M.find(d=>d.k===(VYK.mesK||'A7'))||VYK_MES_M[0];
+  const months=[...new Set(Z.flatMap(z=>z.mesice.map(M=>M.m)))].sort();
+  const lab=ym=>['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][+ym.slice(5)-1]+'/'+ym.slice(2,4);
+  const f=v=>v==null?'—':(D.des?(Math.round(v*10)/10).toLocaleString('cs-CZ',{minimumFractionDigits:1,maximumFractionDigits:1}):Math.round(v).toLocaleString('cs-CZ'))+(D.jedn||'');
+  let h='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+VYK_MES_M.map(d=>'<button class="btn sm'+(d.k===D.k?'':' ghost')+'" style="padding:4px 10px;font-size:12px" title="'+esc(d.pop)+'" onclick="VYK.mesK=\''+d.k+'\';vykMesRender()">'+esc(d.l)+'</button>').join('')+'</div>';
+  h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px;color:var(--ink)"><thead><tr><th style="text-align:left;'+vykTh+'">Závod</th>'+(D.cil?'<th style="text-align:right;'+vykTh+'">Cíl</th>':'')+months.map(m=>'<th style="text-align:right;'+vykTh+'">'+lab(m)+(Z.some(z=>(z.mesice.find(q=>q.m===m)||{}).neuplny)?'*':'')+'</th>').join('')+'<th style="text-align:right;'+vykTh+'" title="poslední uzavřený měsíc proti prvnímu měsíci roku">Od začátku roku</th></tr></thead><tbody>';
+  Z.forEach(z=>{ const cil=D.cil?((z.cile&&z.cile[D.k])||(D.k==='A7'?z.cil:null)):null; let prev=null, first=null, lastFull=null;
+    h+='<tr style="cursor:pointer" onclick="vykPick(\''+z.key+'\')"><td style="'+vykTd+';white-space:nowrap"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+(VYK_BARVY[z.key]||'#555')+';margin-right:6px;vertical-align:-1px"></i><b>'+esc(z.name)+'</b></td>'+(D.cil?'<td style="'+vykTd+';text-align:right" class="muted">'+(cil?String(cil).replace('.',','):'—')+'</td>':'');
+    months.forEach(m=>{ const M=z.mesice.find(q=>q.m===m); const v=M?M[D.k]:null; const ne=M&&M.neuplny;
+      // u součtů (operace, kusy, hodiny, lidé) se běžící měsíc s předchozím srovnat nedá
+      const srov=v!=null&&prev!=null&&(!ne||D.den); const d=srov?Math.round((v-prev)*10)/10:null;
+      const ok=d==null||d===0||!D.smer?null:(D.smer==='up'?d>0:d<0);
+      const col=cil&&v!=null?(v>=cil?'#0a7a0a':(v>=cil*0.8?'#b57400':'#c93a39')):'var(--ink)';
+      h+='<td style="'+vykTd+';text-align:right;white-space:nowrap'+(ne?';opacity:.75':'')+'"><div style="font-weight:600;color:'+col+'">'+f(v)+(ne?'*':'')+'</div><div style="font-size:11px;color:'+(ok==null?'var(--ink-soft)':(ok?'#0a7a0a':'#c93a39'))+'">'+(d==null?(v!=null&&prev!=null&&ne?'neúplný':'&nbsp;'):(d===0?'=':(d>0?'▲ +':'▼ −')+f(Math.abs(d))))+'</div></td>';
+      if(v!=null){ if(first==null&&!ne) first=v; if(!ne) lastFull=v; prev=v; } });
+    const dd=(first!=null&&lastFull!=null)?Math.round((lastFull-first)*10)/10:null; const okk=dd==null||dd===0||!D.smer?null:(D.smer==='up'?dd>0:dd<0);
+    h+='<td style="'+vykTd+';text-align:right;white-space:nowrap;font-weight:600;color:'+(okk==null?'var(--ink-soft)':(okk?'#0a7a0a':'#c93a39'))+'">'+(dd==null?'—':(dd===0?'=':(dd>0?'▲ +':'▼ −')+f(Math.abs(dd)))+(first?' <span style="font-weight:400">('+(dd>0?'+':'−')+Math.abs(Math.round(dd/first*100))+' %)</span>':''))+'</td></tr>'; });
+  h+='</tbody></table></div><div class="muted" style="font-size:12px;margin-top:6px">'+esc(D.pop)+'. '+(D.smer?'Zelená změna = zlepšení, červená = zhoršení.':'Změna je jen informativní (víc není samo o sobě lépe ani hůř).')+(D.cil?' Barva hodnoty: zelená = cíl splněn, žlutá = nad 80 % cíle, červená = pod 80 %.':'')+' Kliknutím na řádek otevřete detail závodu.</div>';
+  box.innerHTML=h;
 }
 function vykCmpRender(){
   const box=document.getElementById('vykCmp'), J=VYK.cmp; if(!box||!J) return;
-  const defs=(J.legenda||[]).flatMap(g=>g.items); const def=defs.find(d=>d.k===VYK.cmpK)||defs[0]; const Z=(J.zavody||[]).filter(z=>z.mesice);
+  const defs=(J.legenda||[]).flatMap(g=>g.items); const def=defs.find(d=>d.k===VYK.cmpK)||defs[0]; const Z=(J.zavody||[]).filter(z=>z.mesice&&(VYK.cmpPop||z.key!=='popelnice'));
   const months=[...new Set(Z.flatMap(z=>z.mesice.map(M=>M.m)))].sort();
   const lab=ym=>['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][+ym.slice(5)-1];
   const fmtv=v=>v==null?'—':((def.k==='A3'||def.k==='B3'||def.k==='A7'||def.k==='A8'||def.k==='A9'||def.k==='A10')?String(v).replace('.',','):Number(v).toLocaleString('cs-CZ'))+(def.jedn==='%'?' %':(def.jedn?' '+def.jedn:''));
