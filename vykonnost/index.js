@@ -314,7 +314,8 @@ function mount(host) {
         for (let r = hi + 1; r < V.length; r++) { const row = V[r]; const op = row[ci.op] || ''; const min = numN(row[ci.min]); const kcRaw = ci.kc >= 0 ? row[ci.kc] : ''; const kc = isPLN(kcRaw) ? null : numN(kcRaw);
           if (!op && min == null) { if (row.every(c => !c)) last = ''; continue; }
           if (op) last = op; if (!last) continue;
-          mk({ kod: kodCol >= 0 ? row[kodCol] : '', op: last, del: rangeN(row[ci.del]), vys: rangeN(row[ci.vys]), min, kc, ks: numN(row[ci.ks]) }); }
+          const spc = row.find(c => /^SP\s*\d{3,4}$/i.test(c));
+          mk({ kod: (kodCol >= 0 && row[kodCol]) || (spc ? 'SP ' + spc.replace(/\D/g, '') : ''), op: last, del: rangeN(row[ci.del]), vys: rangeN(row[ci.vys]), min, kc, ks: numN(row[ci.ks]) }); }
         return { items, sazba, layout: 'A' };
       }
       // C) matice: skupiny podle sloupců s časem; varianta = text nad skupinou
@@ -415,10 +416,10 @@ function mount(host) {
   function normIndex() {
     if (_nIdx) return _nIdx;
     const N = loadNormy(); const items = (N && N.items) || [];
-    const byN = {}, byB = {}, byId = {}; items.forEach(n => { (byN[n.opN] = byN[n.opN] || []).push(n); (byB[n.opB] = byB[n.opB] || []).push(n); byId[normId(n)] = n; });
+    const byN = {}, byB = {}, byId = {}, bySP = {}; items.forEach(n => { const sp = /^SP (\d{3,4})$/.exec(n.kod || ''); if (sp) (bySP[sp[1]] = bySP[sp[1]] || []).push(n); (byN[n.opN] = byN[n.opN] || []).push(n); (byB[n.opB] = byB[n.opB] || []).push(n); byId[normId(n)] = n; });
     const keys = Object.keys(byB).filter(k => k.length >= 10).sort((a, b) => b.length - a.length);
     const tok = {}; keys.forEach(k => tok[k] = new Set(k.split(' ').filter(w => w.length > 1)));
-    return (_nIdx = { items, byN, byB, byId, keys, tok, syncedAt: N ? N.syncedAt : '', diag: (N && N.diag) || [], mapa: loadNMap(), cache: new Map() });
+    return (_nIdx = { items, byN, byB, byId, bySP, keys, tok, syncedAt: N ? N.syncedAt : '', diag: (N && N.diag) || [], mapa: loadNMap(), cache: new Map() });
   }
   function pickVariant(c, dil) {
     if (c.length === 1) return c[0];
@@ -441,8 +442,13 @@ function mount(host) {
     if (man === '__none__') res = null;
     else if (man && I.byId[man]) res = Object.assign({}, I.byId[man], { how: 'ručně' });
     else {
-      const ok = a => { const f = (a || []).filter(n => okruhOK(n, zavodKey, dil)); return f.length ? f : null; };
-      const o = nrm(op), ob = nrmBez(op); let c = ok(I.byN[o]) || ok(I.byB[ob]); let how = 'přesně';
+      // Číslo SP v názvu operace („… svaření - SP 1092“) je jednoznačné → páruje se podle něj. Když takové SP v normách není,
+      // nesmí operaci podle podobného názvu dostat norma jiného SP (Konzole S-hák SP 1067 ≠ SP 1309).
+      const spm = /(?:^|[^a-z0-9])SP\s*(\d{3,4})(?!\d)/i.exec(op);
+      const ok = a => { const f = (a || []).filter(n => okruhOK(n, zavodKey, dil) && !(spm && /^SP /.test(n.kod || ''))); return f.length ? f : null; };
+      const o = nrm(op), ob = nrmBez(op); let c = null, how = 'přesně';
+      if (spm && I.bySP[spm[1]]) { c = I.bySP[spm[1]].filter(n => okruhOK(n, zavodKey, dil)); if (c.length) how = 'číslo SP'; else c = null; }
+      if (!c) c = ok(I.byN[o]) || ok(I.byB[ob]);
       const al = ALIASY[o] || ALIASY[ob]; if (!c && al) { c = ok(I.byB[al]) || ok(I.byN[al]); if (c) how = 'alias'; }
       if (!c && ob.length >= 12) {
         // operace je delší než norma („… svaření - SP 1067“) → nejdelší norma, kterou začíná; operace je obecnější než norma („odkuličkování CITY“) → všechny její varianty, vybere pickVariant
