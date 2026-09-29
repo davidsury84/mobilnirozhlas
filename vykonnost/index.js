@@ -478,7 +478,8 @@ function mount(host) {
       { k: 'A6', label: '% výrobních řádků s normou', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'výrobní řádky spárované s položkou v katalogu norem ÷ výrobní řádky', proc: 'Pokrytí normami. Co není spárované, nemá cenu ani čas — buď chybí norma, nebo jen ruční přiřazení v záložce Normy.' },
       { k: 'A7', klic: true, label: 'Hotových výrobků za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v operaci lakování (poslední operace řetězce; u Popelnice „Lakování“ beden) ÷ pracovní dny měsíce', proc: 'Skutečný výstup závodu proti cíli (výchozí 6 kontejnerů/den; správce může změnit). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' },
       { k: 'A8', klic: true, label: 'Hlavních operací za pracovní den', jedn: 'op.', smer: 'up', cil: true, vzorec: 'kusy odvedené v 10 hlavních fázích kontejneru (natahování, trámec rolen, podlaha, 2× bočnice, 2× vrata, skládání, dovařování, osazení vrat, odkuličkování, lakování) ÷ pracovní dny měsíce', proc: 'Jeden kontejner = 12 hlavních operací, cíl 6 kontejnerů denně = 72 operací denně. Říká, jestli se odvádí tolik práce, kolik je na cílový výstup potřeba — dřív, než se to projeví na hotových kusech (A7). Zelená = cíl splněn, žlutá = nad 80 % cíle. Časy a počty fází se berou ze záložky Plán 6 ABR/den.' },
-      { k: 'A9', label: 'Hlavních operací na hotový kontejner', jedn: 'op.', smer: 'watch', cil: true, pasmo: [10, 25], vzorec: 'kusy odvedené v 10 hlavních fázích ÷ kusy v operaci lakování ABR', proc: 'Má vyjít 12. Méně = část práce na kontejneru se neodvádí (nebo končí v režii). Více = rozpracovanost roste, vyrábí se dílce, které se nedolakují. Zelená = do 10 % od 12, žlutá = do 25 %.' }
+      { k: 'A9', label: 'Hlavních operací na hotový kontejner', jedn: 'op.', smer: 'watch', cil: true, pasmo: [10, 25], vzorec: 'kusy odvedené v 10 hlavních fázích ÷ kusy v operaci lakování ABR', proc: 'Má vyjít 12. Méně = část práce na kontejneru se neodvádí (nebo končí v režii). Více = rozpracovanost roste, vyrábí se dílce, které se nedolakují. Zelená = do 10 % od 12, žlutá = do 25 %.' },
+      { k: 'A10', label: 'Odvedená práce v hlavních operacích — osobosměn za den', jedn: 'os.', smer: 'up', cil: true, vzorec: 'Σ (kusy fáze × čas fáze z plánu) ÷ délka směny ÷ pracovní dny měsíce', proc: 'Totéž co A8, ale vážené časem: dovařování (450 min) váží víc než natahování (60 min). Cíl = kolik lidí plně v úkolu je potřeba na cílový výstup (6 kontejnerů × 1 850 min ÷ 440 min = 25,2 osobosměny denně). Počet lidí na operaci počet kusů nemění — dva lidé na jednom dovaření si v Heliosu kus dělí (0,5 + 0,5).' }
     ] },
     { skup: 'B', nazev: 'Struktura režie — co se v ní schovává', items: [
       { k: 'B1', klic: true, label: '% režie, která je výroba bez normy', jedn: '%', smer: 'down', prah: [25, 50], vzorec: 'hodiny v režijních operacích výrobního typu (úprava/příprava materiálu, spojování vrat, polepování, přehazování nástrojů, montáž po laku, výměna filtrů…) ÷ režijní hodiny', proc: 'Práce, která by měla mít úkolovou cenu. Každá dodělaná norma toto číslo sníží — přímé měřítko postupu.' },
@@ -514,13 +515,15 @@ function mount(host) {
   }
   // kolik hlavních operací (kusů fází) připadá na jeden kontejner podle plánu — výchozí 12
   const opsNaKont = () => loadPlan6().faze.reduce((s, f) => s + (+f.ks || 0), 0);
+  const cileZ = cil => { if (!cil) return {}; const P = loadPlan6(), oK = opsNaKont(); return { A7: cil, A8: Math.round(cil * oK * 10) / 10, A9: oK, A10: Math.round(cil * P.faze.reduce((s, f) => s + f.ks * f.min, 0) / P.smenaMin * 10) / 10 }; };
   function indikatoryMesice(rows, ym, rokRows, zavodKey) {
     const pd = pracDnyMesice(ym); const rez = rows.filter(r => isRezie(r[R.dil])), prod = rows.filter(r => !isRezie(r[R.dil]));
     let nMin = 0, nRows = 0; if (normIndex().items.length) prod.forEach(r => { const n = matchNorma(zavodKey, r[R.op], r[R.dil]); if (n) { nMin += (n.min || 0) * r[R.ks]; nRows++; } });
     const FZ = FAZE_VYSTUPU[zavodKey] || FAZE_VYSTUPU.default; const lakKs = prod.filter(r => FZ.lak(r[R.op])).reduce((s, r) => s + r[R.ks], 0);
     const rezH = rez.reduce((s, r) => s + r[R.ks], 0), ks = prod.reduce((s, r) => s + r[R.ks], 0);
     // hlavní operace kontejneru (fáze plánu 6 ABR/den) — jen závody s cílem v kontejnerech
-    let opKs = null, lakAbr = 0; if (CIL_DEFAULT[zavodKey]) { opKs = 0; const RE = Object.values(PLAN6_RE); prod.forEach(r => { if (RE.some(re => re.test(r[R.op]))) opKs += r[R.ks]; if (PLAN6_RE.lakovani.test(r[R.op])) lakAbr += r[R.ks]; }); }
+    let opKs = null, opMin = null, lakAbr = 0; const P6 = loadPlan6();
+    if (CIL_DEFAULT[zavodKey]) { opKs = 0; opMin = 0; prod.forEach(r => { const f = P6.faze.find(f => PLAN6_RE[f.k].test(r[R.op])); if (f) { opKs += r[R.ks]; opMin += r[R.ks] * f.min; } if (PLAN6_RE.lakovani.test(r[R.op])) lakAbr += r[R.ks]; }); }
     const lide = new Set(rows.map(r => r[R.id] || r[R.name])); const fond = lide.size * pd * 8;
     const sum = (arr, f) => arr.filter(f).reduce((s, r) => s + r[R.ks], 0);
     const rezProd = sum(rez, r => !RE_PROD.test(r[R.op])), rezOst = sum(rez, r => RE_OST.test(r[R.op]) || !r[R.pozn]), rekH = sum(rez, r => RE_REKL.test(r[R.op])), zaH = sum(rez, r => RE_ZAUC.test(r[R.op]));
@@ -533,6 +536,7 @@ function mount(host) {
       A1: p(rezH, fond), A2: ks ? Math.round(rezH / ks * 1000) : 0, A3: prod.length ? Math.round(rezH / prod.length * 100) / 100 : 0, A4: lide.size ? Math.round(ks / lide.size) : 0,
       A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null, A7: pd ? Math.round(lakKs / pd * 10) / 10 : null,
       A8: opKs != null && pd ? Math.round(opKs / pd * 10) / 10 : null, A9: opKs != null && lakAbr > 0 ? Math.round(opKs / lakAbr * 10) / 10 : null, opKs: opKs != null ? Math.round(opKs) : null,
+      A10: opMin != null && pd ? Math.round(opMin / P6.smenaMin / pd * 10) / 10 : null, opMin: opMin != null ? Math.round(opMin) : null,
       B1: p(rezProd, rezH), B2: p(rezOst, rezH), B3: ks ? r1(rekH / ks * 1000) : 0, B4: p(zaH, rezH),
       C1: p(term, rows.length), C2: p(top3, rows.length), C3: p(prub, lide.size), C4: p(prod.filter(r => !r[R.cvz]).length, prod.length), C5: prod.filter(r => r[R.ks] === 0).length,
       D1: lide.size, D2: bez };
@@ -545,9 +549,9 @@ function mount(host) {
     const out = mesice.map(ym => indikatoryMesice(all.filter(r => r[R.date].startsWith(ym)), ym, all, z.key));
     const snapM = D.snapshot.slice(0, 7); const cilZ = loadCile()[z.key];
     out.forEach((M, i) => {
-      M.cil = cilZ; const oK = opsNaKont(); M.cile = cilZ ? { A7: cilZ, A8: Math.round(cilZ * oK * 10) / 10, A9: oK } : {};
+      M.cil = cilZ; M.cile = cileZ(cilZ);
       M.neuplny = M.m === snapM && !/-(2[89]|3[01])$/.test(D.snapshot);
-      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && (FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default).lak(r[R.op])).reduce((s, r) => s + r[R.ks], 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; if (M.opKs != null) M.A8 = Math.round(M.opKs / pdSoFar * 10) / 10; }
+      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && (FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default).lak(r[R.op])).reduce((s, r) => s + r[R.ks], 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; if (M.opKs != null) { M.A8 = Math.round(M.opKs / pdSoFar * 10) / 10; M.A10 = Math.round(M.opMin / loadPlan6().smenaMin / pdSoFar * 10) / 10; } }
       M.sem = {}; M.trend = {}; M.med = {};
       LEG_FLAT.forEach(def => {
         M.sem[def.k] = semafor(def, M[def.k], M);
@@ -556,8 +560,7 @@ function mount(host) {
         if (hist.length >= 3) M.med[def.k] = hist.length % 2 ? hist[(hist.length - 1) / 2] : (hist[hist.length / 2 - 1] + hist[hist.length / 2]) / 2;
       });
     });
-    const oK = opsNaKont();
-    return { zavod: z.key, name: z.name, snapshot: D.snapshot, cil: cilZ, cile: cilZ ? { A7: cilZ, A8: Math.round(cilZ * oK * 10) / 10, A9: oK } : {}, opsKont: oK, mesice: out };
+    return { zavod: z.key, name: z.name, snapshot: D.snapshot, cil: cilZ, cile: cileZ(cilZ), opsKont: opsNaKont(), mesice: out };
   }
   // Text pro trend: zlepšení/zhoršení podle směru indikátoru
   const lepsi = (def, d) => def.smer === 'watch' ? null : (def.smer === 'up' ? d > 0 : d < 0);
@@ -792,7 +795,7 @@ function mount(host) {
   const esc = x => String(x == null ? '' : x).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const MES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
   const mesLabel = ym => { const [y, m] = ym.split('-'); return MES[+m - 1] + ' ' + y; };
-  const fmtV = (def, v) => v == null ? '—' : (def.k === 'A3' || def.k === 'B3' || def.k === 'A7' || def.k === 'A8' || def.k === 'A9' ? String(v).replace('.', ',') : fmt0(v)) + (def.jedn === '%' ? ' %' : (def.jedn ? ' ' + def.jedn : ''));
+  const fmtV = (def, v) => v == null ? '—' : (def.k === 'A3' || def.k === 'B3' || def.k === 'A7' || def.k === 'A8' || def.k === 'A9' || def.k === 'A10' ? String(v).replace('.', ',') : fmt0(v)) + (def.jedn === '%' ? ' %' : (def.jedn ? ' ' + def.jedn : ''));
   const SEM_BG = { g: '#e6f3e4', y: '#fbf1dc', r: '#fbe9e8', '': 'transparent' }, SEM_FG = { g: '#0a7a0a', y: '#b57400', r: '#c93a39', '': '#1c1d1a' };
   // Report za poslední UZAVŘENÝ měsíc (ym); když není zadán, vezme měsíc před měsícem snímku.
   function buildReport(ymArg) {
