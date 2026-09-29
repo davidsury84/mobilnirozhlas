@@ -105,6 +105,17 @@ async function downloadFileBase64(fileId, maxBytes = 15 * 1024 * 1024) {
   return { base64: buf.toString('base64'), bytes: buf.length };
 }
 
+// Export nativní Google tabulky jako .xlsx (všechny listy jedním požadavkem přes Drive API —
+// nečerpá kvótu Sheets API „read requests per minute"). Vrací Buffer.
+async function exportXlsx(fileId, maxBytes = 20 * 1024 * 1024) {
+  const tok = await accessToken();
+  const buf = await httpsBuffer('GET', 'www.googleapis.com',
+    `/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')}`,
+    { Authorization: 'Bearer ' + tok });
+  if (buf.length > maxBytes) throw new Error('Export je příliš velký (' + Math.round(buf.length / 1048576) + ' MB).');
+  return buf;
+}
+
 // Vyhledání podle názvu napříč vším, co SA vidí (sdílené složky i jejich obsah).
 // Vrací [{id,name,mimeType,parents,createdTime}] — složky i soubory (mime volitelně omezí).
 async function findByName(name, mime) {
@@ -115,4 +126,4 @@ async function findByName(name, mime) {
   return j.files || [];
 }
 
-module.exports = { configured, listFolder, downloadFileBase64, saEmail, findByName, FOLDER_MIME };
+module.exports = { configured, listFolder, downloadFileBase64, exportXlsx, saEmail, findByName, FOLDER_MIME };

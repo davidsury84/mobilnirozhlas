@@ -293,14 +293,14 @@ function mount(host) {
   const nrm = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9+/.,\- ]/g, ' ').replace(/\s+/g, ' ').trim();
   const nrmBez = s => nrm(String(s).replace(/\([^)]*\)/g, ' ')).replace(/[.,]+$/, '').trim();
   const numN = v => { const m = String(v == null ? '' : v).replace(/[\s ]/g, '').replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
-  const rangeN = v => { const s = String(v == null ? '' : v); let m = s.match(/(\d{3,4})\s*[-–]\s*(\d{3,4})/); if (m) return [+m[1], +m[2]]; m = s.match(/^\s*(\d{3,4})\s*(mm)?\s*$/); if (m) return [+m[1], +m[1]]; m = s.match(/^\s*do\s*(\d{3,4})/i); if (m) return [0, +m[1]]; return null; };
+  const rangeN = v => { const s = String(v == null ? '' : v); let m = s.match(/(?:^|[^\d])(\d{1,4})\s*[-–]\s*(\d{3,4})/); if (m) return [+m[1], +m[2]]; m = s.match(/^\s*(\d{3,4})\s*(mm)?\s*$/); if (m) return [+m[1], +m[1]]; m = s.match(/^\s*do\s*(\d{3,4})/i); if (m) return [0, +m[1]]; return null; };
   const dimsOf = dil => { const m = String(dil || '').match(/(\d{4})\s*[x×]\s*(\d{4})(?:\s*\/\s*\d{4})?\s*[x×]\s*(\d{3,4})/); return m ? { L: +m[1], H: +m[3] } : null; };
   const isPLN = v => /pln|z[łl]/i.test(String(v || ''));
   function parseNormyGrid(values, meta) {
     const V = (values || []).map(r => (r || []).map(c => String(c == null ? '' : c).trim()));
     const items = []; let sazba = null;
     for (let i = 0; i < Math.min(8, V.length); i++) { const r = V[i]; const j = r.findIndex(c => /sazba|k[čc]\s*\/\s*hod|mzda normovan/i.test(c)); if (j >= 0) { const n = numN(r[j + 1]) != null ? numN(r[j + 1]) : numN(r[j]); if (n && !isPLN(r[j + 1] || '')) { sazba = n; break; } } }
-    const mk = (o, extra) => { const op = String(o.op || '').replace(/\s+/g, ' ').trim(); if (!op || (o.min == null && o.kc == null)) return; if (/^(celkem|rekapitulace|pozn|poznámka)/i.test(op)) return; items.push(Object.assign({ file: meta.file, sheet: meta.sheet, kod: o.kod || '', op, opN: nrm(op), opB: nrmBez(op), varianta: o.varianta || '', del: o.del || null, vys: o.vys || null, min: o.min, kc: o.kc, ksKont: o.ks || null, sazba }, extra || {})); };
+    const mk = (o, extra) => { const op = String(o.op || '').replace(/\s+/g, ' ').trim(); if (!op || (o.min == null && !o.kc)) return; let minOdv = false; if (o.min == null && o.kc > 0 && sazba > 0) { o.min = o.kc / sazba * 60; minOdv = true; } if (o.kc != null) o.kc = Math.round(o.kc * 100) / 100; if (o.min != null) o.min = Math.round(o.min * 100) / 100; if (/^(celkem|rekapitulace|pozn|poznámka)/i.test(op)) return; items.push(Object.assign({ file: meta.file, sheet: meta.sheet, kod: o.kod || '', op, opN: nrm(op), opB: nrmBez(op), varianta: o.varianta || '', del: o.del || null, vys: o.vys || null, min: o.min, kc: o.kc, ksKont: o.ks || null, sazba, okruh: okruhOf(meta.file) }, minOdv ? { minOdv: true } : {}, extra || {})); };
     // A) klasická tabulka
     let hi = V.findIndex(r => r.some(c => /^(operace|popis operace)$/i.test(c)) && r.some(c => /čas|time|^min|minut/i.test(c)));
     if (hi >= 0) {
@@ -324,11 +324,23 @@ function mount(host) {
       for (let r = hi + 1; r < V.length; r++) { const row = V[r]; const op = row[ci.op] || row[0] || ''; if (!op || /^celkem/i.test(op)) continue; groups.forEach(g => { const min = numN(row[g.min]); const kcRaw = g.kc >= 0 ? row[g.kc] : ''; const kc = isPLN(kcRaw) ? null : numN(kcRaw); if (min == null && kc == null) return; const key = nrm(op) + '|' + g.varianta; if (seen.has(key)) return; seen.add(key); mk({ op, varianta: g.varianta, min, kc }); }); }
       return { items, sazba, layout: 'C' };
     }
+    // D) bloky bez sloupce „Operace" (Muldy): hlavička „(prázdné) | min | osob | norma celkem | dílů | celkem | min | …", varianta o řádek výš
+    const jeHlavD = r => r && !r[0] && r.filter(c => /^min$/i.test(c)).length >= 1 && r.some(c => /^norma celkem$|^norma\/ks$/i.test(c));
+    if (V.some(jeHlavD)) {
+      const seen = new Set();
+      for (let h = 0; h < V.length; h++) { if (!jeHlavD(V[h])) continue; const H = V[h].map(c => c.toLowerCase()); const mins = H.map((c, i) => (c === 'min' ? i : -1)).filter(i => i >= 0);
+        const groups = mins.map((c, gi) => { const to = gi + 1 < mins.length ? mins[gi + 1] - 1 : H.length - 1; let kcCol = -1, ksCol = -1; for (let j = c; j <= to; j++) { if (kcCol < 0 && /^norma celkem$|^norma\/ks$/.test(H[j])) kcCol = j; if (ksCol < 0 && /^dílů$|^dilu$|^ks/.test(H[j])) ksCol = j; } let varianta = ''; const up = V[h - 1] || []; for (let j = c; j <= to && !varianta; j++) if (up[j]) varianta = up[j]; return { min: c, kc: kcCol, ks: ksCol, varianta }; });
+        for (let r = h + 1; r < V.length; r++) { const row = V[r]; if (jeHlavD(row)) break; if (!row[0]) { if (row.some(c => c)) break; continue; } if (/^celkem/i.test(row[0])) continue;
+          groups.forEach(g => { const min = numN(row[g.min]); const kcRaw = g.kc >= 0 ? row[g.kc] : ''; const kc = isPLN(kcRaw) ? null : numN(kcRaw); if (min == null && kc == null) return; const key = nrm(row[0]) + '|' + g.varianta; if (seen.has(key)) return; seen.add(key); mk({ op: row[0], varianta: g.varianta, min, kc, ks: g.ks >= 0 ? numN(row[g.ks]) : null }); }); } }
+      if (items.length) return { items, sazba, layout: 'D' };
+    }
     // B) sekce dělírny
     let found = false;
-    for (let r = 0; r < V.length; r++) { const row = V[r]; const L = row.map(c => c.toLowerCase()); const iKs = L.indexOf('ks'), iMin = L.indexOf('min'), iNk = L.findIndex(c => /norma\/ks/.test(c));
-      if (iKs < 0 || iMin < 0 || iNk < 0) continue; found = true; const sekce = row[0] || '';
-      for (let q = r + 1; q < V.length; q++) { const rr = V[q]; if (!rr[0] && !rr[iMin]) break; if (rr.map(c => c.toLowerCase()).indexOf('min') >= 0) break; const min = numN(rr[iMin]), kc = numN(rr[iNk]); if (!rr[0] || (min == null && kc == null)) continue; mk({ op: (sekce ? sekce + ' ' : '') + rr[0], min, kc, ks: numN(rr[iKs]) }); }
+    // hlavička sekce: „<název> | ks | [osob] | min | … | norma/ks"; sloupec času je „min" nebo „čas (min)" (sekce Pila), ne „celkem čas"
+    const hlav = row => { const L = row.map(c => c.toLowerCase()); const iKs = L.indexOf('ks'), iNk = L.findIndex(c => /norma\/ks/.test(c)); let iMin = L.indexOf('min'); if (iMin < 0) iMin = L.findIndex(c => /^čas|^cas/.test(c)); return (iKs < 0 || iMin < 0 || iNk < 0) ? null : { iKs, iMin, iNk }; };
+    for (let r = 0; r < V.length; r++) { const row = V[r]; const h = hlav(row); if (!h) continue; found = true; const sekce = row[0] || '';
+      for (let q = r + 1; q < V.length; q++) { const rr = V[q]; if (!rr[0] && !rr[h.iMin]) break; if (hlav(rr)) break; const min = numN(rr[h.iMin]), kc = numN(rr[h.iNk]); if (!rr[0] || /^celkem/i.test(rr[0]) || (min == null && kc == null)) continue;
+        const jm = rr[0].replace(/^\?\s*/, ''); mk({ op: (sekce && nrm(jm).indexOf(nrm(sekce)) !== 0 ? sekce + ' ' : '') + jm, min, kc: kc != null ? Math.round(kc * 100) / 100 : null, ks: numN(rr[h.iKs]) }); }
     }
     return { items, sazba, layout: found ? 'B' : 'none', warn: found ? '' : 'nerozpoznané rozvržení' };
   }
@@ -339,34 +351,64 @@ function mount(host) {
     'skladani abr 45/90st 1550-2500 mm dsd/afs/wd': 'skladani abr 45/90st 1550-2500 mm',     // norma má navíc /ALST (páruje se i bez závorek)
     'skladani abr 45/90st 500-1500 mm dsd/afs/wd': 'skladani abr 45/90st 500-1500 mm',
     'natahovani nh 1570/50+60 vyztuzene': 'natahovani nh 1570/50 + nh 1570/60 vyztuzene',
-    'dovareni abr s t- profilem za 2 ks': 'dovareni abr s t-profilem priplatek'
+    'dovareni abr s t- profilem za 2 ks': 'dovareni abr s t-profilem priplatek',
+    // dělírna — pila (list „Výrobní normy dělírna", sekce Pila)
+    'pila manual do 50': 'pila manual obecna fi 50', 'pila manual do 100': 'pila manual obecna fi 100', 'pila manual do 200': 'pila manual obecna fi 200',
+    'pila manual pro kulatinu do 50': 'pila manual obecna fi 50', 'pila manual pro kulatinu do 100': 'pila manual obecna fi 100',
+    'pila automat do 50': 'pila automat obecna fi 50', 'pila automat do 100': 'pila automat obecna fi 100',
+    'rezani lyziny ipn 180-upn200': 'pila lyzina', 'rezani tramce rolen': 'pila tramec rolen upn 180', 'rezani vyztuhy za celo': 'pila vyztuha za celo'
   };
   // Rodina výrobku z názvu dílu — rozhoduje mezi variantami normy (bočnice DSD vs. ALST/ECL vs. HBI).
   const RODINY = ['dsd', 'afs', 'alst', 'ecl', 'hbi', 'hbs', 'lwc', 'wd', 'sth', 'domat', 'city', 'wdg', 'wdc', 'sit', 'csd', 'renewi', 'veolia'];
   const rodinaOf = dil => { const d = nrm(dil).replace(/-/g, ' '); return RODINY.filter(f => new RegExp('(^|[^a-z])' + f + '([^a-z]|$)').test(d)); };
+  // Okruh normy podle souboru: normy popelnic platí jen v závodě Popelnice, normy CITY/muld/GSK/SLD jen pro díly té řady.
+  // Soubor ABR-XXX je obecný (svařovna, dělírna, lakovna — obsahuje i lakování CITY a muld).
+  const okruhOf = file => { const f = nrm(file); return /popelnic/.test(f) ? 'popelnice' : /muld/.test(f) ? 'muldy' : /city/.test(f) ? 'city' : /gsk/.test(f) ? 'gsk' : /sld/.test(f) ? 'sld' : 'abr'; };
+  const OKRUH_RE = { muldy: /(^|[^a-z])(am|smr|dmc|dmpm|asm|muld[ay])([^a-z]|$)/, city: /(^|[^a-z])(city|wdg|wdc|sit|csd)([^a-z]|$)/, gsk: /(^|[^a-z])gsk([^a-z]|$)/, sld: /(^|[^a-z])sld([^a-z]|$)/ };
+  const okruhOK = (n, zavodKey, dil) => { const o = n.okruh || okruhOf(n.file); if (o === 'popelnice') return zavodKey === 'popelnice'; if (zavodKey === 'popelnice') return false; if (o === 'abr') return true; return OKRUH_RE[o].test(nrm(dil).replace(/-/g, ' ')); };
+  const objemOf = t => { const m = /(\d+)[,.](\d)/.exec(String(t || '')); return m ? parseFloat(m[1] + '.' + m[2]) : null; };
   const loadNormy = () => { try { return JSON.parse(fs.readFileSync(NORMY_F, 'utf8')); } catch (_) { return null; } };
   const loadNMap = () => { try { return JSON.parse(fs.readFileSync(NMAP_F, 'utf8')) || {}; } catch (_) { return {}; } };
-  const normId = n => [n.file, n.sheet, n.kod, n.opN, n.varianta, (n.del || []).join('-'), (n.vys || []).join('-')].join('|');
+  const normId = n => [n.file, String(n.sheet || '').slice(0, 31), n.kod, n.opN, n.varianta, (n.del || []).join('-'), (n.vys || []).join('-')].join('|');
+  const cekej = ms => new Promise(r => setTimeout(r, ms));
   async function syncNormy() {
     if (!drive || !drive.configured()) return { ok: false, error: 'Service account (GOOGLE_SA_*) není nastavený.' };
     const files = (await drive.listFolder(NORMY_FOLDER)).filter(f => !/archiv/i.test(f.folder || ''));
-    const items = [], diag = [];
+    const prev = loadNormy(); const prevItems = (prev && prev.items) || [], prevDiag = (prev && prev.diag) || [];
+    const items = [], diag = [], videno = new Map(); const SKIP = /archiv|úkoly|ukoly|délky svárů|delky svaru/i;
+    const zpracuj = (f, sheets, url) => { for (const [sh, rows] of Object.entries(sheets)) { if (SKIP.test(sh)) continue; if (!rows.some(r => (r || []).some(c => c !== '' && c != null))) continue; const p = parseNormyGrid(rows, { file: f.name, sheet: sh });
+      // stejný obsah ve dvou souborech (kopie .xlsx vedle Google tabulky) → do katalogu jen jednou
+      const sig = p.items.length ? p.items.map(n => n.opN + '|' + n.min + '|' + n.kc).join('§') : ''; if (sig && videno.has(sig)) { diag.push({ file: f.name, sheet: sh, items: 0, layout: p.layout, sazba: p.sazba, warn: 'shodné s „' + videno.get(sig) + '“ — kopie se do katalogu nezapočítává', kopie: true, url }); continue; } if (sig) videno.set(sig, f.name);
+      items.push(...p.items); diag.push({ file: f.name, sheet: sh, items: p.items.length, layout: p.layout, sazba: p.sazba, warn: p.items.length ? (p.warn || '') : 'list není tabulka norem (chybí sloupce Operace / čas)', url }); } };
     for (const f of files) {
+      const isSheet = f.mimeType === 'application/vnd.google-apps.spreadsheet', isXlsx = /\.xlsx?$/i.test(f.name || '') || /spreadsheetml/.test(f.mimeType || '');
+      if (!isSheet && !isXlsx) continue;
+      const url = isSheet ? 'https://docs.google.com/spreadsheets/d/' + f.id : (f.webViewLink || '');
       try {
-        if (f.mimeType === 'application/vnd.google-apps.spreadsheet') {
-          if (!host.sheetsGet) throw new Error('Sheets API není k dispozici');
-          const tabs = host.sheetsTabs ? await host.sheetsTabs(f.id) : (await host.sheetsMeta(f.id) || []).map(t => ({ title: t }));
-          for (const t of tabs) { if (/archiv|úkoly|ukoly|délky svárů/i.test(t.title)) continue; const r = await host.sheetsGet(f.id, "'" + String(t.title).replace(/'/g, "''") + "'!A1:AZ400"); const p = parseNormyGrid((r && r.values) || [], { file: f.name, sheet: t.title }); items.push(...p.items); diag.push({ file: f.name, sheet: t.title, items: p.items.length, layout: p.layout, sazba: p.sazba, warn: p.warn || '', url: 'https://docs.google.com/spreadsheets/d/' + f.id }); }
-        } else if (/\.xlsx?$/i.test(f.name || '') || /spreadsheetml/.test(f.mimeType || '')) {
-          const dl = await drive.downloadFileBase64(f.id, 10 * 1024 * 1024); const sheets = parseAll(Buffer.from(dl.base64, 'base64'));
-          for (const [sh, rows] of Object.entries(sheets)) { const p = parseNormyGrid(rows, { file: f.name, sheet: sh }); items.push(...p.items); diag.push({ file: f.name, sheet: sh, items: p.items.length, layout: p.layout, sazba: p.sazba, warn: p.warn || '', url: f.webViewLink || '' }); }
-        }
-      } catch (e) { diag.push({ file: f.name, sheet: '', items: 0, layout: '', warn: e.message }); }
+        if (isSheet) {
+          let sheets = null;
+          // 1) Drive export → xlsx: všechny listy jedním požadavkem, nečerpá minutovou kvótu Sheets API
+          try { let buf; try { buf = await drive.exportXlsx(f.id); } catch (e0) { await cekej(3000); buf = await drive.exportXlsx(f.id); } sheets = parseAll(buf, { mena: true }); }
+          catch (e1) {
+            // 2) záloha: Sheets API po listech, s rozestupem a opakováním při 429
+            if (!host.sheetsGet) throw e1;
+            const volej = async fn => { for (let k = 0; ; k++) { try { return await fn(); } catch (e) { if (k >= 3 || !/429/.test(e.message)) throw e; await cekej(20000 * (k + 1)); } } };
+            const tabs = await volej(() => host.sheetsTabs ? host.sheetsTabs(f.id) : host.sheetsMeta(f.id).then(t => (t || []).map(x => ({ title: x })))); sheets = {};
+            for (const t of tabs) { if (SKIP.test(t.title)) continue; await cekej(1200); const r = await volej(() => host.sheetsGet(f.id, "'" + String(t.title).replace(/'/g, "''") + "'!A1:AZ1200")); sheets[t.title] = (r && r.values) || []; }
+          }
+          zpracuj(f, sheets, url);
+        } else { const dl = await drive.downloadFileBase64(f.id, 10 * 1024 * 1024); zpracuj(f, parseAll(Buffer.from(dl.base64, 'base64'), { mena: true }), url); }
+      } catch (e) {
+        // soubor se nepodařilo načíst → ponechat jeho normy z minulého syncu, ať katalog nekolísá
+        const stare = prevItems.filter(n => n.file === f.name);
+        if (stare.length) { items.push(...stare); prevDiag.filter(d => d.file === f.name && d.items).forEach(d => diag.push(Object.assign({}, d, { warn: 'nepodařilo se obnovit (' + String(e.message).slice(0, 80) + ') — ponechána verze z minulého načtení' }))); }
+        else diag.push({ file: f.name, sheet: '', items: 0, layout: '', warn: String(e.message).slice(0, 160), url });
+      }
     }
     fs.writeFileSync(NORMY_F, JSON.stringify({ syncedAt: new Date().toISOString(), folder: NORMY_FOLDER, items, diag }));
     _nIdx = null;
-    console.log('[vykonnost] normy: ' + items.length + ' položek z ' + diag.length + ' listů');
-    return { ok: true, items: items.length, listy: diag.length };
+    console.log('[vykonnost] normy: ' + items.length + ' položek z ' + diag.filter(d => d.items).length + ' listů' + (diag.some(d => d.warn && !d.items) ? ' · nenačteno: ' + diag.filter(d => d.warn && !d.items).map(d => d.file + (d.sheet ? '/' + d.sheet : '')).join(', ') : ''));
+    return { ok: true, items: items.length, listy: diag.filter(d => d.items).length };
   }
   // index pro párování (líně, invalidace po syncu / změně mapy)
   let _nIdx = null;
@@ -380,9 +422,15 @@ function mount(host) {
   }
   function pickVariant(c, dil) {
     if (c.length === 1) return c[0];
+    const dn = nrm(dil).replace(/-/g, ' '); const typ = OKRUH_RE.muldy.test(dn) ? 'muld' : /(^|[^a-z])city/.test(dn) ? 'city' : /(^|[^a-z])abr/.test(dn) ? 'abr' : ''; if (typ) { const f = c.filter(n => n.opN.includes(typ)); if (f.length) c = f; }
+    if (c.length === 1) return c[0];
     const rod = rodinaOf(dil); if (rod.length) { const f = c.filter(n => rod.some(r => new RegExp('(^|[^a-z])' + r + '([^a-z]|$)').test(n.opN.replace(/-/g, ' ')))); if (f.length) c = f; }
     if (c.length === 1) return c[0];
-    const d = dimsOf(dil); if (d) { const f = c.filter(n => (!n.del || (d.L >= n.del[0] && d.L <= n.del[1])) && (!n.vys || (d.H >= n.vys[0] && d.H <= n.vys[1]))); if (f.length) return f[0]; }
+    const ob = objemOf(dil); if (ob != null && c.some(n => n.okruh === 'muldy')) { const f = c.filter(n => { const r = (String(n.varianta).match(/\d+[,.]\d/g) || []).map(x => parseFloat(x.replace(',', '.'))); return r.length === 1 ? r[0] === ob : r.length >= 2 ? ob >= r[0] && ob <= r[r.length - 1] : false; }); if (f.length) return f[0]; }
+    // rozměr normy: ze sloupců délka/výška, jinak z názvu („… 2050-2500 mm“ = výška, rozsah nad 3 m = délka); při shodě vyhrává kratší (obecnější) název
+    const roz = n => { if (n.del || n.vys) return n; const m = /(\d{3,4})\s*-\s*(\d{3,4})(?:\s*mm|$|\/)/.exec(n.op); if (!m) return n; const a = +m[1], b = +m[2]; return b > 3000 ? { del: [a, b] } : { vys: [a, b] }; };
+    c = c.slice().sort((a, b) => a.opB.length - b.opB.length);
+    const d = dimsOf(dil); if (d) { const f = c.filter(n => { const r = roz(n); return (!r.del || (d.L >= r.del[0] && d.L <= r.del[1])) && (!r.vys || (d.H >= r.vys[0] && d.H <= r.vys[1])); }); if (f.length) { const sir = n => { const r = roz(n); return r.vys ? r.vys[1] - r.vys[0] : r.del ? 5000 : 9000; }; return f.sort((a, b) => sir(a) - sir(b) || a.opB.length - b.opB.length)[0]; } }
     const noDim = c.find(n => !n.del && !n.vys); return noDim || c[0];
   }
   function matchNorma(zavodKey, op, dil) {
@@ -393,13 +441,18 @@ function mount(host) {
     if (man === '__none__') res = null;
     else if (man && I.byId[man]) res = Object.assign({}, I.byId[man], { how: 'ručně' });
     else {
-      const o = nrm(op), ob = nrmBez(op); let c = I.byN[o] || I.byB[ob]; let how = 'přesně';
-      if (!c && ALIASY[o]) { c = I.byB[ALIASY[o]] || I.byN[ALIASY[o]]; if (c) how = 'alias'; }
-      if (!c && ob.length >= 12) { const k = I.keys.find(k => k.startsWith(ob) || ob.startsWith(k)); if (k) { c = I.byB[k]; how = 'prefix'; } }
+      const ok = a => { const f = (a || []).filter(n => okruhOK(n, zavodKey, dil)); return f.length ? f : null; };
+      const o = nrm(op), ob = nrmBez(op); let c = ok(I.byN[o]) || ok(I.byB[ob]); let how = 'přesně';
+      const al = ALIASY[o] || ALIASY[ob]; if (!c && al) { c = ok(I.byB[al]) || ok(I.byN[al]); if (c) how = 'alias'; }
+      if (!c && ob.length >= 12) {
+        // operace je delší než norma („… svaření - SP 1067“) → nejdelší norma, kterou začíná; operace je obecnější než norma („odkuličkování CITY“) → všechny její varianty, vybere pickVariant
+        const k = I.keys.find(k => ob.startsWith(k) && ok(I.byB[k])); if (k) { c = ok(I.byB[k]); how = 'prefix'; }
+        else { const ks = I.keys.filter(k => k.startsWith(ob) && ok(I.byB[k])); if (ks.length) { c = ks.flatMap(k => ok(I.byB[k])); how = ks.length > 1 ? 'prefix (varianta dle dílu)' : 'prefix'; } }
+      }
       if (!c && ob.length >= 8) { const t = new Set(ob.split(' ').filter(w => w.length > 1)); const first = ob.split(' ')[0]; let best = null, bs = 0;
         const cands = [];
-        for (const k of I.keys) { if (!k.startsWith(first)) continue; const T = I.tok[k]; let inter = 0; t.forEach(w => { if (T.has(w)) inter++; }); const j = inter / (t.size + T.size - inter); if (j >= 0.7) cands.push([k, j]); if (j > bs) { bs = j; best = k; } }
-        if (best && bs >= 0.7) { c = cands.filter(x => x[1] >= bs - 0.05).flatMap(x => I.byB[x[0]]); how = 'podobnost ' + Math.round(bs * 100) + ' %'; } }
+        for (const k of I.keys) { if (!k.startsWith(first) || !ok(I.byB[k])) continue; const T = I.tok[k]; let inter = 0; t.forEach(w => { if (T.has(w)) inter++; }); const j = inter / (t.size + T.size - inter); if (j >= 0.7) cands.push([k, j]); if (j > bs) { bs = j; best = k; } }
+        if (best && bs >= 0.7) { c = cands.filter(x => x[1] >= bs - 0.05).flatMap(x => ok(I.byB[x[0]]) || []); how = 'podobnost ' + Math.round(bs * 100) + ' %'; } }
       if (c) res = Object.assign({}, pickVariant(c, dil), { how });
     }
     I.cache.set(ck, res); return res;
@@ -530,16 +583,16 @@ function mount(host) {
     const patek = rows.filter(r => new Date(r[R.date] + 'T00:00:00Z').getUTCDay() === 5).length;
     // --- normy: normohodiny a Kč úkolu z norem po řádcích, pokrytí, nespárované operace ---
     const NI = normIndex(); const maNormy = NI.items.length > 0;
-    let normMin = 0, normKc = 0, normRows = 0, normKs = 0; const nesp = {}, spar = {};
+    let normMin = 0, normKc = 0, normRows = 0, normKs = 0; const nesp = {}, spar = {}, pouz = {};
     if (maNormy) rows.forEach(r => { if (isRezie(r[R.dil])) return; const n = matchNorma(z.key, r[R.op], r[R.dil]); const key = r[R.id] || r[R.name]; const L = lide[key];
       if (n) { const mn = (n.min || 0) * r[R.ks], kc = (n.kc || 0) * r[R.ks]; normMin += mn; normKc += kc; normRows++; normKs += r[R.ks]; if (L) { L.normMin = (L.normMin || 0) + mn; L.normKc = (L.normKc || 0) + kc; L.normRows = (L.normRows || 0) + 1; }
-        const S = spar[r[R.op]] = spar[r[R.op]] || { op: r[R.op], norma: n.op, varianta: n.varianta, min: n.min, kc: n.kc, how: n.how, file: n.file, sheet: n.sheet, rows: 0, ks: 0 }; S.rows++; S.ks += r[R.ks]; }
+        const nid = normId(n); pouz[nid] = (pouz[nid] || 0) + 1; const S = spar[r[R.op]] = spar[r[R.op]] || { op: r[R.op], normaId: nid, norma: n.op, varianta: n.varianta, min: n.min, kc: n.kc, how: n.how, file: n.file, sheet: n.sheet, rows: 0, ks: 0 }; S.rows++; S.ks += r[R.ks]; }
       else { const U = nesp[r[R.op]] = nesp[r[R.op]] || { op: r[R.op], rows: 0, ks: 0, lide: new Set(), dil: {} }; U.rows++; U.ks += r[R.ks]; U.lide.add(r[R.name]); U.dil[r[R.dil]] = (U.dil[r[R.dil]] || 0) + 1; } });
     const prodRowsAll = rows.length - rezRows;
-    const normy = maNormy ? { katalog: NI.items.length, syncedAt: NI.syncedAt, listy: NI.diag.length, normH: Math.round(normMin / 60), normKc: Math.round(normKc), rows: normRows, ks: Math.round(normKs), prodRows: prodRowsAll,
+    const normy = maNormy ? { katalog: NI.items.length, syncedAt: NI.syncedAt, listy: NI.diag.filter(d => d.items).length, normH: Math.round(normMin / 60), normKc: Math.round(normKc), rows: normRows, ks: Math.round(normKs), prodRows: prodRowsAll,
       pokrytiRows: prodRowsAll ? Math.round(normRows / prodRowsAll * 100) : 0, pokrytiKs: ks ? Math.round(normKs / ks * 100) : 0, rezieKc: Math.round(rezieH * REZIE_SAZBA), rezieSazba: REZIE_SAZBA,
       nesparovane: Object.values(nesp).sort((a, b) => b.rows - a.rows).slice(0, 60).map(u => ({ op: u.op, rows: u.rows, ks: Math.round(u.ks), lide: u.lide.size, dil: Object.entries(u.dil).sort((a, b) => b[1] - a[1])[0][0] })),
-      sparovane: Object.values(spar).sort((a, b) => b.rows - a.rows).slice(0, 80).map(s => Object.assign({}, s, { ks: Math.round(s.ks), normH: Math.round((s.min || 0) * s.ks / 60) })) } : null;
+      pouzite: pouz, sparovane: Object.values(spar).sort((a, b) => b.rows - a.rows).slice(0, 300).map(s => Object.assign({}, s, { ks: Math.round(s.ks), normH: Math.round((s.min || 0) * s.ks / 60) })) } : null;
     const lideArr = Object.values(lide).map(L => { const maxDay = Math.max(0, ...Object.values(L.perDay)); const topOp = Object.entries(L.opCount).sort((a, b) => b[1] - a[1])[0];
       return { id: L.id, name: L.name, rows: L.rows, prodRows: L.rows - (L.rezRows || 0), ks: Math.round(L.ks), rezieH: Math.round(L.rezieH), normH: Math.round((L.normMin || 0) / 60), normKc: Math.round(L.normKc || 0), normPokryti: (L.rows - (L.rezRows || 0)) ? Math.round((L.normRows || 0) / (L.rows - (L.rezRows || 0)) * 100) : 0, dny: L.dnySet.size, ops: L.opsSet.size, termPct: L.rows ? Math.round(L.term / L.rows * 100) : 0, last: L.last, first: L.first, davkaPct: L.rows ? Math.round(maxDay / L.rows * 100) : 0, reziePct: (L.rows ? Math.round(L.rezieH > 0 ? (L.rezieH / (L.rezieH + Math.max(1, L.ks))) * 100 : 0) : 0), topOp: topOp ? topOp[0] : '' }; })
       .sort((a, b) => b.rows - a.rows);
@@ -847,7 +900,7 @@ function mount(host) {
     if (p === '/api/vykonnost/normy' && req.method === 'GET') {
       const I = normIndex(); const q = nrm(u.query.q || ''); let list = I.items;
       if (q) list = list.filter(n => n.opB.includes(q) || nrm(n.varianta).includes(q) || nrm(n.sheet).includes(q));
-      json(res, 200, { katalog: I.items.length, syncedAt: I.syncedAt, diag: I.diag, folder: NORMY_FOLDER, items: list.slice(0, 300).map(n => ({ id: normId(n), op: n.op, varianta: n.varianta, del: n.del, vys: n.vys, min: n.min, kc: n.kc, file: n.file, sheet: n.sheet, kod: n.kod })), total: list.length, mapa: host.isAdmin(req) ? I.mapa : undefined }); return true;
+      json(res, 200, { katalog: I.items.length, syncedAt: I.syncedAt, diag: I.diag, folder: NORMY_FOLDER, items: list.slice(0, 3000).map(n => ({ id: normId(n), ksKont: n.ksKont, sazba: n.sazba, op: n.op, varianta: n.varianta, del: n.del, vys: n.vys, min: n.min, minOdv: n.minOdv || undefined, okruh: n.okruh || okruhOf(n.file), kc: n.kc, file: n.file, sheet: n.sheet, kod: n.kod })), total: list.length, mapa: host.isAdmin(req) ? I.mapa : undefined }); return true;
     }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
     if (p === '/api/vykonnost/plan6' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } return json(res, 200, { ok: true, plan: savePlan6(b) }), true; }

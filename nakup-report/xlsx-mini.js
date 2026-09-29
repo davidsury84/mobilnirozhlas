@@ -83,7 +83,7 @@ function parse(buffer) {
   const rows = [];
   const rowRe = /<row\b[^>]*>([\s\S]*?)<\/row>/g; let rm;
   while ((rm = rowRe.exec(sx))) {
-    const cells = []; const cRe = /<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g; let cm;
+    const cells = []; const cRe = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g; let cm;
     while ((cm = cRe.exec(rm[1]))) {
       const attr = cm[1] || '', inner = cm[2] || '';
       const refM = /r="([A-Z]+\d+)"/.exec(attr); const idx = refM ? colToIdx(refM[1]) : cells.length;

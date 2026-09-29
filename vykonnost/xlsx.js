@@ -9,7 +9,10 @@ if(e.method===0)return d;if(e.method===8)return zlib.inflateRawSync(d);throw new
 const dec=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#x([0-9a-fA-F]+);/g,(_,h)=>String.fromCodePoint(parseInt(h,16))).replace(/&#(\d+);/g,(_,d)=>String.fromCodePoint(+d)).replace(/&amp;/g,'&');
 function textOf(x){let o='';const re=/<t\b[^>]*>([\s\S]*?)<\/t>/g;let m;while((m=re.exec(x)))o+=dec(m[1]);return o}
 function colIdx(r){const m=/^([A-Z]+)/.exec(r||'');if(!m)return -1;let n=0;for(const ch of m[1])n=n*26+(ch.charCodeAt(0)-64);return n-1}
-function parseAll(buffer){const z=readZip(buffer);const shared=[];const ss=extract(z,'xl/sharedStrings.xml');
+// opts.mena = true → číselné buňky s formátem obsahujícím „zł"/„PLN" se vrátí jako text „<číslo> PLN" (normy v polských zlotých)
+function parseAll(buffer,opts){opts=opts||{};const z=readZip(buffer);const shared=[];
+const pln=[];if(opts.mena){const st=extract(z,'xl/styles.xml');if(st){const sx=st.toString('utf8');const fm={};let m;const re=/<numFmt\b[^>]*numFmtId="(\d+)"[^>]*formatCode="([^"]*)"/g;while((m=re.exec(sx)))fm[m[1]]=dec(m[2]);
+ const xfs=/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(sx);if(xfs){const xr=/<xf\b([^>]*)/g;let x;while((x=xr.exec(xfs[1]))){const id=/numFmtId="(\d+)"/.exec(x[1]);pln.push(!!(id&&/z[łl]|PLN/i.test(fm[id[1]]||'')))}}}}const ss=extract(z,'xl/sharedStrings.xml');
 if(ss){const sx=ss.toString('utf8');const re=/<si>([\s\S]*?)<\/si>/g;let m;while((m=re.exec(sx)))shared.push(textOf(m[1]))}
 // mapa jmen listů
 const wb=extract(z,'xl/workbook.xml').toString('utf8');
@@ -20,13 +23,13 @@ const sheets=[];{const re=/<sheet[^>]*name="([^"]*)"[^>]*r:id="([^"]+)"/g;let m;
 const out={};
 for(const sh of sheets){const b=extract(z,sh.path);if(!b){out[sh.name]=[];continue}
  const sx=b.toString('utf8');const rows=[];const rowRe=/<row\b[^>]*>([\s\S]*?)<\/row>/g;let rm;
- while((rm=rowRe.exec(sx))){const cells=[];const cRe=/<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g;let cm;
+ while((rm=rowRe.exec(sx))){const cells=[];const cRe=/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;let cm;
   while((cm=cRe.exec(rm[1]))){const attr=cm[1]||'',inner=cm[2]||'';const refM=/r="([A-Z]+\d+)"/.exec(attr);const idx=refM?colIdx(refM[1]):cells.length;
    const tM=/t="([^"]+)"/.exec(attr);const t=tM?tM[1]:'';let val='';
    if(t==='s'){const v=/<v>([\s\S]*?)<\/v>/.exec(inner);val=v?(shared[+v[1]]||''):''}
    else if(t==='inlineStr')val=textOf(inner);
    else if(t==='str'){const v=/<v>([\s\S]*?)<\/v>/.exec(inner);val=v?dec(v[1]):''}
-   else{const v=/<v>([\s\S]*?)<\/v>/.exec(inner);if(v){const n=parseFloat(v[1]);val=isNaN(n)?dec(v[1]):n}}
+   else{const v=/<v>([\s\S]*?)<\/v>/.exec(inner);if(v){const n=parseFloat(v[1]);val=isNaN(n)?dec(v[1]):n;if(opts.mena&&typeof val==='number'){const sM=/\bs="(\d+)"/.exec(attr);if(sM&&pln[+sM[1]])val=val+' PLN'}}}
    if(idx>=0)cells[idx]=val}
   for(let i=0;i<cells.length;i++)if(cells[i]===undefined)cells[i]='';
   rows.push(cells)}
