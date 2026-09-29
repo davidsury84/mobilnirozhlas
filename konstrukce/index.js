@@ -3550,11 +3550,14 @@ function mount(host) {
           if (resp) notify(d, resp, 'Blíží se termín kroku „' + st.label + '" u ' + z.cislo + ' (do ' + fmtDateTime(z.deadline) + ').', z.id);
         }
       }
-      // --- překročení termínu (červená, e-mail odpovědné + obchodník + šéf) ---
+      // --- překročení termínu (červená) ---
+      // Krok drží obchodník → zdržení je na jeho straně a upozornění jde JEN jemu;
+      // šéfa konstrukce se netýká. U ostatních kroků: odpovědný + obchodník + šéf.
       if (now > z.deadline) {
         if (!z.esc.overdue) {
           z.esc.overdue = true; z.esc.overdueDay = fmtDate(now); changed = true;
-          const komu = new Set([resp, z.obchodnikEmail, ...employeesWithRole('sef')].filter(Boolean));
+          const jenObchodnik = st.onTurn === 'obchodnik' && !!(z.obchodnikEmail || resp);
+          const komu = new Set((jenObchodnik ? [z.obchodnikEmail || resp] : [resp, z.obchodnikEmail, ...employeesWithRole('sef')]).filter(Boolean));
           komu.forEach(em => notify(d, em, 'PO TERMÍNU: krok „' + st.label + '" u ' + z.cislo + ' překročil termín.', z.id));
           if (cfg.overdueEmail !== false) {
             const text = 'Zakázka ' + z.cislo + ' (' + z.zakaznik + ') překročila termín kroku „' + st.label + '" (' + fmtDateTime(z.deadline) + ').\nOdpovědná osoba: ' + (empName(resp) || '—') + '.';
