@@ -787,6 +787,24 @@ function tabPrehled(){
   h+=box('Měsíční struktura nákladů vs. tržby (mil. Kč)',cv('chStack',280),m.VAR!=null?lgN:'');
   h+='<div class="grid2">'+box('Výnos vs. náklad na km po měsících',cv('chGap',240),legenda([[G,'Výnos Kč/km'],[R,'Náklad Kč/km (dle reálného nájezdu)']]))
     +box('Měsíční nájezd (km)',cv('chKm',240))+'</div>';
+  // tabulka: výnos, náklad, rozdíl na km + skutečně vydělaná částka po měsících
+  if(m.VAR!=null&&m.FIXV!=null){
+    let sK=0,sT=0,sN=0;
+    const rdk=m.mesice.map(x=>{
+      const km=m.sum[x].km, trz=m.sum[x].trzby, vyn=trz/km, nak=m.VAR+m.FIXMES/km, nakCelk=m.VAR*km+m.FIXMES;
+      sK+=km; sT+=trz; sN+=nakCelk;
+      return {x,km,trz,vyn,nak,roz:vyn-nak,vyd:trz-nakCelk};
+    });
+    const vynC=sT/sK, nakC=sN/sK;
+    let tb='<div class="chartbox"><h2 style="margin:0 0 8px">Výnos, náklad a zisk po měsících</h2>'
+      +'<table><thead><tr><th style="text-align:left">Měsíc</th><th>Nájezd (km)</th><th>Výnos Kč/km</th><th>Náklad Kč/km</th><th>Rozdíl Kč/km</th><th>Reálně vyděláno</th></tr></thead><tbody>'
+      +rdk.map(r=>'<tr><td style="text-align:left">'+mesLbl(r.x)+'</td><td>'+Math.round(r.km).toLocaleString('cs-CZ')+'</td><td>'+d2(r.vyn)+'</td><td>'+d2(r.nak)+'</td>'
+        +'<td class="'+(r.roz>=0?'pos':'neg')+'">'+sgn(r.roz,d2)+'</td><td class="'+(r.vyd>=0?'pos':'neg')+'">'+sgn(r.vyd,kc)+'</td></tr>').join('')
+      +'</tbody><tfoot><tr style="font-weight:600;border-top:2px solid var(--bd,#ccc)"><td style="text-align:left">Celkem</td><td>'+Math.round(sK).toLocaleString('cs-CZ')+'</td><td>'+d2(vynC)+'</td><td>'+d2(nakC)+'</td>'
+        +'<td class="'+(vynC-nakC>=0?'pos':'neg')+'">'+sgn(vynC-nakC,d2)+'</td><td class="'+(sT-sN>=0?'pos':'neg')+'">'+sgn(sT-sN,kc)+'</td></tr></tfoot></table>'
+      +'<p class="muted" style="font-size:12px;margin:6px 0 0">Náklad = variabilní '+d2(m.VAR)+' Kč/km + fixy '+tis(m.FIXMES)+'/měs rozpočítané na skutečný nájezd měsíce. „Reálně vyděláno" = (výnos − náklad) × km, tj. tržby měsíce minus náklady (shoduje se s výsledkem dle modelu).</p></div>';
+    h+=tb;
+  }
   $('#app').innerHTML=h;
 
   const lb=m.mesice.map(mesLbl);
