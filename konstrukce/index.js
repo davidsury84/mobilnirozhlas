@@ -462,8 +462,8 @@ const DOTAZNIK_SU = [
 // pravidla a jako fallback. Metadata stavu:
 //   onTurn   = role, která je „na tahu"
 //   phase    = fáze procesu (obchod|konstrukce|schvaleni|vyroba) pro dashboard
-//   lhutaKey = klíč lhůty z číselníku typu (offset od bodu 0 = zadání)
-//   lhutaFrom= 'bod0' (výchozí) | 'step' (revize běží od začátku kroku)
+//   lhutaKey = klíč lhůty z číselníku typu (pracovní dny OD ZAČÁTKU KROKU, v pracovní době)
+//   lhutaFrom= už se nepoužívá — od 2026-09 běží každá lhůta od začátku svého kroku
 //   kind     = start|klient|hold|end|normal (pro plátno a efekty)
 // Dvě fáze jednoho procesu:
 //   faze='nabidka'   — „Nabídka – konstrukce" (pre-sales): zadání → přidělení →
@@ -716,6 +716,68 @@ function businessDaysBetween(aTs, bTs) {
   return sign * n;
 }
 
+// ---- Pracovní doba (český čas) ---------------------------------------------
+// Doby kroků, lhůty i eskalace se počítají JEN v pracovní době: pondělí–pátek
+// bez svátků, 7:00–15:30 místního času. Jeden pracovní den = 8,5 hodiny.
+// Noci, víkendy a svátky se nepočítají nikomu.
+const PRAC_TZ = 'Europe/Prague';
+const PRAC_OD_MIN = 7 * 60, PRAC_DO_MIN = 15 * 60 + 30;
+const PRAC_DEN_MS = (PRAC_DO_MIN - PRAC_OD_MIN) * 60000;
+const _tzFmt = new Intl.DateTimeFormat('en-GB', { timeZone: PRAC_TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+// Místní (český) čas daného okamžiku.
+function mistniCas(ts) {
+  const p = {}; for (const x of _tzFmt.formatToParts(new Date(ts))) p[x.type] = x.value;
+  return { y: +p.year, m: +p.month, d: +p.day, h: (+p.hour) % 24, mi: +p.minute, s: +p.second };
+}
+// Posun místního času proti UTC (ms) v daném okamžiku — letní čas +2 h, zimní +1 h.
+function posunTZ(ts) { const l = mistniCas(ts); return Date.UTC(l.y, l.m - 1, l.d, l.h, l.mi, l.s) - Math.floor(ts / 1000) * 1000; }
+// Místní datum + minuty od půlnoci → okamžik (UTC ms). Změna času je v neděli v noci, mimo pracovní dobu.
+function zMistniho(y, m, d, minuty) {
+  const hrube = Date.UTC(y, m - 1, d, 0, minuty, 0);
+  return hrube - posunTZ(hrube - posunTZ(hrube));
+}
+const _denCache = new Map();
+// Den v místním kalendáři: půlnoc a pracovní okno (od, do v UTC ms); prac=false o víkendu a ve svátek.
+function denInfo(y, m, d) {
+  const k = y * 10000 + m * 100 + d;
+  let o = _denCache.get(k);
+  if (o) return o;
+  const prac = isWorkday(new Date(Date.UTC(y, m - 1, d)));
+  o = { pulnoc: zMistniho(y, m, d, 0), prac, od: prac ? zMistniho(y, m, d, PRAC_OD_MIN) : 0, do: prac ? zMistniho(y, m, d, PRAC_DO_MIN) : 0 };
+  if (_denCache.size > 5000) _denCache.clear();
+  _denCache.set(k, o);
+  return o;
+}
+// Pracovní čas (ms) mezi dvěma okamžiky. Pro a > b vrací záporné číslo.
+function pracMs(a, b) {
+  if (!a || !b || a === b) return 0;
+  if (a > b) return -pracMs(b, a);
+  const l = mistniCas(a), den = new Date(Date.UTC(l.y, l.m - 1, l.d));
+  let sum = 0;
+  for (let i = 0; i < 5000; i++) {
+    const o = denInfo(den.getUTCFullYear(), den.getUTCMonth() + 1, den.getUTCDate());
+    if (o.pulnoc >= b) break;
+    if (o.prac) { const od = Math.max(a, o.od), doo = Math.min(b, o.do); if (doo > od) sum += doo - od; }
+    den.setUTCDate(den.getUTCDate() + 1);
+  }
+  return sum;
+}
+// Okamžik, kdy od `ts` uplyne `ms` pracovního času (lhůta N dnů = N × PRAC_DEN_MS).
+function pridejPrac(ts, ms) {
+  const l = mistniCas(ts), den = new Date(Date.UTC(l.y, l.m - 1, l.d));
+  let zbyva = Math.max(0, ms);
+  for (let i = 0; i < 5000; i++) {
+    const o = denInfo(den.getUTCFullYear(), den.getUTCMonth() + 1, den.getUTCDate());
+    if (o.prac && o.do > ts) {
+      const od = Math.max(ts, o.od), volno = o.do - od;
+      if (zbyva <= volno) return od + zbyva;
+      zbyva -= volno;
+    }
+    den.setUTCDate(den.getUTCDate() + 1);
+  }
+  return ts + ms;
+}
+
 function mount(host) {
   const DATA_F = path.join(host.dataDir || __dirname, 'konstrukce.json');
   const FILES_DIR = path.join(host.dataDir || __dirname, 'konstrukce-files');
@@ -803,46 +865,140 @@ function mount(host) {
     if (d.settings.reportFreq !== 'daily' && d.settings.reportFreq !== 'weekly') d.settings.reportFreq = 'weekly';
     if (typeof d.settings.reportDow !== 'number' || d.settings.reportDow < 0 || d.settings.reportDow > 6) d.settings.reportDow = 1; // 1 = pondělí
     WARN_FRAC = Math.min(1, Math.max(0, (Number(d.settings.notif.warnPct) || 80) / 100));
+    // Časy v pracovní době (2026-09): doplnit historii kroků a přepočítat termíny běžících kroků.
+    if (d._casyV !== CASY_V) {
+      try { migrujCasy(d); d._casyV = CASY_V; save(d); }
+      catch (e) { console.error('[konstrukce] migrace časů selhala:', e.message); }
+    }
     return d;
   }
   function save(d) { fs.writeFileSync(DATA_F, JSON.stringify(d, null, 2)); }
+
+  // ---- migrace časů (2026-09) ------------------------------------------------
+  const CASY_V = 1;
+  // Průběh zakázky zpětně z auditu — pro zakázky (nebo jejich část) z doby,
+  // kdy se historie kroků ještě nezapisovala, a pro stavy, které se do ní nepsaly.
+  function historieZAuditu(z) {
+    const out = []; let stav = null, predPauzou = null, bylaKontrola = false;
+    const push = (st, at) => { out.push({ stav: st, at }); stav = st; };
+    const primaObj = z.rezim === 'objednavka' && !z.zNabidky;
+    // typ bez interní kontroly: po zkreslení jde výkres rovnou k obchodníkovi
+    const bezKontroly = () => { const p = out[out.length - 1]; if (p && p.stav === 'kontrola' && !bylaKontrola) { p.stav = 'obchodnik'; stav = 'obchodnik'; } };
+    const au = (z.audit || []).filter(a => a && a.at).slice().sort((x, y) => x.at - y.at);
+    for (const a of au) {
+      const ac = String(a.action || '');
+      if (/^Založení/.test(ac)) { if (!out.length) push((primaObj && !/závod/.test(String(a.note || ''))) ? 'zavod' : 'prideleni', z.createdAt || a.at); }
+      else if (ac === 'Vybrán závod') push(z.zNabidky ? 'schvaleno' : 'prideleni', a.at);
+      else if (ac === 'Přidělení') { if (stav === 'prideleni' || stav == null) push('prace', a.at); }
+      else if (ac === 'Zkreslení hotovo') { bylaKontrola = false; push('kontrola', a.at); }
+      else if (ac === 'Interní kontrola OK') { bylaKontrola = true; if (stav === 'kontrola') push('obchodnik', a.at); }
+      else if (ac === 'Vráceno z kontroly') { bylaKontrola = true; push('prace', a.at); }
+      else if (ac === 'Vráceno obchodníkem') { bezKontroly(); push('prace', a.at); }
+      else if (ac === 'Odesláno klientovi') { bezKontroly(); if (stav !== 'klient') push('klient', a.at); }
+      else if (ac === 'Klient poslal připomínky' || /^Změna zadání po zkreslení/.test(ac)) push('revize', a.at);
+      else if (ac === 'Klient schválil výkres') push('schvaleno', a.at);
+      else if (/^Potvrzeno ZA klienta/.test(ac)) { bezKontroly(); if (z.rezim === 'objednavka' && !z.zNabidky) push('schvaleno', a.at); }
+      else if (/^Nabídka potvrzena/.test(ac)) push('zavod', a.at);
+      else if (ac === 'Čeká na podklady') { predPauzou = stav; push('podklady', a.at); }
+      else if (ac === 'Podklady doplněny') push(predPauzou || 'prace', a.at);
+      else if (ac === 'Storno' || ac === 'Klient zamítl') push('zamitnuto', a.at);
+      else if (/^Vložena výrobní dokumentace → do výroby/.test(ac)) push('dokonceno', a.at);
+    }
+    return out;
+  }
+  // Doplní do historie kroků to, co v ní chybí: kroky před prvním záznamem,
+  // pozastavení a koncový stav. Co už v historii je, se nemění.
+  function doplnHistorii(z) {
+    const rek = historieZAuditu(z);
+    let h = (Array.isArray(z.stepHistory) ? z.stepHistory : []).filter(e => e && e.stav && e.at).map(e => ({ stav: e.stav, at: e.at }));
+    if (!h.length) h = rek.slice();
+    else {
+      const prvni = h[0];
+      const pred = rek.filter(e => e.at < prvni.at - 1000);
+      while (pred.length && pred[pred.length - 1].stav === prvni.stav) pred.pop();
+      const pauzy = rek.filter(e => e.stav === 'podklady' && e.at >= prvni.at - 1000 && !h.some(x => x.stav === 'podklady' && Math.abs(x.at - e.at) < 5000));
+      h = pred.concat(h, pauzy).sort((a, b) => a.at - b.at);
+    }
+    const st = STAV[z.stav] || {};
+    if (!h.length) h.push({ stav: st.terminal ? 'prideleni' : z.stav, at: z.createdAt || z.stepStartedAt || Date.now() });
+    if (st.terminal && h[h.length - 1].stav !== z.stav) h.push({ stav: z.stav, at: Math.max(z.closedAt || 0, h[h.length - 1].at) });
+    z.stepHistory = h.slice(-200);
+  }
+  function migrujCasy(d) {
+    const now = Date.now();
+    for (const z of (d.zakazky || [])) {
+      if (!Array.isArray(z.versions)) z.versions = [];
+      doplnHistorii(z);
+      const st = STAV[z.stav] || {};
+      if (st.terminal) { z.deadline = null; continue; }
+      if (st.hold) continue;
+      if (!z.stepStartedAt) z.stepStartedAt = z.stepHistory[z.stepHistory.length - 1].at;
+      const rucne = (z.audit || []).some(a => a.action === 'Změna termínu' && a.at >= z.stepStartedAt);
+      if (rucne && z.deadline) {
+        // ručně zadaný termín byl uložený jako konec dne v UTC → konec pracovní doby téhož dne
+        const x = new Date(z.deadline);
+        z.deadline = zMistniho(x.getUTCFullYear(), x.getUTCMonth() + 1, x.getUTCDate(), PRAC_DO_MIN);
+      } else {
+        const days = lhutaKroku(d, z, z.stav);
+        z.deadline = days ? pridejPrac(z.stepStartedAt, days * PRAC_DEN_MS) : null;
+      }
+      // krok, který podle nového termínu ještě po lhůtě není, má dostat upozornění znovu, až na ně dojde
+      if (z.esc && z.deadline && now < z.deadline) { delete z.esc.overdue; delete z.esc.overdueDay; delete z.esc.warned80; }
+    }
+  }
 
   // ---- Fáze procesu: Obchod -> Konstrukce -> Schvaleni -> Zadani do vyroby ----
   const PHASE_LABEL = { obchod: 'Obchod', konstrukce: 'Konstrukce', schvaleni: 'Schvaleni', vyroba: 'Zadani do vyroby' };
   const PHASE_OF = { novy: 'obchod', prideleni: 'obchod', obchodnik: 'schvaleni', klient: 'schvaleni', prace: 'konstrukce', kontrola: 'konstrukce', revize: 'konstrukce', podklady: 'konstrukce', schvaleno: 'vyroba', dokonceno: 'vyroba' };
   function auditAt(z, needle, last) { let t = null; (z.audit || []).forEach(a => { if ((a.action || '').indexOf(needle) >= 0) { if (last) t = a.at; else if (t == null) t = a.at; } }); return t; }
+  // Skutečné doby fází: z historie kroků, v pracovní době, podle toho, kdo zakázku
+  // v tu chvíli držel. Fáze jde do průměru, až ji zakázka opustí (součet všech
+  // návštěv, tedy i revizí). Pozastavení se nepočítá nikomu. Celý proces = jen
+  // dokončené zakázky; storno do něj nepatří. Lead time = od zadání po schválení klientem.
+  function fazeStavu(stav) { return (STAV[stav] && STAV[stav].phase) || PHASE_OF[stav] || null; }
   function computePhaseStats(d) {
-    const acc = { obchod: [], konstrukce: [], schvaleni: [], vyroba: [] }, total = [];
+    const acc = { obchod: [], konstrukce: [], schvaleni: [], vyroba: [] }, total = [], lead = [];
+    const now = Date.now();
     for (const z of (d.zakazky || [])) {
-      const created = z.createdAt || null;
-      const assigned = auditAt(z, 'Přidělení', false);
-      const drawn = auditAt(z, 'Zkreslení hotovo', true);
-      const approved = auditAt(z, 'Klient schválil', false);
-      const toProd = auditAt(z, 'Předáno do výroby', false) || approved;
-      const done = z.closedAt || null;
-      if (created && assigned) acc.obchod.push(businessDaysBetween(created, assigned));
-      if (assigned && drawn) acc.konstrukce.push(businessDaysBetween(assigned, drawn));
-      if (drawn && approved) acc.schvaleni.push(businessDaysBetween(drawn, approved));
-      if (toProd && done) acc.vyroba.push(businessDaysBetween(toProd, done));
-      const end = done || approved;
-      if (created && end) total.push(businessDaysBetween(created, end));
+      const kr = prubehKroku(z, now);
+      if (!kr.length) continue;
+      const sum = {}; let celkem = 0, doSchvaleni = null;
+      kr.forEach((k, i) => {
+        if (k.konec || k.pauza) return;
+        // schválení klientem = vstup do výrobní dokumentace, nebo předání potvrzené nabídky do objednávek
+        if (doSchvaleni == null && (k.stav === 'schvaleno' || (k.stav === 'zavod' && i > 0))) doSchvaleni = celkem;
+        const ph = fazeStavu(k.stav);
+        if (ph) sum[ph] = (sum[ph] || 0) + k.prac;
+        celkem += k.prac;
+      });
+      const posl = kr[kr.length - 1];
+      // fáze, ve které zakázka právě je (nebo ve které skončila stornem), hotová není
+      let otevrena = null;
+      if (posl.bezi) otevrena = fazeStavu(posl.pauza ? (z.prevStav || 'prace') : posl.stav);
+      else if (posl.konec && posl.stav !== 'dokonceno') {
+        for (let i = kr.length - 2; i >= 0; i--) if (!kr[i].pauza && !kr[i].konec) { otevrena = fazeStavu(kr[i].stav); break; }
+      }
+      for (const ph of Object.keys(acc)) if (sum[ph] != null && ph !== otevrena) acc[ph].push(sum[ph] / PRAC_DEN_MS);
+      if (posl.konec && posl.stav === 'dokonceno') total.push(celkem / PRAC_DEN_MS);
+      if (doSchvaleni != null) lead.push(doSchvaleni / PRAC_DEN_MS);
     }
     const avg = a => a.length ? Math.round(a.reduce((x, v) => x + v, 0) / a.length * 10) / 10 : null;
-    return { obchod: avg(acc.obchod), konstrukce: avg(acc.konstrukce), schvaleni: avg(acc.schvaleni), vyroba: avg(acc.vyroba), total: avg(total),
-      n: { obchod: acc.obchod.length, konstrukce: acc.konstrukce.length, schvaleni: acc.schvaleni.length, vyroba: acc.vyroba.length, total: total.length } };
+    return { obchod: avg(acc.obchod), konstrukce: avg(acc.konstrukce), schvaleni: avg(acc.schvaleni), vyroba: avg(acc.vyroba), total: avg(total), lead: avg(lead),
+      n: { obchod: acc.obchod.length, konstrukce: acc.konstrukce.length, schvaleni: acc.schvaleni.length, vyroba: acc.vyroba.length, total: total.length, lead: lead.length } };
   }
   // Referenční (standardní) typ pro cílové doby fází na dashboardu.
   function refType(d) { return (d.types || []).find(t => t.standard) || (d.types || [])[0] || {}; }
   // Cílové doby fází ODVOZENÉ z per-krokových lhůt typu (jediný zdroj pravdy = Postup / Role a číselník).
-  // Kroky jsou offsety od bodu 0 → konec fáze = nejzazší offset jejích kroků; délka fáze = rozdíl konců.
+  // Lhůta každého kroku běží od jeho začátku → cíl fáze = součet lhůt jejích kroků.
   function phaseDaysFromType(t) {
     t = t || {};
     const n = v => Math.max(0, Number(v) || 0);
-    const obchodEnd = n(t.lhutaPrideleniDays);
-    const konstrEnd = Math.max(n(t.lhutaZkresleniDays), n(t.lhutaKontrolaDays), obchodEnd);
-    const schvalEnd = Math.max(n(t.lhutaObchodnikDays), n(t.lhutaKlientDays), konstrEnd);
-    const vyrobaEnd = Math.max(n(t.lhutaVyrobaDays), schvalEnd);
-    return { obchod: obchodEnd, konstrukce: konstrEnd - obchodEnd, schvaleni: schvalEnd - konstrEnd, vyroba: vyrobaEnd - schvalEnd };
+    return {
+      obchod: n(t.lhutaPrideleniDays),
+      konstrukce: n(t.lhutaZkresleniDays) + (t.internalCheck === false ? 0 : n(t.lhutaKontrolaDays)),
+      schvaleni: n(t.lhutaObchodnikDays) + n(t.lhutaKlientDays),
+      vyroba: n(t.lhutaVyrobaDays),
+    };
   }
   function isoWeekKey(ts) { const dt = new Date(ts); const day = (dt.getUTCDay() + 6) % 7; const th = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate() - day + 3)); const wk = 1 + Math.round((th - new Date(Date.UTC(th.getUTCFullYear(), 0, 4))) / 604800000); return th.getUTCFullYear() + '-W' + String(wk).padStart(2, '0'); }
   function buildWeeklyReport(d) {
@@ -1031,13 +1187,12 @@ function mount(host) {
     if (!z.deadline || !z.stepStartedAt) return 'green';
     const now = Date.now();
     if (now > z.deadline) return 'red';
-    // Okno pro „blíží se" počítáme od bodu 0 (zadání), u kroků od začátku kroku (lhutaFrom='step').
-    const base = (st.lhutaFrom === 'step') ? z.stepStartedAt : (z.createdAt || z.stepStartedAt);
-    const total = z.deadline - base;
-    const elapsed = now - base;
+    // Lhůta běží od začátku kroku a počítá se v pracovní době.
+    const total = pracMs(z.stepStartedAt, z.deadline);
+    const elapsed = pracMs(z.stepStartedAt, now);
     if (total > 0 && elapsed >= WARN_FRAC * total) return 'amber';
-    // zbývá poslední pracovní den → oranžová
-    if (businessDaysBetween(now, z.deadline) <= 1) return 'amber';
+    // zbývá poslední pracovní den → oranžová (u lhůt do jednoho dne by krok svítil oranžově od začátku)
+    if (total > PRAC_DEN_MS && pracMs(now, z.deadline) <= PRAC_DEN_MS) return 'amber';
     return 'green';
   }
   function typeOf(d, key) { return d.types.find(t => t.key === key) || d.types[0]; }
@@ -1054,29 +1209,48 @@ function mount(host) {
     if (!Array.isArray(z.audit)) z.audit = [];
     z.audit.push({ at: Date.now(), by: by || '', action, note: note || '', from: from || '', to: to || '' });
   }
+  // ---- průběh zakázky v čase ---------------------------------------------------
+  // KAŽDÁ změna stavu jde do z.stepHistory ({stav, at}) — i pozastavení a koncové
+  // stavy. Z historie se počítá, jak dlouho která role zakázku držela.
+  function zapisKrok(z, stav, at) {
+    if (!Array.isArray(z.stepHistory)) z.stepHistory = [];
+    z.stepHistory.push({ stav, at: at || Date.now() });
+    if (z.stepHistory.length > 200) z.stepHistory.shift();
+  }
+  // Lhůta kroku v pracovních dnech (z číselníku typu přes uzel grafu); 0 = bez termínu.
+  function lhutaKroku(d, z, stav) {
+    const node = STAV[stav] || {};
+    if (!node.lhutaKey) return 0;
+    return Math.max(0, Number(typeOf(d, z.typKey)[node.lhutaKey]) || 0);
+  }
+  // Kroky zakázky s dobou v pracovním čase. Běžící krok se počítá do `now`;
+  // koncový stav (hotovo / storno) dobu nemá a předchozí krok jím končí.
+  function prubehKroku(z, now) {
+    const h = z.stepHistory || [], out = [];
+    for (let i = 0; i < h.length; i++) {
+      const e = h[i], st = STAV[e.stav] || {}, dalsi = h[i + 1];
+      const konec = !!st.terminal;
+      const doTs = konec ? e.at : (dalsi ? dalsi.at : now);
+      out.push({ stav: e.stav, od: e.at, do: doTs, prac: konec ? 0 : Math.max(0, pracMs(e.at, doTs)), bezi: !dalsi && !konec, pauza: !!st.hold, konec });
+    }
+    return out;
+  }
+  // Pracovní čas do termínu kroku (záporný = po termínu).
+  function zbyvaPrac(z, now) {
+    if (!z.deadline) return null;
+    return now <= z.deadline ? pracMs(now, z.deadline) : -pracMs(z.deadline, now);
+  }
   // Nastaví nový stav + termín + začátek kroku (výchozí lhůta z číselníku).
   function enterState(d, z, stav) {
-    // Historie kroků — z ní se počítá, jak dlouho který krok reálně trval.
-    // (U starších zakázek chybí; frontend si tam pomůže odhadem z auditu.)
     if (!Array.isArray(z.stepHistory)) z.stepHistory = [];
     if (!z.stepHistory.length && z.stav && z.stepStartedAt) z.stepHistory.push({ stav: z.stav, at: z.stepStartedAt });
     z.stav = stav;
     z.stepStartedAt = Date.now();
-    z.stepHistory.push({ stav, at: z.stepStartedAt });
-    if (z.stepHistory.length > 200) z.stepHistory.shift();
-    const t = typeOf(d, z.typKey);
-    // Lhůty kroků jsou OFFSETY od bodu 0 (zadání = z.createdAt) — dny se NESČÍTAJÍ.
-    // Termín kroku = zadání + N prac. dní; stejné N u dvou kroků = stejné datum.
-    const bod0 = z.createdAt || z.stepStartedAt;
-    // Lhůta se čte z uzlu grafu: lhutaKey = klíč lhůty v číselníku typu;
-    // lhutaFrom='step' (revize) běží od začátku kroku, jinak offset od bodu 0.
-    const node = STAV[stav] || {};
-    const days = node.lhutaKey ? Number(t[node.lhutaKey]) : 0;
-    if (node.lhutaFrom === 'step') {
-      z.deadline = days ? addBusinessDays(z.stepStartedAt, days) : null;
-    } else {
-      z.deadline = days ? addBusinessDays(bod0, days) : null;
-    }
+    zapisKrok(z, stav, z.stepStartedAt);
+    // Lhůta běží OD ZAČÁTKU KROKU a počítá se v pracovní době (po–pá 7:00–15:30 bez svátků):
+    // N pracovních dnů = N × 8,5 hodiny pracovního času. 0 = krok bez termínu.
+    const days = lhutaKroku(d, z, stav);
+    z.deadline = days ? pridejPrac(z.stepStartedAt, days * PRAC_DEN_MS) : null;
     // vyčistíme eskalační příznaky pro nový krok
     z.esc = { key: stav + ':' + (z.versions.length || 0) };
   }
@@ -1549,6 +1723,8 @@ function mount(host) {
       notif: myNotif.slice(0, 40),
       notifUnread: myNotif.filter(n => !n.read).length,
       now: Date.now(),
+      // pracovní doba, ve které se počítají doby kroků a lhůty
+      pracDoba: { od: '7:00', do: '15:30', denMs: PRAC_DEN_MS },
       settings: me.isAdmin ? d.settings : undefined,
       phaseDays: phaseDaysFromType(refType(d)),
       phaseDaysType: refType(d).name || '',
@@ -1587,6 +1763,7 @@ function mount(host) {
     const totalSec = (z.timeEntries || []).reduce((s, e) => s + (e.seconds || 0), 0) + tsSec;
     const myTimer = z.activeTimer && me && z.activeTimer.user === me.email ? z.activeTimer : null;
     const nodeF = STAV[z.stav] || {};
+    const nowTs = Date.now(), kroky = prubehKroku(z, nowTs);
     return {
       id: z.id, cislo: z.cislo, createdAt: z.createdAt,
       rezim: z.rezim || 'nabidka', cisloObj: z.cisloObj || '', faze: nodeF.faze || (['zavod', 'schvaleno', 'dokonceno'].includes(z.stav) ? 'objednavka' : 'nabidka'),
@@ -1611,7 +1788,11 @@ function mount(host) {
       obchodnikEmail: z.obchodnikEmail, obchodnikName: empName(z.obchodnikEmail),
       assignedTo: z.assignedTo || '', assignedName: z.assignedTo ? empName(z.assignedTo) : '',
       deadline: z.deadline || null, stepStartedAt: z.stepStartedAt || null,
-      stepHistory: z.stepHistory || [],   // {stav, at} — doba strávená v jednotlivých krocích
+      stepHistory: z.stepHistory || [],   // {stav, at} — každá změna stavu
+      // doby kroků v pracovní době (ms): {stav, od, do, prac, bezi, pauza, konec}
+      kroky: kroky,
+      celkemPrac: kroky.reduce((a, k) => a + ((k.pauza || k.konec) ? 0 : k.prac), 0),   // pracovní čas od zadání bez pozastavení
+      zbyvaPrac: (nodeF.terminal || nodeF.hold) ? null : zbyvaPrac(z, nowTs),          // do termínu kroku; záporné = po termínu
       semafor: semafor(z),
       responsible: responsibleEmail(z), responsibleName: empName(responsibleEmail(z)),
       versionCount: z.versions.length,
@@ -2045,10 +2226,11 @@ function mount(host) {
     // kontrola realizovatelnosti požadovaného termínu (aprox z výchozích lhůt)
     let warn = null;
     if (z.pozadovanyTermin) {
-      // Lhůty jsou offsety od zadání → interně hotovo = nejzazší z interních kroků (ne součet).
-      const internalDays = Math.max(t.lhutaPrideleniDays || 0, t.lhutaZkresleniDays || 0, (t.internalCheck ? (t.lhutaKontrolaDays || 0) : 0), t.lhutaObchodnikDays || 0);
-      const earliest = addBusinessDays(now, internalDays);
-      if (new Date(z.pozadovanyTermin + 'T23:59:59Z').getTime() < earliest) warn = 'Pozor: požadovaný termín je při výchozích lhůtách (interně ~' + internalDays + ' prac. dnů) nereálný ještě před reakcí klienta.';
+      // Lhůta každého kroku běží od jeho začátku → interně hotovo = součet interních kroků.
+      const internalDays = (Number(t.lhutaPrideleniDays) || 0) + (Number(t.lhutaZkresleniDays) || 0) + (t.internalCheck ? (Number(t.lhutaKontrolaDays) || 0) : 0) + (Number(t.lhutaObchodnikDays) || 0);
+      const earliest = pridejPrac(now, internalDays * PRAC_DEN_MS);
+      const pm = String(z.pozadovanyTermin).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (pm && zMistniho(+pm[1], +pm[2], +pm[3], PRAC_DO_MIN) < earliest) warn = 'Pozor: požadovaný termín je při výchozích lhůtách (interně ~' + internalDays + ' prac. dnů) nereálný ještě před reakcí klienta.';
     }
     // objednávka do plánu výroby (ČVZ) — na pozadí, ať nedrží odpověď
     if (jeObj) setTimeout(() => planZapis(z.id, me.name), 0);
@@ -2300,8 +2482,11 @@ function mount(host) {
         if (!note) { err = 'Uveďte důvod čekání na podklady.'; break; }
         if (STAV[z.stav].terminal || z.stav === 'podklady') { err = 'Nelze pozastavit.'; break; }
         z.prevStav = z.stav; z.holdReason = note; z.holdSince = Date.now();
+        // kolik pracovního času zbývalo do termínu — pozastavení lhůtu jen přeruší
+        z.holdZbyva = z.deadline ? Math.max(0, zbyvaPrac(z, z.holdSince)) : null;
         stopTimer(z, me.email);
         z.stav = 'podklady'; z.deadline = null;
+        zapisKrok(z, 'podklady', z.holdSince);   // čekání na podklady se nepočítá nikomu
         audit(z, me.email, 'Čeká na podklady', note);
         break;
       }
@@ -2309,8 +2494,12 @@ function mount(host) {
         if (!isObch && !isSef) { err = 'Obnovit smí obchodník nebo šéf konstrukce.'; break; }
         if (z.stav !== 'podklady') { err = 'Zakázka nečeká na podklady.'; break; }
         const back = z.prevStav || 'prace';
+        const zbyvalo = z.holdZbyva;
         audit(z, me.email, 'Podklady doplněny', 'návrat do: ' + STAV[back].label);
         enterState(d, z, back);
+        // krok pokračuje se zbytkem lhůty, který měl před pozastavením
+        if (zbyvalo != null) z.deadline = pridejPrac(z.stepStartedAt, zbyvalo);
+        delete z.holdZbyva;
         z.holdReason = ''; z.prevStav = '';
         notify(d, responsibleEmail(z), 'Podklady k ' + z.cislo + ' doplněny, pokračujte.', z.id);
         break;
@@ -2320,7 +2509,7 @@ function mount(host) {
         if (!note) { err = 'Uveďte důvod storna.'; break; }
         stopTimer(z, me.email);
         if (z.link) z.link.active = false;
-        z.stav = 'zamitnuto'; z.deadline = null; z.closedAt = Date.now();
+        z.stav = 'zamitnuto'; z.deadline = null; z.closedAt = Date.now(); zapisKrok(z, 'zamitnuto', z.closedAt);
         audit(z, me.email, 'Storno', note);
         break;
       }
@@ -2386,7 +2575,7 @@ function mount(host) {
         if (z.stav !== 'schvaleno') { err = 'Výrobní dokumentaci lze vložit až po schválení klientem.'; break; }
         if (!z.vyrobniDok || !z.vyrobniDok.path) { err = 'Nejdřív nahrajte soubor výrobní dokumentace.'; break; }
         stopTimer(z, me.email);
-        z.stav = 'dokonceno'; z.deadline = null; z.closedAt = Date.now();
+        z.stav = 'dokonceno'; z.deadline = null; z.closedAt = Date.now(); zapisKrok(z, 'dokonceno', z.closedAt);
         audit(z, me.email, 'Vložena výrobní dokumentace → do výroby', (z.strediskoName ? 'závod ' + z.strediskoName : ''));
         notify(d, z.obchodnikEmail, 'Zakázka ' + z.cislo + ' má výrobní dokumentaci a jde do výroby (' + (z.strediskoName || '') + ').', z.id);
         const dir = z.strediskoKey ? oblastReditel(d, z.strediskoKey) : '';
@@ -2734,7 +2923,9 @@ function mount(host) {
     if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
     const reason = String(b.duvod || '').trim();
     if (!reason) { json(res, 400, { chyba: 'Změnu termínu je nutné zdůvodnit.' }); return true; }
-    const newTs = b.deadline ? new Date(String(b.deadline).slice(0, 10) + 'T23:59:59Z').getTime() : null;
+    // termín = konec pracovní doby zvoleného dne (místního času)
+    const dm = String(b.deadline || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const newTs = dm ? zMistniho(+dm[1], +dm[2], +dm[3], PRAC_DO_MIN) : null;
     if (!newTs || isNaN(newTs)) { json(res, 400, { chyba: 'Neplatný termín.' }); return true; }
     const canObch = me.isAdmin || (ma(me, 'obchodnik') && (z.obchodnikEmail || '').toLowerCase() === me.email) || ma(me, 'sef');
     if (!canObch) { json(res, 403, { chyba: 'Termín běžící zakázky mění obchodník (konstruktér jen se souhlasem obchodníka).' }); return true; }
@@ -3185,7 +3376,7 @@ function mount(host) {
       z.clientDecision = { action: 'zamitnout', name, email: z.kontaktEmail || '', at: Date.now(), ip, duvod };
       addComment(z, { email: '', name: name || 'Klient' }, 'client', 'ZAMÍTNUTO: ' + duvod);
       z.link.accesses.push({ at: Date.now(), ip, ua: kratkyUA(req), action: 'zamítl' });
-      z.stav = 'zamitnuto'; z.deadline = null; z.closedAt = Date.now();
+      z.stav = 'zamitnuto'; z.deadline = null; z.closedAt = Date.now(); zapisKrok(z, 'zamitnuto', z.closedAt);
       audit(z, (name || 'klient') + ' (klient)', 'Klient zamítl', duvod + ' — IP ' + ip);
       notify(d, z.obchodnikEmail, 'Klient ZAMÍTL výkres ' + z.cislo + '. Řešte další postup.', z.id);
       save(d);
@@ -3324,7 +3515,7 @@ function mount(host) {
 
       // --- klient nereaguje (5 / 10 pracovních dnů) ---
       if (z.stav === 'klient' && z.stepStartedAt) {
-        const bdays = businessDaysBetween(z.stepStartedAt, now);
+        const bdays = pracMs(z.stepStartedAt, now) / PRAC_DEN_MS;   // pracovní dny v pracovní době
         if (remind1 > 0 && bdays >= remind1 && !z.esc.klient5) {
           z.esc.klient5 = true; changed = true;
           notify(d, z.obchodnikEmail, 'Klient nereaguje na náhled ' + z.cislo + ' ' + remind1 + ' prac. dnů — odeslána připomínka.', z.id);
@@ -3349,13 +3540,14 @@ function mount(host) {
 
       if (!z.deadline) continue;
       const resp = responsibleEmail(z);
-      // --- blíží se termín (oranžová, app-notifikace odpovědné osobě) — okno od bodu 0 (zadání) ---
-      const warnBase = (st.lhutaFrom === 'step') ? z.stepStartedAt : (z.createdAt || z.stepStartedAt);
+      // --- blíží se termín (oranžová, app-notifikace odpovědné osobě) — podíl lhůty od začátku kroku, v pracovní době ---
+      const warnBase = z.stepStartedAt;
       if (warnBase && z.deadline > warnBase) {
-        const frac = (now - warnBase) / (z.deadline - warnBase);
+        const lhuta = pracMs(warnBase, z.deadline);
+        const frac = lhuta > 0 ? pracMs(warnBase, now) / lhuta : 0;
         if (frac >= warnFrac && now < z.deadline && !z.esc.warned80) {
           z.esc.warned80 = true; changed = true;
-          if (resp) notify(d, resp, 'Blíží se termín kroku „' + st.label + '" u ' + z.cislo + ' (do ' + fmtDate(z.deadline) + ').', z.id);
+          if (resp) notify(d, resp, 'Blíží se termín kroku „' + st.label + '" u ' + z.cislo + ' (do ' + fmtDateTime(z.deadline) + ').', z.id);
         }
       }
       // --- překročení termínu (červená, e-mail odpovědné + obchodník + šéf) ---
@@ -3365,7 +3557,7 @@ function mount(host) {
           const komu = new Set([resp, z.obchodnikEmail, ...employeesWithRole('sef')].filter(Boolean));
           komu.forEach(em => notify(d, em, 'PO TERMÍNU: krok „' + st.label + '" u ' + z.cislo + ' překročil termín.', z.id));
           if (cfg.overdueEmail !== false) {
-            const text = 'Zakázka ' + z.cislo + ' (' + z.zakaznik + ') překročila termín kroku „' + st.label + '" (' + fmtDate(z.deadline) + ').\nOdpovědná osoba: ' + (empName(resp) || '—') + '.';
+            const text = 'Zakázka ' + z.cislo + ' (' + z.zakaznik + ') překročila termín kroku „' + st.label + '" (' + fmtDateTime(z.deadline) + ').\nOdpovědná osoba: ' + (empName(resp) || '—') + '.';
             komu.forEach(em => mail(em, 'Po termínu · ' + (z.cisloObj || z.cislo), text, z, { stitek: 'PO TERMÍNU', stitekBarva: '#c62828' }));
           }
         }
@@ -3386,7 +3578,7 @@ function mount(host) {
           _krok: (STAV[z.stav] && STAV[z.stav].label) || z.stav,
           _termin: fmtDate(z.deadline),
           _kdo: empName(responsibleEmail(z)) || '—',
-          _dny: Math.max(1, Math.floor((now - z.deadline) / 86400000)),
+          _dny: Math.max(1, Math.floor(pracMs(z.deadline, now) / PRAC_DEN_MS)),   // pracovní dny po termínu
         })).sort((a, b) => b._dny - a._dny);
         const lines = rows.map(z => '• ' + z.cislo + ' (' + z.zakaznik + ') — „' + z._krok + '", termín byl ' + z._termin + ' → ' + z._dny + ' ' + sklonDni(z._dny) + ' po termínu, odpovídá ' + z._kdo).join('\n');
         const text = 'Přehled zpožděných zakázek konstrukce k ' + today + ' (' + rows.length + ' ' + sklonZakazek(rows.length) + ', nejdéle ' + rows[0]._dny + ' ' + sklonDni(rows[0]._dny) + '):\n\n' + lines;
@@ -3423,8 +3615,9 @@ function mount(host) {
   // ======================================================================
   //  Pomocné formátovače + veřejná HTML stránka
   // ======================================================================
-  function fmtDate(ts) { if (!ts) return '—'; const dt = new Date(ts); return String(dt.getUTCDate()).padStart(2, '0') + '.' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '.' + dt.getUTCFullYear(); }
-  function fmtDateTime(ts) { const dt = new Date(ts); return fmtDate(ts) + ' ' + String(dt.getUTCHours()).padStart(2, '0') + ':' + String(dt.getUTCMinutes()).padStart(2, '0'); }
+  // Datum a čas vždy v českém čase (server běží v UTC).
+  function fmtDate(ts) { if (!ts) return '—'; const l = mistniCas(ts); return String(l.d).padStart(2, '0') + '.' + String(l.m).padStart(2, '0') + '.' + l.y; }
+  function fmtDateTime(ts) { if (!ts) return '—'; const l = mistniCas(ts); return fmtDate(ts) + ' ' + String(l.h).padStart(2, '0') + ':' + String(l.mi).padStart(2, '0'); }
   function addDaysCal(ts, days) { return ts + days * 24 * 3600 * 1000; }
 
   function publicPage() {
@@ -3863,4 +4056,4 @@ fetch('/api/konstrukce/prehled/'+TOKEN+location.search,{cache:'no-store'}).then(
 </script></body></html>`;
 
 
-module.exports = { mount };
+module.exports = { mount, _cas: { pracMs, pridejPrac, mistniCas, zMistniho, PRAC_DEN_MS } };
