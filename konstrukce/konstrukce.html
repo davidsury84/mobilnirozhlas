@@ -1276,8 +1276,9 @@ function kPattern(s){
     var ksw={en:'pcs',de:'Stk.',pl:'szt.',ua:'шт.',ro:'buc.'}[K_LANG]||'ks';
     return h+' ('+m[2]+' '+ksw+' × '+m[3]+')';
   }
-  /* katalog ABR: „LZP — lyžina IPN zajištění pasivní…" → kód zůstává, popis se přeloží */
-  if((m=s.match(/^([A-Z0-9][A-Z0-9/.\-]*)\s+—\s+(.+)$/))){
+  /* katalog ABR: „LZP — lyžina IPN zajištění pasivní…" → kód zůstává, popis se přeloží
+     (malé „x" kvůli kódům s rozměrem profilu — VU100x50) */
+  if((m=s.match(/^([A-Z0-9][A-Z0-9x/.\-]*)\s+—\s+(.+)$/))){
     var kk=K_ABR[m[2]]; if(kk&&kk[K_IDX[K_LANG]]) return m[1]+' — '+kk[K_IDX[K_LANG]];
   }
   return null;

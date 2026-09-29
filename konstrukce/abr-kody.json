@@ -138,8 +138,8 @@
      "depr": false
     },
     {
-     "kod": "ABR-DSD-PREZERO",
-     "popis": "DE - značení kont pro konkrétního zákazníka (PREZERO DE)",
+     "kod": "ABR-DSD-PREZERO-DE",
+     "popis": "značení kont pro konkrétního zákazníka (PREZERO DE)",
      "std": false,
      "ne": false,
      "depr": false
@@ -194,8 +194,8 @@
      "depr": false
     },
     {
-     "kod": "ABR-ECL1-PREZERO",
-     "popis": "DE - značení kont pro konkrétního zákazníka (PREZERO DE)",
+     "kod": "ABR-ECL1-PREZERO-DE",
+     "popis": "značení kont pro konkrétního zákazníka (PREZERO DE)",
      "std": false,
      "ne": false,
      "depr": false
@@ -803,8 +803,8 @@
      "depr": false
     },
     {
-     "kod": "VU100",
-     "popis": "x50 - profil U100x50",
+     "kod": "VU100x50",
+     "popis": "profil U100x50",
      "std": false,
      "ne": false,
      "depr": false

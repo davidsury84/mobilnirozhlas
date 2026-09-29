@@ -32,6 +32,24 @@ try { KATALOG_ABR = (JSON.parse(fs.readFileSync(path.join(__dirname, 'katalog-ab
 // ne = komponenta není (z kódu se vynechává), depr = NEPOUŽÍVAT (skryto).
 let ABR_KODY = { sekce: [], data: {} };
 try { ABR_KODY = JSON.parse(fs.readFileSync(path.join(__dirname, 'abr-kody.json'), 'utf8')); } catch (_) {}
+// Kontrola číselníku při načtení: dva platné záznamy se stejným kódem v jedné
+// sekci genKodAbr nerozliší (z volby bere první token) — a shodne-li se ten kód
+// se standardem řady, do kódu kontejneru se nevypíše vůbec (VU100 × VU100x50).
+function abrKodyDuplicity(kody) {
+  const out = [];
+  const data = (kody && kody.data) || {};
+  for (const sek of Object.keys(data)) {
+    const videno = {};
+    for (const o of ((data[sek] || {}).opts || [])) {
+      if (!o || o.depr) continue;
+      const kod = o.ne ? 'NE' : (String(o.kod || '').trim().split(/[\s—–]+/)[0] || '');
+      if (videno[kod]) out.push({ sek, kod, popisy: [videno[kod].popis, o.popis] });
+      else videno[kod] = o;
+    }
+  }
+  return out;
+}
+abrKodyDuplicity(ABR_KODY).forEach(x => console.warn('[konstrukce] číselník ABR: sekce „' + x.sek + '" má dva platné záznamy s kódem „' + x.kod + '" (' + x.popisy.map(p => '„' + p + '"').join(' × ') + ') — v kódu kontejneru je nelze rozlišit'));
 // Ilustrační obrázky typů natahování (CAD rendery z alba) — kod → soubor.
 let NATAH_IMG = {};
 try { NATAH_IMG = JSON.parse(fs.readFileSync(path.join(__dirname, 'natah-img', 'map.json'), 'utf8')); } catch (_) {}
@@ -102,13 +120,18 @@ function abrPole(sek, label, over) {
   const opts = (s.opts || []).filter(o => !o.depr);
   let stdO = null, stdText = '';
   if (over.stdKod) stdO = opts.find(o => o.kod === over.stdKod || (over.stdKod === 'NE' && o.ne)) || null;
+  // List řady zapisuje „komponenta není" i textem (std: 'NE' — sth/hbs/hdc vrata).
+  // I tak jde o položku NE z číselníku; jako pouhý text by v nabídce zůstala
+  // a NE by bylo k výběru dvakrát (standard + opce / „další z katalogu").
+  const stdNe = over.std !== undefined && String(over.std).trim().toUpperCase() === 'NE';
+  if (!stdO && stdNe) stdO = opts.find(o => o.ne) || null;
   if (!stdO && over.std !== undefined) {
-    stdText = (String(over.std).toUpperCase() === 'NE')
+    stdText = stdNe
       ? ('NE — ' + (over.stdPopis || 'komponenta není (dle listu řady)'))
       : (over.std + ' — ' + (over.stdPopis || 'standard dle listu řady'));
   }
   if (!stdO && !stdText) stdO = opts.find(o => o.std) || opts.find(o => o.ne) || null;
-  const std = stdText || (stdO ? (stdO.ne ? ('NE — ' + stdO.popis) : (stdO.kod + ' — ' + (over.stdPopis || stdO.popis))) : '—');
+  const std = stdText || (stdO ? ((stdO.ne ? 'NE' : stdO.kod) + ' — ' + (over.stdPopis || stdO.popis)) : '—');
   const rest = opts.filter(o => o !== stdO);
   const lab = o => (o.ne ? 'NE' : o.kod) + ' — ' + o.popis;
   if (over._rada) {
