@@ -51,7 +51,7 @@ async function listOne(tok, folderId) {
   const out = []; let pageToken = '';
   do {
     const q = encodeURIComponent(`'${folderId}' in parents and trashed=false`);
-    const fields = encodeURIComponent('nextPageToken,files(id,name,mimeType,webViewLink,createdTime)');
+    const fields = encodeURIComponent('nextPageToken,files(id,name,mimeType,webViewLink,createdTime,modifiedTime)');
     const path = `/drive/v3/files?q=${q}&fields=${fields}&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true` + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
     const j = await httpsJson('GET', 'www.googleapis.com', path, { headers: { Authorization: 'Bearer ' + tok } });
     out.push(...(j.files || []));
