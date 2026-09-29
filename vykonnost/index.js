@@ -751,7 +751,7 @@ function mount(host) {
     if (!od) { const d = new Date(snap + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 27); od = d.toISOString().slice(0, 10); } if (!do_) do_ = snap;
     const rows = D.rows.filter(r => r[R.date] >= od && r[R.date] <= do_ && !isRezie(r[R.dil])); const pd = Math.max(1, pracDnyRozsah(od, do_));
     // pracovní dny aktuálního měsíce snímku (pro „měsíčně“)
-    const ym = snap.slice(0, 7); const pdMes = pracDnyMesice(ym);
+    const ym = od.slice(0, 7) === do_.slice(0, 7) ? od.slice(0, 7) : snap.slice(0, 7); const pdMes = pracDnyMesice(ym);
     const maN = normIndex().items.length > 0;
     const faze = P.faze.map(f => {
       const re = PLAN6_RE[f.k]; const rs = rows.filter(r => re.test(r[R.op])); const ks = rs.reduce((s, r) => s + r[R.ks], 0);
