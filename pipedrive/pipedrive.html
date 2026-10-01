@@ -82,15 +82,50 @@ tfoot td{font-weight:700;border-top:2px solid var(--line-strong);border-bottom:0
 .pill.mute{background:#eef1ec;color:var(--ink-soft)}
 .pill.warn{background:var(--yellow-soft);color:var(--amber)}
 
-/* sloupcový graf po dnech — jedna řada, jedna barva */
-.graf{display:flex;align-items:flex-end;gap:3px;height:150px;padding-top:18px}
-.graf .s{flex:1;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;position:relative}
-.graf .s i{display:block;width:100%;max-width:34px;background:var(--green);border-radius:4px 4px 0 0;min-height:0}
-.graf .s.vik i{background:#9fd3b3}
-.graf .s b{font-size:10.5px;font-weight:600;color:var(--ink-soft);line-height:1.3}
-.graf .s:hover i{background:var(--green-d)}
-.osa{display:flex;gap:3px;border-top:1px solid var(--line-strong);padding-top:4px}
-.osa span{flex:1;min-width:4px;text-align:center;font-size:10px;color:var(--faint);white-space:nowrap;overflow:visible}
+/* barvy typů aktivit (řady grafů) — ověřená kategoriální paleta, pořadí se nemění */
+:root{--t1:#2a78d6;--t2:#eb6834;--t3:#1baf7a;--t4:#eda100;--t5:#e87ba4;--t6:#008300;--t-ost:#a3a9a3}
+.kpi .k .v .dl{margin-left:8px;vertical-align:middle}
+.dl{display:inline-block;font-family:var(--sans);font-size:11.5px;font-weight:600;color:var(--ink-soft);background:var(--bg);border-radius:20px;padding:1px 8px;white-space:nowrap;line-height:1.6}
+.leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft)}
+.leg i,.kt i,#tip i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+.plot{position:relative;margin-left:34px}
+.gl{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.gl span{position:absolute;left:-34px;top:-8px;width:28px;text-align:right;font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.cols{position:absolute;inset:0;display:flex;gap:2px;align-items:flex-end}
+.col{flex:1;min-width:3px;height:100%;display:flex;align-items:flex-end;justify-content:center}
+.col:hover{background:rgba(15,21,18,.05)}
+.stk{width:100%;max-width:30px;display:flex;flex-direction:column-reverse;gap:2px}
+.stk i{display:block;width:100%}
+.stk i:last-child{border-radius:4px 4px 0 0}
+.osa{display:flex;gap:2px;margin-left:34px;border-top:1px solid var(--line-strong);padding-top:4px}
+.osa span{flex:1;min-width:3px;text-align:center;font-size:10px;color:var(--faint);white-space:nowrap;overflow:visible}
+.lb{display:grid;grid-template-columns:minmax(110px,170px) 1fr 110px;gap:12px;align-items:center;padding:6px 8px;margin:0 -8px;border-radius:8px;cursor:pointer}
+.lb:hover{background:#f3f7f2}
+.lbn{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbs{display:flex;gap:2px;height:16px;min-width:3px}
+.lbs i{display:block;min-width:1px}
+.lbs i:last-child{border-radius:0 4px 4px 0}
+.lbv{font-variant-numeric:tabular-nums;white-space:nowrap}
+.lbv .dl{margin-left:6px}
+.karty{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.karta{cursor:pointer;margin:0}
+.karta:hover{border-color:var(--green)}
+.kj{font-family:var(--cond);font-weight:700;font-size:16.5px}
+.kv{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:2px 0 8px}
+.kv b{font-family:var(--cond);font-size:30px;line-height:1.1}
+.kv>span:not(.dl){font-size:12.5px;color:var(--ink-soft)}
+.spark{display:block;width:100%;height:42px}
+.spark polyline{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.spo{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);border-top:1px solid var(--line);padding-top:2px}
+.kt{display:flex;gap:4px 12px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-soft);margin:10px 0}
+.kt b{color:var(--ink)}
+.kr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;border-top:1px dashed var(--line);padding-top:10px}
+.kr span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:600;white-space:nowrap}
+.kr b{font-variant-numeric:tabular-nums}
+#tip{position:fixed;display:none;z-index:95;pointer-events:none;background:var(--paper);border:1px solid var(--line-strong);border-radius:10px;box-shadow:var(--shadow);padding:8px 12px;font-size:12.5px;color:var(--ink-soft);max-width:260px}
+#tip .tt{font-weight:600;color:var(--ink);margin-bottom:2px}
+#tip b{color:var(--ink)}
+@media(max-width:640px){.lb{grid-template-columns:1fr 80px}.lbn{grid-column:1/-1}}
 
 .modal{position:fixed;inset:0;background:rgba(15,21,18,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:24px 14px}
 .modal.on{display:flex}
@@ -127,6 +162,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--line-strong);border-bottom:0
   <div class="lista">
     <span class="mut">Od</span><input type="date" id="od" onchange="vlastni()">
     <span class="mut">do</span><input type="date" id="do" onchange="vlastni()">
+    <div class="tabs" id="pohledy"><button class="on" data-p="dash" onclick="pohled('dash')">Dashboard</button><button data-p="tab" onclick="pohled('tab')">Tabulka</button></div>
+    <span id="skryte"></span>
     <div class="sp"></div>
     <button class="btn sm" onclick="nacti(true)">↻ Načíst znovu z Pipedrive</button>
     <button class="btn sm" id="btnNast" style="display:none" onclick="nastaveni()">⚙ Nastavení</button>
@@ -140,10 +177,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--line-strong);border-bottom:0
   <div class="b" id="mObsah"></div>
 </div></div>
 <div class="toast" id="toast"></div>
+<div id="tip" role="status"></div>
 
 <script>
 "use strict";
-let D=null, OBD="d30", RAZENI={k:"hotovo",dolu:true}, BEZI=0;
+let D=null, POHLED="dash", VSE=false, OBD="d30", RAZENI={k:"hotovo",dolu:true}, BEZI=0;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); setTimeout(()=>el.classList.remove("on"),2400); }
@@ -185,7 +223,7 @@ async function nacti(znovu){
   const beh=++BEZI;
   $("#podtitul").textContent="Načítám data z Pipedrive…";
   try{
-    const d=await api("/api/pipedrive/data?od="+encodeURIComponent($("#od").value)+"&do="+encodeURIComponent($("#do").value)+(znovu?"&obnovit=1":""));
+    const d=await api("/api/pipedrive/data?od="+encodeURIComponent($("#od").value)+"&do="+encodeURIComponent($("#do").value)+(znovu?"&obnovit=1":"")+(VSE?"&vse=1":""));
     if(beh!==BEZI) return;
     D=d; vykresli();
     if(znovu&&!d.chyba) toast("Data načtena z Pipedrive");
@@ -201,6 +239,27 @@ const cislo=n=>Number(n||0).toLocaleString("cs-CZ");
 function penize(o){ const k=Object.keys(o||{}); if(!k.length) return ""; return k.map(m=>Number(o[m]).toLocaleString("cs-CZ",{maximumFractionDigits:0})+" "+esc(m)).join(" + "); }
 function soucetMen(lide,pole){ const o={}; lide.forEach(c=>Object.keys(c[pole]||{}).forEach(m=>{ o[m]=(o[m]||0)+c[pole][m]; })); return o; }
 function nazevTypu(k){ const t=(D.typy||[]).find(x=>x.klic===k); return t?t.nazev:k; }
+
+// Řady grafů = typy aktivit. Barva patří typu (podle pořadí v Pipedrive), ne jeho pořadí v datech;
+// sedmý a další typ se sčítají do „Ostatní".
+function serie(lide){
+  const s=(D.typy||[]).slice(0,6).map((t,i)=>({klic:t.klic,nazev:t.nazev,barva:"var(--t"+(i+1)+")"}));
+  const zname={}; s.forEach(x=>zname[x.klic]=1);
+  const jeOst=lide.some(c=>Object.keys(c.podleTypu).some(t=>!zname[t]));
+  const pouzite=s.filter(x=>lide.some(c=>c.podleTypu[x.klic]));
+  if(jeOst) pouzite.push({klic:"_ost",nazev:"Ostatní",barva:"var(--t-ost)"});
+  pouzite.hodnota=(o,x)=>x.klic==="_ost"?Object.keys(o||{}).reduce((a,t)=>a+(zname[t]?0:o[t]),0):((o||{})[x.klic]||0);
+  return pouzite;
+}
+function zmena(ted,driv){
+  if(driv==null) return "";
+  const tit=' title="předchozí období: '+cislo(driv)+'"';
+  if(!driv) return ted?'<span class="dl"'+tit+'>nově</span>':"";
+  const p=Math.round((ted-driv)/driv*100);
+  return '<span class="dl"'+tit+'>'+(p>0?"▲ +":p<0?"▼ ":"● ")+p+" %</span>";
+}
+const tip=o=>' data-tip="'+esc(JSON.stringify(o))+'"';
+function hezke(n){ if(n<=4) return 4; const p=Math.pow(10,Math.floor(Math.log10(n))), k=n/p; return (k<=1?1:k<=2?2:k<=4?4:k<=5?5:10)*p; }
 
 function vykresli(){
   $("#btnNast").style.display=(D.me&&D.me.admin)?"":"none";
@@ -218,31 +277,95 @@ function vykresli(){
   }
   const lide=D.lide||[];
   const sum=k=>lide.reduce((a,c)=>a+(c[k]||0),0);
+  const min=D.minule&&D.minule.lide;
+  const sumMin=k=>min?lide.reduce((a,c)=>a+((min[c.id]||{})[k]||0),0):null;
   const cas=new Date(D.nacteno).toLocaleTimeString("cs-CZ",{hour:"2-digit",minute:"2-digit"});
   $("#podtitul").textContent=cz(D.od)+" – "+cz(D.do)+" · načteno z Pipedrive v "+cas;
+  $("#skryte").innerHTML=(D.me.admin&&D.skrytych)?'<label class="mut" style="cursor:pointer"><input type="checkbox" '+(VSE?"checked":"")+' onchange="VSE=this.checked;nacti()"> zobrazit skryté účty ('+D.skrytych+')</label>':"";
 
+  let h="";
+  if(D.orez) h+='<div class="varovani">Za zvolené období je v Pipedrive víc záznamů, než modul najednou načte — čísla mohou být neúplná. Zkuste kratší období.</div>';
+  const vyhrano=penize(soucetMen(lide,"vyhranoHodnota"));
+  const srov=D.minule?'oproti '+czKr(D.minule.od)+' – '+czKr(D.minule.do):"za zvolené období";
+  const k=(n,v,p,d,zle)=>'<div class="k'+(zle?" zle":"")+'"><div class="n">'+n+'</div><div class="v">'+cislo(v)+(d||"")+'</div><div class="p">'+p+'</div></div>';
+  h+='<div class="kpi">'+
+    k("Dokončené aktivity",sum("hotovo"),srov,zmena(sum("hotovo"),sumMin("hotovo")))+
+    k("Naplánováno",sum("naplanovano"),"otevřené, termín dnes a dál")+
+    k("Po termínu",sum("poTerminu"),"otevřené s prošlým termínem","",sum("poTerminu")>0)+
+    k("Nové dealy",sum("dealyNove"),srov,zmena(sum("dealyNove"),sumMin("dealyNove")))+
+    k("Vyhrané dealy",sum("dealyVyhrane"),vyhrano||srov,zmena(sum("dealyVyhrane"),sumMin("dealyVyhrane")))+
+    k("Prohrané dealy",sum("dealyProhrane"),srov,zmena(sum("dealyProhrane"),sumMin("dealyProhrane")))+
+  '</div>';
+  h+=POHLED==="dash"?dashboard(lide):tabulka(lide,sum);
+  $("#obsah").innerHTML=h;
+}
+function pohled(p){ POHLED=p; document.querySelectorAll("#pohledy button").forEach(b=>b.classList.toggle("on",b.dataset.p===p)); if(D) vykresli(); }
+
+/* ---- dashboard ---- */
+function dashboard(lide){
+  const S=serie(lide), min=D.minule&&D.minule.lide;
+  const aktivni=lide.filter(c=>c.hotovo||c.naplanovano||c.poTerminu||c.dealyNove||c.dealyVyhrane||c.dealyProhrane)
+    .sort((a,b)=>b.hotovo-a.hotovo||a.jmeno.localeCompare(b.jmeno,"cs"));
+  if(!aktivni.length) return '<div class="card"><div class="empty">Za zvolené období není v Pipedrive žádná aktivita ani deal.</div></div>';
+  const legenda=S.length>1?'<div class="leg">'+S.map(x=>'<span><i style="background:'+x.barva+'"></i>'+esc(x.nazev)+'</span>').join("")+'</div>':"";
+  const radkyTipu=o=>S.map(x=>[x.barva,x.nazev,S.hodnota(o,x)]).filter(r=>r[2]);
+
+  // 1) aktivity v čase, skládané podle typu
+  const od=zIso(D.od), doo=zIso(D.do), pocet=Math.round((doo-od)/86400000)+1, poTydnech=pocet>45, sl=[];
+  for(let d=new Date(od); d<=doo; d.setDate(d.getDate()+1)){
+    const den=iso(d);
+    if(!poTydnech||!sl.length||d.getDay()===1) sl.push({od:den,do:den,t:{},n:0});
+    const s=sl[sl.length-1]; s.do=den;
+    lide.forEach(c=>{ const o=c.podleDneTypu[den]; if(o) Object.keys(o).forEach(t=>{ s.t[t]=(s.t[t]||0)+o[t]; s.n+=o[t]; }); });
+  }
+  let h="";
+  if(sl.length>1){
+    const max=hezke(Math.max(1,...sl.map(s=>s.n))), V=180, krok=Math.ceil(sl.length/14);
+    h+='<div class="card"><div class="h"><h2>Dokončené aktivity '+(poTydnech?"po týdnech":"po dnech")+'</h2><div class="sp"></div>'+legenda+'</div><div class="b"><div class="plot" style="height:'+V+'px">'+
+      [1,.5,0].map(f=>'<div class="gl" style="bottom:'+(f*V)+'px"><span>'+cislo(max*f)+'</span></div>').join("")+
+      '<div class="cols">'+sl.map(s=>'<div class="col"'+tip({t:(s.od===s.do?cz(s.od):czKr(s.od)+" – "+cz(s.do)),c:s.n,r:radkyTipu(s.t)})+'><div class="stk">'+
+        S.map(x=>{ const n=S.hodnota(s.t,x); return n?'<i style="background:'+x.barva+';height:'+Math.max(2,n/max*V).toFixed(1)+'px"></i>':""; }).join("")+'</div></div>').join("")+'</div></div>'+
+      '<div class="osa">'+sl.map((s,i)=>'<span>'+(i%krok===0?czKr(s.od):"")+'</span>').join("")+'</div></div></div>';
+  }
+
+  // 2) srovnání obchodníků
+  const maxH=Math.max(1,...aktivni.map(c=>c.hotovo));
+  h+='<div class="card"><div class="h"><h2>Obchodníci podle dokončených aktivit</h2><div class="sp"></div>'+legenda+'</div><div class="b">'+
+    aktivni.map(c=>'<div class="lb" onclick="detail('+Number(c.id)+')"'+tip({t:c.jmeno,c:c.hotovo,r:radkyTipu(c.podleTypu)})+'><div class="lbn">'+esc(c.jmeno)+'</div><div class="lbt"><div class="lbs" style="width:'+(c.hotovo/maxH*100).toFixed(1)+'%">'+
+      S.map(x=>{ const n=S.hodnota(c.podleTypu,x); return n?'<i style="background:'+x.barva+';flex:'+n+'"></i>':""; }).join("")+'</div></div>'+
+      '<div class="lbv"><b>'+cislo(c.hotovo)+'</b>'+zmena(c.hotovo,min?((min[c.id]||{}).hotovo||0):null)+'</div></div>').join("")+'</div></div>';
+
+  // 3) karty obchodníků
+  const dny=[]; for(let d=new Date(od); d<=doo; d.setDate(d.getDate()+1)) dny.push(iso(d));
+  const maxD=Math.max(1,...aktivni.map(c=>Math.max(0,...Object.values(c.podleDne))));
+  h+='<div class="karty">'+aktivni.map(c=>{
+    const m=min?(min[c.id]||{}):null;
+    const body=dny.map((d,i)=>(dny.length>1?i/(dny.length-1)*100:50).toFixed(2)+","+(27-(c.podleDne[d]||0)/maxD*25).toFixed(2)).join(" ");
+    const typy=S.map(x=>[x,S.hodnota(c.podleTypu,x)]).filter(r=>r[1]).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    const vyhr=penize(c.vyhranoHodnota);
+    return '<div class="card karta" onclick="detail('+Number(c.id)+')"><div class="b">'+
+      '<div class="kj">'+esc(c.jmeno)+(c.skryty?' <span class="pill mute">skrytý</span>':'')+'</div>'+
+      '<div class="kv"><b>'+cislo(c.hotovo)+'</b><span>dokončených aktivit</span>'+zmena(c.hotovo,m?(m.hotovo||0):null)+'</div>'+
+      (dny.length>1?'<svg class="spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="'+body+'" vector-effect="non-scaling-stroke"/></svg><div class="spo"><span>'+czKr(D.od)+'</span><span>'+czKr(D.do)+'</span></div>':'')+
+      '<div class="kt">'+(typy.length?typy.map(r=>'<span><i style="background:'+r[0].barva+'"></i>'+esc(r[0].nazev)+' <b>'+cislo(r[1])+'</b></span>').join(""):'<span class="mut">žádná dokončená aktivita</span>')+'</div>'+
+      '<div class="kr"><div><span>Naplánováno</span><b>'+cislo(c.naplanovano)+'</b></div><div><span>Po termínu</span><b>'+(c.poTerminu?'<span class="pill zle">⚠ '+cislo(c.poTerminu)+'</span>':'0')+'</b></div>'+
+      '<div><span>Nové dealy</span><b>'+cislo(c.dealyNove)+'</b></div><div><span>Vyhrané</span><b>'+cislo(c.dealyVyhrane)+'</b></div><div><span>Prohrané</span><b>'+cislo(c.dealyProhrane)+'</b></div></div>'+
+      (vyhr?'<div class="mut" style="margin-top:8px">Vyhráno: <b style="color:var(--ink)">'+vyhr+'</b></div>':'')+
+    '</div></div>';
+  }).join("")+'</div>';
+  const bez=lide.length-aktivni.length;
+  if(bez) h+='<p class="mut">'+bez+' '+(bez===1?"účet":bez<5?"účty":"účtů")+' bez aktivity v tomto období — najdete je v tabulce.</p>';
+  return h;
+}
+
+/* ---- tabulka ---- */
+function tabulka(lide,sum){
   // typy aktivit jako sloupce: nejčastějších 6, zbytek „Ostatní"
   const typSum={}; lide.forEach(c=>Object.keys(c.podleTypu).forEach(t=>{ typSum[t]=(typSum[t]||0)+c.podleTypu[t]; }));
   const typy=Object.keys(typSum).sort((a,b)=>typSum[b]-typSum[a]);
   const hlavni=typy.slice(0,6), zbytek=typy.slice(6);
   const ostatni=c=>zbytek.reduce((a,t)=>a+(c.podleTypu[t]||0),0);
-
   let h="";
-  if(D.orez) h+='<div class="varovani">Za zvolené období je v Pipedrive víc záznamů, než modul najednou načte — čísla mohou být neúplná. Zkuste kratší období.</div>';
-
-  const vyhrano=penize(soucetMen(lide,"vyhranoHodnota"));
-  h+='<div class="kpi">'+
-    '<div class="k"><div class="n">Dokončené aktivity</div><div class="v">'+cislo(sum("hotovo"))+'</div><div class="p">za zvolené období</div></div>'+
-    '<div class="k"><div class="n">Naplánováno</div><div class="v">'+cislo(sum("naplanovano"))+'</div><div class="p">otevřené, termín dnes a dál</div></div>'+
-    '<div class="k'+(sum("poTerminu")?" zle":"")+'"><div class="n">Po termínu</div><div class="v">'+cislo(sum("poTerminu"))+'</div><div class="p">otevřené s prošlým termínem</div></div>'+
-    '<div class="k"><div class="n">Nové dealy</div><div class="v">'+cislo(sum("dealyNove"))+'</div><div class="p">založené v období</div></div>'+
-    '<div class="k"><div class="n">Vyhrané dealy</div><div class="v">'+cislo(sum("dealyVyhrane"))+'</div><div class="p">'+(vyhrano||"—")+'</div></div>'+
-    '<div class="k"><div class="n">Prohrané dealy</div><div class="v">'+cislo(sum("dealyProhrane"))+'</div><div class="p">uzavřené jako prohrané</div></div>'+
-  '</div>';
-
-  h+=grafDny(lide);
-
-  // tabulka obchodníků
   const hod=(c,k)=>k==="jmeno"?c.jmeno:k==="ostatni"?ostatni(c):k.indexOf("t:")===0?(c.podleTypu[k.slice(2)]||0):(c[k]||0);
   const serazeni=lide.slice().sort((a,b)=>{
     const x=hod(a,RAZENI.k), y=hod(b,RAZENI.k);
@@ -260,7 +383,7 @@ function vykresli(){
   serazeni.forEach(c=>{
     const nic=!c.hotovo&&!c.naplanovano&&!c.poTerminu&&!c.dealyNove&&!c.dealyVyhrane&&!c.dealyProhrane;
     h+='<tr class="radek'+(nic?" nic":"")+'" onclick="detail('+Number(c.id)+')">'+
-      '<td><span class="jm">'+esc(c.jmeno)+'</span>'+(c.aktivni?"":' <span class="pill mute">neaktivní</span>')+'</td>'+
+      '<td><span class="jm">'+esc(c.jmeno)+'</span>'+(c.aktivni?"":' <span class="pill mute">neaktivní</span>')+(c.skryty?' <span class="pill mute">skrytý</span>':'')+'</td>'+
       '<td class="c"><b>'+cislo(c.hotovo)+'</b></td>'+
       '<td><div class="pruhbox">'+(c.hotovo?'<div class="pruh" style="width:'+Math.round(c.hotovo/max*100)+'%"></div>':'')+'</div></td>'+
       hlavni.map(t=>'<td class="c">'+(c.podleTypu[t]?cislo(c.podleTypu[t]):'<span class="mut">·</span>')+'</td>').join("")+
@@ -276,29 +399,29 @@ function vykresli(){
     hlavni.map(t=>'<td class="c">'+cislo(typSum[t])+'</td>').join("")+
     (zbytek.length?'<td class="c">'+cislo(zbytek.reduce((a,t)=>a+typSum[t],0))+'</td>':"")+
     '<td class="c">'+cislo(sum("naplanovano"))+'</td><td class="c">'+cislo(sum("poTerminu"))+'</td><td class="c">'+cislo(sum("dealyNove"))+'</td><td class="c">'+cislo(sum("dealyVyhrane"))+'</td><td class="c">'+cislo(sum("dealyProhrane"))+'</td><td></td></tr></tfoot></table></div></div>';
-  $("#obsah").innerHTML=h;
+  return h;
 }
 function razeni(k){ RAZENI=RAZENI.k===k?{k,dolu:!RAZENI.dolu}:{k,dolu:k!=="jmeno"}; vykresli(); }
 
-// Dokončené aktivity po dnech (všichni obchodníci dohromady); nad 45 dní po týdnech.
-function grafDny(lide){
-  const dny={}; lide.forEach(c=>Object.keys(c.podleDne).forEach(d=>{ dny[d]=(dny[d]||0)+c.podleDne[d]; }));
-  const od=zIso(D.od), doo=zIso(D.do), pocet=Math.round((doo-od)/86400000)+1;
-  if(pocet<2) return "";
-  const poTydnech=pocet>45; const sl=[];
-  for(let d=new Date(od); d<=doo; d.setDate(d.getDate()+1)){
-    const k=iso(d), dt=d.getDay(), n=dny[k]||0;
-    if(poTydnech){
-      if(!sl.length||dt===1) sl.push({od:k,do:k,n:0});
-      const s=sl[sl.length-1]; s.do=k; s.n+=n;
-    } else sl.push({od:k,do:k,n,vik:dt===0||dt===6});
-  }
-  const max=Math.max(1,...sl.map(s=>s.n));
-  const krok=Math.ceil(sl.length/16);
-  return '<div class="card"><div class="h"><h2>Dokončené aktivity '+(poTydnech?"po týdnech":"po dnech")+'</h2><div class="sp"></div><span class="mut">všichni obchodníci dohromady</span></div><div class="b">'+
-    '<div class="graf">'+sl.map(s=>'<div class="s'+(s.vik?" vik":"")+'" title="'+(s.od===s.do?cz(s.od):czKr(s.od)+" – "+cz(s.do))+': '+cislo(s.n)+'">'+(s.n&&sl.length<=31?'<b>'+cislo(s.n)+'</b>':'')+'<i style="height:'+(s.n/max*100).toFixed(1)+'%"></i></div>').join("")+'</div>'+
-    '<div class="osa">'+sl.map((s,i)=>'<span>'+(i%krok===0?czKr(s.od):"")+'</span>').join("")+'</div></div></div>';
-}
+/* ---- bublina nad grafem (obsah jen přes textContent) ---- */
+(function(){
+  const el=document.getElementById("tip");
+  const schovej=()=>{ el.style.display="none"; };
+  document.addEventListener("pointermove",e=>{
+    const m=e.target.closest&&e.target.closest("[data-tip]");
+    if(!m){ schovej(); return; }
+    let o; try{ o=JSON.parse(m.dataset.tip); }catch(_){ schovej(); return; }
+    el.textContent="";
+    const t=document.createElement("div"); t.className="tt"; t.textContent=o.t; el.appendChild(t);
+    const c=document.createElement("div"); c.className="tr"; const cb=document.createElement("b"); cb.textContent=cislo(o.c); c.appendChild(cb); c.appendChild(document.createTextNode(" celkem")); el.appendChild(c);
+    (o.r||[]).forEach(r=>{ const d=document.createElement("div"); d.className="tr"; const i=document.createElement("i"); i.style.background=r[0]; const b=document.createElement("b"); b.textContent=cislo(r[2]); d.appendChild(i); d.appendChild(b); d.appendChild(document.createTextNode(" "+r[1])); el.appendChild(d); });
+    el.style.display="block";
+    const w=el.offsetWidth, hh=el.offsetHeight;
+    el.style.left=Math.max(8,Math.min(window.innerWidth-w-8,e.clientX+14))+"px";
+    el.style.top=Math.max(8,Math.min(window.innerHeight-hh-8,e.clientY+14))+"px";
+  });
+  document.addEventListener("pointerleave",schovej); window.addEventListener("scroll",schovej,true);
+})();
 
 /* ---- detail obchodníka ---- */
 async function detail(id){
@@ -317,8 +440,15 @@ async function detail(id){
     h+='<h3>Po termínu ('+po.length+')</h3>'+tab(po.map(radA),"Nic po termínu.");
     h+='<h3>Dokončené aktivity ('+d.aktivitCelkem+')</h3>'+tab(d.aktivity.map(radA),"V období žádná dokončená aktivita.")+(d.aktivitCelkem>d.aktivity.length?'<p class="mut">Zobrazeno prvních '+d.aktivity.length+'.</p>':'');
     h+='<h3>Naplánováno ('+plan.length+')</h3>'+tab(plan.slice(0,100).map(radA),"Nic naplánováno.")+(plan.length>100?'<p class="mut">Zobrazeno prvních 100.</p>':'');
+    if(D.me.admin){ const c=(D.lide||[]).find(x=>x.id===d.id)||{}; h+='<p style="margin:18px 0 0;text-align:right"><button class="btn sm" onclick="skryt('+Number(d.id)+','+(c.skryty?'false':'true')+')">'+(c.skryty?"Vrátit účet do přehledu":"Skrýt účet z přehledu (není obchodník)")+'</button></p>'; }
     modal(d.jmeno+" · "+cz(D.od)+" – "+cz(D.do),h);
   }catch(e){ modal("Chyba",'<div class="chyba">'+esc(e.message)+'</div>'); }
+}
+
+async function skryt(id,ano){
+  const c=(D.lide||[]).find(x=>x.id===id)||{};
+  try{ await api("/api/pipedrive/skryt",{id,skryt:ano,jmeno:c.jmeno||""}); zavri(); toast(ano?"Účet skryt z přehledu":"Účet vrácen do přehledu"); nacti(); }
+  catch(e){ toast(e.message); }
 }
 
 /* ---- nastavení tokenu (správce) ---- */

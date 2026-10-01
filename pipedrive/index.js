@@ -58,11 +58,18 @@ function mount(host) {
   function konfig() {
     const env = (process.env.PIPEDRIVE_API_TOKEN || '').trim();
     if (env) return { token: env, zdroj: 'env' };
+    const d = ctiSoubor();
+    const t = typeof d.token === 'string' ? d.token.trim() : '';
+    return { token: t, zdroj: t ? 'soubor' : '', zmena: d.zmena || null };
+  }
+  function ctiSoubor() {
     let d = null;
     try { d = JSON.parse(fs.readFileSync(CFG_F, 'utf8')); } catch (_) {}
-    const t = d && typeof d.token === 'string' ? d.token.trim() : '';
-    return { token: t, zdroj: t ? 'soubor' : '', zmena: (d && d.zmena) || null };
+    return (d && typeof d === 'object') ? d : {};
   }
+  function zapisSoubor(zmeny) { fs.writeFileSync(CFG_F, JSON.stringify(Object.assign(ctiSoubor(), zmeny), null, 2)); }
+  // Účty Pipedrive, které nejsou obchodníci (vývoj, administrativa…) — správce je skryje z přehledu.
+  function skryti() { const a = ctiSoubor().skryti; return Array.isArray(a) ? a.map(Number) : []; }
 
   // ---- kdo jsem ------------------------------------------------------------
   function ja(req) {
@@ -120,6 +127,16 @@ function mount(host) {
   }
 
   // ---- přehled za období ---------------------------------------------------
+  // Otevřené aktivity nezávisí na období — jedno načtení poslouží i srovnání s minulým obdobím.
+  let otevreneC = null;
+  function otevrene(token) {
+    if (otevreneC && otevreneC.token === token && Date.now() - otevreneC.ts < CACHE_MS) return otevreneC.p;
+    const p = pdVse('/api/v2/activities', { done: false, sort_by: 'due_date', sort_direction: 'asc' }, token);
+    otevreneC = { token, ts: Date.now(), p };
+    p.catch(() => { if (otevreneC && otevreneC.p === p) otevreneC = null; });
+    return p;
+  }
+
   const cache = new Map();     // 'od|do' → { ts, data }
   const bezi = new Map();      // 'od|do' → Promise (souběžné dotazy čekají na jedno načtení)
 
@@ -146,7 +163,7 @@ function mount(host) {
     const [cis, hot, otev, dealy] = await Promise.all([
       nactiCiselniky(token),
       pdVse('/api/v2/activities', { done: true, updated_since: odCas, sort_by: 'update_time', sort_direction: 'desc' }, token),
-      pdVse('/api/v2/activities', { done: false, sort_by: 'due_date', sort_direction: 'asc' }, token),
+      otevrene(token),
       pdVse('/api/v2/deals', { updated_since: odCas, sort_by: 'update_time', sort_direction: 'desc' }, token),
     ]);
     const dnes = den(new Date());
@@ -158,7 +175,7 @@ function mount(host) {
         const u = cis.uzivatele.find(x => x.id === id);
         lide.set(id, {
           id, jmeno: u ? u.jmeno : ('Uživatel #' + id), email: u ? u.email : '', aktivni: u ? u.aktivni : false,
-          hotovo: 0, podleTypu: {}, podleDne: {}, naplanovano: 0, poTerminu: 0, posledni: '',
+          hotovo: 0, podleTypu: {}, podleDne: {}, podleDneTypu: {}, naplanovano: 0, poTerminu: 0, posledni: '',
           dealyNove: 0, dealyVyhrane: 0, dealyProhrane: 0, vyhranoHodnota: {}, noveHodnota: {},
           aktivity: [], otevrene: [], dealy: [],
         });
@@ -181,6 +198,8 @@ function mount(host) {
       const t = a.type || 'jine';
       c.podleTypu[t] = (c.podleTypu[t] || 0) + 1;
       c.podleDne[kdy] = (c.podleDne[kdy] || 0) + 1;
+      const dt = c.podleDneTypu[kdy] || (c.podleDneTypu[kdy] = {});
+      dt[t] = (dt[t] || 0) + 1;
       if (kdy > c.posledni) c.posledni = kdy;
       c.aktivity.push(tvarAktivity(a, kdy));
     });
@@ -239,10 +258,29 @@ function mount(host) {
     if (!k.token) { json(res, 200, hlava); return true; }
     const { od, doo } = obdobi(q);
     try {
-      const d = await prehled(od, doo, q.obnovit === '1');
+      if (q.obnovit === '1') otevreneC = null;
+      // Stejně dlouhé období těsně před zvoleným — pro srovnání na dashboardu.
+      const dni = Math.round((new Date(doo + 'T00:00:00Z') - new Date(od + 'T00:00:00Z')) / 86400000) + 1;
+      const posun = (s, n) => new Date(new Date(s + 'T00:00:00Z').getTime() + n * 86400000).toISOString().slice(0, 10);
+      const mOd = posun(od, -dni), mDo = posun(od, -1);
+      const [d, m] = await Promise.all([
+        prehled(od, doo, q.obnovit === '1'),
+        prehled(mOd, mDo, false).catch(e => { console.error('[pipedrive] minulé období:', e.message); return null; }),
+      ]);
+      const skr = skryti();
+      const vse = me.admin && q.vse === '1';
       // Seznamy aktivit a dealů jdou zvlášť (/detail), ať je přehled lehký.
-      const lide = d.lide.map(c => { const o = Object.assign({}, c); delete o.aktivity; delete o.otevrene; delete o.dealy; return o; });
-      json(res, 200, Object.assign(hlava, { od: d.od, do: d.do, dnes: d.dnes, nacteno: d.nacteno, typy: d.typy, lide, orez: d.orez }));
+      const lide = d.lide.filter(c => vse || skr.indexOf(c.id) < 0).map(c => {
+        const o = Object.assign({}, c, { skryty: skr.indexOf(c.id) >= 0 });
+        delete o.aktivity; delete o.otevrene; delete o.dealy; return o;
+      });
+      let minule = null;
+      if (m) {
+        minule = { od: mOd, do: mDo, lide: {} };
+        m.lide.forEach(c => { minule.lide[c.id] = { hotovo: c.hotovo, dealyNove: c.dealyNove, dealyVyhrane: c.dealyVyhrane, dealyProhrane: c.dealyProhrane }; });
+      }
+      json(res, 200, Object.assign(hlava, { od: d.od, do: d.do, dnes: d.dnes, nacteno: d.nacteno, typy: d.typy, lide, minule,
+        skrytych: d.lide.filter(c => skr.indexOf(c.id) >= 0).length, orez: d.orez || !!(m && m.orez) }));
     } catch (e) {
       console.error('[pipedrive] načtení:', e.message);
       json(res, 200, Object.assign(hlava, { od, do: doo, chyba: e.message }));
@@ -276,10 +314,24 @@ function mount(host) {
       try { const j = await pd('/v1/users/me', null, token); firma = (j.data && (j.data.company_name || j.data.company_domain)) || ''; }
       catch (e) { json(res, 400, { chyba: e.message }); return true; }
     }
-    fs.writeFileSync(CFG_F, JSON.stringify({ token, zmena: { kdo: me.jmeno || me.email, ts: Date.now() } }, null, 2));
-    cache.clear(); ciselniky = null;
+    zapisSoubor({ token, zmena: { kdo: me.jmeno || me.email, ts: Date.now() } });
+    cache.clear(); ciselniky = null; otevreneC = null;
     try { if (host.logActivity) host.logActivity('pipedrive', { email: me.email, name: me.jmeno }, token ? 'Nastaven API token Pipedrive' : 'Odebrán API token Pipedrive'); } catch (_) {}
     json(res, 200, { ok: true, firma });
+    return true;
+  }
+
+  // Správce skryje / vrátí účet, který do přehledu obchodníků nepatří.
+  async function apiSkryt(req, res, me) {
+    if (!me.admin) { json(res, 403, { chyba: 'Skrývat účty může jen správce.' }); return true; }
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const id = Number(b.id);
+    if (!Number.isInteger(id)) { json(res, 400, { chyba: 'Chybí uživatel.' }); return true; }
+    const s = skryti().filter(x => x !== id);
+    if (b.skryt) s.push(id);
+    zapisSoubor({ skryti: s });
+    try { if (host.logActivity) host.logActivity('pipedrive', { email: me.email, name: me.jmeno }, (b.skryt ? 'Skryt účet ' : 'Vrácen účet ') + String(b.jmeno || id).slice(0, 80)); } catch (_) {}
+    json(res, 200, { ok: true });
     return true;
   }
 
@@ -307,6 +359,7 @@ function mount(host) {
     try {
       if (p === '/api/pipedrive/data' && req.method === 'GET') return await apiData(req, res, me, u.query);
       if (p === '/api/pipedrive/detail' && req.method === 'GET') return await apiDetail(req, res, me, u.query);
+      if (p === '/api/pipedrive/skryt' && req.method === 'POST') return await apiSkryt(req, res, me);
       if (p === '/api/pipedrive/nastaveni' && req.method === 'POST') return await apiNastaveni(req, res, me);
     } catch (e) {
       console.error('[pipedrive] ' + p + ':', e.message);
