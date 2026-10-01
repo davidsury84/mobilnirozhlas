@@ -1526,6 +1526,7 @@ const MUJ_MODS = [
   { key:"pozadavky", icon:MUJ_IC.cart, label:"Požadavky nákupu", gated:true },
   { key:"poptavky", icon:MUJ_IC.ticket, label:"Poptávky", gated:true },
   { key:"obchod", icon:MUJ_IC.users, label:"Rozdělení obchodníků", gated:true },
+  { key:"pipedrive", icon:MUJ_IC.poll, label:"Pipedrive — aktivita obchodníků", gated:true },
   { key:"reklamace", icon:MUJ_IC.shield, label:"Reklamace", gated:true },
   { key:"zadanikonstrukce", icon:MUJ_IC.file, label:"Nabídka – konstrukce", gated:true },
   { grp:"Smlouvy" },
@@ -1898,7 +1899,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="pohledavky"||MUJ.view==="vyroba"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="pohledavky"||MUJ.view==="vyroba"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk"||MUJ.view==="pipedrive");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -2003,6 +2004,7 @@ function mjGo(key){
   else if(key==="ukoly") showUkoly();
   else if(key==="telefon") showTelefon();
   else if(key==="kontaktysvet") showKontaktySvet();
+  else if(key==="pipedrive") showPipedrive();
   else if(key==="zapisy") showZapisy();
   else if(key==="qooling") showQooling();
   else if(key==="vykonnost") showVykonnost();
@@ -3109,6 +3111,13 @@ function showVozidla(){
   const body=document.getElementById("mujBody");
   if(!moduleVisible({key:"vozidla",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu Vozový park nemáte přístup. Uvidí ho správce vozu, zodpovědná osoba za středisko a správce intranetu.</div>'; return; }
   body.innerHTML='<iframe src="/vozidla" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f7f9f5" title="Vozový park — svěřená vozidla, technické prohlídky, inventarizace"></iframe>';
+  window.scrollTo(0,0);
+}
+function showPipedrive(){
+  MUJ.view="pipedrive"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!moduleVisible({key:"pipedrive",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu Pipedrive — aktivita obchodníků nemáte přístup. Přístup přiděluje správce intranetu.</div>'; return; }
+  body.innerHTML='<iframe src="/pipedrive" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#f7f9f5" title="Pipedrive — aktivita obchodníků"></iframe>';
   window.scrollTo(0,0);
 }
 function showKontaktySvet(){
@@ -6491,7 +6500,7 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["pipedrive","Pipedrive — aktivita obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
@@ -6499,7 +6508,7 @@ const ACCESS_GROUPS=[
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
   ["Vývoj projektů",["eshopmodel"]],
   ["Finance",["pohledavky"]],
-  ["Agendy",["doprava","loznyplan","vozidla","vyroba","vyrobadilna","konstrukce","obchod","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","stavebnipovoleni","adaptace","freelo","aktuality"]]
+  ["Agendy",["doprava","loznyplan","vozidla","vyroba","vyrobadilna","konstrukce","obchod","pipedrive","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","stavebnipovoleni","adaptace","freelo","aktuality"]]
 ];
 let ACCESS_FILTER="";
 function accessLabel(key){ const m=ACCESS_MODULES.find(x=>x[0]===key); return m?m[1]:key; }

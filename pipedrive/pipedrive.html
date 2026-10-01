@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipedrive — aktivita obchodníků · Intranet ELKOPLAST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#0e8a43; --green-2:#12a350; --green-d:#0a6b34; --green-soft:#e6f6ec;
+  --ink:#0f1512; --ink-soft:#5b635c; --faint:#8b938c;
+  --bg:#eef1ec; --bg-2:#f7f9f5; --paper:#fff; --line:#e3e7e0; --line-strong:#cdd3ca;
+  --yellow-soft:#fff6d2; --amber:#7a5c0e; --red:#c23636; --red-soft:#fbe9e7;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+  --cond:'IBM Plex Sans Condensed','IBM Plex Sans',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(15,21,18,.04),0 10px 30px rgba(15,21,18,.07);
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg-2);color:var(--ink);font-family:var(--sans);font-size:14.5px;line-height:1.55}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit;font-size:14px}
+a{color:var(--green-d)}
+.wrap{max-width:1320px;margin:0 auto;padding:20px}
+
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.top .ic{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#15ab57,#0a6b34);display:grid;place-items:center;color:#fff;font-size:22px;box-shadow:0 6px 16px rgba(10,107,52,.28)}
+.top h1{font-family:var(--cond);font-weight:700;font-size:22px;margin:0}
+.top .sub{font-size:12.5px;color:var(--ink-soft)}
+.top .sp{flex:1}
+
+.btn{border:1px solid var(--line-strong);background:var(--paper);color:var(--ink);padding:8px 14px;border-radius:9px;font-weight:600;font-size:13.5px}
+.btn:hover{border-color:var(--green);color:var(--green-d)}
+.btn.pri{background:var(--green);border-color:var(--green);color:#fff}
+.btn.pri:hover{background:var(--green-d);color:#fff}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:7px}
+.btn.danger{color:var(--red);border-color:#e7c3c0}
+
+.tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:5px;flex-wrap:wrap}
+.tabs button{border:0;background:transparent;padding:7px 13px;border-radius:8px;font-weight:600;font-size:13px;color:var(--ink-soft)}
+.tabs button.on{background:var(--green-soft);color:var(--green-d)}
+
+.lista{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.lista input[type=date]{padding:7px 10px;border:1px solid var(--line-strong);border-radius:9px;background:var(--paper)}
+.lista .sp{flex:1}
+.mut{color:var(--ink-soft);font-size:12.5px}
+
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi .k{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:13px 16px}
+.kpi .k .n{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--faint);font-weight:600}
+.kpi .k .v{font-family:var(--cond);font-weight:700;font-size:28px;line-height:1.2}
+.kpi .k .p{font-size:12px;color:var(--ink-soft)}
+.kpi .k.zle .v{color:var(--red)}
+
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.card .h{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#fbfdfb,#f6faf6);flex-wrap:wrap}
+.card .h h2{font-family:var(--cond);font-weight:700;font-size:16px;margin:0}
+.card .h .sp{flex:1}
+.card .b{padding:16px 18px}
+.posuv{overflow-x:auto}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--faint);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line-strong);white-space:nowrap}
+th.c,td.c{text-align:right;font-variant-numeric:tabular-nums}
+th[data-s]{cursor:pointer;user-select:none}
+th[data-s]:hover{color:var(--green-d)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr.radek{cursor:pointer}
+tbody tr.radek:hover td{background:#fafcf9}
+tbody tr.nic td{color:var(--faint)}
+tfoot td{font-weight:700;border-top:2px solid var(--line-strong);border-bottom:0}
+.jm{font-weight:600}
+.pruh{height:8px;border-radius:4px;background:var(--green);min-width:2px}
+.pruhbox{width:120px;background:var(--bg);border-radius:4px}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--green-soft);color:var(--green-d)}
+.pill.zle{background:var(--red-soft);color:var(--red)}
+.pill.mute{background:#eef1ec;color:var(--ink-soft)}
+.pill.warn{background:var(--yellow-soft);color:var(--amber)}
+
+/* sloupcový graf po dnech — jedna řada, jedna barva */
+.graf{display:flex;align-items:flex-end;gap:3px;height:150px;padding-top:18px}
+.graf .s{flex:1;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;position:relative}
+.graf .s i{display:block;width:100%;max-width:34px;background:var(--green);border-radius:4px 4px 0 0;min-height:0}
+.graf .s.vik i{background:#9fd3b3}
+.graf .s b{font-size:10.5px;font-weight:600;color:var(--ink-soft);line-height:1.3}
+.graf .s:hover i{background:var(--green-d)}
+.osa{display:flex;gap:3px;border-top:1px solid var(--line-strong);padding-top:4px}
+.osa span{flex:1;min-width:4px;text-align:center;font-size:10px;color:var(--faint);white-space:nowrap;overflow:visible}
+
+.modal{position:fixed;inset:0;background:rgba(15,21,18,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:24px 14px}
+.modal.on{display:flex}
+.modal .box{background:var(--paper);border-radius:16px;max-width:920px;width:100%;box-shadow:0 20px 60px rgba(15,21,18,.3)}
+.modal .box .h{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.modal .box .h h2{font-family:var(--cond);font-size:18px;margin:0;flex:1}
+.modal .box .b{padding:18px}
+.modal h3{font-family:var(--cond);font-size:14.5px;margin:18px 0 6px}
+.modal h3:first-child{margin-top:0}
+.f{display:block;margin-bottom:10px}
+.f span{display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:3px;font-weight:600}
+.f input{width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper)}
+.hint{font-size:12.5px;color:var(--ink-soft);line-height:1.55}
+.empty{padding:30px;text-align:center;color:var(--ink-soft)}
+.chyba{background:var(--red-soft);color:var(--red);border:1px solid #e7c3c0;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px}
+.varovani{background:var(--yellow-soft);color:var(--amber);border-radius:10px;padding:8px 14px;margin-bottom:14px;font-size:13px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:10px;font-size:13.5px;z-index:90;opacity:0;transition:.25s;pointer-events:none}
+.toast.on{opacity:1}
+@media print{ .tabs,.btn,.lista{display:none!important} .card{box-shadow:none;break-inside:avoid} .wrap{padding:0} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="ic">📈</div>
+    <div>
+      <h1>Pipedrive — aktivita obchodníků</h1>
+      <div class="sub" id="podtitul">Načítám…</div>
+    </div>
+    <div class="sp"></div>
+    <div class="tabs" id="obdobi"></div>
+  </div>
+
+  <div class="lista">
+    <span class="mut">Od</span><input type="date" id="od" onchange="vlastni()">
+    <span class="mut">do</span><input type="date" id="do" onchange="vlastni()">
+    <div class="sp"></div>
+    <button class="btn sm" onclick="nacti(true)">↻ Načíst znovu z Pipedrive</button>
+    <button class="btn sm" id="btnNast" style="display:none" onclick="nastaveni()">⚙ Nastavení</button>
+  </div>
+
+  <div id="obsah"><div class="card"><div class="empty">Načítám data z Pipedrive…</div></div></div>
+</div>
+
+<div class="modal" id="modal" onclick="if(event.target===this)zavri()"><div class="box">
+  <div class="h"><h2 id="mTitul">—</h2><button class="btn sm" onclick="zavri()">Zavřít</button></div>
+  <div class="b" id="mObsah"></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+let D=null, OBD="d30", RAZENI={k:"hotovo",dolu:true}, BEZI=0;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); setTimeout(()=>el.classList.remove("on"),2400); }
+function zavri(){ $("#modal").classList.remove("on"); }
+function modal(titul,obsah){ $("#mTitul").textContent=titul; $("#mObsah").innerHTML=obsah; $("#modal").classList.add("on"); }
+async function api(cesta,telo){
+  const o=telo?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(telo)}:{cache:"no-store"};
+  const r=await fetch(cesta,o); const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.chyba||("Chyba "+r.status));
+  return j;
+}
+
+/* ---- období ---- */
+const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const zIso=s=>{ const a=s.split("-"); return new Date(+a[0],+a[1]-1,+a[2]); };
+const cz=s=>{ if(!s) return "—"; const a=s.split("-"); return (+a[2])+". "+(+a[1])+". "+a[0]; };
+const czKr=s=>{ const a=s.split("-"); return (+a[2])+". "+(+a[1])+"."; };
+const OBDOBI=[["dnes","Dnes"],["tyden","Tento týden"],["mtyden","Minulý týden"],["mesic","Tento měsíc"],["mmesic","Minulý měsíc"],["d30","30 dní"],["d90","90 dní"]];
+function rozsah(k){
+  const t=new Date(); t.setHours(12,0,0,0);
+  const plus=(d,n)=>{ const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+  const pond=plus(t,-((t.getDay()+6)%7));
+  if(k==="dnes") return [t,t];
+  if(k==="tyden") return [pond,t];
+  if(k==="mtyden") return [plus(pond,-7),plus(pond,-1)];
+  if(k==="mesic") return [new Date(t.getFullYear(),t.getMonth(),1),t];
+  if(k==="mmesic") return [new Date(t.getFullYear(),t.getMonth()-1,1),new Date(t.getFullYear(),t.getMonth(),0)];
+  if(k==="d90") return [plus(t,-89),t];
+  return [plus(t,-29),t];
+}
+function tlObdobi(){
+  $("#obdobi").innerHTML=OBDOBI.map(o=>'<button class="'+(OBD===o[0]?"on":"")+'" onclick="zvol(\''+o[0]+'\')">'+o[1]+'</button>').join("");
+}
+function zvol(k){ OBD=k; const r=rozsah(k); $("#od").value=iso(r[0]); $("#do").value=iso(r[1]); tlObdobi(); nacti(); }
+function vlastni(){ if(!$("#od").value||!$("#do").value) return; OBD=""; tlObdobi(); nacti(); }
+
+/* ---- načtení ---- */
+async function nacti(znovu){
+  const beh=++BEZI;
+  $("#podtitul").textContent="Načítám data z Pipedrive…";
+  try{
+    const d=await api("/api/pipedrive/data?od="+encodeURIComponent($("#od").value)+"&do="+encodeURIComponent($("#do").value)+(znovu?"&obnovit=1":""));
+    if(beh!==BEZI) return;
+    D=d; vykresli();
+    if(znovu&&!d.chyba) toast("Data načtena z Pipedrive");
+  }catch(e){
+    if(beh!==BEZI) return;
+    $("#podtitul").textContent="";
+    $("#obsah").innerHTML='<div class="chyba">'+esc(e.message)+'</div>';
+  }
+}
+
+/* ---- vykreslení ---- */
+const cislo=n=>Number(n||0).toLocaleString("cs-CZ");
+function penize(o){ const k=Object.keys(o||{}); if(!k.length) return ""; return k.map(m=>Number(o[m]).toLocaleString("cs-CZ",{maximumFractionDigits:0})+" "+esc(m)).join(" + "); }
+function soucetMen(lide,pole){ const o={}; lide.forEach(c=>Object.keys(c[pole]||{}).forEach(m=>{ o[m]=(o[m]||0)+c[pole][m]; })); return o; }
+function nazevTypu(k){ const t=(D.typy||[]).find(x=>x.klic===k); return t?t.nazev:k; }
+
+function vykresli(){
+  $("#btnNast").style.display=(D.me&&D.me.admin)?"":"none";
+  if(!D.nastaveno){
+    $("#podtitul").textContent="Modul zatím není propojen s Pipedrive.";
+    $("#obsah").innerHTML='<div class="card"><div class="empty"><p style="margin:0 0 12px"><b>Chybí API token Pipedrive.</b></p>'+
+      (D.me.admin?'<p class="hint" style="max-width:560px;margin:0 auto 14px">Token najdete v Pipedrive: <i>Nastavení → Osobní předvolby → API</i>. Uloží se jen na server intranetu.</p><button class="btn pri" onclick="nastaveni()">Nastavit token</button>'
+        :'<p class="hint">Požádejte správce intranetu o propojení modulu s Pipedrive.</p>')+'</div></div>';
+    return;
+  }
+  if(D.chyba){
+    $("#podtitul").textContent="Data se nepodařilo načíst.";
+    $("#obsah").innerHTML='<div class="chyba">'+esc(D.chyba)+'</div>';
+    return;
+  }
+  const lide=D.lide||[];
+  const sum=k=>lide.reduce((a,c)=>a+(c[k]||0),0);
+  const cas=new Date(D.nacteno).toLocaleTimeString("cs-CZ",{hour:"2-digit",minute:"2-digit"});
+  $("#podtitul").textContent=cz(D.od)+" – "+cz(D.do)+" · načteno z Pipedrive v "+cas;
+
+  // typy aktivit jako sloupce: nejčastějších 6, zbytek „Ostatní"
+  const typSum={}; lide.forEach(c=>Object.keys(c.podleTypu).forEach(t=>{ typSum[t]=(typSum[t]||0)+c.podleTypu[t]; }));
+  const typy=Object.keys(typSum).sort((a,b)=>typSum[b]-typSum[a]);
+  const hlavni=typy.slice(0,6), zbytek=typy.slice(6);
+  const ostatni=c=>zbytek.reduce((a,t)=>a+(c.podleTypu[t]||0),0);
+
+  let h="";
+  if(D.orez) h+='<div class="varovani">Za zvolené období je v Pipedrive víc záznamů, než modul najednou načte — čísla mohou být neúplná. Zkuste kratší období.</div>';
+
+  const vyhrano=penize(soucetMen(lide,"vyhranoHodnota"));
+  h+='<div class="kpi">'+
+    '<div class="k"><div class="n">Dokončené aktivity</div><div class="v">'+cislo(sum("hotovo"))+'</div><div class="p">za zvolené období</div></div>'+
+    '<div class="k"><div class="n">Naplánováno</div><div class="v">'+cislo(sum("naplanovano"))+'</div><div class="p">otevřené, termín dnes a dál</div></div>'+
+    '<div class="k'+(sum("poTerminu")?" zle":"")+'"><div class="n">Po termínu</div><div class="v">'+cislo(sum("poTerminu"))+'</div><div class="p">otevřené s prošlým termínem</div></div>'+
+    '<div class="k"><div class="n">Nové dealy</div><div class="v">'+cislo(sum("dealyNove"))+'</div><div class="p">založené v období</div></div>'+
+    '<div class="k"><div class="n">Vyhrané dealy</div><div class="v">'+cislo(sum("dealyVyhrane"))+'</div><div class="p">'+(vyhrano||"—")+'</div></div>'+
+    '<div class="k"><div class="n">Prohrané dealy</div><div class="v">'+cislo(sum("dealyProhrane"))+'</div><div class="p">uzavřené jako prohrané</div></div>'+
+  '</div>';
+
+  h+=grafDny(lide);
+
+  // tabulka obchodníků
+  const hod=(c,k)=>k==="jmeno"?c.jmeno:k==="ostatni"?ostatni(c):k.indexOf("t:")===0?(c.podleTypu[k.slice(2)]||0):(c[k]||0);
+  const serazeni=lide.slice().sort((a,b)=>{
+    const x=hod(a,RAZENI.k), y=hod(b,RAZENI.k);
+    const r=typeof x==="string"?x.localeCompare(y,"cs"):x-y;
+    return (RAZENI.dolu?-r:r)||a.jmeno.localeCompare(b.jmeno,"cs");
+  });
+  const max=Math.max(1,...lide.map(c=>c.hotovo));
+  const th=(k,t,c)=>'<th data-s="'+esc(k)+'" class="'+(c?"c":"")+'" onclick="razeni(this.dataset.s)">'+esc(t)+(RAZENI.k===k?(RAZENI.dolu?" ↓":" ↑"):"")+'</th>';
+  h+='<div class="card"><div class="h"><h2>Obchodníci</h2><div class="sp"></div><span class="mut">Kliknutím na řádek zobrazíte aktivity a dealy</span></div><div class="posuv"><table><thead><tr>'+
+    th("jmeno","Obchodník")+th("hotovo","Dokončeno",1)+'<th></th>'+
+    hlavni.map(t=>th("t:"+t,nazevTypu(t),1)).join("")+(zbytek.length?th("ostatni","Ostatní",1):"")+
+    th("naplanovano","Naplánováno",1)+th("poTerminu","Po termínu",1)+th("dealyNove","Nové dealy",1)+th("dealyVyhrane","Vyhrané",1)+th("dealyProhrane","Prohrané",1)+
+    '<th>Poslední aktivita</th></tr></thead><tbody>';
+  if(!serazeni.length) h+='<tr><td colspan="20" class="empty">V Pipedrive nejsou žádní aktivní uživatelé.</td></tr>';
+  serazeni.forEach(c=>{
+    const nic=!c.hotovo&&!c.naplanovano&&!c.poTerminu&&!c.dealyNove&&!c.dealyVyhrane&&!c.dealyProhrane;
+    h+='<tr class="radek'+(nic?" nic":"")+'" onclick="detail('+Number(c.id)+')">'+
+      '<td><span class="jm">'+esc(c.jmeno)+'</span>'+(c.aktivni?"":' <span class="pill mute">neaktivní</span>')+'</td>'+
+      '<td class="c"><b>'+cislo(c.hotovo)+'</b></td>'+
+      '<td><div class="pruhbox">'+(c.hotovo?'<div class="pruh" style="width:'+Math.round(c.hotovo/max*100)+'%"></div>':'')+'</div></td>'+
+      hlavni.map(t=>'<td class="c">'+(c.podleTypu[t]?cislo(c.podleTypu[t]):'<span class="mut">·</span>')+'</td>').join("")+
+      (zbytek.length?'<td class="c">'+(ostatni(c)?cislo(ostatni(c)):'<span class="mut">·</span>')+'</td>':"")+
+      '<td class="c">'+cislo(c.naplanovano)+'</td>'+
+      '<td class="c">'+(c.poTerminu?'<span class="pill zle">'+cislo(c.poTerminu)+'</span>':'0')+'</td>'+
+      '<td class="c">'+cislo(c.dealyNove)+'</td>'+
+      '<td class="c" title="'+penize(c.vyhranoHodnota)+'">'+(c.dealyVyhrane?'<span class="pill ok">'+cislo(c.dealyVyhrane)+'</span>':'0')+'</td>'+
+      '<td class="c">'+cislo(c.dealyProhrane)+'</td>'+
+      '<td>'+(c.posledni?cz(c.posledni):'<span class="pill warn">žádná v období</span>')+'</td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td>Celkem</td><td class="c">'+cislo(sum("hotovo"))+'</td><td></td>'+
+    hlavni.map(t=>'<td class="c">'+cislo(typSum[t])+'</td>').join("")+
+    (zbytek.length?'<td class="c">'+cislo(zbytek.reduce((a,t)=>a+typSum[t],0))+'</td>':"")+
+    '<td class="c">'+cislo(sum("naplanovano"))+'</td><td class="c">'+cislo(sum("poTerminu"))+'</td><td class="c">'+cislo(sum("dealyNove"))+'</td><td class="c">'+cislo(sum("dealyVyhrane"))+'</td><td class="c">'+cislo(sum("dealyProhrane"))+'</td><td></td></tr></tfoot></table></div></div>';
+  $("#obsah").innerHTML=h;
+}
+function razeni(k){ RAZENI=RAZENI.k===k?{k,dolu:!RAZENI.dolu}:{k,dolu:k!=="jmeno"}; vykresli(); }
+
+// Dokončené aktivity po dnech (všichni obchodníci dohromady); nad 45 dní po týdnech.
+function grafDny(lide){
+  const dny={}; lide.forEach(c=>Object.keys(c.podleDne).forEach(d=>{ dny[d]=(dny[d]||0)+c.podleDne[d]; }));
+  const od=zIso(D.od), doo=zIso(D.do), pocet=Math.round((doo-od)/86400000)+1;
+  if(pocet<2) return "";
+  const poTydnech=pocet>45; const sl=[];
+  for(let d=new Date(od); d<=doo; d.setDate(d.getDate()+1)){
+    const k=iso(d), dt=d.getDay(), n=dny[k]||0;
+    if(poTydnech){
+      if(!sl.length||dt===1) sl.push({od:k,do:k,n:0});
+      const s=sl[sl.length-1]; s.do=k; s.n+=n;
+    } else sl.push({od:k,do:k,n,vik:dt===0||dt===6});
+  }
+  const max=Math.max(1,...sl.map(s=>s.n));
+  const krok=Math.ceil(sl.length/16);
+  return '<div class="card"><div class="h"><h2>Dokončené aktivity '+(poTydnech?"po týdnech":"po dnech")+'</h2><div class="sp"></div><span class="mut">všichni obchodníci dohromady</span></div><div class="b">'+
+    '<div class="graf">'+sl.map(s=>'<div class="s'+(s.vik?" vik":"")+'" title="'+(s.od===s.do?cz(s.od):czKr(s.od)+" – "+cz(s.do))+': '+cislo(s.n)+'">'+(s.n&&sl.length<=31?'<b>'+cislo(s.n)+'</b>':'')+'<i style="height:'+(s.n/max*100).toFixed(1)+'%"></i></div>').join("")+'</div>'+
+    '<div class="osa">'+sl.map((s,i)=>'<span>'+(i%krok===0?czKr(s.od):"")+'</span>').join("")+'</div></div></div>';
+}
+
+/* ---- detail obchodníka ---- */
+async function detail(id){
+  modal("Načítám…",'<div class="empty">Načítám…</div>');
+  try{
+    const d=await api("/api/pipedrive/detail?uzivatel="+encodeURIComponent(id)+"&od="+encodeURIComponent(D.od)+"&do="+encodeURIComponent(D.do));
+    const web=d.domena&&/^[a-z0-9-]+$/i.test(d.domena)?"https://"+d.domena+".pipedrive.com":"";
+    const odkazA=a=>esc(a.predmet||"(bez předmětu)");
+    const odkazD=(idd,t)=>web?'<a href="'+web+'/deal/'+Number(idd)+'" target="_blank" rel="noopener">'+t+'</a>':t;
+    let h="";
+    const po=d.otevrene.filter(a=>a.poTerminu), plan=d.otevrene.filter(a=>!a.poTerminu);
+    const tab=(radky,prazdno)=>radky.length?'<div class="posuv"><table><tbody>'+radky.join("")+'</tbody></table></div>':'<p class="mut">'+prazdno+'</p>';
+    const radA=a=>'<tr><td style="white-space:nowrap;width:1%">'+(a.den?cz(a.den):"bez termínu")+(a.cas?' <span class="mut">'+esc(a.cas)+'</span>':'')+'</td><td style="width:1%"><span class="pill mute">'+esc(nazevTypu(a.typ))+'</span></td><td>'+odkazA(a)+'</td><td style="width:1%;white-space:nowrap">'+(a.deal?odkazD(a.deal,"deal #"+Number(a.deal)):"")+'</td></tr>';
+    const STAV={novy:['mute','nový'],vyhrany:['ok','vyhraný'],prohrany:['zle','prohraný']};
+    h+='<h3>Dealy v období ('+d.dealy.length+')</h3>'+tab(d.dealy.map(x=>'<tr><td style="white-space:nowrap;width:1%">'+cz(x.den)+'</td><td style="width:1%"><span class="pill '+STAV[x.co][0]+'">'+STAV[x.co][1]+'</span></td><td>'+odkazD(x.id,esc(x.nazev||"(bez názvu)"))+'</td><td class="c" style="white-space:nowrap">'+(x.hodnota?cislo(x.hodnota)+" "+esc(x.mena):"")+'</td></tr>'),"Žádné nové, vyhrané ani prohrané dealy.");
+    h+='<h3>Po termínu ('+po.length+')</h3>'+tab(po.map(radA),"Nic po termínu.");
+    h+='<h3>Dokončené aktivity ('+d.aktivitCelkem+')</h3>'+tab(d.aktivity.map(radA),"V období žádná dokončená aktivita.")+(d.aktivitCelkem>d.aktivity.length?'<p class="mut">Zobrazeno prvních '+d.aktivity.length+'.</p>':'');
+    h+='<h3>Naplánováno ('+plan.length+')</h3>'+tab(plan.slice(0,100).map(radA),"Nic naplánováno.")+(plan.length>100?'<p class="mut">Zobrazeno prvních 100.</p>':'');
+    modal(d.jmeno+" · "+cz(D.od)+" – "+cz(D.do),h);
+  }catch(e){ modal("Chyba",'<div class="chyba">'+esc(e.message)+'</div>'); }
+}
+
+/* ---- nastavení tokenu (správce) ---- */
+function nastaveni(){
+  if(D&&D.zdrojTokenu==="env"){ modal("Nastavení Pipedrive",'<p class="hint">API token je nastaven na serveru proměnnou prostředí <b>PIPEDRIVE_API_TOKEN</b>. Změnit ho lze jen tam.</p>'); return; }
+  modal("Nastavení Pipedrive",
+    '<p class="hint" style="margin-top:0">Token najdete v Pipedrive: <i>Nastavení → Osobní předvolby → API → Váš osobní API token</i>. Modul z Pipedrive jen čte. Vidí to, co vidí účet, kterému token patří — použijte účet s přístupem k aktivitám všech obchodníků.</p>'+
+    '<label class="f"><span>API token</span><input type="password" id="nToken" autocomplete="off" placeholder="'+(D&&D.nastaveno?"token je uložen — vložte nový pro změnu":"vložte token")+'"></label>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'+(D&&D.nastaveno?'<button class="btn danger" onclick="ulozToken(true)">Odpojit Pipedrive</button>':'')+'<button class="btn pri" onclick="ulozToken()">Ověřit a uložit</button></div>');
+}
+async function ulozToken(smazat){
+  const token=smazat?"":$("#nToken").value.trim();
+  if(!smazat&&!token){ toast("Vložte token"); return; }
+  if(smazat&&!confirm("Odpojit modul od Pipedrive?")) return;
+  try{
+    const r=await api("/api/pipedrive/nastaveni",{token});
+    zavri(); toast(smazat?"Pipedrive odpojen":"Propojeno"+(r.firma?" · "+r.firma:"")); nacti(true);
+  }catch(e){ toast(e.message); }
+}
+
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") zavri(); });
+zvol("d30");
+</script>
+</body>
+</html>

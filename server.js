@@ -3812,6 +3812,16 @@ try {
   console.error('[kontakty] modul se nenačetl, intranet pokračuje bez něj:', e.message);
 }
 
+// ---- Modul „Pipedrive — aktivita obchodníků" (živá data z Pipedrive API; modul „pipedrive" nebo správce) ----
+let pipedriveMod = null;
+try {
+  pipedriveMod = require('./pipedrive').mount({
+    send, readBody, empSession, isAdmin, employeeModules, logActivity, dataDir: DATA_DIR,
+  });
+} catch (e) {
+  console.error('[pipedrive] modul se nenačetl, intranet pokračuje bez něj:', e.message);
+}
+
 // ---- Modul „Vozový park" (svěřená vozidla, technické prohlídky, inventarizace) ----
 let vozidlaMod = null;
 try {
@@ -4226,6 +4236,8 @@ const server = http.createServer(async (req, res) => {
     if (reklamaceMod && await reklamaceMod.handle(req, res)) return;
     // Modul „Zahraniční pobočky a partneři" si obslouží vlastní cesty (/kontakty*, /api/kontakty*).
     if (kontaktyMod && await kontaktyMod.handle(req, res)) return;
+    // Modul „Pipedrive — aktivita obchodníků" si obslouží vlastní cesty (/pipedrive*, /api/pipedrive*).
+    if (pipedriveMod && await pipedriveMod.handle(req, res)) return;
     // Modul „Vozový park" si obslouží vlastní cesty (/vozidla*, /api/vozidla*).
     if (vozidlaMod && await vozidlaMod.handle(req, res)) return;
     // Modul „Výroba Popelnice" si obslouží vlastní cesty (/vyroba*, /api/vyroba*).
