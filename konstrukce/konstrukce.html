@@ -1436,8 +1436,7 @@ function maRoli(r){return !!(ME&&ME.roles&&ME.roles.indexOf(r)>=0)}
 /* ČVZ (číslo výrobní zakázky z plánu výroby) se ukazuje PŘED číslem zakázky */
 function cvzOdznak(z){
   if(!z||!z.cvzHelios)return '';
-  return '<span class="cvzb" title="Číslo výrobní zakázky v plánu výroby">'+esc(z.cvzHelios)+
-    (z.cvzStrecha?('<i>+'+esc(z.cvzStrecha)+' střecha</i>'):'')+'</span> ';
+  return '<span class="cvzb" title="Číslo výrobní zakázky v plánu výroby">'+esc(z.cvzHelios)+'</span> ';
 }
 function roleLabels(){var rs=(ME&&ME.roles&&ME.roles.length)?ME.roles:[(ME||{}).role];return rs.filter(Boolean).map(roleLabel).join(' + ')||roleLabel((ME||{}).role)}
 function api(path,method,body){return fetch('/api/konstrukce'+path,{method:method||'GET',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined,cache:'no-store'}).then(function(r){return r.json().then(function(j){return{ok:r.ok,status:r.status,j:j}})})}
@@ -3720,21 +3719,15 @@ function openNew(state){
 }
 /* Náhled dalšího volného ČVZ pro zvolený závod — jen orientačně, číslo se přidělí
    až při uložení (dvě otevřená okna by jinak viděla totéž číslo). Načítá se jen
-   při změně závodu; střecha se dopočítává z formuláře bez dalšího dotazu. */
-var CVZ_CACHE={}, CVZ_T=null;
-function maStrechuVeFormulari(){
-  var dot=collectDot();
-  return ['strecha','viko'].some(function(k){var a=dot[k]; if(!a||typeof a!=='object'||!a.volba||a.volba==='standard')return false;
-    var t=String(a.hodnota||'').trim(); return !!t&&!/^(ne|bez)\b/i.test(t)&&!/^ne\s*[—–-]/.test(t);});
-}
+   při změně závodu. Jeden výrobek = jedno číslo, i když má střechu, plachtu nebo víko. */
+var CVZ_CACHE={};
 function cvzNahled(){
   var box=document.getElementById('cvzNahled'); if(!box)return;
   var key=val('nZavod'); if(!key){box.innerHTML='';return}
   var vykresli=function(j){
     if(!j||!j.plan){box.innerHTML='';return}
     if(j.nedostupne||j.chyba){box.innerHTML='<span class="muted">'+esc(tr('Plán výroby teď není dostupný — ČVZ se přidělí při uložení.'))+'</span>';return}
-    var str=maStrechuVeFormulari();
-    box.innerHTML='<span class="cvzb"><span>'+esc(tr('Další volné ČVZ'))+'</span>: '+esc(j.cvz)+(str?('<i>+'+esc(j.cvzStrecha)+' '+esc(tr('střecha'))+'</i>'):'')+'</span>'+
+    box.innerHTML='<span class="cvzb"><span>'+esc(tr('Další volné ČVZ'))+'</span>: '+esc(j.cvz)+'</span>'+
       '<div class="muted" style="font-size:11.5px;margin-top:3px"><span>'+esc(tr('Předběžně — přidělí se při uložení objednávky'))+'</span> · '+esc(j.list)+', '+esc(tr('řádek'))+' '+j.radek+'</div>';
   };
   if(CVZ_CACHE[key]){vykresli(CVZ_CACHE[key]);return}
@@ -3793,7 +3786,7 @@ function segClick(el){var row=el.closest('.dq2');row.querySelectorAll('.seg').fo
   // rozbalovací katalog jen pro trigger bez konkrétní hodnoty (řadové opce mají data-optval)
   var ow=row.querySelector('.dq2-optwrap');if(ow)ow.style.display=(v==='opce'&&!el.getAttribute('data-optval')?'':'none');
   if(v==='pozadavek'&&req)req.focus(); else if(v==='opce'&&ow){var oi=ow.querySelector('.dq2-opt');if(oi)oi.focus();}
-  dqKodPreview();clearTimeout(CVZ_T);CVZ_T=setTimeout(cvzNahled,150);}
+  dqKodPreview();}
 /* ---- Natahování: obrázkové dlaždice (ilustrace z katalogu ABROLL) ---- */
 function natGrid(f,opts,vol,curOpt,rq){
   var tile=function(dv,val,lab,selq){
@@ -3945,7 +3938,7 @@ function renderDotaznik(){
   document.getElementById('paramBox').innerHTML=h;
   (t.dotaznik||[]).forEach(function(sec){(sec.fields||[]).forEach(function(f){if(f.ral)ralMark(f.k)})});
   var pb=document.getElementById('paramBox');
-  if(pb&&!pb._kodHook){pb._kodHook=1;pb.addEventListener('input',function(){dqKodPreview();clearTimeout(CVZ_T);CVZ_T=setTimeout(cvzNahled,150)});}
+  if(pb&&!pb._kodHook){pb._kodHook=1;pb.addEventListener('input',function(){dqKodPreview()});}
   dqKodPreview();
 }
 /* Sběr vyplněného formuláře — sdílí ho založení zakázky i pozdější úprava zadání. */

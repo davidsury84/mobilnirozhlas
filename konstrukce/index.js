@@ -1774,7 +1774,6 @@ function mount(host) {
       dalsiCekajici: klientoviCekajici(d, z.kontaktEmail, z.id).length,   // kolik dalších výkresů téhož klienta právě čeká na rozhodnutí
       cisloPoptavky: z.cisloPoptavky, pozadovanyTermin: z.pozadovanyTermin || null,
       cvzHelios: z.cvzHelios || '',   // ČVZ (26C-272) — přiděluje aplikace při zápisu do plánu výroby
-      cvzStrecha: z.cvzStrecha || '', // samostatné ČVZ střechy, je-li v zadání požadovaná
       kodAbr: z.kodAbr || '',         // celkový kód kontejneru dle katalogu ABR (varianta B)
       vykresStd: maVykresKonstrukce(z) ? null : vykresStdFor(z),   // standardní výkres řady (JPG) jen do doby, než konstruktér vloží vlastní
       maVykres: maVykresKonstrukce(z),   // od té chvíle se pracuje jen s výkresem konstrukce
@@ -1886,7 +1885,8 @@ function mount(host) {
     strecha: ['strecha/plachta/aj.', 'strecha/plachta', 'strecha', 'roof specs'],
     ks: ['ks', 'pcs/ks'],
     ral: ['ral', 'barva ral'],
-    cisloObj: ['cislo zakazky', 'cislo', 'nr./cislo'],
+    // Číslo zakázky z Heliosu (Chomutov a Bruntál „číslo", Supíkovice „Nr./číslo") se NEVYPLŇUJE —
+    // do tabulky ho zapisuje výroba ručně, aplikace ten sloupec nechává být.
     zeDne: ['ze dne', 'date/ze dne'],
     kontakt: ['kontakt'],
     termin: ['pozadovany/potvrzeny', 'pozadovany', 'pozadovane dodani'],
@@ -1907,8 +1907,6 @@ function mount(host) {
     else { idx.prefix = 0; idx.cislo = 1; }   // Chomutov/Bruntál: ČVZ v A/B (hlavička je sloučená, název tam není)
     return idx;
   }
-  // Číslo tak, jak ho píše daný list: „26C-271" (aplikace) vs. „26S177" (Supíkovice v jedné buňce)
-  const planCisloList = (cfg, pref, n) => (cfg && cfg.cvzVJedneBunce) ? pref + String(n).padStart(3, '0') : planCislo(pref, n);
 
   function planDatum(ms) { if (!ms) return ''; const x = new Date(ms); return x.getDate() + '.' + (x.getMonth() + 1) + '.' + x.getFullYear(); }
   function planDatumISO(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? (+m[3] + '.' + (+m[2]) + '.' + m[1]) : ''; }
@@ -1961,7 +1959,9 @@ function mount(host) {
     if (fam === 'city') return 'CITY-' + key;
     return key;
   }
-  // Požadavek na střechu/plachtu = cokoli jiného než standard „NE / bez".
+  // Požadavek na střechu / plachtu / víko = cokoli jiného než standard „NE / bez".
+  // Zapisuje se jako text do sloupce „Střecha/Plachta/aj." TÉHOŽ řádku. Jeden výrobek = jedno
+  // výrobní číslo; samostatné číslo pro střechu se nepřiděluje (pravidlo zrušeno 2026-10).
   function planStrecha(z) {
     for (const k of ['strecha', 'viko']) {
       const a = (z.dotaznik || {})[k]; if (!a) continue;
@@ -1973,14 +1973,12 @@ function mount(host) {
     return '';
   }
   // Hodnoty jednoho řádku podle polí aplikace; do sloupců je rozmístí planRadek dle hlavičky.
-  function planHodnoty(d, z, pref, cislo, opt, cfg) {
-    opt = opt || {}; cfg = cfg || {};
+  function planHodnoty(d, z, pref, cislo, cfg) {
+    cfg = cfg || {};
     const num = String(cislo).padStart(3, '0');
-    const tl = opt.strecha ? '' : planTloustky(z);          // u střechy jiná tloušťka, doplní výroba
-    const objem = opt.strecha ? '' : planObjem(z);          // objem patří ke kontejneru
+    const tl = planTloustky(z), objem = planObjem(z);
     let vyrobek = planVyrobek(d, z), rozmery = planRozmery(z), ral = planRal(z);
     if (cfg.objemDoVyrobku && objem) vyrobek += ' ' + objem.replace('m3', 'cbm').replace('.', ',');   // Supíkovice: „ABR-DSD 39cbm"
-    if (opt.strecha) vyrobek += ' - STŘECHA';
     if (cfg.tlDoRozmeru && tl && rozmery) rozmery += '/' + tl;                                       // Supíkovice: „…x2350/53"
     if (cfg.ralBezPredpony) ral = ral.replace(/^RAL\s*/i, '');
     return {
@@ -1988,10 +1986,10 @@ function mount(host) {
       vyrobek, rozmery,
       tl: cfg.tlDoRozmeru ? '' : tl,
       objem: cfg.objemDoVyrobku ? '' : objem,
-      napojeniLem: opt.strecha ? '' : planNapojeniLem(z),
-      strecha: opt.strecha || opt.odkaz || '',
+      napojeniLem: planNapojeniLem(z),
+      strecha: planStrecha(z),
       ks: planHod(z, 'pocet'), ral,
-      cisloObj: z.cisloPoptavky || '', zeDne: planDatum(z.objAt || z.createdAt),
+      zeDne: planDatum(z.objAt || z.createdAt),
       kontakt: cfg.kontaktCeleJmeno ? empName(z.obchodnikEmail) : planZkratka(empName(z.obchodnikEmail)),
       termin: planDatumISO(z.pozadovanyTermin),
       zakaznik: z.zakaznik || '',
@@ -2077,7 +2075,7 @@ function mount(host) {
       const d = load(); const rok = new Date().getFullYear();
       const c = await planCil(cfg, rok);
       const next = planDalsi(d, cfg, c);
-      json(res, 200, { ok: true, plan: true, nazev: cfg.nazev, list: c.list, radek: c.cil, cvz: planCislo(c.pref, next), cvzStrecha: planCislo(c.pref, next + 1) });
+      json(res, 200, { ok: true, plan: true, nazev: cfg.nazev, list: c.list, radek: c.cil, cvz: planCislo(c.pref, next) });
     } catch (e) { json(res, 200, { ok: true, plan: true, chyba: e.message }); }
     return true;
   }
@@ -2095,7 +2093,7 @@ function mount(host) {
     const cis = z.cisloObj || z.cislo;
     const t = typeOf(d, z.typKey);
     const cvz = z.cvzHelios
-      ? ('\nČíslo výrobní zakázky: ' + z.cvzHelios + (z.cvzStrecha ? (' · střecha ' + z.cvzStrecha) : '')
+      ? ('\nČíslo výrobní zakázky: ' + z.cvzHelios
          + '\nŘádek je zapsaný v plánu výroby ' + (z.strediskoName || '') + '.')
       : '\nČíslo výrobní zakázky zatím přidělené není.';
     komu.forEach(em => notify(d, em, 'Nová objednávka ' + cis + ' (' + z.zakaznik + ') pro závod '
@@ -2134,22 +2132,20 @@ function mount(host) {
       const rok = new Date(z.objAt || z.createdAt || Date.now()).getFullYear();
       const c = await planCil(cfg, rok);
       const next = planDalsi(d, cfg, c);
-      const strecha = planStrecha(z);
-      const rows = [planRadek(planHodnoty(d, z, c.pref, next, strecha ? { odkaz: 'střecha viz ' + planCisloList(cfg, c.pref, next + 1) } : {}, cfg), c.mapa, c.sirka)];
-      if (strecha) rows.push(planRadek(planHodnoty(d, z, c.pref, next + 1, { strecha }, cfg), c.mapa, c.sirka));
+      // jeden výrobek = jeden řádek = jedno výrobní číslo (i se střechou, plachtou nebo víkem)
+      const rows = [planRadek(planHodnoty(d, z, c.pref, next, cfg), c.mapa, c.sirka)];
       const rozsah = "'" + c.list + "'!A" + c.cil + ':' + planSloupec(c.sirka) + (c.cil + rows.length - 1);
       if (PLAN_DRYRUN) console.log('[konstrukce/plán] DRY-RUN, nezapisuji:', cfg.nazev, rozsah, JSON.stringify(rows));
       else await host.sheets.update(cfg.sheet, rozsah, rows);
       d = load(); z = d.zakazky.find(x => x.id === zakId); if (!z) return;
       z.cvzHelios = planCislo(c.pref, next);
-      if (strecha) z.cvzStrecha = planCislo(c.pref, next + 1);
       z.planZapsano = Date.now();
       z.planRadek = c.cil;
       if (!d.planPosledni) d.planPosledni = {};
-      d.planPosledni[c.pref] = next + (strecha ? 1 : 0);
+      d.planPosledni[c.pref] = next;
       delete z.cvzRem;                                    // upomínky na ČVZ jsou bezpředmětné
       audit(z, 'systém', 'Zapsáno do plánu výroby ' + (z.strediskoName || ''),
-        'ČVZ ' + z.cvzHelios + (strecha ? (' · střecha ' + z.cvzStrecha) : '') + ' · řádek ' + c.cil + ' v „' + c.list + '"');
+        'ČVZ ' + z.cvzHelios + ' · řádek ' + c.cil + ' v „' + c.list + '"');
       oznamVyrobe(d, z, kdo);     // teď už víme číslo — pošleme výrobě jednu zprávu
       save(d);
     } catch (e) {
