@@ -22,6 +22,7 @@
 //    GET /v1/users, /v1/users/me, /v1/activityTypes
 //    GET /api/v2/activities   (done, updated_since, cursor, limit ≤ 500)
 //    GET /api/v2/deals        (updated_since, cursor, limit ≤ 500)
+//    GET /v1/notes            (start_date, end_date, start, limit ≤ 500)
 // ----------------------------------------------------------------------------
 
 const fs = require('fs');
@@ -46,6 +47,14 @@ function cas(s) {
   return isNaN(d) ? null : d;
 }
 const denZ = s => { const d = cas(s); return d ? den(d) : ''; };
+// Poznámky jsou v Pipedrive HTML — do intranetu jde jen čistý text.
+function cisti(html, max) {
+  const ENT = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'" };
+  return String(html || '')
+    .replace(/<(br|\/p|\/div|\/li|\/h\d)\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '')
+    .replace(/&(nbsp|amp|lt|gt|quot|#39|apos);/g, (m, k) => ENT[k])
+    .replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim().slice(0, max || 600);
+}
 const jeDen = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '') && !isNaN(new Date(s + 'T00:00:00Z'));
 
 function mount(host) {
@@ -107,6 +116,19 @@ function mount(host) {
     }
     return { data: out, orez };
   }
+  // Všechny stránky v1 endpointu (stránkování start/limit).
+  async function pdVseV1(cesta, params, token) {
+    const out = []; let start = 0; let orez = false;
+    for (let i = 0; ; i++) {
+      if (i >= MAX_STRAN) { orez = true; break; }
+      const j = await pd(cesta, Object.assign({ limit: 500 }, params, { start }), token);
+      (j.data || []).forEach(x => out.push(x));
+      const pg = j.additional_data && j.additional_data.pagination;
+      if (!pg || !pg.more_items_in_collection) break;
+      start = pg.next_start != null ? pg.next_start : start + 500;
+    }
+    return { data: out, orez };
+  }
 
   // ---- číselníky: uživatelé, typy aktivit, doména firmy --------------------
   let ciselniky = null;
@@ -160,11 +182,13 @@ function mount(host) {
     // Dokončení i změna stavu dealu vždy posune update_time, takže stačí brát změny
     // od začátku období (den rezerva kvůli časovým pásmům).
     const odCas = new Date(new Date(od + 'T00:00:00Z').getTime() - 36 * 3600 * 1000).toISOString().replace(/\.\d+Z$/, 'Z');
-    const [cis, hot, otev, dealy] = await Promise.all([
+    const posunDen = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n * 86400000).toISOString().slice(0, 10);
+    const [cis, hot, otev, dealy, pozn] = await Promise.all([
       nactiCiselniky(token),
       pdVse('/api/v2/activities', { done: true, updated_since: odCas, sort_by: 'update_time', sort_direction: 'desc' }, token),
       otevrene(token),
       pdVse('/api/v2/deals', { updated_since: odCas, sort_by: 'update_time', sort_direction: 'desc' }, token),
+      pdVseV1('/v1/notes', { start_date: posunDen(od, -1), end_date: posunDen(doo, 1), sort: 'add_time DESC' }, token),
     ]);
     const dnes = den(new Date());
     const vObdobi = d => d && d >= od && d <= doo;
@@ -177,7 +201,7 @@ function mount(host) {
           id, jmeno: u ? u.jmeno : ('Uživatel #' + id), email: u ? u.email : '', aktivni: u ? u.aktivni : false,
           hotovo: 0, podleTypu: {}, podleDne: {}, podleDneTypu: {}, naplanovano: 0, poTerminu: 0, posledni: '',
           dealyNove: 0, dealyVyhrane: 0, dealyProhrane: 0, vyhranoHodnota: {}, noveHodnota: {},
-          aktivity: [], otevrene: [], dealy: [],
+          poznamky: 0, aktivity: [], otevrene: [], dealy: [], poznamkySeznam: [],
         });
       }
       return lide.get(id);
@@ -187,6 +211,7 @@ function mount(host) {
     const tvarAktivity = (a, kdy) => ({
       id: a.id, predmet: String(a.subject || '').slice(0, 200), typ: a.type || '', den: kdy,
       termin: a.due_date || '', cas: (a.due_time || '').slice(0, 5), deal: a.deal_id || null,
+      poznamka: cisti(a.note, 400),
     });
 
     hot.data.forEach(a => {
@@ -228,6 +253,20 @@ function mount(host) {
       });
     });
 
+    pozn.data.forEach(n => {
+      if (n.active_flag === false || n.user_id == null) return;
+      const kdy = denZ(n.add_time);
+      if (!vObdobi(kdy)) return;
+      const c = clovek(n.user_id);
+      c.poznamky++;
+      c.poznamkySeznam.push({
+        id: n.id, den: kdy, text: cisti(n.content, 600), deal: n.deal_id || null,
+        dealNazev: String((n.deal && n.deal.title) || '').slice(0, 160),
+        firma: String((n.organization && n.organization.name) || '').slice(0, 160),
+        osoba: String((n.person && n.person.name) || '').slice(0, 160),
+      });
+    });
+
     const seznam = Array.from(lide.values());
     seznam.forEach(c => {
       c.aktivity.sort((a, b) => (b.den + b.cas).localeCompare(a.den + a.cas));
@@ -237,7 +276,7 @@ function mount(host) {
     seznam.sort((a, b) => b.hotovo - a.hotovo || a.jmeno.localeCompare(b.jmeno, 'cs'));
     return {
       od, do: doo, dnes, nacteno: Date.now(), domena: cis.domena, typy: cis.typy, lide: seznam,
-      orez: hot.orez || otev.orez || dealy.orez,
+      orez: hot.orez || otev.orez || dealy.orez || pozn.orez,
     };
   }
 
@@ -272,12 +311,12 @@ function mount(host) {
       // Seznamy aktivit a dealů jdou zvlášť (/detail), ať je přehled lehký.
       const lide = d.lide.filter(c => vse || skr.indexOf(c.id) < 0).map(c => {
         const o = Object.assign({}, c, { skryty: skr.indexOf(c.id) >= 0 });
-        delete o.aktivity; delete o.otevrene; delete o.dealy; return o;
+        delete o.aktivity; delete o.otevrene; delete o.dealy; delete o.poznamkySeznam; return o;
       });
       let minule = null;
       if (m) {
         minule = { od: mOd, do: mDo, lide: {} };
-        m.lide.forEach(c => { minule.lide[c.id] = { hotovo: c.hotovo, dealyNove: c.dealyNove, dealyVyhrane: c.dealyVyhrane, dealyProhrane: c.dealyProhrane }; });
+        m.lide.forEach(c => { minule.lide[c.id] = { hotovo: c.hotovo, poznamky: c.poznamky, dealyNove: c.dealyNove, dealyVyhrane: c.dealyVyhrane, dealyProhrane: c.dealyProhrane }; });
       }
       json(res, 200, Object.assign(hlava, { od: d.od, do: d.do, dnes: d.dnes, nacteno: d.nacteno, typy: d.typy, lide, minule,
         skrytych: d.lide.filter(c => skr.indexOf(c.id) >= 0).length, orez: d.orez || !!(m && m.orez) }));
@@ -298,6 +337,7 @@ function mount(host) {
       aktivity: c.aktivity.slice(0, 500), aktivitCelkem: c.aktivity.length,
       otevrene: c.otevrene.slice(0, 300), otevrenychCelkem: c.otevrene.length,
       dealy: c.dealy.slice(0, 300),
+      poznamky: c.poznamkySeznam.slice(0, 300), poznamekCelkem: c.poznamkySeznam.length,
     });
     return true;
   }
@@ -318,6 +358,66 @@ function mount(host) {
     cache.clear(); ciselniky = null; otevreneC = null;
     try { if (host.logActivity) host.logActivity('pipedrive', { email: me.email, name: me.jmeno }, token ? 'Nastaven API token Pipedrive' : 'Odebrán API token Pipedrive'); } catch (_) {}
     json(res, 200, { ok: true, firma });
+    return true;
+  }
+
+  // ---- plnění měsíčního plánu schůzek a hovorů ------------------------------
+  // Cíle na měsíc: výchozí pro všechny + výjimky po lidech (data/pipedrive.json → cile).
+  const TYP_SCHUZKA = (process.env.PIPEDRIVE_TYP_SCHUZKA || 'meeting'), TYP_HOVOR = (process.env.PIPEDRIVE_TYP_HOVOR || 'call');
+  const cil = v => { const n = Math.round(Number(v)); return n > 0 && n <= 100000 ? n : 0; };
+  function cile() {
+    const c = ctiSoubor().cile || {};
+    const v = c.vychozi || {};
+    const lide = {};
+    Object.keys(c.lide || {}).forEach(id => { const o = c.lide[id] || {}; lide[id] = { schuzky: o.schuzky == null ? null : cil(o.schuzky), hovory: o.hovory == null ? null : cil(o.hovory) }; });
+    return { vychozi: { schuzky: cil(v.schuzky), hovory: cil(v.hovory) }, lide };
+  }
+  async function apiPlan(req, res, me, q) {
+    const k = konfig();
+    if (!k.token) { json(res, 200, { nastaveno: false }); return true; }
+    const dnes = den(new Date());
+    const mesic = /^\d{4}-(0[1-9]|1[0-2])$/.test(q.mesic || '') ? q.mesic : dnes.slice(0, 7);
+    const [r, m] = mesic.split('-').map(Number);
+    const posledni = mesic + '-' + String(new Date(Date.UTC(r, m, 0)).getUTCDate()).padStart(2, '0');
+    const od = mesic + '-01';
+    // pracovní dny (po–pá, bez svátků) — kolik jich v měsíci je a kolik už uplynulo včetně dneška
+    let pracDni = 0, uplynulo = 0;
+    for (let d = new Date(od + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= posledni; d.setUTCDate(d.getUTCDate() + 1)) {
+      const wd = d.getUTCDay(); if (wd === 0 || wd === 6) continue;
+      pracDni++; if (d.toISOString().slice(0, 10) <= dnes) uplynulo++;
+    }
+    if (od > dnes) { json(res, 200, { nastaveno: true, mesic, dnes, pracDni, uplynulo: 0, lide: [], cile: cile(), me: { admin: me.admin } }); return true; }
+    let d;
+    try { d = await prehled(od, posledni < dnes ? posledni : dnes, q.obnovit === '1'); }
+    catch (e) { console.error('[pipedrive] plán:', e.message); json(res, 200, { nastaveno: true, mesic, chyba: e.message }); return true; }
+    const c = cile(), skr = skryti();
+    const lide = d.lide.filter(x => skr.indexOf(x.id) < 0).map(x => {
+      const o = c.lide[x.id] || {};
+      return {
+        id: x.id, jmeno: x.jmeno, aktivni: x.aktivni,
+        schuzky: x.podleTypu[TYP_SCHUZKA] || 0, hovory: x.podleTypu[TYP_HOVOR] || 0,
+        cilSchuzky: o.schuzky != null ? o.schuzky : c.vychozi.schuzky,
+        cilHovory: o.hovory != null ? o.hovory : c.vychozi.hovory,
+        vlastniCil: o.schuzky != null || o.hovory != null,
+      };
+    });
+    json(res, 200, { nastaveno: true, mesic, dnes, nacteno: d.nacteno, pracDni, uplynulo, lide, cile: c, orez: d.orez, me: { admin: me.admin } });
+    return true;
+  }
+  async function apiCile(req, res, me) {
+    if (!me.admin) { json(res, 403, { chyba: 'Cíle může nastavit jen správce.' }); return true; }
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const v = b.vychozi || {};
+    const lide = {};
+    Object.keys(b.lide || {}).forEach(id => {
+      if (!/^\d{1,12}$/.test(id)) return;
+      const o = b.lide[id] || {};
+      const z = { schuzky: o.schuzky === '' || o.schuzky == null ? null : cil(o.schuzky), hovory: o.hovory === '' || o.hovory == null ? null : cil(o.hovory) };
+      if (z.schuzky != null || z.hovory != null) lide[id] = z;
+    });
+    zapisSoubor({ cile: { vychozi: { schuzky: cil(v.schuzky), hovory: cil(v.hovory) }, lide, zmena: { kdo: me.jmeno || me.email, ts: Date.now() } } });
+    try { if (host.logActivity) host.logActivity('pipedrive', { email: me.email, name: me.jmeno }, 'Upraveny měsíční cíle schůzek a hovorů'); } catch (_) {}
+    json(res, 200, { ok: true });
     return true;
   }
 
@@ -359,6 +459,8 @@ function mount(host) {
     try {
       if (p === '/api/pipedrive/data' && req.method === 'GET') return await apiData(req, res, me, u.query);
       if (p === '/api/pipedrive/detail' && req.method === 'GET') return await apiDetail(req, res, me, u.query);
+      if (p === '/api/pipedrive/plan' && req.method === 'GET') return await apiPlan(req, res, me, u.query);
+      if (p === '/api/pipedrive/cile' && req.method === 'POST') return await apiCile(req, res, me);
       if (p === '/api/pipedrive/skryt' && req.method === 'POST') return await apiSkryt(req, res, me);
       if (p === '/api/pipedrive/nastaveni' && req.method === 'POST') return await apiNastaveni(req, res, me);
     } catch (e) {

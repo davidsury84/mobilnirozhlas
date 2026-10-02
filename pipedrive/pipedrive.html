@@ -119,6 +119,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--line-strong);border-bottom:0
 .spo{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);border-top:1px solid var(--line);padding-top:2px}
 .kt{display:flex;gap:4px 12px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-soft);margin:10px 0}
 .kt b{color:var(--ink)}
+.pl{position:relative;height:12px;background:var(--bg);border-radius:6px}
+.plf{height:100%;background:var(--green);border-radius:6px;min-width:2px}
+.plt{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:1px}
+.pozn{white-space:pre-line;font-size:12.5px;color:var(--ink-soft);margin-top:3px;max-width:70ch}
+.pozn.ink{color:var(--ink);font-size:13px}
 .kr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;border-top:1px dashed var(--line);padding-top:10px}
 .kr span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:600;white-space:nowrap}
 .kr b{font-variant-numeric:tabular-nums}
@@ -156,16 +161,16 @@ tfoot td{font-weight:700;border-top:2px solid var(--line-strong);border-bottom:0
       <div class="sub" id="podtitul">Načítám…</div>
     </div>
     <div class="sp"></div>
-    <div class="tabs" id="obdobi"></div>
+    <div class="tabs jen-obdobi" id="obdobi"></div>
   </div>
 
   <div class="lista">
-    <span class="mut">Od</span><input type="date" id="od" onchange="vlastni()">
-    <span class="mut">do</span><input type="date" id="do" onchange="vlastni()">
-    <div class="tabs" id="pohledy"><button class="on" data-p="dash" onclick="pohled('dash')">Dashboard</button><button data-p="tab" onclick="pohled('tab')">Tabulka</button></div>
+    <span class="mut jen-obdobi">Od</span><input class="jen-obdobi" type="date" id="od" onchange="vlastni()">
+    <span class="mut jen-obdobi">do</span><input class="jen-obdobi" type="date" id="do" onchange="vlastni()">
+    <div class="tabs" id="pohledy"><button class="on" data-p="dash" onclick="pohled('dash')">Dashboard</button><button data-p="tab" onclick="pohled('tab')">Tabulka</button><button data-p="plan" onclick="pohled('plan')">Plnění plánu</button></div>
     <span id="skryte"></span>
     <div class="sp"></div>
-    <button class="btn sm" onclick="nacti(true)">↻ Načíst znovu z Pipedrive</button>
+    <button class="btn sm" onclick="POHLED==='plan'?nactiPlan(true):nacti(true)">↻ Načíst znovu z Pipedrive</button>
     <button class="btn sm" id="btnNast" style="display:none" onclick="nastaveni()">⚙ Nastavení</button>
   </div>
 
@@ -275,6 +280,8 @@ function vykresli(){
     $("#obsah").innerHTML='<div class="chyba">'+esc(D.chyba)+'</div>';
     return;
   }
+  document.querySelectorAll(".jen-obdobi").forEach(e=>{ e.style.display=POHLED==="plan"?"none":""; });
+  if(POHLED==="plan"){ vykresliPlan(); return; }
   const lide=D.lide||[];
   const sum=k=>lide.reduce((a,c)=>a+(c[k]||0),0);
   const min=D.minule&&D.minule.lide;
@@ -290,6 +297,7 @@ function vykresli(){
   const k=(n,v,p,d,zle)=>'<div class="k'+(zle?" zle":"")+'"><div class="n">'+n+'</div><div class="v">'+cislo(v)+(d||"")+'</div><div class="p">'+p+'</div></div>';
   h+='<div class="kpi">'+
     k("Dokončené aktivity",sum("hotovo"),srov,zmena(sum("hotovo"),sumMin("hotovo")))+
+    k("Poznámky",sum("poznamky"),srov,zmena(sum("poznamky"),sumMin("poznamky")))+
     k("Naplánováno",sum("naplanovano"),"otevřené, termín dnes a dál")+
     k("Po termínu",sum("poTerminu"),"otevřené s prošlým termínem","",sum("poTerminu")>0)+
     k("Nové dealy",sum("dealyNove"),srov,zmena(sum("dealyNove"),sumMin("dealyNove")))+
@@ -301,10 +309,70 @@ function vykresli(){
 }
 function pohled(p){ POHLED=p; document.querySelectorAll("#pohledy button").forEach(b=>b.classList.toggle("on",b.dataset.p===p)); if(D) vykresli(); }
 
+/* ---- plnění měsíčního plánu schůzek a hovorů ---- */
+let PLAN=null, MESIC="";
+async function nactiPlan(znovu){
+  $("#obsah").innerHTML='<div class="card"><div class="empty">Načítám plnění plánu…</div></div>';
+  try{ PLAN=await api("/api/pipedrive/plan?mesic="+encodeURIComponent(MESIC)+(znovu?"&obnovit=1":"")); MESIC=PLAN.mesic||MESIC; vykresliPlan(); }
+  catch(e){ $("#obsah").innerHTML='<div class="chyba">'+esc(e.message)+'</div>'; }
+}
+const MESICE=["leden","únor","březen","duben","květen","červen","červenec","srpen","září","říjen","listopad","prosinec"];
+function posunMesic(n){ const a=MESIC.split("-").map(Number); const d=new Date(a[0],a[1]-1+n,1); MESIC=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); nactiPlan(); }
+function vykresliPlan(){
+  const P=PLAN; if(!P){ nactiPlan(); return; }
+  if(P.chyba){ $("#obsah").innerHTML='<div class="chyba">'+esc(P.chyba)+'</div>'; return; }
+  const a=P.mesic.split("-").map(Number), nazev=MESICE[a[1]-1]+" "+a[0];
+  const tempo=P.pracDni?P.uplynulo/P.pracDni:0, bezi=P.uplynulo<P.pracDni;
+  $("#podtitul").textContent="Plnění plánu · "+nazev;
+  const proc=(n,c)=>c?Math.round(n/c*100):null;
+  const lide=(P.lide||[]).filter(c=>c.aktivni||c.schuzky||c.hovory).map(c=>Object.assign({},c,{pS:proc(c.schuzky,c.cilSchuzky),pH:proc(c.hovory,c.cilHovory)}));
+  const prumer=c=>{ const x=[c.pS,c.pH].filter(v=>v!=null); return x.length?x.reduce((s,v)=>s+v,0)/x.length:-1; };
+  lide.sort((x,y)=>prumer(y)-prumer(x)||(y.schuzky+y.hovory)-(x.schuzky+x.hovory)||x.jmeno.localeCompare(y.jmeno,"cs"));
+  const bunka=(n,c,p,co)=>{
+    if(!c) return '<td class="c"><b>'+cislo(n)+'</b></td><td colspan="2" class="mut">cíl není nastaven</td>';
+    return '<td class="c" style="white-space:nowrap"><b>'+cislo(n)+'</b> <span class="mut">/ '+cislo(c)+'</span></td>'+
+      '<td style="min-width:150px"><div class="pl" title="'+co+': '+cislo(n)+' z '+cislo(c)+' ('+p+' %)"><div class="plf" style="width:'+Math.min(100,p)+'%"></div>'+(bezi?'<div class="plt" style="left:'+(tempo*100).toFixed(1)+'%"></div>':'')+'</div></td>'+
+      '<td class="c" style="white-space:nowrap"><b>'+p+' %</b>'+(p>=100?' <span class="pill ok">✓ splněno</span>':(bezi&&p<tempo*100-0.5?' <span class="pill warn">▼ pod tempem</span>':''))+'</td>';
+  };
+  const s=k=>lide.reduce((x,c)=>x+(c[k]||0),0);
+  let h='<div class="lista" style="margin-bottom:12px"><button class="btn sm" onclick="posunMesic(-1)">‹</button><b style="font-family:var(--cond);font-size:17px;min-width:120px;text-align:center">'+nazev+'</b><button class="btn sm" onclick="posunMesic(1)">›</button>'+
+    '<span class="mut">'+(P.uplynulo?(bezi?'uplynulo '+P.uplynulo+' z '+P.pracDni+' pracovních dnů ('+Math.round(tempo*100)+' %) — svislá čárka v pruhu ukazuje, kde by plnění mělo být':'měsíc uzavřen · '+P.pracDni+' pracovních dnů'):'měsíc ještě nezačal')+'</span><div class="sp"></div>'+
+    (P.me&&P.me.admin?'<button class="btn sm pri" onclick="upravCile()">Nastavit cíle</button>':'')+'</div>';
+  if(P.orez) h+='<div class="varovani">V Pipedrive je za měsíc víc záznamů, než modul najednou načte — čísla mohou být neúplná.</div>';
+  if(!P.cile.vychozi.schuzky&&!P.cile.vychozi.hovory&&!Object.keys(P.cile.lide).length) h+='<div class="varovani">Měsíční cíle zatím nejsou nastavené, proto se plnění v procentech nepočítá.'+(P.me&&P.me.admin?' Nastavte je tlačítkem „Nastavit cíle“.':' Nastaví je správce intranetu.')+'</div>';
+  h+='<div class="card"><div class="posuv"><table><thead><tr><th>Obchodník</th><th class="c">Schůzky</th><th></th><th class="c">Plnění</th><th class="c">Hovory</th><th></th><th class="c">Plnění</th></tr></thead><tbody>';
+  if(!lide.length) h+='<tr><td colspan="7" class="empty">Za tento měsíc nejsou žádná data.</td></tr>';
+  lide.forEach(c=>{ h+='<tr class="radek" onclick="detailMesic('+Number(c.id)+')"><td><span class="jm">'+esc(c.jmeno)+'</span>'+(c.vlastniCil?' <span class="pill mute" title="má vlastní cíl">vlastní cíl</span>':'')+'</td>'+bunka(c.schuzky,c.cilSchuzky,c.pS,"Schůzky")+bunka(c.hovory,c.cilHovory,c.pH,"Hovory")+'</tr>'; });
+  const cS=s("cilSchuzky"), cH=s("cilHovory");
+  h+='</tbody><tfoot><tr><td>Celkem</td>'+bunka(s("schuzky"),cS,proc(s("schuzky"),cS),"Schůzky")+bunka(s("hovory"),cH,proc(s("hovory"),cH),"Hovory")+'</tr></tfoot></table></div></div>'+
+    '<p class="mut">Počítají se dokončené aktivity typu Schůzka a Hovor podle dne, kdy byly v Pipedrive označené jako hotové. Pracovní dny jsou pondělí–pátek, bez státních svátků.</p>';
+  $("#obsah").innerHTML=h;
+}
+function detailMesic(id){
+  const a=PLAN.mesic.split("-").map(Number), posl=new Date(a[0],a[1],0).getDate();
+  const puv={od:D.od,do:D.do}; D.od=PLAN.mesic+"-01"; D.do=PLAN.mesic+"-"+String(posl).padStart(2,"0"); if(D.do>PLAN.dnes) D.do=PLAN.dnes;
+  detail(id).finally(()=>{ D.od=puv.od; D.do=puv.do; });
+}
+function upravCile(){
+  const c=PLAN.cile, inp=(id,v,ph)=>'<input type="number" min="0" step="1" id="'+id+'" value="'+(v==null||v===0&&ph!=null?"":v)+'" placeholder="'+(ph==null?"0":ph)+'" style="width:90px;padding:6px 8px;border:1px solid var(--line-strong);border-radius:8px">';
+  modal("Měsíční cíle schůzek a hovorů",
+    '<p class="hint" style="margin-top:0">Cíl je počet dokončených aktivit za kalendářní měsíc. Výchozí cíl platí pro všechny; u jednotlivce ho přepíšete vyplněním jeho řádku (prázdné pole = výchozí cíl).</p>'+
+    '<table><thead><tr><th>Obchodník</th><th>Schůzky / měsíc</th><th>Hovory / měsíc</th></tr></thead><tbody>'+
+    '<tr><td><b>Výchozí cíl pro všechny</b></td><td>'+inp("cV_s",c.vychozi.schuzky||"")+'</td><td>'+inp("cV_h",c.vychozi.hovory||"")+'</td></tr>'+
+    (PLAN.lide||[]).filter(x=>x.aktivni).sort((x,y)=>x.jmeno.localeCompare(y.jmeno,"cs")).map(x=>{ const o=c.lide[x.id]||{}; return '<tr data-cil="'+Number(x.id)+'"><td>'+esc(x.jmeno)+'</td><td>'+inp("",o.schuzky==null?null:o.schuzky,"výchozí")+'</td><td>'+inp("",o.hovory==null?null:o.hovory,"výchozí")+'</td></tr>'; }).join("")+
+    '</tbody></table><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="zavri()">Zrušit</button><button class="btn pri" onclick="ulozCile()">Uložit cíle</button></div>');
+}
+async function ulozCile(){
+  const lide=Object.assign({},PLAN.cile.lide);   // cíle účtů, které teď v seznamu nejsou, zůstávají
+  document.querySelectorAll("#mObsah tr[data-cil]").forEach(tr=>{ const i=tr.querySelectorAll("input"); lide[tr.dataset.cil]={schuzky:i[0].value.trim(),hovory:i[1].value.trim()}; });
+  try{ await api("/api/pipedrive/cile",{vychozi:{schuzky:$("#cV_s").value,hovory:$("#cV_h").value},lide}); zavri(); toast("Cíle uloženy"); nactiPlan(); }
+  catch(e){ toast(e.message); }
+}
+
 /* ---- dashboard ---- */
 function dashboard(lide){
   const S=serie(lide), min=D.minule&&D.minule.lide;
-  const aktivni=lide.filter(c=>c.hotovo||c.naplanovano||c.poTerminu||c.dealyNove||c.dealyVyhrane||c.dealyProhrane)
+  const aktivni=lide.filter(c=>c.hotovo||c.poznamky||c.naplanovano||c.poTerminu||c.dealyNove||c.dealyVyhrane||c.dealyProhrane)
     .sort((a,b)=>b.hotovo-a.hotovo||a.jmeno.localeCompare(b.jmeno,"cs"));
   if(!aktivni.length) return '<div class="card"><div class="empty">Za zvolené období není v Pipedrive žádná aktivita ani deal.</div></div>';
   const legenda=S.length>1?'<div class="leg">'+S.map(x=>'<span><i style="background:'+x.barva+'"></i>'+esc(x.nazev)+'</span>').join("")+'</div>':"";
@@ -348,7 +416,7 @@ function dashboard(lide){
       '<div class="kv"><b>'+cislo(c.hotovo)+'</b><span>dokončených aktivit</span>'+zmena(c.hotovo,m?(m.hotovo||0):null)+'</div>'+
       (dny.length>1?'<svg class="spark" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline points="'+body+'" vector-effect="non-scaling-stroke"/></svg><div class="spo"><span>'+czKr(D.od)+'</span><span>'+czKr(D.do)+'</span></div>':'')+
       '<div class="kt">'+(typy.length?typy.map(r=>'<span><i style="background:'+r[0].barva+'"></i>'+esc(r[0].nazev)+' <b>'+cislo(r[1])+'</b></span>').join(""):'<span class="mut">žádná dokončená aktivita</span>')+'</div>'+
-      '<div class="kr"><div><span>Naplánováno</span><b>'+cislo(c.naplanovano)+'</b></div><div><span>Po termínu</span><b>'+(c.poTerminu?'<span class="pill zle">⚠ '+cislo(c.poTerminu)+'</span>':'0')+'</b></div>'+
+      '<div class="kr"><div><span>Poznámky</span><b>'+cislo(c.poznamky)+'</b></div><div><span>Naplánováno</span><b>'+cislo(c.naplanovano)+'</b></div><div><span>Po termínu</span><b>'+(c.poTerminu?'<span class="pill zle">⚠ '+cislo(c.poTerminu)+'</span>':'0')+'</b></div>'+
       '<div><span>Nové dealy</span><b>'+cislo(c.dealyNove)+'</b></div><div><span>Vyhrané</span><b>'+cislo(c.dealyVyhrane)+'</b></div><div><span>Prohrané</span><b>'+cislo(c.dealyProhrane)+'</b></div></div>'+
       (vyhr?'<div class="mut" style="margin-top:8px">Vyhráno: <b style="color:var(--ink)">'+vyhr+'</b></div>':'')+
     '</div></div>';
@@ -377,17 +445,18 @@ function tabulka(lide,sum){
   h+='<div class="card"><div class="h"><h2>Obchodníci</h2><div class="sp"></div><span class="mut">Kliknutím na řádek zobrazíte aktivity a dealy</span></div><div class="posuv"><table><thead><tr>'+
     th("jmeno","Obchodník")+th("hotovo","Dokončeno",1)+'<th></th>'+
     hlavni.map(t=>th("t:"+t,nazevTypu(t),1)).join("")+(zbytek.length?th("ostatni","Ostatní",1):"")+
-    th("naplanovano","Naplánováno",1)+th("poTerminu","Po termínu",1)+th("dealyNove","Nové dealy",1)+th("dealyVyhrane","Vyhrané",1)+th("dealyProhrane","Prohrané",1)+
+    th("poznamky","Poznámky",1)+th("naplanovano","Naplánováno",1)+th("poTerminu","Po termínu",1)+th("dealyNove","Nové dealy",1)+th("dealyVyhrane","Vyhrané",1)+th("dealyProhrane","Prohrané",1)+
     '<th>Poslední aktivita</th></tr></thead><tbody>';
   if(!serazeni.length) h+='<tr><td colspan="20" class="empty">V Pipedrive nejsou žádní aktivní uživatelé.</td></tr>';
   serazeni.forEach(c=>{
-    const nic=!c.hotovo&&!c.naplanovano&&!c.poTerminu&&!c.dealyNove&&!c.dealyVyhrane&&!c.dealyProhrane;
+    const nic=!c.hotovo&&!c.poznamky&&!c.naplanovano&&!c.poTerminu&&!c.dealyNove&&!c.dealyVyhrane&&!c.dealyProhrane;
     h+='<tr class="radek'+(nic?" nic":"")+'" onclick="detail('+Number(c.id)+')">'+
       '<td><span class="jm">'+esc(c.jmeno)+'</span>'+(c.aktivni?"":' <span class="pill mute">neaktivní</span>')+(c.skryty?' <span class="pill mute">skrytý</span>':'')+'</td>'+
       '<td class="c"><b>'+cislo(c.hotovo)+'</b></td>'+
       '<td><div class="pruhbox">'+(c.hotovo?'<div class="pruh" style="width:'+Math.round(c.hotovo/max*100)+'%"></div>':'')+'</div></td>'+
       hlavni.map(t=>'<td class="c">'+(c.podleTypu[t]?cislo(c.podleTypu[t]):'<span class="mut">·</span>')+'</td>').join("")+
       (zbytek.length?'<td class="c">'+(ostatni(c)?cislo(ostatni(c)):'<span class="mut">·</span>')+'</td>':"")+
+      '<td class="c">'+cislo(c.poznamky)+'</td>'+
       '<td class="c">'+cislo(c.naplanovano)+'</td>'+
       '<td class="c">'+(c.poTerminu?'<span class="pill zle">'+cislo(c.poTerminu)+'</span>':'0')+'</td>'+
       '<td class="c">'+cislo(c.dealyNove)+'</td>'+
@@ -398,7 +467,7 @@ function tabulka(lide,sum){
   h+='</tbody><tfoot><tr><td>Celkem</td><td class="c">'+cislo(sum("hotovo"))+'</td><td></td>'+
     hlavni.map(t=>'<td class="c">'+cislo(typSum[t])+'</td>').join("")+
     (zbytek.length?'<td class="c">'+cislo(zbytek.reduce((a,t)=>a+typSum[t],0))+'</td>':"")+
-    '<td class="c">'+cislo(sum("naplanovano"))+'</td><td class="c">'+cislo(sum("poTerminu"))+'</td><td class="c">'+cislo(sum("dealyNove"))+'</td><td class="c">'+cislo(sum("dealyVyhrane"))+'</td><td class="c">'+cislo(sum("dealyProhrane"))+'</td><td></td></tr></tfoot></table></div></div>';
+    '<td class="c">'+cislo(sum("poznamky"))+'</td><td class="c">'+cislo(sum("naplanovano"))+'</td><td class="c">'+cislo(sum("poTerminu"))+'</td><td class="c">'+cislo(sum("dealyNove"))+'</td><td class="c">'+cislo(sum("dealyVyhrane"))+'</td><td class="c">'+cislo(sum("dealyProhrane"))+'</td><td></td></tr></tfoot></table></div></div>';
   return h;
 }
 function razeni(k){ RAZENI=RAZENI.k===k?{k,dolu:!RAZENI.dolu}:{k,dolu:k!=="jmeno"}; vykresli(); }
@@ -434,9 +503,10 @@ async function detail(id){
     let h="";
     const po=d.otevrene.filter(a=>a.poTerminu), plan=d.otevrene.filter(a=>!a.poTerminu);
     const tab=(radky,prazdno)=>radky.length?'<div class="posuv"><table><tbody>'+radky.join("")+'</tbody></table></div>':'<p class="mut">'+prazdno+'</p>';
-    const radA=a=>'<tr><td style="white-space:nowrap;width:1%">'+(a.den?cz(a.den):"bez termínu")+(a.cas?' <span class="mut">'+esc(a.cas)+'</span>':'')+'</td><td style="width:1%"><span class="pill mute">'+esc(nazevTypu(a.typ))+'</span></td><td>'+odkazA(a)+'</td><td style="width:1%;white-space:nowrap">'+(a.deal?odkazD(a.deal,"deal #"+Number(a.deal)):"")+'</td></tr>';
+    const radA=a=>'<tr><td style="white-space:nowrap;width:1%">'+(a.den?cz(a.den):"bez termínu")+(a.cas?' <span class="mut">'+esc(a.cas)+'</span>':'')+'</td><td style="width:1%"><span class="pill mute">'+esc(nazevTypu(a.typ))+'</span></td><td>'+odkazA(a)+(a.poznamka?'<div class="pozn">'+esc(a.poznamka)+'</div>':'')+'</td><td style="width:1%;white-space:nowrap">'+(a.deal?odkazD(a.deal,"deal #"+Number(a.deal)):"")+'</td></tr>';
     const STAV={novy:['mute','nový'],vyhrany:['ok','vyhraný'],prohrany:['zle','prohraný']};
     h+='<h3>Dealy v období ('+d.dealy.length+')</h3>'+tab(d.dealy.map(x=>'<tr><td style="white-space:nowrap;width:1%">'+cz(x.den)+'</td><td style="width:1%"><span class="pill '+STAV[x.co][0]+'">'+STAV[x.co][1]+'</span></td><td>'+odkazD(x.id,esc(x.nazev||"(bez názvu)"))+'</td><td class="c" style="white-space:nowrap">'+(x.hodnota?cislo(x.hodnota)+" "+esc(x.mena):"")+'</td></tr>'),"Žádné nové, vyhrané ani prohrané dealy.");
+    h+='<h3>Poznámky ('+d.poznamekCelkem+')</h3>'+tab(d.poznamky.map(x=>'<tr><td style="white-space:nowrap;width:1%;vertical-align:top">'+cz(x.den)+'</td><td><div class="mut">'+[x.deal?odkazD(x.deal,esc(x.dealNazev||("deal #"+x.deal))):"",esc(x.firma),esc(x.osoba)].filter(Boolean).join(" · ")+'</div><div class="pozn ink">'+esc(x.text||"(prázdná poznámka)")+'</div></td></tr>'),"V období žádná poznámka.")+(d.poznamekCelkem>d.poznamky.length?'<p class="mut">Zobrazeno prvních '+d.poznamky.length+'.</p>':'');
     h+='<h3>Po termínu ('+po.length+')</h3>'+tab(po.map(radA),"Nic po termínu.");
     h+='<h3>Dokončené aktivity ('+d.aktivitCelkem+')</h3>'+tab(d.aktivity.map(radA),"V období žádná dokončená aktivita.")+(d.aktivitCelkem>d.aktivity.length?'<p class="mut">Zobrazeno prvních '+d.aktivity.length+'.</p>':'');
     h+='<h3>Naplánováno ('+plan.length+')</h3>'+tab(plan.slice(0,100).map(radA),"Nic naplánováno.")+(plan.length>100?'<p class="mut">Zobrazeno prvních 100.</p>':'');
