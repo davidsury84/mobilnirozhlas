@@ -812,6 +812,31 @@ function mount(host) {
       faze, osobosmenSvar: Math.round(sumU('svar') * 10) / 10, osobosmenLak: Math.round(sumU('lak') * 10) / 10, hrdlo: hrdlo ? hrdlo.nazev : '', maNormy: maN };
   }
 
+  // ---------- Lidé podle profesí: kolik jich závod má a kolik podle norem potřebuje na cílový výstup ----------
+  // Profese člověka v měsíci = úsek, ve kterém má nejvíc výrobních zápisů (dělírna / svařovna / lakovna).
+  const profOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen|odkulič|odkulic/.test(o)) return 'lak'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl[ií]rna|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|ohýb|stříh|strih|střih|loch|obrobna|soustruh/.test(o)) return 'del'; return 'svar'; };
+  // Normominuty na jeden standardní kontejner (ABR-DSD 6500×2300×2350) z katalogu norem; bez katalogu časy z plánu.
+  function normyNaKont(zKey) {
+    const P = loadPlan6(), I = normIndex(), dil = 'ABR-DSD 6500x2300x2350'; const zdroj = { svar: [], lak: [], del: [] };
+    let svar = 0; P.faze.filter(f => f.usek === 'svar').forEach(f => { const [op, d] = PLAN6_NORMA[f.k] || []; const n = I.items.length && op ? matchNorma(zKey, op, d) : null; const min = n && n.min ? n.min : f.min; svar += min * f.ks; zdroj.svar.push(f.nazev + ' ' + f.ks + '× ' + Math.round(min) + ' min' + (n && n.min ? '' : ' (plán)')); });
+    let lak = 0; ['odkuličkování', 'odmaštění', 'základování', 'lakování'].forEach(o => { const n = I.items.length ? matchNorma(zKey, o + ' ABR 2050-2500 mm/rozestup 750 mm', dil) : null; const min = n && n.min ? n.min : (o === 'lakování' ? 90 : o === 'základování' ? 90 : 45); lak += min; zdroj.lak.push(o + ' ' + Math.round(min) + ' min' + (n && n.min ? '' : ' (odhad)')); });
+    // dělírna: list „Výrobní normy dělírna“ — osobominuty na kus (Kč ÷ sazba) × kusů na kontejner; alternativy „… nebo“ se nepočítají dvakrát
+    let del = 0, nDel = 0; I.items.filter(n => /d[eě]l[ií]rna/i.test(n.sheet) && n.ksKont > 0 && !/\bnebo\s*$/i.test(n.op)).forEach(n => { const pm = n.kc && n.sazba ? n.kc / n.sazba * 60 : (n.min || 0); del += pm * n.ksKont; nDel++; });
+    if (nDel) zdroj.del.push(nDel + ' položek listu dělírna (střih, ohýbání, pila) · pálení a obrobna normu nemají'); else del = null;
+    return { svar: Math.round(svar), lak: Math.round(lak), del: del == null ? null : Math.round(del), zdroj };
+  }
+  function profese() {
+    const P = loadPlan6(), cile = loadCile();
+    return { smenaMin: P.smenaMin, zavody: ZAVODY.map(z => { const D = loadData(z.key); if (!D) return { key: z.key, name: z.name, data: false };
+      const all = D.rows.filter(r => r[R.date] <= D.snapshot && !isRezie(r[R.dil])); const per = {};
+      all.forEach(r => { const m = r[R.date].slice(0, 7), k = r[R.id] || r[R.name]; const o = (per[m] = per[m] || {}); const c = (o[k] = o[k] || { svar: 0, del: 0, lak: 0 }); c[profOf(r[R.op])]++; });
+      const mesice = Object.keys(per).sort().map(m => { const c = { m, svar: 0, del: 0, lak: 0 }; Object.values(per[m]).forEach(x => { const t = x.lak >= x.svar && x.lak >= x.del ? 'lak' : (x.del > x.svar ? 'del' : 'svar'); c[t]++; }); return c; });
+      const snapM = D.snapshot.slice(0, 7); const neuplny = !/-(2[89]|3[01])$/.test(D.snapshot); const uz = mesice.filter(x => !(neuplny && x.m === snapM)); const last = uz[uz.length - 1] || mesice[mesice.length - 1];
+      const avg = k => uz.length ? Math.round(uz.reduce((s, x) => s + x[k], 0) / uz.length * 10) / 10 : null;
+      const cil = cile[z.key] || null;
+      return { key: z.key, name: z.name, data: true, snapshot: D.snapshot, cil, mesic: last ? last.m : '', ma: last ? { svar: last.svar, del: last.del, lak: last.lak } : null, prvni: uz[0] ? { m: uz[0].m, svar: uz[0].svar, del: uz[0].del, lak: uz[0].lak } : null, prumer: { svar: avg('svar'), del: avg('del'), lak: avg('lak') }, mesice, normMin: cil ? normyNaKont(z.key) : null }; }) };
+  }
+
   // Přehled všech závodů (poslední 4 týdny do snímku + celý rok)
   function overview() {
     const st = loadState();
@@ -951,7 +976,8 @@ function mount(host) {
     if (p === '/api/vykonnost/indikatory' && req.method === 'GET') {
       const bez = String(u.query.bez || '').split(',').filter(Boolean);
       const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, cile: I.cile, snapshot: I.snapshot, mesice: I.mesice.map(M => { const o = { m: M.m, neuplny: M.neuplny, rows: M.rows, ks: M.ks, rezH: M.rezH, pracDny: M.pracDny }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
-      json(res, 200, { zavody: zav, legenda: LEGENDA }); return true;
+      let prof = null; try { prof = profese(); } catch (e) { console.warn('[vykonnost] profese:', e.message); }
+      json(res, 200, { zavody: zav, legenda: LEGENDA, profese: prof }); return true;
     }
     const mi = /^\/api\/vykonnost\/indikatory\/([a-z]+)$/.exec(p);
     if (mi && req.method === 'GET') {
@@ -985,7 +1011,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, profese, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };
