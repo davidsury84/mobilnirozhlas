@@ -15,6 +15,7 @@
   h1{font:700 24px/1.2 var(--cond);margin:0 0 4px} h2{font:700 16px/1.2 var(--cond);margin:18px 0 8px} h3{font:600 13.5px var(--sans);margin:0 0 6px;color:var(--ink-soft)}
   .sub{color:var(--ink-soft);font-size:13px;margin:0 0 14px}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:12px 0}
+  .kpi.klik{cursor:pointer;transition:box-shadow .12s,transform .12s} .kpi.klik:hover{box-shadow:0 2px 10px rgba(0,0,0,.12);transform:translateY(-1px)} .kpi.klik.on{outline:3px solid var(--ink,#222);outline-offset:-1px}
   .kpi{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px} .kpi .v{font:700 22px/1.1 var(--cond)} .kpi .l{font-size:12px;color:var(--ink-soft);margin-top:4px}
   .kpi.red .v{color:var(--red)} .kpi.amber .v{color:var(--amber)} .kpi.blue .v{color:var(--blue)}
   .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 14px}
@@ -76,7 +77,9 @@ const mp=f=>f.mena&&f.mena!=='CZK'?' <span class="pill blue" title="Saldo v měn
 const den=d=>{if(!d)return '—';const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+'. '+(+m[2])+'. '+m[1]:d;};
 let P=null, U=null;
 // ---- ESKALACE: 10 dní → obchodník rozhodne (3 dny) → upomínka přes Helios (Lucie) → po 7 dnech předžalobní výzva ----
-let E=null;
+let E=null, eskFiltr='', eskKresli=null;   // eskFiltr = klíč dlaždice, podle které je tabulka eskalace vyfiltrovaná
+const ESK_SKUP={bez:['bez-rozhodnuti'],ceka:['ceka-obchodnik','nova'],upominka:['upominka'],po:['po-upomince'],vyzva:['vyzva','vyzva-ceka'],poznamka:['poznamka']};
+function eskFiltruj(k){eskFiltr=(eskFiltr===k?'':k); if(eskKresli)eskKresli(); const t=$('#eskTbl'); if(t&&eskFiltr)t.scrollIntoView({behavior:'smooth',block:'nearest'});}
 const FAZE={nova:['čeká na denní běh','muted'],'ceka-obchodnik':['čeká na rozhodnutí obchodníka','amber'],'bez-rozhodnuti':['BEZ ROZHODNUTÍ přes 3 dny','red'],poznamka:['řeší obchodník','blue'],upominka:['k odeslání upomínky (Helios)','amber'],'po-upomince':['upomínka odeslána, běží 7 dní','blue'],'vyzva-ceka':['čeká na denní běh → výzva','red'],vyzva:['PŘEDŽALOBNÍ VÝZVA k odeslání','red'],'vyzva-odeslana':['výzva odeslána','blue'],pozastaveno:['pozastaveno','amber'],pred:['—','muted']};
 async function loadEsk(){
   try{const r=await fetch('/api/nakup-report/eskalace',{cache:'no-store'});E=await r.json();}catch(e){E=null;}
@@ -116,8 +119,18 @@ async function loadEsk(){
     +'<div class="cfg"><b>Jak to běží:</b> '+k.obchodnik+' dní po splatnosti → e-mail obchodníkovi (<b>'+k.rozhodnuti+' dny na rozhodnutí</b>) → obchodník zvolí <b>📨 Poslat upomínku</b> nebo <b>✎ Poznámka</b> (řeší sám) → upomínky odesílá '+esc((c.vyzvaKomu||[]).join(', '))+' přes Helios a odškrtne odeslání → <b>'+k.vyzvaPoUpomince+' dní po upomínce</b> předžalobní výzva (tisk, podpis '+esc(c.podpis.jmeno)+').</div>'
     +cfgHtml
     +kdoSpravuje(all,c)
-    +'<div class="kpis" style="margin:8px 0">'+[['red',cnt('bez-rozhodnuti'),'bez rozhodnutí přes '+k.rozhodnuti+' dny'],['amber',cnt('ceka-obchodnik')+cnt('nova'),'čeká na obchodníka'],['amber',cnt('upominka'),'k odeslání upomínky (Helios)'],['blue',cnt('po-upomince'),'po upomínce, běží '+k.vyzvaPoUpomince+' dní'],['red',cnt('vyzva')+cnt('vyzva-ceka'),'předžalobní výzva k odeslání'],['blue',cnt('poznamka'),'řeší obchodník']].map(x=>'<div class="kpi '+x[0]+'"><div class="v">'+x[1]+'</div><div class="l">'+esc(x[2])+'</div></div>').join('')+'</div>'
-    +(fa.length?tbl(fa):'<div class="muted">Žádná faktura ≥ '+k.obchodnik+' dní po splatnosti'+(E.admin||E.jeLucie?'':' u vás')+'.</div>')+'</div>';
+    +'<div class="kpis" id="eskKpis" style="margin:8px 0"></div><div id="eskTbl"></div></div>';
+  // dlaždice stavů = filtr tabulky (klik vyfiltruje, druhý klik zruší); filtr přežije i obnovení dat po akci
+  const dlazdice=[['bez','red','bez rozhodnutí přes '+k.rozhodnuti+' dny'],['ceka','amber','čeká na obchodníka'],['upominka','amber','k odeslání upomínky (Helios)'],['po','blue','po upomínce, běží '+k.vyzvaPoUpomince+' dní'],['vyzva','red','předžalobní výzva k odeslání'],['poznamka','blue','řeší obchodník']];
+  const ve=key=>fa.filter(f=>ESK_SKUP[key].includes(f.faze));
+  eskKresli=()=>{
+    if(eskFiltr&&!ve(eskFiltr).length)eskFiltr='';
+    $('#eskKpis').innerHTML=dlazdice.map(x=>{const c=ve(x[0]).length;return '<div class="kpi '+x[1]+(c?' klik':'')+(eskFiltr===x[0]?' on':'')+'"'+(c?' onclick="eskFiltruj(\''+x[0]+'\')" title="Zobrazit jen tyto faktury"':'')+'><div class="v">'+c+'</div><div class="l">'+esc(x[2])+'</div></div>';}).join('');
+    const rows=eskFiltr?ve(eskFiltr):fa; const nazev=eskFiltr?dlazdice.find(x=>x[0]===eskFiltr)[2]:'';
+    $('#eskTbl').innerHTML=(eskFiltr?'<div style="margin:0 0 6px;font-size:13px"><b>Filtr:</b> '+esc(nazev)+' · '+rows.length+' z '+fa.length+' faktur · '+kc(rows.reduce((s,f)=>s+f.saldo,0))+' Kč <button class="btn" style="margin-left:8px" onclick="eskFiltruj(\''+eskFiltr+'\')">✕ zrušit filtr</button></div>':'')
+      +(rows.length?tbl(rows):'<div class="muted">Žádná faktura ≥ '+k.obchodnik+' dní po splatnosti'+(E.admin||E.jeLucie?'':' u vás')+'.</div>');
+  };
+  eskKresli();
 }
 // ---- POHLED LUCIE: 1) odeslat upomínku (Helios)  2) odeslat předžalobní výzvu  + export XLSX ----
 function renderLucie(all,c){
