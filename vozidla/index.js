@@ -402,6 +402,7 @@ function mount(host) {
 
   // ---- e-mail --------------------------------------------------------------
   // rezim 'souhrn' = zpráva nejde hned, ale do denního souhrnu (jeden e-mail ráno na člověka).
+  // rezim 'hned'   = urgentní, nesmí čekat do rána ani správci (škoda, propadlá technická).
   async function mail(to, subject, text, rezim) {
     // Pozor: odesílatele NEvyžadujeme — při odesílání přes Resend bývá CFG.user prázdný
     // a podmínka na něj by upozornění tiše zahodila.
@@ -415,6 +416,7 @@ function mount(host) {
     if (mf.user) { zprava.fromAddr = mf.user; zprava.fromName = mf.name || 'Intranet – vozový park'; }
     zprava.modul = 'Vozový park';
     if (rezim === 'souhrn') zprava.souhrn = 'denni';
+    if (rezim === 'hned') zprava.urgent = true;
     try { await host.deliver(zprava); return true; }
     catch (e) { console.error('[vozidla] e-mail se nepodařilo odeslat:', e.message); return false; }
   }
@@ -792,7 +794,7 @@ function mount(host) {
       + (zaznam.viník ? 'Viník: ' + zaznam.viník + '\n' : '')
       + 'Policie ČR: ' + (zaznam.policie ? 'přivolána' : 'nepřivolána') + '\n\n'
       + 'Co se stalo:\n' + zaznam.popis + '\n\n'
-      + 'Fotodokumentaci přiložte k vozidlu v intranetu → Vozový park → detail vozidla.');
+      + 'Fotodokumentaci přiložte k vozidlu v intranetu → Vozový park → detail vozidla.', 'hned');
     json(res, 200, { ok: true, komu: prijemci, odeslano, bezReditele: !d.nastaveni.reditelEmail });
     return true;
   }
@@ -1014,7 +1016,7 @@ function mount(host) {
           await poslatJednou('stk-po:' + v.id + ':' + dnesStr.slice(0, 7), 25, terminy.join(','),
             'PROPADLÁ technická prohlídka — ' + popis,
             'Vozidlo ' + popis + ' má propadlou technickou prohlídku (platila do ' + v.stkDo + ', tedy před ' + (-st.dnyStk) + ' dny).\n\n'
-            + 'S propadlou prohlídkou nesmí vozidlo do provozu. Zajistěte prohlídku a zapište ji v intranetu → Vozový park.');
+            + 'S propadlou prohlídkou nesmí vozidlo do provozu. Zajistěte prohlídku a zapište ji v intranetu → Vozový park.', 'hned');
         }
       }
 

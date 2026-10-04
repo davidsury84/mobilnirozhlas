@@ -210,7 +210,7 @@ function mount(host) {
   const radekFa = x => '<li style="margin:0 0 8px"><b>Faktura č. ' + esc(x.pz) + '</b> u zákazníka <b>' + esc(x.org) + '</b> na částku <b>' + castkaM(x) + '</b>, splatná ' + esc(x.spl) + ' (<span style="color:#b23">' + x.dni + ' dní po splatnosti</span>)' + (x._fallback ? ' <i style="color:#888">— obchodník „' + esc(x.kdo || '—') + '" nemá v intranetu e-mail</i>' : '') + '</li>';
   // Eskalace pohledávek chodí denně — do souhrnu, ať člověk dostane jeden e-mail ráno
   // se vším, ne zvlášť zprávu ke každé faktuře (přání 2026-10-04).
-  async function posli(to, cc, subject, html, hned) { try { await host.deliver({ to: [].concat(to, cc || []).join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html, modul: 'Pohledávky', souhrn: hned ? undefined : 'denni' }); return { ok: true }; } catch (e) { return { ok: false, err: e.message }; } }
+  async function posli(to, cc, subject, html, hned) { try { await host.deliver({ to: [].concat(to, cc || []).join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html, modul: 'Pohledávky', souhrn: hned ? undefined : 'denni', urgent: !!hned }); return { ok: true }; } catch (e) { return { ok: false, err: e.message }; } }
   // Denní běh (každá faktura v každé fázi jednou)
   async function tickEskalace() {
     const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; if (!P) return { ok: false, error: 'bez snímku pohledávek' };

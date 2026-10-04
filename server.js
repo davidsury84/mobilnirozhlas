@@ -809,8 +809,17 @@ function reportDisabled(key) { return !!rozesilkyOff()[key]; }
    zprávy ven k zákazníkovi, škody, hesla a pozvánky.
    ============================================================ */
 const SOUHRN_HODINA = Number(process.env.SOUHRN_HODINA || 7);   // kdy ráno souhrn odchází
-function readSouhrn() { const d = readJson(SOUHRN_F, { fronta: [], odeslano: {} }); if (!Array.isArray(d.fronta)) d.fronta = []; if (!d.odeslano) d.odeslano = {}; return d; }
+function readSouhrn() {
+  const d = readJson(SOUHRN_F, { fronta: [], odeslano: {}, vzdy: null });
+  if (!Array.isArray(d.fronta)) d.fronta = [];
+  if (!d.odeslano) d.odeslano = {};
+  // Komu chodí v souhrnu ÚPLNĚ všechno (ne jen vybraná upozornění) — typicky správce
+  // intranetu, který je v kopii skoro u každého modulu. Urgentní zprávy jdou i jim hned.
+  if (!Array.isArray(d.vzdy)) d.vzdy = [SUPERADMIN];
+  return d;
+}
 function writeSouhrn(d) { writeJson(SOUHRN_F, d); }
+function souhrnVzdy() { try { return readSouhrn().vzdy.map(x => String(x).toLowerCase()); } catch (_) { return [SUPERADMIN]; } }
 // Zařadí zprávu do fronty místo okamžitého odeslání.
 function souhrnZaradit(mail) {
   const d = readSouhrn();
@@ -818,7 +827,7 @@ function souhrnZaradit(mail) {
   if (!komu.length) return { ok: false };
   komu.forEach(email => d.fronta.push({
     ts: Date.now(), email,
-    modul: String(mail.modul || 'Intranet').slice(0, 40),
+    modul: String(mail.modul || mail.fromName || 'Intranet').replace(/^Intranet\s*[–-]\s*/i, '').slice(0, 40),
     predmet: String(mail.subject || '').slice(0, 200),
     text: String(mail.text || '').slice(0, 4000),
     odkaz: String(mail.odkaz || '').slice(0, 300),
@@ -903,6 +912,21 @@ function deliver(mail) {
   if (mail && mail.souhrn === 'denni' && !mail._souhrnOdeslani) {
     try { souhrnZaradit(mail); return Promise.resolve({ ok: true, souhrn: true }); }
     catch (e) { /* když fronta selže, radši pošli hned */ }
+  }
+  // Správce intranetu je v kopii skoro u všeho. Co není urgentní, mu jde do souhrnu —
+  // ostatním adresátům téže zprávy se pošle hned (zpráva se rozdělí).
+  if (mail && !mail._souhrnOdeslani && !mail.urgent) {
+    try {
+      const vzdy = souhrnVzdy();
+      const komu = String(mail.to || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
+      const doSouhrnu = komu.filter(x => vzdy.indexOf(x.toLowerCase()) >= 0);
+      if (doSouhrnu.length) {
+        souhrnZaradit(Object.assign({}, mail, { to: doSouhrnu.join(',') }));
+        const zbytek = komu.filter(x => vzdy.indexOf(x.toLowerCase()) < 0);
+        if (!zbytek.length) return Promise.resolve({ ok: true, souhrn: true });
+        mail = Object.assign({}, mail, { to: zbytek.join(', ') });
+      }
+    } catch (e) { /* při chybě se nic nefiltruje a zpráva jde celá hned */ }
   }
   const zaznam = { ts: Date.now(), to: String((mail && mail.to) || ''), subject: String((mail && mail.subject) || '').slice(0, 200), from: String((mail && (mail.fromName || mail.fromAddr)) || '').slice(0, 100) };
   // MAIL_DRY_RUN=1 → nic se neodešle, jen se vypíše co by odešlo. Pro lokální běh s produkčními
@@ -992,6 +1016,7 @@ function authZadost(email, name) {
     Promise.resolve(deliver({
       to: SUPERADMIN, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST',
       subject: 'Žádost o přístup do intranetu: ' + email,
+      urgent: true,   // někdo se nedostane dovnitř — tohle nemá čekat do rána
       html: '<p><b>' + esc(name || email) + '</b> (' + esc(email) + ') se pokusil přihlásit do intranetu.</p>' +
         '<p>Adresa je z firemní domény <b>' + esc(authDomain(email)) + '</b>, která vyžaduje schválení správcem.</p>' +
         '<p>Schválit můžete v intranetu → Správa → Přístupy → „Přístup z ostatních domén“.</p>'
