@@ -208,7 +208,9 @@ function mount(host) {
   const kcM = v => Math.round(v).toLocaleString('cs-CZ') + ' Kč';
   const castkaM = x => kcM(x.saldo) + (x.mena && x.mena !== 'CZK' ? ' (' + (+x.saldoMena || 0).toLocaleString('cs-CZ', { maximumFractionDigits: 2 }) + ' ' + esc(x.mena) + ')' : '');
   const radekFa = x => '<li style="margin:0 0 8px"><b>Faktura č. ' + esc(x.pz) + '</b> u zákazníka <b>' + esc(x.org) + '</b> na částku <b>' + castkaM(x) + '</b>, splatná ' + esc(x.spl) + ' (<span style="color:#b23">' + x.dni + ' dní po splatnosti</span>)' + (x._fallback ? ' <i style="color:#888">— obchodník „' + esc(x.kdo || '—') + '" nemá v intranetu e-mail</i>' : '') + '</li>';
-  async function posli(to, cc, subject, html) { try { await host.deliver({ to: [].concat(to, cc || []).join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html }); return { ok: true }; } catch (e) { return { ok: false, err: e.message }; } }
+  // Eskalace pohledávek chodí denně — do souhrnu, ať člověk dostane jeden e-mail ráno
+  // se vším, ne zvlášť zprávu ke každé faktuře (přání 2026-10-04).
+  async function posli(to, cc, subject, html, hned) { try { await host.deliver({ to: [].concat(to, cc || []).join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html, modul: 'Pohledávky', souhrn: hned ? undefined : 'denni' }); return { ok: true }; } catch (e) { return { ok: false, err: e.message }; } }
   // Denní běh (každá faktura v každé fázi jednou)
   async function tickEskalace() {
     const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; if (!P) return { ok: false, error: 'bez snímku pohledávek' };
@@ -251,7 +253,8 @@ function mount(host) {
       const html = mailWrap('<p>Dobrý den,</p><p>upomínka byla odeslána před ' + cfg.kroky.vyzvaPoUpomince + '+ dny a faktury jsou stále neuhrazené — k odeslání ' + (zak.length === 1 ? 'je připravena <b>předžalobní výzva</b>' : 'jsou připraveny <b>předžalobní výzvy</b>') + '. Prosím: otevřít, <b>vytisknout na hlavičkový papír</b>, nechat podepsat (' + esc(cfg.podpis.jmeno) + ') a <b>odeslat doporučeně</b>; v intranetu pak odškrtnout „výzva odeslána".</p>' +
         '<ul style="padding-left:18px">' + zak.map(z => { const cel = z.faktury.reduce((s2, x) => s2 + x.saldo, 0); return '<li style="margin:0 0 10px"><b>' + esc(z.org) + '</b> — ' + z.faktury.length + ' ' + (z.faktury.length === 1 ? 'faktura' : 'faktur') + ', ' + kcM(cel) + ' (' + z.faktury.map(x => esc(x.pz) + ' · ' + x.dni + ' d').join(', ') + ')<br><a href="' + publicUrl + '/pohledavky/vyzva?org=' + encodeURIComponent(z.org) + '" style="color:#0e8a43;font-weight:700">Otevřít výzvu k tisku</a></li>'; }).join('') + '</ul>', publicUrl);
       const subject = 'Předžalobní výzva k odeslání: ' + zak.length + ' ' + (zak.length === 1 ? 'zákazník' : zak.length < 5 ? 'zákazníci' : 'zákazníků') + ' · ' + kcM(zak.reduce((s2, z) => s2 + z.faktury.reduce((t, x) => t + x.saldo, 0), 0));
-      const r = await posli(lucie, cc, subject, html); if (r.ok) zak.forEach(z => z.faktury.forEach(x => { d.stav[x.pz].vyzvaOznamena = { kdy: dnes, komu: lucie, cc }; }));
+      // Předžalobní výzva je ostrý krok — ta jde hned, ne až ráno v souhrnu.
+      const r = await posli(lucie, cc, subject, html, true); if (r.ok) zak.forEach(z => z.faktury.forEach(x => { d.stav[x.pz].vyzvaOznamena = { kdy: dnes, komu: lucie, cc }; }));
       vysledky.push({ krok: 'vyzva', komu: lucie, cc, zakazniku: zak.length, ok: r.ok, err: r.err }); console.log('[nakup-report] předžalobní výzvy → ' + lucie.join(', ') + ': ' + zak.length + ' zákazníků'); }
     const ziva = new Set(P.faktury.map(x => x.pz)); Object.keys(d.stav).forEach(pz => { const st = d.stav[pz]; const posl = [st.k10, st.kU, st.vyzvaOznamena].filter(Boolean).map(k => k.kdy).sort().pop(); if (!ziva.has(pz) && posl && (Date.now() - Date.parse(posl)) > 180 * 86400000) delete d.stav[pz]; });
     saveUpom(d); return { ok: true, vysledky };

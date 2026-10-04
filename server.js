@@ -253,6 +253,7 @@ const PREKLAD_LEADY_F = path.join(DATA_DIR, 'preklad-leady.json'); // Obchod →
 const AKTUALITY_F = path.join(DATA_DIR, 'aktuality.json');    // aktuality (novinky) na intranetu: {posts:[{id,title,body,image,author,authorEmail,ts,likes:{email:ts}}]}
 const SITE_F      = path.join(DATA_DIR, 'site.json');         // nastavení vzhledu intranetu (např. vlastní hero banner)
 const EXT_F       = path.join(DATA_DIR, 'externi-ucty.json'); // partnerské účty (přihlášení heslem, bez Google SSO)
+const SOUHRN_F    = path.join(DATA_DIR, 'souhrn-fronta.json');  // fronta zpráv do denního souhrnu (místo e-mailu na každou drobnost)
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');           // nahrané obrázky (aktuality, banner) — persistentní volume
 for (const d of [DATA_DIR, PUB_DIR, UPLOADS_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 
@@ -798,7 +799,111 @@ const ROZESILKY_OFF_F = () => path.join(DATA_DIR, 'rozesilky-vypnute.json');
 function rozesilkyOff() { try { return JSON.parse(fs.readFileSync(ROZESILKY_OFF_F(), 'utf8')) || {}; } catch (_) { return {}; } }
 function rozesilkyOffWrite(o) { try { fs.writeFileSync(ROZESILKY_OFF_F(), JSON.stringify(o, null, 2)); } catch (_) {} }
 function reportDisabled(key) { return !!rozesilkyOff()[key]; }
+/* ============================================================
+   DENNÍ SOUHRN — jeden e-mail místo deseti
+   ------------------------------------------------------------
+   Modul místo okamžitého e-mailu zařadí zprávu do fronty
+   (deliver s souhrn:'denni'). Ráno odejde každému člověku JEDEN
+   e-mail se vším, co se ho za posledních 24 h týkalo, členěný
+   podle modulů. Okamžitě se posílá jen to, co nepočká:
+   zprávy ven k zákazníkovi, škody, hesla a pozvánky.
+   ============================================================ */
+const SOUHRN_HODINA = Number(process.env.SOUHRN_HODINA || 7);   // kdy ráno souhrn odchází
+function readSouhrn() { const d = readJson(SOUHRN_F, { fronta: [], odeslano: {} }); if (!Array.isArray(d.fronta)) d.fronta = []; if (!d.odeslano) d.odeslano = {}; return d; }
+function writeSouhrn(d) { writeJson(SOUHRN_F, d); }
+// Zařadí zprávu do fronty místo okamžitého odeslání.
+function souhrnZaradit(mail) {
+  const d = readSouhrn();
+  const komu = String((mail && mail.to) || '').split(/[,;]/).map(x => x.trim().toLowerCase()).filter(Boolean);
+  if (!komu.length) return { ok: false };
+  komu.forEach(email => d.fronta.push({
+    ts: Date.now(), email,
+    modul: String(mail.modul || 'Intranet').slice(0, 40),
+    predmet: String(mail.subject || '').slice(0, 200),
+    text: String(mail.text || '').slice(0, 4000),
+    odkaz: String(mail.odkaz || '').slice(0, 300),
+  }));
+  if (d.fronta.length > 5000) d.fronta = d.fronta.slice(-5000);
+  writeSouhrn(d);
+  return { ok: true, zarazeno: komu.length };
+}
+function souhrnHtml(polozky, jmeno) {
+  const dle = {};
+  polozky.forEach(p => { (dle[p.modul] = dle[p.modul] || []).push(p); });
+  const cas = ts => new Date(ts).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+  let h = '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#0f1512;line-height:1.6;max-width:640px">'
+    + '<p>Dobrý den,</p>'
+    + '<p>souhrn toho, co se vás od včerejška týkalo v intranetu — <strong>' + polozky.length + ' '
+    + (polozky.length === 1 ? 'položka' : polozky.length < 5 ? 'položky' : 'položek') + '</strong>:</p>';
+  Object.keys(dle).sort().forEach(m => {
+    h += '<div style="margin:16px 0 6px;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#5b635c">' + esc(m) + '</div>'
+      + '<table style="width:100%;border-collapse:collapse">';
+    dle[m].forEach(p => {
+      const prvni = String(p.text || '').split('\n').filter(x => x.trim())[1] || '';
+      h += '<tr><td style="padding:7px 0;border-bottom:1px solid #e3e7e0;vertical-align:top">'
+        + '<div><strong>' + esc(p.predmet) + '</strong> <span style="color:#8b938c;font-size:12px">' + cas(p.ts) + '</span></div>'
+        + (prvni ? '<div style="color:#5b635c;font-size:13px">' + esc(prvni.slice(0, 160)) + '</div>' : '')
+        + (p.odkaz ? '<div style="font-size:13px"><a href="' + esc(p.odkaz) + '">otevřít</a></div>' : '')
+        + '</td></tr>';
+    });
+    h += '</table>';
+  });
+  h += '<p style="margin-top:18px;color:#5b635c;font-size:13px">Tohle je jediný souhrnný e-mail za den — jednotlivé zprávy vám chodit nebudou. '
+    + 'Vše najdete i v intranetu: <a href="https://intranet.elkoplast.cz/">intranet.elkoplast.cz</a></p></div>';
+  return h;
+}
+function souhrnText(polozky) {
+  const dle = {};
+  polozky.forEach(p => { (dle[p.modul] = dle[p.modul] || []).push(p); });
+  let t = 'Souhrn z intranetu — ' + polozky.length + ' položek:\n';
+  Object.keys(dle).sort().forEach(m => {
+    t += '\n' + m.toUpperCase() + '\n';
+    dle[m].forEach(p => { t += '• ' + p.predmet + (p.odkaz ? ('\n  ' + p.odkaz) : '') + '\n'; });
+  });
+  return t + '\nTohle je jediný souhrnný e-mail za den. https://intranet.elkoplast.cz/\n';
+}
+// Rozešle souhrny — jednou denně, každému jeden e-mail. Vrací počet odeslaných.
+async function souhrnRozeslat(vynutit) {
+  const d = readSouhrn();
+  if (!d.fronta.length) return 0;
+  const ted = new Date();
+  const dnes = ted.toISOString().slice(0, 10);
+  if (!vynutit && ted.getHours() < SOUHRN_HODINA) return 0;
+  const lide = {};
+  d.fronta.forEach(p => { (lide[p.email] = lide[p.email] || []).push(p); });
+  let odeslano = 0;
+  const zbyva = [];
+  for (const email of Object.keys(lide)) {
+    if (!vynutit && d.odeslano[email] === dnes) { zbyva.push.apply(zbyva, lide[email]); continue; }
+    const polozky = lide[email].sort((a, b) => a.ts - b.ts);
+    const emp = findEmployeeByEmail(email);
+    const predmet = 'Intranet — souhrn dne (' + polozky.length + ' '
+      + (polozky.length === 1 ? 'položka' : polozky.length < 5 ? 'položky' : 'položek') + ')';
+    try {
+      await deliver({
+        to: email, fromAddr: CFG.user, fromName: CFG.fromName || 'Intranet ELKOPLAST',
+        subject: predmet, text: souhrnText(polozky), html: souhrnHtml(polozky, emp ? emp.name : ''),
+        _souhrnOdeslani: true,
+      });
+      d.odeslano[email] = dnes; odeslano++;
+    } catch (e) {
+      console.error('[souhrn] neodesláno ' + email + ':', e.message);
+      zbyva.push.apply(zbyva, polozky);     // co neodešlo, zůstává ve frontě
+    }
+  }
+  d.fronta = zbyva;
+  writeSouhrn(d);
+  if (odeslano) console.log('[souhrn] denní souhrn odeslán ' + odeslano + ' lidem');
+  return odeslano;
+}
+
 function deliver(mail) {
+  // Zpráva do denního souhrnu se neodesílá hned — zařadí se do fronty a ráno odejde
+  // jedním e-mailem se vším ostatním. Platí jen pro interní adresáty.
+  if (mail && mail.souhrn === 'denni' && !mail._souhrnOdeslani) {
+    try { souhrnZaradit(mail); return Promise.resolve({ ok: true, souhrn: true }); }
+    catch (e) { /* když fronta selže, radši pošli hned */ }
+  }
   const zaznam = { ts: Date.now(), to: String((mail && mail.to) || ''), subject: String((mail && mail.subject) || '').slice(0, 200), from: String((mail && (mail.fromName || mail.fromAddr)) || '').slice(0, 100) };
   // MAIL_DRY_RUN=1 → nic se neodešle, jen se vypíše co by odešlo. Pro lokální běh s produkčními
   // proměnnými (railway run): jinak plánovač nad prázdným DATA_DIR rozešle všechny reporty naostro.
@@ -4257,6 +4362,28 @@ const server = http.createServer(async (req, res) => {
     if (vykonnostMod && await vykonnostMod.handle(req, res)) return;
 
     // Centrální přehled rozesílek (správce) — agreguje descriptory z modulů, které je vystavují.
+    // ---- denní souhrn: co čeká ve frontě + ruční odeslání (jen správce) ----
+    if (p === '/api/admin/souhrn' && req.method === 'GET') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      const d = readSouhrn();
+      const lide = {};
+      d.fronta.forEach(x => { (lide[x.email] = lide[x.email] || []).push(x); });
+      return send(res, 200, {
+        hodina: SOUHRN_HODINA,
+        celkem: d.fronta.length,
+        lide: Object.keys(lide).sort().map(e => ({
+          email: e, pocet: lide[e].length,
+          moduly: Array.from(new Set(lide[e].map(x => x.modul))),
+          odeslanoDnes: d.odeslano[e] === new Date().toISOString().slice(0, 10),
+        })),
+      });
+    }
+    if (p === '/api/admin/souhrn' && req.method === 'POST') {
+      if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
+      const odeslano = await souhrnRozeslat(true);
+      logActivity('souhrn', empSession(req) || { email: 'správce' }, 'Ručně rozeslán denní souhrn (' + odeslano + ' lidem)');
+      return send(res, 200, { ok: true, odeslano });
+    }
     if (p === '/api/admin/reports' && req.method === 'GET') {
       if (!isAdmin(req)) return send(res, 403, { error: 'Jen pro správce.' });
       const mods = [nakupReportMod, dopravaMod, mobilniLisyMod, smlouvyMod, konstrukceMod, reklamaceMod, kontejneryMod, pozadavkyMod, qoolingMod, vykonnostMod];
@@ -6005,6 +6132,11 @@ if (require.main === module) {
     if (kontejneryMod) {
       if (kontejneryMod.syncSheet) { kontejneryMod.syncSheet().catch(() => {}); setInterval(() => kontejneryMod.syncSheet().catch(() => {}), 15 * 60 * 1000); }
       if (kontejneryMod.tick) { kontejneryMod.tick(); setInterval(() => kontejneryMod.tick(), 6 * 3600 * 1000); }
+    }
+    // Denní souhrn: jeden e-mail na člověka místo desítek drobných zpráv (kontrola každou hodinu).
+    {
+      souhrnRozeslat().catch(() => {});
+      setInterval(() => souhrnRozeslat().catch(() => {}), 3600 * 1000);
     }
     // Hlídač smluv: denní notifikační běh (stejný 6h interval, vnitřní pojistka na 1×/den)
     if (smlouvyMod) {

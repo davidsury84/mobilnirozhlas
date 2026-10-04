@@ -637,7 +637,8 @@ async function zadostVuz(id){
   const z=n.lide[0], v=z.vozidla[0];
   if(!confirm("Poslat žádost o doplnění?\n\nKomu: "+(z.jmeno||z.email)+" ("+z.duvod+")\nVozidlo: "+v.spz+(v.popis?" "+v.popis:"")
     +"\nChybí: "+v.chybi.join(", ")
-    +(z.naposled?("\n\nPoslední žádost: "+new Date(z.naposled).toLocaleDateString("cs-CZ")):"")))return;
+    +(z.naposled?("\n\nPoslední žádost: "+new Date(z.naposled).toLocaleDateString("cs-CZ")):"")
+    +"\n\nPřidá se do jeho ranního souhrnu z intranetu."))return;
   try{
     const r=await api("/api/vozidla/zadost",{id,komu:[z.email]});
     zavri();
@@ -648,7 +649,7 @@ async function zadostVuz(id){
 async function zadostOdeslat(){
   const komu=[...document.querySelectorAll(".zadostChk")].filter(c=>c.checked).map(c=>c.value);
   if(!komu.length){ alert("Nikdo není vybraný."); return; }
-  if(!confirm("Odeslat žádost o doplnění údajů "+komu.length+" lidem?"))return;
+  if(!confirm("Odeslat žádost o doplnění údajů "+komu.length+" lidem?\n\nŽádost se přidá do jejich ranního souhrnu z intranetu — nechodí jako samostatný e-mail."))return;
   try{
     const r=await api("/api/vozidla/zadost",{komu});
     zavri();

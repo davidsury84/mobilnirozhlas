@@ -401,7 +401,8 @@ function mount(host) {
   }
 
   // ---- e-mail --------------------------------------------------------------
-  async function mail(to, subject, text) {
+  // rezim 'souhrn' = zpráva nejde hned, ale do denního souhrnu (jeden e-mail ráno na člověka).
+  async function mail(to, subject, text, rezim) {
     // Pozor: odesílatele NEvyžadujeme — při odesílání přes Resend bývá CFG.user prázdný
     // a podmínka na něj by upozornění tiše zahodila.
     if (!to || !host.deliver) return;
@@ -412,6 +413,8 @@ function mount(host) {
         + esc(text).replace(/\n/g, '<br>') + '</div>',
     };
     if (mf.user) { zprava.fromAddr = mf.user; zprava.fromName = mf.name || 'Intranet – vozový park'; }
+    zprava.modul = 'Vozový park';
+    if (rezim === 'souhrn') zprava.souhrn = 'denni';
     try { await host.deliver(zprava); return true; }
     catch (e) { console.error('[vozidla] e-mail se nepodařilo odeslat:', e.message); return false; }
   }
@@ -811,7 +814,7 @@ function mount(host) {
     d.zadostiOdeslano = d.zadostiOdeslano || {};
     let odeslano = 0; const selhalo = [];
     for (const z of vybrani) {
-      const ok = await mail(z.email, 'Vozový park — prosím doplňte údaje u svěřeného vozidla', zadostText(z, r.name || ''));
+      const ok = await mail(z.email, 'Vozový park — prosím doplňte údaje u svěřeného vozidla', zadostText(z, r.name || ''), 'souhrn');
       if (ok !== true) selhalo.push(z.email); else { odeslano++; d.zadostiOdeslano[z.email] = Date.now(); }
     }
     save(d);
@@ -976,10 +979,10 @@ function mount(host) {
     let zmena = false;
     // Odešle upozornění nejvýš jednou za minDnu dní. Značku „odesláno" zapisujeme AŽ po
     // úspěšném odeslání — jinak by výpadek pošty upozornění navždy spolkl.
-    const poslatJednou = async (klic, minDnu, to, predmet, text) => {
+    const poslatJednou = async (klic, minDnu, to, predmet, text, rezim) => {
       const t = d.odeslano[klic];
       if (t && Date.now() - t < minDnu * DEN) return false;
-      const ok = await mail(to, predmet, text);
+      const ok = await mail(to, predmet, text, rezim);
       if (ok) { d.odeslano[klic] = Date.now(); zmena = true; }
       return ok;
     };
@@ -1006,7 +1009,7 @@ function mount(host) {
             'Vozidlu ' + popis + ' končí technická prohlídka ' + v.stkDo + ' (zbývá ' + st.dnyStk + ' dní).\n\n'
             + 'Správce vozu: ' + (v.spravceJmeno || v.spravceEmail || 'nepřidělen') + '\n'
             + 'Středisko: ' + (v.stredisko || '—') + (zod ? ' · zodpovídá ' + zod.jmeno : '') + '\n\n'
-            + 'Po absolvování prohlídky ji prosím odškrtněte v intranetu → Vozový park (zapíše se nové datum platnosti).');
+            + 'Po absolvování prohlídky ji prosím odškrtněte v intranetu → Vozový park (zapíše se nové datum platnosti).', 'souhrn');
         } else if (st.dnyStk < 0) {
           await poslatJednou('stk-po:' + v.id + ':' + dnesStr.slice(0, 7), 25, terminy.join(','),
             'PROPADLÁ technická prohlídka — ' + popis,
@@ -1022,7 +1025,7 @@ function mount(host) {
           'U svěřeného vozidla ' + popis + ' chybí letošní zápis stavu tachometru (rok ' + st.chybejiciRoky.join(', ') + ').\n\n'
           + 'Stačí opsat, kolik má vůz teď na tachometru: https://intranet.elkoplast.cz/#modul=vozidla → detail vozidla → Stav tachometru po letech.\n'
           + 'Zpětně nic dohledávat nemusíte — kolik se za rok najelo, spočítá systém z rozdílu proti loňskému zápisu.\n'
-          + nezapomen(v));
+          + nezapomen(v), 'souhrn');
       }
 
       // 3) inventarizace svěřeného majetku (jednou za dva roky)
@@ -1033,7 +1036,7 @@ function mount(host) {
           + 'Projděte vozidlo, doplňte stav tachometru, vyfoťte ho ze čtyř stran a zápis uložte zde:\n'
           + 'https://intranet.elkoplast.cz/#modul=vozidla → detail vozidla → Inventarizace svěřeného majetku.\n'
           + 'Inventarizace se dělá jednou za ' + (nast.inventuraMesice / 12) + ' roky.\n'
-          + nezapomen(v));
+          + nezapomen(v), 'souhrn');
       }
     }
     if (zmena) save(d);

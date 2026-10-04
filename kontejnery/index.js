@@ -122,9 +122,16 @@ function mount(host) {
     return '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:15px;color:#1c1d1a;line-height:1.6">' + safe +
       '<hr style="border:0;border-top:1px solid #e6e9e3;margin:18px 0"><div style="font-size:12px;color:#8a938a">Intranet ELKOPLAST CZ · Lodní kontejnery</div></div>';
   }
-  async function notify(to, subject, text) {
-    if (!to || !host.deliver || !host.mailFrom || !host.mailFrom.user) return;
-    try { await host.deliver({ to, fromAddr: host.mailFrom.user, fromName: host.mailFrom.name || 'ELKOPLAST — kontejnery', subject, text, html: mailHtml(text) }); }
+  // Pozor: odesílatele NEvyžadujeme — přes Resend bývá CFG.user prázdný a podmínka na něj
+  // by zprávu tiše zahodila (stejná past jako v modulu reklamace a vozidla).
+  // „souhrn“ = zpráva nejde hned, ale do denního souhrnu (jeden e-mail ráno na člověka).
+  async function notify(to, subject, text, rezim) {
+    if (!to || !host.deliver) return;
+    const mf = host.mailFrom || {};
+    const zprava = { to, subject, text, html: mailHtml(text), modul: 'Lodní kontejnery' };
+    if (mf.user) { zprava.fromAddr = mf.user; zprava.fromName = mf.name || 'ELKOPLAST — kontejnery'; }
+    if (rezim === 'souhrn') zprava.souhrn = 'denni';
+    try { await host.deliver(zprava); }
     catch (e) { console.error('[kontejnery] e-mail neodeslán (' + to + '):', e.message); }
   }
   function logAct(type, who, detail) { try { if (host.logActivity) host.logActivity(type, who, detail); } catch (_) {} }
@@ -236,7 +243,8 @@ function mount(host) {
     if (prideleno) addRec(prideleno);
     (db.config.dohled || []).forEach(addRec);
     (db.config.notify || []).forEach(addRec);
-    for (const e of prijemci) await notify(e, 'Nová poptávka kontejneru #' + item.cislo + (prideleno ? ' — ' + prideleno.name : ''), text);
+    // Poptávek chodí několik denně — do souhrnu, ne jednotlivě (přání 2026-10-04).
+    for (const e of prijemci) await notify(e, 'Nová poptávka kontejneru #' + item.cislo + (prideleno ? ' — ' + prideleno.name : ''), text, 'souhrn');
     json(res, 200, { ok: true, cislo: item.cislo, prideleno: prideleno ? prideleno.name : null });
     return true;
   }
@@ -302,7 +310,7 @@ function mount(host) {
         + (it.email ? '• E-mail: ' + it.email + '\n' : '') + (it.telefon ? '• Telefon: ' + it.telefon + '\n' : '')
         + (it.typ ? '• Typ: ' + it.typ + '\n' : '') + (it.rezim ? '• Režim: ' + it.rezim + '\n' : '')
         + (it.zprava ? '• Zpráva: ' + it.zprava + '\n' : '')
-        + '\nZpracujte nabídku a aktualizujte stav v intranetu → Lodní kontejnery:\n' + link);
+        + '\nZpracujte nabídku a aktualizujte stav v intranetu → Lodní kontejnery:\n' + link, 'souhrn');
     }
     json(res, 200, { ok: true, item: it });
     return true;
@@ -665,7 +673,7 @@ function mount(host) {
           + (it.zprava ? '• Zpráva: ' + it.zprava + '\n' : '')
           + (it.obchodnik ? '\n→ Přiřazeno (na střídačku): ' + it.obchodnik.name + '\n' : '')
           + '\nDetail v intranetu → Poptávky.';
-        for (const e of prijemci) await notify(e, 'Nová poptávka kontejneru #' + it.cislo + (it.obchodnik ? ' — ' + it.obchodnik.name : ''), text);
+        for (const e of prijemci) await notify(e, 'Nová poptávka kontejneru #' + it.cislo + (it.obchodnik ? ' — ' + it.obchodnik.name : ''), text, 'souhrn');
       }
     }
     if (created.length) console.log('[kontejnery] import z tabulky: ' + created.length + ' nových poptávek' + (firstImport ? ' (první naplnění, bez e-mailů)' : ''));
@@ -707,7 +715,8 @@ function mount(host) {
       const text = 'Lodní kontejnery — týdenní report (' + period + ')\n\n'
         + 'ODESLANÉ NABÍDKY (7 dní): ' + odeslane.length + '\n' + (odeslane.map(t).join('\n') || '—') + '\n\n'
         + 'NEVYŘÍZENÉ POPTÁVKY: ' + nevyrizene.length + '\n' + (nevyrizene.map(t).join('\n') || '—');
-      for (const r of rep.to) await notify(r.email, 'Lodní kontejnery — týdenní report (odeslané ' + odeslane.length + ' · nevyřízené ' + nevyrizene.length + ')', text, html);
+      // (report se posílá hned, je týdenní; html se skládá v notify z textu)
+      for (const r of rep.to) await notify(r.email, 'Lodní kontejnery — týdenní report (odeslané ' + odeslane.length + ' · nevyřízené ' + nevyrizene.length + ')', text);
       rep.lastWeek = wk; rep.lastAt = now.toISOString(); save(db);
       console.log('[kontejnery] týdenní report ' + wk + ' → ' + rep.to.map(r => r.email).join(', '));
     } catch (e) { console.error('[kontejnery] report tick:', e.message); }

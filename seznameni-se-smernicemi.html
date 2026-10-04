@@ -5608,6 +5608,27 @@ async function rozesilkaSend(i){
     rozStatus('✓ Odesláno na '+to+'.'); renderRozesilky();
   }catch(e){ rozStatus('Chyba: '+e.message,true); }
 }
+async function souhrnNacti(){
+  const box=document.getElementById("souhrnBox"); if(!box)return;
+  try{
+    const j=await (await fetch("/api/admin/souhrn",{cache:"no-store"})).json();
+    if(!j.celkem){ box.innerHTML='<p class="muted" style="margin:0">Fronta je prázdná — momentálně nikomu nic nečeká.</p>'; return; }
+    box.innerHTML='<p style="margin:0 0 6px">Ve frontě čeká <b>'+j.celkem+'</b> '+(j.celkem===1?'položka':j.celkem<5?'položky':'položek')+
+      ' pro <b>'+j.lide.length+'</b> '+(j.lide.length===1?'člověka':'lidí')+'. Odejde ráno po '+j.hodina+'. hodině.</p>'+
+      '<table class="tbl" style="width:100%;font-size:12.5px"><tbody>'+
+      j.lide.map(l=>'<tr><td>'+esc(l.email)+(l.odeslanoDnes?' <span class="pill">dnes už odesláno</span>':'')+'</td>'+
+        '<td class="muted">'+esc(l.moduly.join(", "))+'</td><td class="num"><b>'+l.pocet+'</b></td></tr>').join("")+'</tbody></table>';
+  }catch(e){ box.innerHTML='<p class="muted" style="margin:0">Frontu se nepodařilo načíst.</p>'; }
+}
+async function souhrnOdeslat(){
+  if(!confirm("Rozeslat denní souhrny hned teď?"))return;
+  try{
+    const r=await fetch("/api/admin/souhrn",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+    const j=await r.json();
+    toast(j.odeslano?("Souhrn odeslán "+j.odeslano+" lidem"):"Nebylo co odeslat");
+    souhrnNacti();
+  }catch(e){ alert("Nepodařilo se odeslat."); }
+}
 async function renderRozesilky(){
   const box=document.getElementById("rozesilkyBox");
   box.innerHTML='<p class="muted">Načítám…</p>';
@@ -5619,6 +5640,12 @@ async function renderRozesilky(){
   const DNY=['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota'];
   let h='<div class="card pad" style="margin-bottom:14px"><b>'+reports.length+'</b> automatických reportů · <b style="color:#0a7d33">'+on+'</b> zapnuto · <b>'+(reports.length-on)+'</b> vypnuto'+
     '<div class="muted" style="font-size:12.5px;margin-top:6px">Vše se dá nastavit přímo tady: zapnout/vypnout přepínačem, upravit příjemce, den nebo hodinu odeslání — pak dej <b>Uložit</b>.</div></div>';
+  h+='<div class="card pad" style="margin-bottom:14px"><div class="spread"><strong>📬 Denní souhrn</strong>'+
+    '<button class="btn sm" onclick="souhrnOdeslat()">Odeslat souhrny teď</button></div>'+
+    '<p class="muted" style="margin:6px 0 0;font-size:12.5px">Drobná upozornění (nové poptávky kontejnerů, upomínky vozového parku, termíny smluv, eskalace pohledávek) '+
+    'nechodí jednotlivě — čekají ve frontě a ráno odejde každému <b>jeden</b> e-mail se vším. Urgentní věci (škoda na vozidle, propadlá technická, '+
+    'zprávy zákazníkům, hesla a pozvánky) jdou pořád hned.</p>'+
+    '<div id="souhrnBox" style="margin-top:10px"><p class="muted" style="margin:0">Načítám frontu…</p></div></div>';
   h+='<div class="card" style="overflow:auto"><table class="matrix" style="width:100%"><thead><tr>'+
     '<th style="text-align:center">Zapnuto</th><th>Report</th><th style="min-width:230px">Příjemci</th><th>Kdy</th><th>Naposledy</th><th>Akce</th></tr></thead><tbody>';
   reports.forEach((r,i)=>{
@@ -5664,6 +5691,7 @@ async function renderRozesilky(){
     h+='</tbody></table></div>';
   }
   box.innerHTML=h;
+  souhrnNacti();
 }
 async function renderActivity(){
   const box=document.getElementById("activityBox");

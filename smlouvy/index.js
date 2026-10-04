@@ -481,7 +481,11 @@ function mount(host) {
   // ---- cron tick ---------------------------------------------------
   async function tick() {
     // Hlídání termínů smluv lze zrušit v přehledu Rozesílky (maily se pak neposílají, kontrola běží dál).
-    const terminyDeliver = (host.reportDisabled && host.reportDisabled('smlouvy-terminy')) ? (async () => {}) : host.deliver;
+    // Upozornění na blížící se termíny nejsou urgentní → jdou do denního souhrnu intranetu
+    // (jeden e-mail ráno místo zprávy na každou smlouvu).
+    const terminyDeliver = (host.reportDisabled && host.reportDisabled('smlouvy-terminy'))
+      ? (async () => {})
+      : ((m) => host.deliver(Object.assign({}, m, { souhrn: 'denni', modul: 'Smlouvy' })));
     try { await engine.tick(M, { deliver: terminyDeliver, baseUrl: host.publicBaseUrl || '', eskalaceEmail: host.eskalaceEmail }); }
     catch (e) { console.error('[smlouvy] tick chyba:', e.message); }
     try { await driveSync(); }
