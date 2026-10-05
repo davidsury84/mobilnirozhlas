@@ -854,7 +854,8 @@ function mount(host) {
 
   // ---------- měsíční e-mail „Indikátory výkonnosti středisek“ ----------
   const CFG_F = path.join(dataDir, 'vykonnost-report.json'), RSTATE_F = path.join(dataDir, 'vykonnost-report-state.json');
-  const DEF_TO = ['david.sury@elkoplast.cz', 'tomas.krajca@elkoplast.cz'];
+  // vedení + výrobní ředitelé závodů (Chomutov, Bruntál Abroly, Supíkovice); příjemce jde měnit v adminu / Rozesílkách
+  const DEF_TO = ['david.sury@elkoplast.cz', 'tomas.krajca@elkoplast.cz', 'jiri.hejda@elkoplast.cz', 'ales.fleger@elkoplast.cz', 'jakub.sefcik@elkoplast.cz'];
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
   function loadCfg() { let c = {}; try { c = JSON.parse(fs.readFileSync(CFG_F, 'utf8')) || {}; } catch (_) {} return { to: Array.isArray(c.to) ? c.to : DEF_TO.slice(), enabled: c.enabled !== undefined ? !!c.enabled : true, hour: (c.hour >= 0 && c.hour <= 23) ? c.hour : 7 }; }
   const saveCfg = c => { try { fs.writeFileSync(CFG_F, JSON.stringify(c, null, 2)); } catch (e) { console.error('[vykonnost] zápis config:', e.message); } };
@@ -917,7 +918,10 @@ function mount(host) {
       const st = loadRState(); const cur = now.toISOString().slice(0, 7);
       if (st.lastMonth === cur) return;
       if (st.failMonth === cur && (st.failCount || 0) >= 3) return;
-      const r = await sendReport(cfg.to);
+      // report je za předchozí kalendářní měsíc, pokud z něj už jsou data (snímek z 29. 9. odeslaný 1. 10. = září, ne srpen)
+      const pm = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().slice(0, 7);
+      const maData = ZAVODY.some(z => { const D = loadData(z.key); return D && String(D.snapshot || '').slice(0, 7) >= pm; });
+      const r = await sendReport(cfg.to, maData ? pm : undefined);
       if (r.ok) { st.lastMonth = cur; st.lastAt = now.toISOString(); st.lastError = ''; delete st.failMonth; delete st.failCount; }
       else { st.failCount = (st.failMonth === cur ? (st.failCount || 0) : 0) + 1; st.failMonth = cur; st.lastError = r.error || 'odeslání selhalo'; }
       st.lastResult = r; try { fs.writeFileSync(RSTATE_F, JSON.stringify(st, null, 2)); } catch (_) {}
