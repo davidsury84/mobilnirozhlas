@@ -14,7 +14,7 @@ const { parseAll } = require('./xlsx');
 
 const ZAVODY = [
   { key: 'chomutov', name: 'Chomutov', kratce: 'CHO', folder: process.env.VYKON_FOLDER_CHOMUTOV || '1jhaouHBx-M8WPf0fcuG2JtzM9GP2IvNC', kmen: '40000000',
-    plan: { sheetId: process.env.VYKON_PLAN_CHOMUTOV || '1mh8Fhi39uClg0xXvKuWvEDqmFvF5-mWv_8IA1cStBQM', tabRe: /zak[aá]zky/i } },
+    plan: { sheetId: process.env.VYKON_PLAN_CHOMUTOV || '1mh8Fhi39uClg0xXvKuWvEDqmFvF5-mWv_8IA1cStBQM', tabRe: /zak[aá]zky/i, muldyRe: /kapa.*muld/i } },
   { key: 'abroly', name: 'Bruntál Abroly', kratce: 'ABR', folder: process.env.VYKON_FOLDER_ABROLY || '1xxO2ZI3k5kIOf1oD9JEpSsyrxNNZ7sDa', kmen: '20000020',
     plan: { sheetId: process.env.VYKON_PLAN_ABROLY || '1CWoHIcbSR7Z5V1PjKE2QslOZ60JrZUPUD_Hhuexizaw', tabRe: /^zak\.?\s*brunt/i } },
   { key: 'popelnice', name: 'Bruntál Popelnice', kratce: 'POP', folder: process.env.VYKON_FOLDER_POPELNICE || '1YkmqHrRh8lzQ02dfjhebULOvxUsg2cmx', kmen: '20000022',
@@ -61,7 +61,9 @@ function mount(host) {
   const json = (res, code, obj) => host.send(res, code, obj, { 'Cache-Control': 'no-store' });
   const loadState = () => { try { return JSON.parse(fs.readFileSync(STATE_F, 'utf8')) || {}; } catch (_) { return {}; } };
   const saveState = st => { try { fs.writeFileSync(STATE_F, JSON.stringify(st, null, 2)); } catch (_) {} };
-  const loadData = k => { try { return JSON.parse(fs.readFileSync(DATA_F(k), 'utf8')); } catch (_) { return null; } };
+  // data závodu se drží v paměti, dokud se soubor nezmění (každý dotaz je jinak parsoval znovu)
+  const _dc = {};
+  const loadData = k => { try { const f = DATA_F(k); const mt = fs.statSync(f).mtimeMs; if (_dc[k] && _dc[k].mt === mt) return _dc[k].d; const d = JSON.parse(fs.readFileSync(f, 'utf8')); _dc[k] = { mt, d }; return d; } catch (_) { return null; } };
   const loadPlan = k => { try { return JSON.parse(fs.readFileSync(PLAN_F(k), 'utf8')); } catch (_) { return null; } };
   const zavodOf = k => ZAVODY.find(z => z.key === k);
 
@@ -150,6 +152,7 @@ function mount(host) {
       const row = values[r] || []; let cvz = String(row[c.cvz] == null ? '' : row[c.cvz]).trim();
       if (!cvz) continue;
       if (cvzPrefixCol >= 0) { const pre = String(row[cvzPrefixCol] || '').trim(); if (/^\d{2}[A-Z]$/i.test(pre) && /^\d+[A-Z]?$/i.test(cvz)) cvz = pre.toUpperCase() + cvz.padStart(3, '0'); else if (!/^\d{2}[A-Z]/i.test(cvz)) continue; }
+      if (/^\d{2}[A-Z]$/i.test(cvz)) { const nx = String(row[c.cvz + 1] == null ? '' : row[c.cvz + 1]).trim().replace(/\.0$/, ''); if (/^\d{1,4}$/.test(nx)) cvz = cvz + nx.padStart(3, '0'); else continue; }   // Chomutov: „26C“ | „001“
       cvz = cvz.toUpperCase().replace(/[\s-]/g, '');
       const S = i => i >= 0 ? String(row[i] == null ? '' : row[i]).trim() : '';
       const ks = parseFloat(String(S(c.ks)).replace(',', '.'));
@@ -160,21 +163,40 @@ function mount(host) {
     const labels = H.map((h, i) => h || H0[i] || '');
     return { items, header: H, labels, faze: faze.map(f => f.n) };
   }
+  // List denního plánu muld: datum ve sloupci B, v dalších sloupcích „2x215, 1x216“ → [{ d, cvz, ks }]
+  function parseMuldyDny(values) {
+    const dny = [];
+    (values || []).forEach(row => { if (!row) return; let d = ''; for (let i = 0; i < Math.min(3, row.length) && !d; i++) d = parseAnyDate(row[i]); if (!d) return;
+      const txt = row.slice(2).filter(c => typeof c === 'string').join(', '); if (!txt) return; const re = /(\d{1,3})\s*[x×]\s*(?:\d{2})?\s*C?\s*(\d{2,4})(?!\d)/gi; let m;
+      while ((m = re.exec(txt))) { const ks = +m[1]; if (ks > 0 && ks < 100) dny.push({ d, cvz: d.slice(2, 4) + 'C' + m[2].padStart(3, '0'), ks }); } });
+    return { dny };
+  }
+  // Hotové muldy z plánu pro závod (do data snímku), ČVZ → nepočítat podruhé z Heliosu
+  let _mp = {};
+  function muldyPlan(zKey) {
+    if (_mp[zKey]) return _mp[zKey];
+    const P = loadPlan(zKey); const M = (P && P.muldy) || null; const dny = (M && M.dny) || [];
+    return (_mp[zKey] = { ma: !!M, tab: M ? M.tab : '', gid: M ? M.gid : null, sheetId: P ? P.sheetId : '', syncedAt: P ? P.syncedAt : '', dny, set: new Set(dny.map(x => x.cvz)), items: (P && P.items) || {} });
+  }
   async function syncPlan(z) {
     if (!host.sheetsGet || !z.plan || !z.plan.sheetId) return { ok: false, error: 'plán není nastaven' };
-    let tab = '', gid = null;
+    let tab = '', gid = null, tabsAll = [];
     try {
       const tabs = host.sheetsTabs ? await host.sheetsTabs(z.plan.sheetId) : (host.sheetsMeta ? (await host.sheetsMeta(z.plan.sheetId) || []).map(t => ({ title: t, gid: null })) : []);
       const hit = (tabs || []).find(t => z.plan.tabRe.test(String(t.title))) || (tabs || [])[0];
-      if (hit) { tab = hit.title; gid = hit.gid; }
+      if (hit) { tab = hit.title; gid = hit.gid; } tabsAll = tabs || [];
     } catch (e) { return { ok: false, error: 'listy: ' + e.message }; }
     const range = (tab ? "'" + tab.replace(/'/g, "''") + "'!" : '') + 'A1:AZ5000';
     const r = await host.sheetsGet(z.plan.sheetId, range);
     const p = parsePlanValues((r && r.values) || []);
     const n = Object.keys(p.items).length;
     if (!n) return { ok: false, error: 'list „' + tab + '": ' + (p.warn || 'žádné zakázky') };
-    fs.writeFileSync(PLAN_F(z.key), JSON.stringify({ zavod: z.key, sheetId: z.plan.sheetId, tab, gid, syncedAt: new Date().toISOString(), faze: p.faze, header: p.header, labels: p.labels, items: p.items }));
-    return { ok: true, tab, items: n };
+    // Chomutov: muldy svařované v závodě se neodvádějí v Heliosu — denní počty jsou v listu „kapa-plán Mulden“ („2x215, 1x216“ = ks × číslo zakázky)
+    let muldy = null;
+    if (z.plan.muldyRe) { try { const mt = (tabsAll || []).find(t => z.plan.muldyRe.test(String(t.title))); if (mt) { const rm = await host.sheetsGet(z.plan.sheetId, "'" + String(mt.title).replace(/'/g, "''") + "'!A1:Z1500", { raw: true }); muldy = Object.assign({ tab: mt.title, gid: mt.gid }, parseMuldyDny((rm && rm.values) || [])); } } catch (e) { muldy = { error: e.message, dny: [] }; console.warn('[vykonnost] ' + z.name + ' muldy:', e.message); } }
+    fs.writeFileSync(PLAN_F(z.key), JSON.stringify({ zavod: z.key, sheetId: z.plan.sheetId, tab, gid, syncedAt: new Date().toISOString(), faze: p.faze, header: p.header, labels: p.labels, items: p.items, muldy }));
+    _mp = {};
+    return { ok: true, tab, items: n, muldy: muldy ? (muldy.dny || []).reduce((s, x) => s + x.ks, 0) : undefined };
   }
   async function syncPlans() {
     const st = loadState(); st.plany = st.plany || {};
@@ -506,7 +528,7 @@ function mount(host) {
       { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé s odváděním', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' },
       { k: 'A5', label: 'Normohodiny jako % fondu', jedn: '%', smer: 'up', vzorec: 'Σ (čas normy × ks) u spárovaných operací ÷ fond pracovní doby lidí s odváděním', proc: 'Kolik fondu je kryto normovaným úkolem. Závisí na pokrytí normami (A6) — číst spolu.' },
       { k: 'A6', label: '% výrobních řádků s normou', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'výrobní řádky spárované s položkou v katalogu norem ÷ výrobní řádky', proc: 'Pokrytí normami. Co není spárované, nemá cenu ani čas — buď chybí norma, nebo jen ruční přiřazení v záložce Normy.' },
-      { k: 'A7', klic: true, label: 'Hotových výrobků za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v operaci lakování (poslední operace řetězce; u Popelnice „Lakování“ beden) ÷ pracovní dny měsíce', proc: 'Skutečný výstup závodu proti cíli (výchozí 6 kontejnerů/den; správce může změnit). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' },
+      { k: 'A7', klic: true, label: 'Hotových výrobků za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v operaci lakování (poslední operace řetězce; u Popelnice „Lakování“ beden; u Chomutova navíc muldy z listu „kapa-plán Mulden“, které se v Heliosu neodvádějí) ÷ pracovní dny měsíce', proc: 'Skutečný výstup závodu proti cíli (výchozí 6 kontejnerů/den; správce může změnit). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' },
       { k: 'A8', klic: true, label: 'Hlavních operací za pracovní den', jedn: 'op.', smer: 'up', cil: true, vzorec: 'kusy odvedené v 10 hlavních fázích kontejneru (natahování, trámec rolen, podlaha, 2× bočnice, 2× vrata, skládání, dovařování, osazení vrat, odkuličkování, lakování) ÷ pracovní dny měsíce', proc: 'Jeden kontejner = 12 hlavních operací, cíl 6 kontejnerů denně = 72 operací denně. Říká, jestli se odvádí tolik práce, kolik je na cílový výstup potřeba — dřív, než se to projeví na hotových kusech (A7). Zelená = cíl splněn, žlutá = nad 80 % cíle. Časy a počty fází se berou ze záložky Plán 6 ABR/den.' },
       { k: 'A9', label: 'Hlavních operací na hotový kontejner', jedn: 'op.', smer: 'watch', cil: true, pasmo: [10, 25], vzorec: 'kusy odvedené v 10 hlavních fázích ÷ kusy v operaci lakování ABR', proc: 'Má vyjít 12. Méně = část práce na kontejneru se neodvádí (nebo končí v režii). Více = rozpracovanost roste, vyrábí se dílce, které se nedolakují. Zelená = do 10 % od 12, žlutá = do 25 %.' },
       { k: 'A10', label: 'Odvedená práce v hlavních operacích — osobosměn za den', jedn: 'os.', smer: 'up', cil: true, vzorec: 'Σ (kusy fáze × čas fáze z plánu) ÷ délka směny ÷ pracovní dny měsíce', proc: 'Totéž co A8, ale vážené časem: dovařování (450 min) váží víc než natahování (60 min). Cíl = kolik lidí plně v úkolu je potřeba na cílový výstup (6 kontejnerů × 1 850 min ÷ 440 min = 25,2 osobosměny denně). Počet lidí na operaci počet kusů nemění — dva lidé na jednom dovaření si v Heliosu kus dělí (0,5 + 0,5).' }
@@ -549,7 +571,9 @@ function mount(host) {
   function indikatoryMesice(rows, ym, rokRows, zavodKey) {
     const pd = pracDnyMesice(ym); const rez = rows.filter(r => isRezie(r[R.dil])), prod = rows.filter(r => !isRezie(r[R.dil]));
     let nMin = 0, nRows = 0; if (normIndex().items.length) prod.forEach(r => { const n = matchNorma(zavodKey, r[R.op], r[R.dil], r[R.cop]); if (n) { nMin += (n.min || 0) * r[R.ks]; nRows++; } });
-    const FZ = FAZE_VYSTUPU[zavodKey] || FAZE_VYSTUPU.default; const lakKs = prod.filter(r => FZ.lak(r[R.op])).reduce((s, r) => s + r[R.ks], 0);
+    const FZ = FAZE_VYSTUPU[zavodKey] || FAZE_VYSTUPU.default; const MP = muldyPlan(zavodKey); const snapM = (loadData(zavodKey) || {}).snapshot || '9999';
+    const muldyKs = MP.dny.filter(x => x.d.startsWith(ym) && x.d <= snapM).reduce((s, x) => s + x.ks, 0);
+    const lakKs = prod.filter(r => FZ.lak(r[R.op]) && !MP.set.has(r[R.cvz])).reduce((s, r) => s + r[R.ks], 0) + muldyKs;
     const rezH = rez.reduce((s, r) => s + r[R.ks], 0), ks = prod.reduce((s, r) => s + r[R.ks], 0);
     // hlavní operace kontejneru (fáze plánu 6 ABR/den) — jen závody s cílem v kontejnerech
     let opKs = null, opMin = null, lakAbr = 0; const P6 = loadPlan6();
@@ -564,7 +588,7 @@ function mount(host) {
     const p = (a, b) => b ? Math.round(a / b * 100) : 0, r1 = x => Math.round(x * 10) / 10;
     return { m: ym, rows: rows.length, ks: Math.round(ks), rezH: Math.round(rezH), pracDny: pd,
       A1: p(rezH, fond), A2: ks ? Math.round(rezH / ks * 1000) : 0, A3: prod.length ? Math.round(rezH / prod.length * 100) / 100 : 0, A4: lide.size ? Math.round(ks / lide.size) : 0,
-      A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null, A7: pd ? Math.round(lakKs / pd * 10) / 10 : null,
+      A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null, A7: pd ? Math.round(lakKs / pd * 10) / 10 : null, muldyPlan: muldyKs || undefined,
       A8: opKs != null && pd ? Math.round(opKs / pd * 10) / 10 : null, A9: opKs != null && lakAbr > 0 ? Math.round(opKs / lakAbr * 10) / 10 : null, opKs: opKs != null ? Math.round(opKs) : null,
       A10: opMin != null && pd ? Math.round(opMin / P6.smenaMin / pd * 10) / 10 : null, opMin: opMin != null ? Math.round(opMin) : null,
       B1: p(rezProd, rezH), B2: p(rezOst, rezH), B3: ks ? r1(rekH / ks * 1000) : 0, B4: p(zaH, rezH),
@@ -581,7 +605,7 @@ function mount(host) {
     out.forEach((M, i) => {
       M.cil = cilZ; M.cile = cileZ(cilZ);
       M.neuplny = M.m === snapM && !/-(2[89]|3[01])$/.test(D.snapshot);
-      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && (FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default).lak(r[R.op])).reduce((s, r) => s + r[R.ks], 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; if (M.opKs != null) { M.A8 = Math.round(M.opKs / pdSoFar * 10) / 10; M.A10 = Math.round(M.opMin / loadPlan6().smenaMin / pdSoFar * 10) / 10; } }
+      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const MPz = muldyPlan(z.key); const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && (FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default).lak(r[R.op]) && !MPz.set.has(r[R.cvz])).reduce((s, r) => s + r[R.ks], 0) + (M.muldyPlan || 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; if (M.opKs != null) { M.A8 = Math.round(M.opKs / pdSoFar * 10) / 10; M.A10 = Math.round(M.opMin / loadPlan6().smenaMin / pdSoFar * 10) / 10; } }
       M.sem = {}; M.trend = {}; M.med = {};
       LEG_FLAT.forEach(def => {
         M.sem[def.k] = semafor(def, M[def.k], M);
@@ -700,15 +724,18 @@ function mount(host) {
     const F = FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default; const cil = loadCile()[z.key];
     const all = D.rows.filter(r => r[R.date] <= D.snapshot); const snap = D.snapshot;
     const usekOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen|odkulič|odkulic/.test(o)) return 'lak'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl[ií]rna|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|stříh|strih|loch|obrobna|soustruh/.test(o)) return 'del'; return 'svar'; };
-    const W = {};
+    const W = {}; const MP = muldyPlan(z.key);
     all.forEach(r => { const w = W[r[R.week]] = W[r[R.week]] || { week: r[R.week], skl: 0, dov: 0, lak: 0, lide: new Set(), svar: new Set(), rezieH: 0, rezieSvar: 0, normH: 0, normSvar: 0, rows: 0, dny: new Set(), rework: 0 };
       w.rows++; w.lide.add(r[R.id] || r[R.name]); w.dny.add(r[R.date]);
       if (isRezie(r[R.dil])) { w.rezieH += r[R.ks]; if (RE_REKL.test(r[R.op])) w.rework += r[R.ks]; if (usekOf(r[R.pozn] + ' ' + r[R.op]) === 'svar' && !/lak|trysk/.test(String(r[R.pozn]).toLowerCase())) w.rezieSvar += r[R.ks]; return; }
-      const op = r[R.op]; if (F.skl(op)) w.skl += r[R.ks]; if (F.dov(op)) w.dov += r[R.ks]; if (F.lak(op)) w.lak += r[R.ks];
+      const op = r[R.op]; const zPlanu = MP.set.has(r[R.cvz]); if (F.skl(op)) w.skl += r[R.ks]; if (F.dov(op) && !zPlanu) w.dov += r[R.ks]; if (F.lak(op) && !zPlanu) w.lak += r[R.ks];
       const u = usekOf(op); if (u === 'svar') { w.svar.add(r[R.id] || r[R.name]); w.svarRows = (w.svarRows || 0) + 1; }
       if (normIndex().items.length) { const n = matchNorma(z.key, op, r[R.dil], r[R.cop]); if (n) { const mn = (n.min || 0) * r[R.ks] / 60; w.normH += mn; if (u === 'svar') { w.normSvar += mn; w.svarMatched = (w.svarMatched || 0) + 1; } } } });
+    // muldy z plánu (svařené v závodě, v Heliosu neodváděné) → hotové i svařovna hotovo v den z plánu
+    const mHot = MP.dny.filter(x => x.d <= snap), mPlan = MP.dny.filter(x => x.d > snap);
+    mHot.forEach(x => { const w = W[isoWeekOf(x.d)]; if (!w) return; w.lak += x.ks; w.dov += x.ks; w.muldy = (w.muldy || 0) + x.ks; });
     const weeks = Object.values(W).sort((a, b) => a.week.localeCompare(b.week)).map(w => { const pd = w.week === isoWeekOf(snap) ? Math.max(1, [...w.dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length) : 5;
-      return { week: w.week, od: pracDnyTydne(w.week).od, rows: w.rows, svarRows: w.svarRows || 0, svarMatched: w.svarMatched || 0, skl: Math.round(w.skl), dov: Math.round(w.dov), lak: Math.round(w.lak), lide: w.lide.size, svar: w.svar.size, rezieH: Math.round(w.rezieH), rezieSvar: Math.round(w.rezieSvar), rework: Math.round(w.rework), normH: Math.round(w.normH), normSvar: Math.round(w.normSvar), pd, lakDen: Math.round(w.lak / pd * 10) / 10, dovDen: Math.round(w.dov / pd * 10) / 10, neuplny: w.week === isoWeekOf(snap) }; });
+      return { week: w.week, muldy: w.muldy || 0, od: pracDnyTydne(w.week).od, rows: w.rows, svarRows: w.svarRows || 0, svarMatched: w.svarMatched || 0, skl: Math.round(w.skl), dov: Math.round(w.dov), lak: Math.round(w.lak), lide: w.lide.size, svar: w.svar.size, rezieH: Math.round(w.rezieH), rezieSvar: Math.round(w.rezieSvar), rework: Math.round(w.rework), normH: Math.round(w.normH), normSvar: Math.round(w.normSvar), pd, lakDen: Math.round(w.lak / pd * 10) / 10, dovDen: Math.round(w.dov / pd * 10) / 10, neuplny: w.week === isoWeekOf(snap) }; });
     // odstávka (celozávodní dovolená, svátky) = týden s méně než polovinou obvyklého počtu lidí → do průměrů nepočítat
     const lideSorted = weeks.filter(w => !w.neuplny).map(w => w.lide).sort((a, b) => a - b); const medLide = lideSorted.length ? lideSorted[Math.floor(lideSorted.length / 2)] : 0;
     weeks.forEach(w => { w.odstavka = !w.neuplny && w.lide < medLide * 0.5; });
@@ -747,7 +774,12 @@ function mount(host) {
       if (nsPerKs > 0 && svarAvg > 0 && kpi.pokrytiSvar >= 50) { const fondDen = svarAvg * 8; const rezDen = avg(rok, 'rezieSvar') / 5; const kapacita = (fondDen - rezDen) / nsPerKs; const kapacitaBezRezie = fondDen / nsPerKs;
         kpi.kapacita = { normSvarNaKs: Math.round(nsPerKs * 10) / 10, svarLide: Math.round(svarAvg * 10) / 10, fondDen: Math.round(fondDen), rezieDen: Math.round(rezDen * 10) / 10, kusuDen: Math.round(kapacita * 10) / 10, kusuDenBezRezie: Math.round(kapacitaBezRezie * 10) / 10, potrebaLidi: Math.round(cil * nsPerKs / 8 * 10) / 10 }; }
     }
-    return { zavod: z.key, name: z.name, snapshot: snap, cil, weeks, kpi, hrdlo: hrdlo ? hrdlo.n : '', proc, faze: z.key === 'popelnice' ? { skl: 'sestavení vany', dov: 'dovaření vany', lak: 'lakování' } : { skl: 'skládání ABR/CITY', dov: 'dovaření', lak: 'lakování' } };
+    let muldy = null;
+    if (MP.ma) { const byC = {}; MP.dny.forEach(x => { const o = byC[x.cvz] = byC[x.cvz] || { cvz: x.cvz, hotovo: 0, plan: 0, od: x.d, do: x.d }; if (x.d <= snap) o.hotovo += x.ks; else o.plan += x.ks; if (x.d < o.od) o.od = x.d; if (x.d > o.do) o.do = x.d; });
+      const od4 = new Date(snap + 'T00:00:00Z'); od4.setUTCDate(od4.getUTCDate() - 27); const o4 = od4.toISOString().slice(0, 10);
+      muldy = { tab: MP.tab, url: MP.sheetId ? 'https://docs.google.com/spreadsheets/d/' + MP.sheetId + '/edit' + (MP.gid != null ? '#gid=' + MP.gid : '') : '', syncedAt: MP.syncedAt, hotovo: mHot.reduce((s, x) => s + x.ks, 0), hotovo4: mHot.filter(x => x.d >= o4).reduce((s, x) => s + x.ks, 0), plan: mPlan.reduce((s, x) => s + x.ks, 0),
+        cvz: Object.values(byC).sort((a, b) => a.od.localeCompare(b.od) || a.cvz.localeCompare(b.cvz)).map(o => { const it = MP.items[o.cvz] || {}; return Object.assign(o, { vyrobek: it.vyrobek || '', objednano: it.ks != null ? it.ks : null, zakaznik: it.zakaznik || '' }); }) }; }
+    return { zavod: z.key, name: z.name, snapshot: snap, cil, weeks, kpi, muldy, hrdlo: hrdlo ? hrdlo.n : '', proc, faze: z.key === 'popelnice' ? { skl: 'sestavení vany', dov: 'dovaření vany', lak: 'lakování' } : { skl: 'skládání ABR/CITY', dov: 'dovaření', lak: 'lakování' } };
   }
 
   // ---------- operační plán: kolik operací musí být odvedeno pro N hotových ABR (standard DSD/AFS) ----------
@@ -1015,7 +1047,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, profese, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, profese, parseMuldyDny, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };

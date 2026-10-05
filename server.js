@@ -2990,10 +2990,11 @@ async function sheetsGetToken(scope) {
   const tok = await httpsPostForm('oauth2.googleapis.com', '/token', { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: header + '.' + claim + '.' + sig });
   return tok.access_token;
 }
-async function sheetsGet(spreadsheetId, range) {
+async function sheetsGet(spreadsheetId, range, opts) {
   if (!GOOGLE_SA_CLIENT_EMAIL || !GOOGLE_SA_PRIVATE_KEY) throw new Error('Service account (GOOGLE_SA_*) není nastaven.');
   const token = await sheetsGetToken();
-  const apiPath = '/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '/values/' + encodeURIComponent(range);
+  // opts.raw = neformátované hodnoty (data jako pořadová čísla dne) — pro listy, kde je datum zobrazené bez roku
+  const apiPath = '/v4/spreadsheets/' + encodeURIComponent(spreadsheetId) + '/values/' + encodeURIComponent(range) + (opts && opts.raw ? '?valueRenderOption=UNFORMATTED_VALUE' : '');
   return await new Promise((resolve, reject) => {
     const r = https.request({ method: 'GET', hostname: 'sheets.googleapis.com', path: apiPath, headers: { 'Authorization': 'Bearer ' + token } }, resp => {
       resp.setEncoding('utf8'); let d = ''; resp.on('data', c => d += c); resp.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_) {} if (resp.statusCode >= 200 && resp.statusCode < 300) return resolve(j || {}); reject(new Error('Sheets ' + resp.statusCode + ': ' + d.slice(0, 200))); });
