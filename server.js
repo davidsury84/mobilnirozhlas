@@ -906,6 +906,74 @@ async function souhrnRozeslat(vynutit) {
   return odeslano;
 }
 
+/* ---------- rozesílky napojených aplikací (mimo intranet) ----------
+   Aplikace mají vlastní plánovač i poštu. Intranet je v záložce Rozesílky jen
+   zobrazuje a umí u nich změnit příjemce / vypnout je. Kontrakt je u všech stejný:
+   GET  /api/rozesilky            → { app, url, reports: [{key,name,to[],enabled,schedule,lastAt,configHint}] }
+   POST /api/rozesilky {key,to,enabled} → { ok, report }
+   Autorizace: hlavička Authorization: Bearer <SSO_SHARED_SECRET>. */
+const APLIKACE_ROZESILKY = [
+  // Hlídač sortimentu je ve stejném Railway projektu — sdílí rovnou SSO_SHARED_SECRET.
+  { id: 'sortiment', nazev: 'Hlídač sortimentu', url: () => (process.env.RANGES_WATCHDOG_URL || '').replace(/\/$/, ''), token: () => SSO_SHARED_SECRET },
+  // Web mobilních lisů běží v jiném Railway projektu, proto má vlastní tajemství.
+  { id: 'lisy', nazev: 'Web mobilních lisů a Bramidanu', url: () => (process.env.CMS_APP_URL || process.env.LISY_WEB_URL || '').replace(/\/$/, ''),
+    token: () => process.env.CMS_ROZESILKY_SECRET || SSO_SHARED_SECRET },
+];
+function aplikaceById(id) { return APLIKACE_ROZESILKY.find(a => a.id === id) || null; }
+function httpJson(adresa, { method = 'GET', telo = null, timeout = 6000, token = '' } = {}) {
+  return new Promise((resolve, reject) => {
+    let u; try { u = new URL(adresa); } catch (e) { return reject(e); }
+    const data = telo ? Buffer.from(JSON.stringify(telo)) : null;
+    const r = (u.protocol === 'http:' ? http : https).request({
+      method, hostname: u.hostname, port: u.port || (u.protocol === 'http:' ? 80 : 443), path: u.pathname + u.search,
+      headers: Object.assign({ 'Authorization': 'Bearer ' + (token || SSO_SHARED_SECRET) },
+        data ? { 'Content-Type': 'application/json', 'Content-Length': data.length } : {}),
+      timeout,
+    }, (resp) => {
+      let b = ''; resp.on('data', c => b += c);
+      resp.on('end', () => { try { resolve({ status: resp.statusCode, data: JSON.parse(b || '{}') }); } catch (e) { resolve({ status: resp.statusCode, data: {} }); } });
+    });
+    r.on('timeout', () => { r.destroy(new Error('aplikace neodpověděla do ' + Math.round(timeout / 1000) + ' s')); });
+    r.on('error', (e) => reject(new Error(e.message || e.code || String(e))));
+    if (data) r.write(data);
+    r.end();
+  });
+}
+// Posbírá rozesílky ze všech napojených aplikací. Nedostupná aplikace přehled nerozbije —
+// ukáže se jako řádek s poznámkou, že se nepodařilo spojit.
+async function rozesilkyAplikaci() {
+  const out = [];
+  for (const a of APLIKACE_ROZESILKY) {
+    const base = a.url();
+    if (!base) continue;
+    try {
+      const r = await httpJson(base + '/api/rozesilky', { token: a.token ? a.token() : '' });
+      if (r.status !== 200 || !Array.isArray(r.data.reports)) {
+        out.push({ key: a.id + ':_chyba', module: a.nazev, name: 'Rozesílky se nepodařilo načíst', to: [], enabled: false,
+          schedule: '—', lastAt: null, readOnly: true, externi: true, appUrl: base,
+          configHint: 'Aplikace odpověděla ' + r.status + '. Zkontroluj, že má nastavené INTRANET_SSO_SECRET shodné s intranetem.' });
+        continue;
+      }
+      (r.data.reports || []).forEach(x => out.push(Object.assign({}, x, {
+        key: a.id + ':' + x.key, module: a.nazev, externi: true, appUrl: r.data.url || base, readOnly: false,
+      })));
+    } catch (e) {
+      out.push({ key: a.id + ':_chyba', module: a.nazev, name: 'Aplikace neodpovídá', to: [], enabled: false,
+        schedule: '—', lastAt: null, readOnly: true, externi: true, appUrl: base,
+        configHint: 'Spojení selhalo: ' + e.message });
+    }
+  }
+  return out;
+}
+async function rozesilkaAplikaceUloz(key, zmena) {
+  const i = key.indexOf(':'); if (i < 0) return null;
+  const a = aplikaceById(key.slice(0, i)); if (!a) return null;
+  const base = a.url(); if (!base) return null;
+  const r = await httpJson(base + '/api/rozesilky', { method: 'POST', token: a.token ? a.token() : '', telo: Object.assign({ key: key.slice(i + 1) }, zmena) });
+  if (r.status !== 200 || !r.data.report) throw new Error((r.data && r.data.chyba) || ('Aplikace odpověděla ' + r.status));
+  return Object.assign({}, r.data.report, { key, module: a.nazev, externi: true, appUrl: base });
+}
+
 function deliver(mail) {
   // Zpráva do denního souhrnu se neodesílá hned — zařadí se do fronty a ráno odejde
   // jedním e-mailem se vším ostatním. Platí jen pro interní adresáty.
@@ -4428,9 +4496,12 @@ const server = http.createServer(async (req, res) => {
           configHint: 'kdo v měsíci čerpal dovolenou, co je schválené dopředu a jaké má kdo konto' });
       } catch (_) {}
       for (const m of mods) { if (m && typeof m.reports === 'function') { try { const rs = m.reports() || []; rs.forEach(r => out.push(r)); } catch (_) {} } }
+      // Aplikace mimo intranet (hlídač sortimentu, web mobilních lisů) — hlásí své rozesílky samy.
+      try { (await rozesilkyAplikaci()).forEach(r => out.push(r)); } catch (_) {}
       // Centrální vypínač: zrušené rozesílky jsou vypnuté bez ohledu na nastavení modulu.
       const off = rozesilkyOff();
-      out.forEach(r => { r.vypnutoCentralne = !!off[r.key]; if (r.vypnutoCentralne) r.enabled = false; });
+      // U aplikací mimo intranet rozhoduje sama aplikace — centrální vypínač by jen lhal.
+      out.forEach(r => { if (r.externi) return; r.vypnutoCentralne = !!off[r.key]; if (r.vypnutoCentralne) r.enabled = false; });
       // Historie VŠECH odeslaných e-mailů (i jednorázových notifikací) — centrální evidence z deliver().
       return send(res, 200, { reports: out, maily: mailLogRead(200) });
     }
@@ -4440,6 +4511,22 @@ const server = http.createServer(async (req, res) => {
       let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
       const key = String(b.key || '').trim();
       if (!key) return send(res, 400, { error: 'Chybí klíč rozesílky.' });
+      // Rozesílka napojené aplikace (klíč „aplikace:rozesilka") — změnu provede ta aplikace.
+      if (aplikaceById(key.split(':')[0])) {
+        try {
+          const zmena = {};
+          // Formulář posílá příjemce jako text oddělený čárkami, API může poslat i pole.
+          if (b.to != null) {
+            const seznam = Array.isArray(b.to) ? b.to : String(b.to).split(/[,;]/);
+            zmena.to = seznam.map(x => String(x || '').trim().toLowerCase()).filter(x => x.indexOf('@') > 0);
+          }
+          if (b.enabled != null) zmena.enabled = !!b.enabled;
+          const rep = await rozesilkaAplikaceUloz(key, zmena);
+          if (!rep) return send(res, 400, { error: 'Aplikace není nastavená (chybí adresa).' });
+          logActivity('rozesilky', empSession(req) || { email: 'správce' }, 'Změna rozesílky ' + key + (zmena.to ? ' → ' + zmena.to.join(', ') : ''));
+          return send(res, 200, { ok: true, report: rep });
+        } catch (e) { return send(res, 502, { error: 'Aplikace změnu nepřijala: ' + e.message }); }
+      }
       // Měsíční přehled dovolené je v jádru — obsloužíme ho tady.
       if (key === 'dovolena-mesicni') {
         const patch = {};
