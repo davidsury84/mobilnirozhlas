@@ -842,6 +842,7 @@ function tabVozidla(){
     +'<label style="width:auto">Vozidlo</label><input id="vozTyp" '+(ADMIN?'':'disabled')+' placeholder="např. Scania R450 · Tautliner" style="flex:1;min-width:0">'
     +'<label style="width:auto">Fix Kč/měs</label><input id="vozFix" '+(ADMIN?'':'disabled')+' style="width:110px" inputmode="numeric">'
     +(ADMIN?'<button class="btn sm" id="vozSave" style="padding:7px 14px">Uložit</button>':'')+'</div>'
+    +'<div id="vozStavBox" style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"></div>'
     +'<p class="muted" id="vozEvid" style="margin:0 0 10px;font-size:12px"></p>'
     +cv('chVoz',240)+'<div id="vozTab" style="margin-top:12px"></div>'
     +'<div id="vozEkonBox" style="display:none"><h2 style="font-size:15px;margin:18px 0 8px">Účetní skutečnost <span class="muted" id="vozEkonInfo"></span></h2>'
@@ -860,7 +861,7 @@ function tabVozidla(){
       +(m.VAR!=null?'<td class="'+(v.prispevek<0?'neg':'')+'">'+sgn(v.prispevek,kc)+'</td>':'')
       +(m.FIXV!=null?'<td class="'+(v.vysledek<0?'neg':'pos')+'">'+sgn(v.vysledek,kc)+'</td>':'')
       +(maEkon?(()=>{const e=ekonVozu(nSpz(v.spz)); return '<td class="'+(e&&e.souhrny.hv&&e.souhrny.hv.celkem<0?'neg':'pos')+'">'+(e&&e.souhrny.hv?sgn(e.souhrny.hv.celkem,kc):'—')+'</td>';})():'')
-      +'<td>'+(v.pausal?'<span class="pill sed">paušál</span>':(v.km===0?'<span class="pill cerv">stojí</span>':''))+'</td></tr>').join('')
+      +'<td>'+[stavPill((INFO[v.cislo]||{}).stav),(v.pausal?'<span class="pill sed">paušál</span>':(v.km===0?'<span class="pill cerv">stojí</span>':''))].filter(Boolean).join(' ')+'</td></tr>').join('')
     +'</tbody></table>'
     +'<p class="muted" style="font-size:12px">Fix/měs: <span class="pill zel">Ú</span> = dle účetnictví (odpisy + režie + pojistky + silniční daň — leasing účetně neběží), <span class="pill zlut">L</span> = běžící leasing dle evidence (plný fix'+(m.FIXV!=null?' '+tis(m.FIXV):'')+'), <span class="pill sed">R</span> = ručně upraveno, bez štítku = model.'+(ADMIN?' Řidiče, typ i fix upravíš v detailu vozu výše.':'')+'</p>';
   $('#app').innerHTML=h;
@@ -873,18 +874,23 @@ function tabVozidla(){
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{title:c=>vozLbl(ef[c[0].dataIndex].cislo),label:c=>d2(c.parsed.x)+' Kč/km'}}},
       scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' Kč'}},y:{...AXC,grid:{display:false}}}}});
   $('#selVoz').onchange=e=>vozDetail(e.target.value);
-  if(ADMIN) $('#vozSave').onclick=async()=>{
-    const cislo=$('#selVoz').value, ridic=$('#vozRidic').value, typ=$('#vozTyp').value, fixMes=$('#vozFix').value.trim();
-    const b=$('#vozSave'); b.disabled=true; b.textContent='Ukládám…';
-    try{
-      const r=await fetch('/api/doprava/vozidlo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cislo,ridic,typ,fixMes})});
-      const j=await r.json(); if(!r.ok) throw new Error(j.chyba||r.status);
-      INFO=j.info||INFO; M=spočítej(); tabVozidla(); ukazVoz(cislo);
-    }catch(e){ alert('Uložení selhalo: '+e.message); b.disabled=false; b.textContent='Uložit'; }
-  };
+  if(ADMIN) $('#vozSave').onclick=()=>ulozVoz();
   vozDetail(akt[0]?akt[0].cislo:m.voz[0].cislo);
 }
 function ukazVoz(c){ const s=$('#selVoz'); if(s){s.value=c; vozDetail(c); s.scrollIntoView({behavior:'smooth',block:'center'});} }
+// Uložení řidiče/typu/fixu (+ stav vozu). stav===undefined → zachovat stávající; jinak nastavit ('', 'prodej', 'likvidace').
+async function ulozVoz(stav){
+  const cislo=$('#selVoz').value, ridic=$('#vozRidic').value, typ=$('#vozTyp').value, fixMes=$('#vozFix').value.trim();
+  const novyStav = stav===undefined ? ((INFO[cislo]||{}).stav||'') : stav;
+  const b=$('#vozSave'); if(b){b.disabled=true;b.textContent='Ukládám…';}
+  try{
+    const r=await fetch('/api/doprava/vozidlo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cislo,ridic,typ,fixMes,stav:novyStav})});
+    const j=await r.json(); if(!r.ok) throw new Error(j.chyba||r.status);
+    INFO=j.info||INFO; M=spočítej(); tabVozidla(); ukazVoz(cislo);
+  }catch(e){ alert('Uložení selhalo: '+e.message); if(b){b.disabled=false;b.textContent='Uložit';} }
+}
+const STAV_LBL={prodej:'Plánovaný prodej',likvidace:'Vyřazeno z provozu — ekologická likvidace'};
+const stavPill=s=>s==='prodej'?'<span class="pill zlut">plánovaný prodej</span>':(s==='likvidace'?'<span class="pill cerv">vyřazeno — ekol. likvidace</span>':'');
 function vozDetail(cislo){
   const m=M, v=m.voz.find(x=>x.cislo===cislo); if(!v) return;
   const sel=$('#selVoz'); if(sel&&sel.value!==cislo) sel.value=cislo;
@@ -899,6 +905,26 @@ function vozDetail(cislo){
   else et = m.evidenceOk? 'V evidenci vozů nenalezeno — počítá se plný fix.' : '';
   $('#vozEvid').textContent=et;
   const sv=$('#vozSave'); if(sv){ sv.disabled=false; sv.textContent='Uložit'; }
+  const sb=$('#vozStavBox');
+  if(sb){
+    const inf=INFO[cislo]||{}, st=inf.stav||'';
+    let s='';
+    if(st){ s+='<span>Stav: '+stavPill(st)+'</span>';
+      if(inf.stavOd) s+='<span class="muted" style="font-size:12px">od '+new Date(inf.stavOd).toLocaleDateString('cs-CZ')+(inf.stavKdo?' · '+esc(inf.stavKdo):'')+'</span>'; }
+    else s+='<span class="muted">Stav: v provozu</span>';
+    if(ADMIN){
+      s+='<span style="flex-basis:100%;height:0"></span>';
+      s+='<button class="btn sm sec" type="button" id="stavProdej">'+(st==='prodej'?'✓ ':'')+'Plánovaný prodej</button>';
+      s+='<button class="btn sm sec" type="button" id="stavLikv">'+(st==='likvidace'?'✓ ':'')+'Vyřadit z provozu (ekol. likvidace)</button>';
+      if(st) s+='<button class="btn sm sec" type="button" id="stavProvoz">Vrátit do provozu</button>';
+    }
+    sb.innerHTML=s;
+    if(ADMIN){
+      const sp=$('#stavProdej'); if(sp) sp.onclick=()=>{ if(st==='prodej'){ulozVoz('');} else if(confirm('Označit vůz '+cislo+' jako plánovaný prodej?')) ulozVoz('prodej'); };
+      const sl=$('#stavLikv'); if(sl) sl.onclick=()=>{ if(st==='likvidace'){ulozVoz('');} else if(confirm('Vyřadit vůz '+cislo+' z provozu (ekologická likvidace)?')) ulozVoz('likvidace'); };
+      const spr=$('#stavProvoz'); if(spr) spr.onclick=()=>ulozVoz('');
+    }
+  }
   const nakl=m.mesice.map(x=>{const d=v.mesice[x]||{km:0,trzby:0}; return (v.fix!=null&&m.VAR!=null)? v.fix+m.VAR*d.km : null;});
   chart('chVoz',{data:{labels:m.mesice.map(mesLbl),datasets:[
     {type:'bar',data:m.mesice.map(x=>(v.mesice[x]||{}).trzby||0),backgroundColor:B,borderRadius:4,maxBarThickness:38},

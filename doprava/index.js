@@ -607,8 +607,17 @@ function mount(host) {
       if (!cislo) { json(res, 400, { chyba: 'Chybí číslo vozu.' }); return true; }
       const info = readInfo();
       const fixMes = parseNum(String(b.fixMes == null ? '' : b.fixMes));
-      info[cislo] = { ridic: String(b.ridic || '').trim().slice(0, 60), typ: String(b.typ || '').trim().slice(0, 60), fixMes: fixMes != null && fixMes >= 0 ? fixMes : null };
-      if (!info[cislo].ridic && !info[cislo].typ && info[cislo].fixMes == null) delete info[cislo];
+      const stav = ['prodej', 'likvidace'].includes(String(b.stav || '')) ? String(b.stav) : '';
+      const predchozi = info[cislo] || {};
+      info[cislo] = {
+        ridic: String(b.ridic || '').trim().slice(0, 60),
+        typ: String(b.typ || '').trim().slice(0, 60),
+        fixMes: fixMes != null && fixMes >= 0 ? fixMes : null,
+        stav,
+        stavOd: stav ? (predchozi.stav === stav && predchozi.stavOd ? predchozi.stavOd : Date.now()) : null,
+        stavKdo: stav ? ((host.empSession(req) || {}).email || '') : '',
+      };
+      if (!info[cislo].ridic && !info[cislo].typ && info[cislo].fixMes == null && !info[cislo].stav) delete info[cislo];
       try { fs.writeFileSync(INFO_F, JSON.stringify(info, null, 2)); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
       json(res, 200, { ok: true, info }); return true;
     }
