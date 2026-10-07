@@ -899,11 +899,14 @@ function mount(host) {
       const avg = k => uz.length ? Math.round(uz.reduce((s, x) => s + x[k], 0) / uz.length * 10) / 10 : null;
       const cil = cile[z.key] || null;
       // personalistika: stav podle pozic k poslednímu uzavřenému měsíci + kdo z výrobních profesí v něm nic neodvedl / kdo odvádí a v seznamu není
-      let hr = null; if (PZ && last) { const lidé = poziceVeStavu(z.key, last.m) || []; const odv = per[last.m] || {}; const osSet = new Set(Object.keys(odv).map(k => String(+k)));
+      let hr = null; if (PZ && last) { const lidé = poziceVeStavu(z.key, last.m) || []; const odv = per[last.m] || {};
+        // párování Helios ↔ personalistika podle osobního čísla, náhradně podle jména (po přijetí znovu dostává člověk někdy nové číslo)
+        const jmenoOs = {}; D.rows.forEach(r => { if (r[R.date].startsWith(last.m) && r[R.id]) jmenoOs[nrm(r[R.name])] = String(+r[R.id]); });
+        const osSet = new Set(Object.keys(odv).map(k => String(+k))); const odvadi = x => osSet.has(x.os) || osSet.has(jmenoOs[nrm(x.jmeno)] || '');
         const cnt = { svar: 0, del: 0, lak: 0, ost: 0 }; lidé.forEach(x => cnt[x.prof]++);
-        const bez = lidé.filter(x => x.prof !== 'ost' && !osSet.has(x.os)).map(x => ({ os: x.os, jmeno: x.jmeno, pozice: x.pozice, prof: x.prof, od: x.od }));
-        const hrOs = new Set(lidé.map(x => x.os)); const vsichniHr = new Set(PZ.items.map(x => x.os));
-        const navic = Object.keys(odv).filter(k => /^\d+$/.test(k) && !hrOs.has(String(+k))).map(k => { const j = PZ.items.find(x => x.os === String(+k)); return { os: String(+k), jmeno: j ? j.jmeno : (D.rows.find(r => r[R.id] === k) || [])[R.name] || k, odkud: j ? (ZAVODY.find(zz => zz.key === j.zavod) || {}).name || ('útvar ' + j.utvar) : 'není v seznamu pozic' }; });
+        const bez = lidé.filter(x => x.prof !== 'ost' && !odvadi(x)).map(x => ({ os: x.os, jmeno: x.jmeno, pozice: x.pozice, prof: x.prof, od: x.od }));
+        const hrOs = new Set(lidé.map(x => x.os)), hrJm = new Set(lidé.map(x => nrm(x.jmeno)));
+        const navic = Object.keys(odv).filter(k => /^\d+$/.test(k) && !hrOs.has(String(+k))).map(k => { const jm = (D.rows.find(r => r[R.id] === k) || [])[R.name] || k; if (hrJm.has(nrm(jm))) return null; const j = PZ.items.find(x => x.os === String(+k)) || PZ.items.find(x => nrm(x.jmeno) === nrm(jm)); return { os: String(+k), jmeno: j ? j.jmeno : jm, odkud: j ? (ZAVODY.find(zz => zz.key === j.zavod) || {}).name || ('útvar ' + j.utvar) : 'není v seznamu pozic' }; }).filter(Boolean);
         hr = { mesic: last.m, celkem: lidé.length, svar: cnt.svar, del: cnt.del, lak: cnt.lak, ost: cnt.ost, bezOdvadeni: bez, navic, importedAt: PZ.importedAt, soubor: PZ.soubor, pozice: Object.entries(lidé.reduce((a, x) => { a[x.pozice] = (a[x.pozice] || 0) + 1; return a; }, {})).sort((a, b) => b[1] - a[1]).map(([pozice, n]) => ({ pozice, n, prof: profOfPozice(pozice) })) }; }
       return { key: z.key, name: z.name, data: true, snapshot: D.snapshot, cil, mesic: last ? last.m : '', hr, ma: last ? { svar: last.svar, del: last.del, lak: last.lak } : null, prvni: uz[0] ? { m: uz[0].m, svar: uz[0].svar, del: uz[0].del, lak: uz[0].lak } : null, prumer: { svar: avg('svar'), del: avg('del'), lak: avg('lak') }, mesice, normMin: cil ? normyNaKont(z.key) : null }; }) };
   }
