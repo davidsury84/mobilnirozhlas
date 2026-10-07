@@ -25,13 +25,14 @@ const ZAVODY = [
 
 // Hotový výrobek = poslední operace řetězce (lakování). Svařovna hotovo = dovaření. Skládání = vstup do svařovny.
 // Popelnice vyrábí bedny (stovky/týden) — cíl 6 ks/den se na ně nevztahuje.
-// Hotový výrobek = odvedené lakování vrchů (vrchní lak). Rozhoduje číslo operace z Heliosu, pokud je k dispozici:
-// ABR závody 900–939 = lakování výrobku (ABR, CITY, muldy, bílá/žlutá, + vrstva navíc), 940–989 = víko / střecha / příplatky (nejsou výrobek),
-// 8xx = základování (není hotovo). Popelnice: 990 = Lakování beden, 1025/1040 = rámečky, pruhy, polepy. Bez čísla rozhoduje název.
-const LAK_NAZEV = op => /^lakov[aá]n[ií]\b/i.test(op) && !/víko|viko|střech|strech|rámeč|ramec|polep|díl|dil\b|lem\b|pruh|p[řr][ií]platek|výztuh|vyztuh/i.test(op);
-const jeVrchniLak = (op, cop, popelnice) => { const n = parseInt(String(cop == null ? '' : cop).trim(), 10);
-  if (popelnice) { if (n === 990) return true; if (n >= 1000) return false; return /^lakov[aá]n[ií](\s*2\s*x.*)?$/i.test(String(op || '').trim()); }
-  if (n >= 900 && n <= 939) return true; if ((n >= 940 && n <= 989) || (n >= 800 && n <= 899)) return false; return LAK_NAZEV(String(op || '')); };
+// Hotový výrobek = odvedené lakování vrchů (vrchní lak). Rozhoduje název operace („lakování …“ bez víka, střechy, rámečků, polepů,
+// vrstvy navíc, dílů, lemů, pruhů, příplatků a výztuh); číslo operace z Heliosu slouží jen jako pojistka: 8xx = základování a 940–989 = víko /
+// střecha / příplatky nejsou výrobek. Samotné číslo 9xx nestačí — v postupu ho mají i akrylování, střih čela nebo pálení.
+// Popelnice: číslo 990 = Lakování beden (vč. variant „Lakování 2x + 10 Kč“), 1025/1040 = rámečky, pruhy, polepy.
+const LAK_NAZEV = op => /^lakov[aá]n[ií]\b/i.test(op) && !/víko|viko|střech|strech|rámeč|ramec|polep|vrstv|díl|dil\b|lem\b|pruh|p[řr][ií]platek|výztuh|vyztuh/i.test(op);
+const jeVrchniLak = (op, cop, popelnice) => { const n = parseInt(String(cop == null ? '' : cop).trim(), 10); const o = String(op || '').trim();
+  if (popelnice) { if (n === 990) return true; if (n >= 1000) return false; return /^lakov[aá]n[ií](\s*2\s*x.*)?$/i.test(o); }
+  if ((n >= 940 && n <= 989) || (n >= 800 && n <= 899)) return false; return LAK_NAZEV(o); };
 const FAZE_VYSTUPU = {
   default: { skl: op => /^sklád[aá]n[ií]\b/i.test(op) && !/n[aá]razn|krabi|rám|USB|SP \d/i.test(op), dov: op => /^dova[řr]|^dovár/i.test(op) && !/SP \d|žeb[řr]|rám|vany|horizont|p[řr][ií]platek|t-? ?profil/i.test(op), lak: (op, cop) => jeVrchniLak(op, cop, false), zakl: (op, cop) => { const n = parseInt(String(cop || ''), 10); return (n >= 800 && n <= 839) || (!(n >= 100) && /^základov[aá]n[ií]\b/i.test(op) && !/víko|viko|střech|strech/i.test(op)); } },
   popelnice: { skl: op => /^sestaven[ií] vany/i.test(op), dov: op => /^dova[řr]en[ií] vany/i.test(op), lak: (op, cop) => jeVrchniLak(op, cop, true), zakl: () => false }
@@ -785,7 +786,7 @@ function mount(host) {
       const od4 = new Date(snap + 'T00:00:00Z'); od4.setUTCDate(od4.getUTCDate() - 27); const o4 = od4.toISOString().slice(0, 10);
       muldy = { tab: MP.tab, url: MP.sheetId ? 'https://docs.google.com/spreadsheets/d/' + MP.sheetId + '/edit' + (MP.gid != null ? '#gid=' + MP.gid : '') : '', syncedAt: MP.syncedAt, hotovo: mHot.reduce((s, x) => s + x.ks, 0), hotovo4: mHot.filter(x => x.d >= o4).reduce((s, x) => s + x.ks, 0), plan: mPlan.reduce((s, x) => s + x.ks, 0),
         cvz: Object.values(byC).sort((a, b) => a.od.localeCompare(b.od) || a.cvz.localeCompare(b.cvz)).map(o => { const it = MP.items[o.cvz] || {}; return Object.assign(o, { vyrobek: it.vyrobek || '', objednano: it.ks != null ? it.ks : null, zakaznik: it.zakaznik || '' }); }) }; }
-    return { zavod: z.key, name: z.name, snapshot: snap, cil, weeks, kpi, muldy, hrdlo: hrdlo ? hrdlo.n : '', proc, faze: z.key === 'popelnice' ? { skl: 'sestavení vany', dov: 'dovaření vany', lak: 'Lakování beden (číslo operace 990)' } : { skl: 'skládání ABR/CITY', dov: 'dovaření', lak: 'lakování vrchů (čísla operací 900–939; víko, střecha a příplatky ne)' } };
+    return { zavod: z.key, name: z.name, snapshot: snap, cil, weeks, kpi, muldy, hrdlo: hrdlo ? hrdlo.n : '', proc, faze: z.key === 'popelnice' ? { skl: 'sestavení vany', dov: 'dovaření vany', lak: 'Lakování beden (číslo operace 990)' } : { skl: 'skládání ABR/CITY', dov: 'dovaření', lak: 'lakování vrchů (bez víka, střechy a příplatků)' } };
   }
 
   // ---------- operační plán: kolik operací musí být odvedeno pro N hotových ABR (standard DSD/AFS) ----------
