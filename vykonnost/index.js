@@ -865,16 +865,47 @@ function mount(host) {
     if (nDel) zdroj.del.push(nDel + ' položek listu dělírna (střih, ohýbání, pila) · pálení a obrobna normu nemají'); else del = null;
     return { svar: Math.round(svar), lak: Math.round(lak), del: del == null ? null : Math.round(del), zdroj };
   }
+  // ---------- pracovní pozice z personalistiky (export „LS - pracovní pozice.xlsx“) = zdroj pravdy o stavu lidí ----------
+  // Sloupce: Os. číslo | Příjmení a jméno | Platnost od | Platnost do | Stav | Pracovní pozice | Útvar (kmenové středisko jako v Heliosu)
+  const POZICE_F = path.join(dataDir, 'vykonnost-pozice.json');
+  const UTVAR_ZAVOD = { '40000000': 'chomutov', '20000020': 'abroly', '20000022': 'popelnice', '60000000': 'supikovice' };
+  const profOfPozice = poz => { const p = nrm(poz); if (/lakyrn|otrysk|lakovn/.test(p)) return 'lak'; if (/svarec|svarov|brusic|montaz/.test(p)) return 'svar'; if (/priprava materialu|tvarecich|kovodeln|obsluha stroj/.test(p)) return 'del'; return 'ost'; };
+  function parsePozice(buf) {
+    const sheets = parseAll(buf); const rows = Object.values(sheets)[0] || [];
+    const hi = rows.findIndex(r => (r || []).some(c => /os\.?\s*č[ií]slo|osobn[ií] č[ií]slo/i.test(String(c || ''))));
+    if (hi < 0) return { items: [], warn: 'hlavička „Os. číslo“ nenalezena' };
+    const H = rows[hi].map(c => String(c == null ? '' : c).trim().toLowerCase()); const ix = re => H.findIndex(h => re.test(h));
+    const c = { os: ix(/os\.?\s*č[ií]slo|osobn/), jm: ix(/p[řr][ií]jmen[ií]|jm[eé]no/), od: ix(/platnost od/), do: ix(/platnost do/), stav: ix(/^stav/), poz: ix(/pozice/), utvar: ix(/[uú]tvar|st[řr]edisko/) };
+    if (c.os < 0 || c.poz < 0) return { items: [], warn: 'chybí sloupec Os. číslo nebo Pracovní pozice' };
+    const S = (r, i) => i >= 0 ? String(r[i] == null ? '' : r[i]).trim() : '';
+    const items = [];
+    for (let i = hi + 1; i < rows.length; i++) { const r = rows[i] || []; const os = S(r, c.os).replace(/\.0$/, ''); if (!/^\d+$/.test(os)) continue;
+      const utvar = S(r, c.utvar).replace(/\.0$/, '');
+      items.push({ os: String(+os), jmeno: S(r, c.jm), od: parseAnyDate(r[c.od]), do: parseAnyDate(r[c.do]), stav: S(r, c.stav), pozice: S(r, c.poz), utvar, zavod: UTVAR_ZAVOD[utvar] || '', prof: profOfPozice(S(r, c.poz)) }); }
+    return { items };
+  }
+  let _pz = null;
+  const loadPozice = () => { if (_pz) return _pz; try { _pz = JSON.parse(fs.readFileSync(POZICE_F, 'utf8')); } catch (_) { _pz = null; } return _pz; };
+  const savePozice = (p, soubor) => { const items = p.items || []; const data = { importedAt: new Date().toISOString(), soubor: soubor || '', pocet: items.length, items }; fs.writeFileSync(POZICE_F, JSON.stringify(data)); _pz = data; return data; };
+  // lidé ve stavu k danému měsíci (platnost od ≤ konec měsíce, platnost do prázdná nebo ≥ začátek měsíce)
+  const poziceVeStavu = (zKey, ym) => { const P = loadPozice(); if (!P) return null; const od = ym + '-01', do_ = ym + '-31'; return P.items.filter(x => x.zavod === zKey && (!x.od || x.od <= do_) && (!x.do || x.do >= od) && !/ukon[cč]en/i.test(x.stav)); };
   function profese() {
-    const P = loadPlan6(), cile = loadCile();
-    return { smenaMin: P.smenaMin, zavody: ZAVODY.map(z => { const D = loadData(z.key); if (!D) return { key: z.key, name: z.name, data: false };
+    const P = loadPlan6(), cile = loadCile(); const PZ = loadPozice();
+    return { smenaMin: P.smenaMin, pozice: PZ ? { importedAt: PZ.importedAt, soubor: PZ.soubor, pocet: PZ.pocet } : null, zavody: ZAVODY.map(z => { const D = loadData(z.key); if (!D) return { key: z.key, name: z.name, data: false };
       const all = D.rows.filter(r => r[R.date] <= D.snapshot && !isRezie(r[R.dil])); const per = {};
       all.forEach(r => { const m = r[R.date].slice(0, 7), k = r[R.id] || r[R.name]; const o = (per[m] = per[m] || {}); const c = (o[k] = o[k] || { svar: 0, del: 0, lak: 0 }); c[profOf(r[R.op])]++; });
       const mesice = Object.keys(per).sort().map(m => { const c = { m, svar: 0, del: 0, lak: 0 }; Object.values(per[m]).forEach(x => { const t = x.lak >= x.svar && x.lak >= x.del ? 'lak' : (x.del > x.svar ? 'del' : 'svar'); c[t]++; }); return c; });
       const snapM = D.snapshot.slice(0, 7); const neuplny = !/-(2[89]|3[01])$/.test(D.snapshot); const uz = mesice.filter(x => !(neuplny && x.m === snapM)); const last = uz[uz.length - 1] || mesice[mesice.length - 1];
       const avg = k => uz.length ? Math.round(uz.reduce((s, x) => s + x[k], 0) / uz.length * 10) / 10 : null;
       const cil = cile[z.key] || null;
-      return { key: z.key, name: z.name, data: true, snapshot: D.snapshot, cil, mesic: last ? last.m : '', ma: last ? { svar: last.svar, del: last.del, lak: last.lak } : null, prvni: uz[0] ? { m: uz[0].m, svar: uz[0].svar, del: uz[0].del, lak: uz[0].lak } : null, prumer: { svar: avg('svar'), del: avg('del'), lak: avg('lak') }, mesice, normMin: cil ? normyNaKont(z.key) : null }; }) };
+      // personalistika: stav podle pozic k poslednímu uzavřenému měsíci + kdo z výrobních profesí v něm nic neodvedl / kdo odvádí a v seznamu není
+      let hr = null; if (PZ && last) { const lidé = poziceVeStavu(z.key, last.m) || []; const odv = per[last.m] || {}; const osSet = new Set(Object.keys(odv).map(k => String(+k)));
+        const cnt = { svar: 0, del: 0, lak: 0, ost: 0 }; lidé.forEach(x => cnt[x.prof]++);
+        const bez = lidé.filter(x => x.prof !== 'ost' && !osSet.has(x.os)).map(x => ({ os: x.os, jmeno: x.jmeno, pozice: x.pozice, prof: x.prof, od: x.od }));
+        const hrOs = new Set(lidé.map(x => x.os)); const vsichniHr = new Set(PZ.items.map(x => x.os));
+        const navic = Object.keys(odv).filter(k => /^\d+$/.test(k) && !hrOs.has(String(+k))).map(k => { const j = PZ.items.find(x => x.os === String(+k)); return { os: String(+k), jmeno: j ? j.jmeno : (D.rows.find(r => r[R.id] === k) || [])[R.name] || k, odkud: j ? (ZAVODY.find(zz => zz.key === j.zavod) || {}).name || ('útvar ' + j.utvar) : 'není v seznamu pozic' }; });
+        hr = { mesic: last.m, celkem: lidé.length, svar: cnt.svar, del: cnt.del, lak: cnt.lak, ost: cnt.ost, bezOdvadeni: bez, navic, importedAt: PZ.importedAt, soubor: PZ.soubor, pozice: Object.entries(lidé.reduce((a, x) => { a[x.pozice] = (a[x.pozice] || 0) + 1; return a; }, {})).sort((a, b) => b[1] - a[1]).map(([pozice, n]) => ({ pozice, n, prof: profOfPozice(pozice) })) }; }
+      return { key: z.key, name: z.name, data: true, snapshot: D.snapshot, cil, mesic: last ? last.m : '', hr, ma: last ? { svar: last.svar, del: last.del, lak: last.lak } : null, prvni: uz[0] ? { m: uz[0].m, svar: uz[0].svar, del: uz[0].del, lak: uz[0].lak } : null, prumer: { svar: avg('svar'), del: avg('del'), lak: avg('lak') }, mesice, normMin: cil ? normyNaKont(z.key) : null }; }) };
   }
 
   // Přehled všech závodů (poslední 4 týdny do snímku + celý rok)
@@ -1047,6 +1078,15 @@ function mount(host) {
     if (p === '/api/vykonnost/preview' && req.method === 'GET') { const rep = buildReport(/^\d{4}-\d{2}$/.test(u.query.m || '') ? u.query.m : ''); return host.send(res, 200, rep.html, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }), true; }
     if (p === '/api/vykonnost/send' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {} const r = await sendReport(b.to ? b.to : loadCfg().to, /^\d{4}-\d{2}$/.test(b.m || '') ? b.m : ''); return json(res, r.ok ? 200 : 500, r), true; }
     if (p === '/api/vykonnost/config' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } return json(res, 200, { ok: true, report: setReport('vykonnost-mesicni', b) }), true; }
+    if (p === '/api/vykonnost/pozice' && req.method === 'POST') {
+      // nahrání exportu „LS - pracovní pozice.xlsx“ (JSON { name, b64 })
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; }
+      if (!b.b64) { json(res, 400, { error: 'Chybí soubor.' }); return true; }
+      let pr; try { pr = parsePozice(Buffer.from(String(b.b64).replace(/^data:[^,]*,/, ''), 'base64')); } catch (e) { json(res, 400, { error: 'Soubor se nepodařilo přečíst: ' + e.message }); return true; }
+      if (!pr.items.length) { json(res, 400, { error: pr.warn || 'V souboru nejsou žádné řádky s osobním číslem.' }); return true; }
+      const d = savePozice(pr, b.name || ''); console.log('[vykonnost] pozice: ' + d.pocet + ' řádků (' + d.soubor + ')');
+      return json(res, 200, { ok: true, pocet: d.pocet, importedAt: d.importedAt, zavody: Object.values(UTVAR_ZAVOD).map(k => ({ zavod: k, n: pr.items.filter(x => x.zavod === k).length })) }), true;
+    }
     if (p === '/api/vykonnost/sync' && req.method === 'POST') {
       try { const r = await sync(true); let pl = null; try { pl = await syncPlans(); } catch (e) { pl = { error: e.message }; } return json(res, r.ok ? 200 : 500, Object.assign(r, { plany: pl })), true; }
       catch (e) { return json(res, 500, { ok: false, error: e.message }), true; }
@@ -1055,7 +1095,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, profese, parseMuldyDny, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, profese, parseMuldyDny, parsePozice, savePozice, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };

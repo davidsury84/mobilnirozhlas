@@ -1516,6 +1516,7 @@ const MUJ_MODS = [
   { grp:"Kalkulačky" },
   { key:"kalkulace", icon:MUJ_IC.calc, label:"Kalkulace-lisy", gated:true },
   { key:"loxxerkalk", icon:MUJ_IC.calc, label:"LOXXER — kalkulace", gated:true },
+  { key:"palime", icon:MUJ_IC.calc, label:"Pálíme — laserové pálení", gated:true },
   { key:"svozesa", icon:MUJ_IC.calc, label:"Kalkulačka svoz ESA", gated:true },
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
@@ -1899,7 +1900,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="pohledavky"||MUJ.view==="vyroba"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk"||MUJ.view==="pipedrive");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="palime"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="pohledavky"||MUJ.view==="vyroba"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk"||MUJ.view==="pipedrive");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1976,6 +1977,7 @@ function mjGo(key){
   else if(key==="eshop") showEshop();
   else if(key==="kalkulace") showKalkulace();
   else if(key==="loxxerkalk") showLoxxerKalk();
+  else if(key==="palime") showPalime();
   else if(key==="poptavky") showPoptavky();
   else if(key==="kontejnerykalk") showKontejneryKalk();
   else if(key==="svozesa") showSvozEsa();
@@ -2836,6 +2838,19 @@ function showLoxxerKalk(){
   MUJ.view="loxxerkalk"; renderSidebar();
   if(!moduleVisible({key:"loxxerkalk",gated:true})){ document.getElementById("mujBody").innerHTML='<div class="card pad" style="margin:26px">K modulu „LOXXER — kalkulace" nemáte přístup. Přiděluje správce.</div>'; return; }
   document.getElementById("mujBody").innerHTML='<iframe src="/loxxerkalk-app" style="width:100%;height:calc(100vh - 69px);border:0;display:block;background:#0e1116" title="LOXXER — kalkulace"></iframe>';
+  window.scrollTo(0,0);
+}
+function showPalime(part){
+  MUJ.view="palime"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!moduleVisible({key:"palime",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu „Pálíme — laserové pálení" nemáte přístup. Přiděluje správce.</div>'; return; }
+  part = part || MUJ.palimePart || "sprava"; MUJ.palimePart = part;
+  const src = part==="zadani" ? "/palime-zadani" : "/palime-app";
+  body.innerHTML='<div style="display:flex;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--paper)">'
+    +'<button class="btn'+(part==="sprava"?"":" sec")+'" style="padding:7px 14px" onclick="showPalime(\'sprava\')">Správa a evidence zakázek</button>'
+    +'<button class="btn'+(part==="zadani"?"":" sec")+'" style="padding:7px 14px" onclick="showPalime(\'zadani\')">Nové zadání (pro zákazníka)</button>'
+    +'<span style="margin-left:auto;font-size:12.5px;color:var(--ink-soft)">Veřejná adresa pro zákazníky: <a href="/palime-zadani" target="_blank" rel="noopener">otevřít v novém okně</a></span></div>'
+    +'<iframe src="'+src+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#eef1ec" title="Pálíme — laserové pálení"></iframe>';
   window.scrollTo(0,0);
 }
 async function showPoptavky(){
@@ -3918,23 +3933,31 @@ function vykProfRender(){
   const box=document.getElementById('vykProf'), P=(VYK.cmp||{}).profese; if(!box) return; if(!P||!(P.zavody||[]).length){ box.textContent='Data nejsou k dispozici.'; return; }
   const S0=P.smenaMin||440; const SM=[{h:8,min:S0,l:'8 h'},{h:10,min:S0+120,l:'10 h'},{h:12,min:S0+240,l:'12 h'}]; const S=SM.find(x=>x.h===(VYK.profH||8))||SM[0];
   const PR=[['svar','Svářeči'],['del','Děliči'],['lak','Lakýrníci']]; const f1=x=>x==null?'—':(Math.round(x*10)/10).toLocaleString('cs-CZ',{minimumFractionDigits:1,maximumFractionDigits:1});
-  let h='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><span style="font-size:12.5px">Délka směny:</span><span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden">'+SM.map(x=>'<button class="btn sm" style="border-radius:0;'+(x.h===S.h?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.profH='+x.h+';vykProfRender()">'+x.l+'</button>').join('')+'</span><span class="muted" style="font-size:12px">čistý čas '+S.min+' min na osobu a den'+(S.h>8?' · prodloužená směna: potřeba lidí klesá, kapacita stávajících roste':'')+'</span></div>';
-  h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px;color:var(--ink)"><thead><tr><th style="text-align:left;'+vykTh+'">Závod</th><th style="text-align:left;'+vykTh+'">Profese</th><th style="text-align:right;'+vykTh+'">V lednu</th><th style="text-align:right;'+vykTh+'">Průměr roku</th><th style="text-align:right;'+vykTh+'">Má teď</th><th style="text-align:right;'+vykTh+'" title="cíl × normominuty na kontejner ÷ čistý čas směny">Potřeba na cíl</th><th style="text-align:right;'+vykTh+'">Rozdíl</th><th style="text-align:right;'+vykTh+'" title="kolik kontejnerů denně zvládne současný počet lidí, kdyby celý čas směny pracovali v úkolu">Kapacita kont/den</th><th style="text-align:right;'+vykTh+'" title="normominuty práce této profese na jeden standardní kontejner ABR-DSD 6500×2300×2350">Norma min/kont</th></tr></thead><tbody>';
-  P.zavody.filter(z=>z.data&&z.ma).forEach(z=>{ const N=z.normMin, cil=z.cil;
-    const kap=PR.map(p=>N&&N[p[0]]?z.ma[p[0]]*S.min/N[p[0]]:null); const minKap=Math.min(...kap.filter(v=>v!=null));
-    PR.forEach((p,i)=>{ const ma=z.ma[p[0]], nm=N?N[p[0]]:null; const potr=nm&&cil?cil*nm/S.min:null; const roz=potr!=null?ma-potr:null; const k=kap[i];
+  const HR=!!P.pozice; const adm=!!(VYK.ov&&VYK.ov.admin);
+  let h='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><span style="font-size:12.5px">Délka směny:</span><span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden">'+SM.map(x=>'<button class="btn sm" style="border-radius:0;'+(x.h===S.h?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="VYK.profH='+x.h+';vykProfRender()">'+x.l+'</button>').join('')+'</span><span class="muted" style="font-size:12px">čistý čas '+S.min+' min na osobu a den'+(S.h>8?' · prodloužená směna: potřeba lidí klesá, kapacita stávajících roste':'')+'</span>'
+    +'<span style="margin-left:auto;font-size:12px" class="muted">'+(HR?'Stav lidí: pracovní pozice z personalistiky, import '+new Date(P.pozice.importedAt).toLocaleDateString('cs-CZ')+' ('+P.pozice.pocet+' řádků)':'Stav lidí zatím jen z odvádění — správce může nahrát export pozic z personalistiky')+(adm?' <label class="btn sm ghost" style="cursor:pointer;margin-left:6px">📄 Nahrát LS – pracovní pozice (xlsx)<input type="file" accept=".xlsx" style="display:none" onchange="vykPoziceUpload(this)"></label>':'')+'</span></div>';
+  h+='<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px;color:var(--ink)"><thead><tr><th style="text-align:left;'+vykTh+'">Závod</th><th style="text-align:left;'+vykTh+'">Profese</th>'+(HR?'<th style="text-align:right;'+vykTh+'" title="lidé ve stavu podle pracovní pozice (personalistika)">Má (pozice)</th>':'')+'<th style="text-align:right;'+vykTh+'" title="lidé, kteří v měsíci odvedli aspoň jednu operaci; profese podle převažujících operací">Odvádí (Helios)</th><th style="text-align:right;'+vykTh+'" title="cíl × normominuty na kontejner ÷ čistý čas směny">Potřeba na cíl</th><th style="text-align:right;'+vykTh+'">Rozdíl</th><th style="text-align:right;'+vykTh+'" title="kolik kontejnerů denně zvládne stav lidí, kdyby celý čas směny pracovali v úkolu">Kapacita kont/den</th><th style="text-align:right;'+vykTh+'" title="normominuty práce této profese na jeden standardní kontejner ABR-DSD 6500×2300×2350">Norma min/kont</th></tr></thead><tbody>';
+  P.zavody.filter(z=>z.data&&z.ma).forEach(z=>{ const N=z.normMin, cil=z.cil, hr=z.hr; const stav=p=>hr?hr[p]:z.ma[p];
+    const kap=PR.map(p=>N&&N[p[0]]?stav(p[0])*S.min/N[p[0]]:null); const minKap=Math.min(...kap.filter(v=>v!=null));
+    PR.forEach((p,i)=>{ const ma=stav(p[0]), odv=z.ma[p[0]], nm=N?N[p[0]]:null; const potr=nm&&cil?cil*nm/S.min:null; const roz=potr!=null?ma-potr:null; const k=kap[i];
       const colK=k==null||!cil?'var(--ink)':(k>=cil?'#0a7a0a':(k>=cil*0.8?'#b57400':'#c93a39'));
-      h+='<tr'+(i===0?' style="border-top:2px solid var(--line)"':'')+'>'+(i===0?'<td rowspan="3" style="'+vykTd+';vertical-align:top;white-space:nowrap;cursor:pointer" onclick="vykPick(\''+z.key+'\')"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+(VYK_BARVY[z.key]||'#555')+';margin-right:6px;vertical-align:-1px"></i><b>'+esc(z.name)+'</b><div class="muted" style="font-size:11.5px;margin-top:3px">'+(cil?'cíl '+String(cil).replace('.',',')+' kont/den':'bez cíle v kontejnerech')+'<br>stav za '+esc(vykMesLabel(z.mesic))+'</div></td>':'')
+      h+='<tr'+(i===0?' style="border-top:2px solid var(--line)"':'')+'>'+(i===0?'<td rowspan="'+(hr?4:3)+'" style="'+vykTd+';vertical-align:top;white-space:nowrap;cursor:pointer" onclick="vykPick(\''+z.key+'\')"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+(VYK_BARVY[z.key]||'#555')+';margin-right:6px;vertical-align:-1px"></i><b>'+esc(z.name)+'</b><div class="muted" style="font-size:11.5px;margin-top:3px">'+(cil?'cíl '+String(cil).replace('.',',')+' kont/den':'bez cíle v kontejnerech')+'<br>stav za '+esc(vykMesLabel(z.mesic))+(hr?'<br>celkem ve stavu '+hr.celkem+' (z toho '+hr.ost+' ostatní profese)':'')+'</div></td>':'')
         +'<td style="'+vykTd+'">'+p[1]+(k!=null&&k===minKap&&cil&&k<cil?' <span style="font-size:11px;color:#c93a39;font-weight:600">· úzké hrdlo</span>':'')+'</td>'
-        +'<td style="'+vykTd+';text-align:right" class="muted">'+(z.prvni?z.prvni[p[0]]:'—')+'</td><td style="'+vykTd+';text-align:right" class="muted">'+f1(z.prumer[p[0]])+'</td>'
-        +'<td style="'+vykTd+';text-align:right;font-weight:700">'+ma+'</td>'
+        +(HR?'<td style="'+vykTd+';text-align:right;font-weight:700">'+(hr?ma:'—')+'</td>':'')
+        +'<td style="'+vykTd+';text-align:right;'+(hr?'':'font-weight:700;')+(hr&&odv<ma?'color:#b57400':'')+'">'+odv+(hr&&odv!==ma?' <span style="font-size:11px;color:'+(odv<ma?'#b57400':'#2a78d6')+'">('+(odv<ma?'−':'+')+Math.abs(odv-ma)+')</span>':'')+'</td>'
         +'<td style="'+vykTd+';text-align:right">'+f1(potr)+'</td>'
         +'<td style="'+vykTd+';text-align:right;font-weight:600;color:'+(roz==null?'var(--ink-soft)':(roz>=0?'#0a7a0a':'#c93a39'))+'">'+(roz==null?'—':(roz>=0?'+':'−')+f1(Math.abs(roz)))+'</td>'
         +'<td style="'+vykTd+';text-align:right;font-weight:600;color:'+colK+'">'+f1(k)+'</td>'
-        +'<td style="'+vykTd+';text-align:right" class="muted"'+(N&&N.zdroj?' title="'+esc((N.zdroj[p[0]]||[]).join(' · '))+'"':'')+'>'+(nm?vykF(nm):'—')+'</td></tr>'; }); });
-  h+='</tbody></table></div><div class="muted" style="font-size:12px;margin-top:8px;line-height:1.55">Profese = úsek, ve kterém má člověk v měsíci nejvíc výrobních zápisů; počítá se každý, kdo odvedl aspoň jednu operaci (součet profesí = počet lidí v tabulce výše). Normy platí pro standardní kontejner ABR-DSD 6500×2300×2350: svařovna 8 hlavních fází bez drobných dílců, lakovna odkuličkování + odmaštění + základování + lakování, dělírna střih, ohýbání a pila z listu norem (pálení a obrobna normu nemají, potřeba děličů je proto spodní odhad). Kapacita předpokládá celý čistý čas směny v úkolu — režie, CITY a muldy ji snižují. Po najetí myší na sloupec „Norma min/kont“ se zobrazí, z čeho se skládá.</div>';
+        +'<td style="'+vykTd+';text-align:right" class="muted"'+(N&&N.zdroj?' title="'+esc((N.zdroj[p[0]]||[]).join(' · '))+'"':'')+'>'+(nm?vykF(nm):'—')+'</td></tr>'; });
+    if(hr){ const bez=hr.bezOdvadeni||[], navic=hr.navic||[];
+      h+='<tr><td colspan="'+(HR?7:6)+'" style="'+vykTd+';font-size:12px;color:var(--ink-soft)">'
+        +(bez.length?'<details><summary style="cursor:pointer"><b style="color:#b57400">'+bez.length+' '+(bez.length===1?'člověk':(bez.length<5?'lidé':'lidí'))+' z výrobních pozic v '+esc(vykMesLabel(z.mesic))+' nic neodvedl'+(bez.length===1?'':(bez.length<5?'i':'o'))+'</b> — klikněte pro jména</summary><div style="margin:6px 0 2px;line-height:1.7">'+bez.map(x=>esc(x.jmeno)+' <span class="muted">('+esc(x.pozice)+(x.od&&x.od>=z.mesic?' · nástup '+vykD(x.od):'')+')</span>').join(' · ')+'</div></details>':'<b style="color:#0a7a0a">Všichni z výrobních pozic v '+esc(vykMesLabel(z.mesic))+' odváděli.</b>')
+        +(navic.length?'<div style="margin-top:4px">Odvádí navíc mimo seznam pozic závodu: '+navic.map(x=>esc(x.jmeno)+' <span class="muted">('+esc(x.odkud)+')</span>').join(' · ')+'</div>':'')
+        +'<div style="margin-top:4px">Pozice: '+hr.pozice.filter(x=>x.prof!=='ost').map(x=>x.n+'× '+esc(x.pozice)).join(', ')+' · ostatní: '+hr.pozice.filter(x=>x.prof==='ost').map(x=>x.n+'× '+esc(x.pozice)).join(', ')+'</div></td></tr>'; } });
+  h+='</tbody></table></div><div class="muted" style="font-size:12px;margin-top:8px;line-height:1.55">'+(HR?'<b>Má (pozice)</b> = lidé ve stavu podle pracovní pozice z personalistiky (útvar = kmenové středisko; svářeč, brusič, montážní dělník a obsluha robota → svařovna; příprava materiálu, obsluha tvářecích strojů a kovodělník → dělírna; lakýrník, otryskávač a pomocný pracovník lakovny → lakovna; mistři, skladníci, expedienti, kontrola, administrativa = ostatní). <b>Odvádí</b> = kolik lidí v měsíci skutečně odvedlo aspoň jednu operaci v Heliosu (profese podle převažujících operací). Potřeba, rozdíl a kapacita vycházejí ze stavu podle pozic. ':'Profese = úsek, ve kterém má člověk v měsíci nejvíc výrobních zápisů; počítá se každý, kdo odvedl aspoň jednu operaci. ')+'Normy platí pro standardní kontejner ABR-DSD 6500×2300×2350: svařovna 8 hlavních fází bez drobných dílců, lakovna odkuličkování + odmaštění + základování + lakování, dělírna střih, ohýbání a pila z listu norem (pálení a obrobna normu nemají, potřeba děličů je proto spodní odhad). Kapacita předpokládá celý čistý čas směny v úkolu — režie, CITY a muldy ji snižují.</div>';
   box.innerHTML=h;
 }
+async function vykPoziceUpload(inp){ const f=inp.files&&inp.files[0]; if(!f) return; toast('Nahrávám pozice…'); try{ const b64=await new Promise((ok,err)=>{const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]); r.onerror=err; r.readAsDataURL(f);}); const r=await fetch('/api/vykonnost/pozice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:f.name,b64})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Nahrání selhalo.'); return; } toast('Pozice načteny: '+j.pocet+' řádků · '+j.zavody.map(z=>z.zavod+' '+z.n).join(', ')); await vykCmpLoad(); }catch(e){ toast('Nahrání selhalo: '+e.message); } }
 /* ---- Změny po měsících: závody × měsíce, hodnota + změna proti předchozímu měsíci ---- */
 const VYK_MES_M=[
   {k:'A7',l:'Hotových / den',smer:'up',des:1,cil:true,den:true,pop:'hotový výrobek = odvedené lakování vrchů (bez víka, střechy a příplatků; u Popelnic číslo operace 990) + u Chomutova muldy z plánu ÷ pracovní dny'},
@@ -4952,7 +4975,7 @@ function showDashboard(){
     provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
     mainH += '</div>';
   }
-  const kalk = [["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["loxxerkalk","LOXXER — kalkulace",MUJ_IC.calc,"LOXXER — tvorba nabídek"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.calc,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.calc,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const kalk = [["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["loxxerkalk","LOXXER — kalkulace",MUJ_IC.calc,"LOXXER — tvorba nabídek"],["palime","Pálíme — laserové pálení",MUJ_IC.calc,"Zadání výpalků, cena hned, evidence zakázek"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.calc,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.calc,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(kalk.length){
     mainH += '<div class="dash-sec">'+mjT('Kalkulačky')+'</div><div class="dash-grid">';
     kalk.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
@@ -6561,7 +6584,7 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["pipedrive","Pipedrive — aktivita obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["palime","Pálíme — laserové pálení"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["pipedrive","Pipedrive — aktivita obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
