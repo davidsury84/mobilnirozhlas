@@ -947,14 +947,15 @@ function mount(host) {
   const SL_VYPLATA = k => (k >= 933 && k <= 940) || k === 9, SL_NAHRADA = k => k === 794 || k === 795, SL_UKOL = k => k === 310 || k === 357 || k === 2, SL_HOD = k => k === 1 || k === 2 || k === 310 || k === 357;
   let _mz = null; const loadMzdy = () => { if (_mz) return _mz; try { _mz = JSON.parse(fs.readFileSync(MZDY_F, 'utf8')); } catch (_) { _mz = null; } return _mz; };
   function parseMzdy(buf) {
-    const rows = Object.values(parseAll(buf))[0] || []; const hi = rows.findIndex(r => (r || []).some(c => /mzdov[eé] slo[žz]ky/i.test(String(c || ''))));
+    // list s hlavičkou (soubor může mít navíc kontingenční list „List1“); od 07-2026 je v exportu i sloupec Útvar
+    let rows = [], hi = -1; for (const r0 of Object.values(parseAll(buf))) { const i = r0.findIndex(r => (r || []).some(c => /mzdov[eé] slo[žz]ky/i.test(String(c || '')))); if (i >= 0) { rows = r0; hi = i; break; } }
     if (hi < 0) return { lide: {}, warn: 'hlavička „Název mzdové složky“ nenalezena' };
     const H = rows[hi].map(c => String(c == null ? '' : c).trim()); const ix = re => H.findIndex(h => re.test(h));
-    const c = { os: ix(/^os\.? ?č/i), pr: ix(/^příjmení|^prijmeni/i), jm: ix(/^jméno|^jmeno/i), kod: ix(/^číslo$|^cislo$/i), naz: ix(/název mzdové|nazev mzdove/i), kc: ix(/^částka|^castka/i), h: ix(/^hodiny/i) };
+    const c = { os: ix(/^os\.? ?č/i), pr: ix(/^příjmení|^prijmeni/i), jm: ix(/^jméno|^jmeno/i), kod: ix(/^číslo$|^cislo$/i), naz: ix(/název mzdové|nazev mzdove/i), kc: ix(/^částka|^castka/i), h: ix(/^hodiny/i), u: ix(/^útvar|^utvar|středisko|stredisko/i) };
     const lide = {}; const nazvy = {};
     for (let i = hi + 1; i < rows.length; i++) { const r = rows[i] || []; const os = String(r[c.os] == null ? '' : r[c.os]).trim().replace(/\.0$/, ''); if (!/^\d+$/.test(os)) continue;
       const kod = parseInt(r[c.kod], 10); if (!isFinite(kod)) continue; const kc = parseFloat(String(r[c.kc]).replace(',', '.')) || 0, h = parseFloat(String(r[c.h]).replace(',', '.')) || 0;
-      const L = lide[String(+os)] = lide[String(+os)] || { jm: (String(r[c.pr] || '').trim() + ' ' + String(r[c.jm] || '').trim()).trim(), s: {} }; const S = L.s[kod] = L.s[kod] || [0, 0]; S[0] += kc; S[1] += h; nazvy[kod] = String(r[c.naz] || '').trim(); }
+      const L = lide[String(+os)] = lide[String(+os)] || { jm: (String(r[c.pr] || '').trim() + ' ' + String(r[c.jm] || '').trim()).trim(), s: {} }; if (c.u >= 0 && r[c.u] != null && r[c.u] !== '') L.u = String(r[c.u]).trim().replace(/\.0$/, ''); const S = L.s[kod] = L.s[kod] || [0, 0]; S[0] += kc; S[1] += h; nazvy[kod] = String(r[c.naz] || '').trim(); }
     return { lide, nazvy };
   }
   async function syncMzdy() {
@@ -978,9 +979,9 @@ function mount(host) {
   function mzdyMesic(zKey, ym) {
     const k = zKey + '|' + ym; if (_mzc[k] !== undefined) return _mzc[k]; const MZ = loadMzdy(); const M = MZ && MZ.mesice[ym]; if (!M) return (_mzc[k] = null);
     const ZL = zavodLidi(ym); const out = { ym, lidi: 0, hrube: 0, ukol: 0, zakl: 0, premie: 0, dovolena: 0, nahrady: 0, vyplaceno: 0, hodiny: 0, hodinyRiziko: 0, vyrobni: { lidi: 0, hrube: 0, ukol: 0, hodiny: 0 }, slozky: {}, lideSez: [] };
-    Object.entries(M).forEach(([os, L]) => { const who = ZL.map[os] || ZL.jmMap[nrm(L.jm)]; if (!who || who.z !== zKey) return; out.lidi++; const vyr = who.prof === 'svar' || who.prof === 'del' || who.prof === 'lak'; if (vyr) out.vyrobni.lidi++;
+    Object.entries(M).forEach(([os, L]) => { let who = ZL.map[os] || ZL.jmMap[nrm(L.jm)]; if (L.u && UTVAR_ZAVOD[L.u] !== undefined) who = Object.assign({}, who || { prof: 'ost', jm: L.jm }, { z: UTVAR_ZAVOD[L.u], utvar: true }); else if (L.u && !who) return; if (!who || who.z !== zKey) return; out.lidi++; const vyr = who.prof === 'svar' || who.prof === 'del' || who.prof === 'lak'; if (vyr) out.vyrobni.lidi++;
       let hr = 0, uk = 0, hod = 0; Object.entries(L.s).forEach(([kod, [kc, h]]) => { const kn = +kod; if (SL_VYPLATA(kn)) { out.vyplaceno += kc; return; } if (SL_NAHRADA(kn)) { out.nahrady += kc; return; } hr += kc; out.hrube += kc; out.slozky[kn] = (out.slozky[kn] || 0) + kc; if (SL_UKOL(kn)) uk += kc; if (SL_HOD(kn)) hod += h; if (kn === 357) out.hodinyRiziko += h; if (kn === 1) out.zakl += kc; if (kn === 651) out.premie += kc; if (kn === 210) out.dovolena += kc; });
-      out.ukol += uk; out.hodiny += hod; if (vyr) { out.vyrobni.hrube += hr; out.vyrobni.ukol += uk; out.vyrobni.hodiny += hod; } out.lideSez.push({ os, jm: who.jm || L.jm, prof: who.prof, hrube: Math.round(hr), ukol: Math.round(uk), hodiny: Math.round(hod), zdroj: who.helios ? 'Helios' : 'pozice' }); });
+      out.ukol += uk; out.hodiny += hod; if (vyr) { out.vyrobni.hrube += hr; out.vyrobni.ukol += uk; out.vyrobni.hodiny += hod; } out.lideSez.push({ os, jm: who.jm || L.jm, prof: who.prof, hrube: Math.round(hr), ukol: Math.round(uk), hodiny: Math.round(hod), zdroj: who.utvar ? 'útvar ve mzdách' : (who.helios ? 'Helios' : 'pozice') }); });
     ['hrube', 'ukol', 'zakl', 'premie', 'dovolena', 'nahrady', 'vyplaceno', 'hodiny', 'hodinyRiziko'].forEach(f => out[f] = Math.round(out[f])); ['hrube', 'ukol', 'hodiny'].forEach(f => out.vyrobni[f] = Math.round(out.vyrobni[f])); Object.keys(out.slozky).forEach(f => out.slozky[f] = Math.round(out.slozky[f]));
     out.lideSez.sort((a, b) => b.hrube - a.hrube); return (_mzc[k] = out);
   }
