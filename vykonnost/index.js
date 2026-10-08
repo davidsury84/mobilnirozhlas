@@ -648,7 +648,7 @@ function mount(host) {
       });
     });
     const MZ = loadMzdy();
-    return { zavod: z.key, name: z.name, snapshot: D.snapshot, cil: cilZ, cile: cileZ(cilZ), opsKont: opsNaKont(), mesice: out, mzdy: MZ ? { syncedAt: MZ.syncedAt, mesice: Object.keys(MZ.mesice).sort(), detail: Object.keys(MZ.mesice).sort().map(ym => mzdyMesic(z.key, ym)).filter(Boolean).map(x => ({ ym: x.ym, lidi: x.lidi, hrube: x.hrube, ukol: x.ukol, zakl: x.zakl, premie: x.premie, dovolena: x.dovolena, nahrady: x.nahrady, vyplaceno: x.vyplaceno, hodiny: x.hodiny, hodinyRiziko: x.hodinyRiziko, vyrobni: x.vyrobni, slozky: x.slozky, lide: x.lideSez })), nazvy: MZ.nazvy } : null };
+    return { zavod: z.key, name: z.name, snapshot: D.snapshot, cil: cilZ, cile: cileZ(cilZ), opsKont: opsNaKont(), mesice: out, mzdy: MZ ? { syncedAt: MZ.syncedAt, cfg: loadMzCfg(), mesice: Object.keys(MZ.mesice).sort(), detail: Object.keys(MZ.mesice).sort().map(ym => mzdyMesic(z.key, ym)).filter(Boolean).map(x => ({ ym: x.ym, rezim: x.rezim, lidi: x.lidi, lidiVse: x.lidiVse, vylouceno: x.vylouceno, hrube: x.hrube, ukol: x.ukol, zakl: x.zakl, premie: x.premie, dovolena: x.dovolena, nahrady: x.nahrady, vyplaceno: x.vyplaceno, hodiny: x.hodiny, hodinyRiziko: x.hodinyRiziko, vyrobni: x.vyrobni, slozky: x.slozky, lide: x.lideSez })), nazvy: MZ.nazvy } : null };
   }
   // Text pro trend: zlepšení/zhoršení podle směru indikátoru
   const lepsi = (def, d) => def.smer === 'watch' ? null : (def.smer === 'up' ? d > 0 : d < 0);
@@ -949,6 +949,10 @@ function mount(host) {
   const MZDY_FOLDER = process.env.VYKON_MZDY_FOLDER || '1Yu8l6BZ1Ai73y-ZdhdR1h4qdXq59acsf';
   const MZDY_F = path.join(dataDir, 'vykonnost-mzdy.json');
   const SL_VYPLATA = k => (k >= 933 && k <= 940) || k === 9, SL_NAHRADA = k => k === 794 || k === 795, SL_UKOL = k => k === 310 || k === 357 || k === 2, SL_HOD = k => k === 1 || k === 2 || k === 310 || k === 357;
+  // Koho do mezd počítat: režim „stredisko“ (všichni s útvarem závodu) / „vyrobni“ (jen výrobní profese) + jmenovitě vyloučení (os. čísla)
+  const MZCFG_F = path.join(dataDir, 'vykonnost-mzdy-cfg.json');
+  const loadMzCfg = () => { let c = {}; try { c = JSON.parse(fs.readFileSync(MZCFG_F, 'utf8')) || {}; } catch (_) {} return { rezim: c.rezim === 'vyrobni' ? 'vyrobni' : 'stredisko', vyloucit: c.vyloucit && typeof c.vyloucit === 'object' ? c.vyloucit : {} }; };
+  const saveMzCfg = c => { fs.writeFileSync(MZCFG_F, JSON.stringify(c, null, 2)); _mzc = {}; return c; };
   let _mz = null; const loadMzdy = () => { if (_mz) return _mz; try { _mz = JSON.parse(fs.readFileSync(MZDY_F, 'utf8')); } catch (_) { _mz = null; } return _mz; };
   function parseMzdy(buf) {
     // list s hlavičkou (soubor může mít navíc kontingenční list „List1“); od 07-2026 je v exportu i sloupec Útvar
@@ -976,16 +980,19 @@ function mount(host) {
   let _mzc = {};
   function zavodLidi(ym) {
     const k = 'z' + ym; if (_mzc[k]) return _mzc[k]; const PZ = loadPozice(); const map = {}, jmMap = {};
-    if (PZ) PZ.items.forEach(x => { if (x.zavod && (!x.do || x.do >= ym + '-01')) { map[x.os] = { z: x.zavod, prof: x.prof, jm: x.jmeno }; jmMap[nrm(x.jmeno)] = map[x.os]; } });
+    if (PZ) PZ.items.forEach(x => { if (x.zavod && (!x.do || x.do >= ym + '-01')) { map[x.os] = { z: x.zavod, prof: x.prof, jm: x.jmeno, pozice: x.pozice }; jmMap[nrm(x.jmeno)] = map[x.os]; } });
     ZAVODY.forEach(z => { const D = loadData(z.key); if (!D) return; D.rows.forEach(r => { if (!r[R.date].startsWith(ym)) return; const os = String(+r[R.id] || 0); if (os !== '0' && !map[os]) map[os] = { z: z.key, prof: profOf(r[R.op]) === 'lak' ? 'lak' : 'svar', jm: r[R.name], helios: true }; const nj = nrm(r[R.name]); if (!jmMap[nj]) jmMap[nj] = map[os] || { z: z.key, prof: 'svar', jm: r[R.name], helios: true }; }); });
     return (_mzc[k] = { map, jmMap });
   }
   function mzdyMesic(zKey, ym) {
     const k = zKey + '|' + ym; if (_mzc[k] !== undefined) return _mzc[k]; const MZ = loadMzdy(); const M = MZ && MZ.mesice[ym]; if (!M) return (_mzc[k] = null);
-    const ZL = zavodLidi(ym); const out = { ym, lidi: 0, hrube: 0, ukol: 0, zakl: 0, premie: 0, dovolena: 0, nahrady: 0, vyplaceno: 0, hodiny: 0, hodinyRiziko: 0, vyrobni: { lidi: 0, hrube: 0, ukol: 0, hodiny: 0 }, slozky: {}, lideSez: [] };
-    Object.entries(M).forEach(([os, L]) => { let who = ZL.map[os] || ZL.jmMap[nrm(L.jm)]; if (L.u && UTVAR_ZAVOD[L.u] !== undefined) who = Object.assign({}, who || { prof: 'ost', jm: L.jm }, { z: UTVAR_ZAVOD[L.u], utvar: true }); else if (L.u && !who) return; if (!who || who.z !== zKey) return; out.lidi++; const vyr = who.prof === 'svar' || who.prof === 'del' || who.prof === 'lak'; if (vyr) out.vyrobni.lidi++;
-      let hr = 0, uk = 0, hod = 0; Object.entries(L.s).forEach(([kod, [kc, h]]) => { const kn = +kod; if (SL_VYPLATA(kn)) { out.vyplaceno += kc; return; } if (SL_NAHRADA(kn)) { out.nahrady += kc; return; } hr += kc; out.hrube += kc; out.slozky[kn] = (out.slozky[kn] || 0) + kc; if (SL_UKOL(kn)) uk += kc; if (SL_HOD(kn)) hod += h; if (kn === 357) out.hodinyRiziko += h; if (kn === 1) out.zakl += kc; if (kn === 651) out.premie += kc; if (kn === 210) out.dovolena += kc; });
-      out.ukol += uk; out.hodiny += hod; if (vyr) { out.vyrobni.hrube += hr; out.vyrobni.ukol += uk; out.vyrobni.hodiny += hod; } out.lideSez.push({ os, jm: who.jm || L.jm, prof: who.prof, hrube: Math.round(hr), ukol: Math.round(uk), hodiny: Math.round(hod), zdroj: who.utvar ? 'útvar ve mzdách' : (who.helios ? 'Helios' : 'pozice') }); });
+    const ZL = zavodLidi(ym); const CFG = loadMzCfg(); const out = { ym, rezim: CFG.rezim, lidiVse: 0, vylouceno: 0, lidi: 0, hrube: 0, ukol: 0, zakl: 0, premie: 0, dovolena: 0, nahrady: 0, vyplaceno: 0, hodiny: 0, hodinyRiziko: 0, vyrobni: { lidi: 0, hrube: 0, ukol: 0, hodiny: 0 }, slozky: {}, lideSez: [] };
+    Object.entries(M).forEach(([os, L]) => { let who = ZL.map[os] || ZL.jmMap[nrm(L.jm)]; if (L.u && UTVAR_ZAVOD[L.u] !== undefined) who = Object.assign({}, who || { prof: 'ost', jm: L.jm, pozice: '' }, { z: UTVAR_ZAVOD[L.u], utvar: true }); else if (L.u && !who) return; if (!who || who.z !== zKey) return; out.lidiVse++; const vyr = who.prof === 'svar' || who.prof === 'del' || who.prof === 'lak';
+      const pocitat = !CFG.vyloucit[os] && (CFG.rezim !== 'vyrobni' || vyr); if (!pocitat) out.vylouceno++;
+      let hr = 0, uk = 0, hod = 0, vyp = 0, nah = 0, riz = 0, zk = 0, pr = 0, dv = 0; const sl = {};
+      Object.entries(L.s).forEach(([kod, [kc, h]]) => { const kn = +kod; if (SL_VYPLATA(kn)) { vyp += kc; return; } if (SL_NAHRADA(kn)) { nah += kc; return; } hr += kc; sl[kn] = (sl[kn] || 0) + kc; if (SL_UKOL(kn)) uk += kc; if (SL_HOD(kn)) hod += h; if (kn === 357) riz += h; if (kn === 1) zk += kc; if (kn === 651) pr += kc; if (kn === 210) dv += kc; });
+      if (pocitat) { out.lidi++; out.hrube += hr; out.ukol += uk; out.hodiny += hod; out.vyplaceno += vyp; out.nahrady += nah; out.hodinyRiziko += riz; out.zakl += zk; out.premie += pr; out.dovolena += dv; Object.keys(sl).forEach(kn => out.slozky[kn] = (out.slozky[kn] || 0) + sl[kn]); if (vyr) { out.vyrobni.lidi++; out.vyrobni.hrube += hr; out.vyrobni.ukol += uk; out.vyrobni.hodiny += hod; } }
+      out.lideSez.push({ os, jm: who.jm || L.jm, prof: who.prof, pozice: who.pozice || '', hrube: Math.round(hr), ukol: Math.round(uk), hodiny: Math.round(hod), pocitat, vylouceno: !!CFG.vyloucit[os], zdroj: who.utvar ? 'útvar ve mzdách' : (who.helios ? 'Helios' : 'pozice') }); });
     ['hrube', 'ukol', 'zakl', 'premie', 'dovolena', 'nahrady', 'vyplaceno', 'hodiny', 'hodinyRiziko'].forEach(f => out[f] = Math.round(out[f])); ['hrube', 'ukol', 'hodiny'].forEach(f => out.vyrobni[f] = Math.round(out.vyrobni[f])); Object.keys(out.slozky).forEach(f => out.slozky[f] = Math.round(out.slozky[f]));
     out.lideSez.sort((a, b) => b.hrube - a.hrube); return (_mzc[k] = out);
   }
@@ -1247,6 +1254,7 @@ function mount(host) {
       const d = savePozice(pr, b.name || ''); console.log('[vykonnost] pozice: ' + d.pocet + ' řádků (' + d.soubor + ')');
       return json(res, 200, { ok: true, pocet: d.pocet, importedAt: d.importedAt, zavody: Object.values(UTVAR_ZAVOD).map(k => ({ zavod: k, n: pr.items.filter(x => x.zavod === k).length })) }), true;
     }
+    if (p === '/api/vykonnost/mzdy/cfg' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } const cur = loadMzCfg(); if (b.rezim) cur.rezim = b.rezim === 'vyrobni' ? 'vyrobni' : 'stredisko'; if (Array.isArray(b.vyloucit)) { cur.vyloucit = {}; b.vyloucit.forEach(os => { if (/^\d+$/.test(String(os))) cur.vyloucit[String(+os)] = true; }); } if (b.os && b.pocitat != null) { if (b.pocitat) delete cur.vyloucit[String(+b.os)]; else cur.vyloucit[String(+b.os)] = true; } return json(res, 200, { ok: true, cfg: saveMzCfg(cur) }), true; }
     if (p === '/api/vykonnost/mzdy/sync' && req.method === 'POST') { try { const r = await syncMzdy(); return json(res, 200, r), true; } catch (e) { return json(res, 500, { ok: false, error: e.message }), true; } }
     if (p === '/api/vykonnost/vydejky/sync' && req.method === 'POST') { try { const r = await syncVydejky(); return json(res, 200, r), true; } catch (e) { return json(res, 500, { ok: false, error: e.message }), true; } }
     if (p === '/api/vykonnost/sync' && req.method === 'POST') {
