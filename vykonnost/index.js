@@ -34,6 +34,11 @@ const LAK_NAZEV = op => /^lakov[aá]n[ií](?=\s|$)/i.test(op) && !/^lakov[aá]n[
 const jeVrchniLak = (op, cop, popelnice) => { const n = parseInt(String(cop == null ? '' : cop).trim(), 10); const o = String(op || '').trim();
   if (popelnice) { if (n === 990) return true; if (n >= 1000) return false; return /^lakov[aá]n[ií](\s*2\s*x.*)?$/i.test(o); }
   if ((n >= 940 && n <= 989) || (n >= 800 && n <= 899)) return false; return LAK_NAZEV(o); };
+// Typ hotového výrobku: ABR (hlavní kritérium proti cíli) · CITY · muldy · jiné — podle názvu operace, u obecného názvu podle dílu
+const typVyrobku = (op, dil) => { const o = String(op || '').toLowerCase(), d = String(dil || '').toLowerCase();
+  const je = (t, re) => re.test(t); const RM = /muld|(^|[^a-z])(am|smr|dmc|dmpm|dms|asm|amk)[- ]?\d/i, RC = /city|wdg|wdc|\bsit\b|csd/i, RA = /\babr\b|abr-|dsd|afs|alst|ecl|hbi|hbs|\bwd\b|lwc|sth|domat|plato|víko|viko/i;
+  if (je(o, /muld/)) return 'muldy'; const oc = je(o, RC), oa = je(o, RA); if (oc && !oa) return 'city'; if (oa && !oc) return 'abr';
+  if (je(d, RM)) return 'muldy'; if (je(d, RC)) return 'city'; if (je(d, RA)) return 'abr'; return oc && oa ? 'abr' : 'jine'; };
 const FAZE_VYSTUPU = {
   default: { skl: op => /^sklád[aá]n[ií]\b/i.test(op) && !/n[aá]razn|krabi|rám|USB|SP \d/i.test(op), dov: op => /^dova[řr]|^dovár/i.test(op) && !/SP \d|žeb[řr]|rám|vany|horizont|p[řr][ií]platek|t-? ?profil/i.test(op), lak: (op, cop) => jeVrchniLak(op, cop, false), zakl: (op, cop) => { const n = parseInt(String(cop || ''), 10); return (n >= 800 && n <= 839) || (!(n >= 100) && /^základov[aá]n[ií]\b/i.test(op) && !/víko|viko|střech|strech/i.test(op)); } },
   popelnice: { skl: op => /^sestaven[ií] vany/i.test(op), dov: op => /^dova[řr]en[ií] vany/i.test(op), lak: (op, cop) => jeVrchniLak(op, cop, true), zakl: () => false }
@@ -537,7 +542,9 @@ function mount(host) {
       { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé s odváděním', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' },
       { k: 'A5', label: 'Normohodiny jako % fondu', jedn: '%', smer: 'up', vzorec: 'Σ (čas normy × ks) u spárovaných operací ÷ fond pracovní doby lidí s odváděním', proc: 'Kolik fondu je kryto normovaným úkolem. Závisí na pokrytí normami (A6) — číst spolu.' },
       { k: 'A6', label: '% výrobních řádků s normou', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'výrobní řádky spárované s položkou v katalogu norem ÷ výrobní řádky', proc: 'Pokrytí normami. Co není spárované, nemá cenu ani čas — buď chybí norma, nebo jen ruční přiřazení v záložce Normy.' },
-      { k: 'A7', klic: true, label: 'Hotových výrobků za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v operaci lakování (poslední operace řetězce; u Popelnice „Lakování“ beden; u Chomutova navíc muldy z listu „kapa-plán Mulden“, které se v Heliosu neodvádějí) ÷ pracovní dny měsíce', proc: 'Skutečný výstup závodu proti cíli (výchozí 6 kontejnerů/den; správce může změnit). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' },
+      { k: 'A7', klic: true, label: 'Hotových ABR za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v odvedeném lakování vrchů u abrolových kontejnerů (ABR, DSD, AFS, ALST, ECL, HBI…; u Popelnice „Lakování“ beden) ÷ pracovní dny měsíce', proc: 'Hlavní kritérium: skutečný výstup abrolů proti cíli (výchozí 6 kontejnerů/den; správce může změnit). CITY a muldy se vedou zvlášť (A7c, A7m). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' },
+      { k: 'A7c', label: 'Hotových CITY za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy v lakování vrchů u kontejnerů CITY (CSD, SIT, WDG, WDC) ÷ pracovní dny měsíce', proc: 'Vedlejší výroba vedená zvlášť, do cíle 6 ABR/den se nepočítá. Popelnice nemají.' },
+      { k: 'A7m', label: 'Hotových muld za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy v lakování muld (AM, SMR, DMC, DMS…) + u Chomutova muldy z listu „kapa-plán Mulden“, které se v Heliosu neodvádějí ÷ pracovní dny měsíce', proc: 'Vedlejší výroba vedená zvlášť, do cíle 6 ABR/den se nepočítá.' },
       { k: 'A8', klic: true, label: 'Hlavních operací za pracovní den', jedn: 'op.', smer: 'up', cil: true, vzorec: 'kusy odvedené v 10 hlavních fázích kontejneru (natahování, trámec rolen, podlaha, 2× bočnice, 2× vrata, skládání, dovařování, osazení vrat, odkuličkování, lakování) ÷ pracovní dny měsíce', proc: 'Jeden kontejner = 12 hlavních operací, cíl 6 kontejnerů denně = 72 operací denně. Říká, jestli se odvádí tolik práce, kolik je na cílový výstup potřeba — dřív, než se to projeví na hotových kusech (A7). Zelená = cíl splněn, žlutá = nad 80 % cíle. Časy a počty fází se berou ze záložky Plán 6 ABR/den.' },
       { k: 'A9', label: 'Hlavních operací na hotový kontejner', jedn: 'op.', smer: 'watch', cil: true, pasmo: [10, 25], vzorec: 'kusy odvedené v 10 hlavních fázích ÷ kusy v operaci lakování ABR', proc: 'Má vyjít 12. Méně = část práce na kontejneru se neodvádí (nebo končí v režii). Více = rozpracovanost roste, vyrábí se dílce, které se nedolakují. Zelená = do 10 % od 12, žlutá = do 25 %.' },
       { k: 'A10', label: 'Odvedená práce v hlavních operacích — osobosměn za den', jedn: 'os.', smer: 'up', cil: true, vzorec: 'Σ (kusy fáze × čas fáze z plánu) ÷ délka směny ÷ pracovní dny měsíce', proc: 'Totéž co A8, ale vážené časem: dovařování (450 min) váží víc než natahování (60 min). Cíl = kolik lidí plně v úkolu je potřeba na cílový výstup (6 kontejnerů × 1 850 min ÷ 440 min = 25,2 osobosměny denně). Počet lidí na operaci počet kusů nemění — dva lidé na jednom dovaření si v Heliosu kus dělí (0,5 + 0,5).' }
@@ -582,7 +589,8 @@ function mount(host) {
     let nMin = 0, nRows = 0; if (normIndex().items.length) prod.forEach(r => { const n = matchNorma(zavodKey, r[R.op], r[R.dil], r[R.cop]); if (n) { nMin += (n.min || 0) * r[R.ks]; nRows++; } });
     const FZ = FAZE_VYSTUPU[zavodKey] || FAZE_VYSTUPU.default; const MP = muldyPlan(zavodKey); const snapM = (loadData(zavodKey) || {}).snapshot || '9999';
     const muldyKs = MP.dny.filter(x => x.d.startsWith(ym) && x.d <= snapM).reduce((s, x) => s + x.ks, 0);
-    const lakKs = prod.filter(r => FZ.lak(r[R.op], r[R.cop]) && !MP.set.has(r[R.cvz])).reduce((s, r) => s + r[R.ks], 0) + muldyKs;
+    let lakA = 0, lakC = 0, lakM = 0; prod.forEach(r => { if (!FZ.lak(r[R.op], r[R.cop]) || MP.set.has(r[R.cvz])) return; const t = zavodKey === 'popelnice' ? 'abr' : typVyrobku(r[R.op], r[R.dil]); if (t === 'abr') lakA += r[R.ks]; else if (t === 'city') lakC += r[R.ks]; else if (t === 'muldy') lakM += r[R.ks]; });
+    lakM += muldyKs; const lakKs = lakA;
     const rezH = rez.reduce((s, r) => s + r[R.ks], 0), ks = prod.reduce((s, r) => s + r[R.ks], 0);
     // hlavní operace kontejneru (fáze plánu 6 ABR/den) — jen závody s cílem v kontejnerech
     let opKs = null, opMin = null, lakAbr = 0; const P6 = loadPlan6();
@@ -597,7 +605,7 @@ function mount(host) {
     const p = (a, b) => b ? Math.round(a / b * 100) : 0, r1 = x => Math.round(x * 10) / 10;
     return { m: ym, rows: rows.length, ks: Math.round(ks), rezH: Math.round(rezH), pracDny: pd,
       A1: p(rezH, fond), A2: ks ? Math.round(rezH / ks * 1000) : 0, A3: prod.length ? Math.round(rezH / prod.length * 100) / 100 : 0, A4: lide.size ? Math.round(ks / lide.size) : 0,
-      A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null, A7: pd ? Math.round(lakKs / pd * 10) / 10 : null, muldyPlan: muldyKs || undefined,
+      A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null, A7: pd ? Math.round(lakKs / pd * 10) / 10 : null, A7c: pd && zavodKey !== 'popelnice' ? Math.round(lakC / pd * 10) / 10 : null, A7m: pd && zavodKey !== 'popelnice' ? Math.round(lakM / pd * 10) / 10 : null, muldyPlan: muldyKs || undefined,
       A8: opKs != null && pd ? Math.round(opKs / pd * 10) / 10 : null, A9: opKs != null && lakAbr > 0 ? Math.round(opKs / lakAbr * 10) / 10 : null, opKs: opKs != null ? Math.round(opKs) : null,
       A10: opMin != null && pd ? Math.round(opMin / P6.smenaMin / pd * 10) / 10 : null, opMin: opMin != null ? Math.round(opMin) : null,
       B1: p(rezProd, rezH), B2: p(rezOst, rezH), B3: ks ? r1(rekH / ks * 1000) : 0, B4: p(zaH, rezH),
@@ -614,7 +622,7 @@ function mount(host) {
     out.forEach((M, i) => {
       M.cil = cilZ; M.cile = cileZ(cilZ);
       M.neuplny = M.m === snapM && !/-(2[89]|3[01])$/.test(D.snapshot);
-      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const MPz = muldyPlan(z.key); const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && (FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default).lak(r[R.op], r[R.cop]) && !MPz.set.has(r[R.cvz])).reduce((s, r) => s + r[R.ks], 0) + (M.muldyPlan || 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; if (M.opKs != null) { M.A8 = Math.round(M.opKs / pdSoFar * 10) / 10; M.A10 = Math.round(M.opMin / loadPlan6().smenaMin / pdSoFar * 10) / 10; } }
+      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const MPz = muldyPlan(z.key); const FZz = FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default; const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && FZz.lak(r[R.op], r[R.cop]) && !MPz.set.has(r[R.cvz]) && (z.key === 'popelnice' || typVyrobku(r[R.op], r[R.dil]) === 'abr')).reduce((s, r) => s + r[R.ks], 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; if (M.opKs != null) { M.A8 = Math.round(M.opKs / pdSoFar * 10) / 10; M.A10 = Math.round(M.opMin / loadPlan6().smenaMin / pdSoFar * 10) / 10; } }
       M.sem = {}; M.trend = {}; M.med = {};
       LEG_FLAT.forEach(def => {
         M.sem[def.k] = semafor(def, M[def.k], M);
@@ -734,16 +742,16 @@ function mount(host) {
     const all = D.rows.filter(r => r[R.date] <= D.snapshot); const snap = D.snapshot;
     const usekOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen|odkulič|odkulic/.test(o)) return 'lak'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl[ií]rna|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|stříh|strih|loch|obrobna|soustruh/.test(o)) return 'del'; return 'svar'; };
     const W = {}; const MP = muldyPlan(z.key); const mHot = MP.dny.filter(x => x.d <= snap), mPlan = MP.dny.filter(x => x.d > snap);
-    all.forEach(r => { const w = W[r[R.week]] = W[r[R.week]] || { week: r[R.week], skl: 0, dov: 0, lak: 0, zakl: 0, lide: new Set(), svar: new Set(), rezieH: 0, rezieSvar: 0, normH: 0, normSvar: 0, rows: 0, dny: new Set(), rework: 0 };
+    all.forEach(r => { const w = W[r[R.week]] = W[r[R.week]] || { week: r[R.week], skl: 0, dov: 0, lak: 0, zakl: 0, lakAbr: 0, lakCity: 0, lakMuldy: 0, lakJine: 0, lide: new Set(), svar: new Set(), rezieH: 0, rezieSvar: 0, normH: 0, normSvar: 0, rows: 0, dny: new Set(), rework: 0 };
       w.rows++; w.lide.add(r[R.id] || r[R.name]); w.dny.add(r[R.date]);
       if (isRezie(r[R.dil])) { w.rezieH += r[R.ks]; if (RE_REKL.test(r[R.op])) w.rework += r[R.ks]; if (usekOf(r[R.pozn] + ' ' + r[R.op]) === 'svar' && !/lak|trysk/.test(String(r[R.pozn]).toLowerCase())) w.rezieSvar += r[R.ks]; return; }
-      const op = r[R.op]; const zPlanu = MP.set.has(r[R.cvz]); if (F.skl(op)) w.skl += r[R.ks]; if (F.dov(op) && !zPlanu) w.dov += r[R.ks]; if (F.lak(op, r[R.cop]) && !zPlanu) w.lak += r[R.ks]; if (F.zakl(op, r[R.cop]) && !zPlanu) w.zakl += r[R.ks];
+      const op = r[R.op]; const zPlanu = MP.set.has(r[R.cvz]); if (F.skl(op)) w.skl += r[R.ks]; if (F.dov(op) && !zPlanu) w.dov += r[R.ks]; if (F.lak(op, r[R.cop]) && !zPlanu) { w.lak += r[R.ks]; const t = z.key === 'popelnice' ? 'abr' : typVyrobku(op, r[R.dil]); w[t === 'abr' ? 'lakAbr' : t === 'city' ? 'lakCity' : t === 'muldy' ? 'lakMuldy' : 'lakJine'] += r[R.ks]; } if (F.zakl(op, r[R.cop]) && !zPlanu) w.zakl += r[R.ks];
       const u = usekOf(op); if (u === 'svar') { w.svar.add(r[R.id] || r[R.name]); w.svarRows = (w.svarRows || 0) + 1; }
       if (normIndex().items.length) { const n = matchNorma(z.key, op, r[R.dil], r[R.cop]); if (n) { const mn = (n.min || 0) * r[R.ks] / 60; w.normH += mn; if (u === 'svar') { w.normSvar += mn; w.svarMatched = (w.svarMatched || 0) + 1; } } } });
     // muldy z plánu (svařené v závodě, v Heliosu neodváděné) → hotové i svařovna hotovo v den z plánu
-    mHot.forEach(x => { const w = W[isoWeekOf(x.d)]; if (!w) return; w.lak += x.ks; w.dov += x.ks; w.muldy = (w.muldy || 0) + x.ks; });
+    mHot.forEach(x => { const w = W[isoWeekOf(x.d)]; if (!w) return; w.lak += x.ks; w.lakMuldy += x.ks; w.dov += x.ks; w.muldy = (w.muldy || 0) + x.ks; });
     const weeks = Object.values(W).sort((a, b) => a.week.localeCompare(b.week)).map(w => { const pd = w.week === isoWeekOf(snap) ? Math.max(1, [...w.dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length) : 5;
-      return { week: w.week, muldy: w.muldy || 0, od: pracDnyTydne(w.week).od, rows: w.rows, svarRows: w.svarRows || 0, svarMatched: w.svarMatched || 0, skl: Math.round(w.skl), dov: Math.round(w.dov), lak: Math.round(w.lak), zakl: Math.round(w.zakl), lide: w.lide.size, svar: w.svar.size, rezieH: Math.round(w.rezieH), rezieSvar: Math.round(w.rezieSvar), rework: Math.round(w.rework), normH: Math.round(w.normH), normSvar: Math.round(w.normSvar), pd, lakDen: Math.round(w.lak / pd * 10) / 10, dovDen: Math.round(w.dov / pd * 10) / 10, neuplny: w.week === isoWeekOf(snap) }; });
+      return { week: w.week, muldy: w.muldy || 0, od: pracDnyTydne(w.week).od, rows: w.rows, svarRows: w.svarRows || 0, svarMatched: w.svarMatched || 0, skl: Math.round(w.skl), dov: Math.round(w.dov), lak: Math.round(w.lakAbr), lakVse: Math.round(w.lak), city: Math.round(w.lakCity), muldyVse: Math.round(w.lakMuldy), jine: Math.round(w.lakJine), zakl: Math.round(w.zakl), lide: w.lide.size, svar: w.svar.size, rezieH: Math.round(w.rezieH), rezieSvar: Math.round(w.rezieSvar), rework: Math.round(w.rework), normH: Math.round(w.normH), normSvar: Math.round(w.normSvar), pd, lakDen: Math.round(w.lakAbr / pd * 10) / 10, lakDenVse: Math.round(w.lak / pd * 10) / 10, cityDen: Math.round(w.lakCity / pd * 10) / 10, muldyDen: Math.round(w.lakMuldy / pd * 10) / 10, dovDen: Math.round(w.dov / pd * 10) / 10, neuplny: w.week === isoWeekOf(snap) }; });
     // odstávka (celozávodní dovolená, svátky) = týden s méně než polovinou obvyklého počtu lidí → do průměrů nepočítat
     const lideSorted = weeks.filter(w => !w.neuplny).map(w => w.lide).sort((a, b) => a - b); const medLide = lideSorted.length ? lideSorted[Math.floor(lideSorted.length / 2)] : 0;
     weeks.forEach(w => { w.odstavka = !w.neuplny && w.lide < medLide * 0.5; });
@@ -753,10 +761,13 @@ function mount(host) {
     const sum = (arr, k) => arr.reduce((s, w) => s + w[k], 0);
     const kpi = { cil, lakDen4: Math.round(avg(last4, 'lakDen') * 10) / 10, dovDen4: Math.round(avg(last4, 'dovDen') * 10) / 10, lakDenRok: Math.round(sum(rok, 'lak') / Math.max(1, sum(rok, 'pd')) * 10) / 10, dovDenRok: Math.round(sum(rok, 'dov') / Math.max(1, sum(rok, 'pd')) * 10) / 10,
       lakRok: sum(rok, 'lak'), dovRok: sum(rok, 'dov'), sklRok: sum(rok, 'skl'), zaklRok: sum(rok, 'zakl'), zakl4: sum(last4, 'zakl'), lak4: sum(last4, 'lak'), muldy4: sum(last4, 'muldy'), od4: last4.length ? last4[0].od : '', do4: last4.length ? pracDnyTydne(last4[last4.length - 1].week).do : '', muldyRok: mHot.reduce((s, x) => s + x.ks, 0), tydnuPod: cil ? rok.filter(w => w.lakDen < cil).length : null, tydnu: rok.length, plneni4: cil && last4.length ? Math.round(avg(last4, 'lakDen') / cil * 100) : null, plneniRok: cil ? Math.round(sum(rok, 'lak') / Math.max(1, sum(rok, 'pd')) / cil * 100) : null,
-      wip: Math.max(0, sum(rok, 'dov') - sum(rok, 'lak')), wipSkl: Math.max(0, sum(rok, 'skl') - sum(rok, 'dov')) };
+      wip: Math.max(0, sum(rok, 'dov') - sum(rok, 'lakVse')), wipSkl: Math.max(0, sum(rok, 'skl') - sum(rok, 'dov')),
+      // vedle hlavního kritéria (ABR) zvlášť CITY, muldy a ostatní — celkem vše
+      lakRokVse: sum(rok, 'lakVse'), lak4Vse: sum(last4, 'lakVse'), city4: sum(last4, 'city'), cityRok: sum(rok, 'city'), cityDen4: Math.round(sum(last4, 'city') / Math.max(1, sum(last4, 'pd')) * 10) / 10, cityDenRok: Math.round(sum(rok, 'city') / Math.max(1, sum(rok, 'pd')) * 10) / 10,
+      muldyVse4: sum(last4, 'muldyVse'), muldyVseRok: sum(rok, 'muldyVse'), muldyDen4: Math.round(sum(last4, 'muldyVse') / Math.max(1, sum(last4, 'pd')) * 10) / 10, muldyDenRok: Math.round(sum(rok, 'muldyVse') / Math.max(1, sum(rok, 'pd')) * 10) / 10, jine4: sum(last4, 'jine'), jineRok: sum(rok, 'jine') };
     // úzké hrdlo v řetězci = fáze s nejnižší roční průchodností
     // úzké hrdlo: srovnatelné jsou dovaření a lakování (obě = 1 na výrobek); skládání je jen pro ABR/CITY (bez muld)
-    const hrdlo = kpi.lakRok < kpi.dovRok * 0.9 ? { n: 'lakovna — hotové výrobky zaostávají za svařovnou o ' + (kpi.dovRok - kpi.lakRok) + ' ks' } : (kpi.dovRok < kpi.lakRok * 0.9 ? { n: 'svařovna — lakovna doháněla rozpracované kusy z dřívějška' } : { n: 'svařovna a lakovna jdou v rovnováze — limit je tempo svařovny' });
+    const hrdlo = kpi.lakRokVse < kpi.dovRok * 0.9 ? { n: 'lakovna — hotové výrobky zaostávají za svařovnou o ' + (kpi.dovRok - kpi.lakRokVse) + ' ks' } : (kpi.dovRok < kpi.lakRokVse * 0.9 ? { n: 'svařovna — lakovna doháněla rozpracované kusy z dřívějška' } : { n: 'svařovna a lakovna jdou v rovnováze — limit je tempo svařovny' });
     kpi.pokrytiSvar = sum(rok, 'svarRows') ? Math.round(sum(rok, 'svarMatched') / sum(rok, 'svarRows') * 100) : 0;
     // proč cíl neplníme: týdny pod cílem vs. nad cílem — co se liší; + korelace výstupu s faktory
     const proc = [];
@@ -921,7 +932,7 @@ function mount(host) {
       const all = D.rows.filter(r => r[R.date] <= snap); const last4 = all.filter(r => r[R.date] >= od4);
       const agg = rs => { let ks = 0, rez = 0, term = 0; const l = new Set(), c = new Set(); rs.forEach(r => { if (isRezie(r[R.dil])) rez += r[R.ks]; else ks += r[R.ks]; if (r[R.aut] === 'terminalETH') term++; l.add(r[R.id] || r[R.name]); if (r[R.cvz]) c.add(r[R.cvz]); }); return { rows: rs.length, ks: Math.round(ks), rezieH: Math.round(rez), lide: l.size, cvz: c.size, termPct: rs.length ? Math.round(term / rs.length * 100) : 0 }; };
       const tyd = {}; last4.forEach(r => { tyd[r[R.week]] = (tyd[r[R.week]] || 0) + 1; });
-      let vy = null; try { const V = vystup(z); if (V) vy = { cil: V.cil, lakDen4: V.kpi.lakDen4, lak4: V.kpi.lak4, muldy4: V.kpi.muldy4, od4: V.kpi.od4, do4: V.kpi.do4, lakDenRok: V.kpi.lakDenRok, plneni4: V.kpi.plneni4, plneniRok: V.kpi.plneniRok, lakRok: V.kpi.lakRok, hrdlo: V.hrdlo, tydnuPod: V.kpi.tydnuPod, tydnu: V.kpi.tydnu }; } catch (_) {}
+      let vy = null; try { const V = vystup(z); if (V) vy = { cil: V.cil, lakDen4: V.kpi.lakDen4, lak4: V.kpi.lak4, muldy4: V.kpi.muldy4, city4: V.kpi.city4, muldyVse4: V.kpi.muldyVse4, jine4: V.kpi.jine4, lak4Vse: V.kpi.lak4Vse, cityRok: V.kpi.cityRok, muldyVseRok: V.kpi.muldyVseRok, lakRokVse: V.kpi.lakRokVse, od4: V.kpi.od4, do4: V.kpi.do4, lakDenRok: V.kpi.lakDenRok, plneni4: V.kpi.plneni4, plneniRok: V.kpi.plneniRok, lakRok: V.kpi.lakRok, hrdlo: V.hrdlo, tydnuPod: V.kpi.tydnuPod, tydnu: V.kpi.tydnu }; } catch (_) {}
       return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: snap, source: D.source, syncedAt: D.syncedAt, error: zs.error || '', rok: agg(all), t4: agg(last4), od4, tydny4: Object.entries(tyd).sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ week: w, rows: n })), plan: pl, vystup: vy };
     });
   }
@@ -937,7 +948,7 @@ function mount(host) {
   const esc = x => String(x == null ? '' : x).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const MES = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
   const mesLabel = ym => { const [y, m] = ym.split('-'); return MES[+m - 1] + ' ' + y; };
-  const fmtV = (def, v) => v == null ? '—' : (def.k === 'A3' || def.k === 'B3' || def.k === 'A7' || def.k === 'A8' || def.k === 'A9' || def.k === 'A10' ? String(v).replace('.', ',') : fmt0(v)) + (def.jedn === '%' ? ' %' : (def.jedn ? ' ' + def.jedn : ''));
+  const fmtV = (def, v) => v == null ? '—' : (/^(A3|B3|A7|A7c|A7m|A8|A9|A10)$/.test(def.k) ? String(v).replace('.', ',') : fmt0(v)) + (def.jedn === '%' ? ' %' : (def.jedn ? ' ' + def.jedn : ''));
   const SEM_BG = { g: '#e6f3e4', y: '#fbf1dc', r: '#fbe9e8', '': 'transparent' }, SEM_FG = { g: '#0a7a0a', y: '#b57400', r: '#c93a39', '': '#1c1d1a' };
   // Report za poslední UZAVŘENÝ měsíc (ym); když není zadán, vezme měsíc před měsícem snímku.
   function buildReport(ymArg) {
