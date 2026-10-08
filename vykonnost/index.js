@@ -752,7 +752,7 @@ function mount(host) {
     const avg = (arr, k) => arr.length ? arr.reduce((s, w) => s + w[k], 0) / arr.length : 0;
     const sum = (arr, k) => arr.reduce((s, w) => s + w[k], 0);
     const kpi = { cil, lakDen4: Math.round(avg(last4, 'lakDen') * 10) / 10, dovDen4: Math.round(avg(last4, 'dovDen') * 10) / 10, lakDenRok: Math.round(sum(rok, 'lak') / Math.max(1, sum(rok, 'pd')) * 10) / 10, dovDenRok: Math.round(sum(rok, 'dov') / Math.max(1, sum(rok, 'pd')) * 10) / 10,
-      lakRok: sum(rok, 'lak'), dovRok: sum(rok, 'dov'), sklRok: sum(rok, 'skl'), zaklRok: sum(rok, 'zakl'), zakl4: sum(last4, 'zakl'), lak4: sum(last4, 'lak'), muldyRok: mHot.reduce((s, x) => s + x.ks, 0), tydnuPod: cil ? rok.filter(w => w.lakDen < cil).length : null, tydnu: rok.length, plneni4: cil && last4.length ? Math.round(avg(last4, 'lakDen') / cil * 100) : null, plneniRok: cil ? Math.round(sum(rok, 'lak') / Math.max(1, sum(rok, 'pd')) / cil * 100) : null,
+      lakRok: sum(rok, 'lak'), dovRok: sum(rok, 'dov'), sklRok: sum(rok, 'skl'), zaklRok: sum(rok, 'zakl'), zakl4: sum(last4, 'zakl'), lak4: sum(last4, 'lak'), muldy4: sum(last4, 'muldy'), od4: last4.length ? last4[0].od : '', do4: last4.length ? pracDnyTydne(last4[last4.length - 1].week).do : '', muldyRok: mHot.reduce((s, x) => s + x.ks, 0), tydnuPod: cil ? rok.filter(w => w.lakDen < cil).length : null, tydnu: rok.length, plneni4: cil && last4.length ? Math.round(avg(last4, 'lakDen') / cil * 100) : null, plneniRok: cil ? Math.round(sum(rok, 'lak') / Math.max(1, sum(rok, 'pd')) / cil * 100) : null,
       wip: Math.max(0, sum(rok, 'dov') - sum(rok, 'lak')), wipSkl: Math.max(0, sum(rok, 'skl') - sum(rok, 'dov')) };
     // úzké hrdlo v řetězci = fáze s nejnižší roční průchodností
     // úzké hrdlo: srovnatelné jsou dovaření a lakování (obě = 1 na výrobek); skládání je jen pro ABR/CITY (bez muld)
@@ -921,7 +921,7 @@ function mount(host) {
       const all = D.rows.filter(r => r[R.date] <= snap); const last4 = all.filter(r => r[R.date] >= od4);
       const agg = rs => { let ks = 0, rez = 0, term = 0; const l = new Set(), c = new Set(); rs.forEach(r => { if (isRezie(r[R.dil])) rez += r[R.ks]; else ks += r[R.ks]; if (r[R.aut] === 'terminalETH') term++; l.add(r[R.id] || r[R.name]); if (r[R.cvz]) c.add(r[R.cvz]); }); return { rows: rs.length, ks: Math.round(ks), rezieH: Math.round(rez), lide: l.size, cvz: c.size, termPct: rs.length ? Math.round(term / rs.length * 100) : 0 }; };
       const tyd = {}; last4.forEach(r => { tyd[r[R.week]] = (tyd[r[R.week]] || 0) + 1; });
-      let vy = null; try { const V = vystup(z); if (V) vy = { cil: V.cil, lakDen4: V.kpi.lakDen4, lakDenRok: V.kpi.lakDenRok, plneni4: V.kpi.plneni4, plneniRok: V.kpi.plneniRok, lakRok: V.kpi.lakRok, hrdlo: V.hrdlo, tydnuPod: V.kpi.tydnuPod, tydnu: V.kpi.tydnu }; } catch (_) {}
+      let vy = null; try { const V = vystup(z); if (V) vy = { cil: V.cil, lakDen4: V.kpi.lakDen4, lak4: V.kpi.lak4, muldy4: V.kpi.muldy4, od4: V.kpi.od4, do4: V.kpi.do4, lakDenRok: V.kpi.lakDenRok, plneni4: V.kpi.plneni4, plneniRok: V.kpi.plneniRok, lakRok: V.kpi.lakRok, hrdlo: V.hrdlo, tydnuPod: V.kpi.tydnuPod, tydnu: V.kpi.tydnu }; } catch (_) {}
       return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: snap, source: D.source, syncedAt: D.syncedAt, error: zs.error || '', rok: agg(all), t4: agg(last4), od4, tydny4: Object.entries(tyd).sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ week: w, rows: n })), plan: pl, vystup: vy };
     });
   }
