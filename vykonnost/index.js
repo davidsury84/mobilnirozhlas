@@ -536,11 +536,11 @@ function mount(host) {
   // klic: true = klíčový indikátor se semaforem v e-mailu.
   const LEGENDA = [
     { skup: 'A', nazev: 'Efektivita — kolik výkonu polyká režie', items: [
-      { k: 'A1', klic: true, label: 'Režie jako % fondu pracovní doby', jedn: '%', smer: 'down', prah: [10, 20], vzorec: 'režijní hodiny ÷ (lidé s odváděním × pracovní dny × 8 h)', proc: 'Nejbližší náhrada „režie vs. mzda“ bez mzdových dat. Kolik procent odpracovaného času se zapsalo jako režie místo úkolu.' },
+      { k: 'A1', klic: true, label: 'Režie jako % fondu pracovní doby', jedn: '%', smer: 'down', prah: [10, 20], vzorec: 'režijní hodiny ÷ (lidé ve stavu podle personalistiky × pracovní dny × 8 h)', proc: 'Nejbližší náhrada „režie vs. mzda“ bez mzdových dat. Kolik procent odpracovaného času se zapsalo jako režie místo úkolu.' },
       { k: 'A2', label: 'Režie h na 1 000 vyrobených ks', jedn: 'h', smer: 'down', vzorec: 'režijní hodiny ÷ kusy × 1000', proc: 'Režie vztažená k výstupu. Srovnávat jen v čase v rámci závodu (kusy nejsou mezi závody stejné).' },
       { k: 'A3', label: 'Režie h na produkční operaci', jedn: 'h', smer: 'down', vzorec: 'režijní hodiny ÷ počet produkčních řádků', proc: 'Kolik režie připadá na jednu odvedenou výrobní operaci.' },
-      { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé s odváděním', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' },
-      { k: 'A5', label: 'Normohodiny jako % fondu', jedn: '%', smer: 'up', vzorec: 'Σ (čas normy × ks) u spárovaných operací ÷ fond pracovní doby lidí s odváděním', proc: 'Kolik fondu je kryto normovaným úkolem. Závisí na pokrytí normami (A6) — číst spolu.' },
+      { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé ve stavu podle personalistiky', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' },
+      { k: 'A5', label: 'Normohodiny jako % fondu', jedn: '%', smer: 'up', vzorec: 'Σ (čas normy × ks) u spárovaných operací ÷ fond pracovní doby lidí ve stavu', proc: 'Kolik fondu je kryto normovaným úkolem. Závisí na pokrytí normami (A6) — číst spolu.' },
       { k: 'A6', label: '% výrobních řádků s normou', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'výrobní řádky spárované s položkou v katalogu norem ÷ výrobní řádky', proc: 'Pokrytí normami. Co není spárované, nemá cenu ani čas — buď chybí norma, nebo jen ruční přiřazení v záložce Normy.' },
       { k: 'A7', klic: true, label: 'Hotových ABR za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v odvedeném lakování vrchů u abrolových kontejnerů (ABR, DSD, AFS, ALST, ECL, HBI…; u Popelnice „Lakování“ beden) ÷ pracovní dny měsíce', proc: 'Hlavní kritérium: skutečný výstup abrolů proti cíli (výchozí 6 kontejnerů/den; správce může změnit). CITY a muldy se vedou zvlášť (A7c, A7m). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' },
       { k: 'A7c', label: 'Hotových CITY za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy v lakování vrchů u kontejnerů CITY (CSD, SIT, WDG, WDC) ÷ pracovní dny měsíce', proc: 'Vedlejší výroba vedená zvlášť, do cíle 6 ABR/den se nepočítá. Popelnice nemají.' },
@@ -573,8 +573,9 @@ function mount(host) {
       { k: 'C5', label: 'Produkční řádky s 0 ks', jedn: 'ř.', smer: 'down', prah: [0, 5], vzorec: 'počet výrobních řádků s nulovým množstvím', proc: 'Práce zapsaná bez množství — pro normu i výkon neviditelná.' }
     ] },
     { skup: 'D', nazev: 'Lidé a kapacita', items: [
-      { k: 'D1', label: 'Lidí s odváděním', jedn: '', smer: 'watch', vzorec: 'počet různých osobních čísel v měsíci', proc: 'Základ pro A1 a A4.' },
-      { k: 'D2', klic: true, label: 'Lidí z roku bez odvádění v měsíci', jedn: '', smer: 'down', prah: [15, 30], vzorec: 'lidé, kteří odváděli dřív v roce, ale v měsíci nic; semafor podle podílu z (D1 + D2)', proc: 'Buď mimo (dovolená, nemoc, odchod), nebo pracují neviditelně. Párovat s docházkou.' }
+      { k: 'D1', label: 'Lidí ve stavu (personalistika)', jedn: '', smer: 'watch', vzorec: 'v měsících s exportem mezd každý placený s útvarem závodu; po posledním exportu mezd aktuální seznam pracovních pozic; bez obojího lidé s odváděním', proc: 'Zdroj pravdy o stavu lidí. Základ fondu pracovní doby pro A1, A5 a A4.' },
+      { k: 'D1h', label: 'Odvádí v Heliosu', jedn: '', smer: 'watch', vzorec: 'počet různých osobních čísel s odvedenou operací v měsíci', proc: 'Kolik lidí ze stavu skutečně zapisuje. Trvale nižší než D1 = lidé pracují mimo odvádění (nebo jsou mimo).' },
+      { k: 'D2', klic: true, label: 'Lidí z roku bez odvádění v měsíci', jedn: '', smer: 'down', prah: [15, 30], vzorec: 'lidé, kteří odváděli dřív v roce, ale v měsíci nic; semafor podle podílu z (D1h + D2)', proc: 'Buď mimo (dovolená, nemoc, odchod), nebo pracují neviditelně. Párovat s docházkou.' }
     ] }
   ];
   const LEG_FLAT = LEGENDA.flatMap(g => g.items);
@@ -587,7 +588,7 @@ function mount(host) {
       if (def.pasmo) { const o = Math.abs(v - c) / c * 100; return o <= def.pasmo[0] ? 'g' : (o <= def.pasmo[1] ? 'y' : 'r'); }
       return v >= c ? 'g' : (v >= c * 0.8 ? 'y' : 'r'); }
     if (!def.prah || v == null) return '';
-    let x = v; if (def.k === 'D2') { const tot = (ctx && ctx.D1 || 0) + v; x = tot ? v / tot * 100 : 0; }
+    let x = v; if (def.k === 'D2') { const tot = (ctx && (ctx.D1h != null ? ctx.D1h : ctx.D1) || 0) + v; x = tot ? v / tot * 100 : 0; }
     if (def.smer === 'up') return x >= def.prah[0] ? 'g' : (x >= def.prah[1] ? 'y' : 'r');
     return x <= def.prah[0] ? 'g' : (x <= def.prah[1] ? 'y' : 'r');
   }
@@ -605,7 +606,7 @@ function mount(host) {
     // hlavní operace kontejneru (fáze plánu 6 ABR/den) — jen závody s cílem v kontejnerech
     let opKs = null, opMin = null, lakAbr = 0; const P6 = loadPlan6();
     if (CIL_DEFAULT[zavodKey]) { opKs = 0; opMin = 0; prod.forEach(r => { const fk = fazeOf(r); const f = fk && P6.faze.find(f => f.k === fk); if (f) { opKs += r[R.ks]; opMin += r[R.ks] * f.min; } if (fk === 'lakovani') lakAbr += r[R.ks]; }); }
-    const lide = new Set(rows.map(r => r[R.id] || r[R.name])); const fond = lide.size * pd * 8;
+    const lide = new Set(rows.map(r => r[R.id] || r[R.name])); const SL = stavLidi(zavodKey, ym); const stav = SL ? SL.n : lide.size; const fond = stav * pd * 8;
     const sum = (arr, f) => arr.filter(f).reduce((s, r) => s + r[R.ks], 0);
     const rezProd = sum(rez, r => !RE_PROD.test(r[R.op])), rezOst = sum(rez, r => RE_OST.test(r[R.op]) || !r[R.pozn]), rekH = sum(rez, r => RE_REKL.test(r[R.op])), zaH = sum(rez, r => RE_ZAUC.test(r[R.op]));
     const term = rows.filter(r => r[R.aut] === 'terminalETH').length;
@@ -614,7 +615,7 @@ function mount(host) {
     const drive = new Set(rokRows.filter(r => r[R.date] < ym).map(r => r[R.id] || r[R.name])); const bez = [...drive].filter(k => !lide.has(k)).length;
     const p = (a, b) => b ? Math.round(a / b * 100) : 0, r1 = x => Math.round(x * 10) / 10;
     return { m: ym, rows: rows.length, ks: Math.round(ks), rezH: Math.round(rezH), pracDny: pd,
-      A1: p(rezH, fond), A2: ks ? Math.round(rezH / ks * 1000) : 0, A3: prod.length ? Math.round(rezH / prod.length * 100) / 100 : 0, A4: lide.size ? Math.round(ks / lide.size) : 0,
+      A1: p(rezH, fond), A2: ks ? Math.round(rezH / ks * 1000) : 0, A3: prod.length ? Math.round(rezH / prod.length * 100) / 100 : 0, A4: stav ? Math.round(ks / stav) : 0,
       A5: normIndex().items.length ? p(nMin / 60, fond) : null, A6: normIndex().items.length ? p(nRows, prod.length) : null, A7: pd ? Math.round(lakKs / pd * 10) / 10 : null, A7e: (() => { const E = expedice(zavodKey); const mm = E && E.mesice.find(x => x.k === ym); return mm && pd ? Math.round(mm.abr / pd * 10) / 10 : null; })(), A7k: (() => { const E = expedice(zavodKey); const mm = E && E.mesice.find(x => x.k === ym); return mm ? Math.round(mm.kc / 1000) : null; })(),
       M1: (() => { const Z = mzdyMesic(zavodKey, ym); return Z && Z.hrube && lakA > 0 ? Math.round(Z.hrube / lakA) : null; })(), M2: (() => { const Z = mzdyMesic(zavodKey, ym); const v = lakA + lakC + lakM; return Z && Z.hrube && v > 0 ? Math.round(Z.hrube / v) : null; })(),
       M3: (() => { const Z = mzdyMesic(zavodKey, ym); return Z && Z.hodiny > 0 ? Math.round(Z.hrube / Z.hodiny) : null; })(), M4: (() => { const Z = mzdyMesic(zavodKey, ym); return Z && Z.vyrobni.hrube > 0 ? Math.round(Z.vyrobni.ukol / Z.vyrobni.hrube * 100) : null; })(), M5: (() => { const Z = mzdyMesic(zavodKey, ym); return Z && Z.ukol > 0 && nKc > 0 ? Math.round(nKc / Z.ukol * 100) : null; })(),
@@ -626,7 +627,7 @@ function mount(host) {
       A10: opMin != null && pd ? Math.round(opMin / P6.smenaMin / pd * 10) / 10 : null, opMin: opMin != null ? Math.round(opMin) : null,
       B1: p(rezProd, rezH), B2: p(rezOst, rezH), B3: ks ? r1(rekH / ks * 1000) : 0, B4: p(zaH, rezH),
       C1: p(term, rows.length), C2: p(top3, rows.length), C3: p(prub, lide.size), C4: p(prod.filter(r => !r[R.cvz]).length, prod.length), C5: prod.filter(r => r[R.ks] === 0).length,
-      D1: lide.size, D2: bez };
+      D1: stav, D1h: lide.size, D1z: SL ? SL.zdroj : 'helios', D1vyr: SL ? SL.vyr : null, D2: bez };
   }
   // Všechny měsíce roku pro závod + semafory, trend vs. předchozí měsíc a vs. medián předchozích 6.
   function indikatory(z) {
@@ -984,6 +985,13 @@ function mount(host) {
     ZAVODY.forEach(z => { const D = loadData(z.key); if (!D) return; D.rows.forEach(r => { if (!r[R.date].startsWith(ym)) return; const os = String(+r[R.id] || 0); if (os !== '0' && !map[os]) map[os] = { z: z.key, prof: profOf(r[R.op]) === 'lak' ? 'lak' : 'svar', jm: r[R.name], helios: true }; const nj = nrm(r[R.name]); if (!jmMap[nj]) jmMap[nj] = map[os] || { z: z.key, prof: 'svar', jm: r[R.name], helios: true }; }); });
     return (_mzc[k] = { map, jmMap });
   }
+  // Stav lidí závodu v měsíci z personalistiky: export mezd (placení s útvarem závodu) → po posledním exportu mezd aktuální seznam pozic → jinak null
+  function stavLidi(zKey, ym) {
+    const Z = mzdyMesic(zKey, ym); if (Z) return { n: Z.lidiVse, vyr: Z.vyrobniVse || 0, zdroj: 'mzdy' };
+    const PZ = loadPozice(); const MZ = loadMzdy(); const lastMz = MZ ? Object.keys(MZ.mesice).sort().pop() || '' : '';
+    if (PZ && ym > lastMz) { const l = PZ.items.filter(x => x.zavod === zKey && !/ukon[cč]en/i.test(x.stav) && (!x.do || x.do >= ym + '-01')); return { n: l.length, vyr: l.filter(x => x.prof !== 'ost').length, zdroj: 'pozice' }; }
+    return null;
+  }
   function mzdyMesic(zKey, ym) {
     const k = zKey + '|' + ym; if (_mzc[k] !== undefined) return _mzc[k]; const MZ = loadMzdy(); const M = MZ && MZ.mesice[ym]; if (!M) return (_mzc[k] = null);
     const ZL = zavodLidi(ym); const CFG = loadMzCfg(); const out = { ym, rezim: CFG.rezim, lidiVse: 0, vylouceno: 0, lidi: 0, hrube: 0, ukol: 0, zakl: 0, premie: 0, dovolena: 0, nahrady: 0, vyplaceno: 0, hodiny: 0, hodinyRiziko: 0, vyrobni: { lidi: 0, hrube: 0, ukol: 0, hodiny: 0 }, slozky: {}, lideSez: [] };
@@ -1217,8 +1225,7 @@ function mount(host) {
     // Indikátory všech závodů najednou (společný graf v přehledu); ?bez=popelnice vynechá závod
     if (p === '/api/vykonnost/indikatory' && req.method === 'GET') {
       const bez = String(u.query.bez || '').split(',').filter(Boolean);
-      const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, cile: I.cile, snapshot: I.snapshot, mesice: I.mesice.map(M => { const MZm = mzdyMesic(z.key, M.m); const PZ = loadPozice(); const MZall = loadMzdy(); const lastMz = MZall ? Object.keys(MZall.mesice).sort().pop() || '' : ''; const hrL = !MZm && PZ && M.m > lastMz ? PZ.items.filter(x => x.zavod === z.key && !/ukon[cč]en/i.test(x.stav) && (!x.do || x.do >= M.m + '-01')) : null;
-        const o = { m: M.m, neuplny: M.neuplny, rows: M.rows, ks: M.ks, rezH: M.rezH, pracDny: M.pracDny, hr: MZm ? MZm.lidiVse : (hrL ? hrL.length : null), hrVyr: MZm ? (MZm.vyrobniVse || 0) : (hrL ? hrL.filter(x => x.prof !== 'ost').length : null), hrZdroj: MZm ? 'mzdy' : (hrL ? 'pozice' : '') }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
+      const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, cile: I.cile, snapshot: I.snapshot, mesice: I.mesice.map(M => { const o = { m: M.m, neuplny: M.neuplny, rows: M.rows, ks: M.ks, rezH: M.rezH, pracDny: M.pracDny, hr: M.D1z === 'helios' ? null : M.D1, hrVyr: M.D1vyr, hrZdroj: M.D1z }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
       let prof = null; try { prof = profese(); } catch (e) { console.warn('[vykonnost] profese:', e.message); }
       json(res, 200, { zavody: zav, legenda: LEGENDA, profese: prof }); return true;
     }
