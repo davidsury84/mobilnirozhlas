@@ -1217,7 +1217,7 @@ function mount(host) {
     // Indikátory všech závodů najednou (společný graf v přehledu); ?bez=popelnice vynechá závod
     if (p === '/api/vykonnost/indikatory' && req.method === 'GET') {
       const bez = String(u.query.bez || '').split(',').filter(Boolean);
-      const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, cile: I.cile, snapshot: I.snapshot, mesice: I.mesice.map(M => { const o = { m: M.m, neuplny: M.neuplny, rows: M.rows, ks: M.ks, rezH: M.rezH, pracDny: M.pracDny }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
+      const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, cile: I.cile, snapshot: I.snapshot, mesice: I.mesice.map(M => { const hrL = poziceVeStavu(z.key, M.m); const o = { m: M.m, neuplny: M.neuplny, rows: M.rows, ks: M.ks, rezH: M.rezH, pracDny: M.pracDny, hr: hrL ? hrL.length : null, hrVyr: hrL ? hrL.filter(x => x.prof !== 'ost').length : null }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
       let prof = null; try { prof = profese(); } catch (e) { console.warn('[vykonnost] profese:', e.message); }
       json(res, 200, { zavody: zav, legenda: LEGENDA, profese: prof }); return true;
     }
