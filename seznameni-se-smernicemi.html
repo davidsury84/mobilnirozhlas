@@ -1509,6 +1509,7 @@ const MUJ_MODS = [
   { key:"loznyplan", icon:MUJ_IC.truck, label:"Ložný plán", gated:true },
   { key:"vozidla", icon:MUJ_IC.truck, label:"Vozový park", gated:true },
   { key:"vyroba", icon:MUJ_IC.gear, label:"Výroba Popelnice", gated:true },
+  { key:"palime", icon:MUJ_IC.gear, label:"Pálíme — laserové pálení", gated:true },
   { key:"konstrukce", icon:MUJ_IC.gear, label:"Zadání do výroby – konstrukce", gated:true },
   { key:"freelo", icon:MUJ_IC.tasks, label:"Freelo", gated:true },
   { grp:"Finance" },
@@ -1516,7 +1517,6 @@ const MUJ_MODS = [
   { grp:"Kalkulačky" },
   { key:"kalkulace", icon:MUJ_IC.calc, label:"Kalkulace-lisy", gated:true },
   { key:"loxxerkalk", icon:MUJ_IC.calc, label:"LOXXER — kalkulace", gated:true },
-  { key:"palime", icon:MUJ_IC.calc, label:"Pálíme — laserové pálení", gated:true },
   { key:"svozesa", icon:MUJ_IC.calc, label:"Kalkulačka svoz ESA", gated:true },
   { key:"tridicilinka", icon:MUJ_IC.calc, label:"Design třídicí linky", gated:true },
   { key:"prekladiste", icon:MUJ_IC.calc, label:"Kalkulačka překladiště", gated:true },
@@ -4988,13 +4988,13 @@ function showDashboard(){
   }
   mainH += '</div>';
 
-  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["loznyplan","Ložný plán",MUJ_IC.truck,"Plánování nakládky vozidel a přepravenky"],["vozidla","Vozový park",MUJ_IC.truck,"Svěřená vozidla, technické prohlídky, inventarizace"],["vyroba","Výroba Popelnice",MUJ_IC.gear,"Zakázky boxů a muld: zadání, výroba, ložné plány"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const provoz = [["sklady","Sklady",MUJ_IC.warehouse,"Provozní modul"],["plasty","Plasty",MUJ_IC.droplet,"Ekonomická analýza skladu"],["kovo","Kovo",MUJ_IC.gear,"Kalkulace nacenění výrobků kovovýroby"],["palime","Pálíme — laserové pálení",MUJ_IC.gear,"Výroba: zadání výpalků, cena hned, evidence zakázek"],["eshop","E-shop",MUJ_IC.cart,"SMI_aplikace"],["doprava","Doprava",MUJ_IC.truck,"Výkony a náklady vozového parku"],["loznyplan","Ložný plán",MUJ_IC.truck,"Plánování nakládky vozidel a přepravenky"],["vozidla","Vozový park",MUJ_IC.truck,"Svěřená vozidla, technické prohlídky, inventarizace"],["vyroba","Výroba Popelnice",MUJ_IC.gear,"Zakázky boxů a muld: zadání, výroba, ložné plány"],["konstrukce","Konstrukce",MUJ_IC.gear,"Workflow zadání a schválení výkresů"],["sortiment","Hlídač sortimentu",MUJ_IC.poll,"Ranges · certifikáty · řady"],["freelo","Freelo",MUJ_IC.tasks,"Projekty načtené živě z Freela"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(provoz.length){
     mainH += '<div class="dash-sec">'+mjT('Provozy')+'</div><div class="dash-grid">';
     provoz.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
     mainH += '</div>';
   }
-  const kalk = [["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["loxxerkalk","LOXXER — kalkulace",MUJ_IC.calc,"LOXXER — tvorba nabídek"],["palime","Pálíme — laserové pálení",MUJ_IC.calc,"Zadání výpalků, cena hned, evidence zakázek"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.calc,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.calc,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  const kalk = [["kalkulace","Kalkulace-lisy",MUJ_IC.calc,"Kalkulace lisů"],["loxxerkalk","LOXXER — kalkulace",MUJ_IC.calc,"LOXXER — tvorba nabídek"],["svozesa","Kalkulačka svoz ESA",MUJ_IC.calc,"Kalkulačka svozu ESA"],["tridicilinka","Design třídicí linky",MUJ_IC.calc,"Digitální dvojče třídicí linky"],["prekladiste","Kalkulačka překladiště",MUJ_IC.calc,"Optimalizace překladiště — nabídky"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
   if(kalk.length){
     mainH += '<div class="dash-sec">'+mjT('Kalkulačky')+'</div><div class="dash-grid">';
     kalk.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
@@ -6603,11 +6603,11 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["palime","Pálíme — laserové pálení"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["pipedrive","Pipedrive — aktivita obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["palime","Pálíme — laserové pálení (výroba)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["pipedrive","Pipedrive — aktivita obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
-  ["Provoz",["sklady","plasty","kovo","eshop","qooling","vykonnost"]],
+  ["Provoz",["sklady","plasty","kovo","palime","eshop","qooling","vykonnost"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
   ["Vývoj projektů",["eshopmodel"]],
   ["Finance",["pohledavky"]],

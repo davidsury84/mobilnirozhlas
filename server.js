@@ -137,6 +137,7 @@ const SMI_APP_FILE = path.join(ROOT, 'SMI_aplikace.html');   // hotová SMI apli
 const KALK_APP_FILE = path.join(ROOT, 'kalkulace-lisy.html'); // aplikace modulu Kalkulace-lisy (napojí se později)
 const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.up.railway.app/'; // aplikace Kalkulace-lisy (Railway); lze přepsat proměnnou
 const LOXXER_KALK_APP_URL = process.env.LOXXER_KALK_APP_URL || 'https://loxxer-kalkulace-production.up.railway.app'; // LOXXER Kalkulátor (Railway); interní nástroj obchodníka na nabídky LOXXER
+const PALIME_APP_URL = (process.env.PALIME_APP_URL || 'https://palime.elkoplast.cz').replace(/\/$/, ''); // Pálíme — zadání a evidence laserového pálení (vlastní app, SSO stejným tajemstvím jako Kalkulace-lisy)
 const LOXXER_WEB_URL = process.env.LOXXER_WEB_URL || 'https://loxxer-production.up.railway.app'; // Veřejná prezentace LOXXER (Railway); má /admin na správu fotky a textů
 const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
 const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace „Hlídač sortimentu" (repo ranges-watchdog)
@@ -489,7 +490,7 @@ function gatePage() {
    pouze moduly ze svého seznamu; do administrace se nedostane.
    ============================================================ */
 const EXT_VYCHOZI_MODULY = ['skoleni', 'konstrukce', 'zadanikonstrukce', 'obchod', 'vyroba',
-  'kalkulace', 'loxxerkalk', 'svozesa', 'tridicilinka', 'prekladiste', 'kovokalk', 'kontejnerykalk'];
+  'kalkulace', 'loxxerkalk', 'palime', 'svozesa', 'tridicilinka', 'prekladiste', 'kovokalk', 'kontejnerykalk'];
 function readExterni() { const d = readJson(EXT_F, { ucty: [] }); if (!Array.isArray(d.ucty)) d.ucty = []; return d; }
 function writeExterni(d) { writeJson(EXT_F, d); }
 function extHash(heslo, salt) { return crypto.scryptSync(String(heslo), salt, 32).toString('hex'); }
@@ -6014,6 +6015,31 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(302, { 'Location': target }); return res.end();
     }
 
+    // ---- Pálíme — laserové pálení: správa a evidence zakázek (iframe + SSO, jako Kalkulace-lisy) ----
+    if (p === '/palime-app') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('palime') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k modulu Pálíme nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      let target = PALIME_APP_URL + '/admin';
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
+    }
+    // ---- Pálíme — zadání nové poptávky jménem zákazníka (zákaznická stránka bez hlavičky; poptávka se eviduje se jménem obchodníka) ----
+    if (p === '/palime-zadani') {
+      const e = empSession(req);
+      const allowed = (e && employeeModules(e.email).indexOf('palime') >= 0) || isAdmin(req);
+      if (!allowed) return send(res, 403, '<h1>Přístup k modulu Pálíme nemáte.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      let target = PALIME_APP_URL + '/embed';
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
+    }
+    // ---- SSO přímo do správy Pálíme (odkaz mimo iframe, např. z e-mailu o nové poptávce) ----
+    if (p === '/sso/palime') {
+      const e = empSession(req);
+      if (!e) { res.writeHead(302, { 'Location': '/auth/google/login?next=' + encodeURIComponent('/sso/palime') }); return res.end(); }
+      const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 });
+      res.writeHead(302, { 'Location': PALIME_APP_URL + '/admin?sso=' + encodeURIComponent(tok) }); return res.end();
+    }
     // ---- LOXXER — správa prezentace (fotka/texty na veřejném webu); bezešvě přes SSO, jen správce nebo osoba s modulem LOXXER-kalkulace ----
     if (p === '/loxxer-web-admin') {
       const e = empSession(req);
