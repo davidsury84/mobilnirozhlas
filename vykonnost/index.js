@@ -36,7 +36,7 @@ const jeVrchniLak = (op, cop, popelnice) => { const n = parseInt(String(cop == n
   if ((n >= 940 && n <= 989) || (n >= 800 && n <= 899)) return false; return LAK_NAZEV(o); };
 // Typ hotového výrobku: ABR (hlavní kritérium proti cíli) · CITY · muldy · jiné — podle názvu operace, u obecného názvu podle dílu
 const typVyrobku = (op, dil) => { const o = String(op || '').toLowerCase(), d = String(dil || '').toLowerCase();
-  const je = (t, re) => re.test(t); const RM = /muld|(^|[^a-z])(am|smr|dmc|dmpm|dms|asm|amk)[- ]?\d/i, RC = /city|wdg|wdc|\bsit\b|csd/i, RA = /\babr\b|abr-|dsd|afs|alst|ecl|hbi|hbs|\bwd\b|lwc|sth|domat|plato|víko|viko/i;
+  const je = (t, re) => re.test(t); const RM = /muld|(^|[^a-z])(am|smr|dmc|dmpm|dms|asm|amk)[- ](?=[a-z0-9])/i, RC = /city|wdg|wdc|\bsit\b|csd/i, RA = /\babr\b|abr-|dsd|afs|alst|ecl|hbi|hbs|\bwd\b|lwc|sth|domat|plato|víko|viko/i;
   if (je(o, /muld/)) return 'muldy'; const oc = je(o, RC), oa = je(o, RA); if (oc && !oa) return 'city'; if (oa && !oc) return 'abr';
   if (je(d, RM)) return 'muldy'; if (je(d, RC)) return 'city'; if (je(d, RA)) return 'abr'; return oc && oa ? 'abr' : 'jine'; };
 const FAZE_VYSTUPU = {
@@ -801,7 +801,7 @@ function mount(host) {
     // 3. kontrolní bod: expedice z výdejek (od data prvního exportu), hlavní = ABR
     const EX = expedice(z.key); let exped = null;
     if (EX) { const byW = {}; EX.tydny.forEach(t => byW[t.k] = t); weeks.forEach(w => { const e = byW[w.week]; w.exp = e ? e.abr : null; w.expVse = e ? e.ks : null; w.expKc = e ? e.kc : null; });
-      const od = EX.od; const wk = full.filter(w => w.od >= od); const l4e = wk.slice(-4);
+      const od = EX.od; const wk = weeks.filter(w => !w.neuplny && w.exp != null && pracDnyTydne(w.week).do >= od); const l4e = wk.slice(-4);
       exped = { od, snapshot: EX.snapshot, syncedAt: EX.syncedAt, celkem: EX.celkem, kcSluzby: EX.kcSluzby, tydnu: wk.length, abrDen4: l4e.length ? Math.round(sum(l4e, 'exp') / Math.max(1, sum(l4e, 'pd')) * 10) / 10 : null, abr4: sum(l4e, 'exp'), vse4: sum(l4e, 'expVse'), kc4: sum(l4e, 'expKc'), lak4: sum(l4e, 'lak'), lakVse4: sum(l4e, 'lakVse'),
         abrDenOd: wk.length ? Math.round(sum(wk, 'exp') / Math.max(1, sum(wk, 'pd')) * 10) / 10 : null, lakDenOd: wk.length ? Math.round(sum(wk, 'lak') / Math.max(1, sum(wk, 'pd')) * 10) / 10 : null, mesice: EX.mesice, posledni: EX.posledni }; }
     let muldy = null;
@@ -913,14 +913,15 @@ function mount(host) {
   // expedice závodu: po dnech/týdnech/měsících, podle typu výrobku (bez služeb), Kč bez daní
   function expedice(zKey) {
     if (_vc[zKey]) return _vc[zKey]; const V = loadVyd(zKey); if (!V || !V.items.length) return (_vc[zKey] = null);
-    const T = t => zKey === 'popelnice' ? 'abr' : (t === 'jine' && zKey !== 'popelnice' ? 'jine' : t);
+    const komponenta = n => /střech|strech|víko|viko|náhradn|nahradn|plachta|žebř|zebr|^nd[ -]|^sd[ -]|rámeč|ramec/i.test(String(n || ''));
+    const T = x => zKey === 'popelnice' ? 'abr' : (komponenta(x.naz) ? 'jine' : typVyrobku('', x.naz));
     const vyr = V.items.filter(x => !x.sluzba); const tyd = {}, mes = {}, dny = {};
-    const add = (o, k, x) => { const r = o[k] = o[k] || { ks: 0, abr: 0, city: 0, muldy: 0, jine: 0, kc: 0, n: 0 }; r.ks += x.mn; r[T(x.typ)] += x.mn; r.kc += x.kc; r.n++; };
+    const add = (o, k, x) => { const r = o[k] = o[k] || { ks: 0, abr: 0, city: 0, muldy: 0, jine: 0, kc: 0, n: 0 }; r.ks += x.mn; r[T(x)] += x.mn; r.kc += x.kc; r.n++; };
     vyr.forEach(x => { add(tyd, isoWeekOf(x.d), x); add(mes, x.d.slice(0, 7), x); add(dny, x.d, x); });
     const kcSluzby = V.items.filter(x => x.sluzba).reduce((s, x) => s + x.kc, 0);
     const rd = o => Object.keys(o).sort().map(k => Object.assign({ k }, o[k], { ks: Math.round(o[k].ks), abr: Math.round(o[k].abr), city: Math.round(o[k].city), muldy: Math.round(o[k].muldy), jine: Math.round(o[k].jine), kc: Math.round(o[k].kc) }));
-    return (_vc[zKey] = { od: V.od, snapshot: V.snapshot, syncedAt: V.syncedAt, radku: V.items.length, tydny: rd(tyd), mesice: rd(mes), dny: rd(dny), kcSluzby: Math.round(kcSluzby), celkem: { ks: Math.round(vyr.reduce((s, x) => s + x.mn, 0)), abr: Math.round(vyr.filter(x => T(x.typ) === 'abr').reduce((s, x) => s + x.mn, 0)), city: Math.round(vyr.filter(x => T(x.typ) === 'city').reduce((s, x) => s + x.mn, 0)), muldy: Math.round(vyr.filter(x => T(x.typ) === 'muldy').reduce((s, x) => s + x.mn, 0)), kc: Math.round(vyr.reduce((s, x) => s + x.kc, 0)) },
-      posledni: V.items.slice(-40).reverse().map(x => ({ d: x.d, naz: x.naz, mn: x.mn, mj: x.mj, kc: x.kc, org: x.org, zak: x.zak, typ: T(x.typ), sluzba: x.sluzba })) });
+    return (_vc[zKey] = { od: V.od, snapshot: V.snapshot, syncedAt: V.syncedAt, radku: V.items.length, tydny: rd(tyd), mesice: rd(mes), dny: rd(dny), kcSluzby: Math.round(kcSluzby), celkem: { ks: Math.round(vyr.reduce((s, x) => s + x.mn, 0)), abr: Math.round(vyr.filter(x => T(x) === 'abr').reduce((s, x) => s + x.mn, 0)), city: Math.round(vyr.filter(x => T(x) === 'city').reduce((s, x) => s + x.mn, 0)), muldy: Math.round(vyr.filter(x => T(x) === 'muldy').reduce((s, x) => s + x.mn, 0)), jine: Math.round(vyr.filter(x => T(x) === 'jine').reduce((s, x) => s + x.mn, 0)), kc: Math.round(vyr.reduce((s, x) => s + x.kc, 0)) },
+      posledni: V.items.slice(-40).reverse().map(x => ({ d: x.d, naz: x.naz, mn: x.mn, mj: x.mj, kc: x.kc, org: x.org, zak: x.zak, typ: T(x), sluzba: x.sluzba })) });
   }
   // ---------- Lidé podle profesí: kolik jich závod má a kolik podle norem potřebuje na cílový výstup ----------
   // Profese člověka v měsíci = úsek, ve kterém má nejvíc výrobních zápisů (dělírna / svařovna / lakovna).
