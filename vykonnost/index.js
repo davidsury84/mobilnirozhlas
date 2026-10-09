@@ -905,9 +905,10 @@ function mount(host) {
     const c = { zak: ix(/^číslo zakázky|^cislo zakazky/i), cvz: ix(/^čvz$|^cvz$/i), druh: ix(/druh pohybu/i), reg: ix(/^reg/i), naz: ix(/^název 1$|^nazev 1$/i), mn: ix(/^množství|^mnozstvi/i), mj: ix(/^mj/i), kc: ix(/^cc bez dan/i), dat: ix(/^datum případu$|^datum pripadu$/i), org: H.lastIndexOf('Název') };
     if (c.dat < 0 || c.mn < 0 || c.naz < 0) return { items: [], warn: 'chybí sloupce Datum případu / Množství / Název 1' };
     const S = (r, i) => i >= 0 ? String(r[i] == null ? '' : r[i]).trim() : ''; const items = [];
-    for (let i = hi + 1; i < rows.length; i++) { const r = rows[i] || []; if (r.length < 5) continue; const d = parseAnyDate(r[c.dat]); if (!d) continue; if (c.druh >= 0 && !/výdej|vydej/i.test(S(r, c.druh))) continue;
-      const mn = parseFloat(String(r[c.mn]).replace(',', '.')) || 0, kc = parseFloat(String(r[c.kc]).replace(',', '.')) || 0; const naz = S(r, c.naz), mj = S(r, c.mj);
-      items.push({ d, zak: S(r, c.zak), cvz: S(r, c.cvz), reg: S(r, c.reg), naz, mn, mj, kc: Math.round(kc), org: S(r, c.org), sluzba: jeSluzba(naz, mj), typ: typVyrobku('', naz) }); }
+    for (let i = hi + 1; i < rows.length; i++) { const r = rows[i] || []; if (r.length < 5) continue; const d = parseAnyDate(r[c.dat]); if (!d) continue; const druh = S(r, c.druh); if (c.druh >= 0 && !/výdej|vydej/i.test(druh)) continue;
+      const storno = /storno/i.test(druh) ? -1 : 1;   // „Storno výdeje“ výdej ruší → záporně
+      let mn = (parseFloat(String(r[c.mn]).replace(',', '.')) || 0), kc = (parseFloat(String(r[c.kc]).replace(',', '.')) || 0); if (storno < 0) { mn = -Math.abs(mn); kc = -Math.abs(kc); } const naz = S(r, c.naz), mj = S(r, c.mj);
+      items.push({ d, zak: S(r, c.zak), cvz: S(r, c.cvz), reg: S(r, c.reg), naz, mn, mj, kc: Math.round(kc), org: S(r, c.org), sluzba: jeSluzba(naz, mj), typ: typVyrobku('', naz), druh: storno < 0 ? 'storno' : (/evid/i.test(druh) ? 'evid' : '') }); }
     return { items };
   }
   async function syncVydejky() {
@@ -917,13 +918,19 @@ function mount(host) {
       if (!fz.length) { out[z.key] = { ok: false, error: 'bez souboru' }; continue; }
       const f = fz[0]; const cur = loadVyd(z.key) || { zavod: z.key, items: [], soubory: [] };
       if (cur.soubory.some(x => x.id === f.id && x.modified === (f.modifiedTime || ''))) { out[z.key] = { ok: true, skipped: true, file: f.name }; continue; }
-      try { const dl = await drive.downloadFileBase64(f.id, 40 * 1024 * 1024); const p = parseVydejky(Buffer.from(dl.base64, 'base64')); if (p.warn) { out[z.key] = { ok: false, error: f.name + ': ' + p.warn }; continue; }
-        const key = x => [x.zak, x.reg, x.d, x.mn, x.kc, x.org].join('|'); const have = new Set(cur.items.map(key)); let novych = 0; p.items.forEach(x => { if (!have.has(key(x))) { cur.items.push(x); have.add(key(x)); novych++; } });
-        cur.items.sort((a, b) => a.d.localeCompare(b.d)); cur.soubory = cur.soubory.filter(x => x.id !== f.id).concat([{ id: f.id, name: f.name, modified: f.modifiedTime || '', at: new Date().toISOString(), radku: p.items.length, novych }]).slice(-30);
-        cur.snapshot = dateOfName(f.name) || cur.snapshot; cur.syncedAt = new Date().toISOString(); cur.od = cur.items.length ? cur.items[0].d : ''; fs.writeFileSync(VYD_F(z.key), JSON.stringify(cur)); _vc = {};
-        out[z.key] = { ok: true, file: f.name, radku: p.items.length, novych, celkem: cur.items.length }; console.log('[vykonnost] výdejky ' + z.name + ': ' + f.name + ' → ' + p.items.length + ' ř., nových ' + novych + ', celkem ' + cur.items.length);
-      } catch (e) { out[z.key] = { ok: false, error: e.message }; console.warn('[vykonnost] výdejky ' + z.name + ':', e.message); } }
+      try { const dl = await drive.downloadFileBase64(f.id, 40 * 1024 * 1024); out[z.key] = importVydejky(z.key, Buffer.from(dl.base64, 'base64'), { id: f.id, name: f.name, modified: f.modifiedTime || '', snapshot: dateOfName(f.name) }); }
+      catch (e) { out[z.key] = { ok: false, error: e.message }; console.warn('[vykonnost] výdejky ' + z.name + ':', e.message); } }
     const st = loadState(); st.vydejky = Object.assign({}, out, { at: new Date().toISOString() }); saveState(st); return { ok: true, zavody: out };
+  }
+  // sloučení exportu výdejek do evidence závodu — automatický sync i ruční nahrání historie („HV CHOM.xlsx“ od ledna)
+  function importVydejky(zKey, buf, meta) {
+    const z = ZAVODY.find(x => x.key === zKey); const p = parseVydejky(buf); if (p.warn) return { ok: false, error: (meta.name || '') + ': ' + p.warn };
+    const cur = loadVyd(zKey) || { zavod: zKey, items: [], soubory: [] };
+    const key = x => [x.zak, x.reg, x.d, x.mn, x.kc, x.org].join('|'); const have = new Set(cur.items.map(key)); let novych = 0; p.items.forEach(x => { if (!have.has(key(x))) { cur.items.push(x); have.add(key(x)); novych++; } });
+    cur.items.sort((a, b) => a.d.localeCompare(b.d)); cur.soubory = cur.soubory.filter(x => !meta.id || x.id !== meta.id).concat([{ id: meta.id || '', name: meta.name || '', modified: meta.modified || '', at: new Date().toISOString(), radku: p.items.length, novych, rucne: !meta.id }]).slice(-30);
+    if (meta.snapshot && (!cur.snapshot || meta.snapshot > cur.snapshot)) cur.snapshot = meta.snapshot; cur.syncedAt = new Date().toISOString(); cur.od = cur.items.length ? cur.items[0].d : ''; fs.writeFileSync(VYD_F(zKey), JSON.stringify(cur)); _vc = {};
+    console.log('[vykonnost] výdejky ' + (z ? z.name : zKey) + ': ' + (meta.name || 'ruční import') + ' → ' + p.items.length + ' ř., nových ' + novych + ', celkem ' + cur.items.length);
+    return { ok: true, file: meta.name || '', radku: p.items.length, novych, celkem: cur.items.length, od: cur.od };
   }
   let _vc = {};
   // expedice závodu: po dnech/týdnech/měsících, podle typu výrobku (bez služeb), Kč bez daní
@@ -1264,6 +1271,12 @@ function mount(host) {
     }
     if (p === '/api/vykonnost/mzdy/cfg' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } const cur = loadMzCfg(); if (b.rezim) cur.rezim = b.rezim === 'vyrobni' ? 'vyrobni' : 'stredisko'; if (Array.isArray(b.vyloucit)) { cur.vyloucit = {}; b.vyloucit.forEach(os => { if (/^\d+$/.test(String(os))) cur.vyloucit[String(+os)] = true; }); } if (b.os && b.pocitat != null) { if (b.pocitat) delete cur.vyloucit[String(+b.os)]; else cur.vyloucit[String(+b.os)] = true; } return json(res, 200, { ok: true, cfg: saveMzCfg(cur) }), true; }
     if (p === '/api/vykonnost/mzdy/sync' && req.method === 'POST') { try { const r = await syncMzdy(); return json(res, 200, r), true; } catch (e) { return json(res, 500, { ok: false, error: e.message }), true; } }
+    if (p === '/api/vykonnost/vydejky/import' && req.method === 'POST') {
+      // ruční nahrání exportu výdejek (JSON { zavod, name, b64 }) — např. historie od začátku roku
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; }
+      if (!zavodOf(b.zavod)) { json(res, 400, { error: 'Neznámý závod.' }); return true; } if (!b.b64) { json(res, 400, { error: 'Chybí soubor.' }); return true; }
+      try { return json(res, 200, importVydejky(b.zavod, Buffer.from(String(b.b64).replace(/^data:[^,]*,/, ''), 'base64'), { name: b.name || '' })), true; } catch (e) { return json(res, 400, { error: 'Soubor se nepodařilo přečíst: ' + e.message }), true; }
+    }
     if (p === '/api/vykonnost/vydejky/sync' && req.method === 'POST') { try { const r = await syncVydejky(); return json(res, 200, r), true; } catch (e) { return json(res, 500, { ok: false, error: e.message }), true; } }
     if (p === '/api/vykonnost/sync' && req.method === 'POST') {
       try { const r = await sync(true); let pl = null; try { pl = await syncPlans(); } catch (e) { pl = { error: e.message }; } return json(res, r.ok ? 200 : 500, Object.assign(r, { plany: pl })), true; }
@@ -1273,7 +1286,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, profese, parseMuldyDny, parsePozice, savePozice, syncVydejky, expedice, syncMzdy, mzdyMesic, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, profese, parseMuldyDny, parsePozice, savePozice, syncVydejky, importVydejky, expedice, syncMzdy, mzdyMesic, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };
