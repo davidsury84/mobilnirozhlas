@@ -256,7 +256,7 @@ function mount(host) {
     const Z = [], U = [], V = [], D = [];
     const kap = X.pracDnu * 8; // hodiny jednoho úvazku v období
     const uvazky = kap ? X.rezieH / kap : 0;
-    const rezPct = X.rows ? Math.round(X.rezRows / X.rows * 100) : 0;
+    const rezPct = X.odprac && X.odprac.h ? Math.round(X.rezieH / X.odprac.h * 100) : (X.rows ? Math.round(X.rezRows / X.rows * 100) : 0); const rezPctTxt = X.odprac && X.odprac.h ? ' % odpracovaných hodin (' + fmt0(X.odprac.h) + ' h, zdroj ' + X.odprac.zdroj + ')' : ' % řádků';
     const termPct = X.rows ? Math.round(X.term / X.rows * 100) : 0;
     const top3 = X.rows ? Math.round(X.topDny.reduce((s, d) => s + d.rows, 0) / X.rows * 100) : 0;
     const patekPct = X.rows ? Math.round(X.patek / X.rows * 100) : 0;
@@ -265,7 +265,7 @@ function mount(host) {
     if (!X.rows) return { zjisteni: [{ tag: 'info', titul: 'V období nejsou žádné odvedené operace.', text: 'Zvolte jiné období nebo počkejte na další snímek exportu.' }], uzka: [], vycnivaji: [], doporuceni: [], shrnuti: '' };
     // --- zjištění ---
     if (X.rezieH > 0) Z.push({ tag: uvazky >= 3 ? 'crit' : (uvazky >= 1 || rezPct >= 10 ? 'warn' : 'info'), titul: 'Režie: ' + fmt0(X.rezieH) + ' h zapsaných jako úkol, to je zhruba ' + (uvazky >= 1 ? uvazky.toFixed(1).replace('.', ',') + ' plných úvazků' : Math.round(uvazky * 100) + ' % úvazku') + ' za období.',
-      text: 'Režijní položky tvoří ' + rezPct + ' % řádků. Největší příčina: ' + (X.rezKat[0] ? X.rezKat[0].kat.toLowerCase() + ' (' + fmt0(X.rezKat[0].h) + ' h)' : '—') + (topPol ? '; nejdražší jednotlivá položka „' + topPol.text + '" ' + fmt0(topPol.h) + ' h (' + jm([...topPol.lide], 3) + ')' : '') + '. Režie neměří výkon — dorovnává čas, který se nevešel do normy.' });
+      text: 'Režijní hodiny tvoří ' + rezPct + rezPctTxt + '. Největší příčina: ' + (X.rezKat[0] ? X.rezKat[0].kat.toLowerCase() + ' (' + fmt0(X.rezKat[0].h) + ' h)' : '—') + (topPol ? '; nejdražší jednotlivá položka „' + topPol.text + '" ' + fmt0(topPol.h) + ' h (' + jm([...topPol.lide], 3) + ')' : '') + '. Režie neměří výkon — dorovnává čas, který se nevešel do normy.' });
     else Z.push({ tag: 'good', titul: 'V období není zapsaná žádná režie.', text: 'Všechny řádky jsou skutečné operace.' });
     // Kdy v měsíci se režie zapisuje (celý rok): dopisování na konci měsíce = režie je dorovnání, ne průběžná evidence
     const RK = X.rezieKdy; if (RK) { const t = RK.tretiny; const txt = 'Režijní hodiny podle data: ' + t.rez[0] + ' % v 1.–10. dni, ' + t.rez[1] + ' % v 11.–20. dni, ' + t.rez[2] + ' % od 21. do konce měsíce (výrobní operace ' + t.prod.join(' / ') + ' %). Nejsilnější den v měsíci je ' + RK.topDen.d + '. (' + RK.topDen.pct + ' % všech režijních hodin), posledních 7 dní měsíce nese ' + RK.posl7Pct + ' %, prvních 7 dní ' + RK.prv7Pct + ' %. Počítáno z celého roku do snímku.';
@@ -739,11 +739,12 @@ function mount(host) {
     const rezZapis = { n: rezN, autori: Object.entries(rezAut).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, pct: Math.round(n / Math.max(1, rezN) * 100) })), dny: Object.entries(rezDen).sort((a, b) => b[1] - a[1]).map(([d, n]) => ({ den: d, pct: Math.round(n / Math.max(1, rezN) * 100) })) };
     const rezieKdy = rezieVMesici(D.rows.filter(r => r[R.date] <= snapshot));
     const rozpad = rozpadOperaci(rows);
-    const ana = buildAnalyza({ name: z.name, key: z.key, rezZapis, normy, rezieKdy, rows: rows.length, ks, rezieH, rezRows, term, lideArr, usekyArr, dvojice, bezOdvadeni, jediny, nulTop, nulKs, bezCvz, future, topDny, patek, dnyArr, pracDnu, rezKat: Object.values(rezKat).sort((a, b) => b.h - a.h), rezPol: Object.values(rezPol).sort((a, b) => b.h - a.h), autori: Object.entries(autori).sort((a, b) => b[1] - a[1]), snapshot, od, do_ });
+    const OH = odpracHodiny(z.key, od || (rows[0] ? rows[0][R.date] : ''), do_ || snapshot, lideArr.length);
+    const ana = buildAnalyza({ name: z.name, key: z.key, rezZapis, normy, rezieKdy, odprac: OH, rows: rows.length, ks, rezieH, rezRows, term, lideArr, usekyArr, dvojice, bezOdvadeni, jediny, nulTop, nulKs, bezCvz, future, topDny, patek, dnyArr, pracDnu, rezKat: Object.values(rezKat).sort((a, b) => b.h - a.h), rezPol: Object.values(rezPol).sort((a, b) => b.h - a.h), autori: Object.entries(autori).sort((a, b) => b[1] - a[1]), snapshot, od, do_ });
     return {
       analyza: ana, useky: usekyArr, normy, rezieKdy, rozpad,
       zavod: z.key, name: z.name, snapshot, source: D.source, syncedAt: D.syncedAt, od: od || '', do: do_ || '', mesice, tydny,
-      kpi: { rows: rows.length, ks: Math.round(ks), rezieH: Math.round(rezieH), rezRows, reziePodil: rows.length ? Math.round(rezRows / rows.length * 100) : 0, lide: lideArr.length, ops: Object.keys(ops).length, cvz: cvzArr.length,
+      kpi: { rows: rows.length, ks: Math.round(ks), rezieH: Math.round(rezieH), rezRows, reziePodilRadku: rows.length ? Math.round(rezRows / rows.length * 100) : 0, odprac: OH.h, odpracZdroj: OH.zdroj, reziePodil: OH.h ? Math.round(rezieH / OH.h * 100) : null, lide: lideArr.length, ops: Object.keys(ops).length, cvz: cvzArr.length,
         termPct: rows.length ? Math.round(term / rows.length * 100) : 0, dnu: dnyArr.length, top3Pct: rows.length ? Math.round(topDny.reduce((s, d) => s + d.rows, 0) / rows.length * 100) : 0, patekPct: rows.length ? Math.round(patek / rows.length * 100) : 0 },
       dny: dnyArr.map(d => ({ date: d.date, rows: d.rows, ks: Math.round(d.ks), rezieH: Math.round(d.rezieH) })),
       lide: lideArr, operace: top(ops, 25, 'rows').map(o => ({ op: o.op, rows: o.rows, ks: Math.round(o.ks), lide: o.lide.size })),
@@ -1013,6 +1014,16 @@ function mount(host) {
     ['hrube', 'ukol', 'zakl', 'premie', 'dovolena', 'nahrady', 'vyplaceno', 'hodiny', 'hodinyRiziko'].forEach(f => out[f] = Math.round(out[f])); ['hrube', 'ukol', 'hodiny'].forEach(f => out.vyrobni[f] = Math.round(out.vyrobni[f])); Object.values(out.profese).forEach(P => ['hrube', 'ukol', 'hodiny'].forEach(f => P[f] = Math.round(P[f]))); Object.keys(out.slozky).forEach(f => out.slozky[f] = Math.round(out.slozky[f]));
     out.lideSez.sort((a, b) => b.hrube - a.hrube); return (_mzc[k] = out);
   }
+  // Odpracované hodiny závodu v období: z exportu mezd (hodiny ve složkách základ/úkol/riziko/přesčas), jinak stav lidí z personalistiky × pracovní dny × 8,
+  // jinak lidé s odváděním × pracovní dny × 8; částečný měsíc poměrně podle pracovních dnů.
+  function odpracHodiny(zKey, od, do_, lideFallback) {
+    let tot = 0, zdroj = new Set(); if (!od || !do_) return { h: 0, zdroj: '' };
+    for (let d = new Date(od.slice(0, 7) + '-01T00:00:00Z'); d.toISOString().slice(0, 7) <= do_.slice(0, 7); d.setUTCMonth(d.getUTCMonth() + 1)) {
+      const ym = d.toISOString().slice(0, 7); const pdM = pracDnyMesice(ym); const a = ym + '-01', b = ym + '-31'; const pdIn = pracDnyRozsah(od > a ? od : a, do_ < b ? do_ : b); if (!pdIn) continue;
+      const Z = mzdyMesic(zKey, ym); let h; if (Z && Z.hodiny) { h = Z.hodiny; zdroj.add('mzdy'); } else { const SL = stavLidi(zKey, ym); const n = SL ? SL.n : (lideFallback || 0); h = n * pdM * 8; zdroj.add(SL ? 'pozice' : 'odvádění'); }
+      tot += h * Math.min(1, pdIn / Math.max(1, pdM)); }
+    return { h: Math.round(tot), zdroj: [...zdroj].join('+') };
+  }
   // ---------- Lidé podle profesí: kolik jich závod má a kolik podle norem potřebuje na cílový výstup ----------
   // Profese člověka v měsíci = úsek, ve kterém má nejvíc výrobních zápisů (dělírna / svařovna / lakovna).
   const profOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen|odkulič|odkulic/.test(o)) return 'lak'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl[ií]rna|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|ohýb|stříh|strih|střih|loch|obrobna|soustruh/.test(o)) return 'del'; return 'svar'; };
@@ -1099,10 +1110,10 @@ function mount(host) {
       if (!D) return { key: z.key, name: z.name, kratce: z.kratce, data: false, error: zs.error || 'zatím nesynchronizováno', plan: pl };
       const snap = D.snapshot; const od = new Date(snap + 'T00:00:00Z'); od.setUTCDate(od.getUTCDate() - 27); const od4 = od.toISOString().slice(0, 10);
       const all = D.rows.filter(r => r[R.date] <= snap); const last4 = all.filter(r => r[R.date] >= od4);
-      const agg = rs => { let ks = 0, rez = 0, term = 0; const l = new Set(), c = new Set(); rs.forEach(r => { if (isRezie(r[R.dil])) rez += r[R.ks]; else ks += r[R.ks]; if (r[R.aut] === 'terminalETH') term++; l.add(r[R.id] || r[R.name]); if (r[R.cvz]) c.add(r[R.cvz]); }); return { rows: rs.length, ks: Math.round(ks), rezieH: Math.round(rez), lide: l.size, cvz: c.size, termPct: rs.length ? Math.round(term / rs.length * 100) : 0 }; };
+      const agg = (rs, od, do_) => { let ks = 0, rez = 0, term = 0; const l = new Set(), c = new Set(); rs.forEach(r => { if (isRezie(r[R.dil])) rez += r[R.ks]; else ks += r[R.ks]; if (r[R.aut] === 'terminalETH') term++; l.add(r[R.id] || r[R.name]); if (r[R.cvz]) c.add(r[R.cvz]); }); const OH = odpracHodiny(z.key, od, do_, l.size); return { rows: rs.length, ks: Math.round(ks), rezieH: Math.round(rez), lide: l.size, cvz: c.size, termPct: rs.length ? Math.round(term / rs.length * 100) : 0, odprac: OH.h, reziePct: OH.h ? Math.round(rez / OH.h * 100) : null }; };
       const tyd = {}; last4.forEach(r => { tyd[r[R.week]] = (tyd[r[R.week]] || 0) + 1; });
       let vy = null; try { const V = vystup(z); if (V) vy = { cil: V.cil, exped: V.exped ? { abrDen4: V.exped.abrDen4, abr4: V.exped.abr4, vse4: V.exped.vse4, kc4: V.exped.kc4, od: V.exped.od, celkem: V.exped.celkem } : null, lakDen4: V.kpi.lakDen4, lakDen4Mul: V.kpi.lakDen4Mul, lakDen4Vse: V.kpi.lakDen4Vse, lakDenRokMul: V.kpi.lakDenRokMul, lakDenRokVse: V.kpi.lakDenRokVse, lak4: V.kpi.lak4, muldy4: V.kpi.muldy4, city4: V.kpi.city4, muldyVse4: V.kpi.muldyVse4, jine4: V.kpi.jine4, lak4Vse: V.kpi.lak4Vse, cityRok: V.kpi.cityRok, muldyVseRok: V.kpi.muldyVseRok, lakRokVse: V.kpi.lakRokVse, od4: V.kpi.od4, do4: V.kpi.do4, lakDenRok: V.kpi.lakDenRok, plneni4: V.kpi.plneni4, plneniRok: V.kpi.plneniRok, lakRok: V.kpi.lakRok, hrdlo: V.hrdlo, tydnuPod: V.kpi.tydnuPod, tydnu: V.kpi.tydnu }; } catch (_) {}
-      return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: snap, source: D.source, syncedAt: D.syncedAt, error: zs.error || '', rok: agg(all), t4: agg(last4), rozpad4: rozpadOperaci(last4).kat, od4, tydny4: Object.entries(tyd).sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ week: w, rows: n })), plan: pl, vystup: vy };
+      return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: snap, source: D.source, syncedAt: D.syncedAt, error: zs.error || '', rok: agg(all, all[0] ? all.reduce((m, r) => r[R.date] < m ? r[R.date] : m, '9999') : '', snap), t4: agg(last4, od4, snap), rozpad4: rozpadOperaci(last4).kat, od4, tydny4: Object.entries(tyd).sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ week: w, rows: n })), plan: pl, vystup: vy };
     });
   }
 
