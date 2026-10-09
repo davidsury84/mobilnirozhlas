@@ -839,6 +839,12 @@ var K_L10N = {
 'pracovních dní od začátku kroku':['working days from the start of the step','Arbeitstage ab Beginn des Schritts','dni roboczych od rozpoczęcia kroku','робочих днів від початку кроку','zile lucrătoare de la începutul pasului'],
 ', do kdy má být krok hotový.':[', by when the step must be completed.',', bis wann der Schritt fertig sein muss.',', do kiedy krok ma być gotowy.',', до якого часу крок має бути готовий.',', până când trebuie finalizat pasul.'],
 'do termínu':['to deadline','bis Termin','do terminu','до терміну','până la termen'],
+'klient vidí':['customer can see','Kunde sieht','klient widzi','клієнт бачить','clientul vede'],
+'jen interně':['internal only','nur intern','tylko wewnętrznie','лише внутрішньо','doar intern'],
+'Zobrazit klientovi':['Show to customer','Dem Kunden zeigen','Pokaż klientowi','Показати клієнту','Arată clientului'],
+'Skrýt před klientem':['Hide from customer','Vor dem Kunden verbergen','Ukryj przed klientem','Приховати від клієнта','Ascunde de client'],
+'zobrazit klientovi na stránce výkresu':['show to the customer on the drawing page','dem Kunden auf der Zeichnungsseite zeigen','pokaż klientowi na stronie rysunku','показати клієнту на сторінці креслення','arată clientului pe pagina desenului'],
+'📎 Přílohy klient neuvidí. Pokud mu je chcete ukázat, zapněte u nich „Zobrazit klientovi".':['📎 The customer will not see the attachments. To show them, switch on “Show to customer” next to each one.','📎 Der Kunde sieht die Anlagen nicht. Um sie zu zeigen, schalten Sie bei ihnen „Dem Kunden zeigen“ ein.','📎 Klient nie zobaczy załączników. Aby mu je pokazać, włącz przy nich „Pokaż klientowi”.','📎 Клієнт не побачить вкладення. Щоб їх показати, увімкніть біля них «Показати клієнту».','📎 Clientul nu va vedea atașamentele. Pentru a i le arăta, activați la ele „Arată clientului”.'],
 '(krok u obchodníka: jen obchodník; ostatní kroky: odpovědný + obchodník + šéf)':['(step with the sales rep: sales rep only; other steps: responsible person + sales rep + head of engineering)','(Schritt beim Vertrieb: nur Vertrieb; übrige Schritte: Verantwortlicher + Vertrieb + Konstruktionsleiter)','(krok u handlowca: tylko handlowiec; pozostałe kroki: odpowiedzialny + handlowiec + szef konstrukcji)','(крок у менеджера: лише менеджер; інші кроки: відповідальний + менеджер + керівник конструкції)','(pas la reprezentant: doar reprezentantul; ceilalți pași: responsabil + reprezentant + șef proiectare)'],
 'krok od':['step since','Schritt seit','krok od','крок від','pas din'],
 '(mimo prac. dobu)':['(outside working hours)','(außerhalb der Arbeitszeit)','(poza czasem pracy)','(поза робочим часом)','(în afara programului)'],
@@ -1255,6 +1261,13 @@ function kPattern(s){
   if((m=s.match(/^(.+?)\s+·$/))){ h=kT(m[1]); return h===m[1]?null:h+' ·'; }
   if((m=s.match(/^Provedení dle listu řady (.+)$/))){ var pr={en:'Design per the ',de:'Ausführung laut Blatt der Reihe ',pl:'Wykonanie wg arkusza serii ',ua:'Виконання за листом серії ',ro:'Execuție conform fișei seriei '}[K_LANG]; return pr?(K_LANG==='en'?('Design per the '+m[1]+' series sheet'):(pr+m[1])):null; }
   if((m=s.match(/^(termín|poptávka|závod|krok od|Vloženo:|Doporučeno:|Na tahu|Čeká na)\s+(.+)$/))){ h=kT(m[1]); return h===m[1]?null:h+' '+m[2]; }
+  /* „📎 Klient u výkresu uvidí 2 přílohy." */
+  if((m=s.match(/^📎\s*Klient u výkresu uvidí\s+(\d+)\s+(přílohu|přílohy|příloh)\.$/))){
+    var pz={en:['attachment','attachments'],de:['Anlage','Anlagen'],pl:['załącznik','załączniki'],ua:['вкладення','вкладень'],ro:['atașament','atașamente']}[K_LANG];
+    var pre={en:'📎 The customer will see',de:'📎 Der Kunde sieht',pl:'📎 Klient zobaczy',ua:'📎 Клієнт побачить',ro:'📎 Clientul va vedea'}[K_LANG];
+    var post={en:'with the drawing.',de:'bei der Zeichnung.',pl:'przy rysunku.',ua:'біля креслення.',ro:'lângă desen.'}[K_LANG];
+    if(!pz) return null; return pre+' '+m[1]+' '+(m[1]==='1'?pz[0]:pz[1])+' '+post;
+  }
   /* samotná doba: „3 dny" · „1,5 dne" (hodiny a minuty se nepřekládají) */
   if((m=s.match(/^(\d+(?:,\d)?)\s+(den|dny|dní|dne)$/))){ var dt0=kDoba(s); return dt0===s?null:dt0; }
   if((m=s.match(/^(.+?)\s+\((\d+)\)$/))){ h=kT(m[1]); return h===m[1]?null:h+' ('+m[2]+')'; }
@@ -2606,8 +2619,36 @@ function delZakGo(id){
     closeModal(); closeDrawer(); reloadData();
   });
 }
+/* Detail se po každém uložení (příloha, komentář, ČVZ…) překresluje celý. Co má člověk
+   rozepsané — text e-mailu klientovi, PIN, jazyk, poznámku — se proto před překreslením
+   sebere a po něm vrátí. Bere se jen to, co uživatel sám změnil proti předvolené hodnotě;
+   prvek, který po překreslení už neexistuje (krok se posunul), se přeskočí. */
+function drawerRozepsane(d,zakId){
+  var out={};
+  if(!d||d.getAttribute('data-zak')!==zakId||!d.classList.contains('open'))return out;
+  d.querySelectorAll('input[id],textarea[id],select[id]').forEach(function(el){
+    var t=(el.type||'').toLowerCase();
+    if(t==='file'||t==='hidden'||t==='button'||t==='submit')return;
+    if(t==='checkbox'||t==='radio'){if(el.checked!==el.defaultChecked)out[el.id]={checked:el.checked};return}
+    if(el.tagName==='SELECT'){var o=el.options[el.selectedIndex];if(o&&!o.defaultSelected)out[el.id]={value:el.value};return}
+    if(el.value!==el.defaultValue)out[el.id]={value:el.value,ss:el.selectionStart,se:el.selectionEnd};
+  });
+  var a=document.activeElement; if(a&&a.id&&d.contains(a))out.__focus=a.id;
+  out.__scroll=d.scrollTop;
+  return out;
+}
+function drawerObnov(d,st){
+  Object.keys(st).forEach(function(id){
+    if(id.charAt(0)==='_')return;
+    var el=document.getElementById(id); if(!el)return;
+    if('checked' in st[id])el.checked=st[id].checked; else el.value=st[id].value;
+  });
+  if(st.__scroll!=null)d.scrollTop=st.__scroll;
+  if(st.__focus){var f=document.getElementById(st.__focus);if(f&&f.focus){try{f.focus({preventScroll:true});var v=st[st.__focus];if(v&&v.ss!=null&&f.setSelectionRange)f.setSelectionRange(v.ss,v.se)}catch(e){}}}
+}
 function renderDrawer(z){
   var d=document.getElementById('drawer');
+  var rozepsane=drawerRozepsane(d,z.id);
   var params='';var pk=Object.keys(z.params||{});
   if(pk.length)params='<div class="sec">Parametry výrobku</div><div class="kv">'+pk.map(function(k){return '<b>'+esc(k)+'</b><span>'+esc(z.params[k])+'</span>'}).join('')+'</div>';
   var vers='';
@@ -2653,6 +2694,8 @@ function renderDrawer(z){
       comments+audit+
       delBox(z)+
     '</div>';
+  d.setAttribute('data-zak',z.id);
+  drawerObnov(d,rozepsane);
   archDrawer(z);
 }
 function czDays(n){n=Math.abs(n);return n===1?'den':(n>=2&&n<=4?'dny':'dní');}
@@ -2823,19 +2866,33 @@ function prilohyBlock(z){
   if(!list.length&&!can)return '';
   var h='<div class="sec">Přílohy (podklady od zákazníka)</div><div class="card">';
   if(list.length)h+=list.map(function(p){
-    return '<div class="row" style="justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)">'+
-      '<span>📎 <a href="/api/konstrukce/soubor?id='+z.id+'&kind=priloha&i='+p.i+'" target="_blank" style="font-weight:700">'+esc(p.name)+'</a></span>'+
-      '<span class="muted" style="font-size:11.5px;white-space:nowrap">'+esc(p.author||'')+' · '+fdate(p.at)+'</span></div>';
+    return '<div class="row" style="justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">'+
+      '<span>📎 <a href="/api/konstrukce/soubor?id='+z.id+'&kind=priloha&i='+p.i+'" target="_blank" style="font-weight:700">'+esc(p.name)+'</a> '+
+        (p.klient?'<span class="pill klient" style="font-size:11px;padding:2px 8px" title="Klient ji uvidí na stránce výkresu">klient vidí</span>':'<span class="pill novy" style="font-size:11px;padding:2px 8px" title="Jen pro nás, klient ji neuvidí">jen interně</span>')+'</span>'+
+      '<span class="muted" style="font-size:11.5px;white-space:nowrap">'+esc(p.author||'')+' · '+fdate(p.at)+
+        (can?(' <button class="btn ghost sm" onclick="prilKlient(\''+z.id+'\','+p.i+','+(p.klient?'false':'true')+')">'+(p.klient?'Skrýt před klientem':'Zobrazit klientovi')+'</button>'):'')+'</span></div>';
   }).join('');
   else h+='<p class="muted" style="margin:0">Zatím žádné přílohy.</p>';
-  if(can)h+='<div class="actions" style="margin-top:8px"><label class="btn ghost sm" style="cursor:pointer">+ Přidat přílohu (PDF / obrázek)<input type="file" accept=".pdf,.png,.jpg,.jpeg" style="display:none" onchange="prilUpload(\''+z.id+'\',this)"></label></div>';
+  if(can)h+='<div class="actions" style="margin-top:8px;align-items:center;gap:12px;flex-wrap:wrap"><label class="btn ghost sm" style="cursor:pointer">+ Přidat přílohu (PDF / obrázek)<input type="file" accept=".pdf,.png,.jpg,.jpeg" style="display:none" onchange="prilUpload(\''+z.id+'\',this)"></label>'+
+    '<label class="muted" style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="prilKlientNova_'+z.id+'" style="width:auto;margin:0"> zobrazit klientovi na stránce výkresu</label></div>';
   return h+'</div>';
+}
+/* Co klient u výkresu uvidí — připomínka u odeslání, ať se přílohy neposílají „naprázdno". */
+function prilohyKlientHint(z){
+  var list=z.prilohy||[]; if(!list.length)return '';
+  var n=list.filter(function(p){return p.klient}).length;
+  if(n)return '<div class="muted" style="font-size:12px;margin:4px 0 6px">📎 Klient u výkresu uvidí '+n+' '+(n===1?'přílohu':(n<5?'přílohy':'příloh'))+'.</div>';
+  return '<div style="font-size:12px;margin:4px 0 6px;color:var(--amber)">📎 Přílohy klient neuvidí. Pokud mu je chcete ukázat, zapněte u nich „Zobrazit klientovi".</div>';
+}
+function prilKlient(id,i,klient){
+  api('/priloha','POST',{id:id,i:i,klient:klient}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}reloadData()});
 }
 function prilUpload(id,inp){
   var f=inp.files&&inp.files[0];if(!f)return;
   if(f.size>15e6){alert('Soubor je příliš velký (max 15 MB).');inp.value='';return}
+  var klient=!!((document.getElementById('prilKlientNova_'+id)||{}).checked);
   var r=new FileReader();
-  r.onload=function(){api('/upload','POST',{id:id,kind:'priloha',name:f.name,dataUrl:r.result}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}reloadData()});};
+  r.onload=function(){api('/upload','POST',{id:id,kind:'priloha',name:f.name,dataUrl:r.result,klient:klient}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}reloadData()});};
   r.readAsDataURL(f);
 }
 function pdfPanel(z){
@@ -3064,7 +3121,7 @@ function obchodnikBlock(z){
     '<textarea id="obNote" rows="2" placeholder="Připomínky (u vrácení povinné)…"></textarea>'+
     '<div class="actions"><button class="btn warn sm" onclick="doAction(\''+z.id+'\',\'obchodnik-vrat\',\'obNote\')">↩ Vrátit konstruktérovi</button></div>'+
     '<div style="border-top:1px solid var(--line);margin:12px 0"></div>'+
-    '<b>Odeslat náhled klientovi</b>'+
+    '<b>Odeslat náhled klientovi</b>'+prilohyKlientHint(z)+
     (z.kontaktEmail?'':('<div class="err">Doplňte e-mail kontaktní osoby (přes tlačítko níže nelze odeslat).</div>'))+
     '<label>Komu</label><input value="'+esc(z.kontaktEmail||'')+'" id="clMail_'+z.id+'" placeholder="email@klient.cz">'+
     '<label>Volitelný PIN (pošlete zvlášť)</label><input id="clPin_'+z.id+'" placeholder="např. 4827">'+
@@ -3127,6 +3184,7 @@ function linkBox(z){
     '<input readonly value="'+esc(full)+'" onclick="this.select()" style="margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px">'+
     '<div class="actions" style="margin-top:8px"><button class="btn ghost sm" onclick="copyMailKlient(\''+z.id+'\')">⧉ Kopírovat celý text e-mailu</button>'+
       ((z.stav==='klient'&&z.link.active)?('<button class="btn sm" onclick="poslatZnovu(\''+z.id+'\')" title="Pošle stejný odkaz znovu — token se nemění">✉ Poslat klientovi znovu</button>'):'')+'</div>'+
+    prilohyKlientHint(z)+
     '<div class="muted" style="font-size:12px;margin-top:4px">Odkaz můžete klientovi poslat i z vlastní pošty — rozhodnutí se do systému propíše stejně.</div>'+
     (z.link.prehledUrl?('<div class="muted" style="font-size:12px;margin-top:6px;border-top:1px solid var(--line);padding-top:6px">📋 <span>Přehled všech čekajících výkresů tohoto klienta:</span> <a href="'+esc(location.origin+z.link.prehledUrl)+'" target="_blank" rel="noopener">otevřít</a> · <a href="#" onclick="copyTxtToast(\''+esc(location.origin+z.link.prehledUrl)+'\',\'✓ Odkaz na přehled zkopírován\');return false">kopírovat odkaz</a>'+
       (z.dalsiCekajici?(' · <b>'+z.dalsiCekajici+'</b> <span>další čeká na rozhodnutí</span>'):'')+'</div>'):'')+'</div>';
@@ -3147,8 +3205,8 @@ function assign(id,selId){
   api('/prideli','POST',{id:id,konstrukter:k}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba.');return}reloadData()});
 }
 function addComment(id){
-  var t=(document.getElementById('cmtx')||{}).value||'';if(!t.trim())return;
-  api('/komentar','POST',{id:id,text:t}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba.');return}reloadData()});
+  var ta=document.getElementById('cmtx'), t=(ta||{}).value||'';if(!t.trim())return;
+  api('/komentar','POST',{id:id,text:t}).then(function(o){if(!o.ok){alert(o.j.chyba||'Chyba.');return}if(ta)ta.value='';reloadData()});
 }
 function timer(id,action){api('/timer','POST',{id:id,action:action}).then(function(o){if(!o.ok){alert(o.j.chyba);return}reloadData()})}
 function manualTime(id){var m=prompt('Kolik minut připsat?');if(!m)return;api('/timer','POST',{id:id,action:'manual',minutes:parseInt(m,10)}).then(function(){reloadData()})}
