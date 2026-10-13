@@ -97,8 +97,12 @@ function mount(host) {
       n1: idx(/^název 1$|^nazev 1$/i), cvz: idx(/^čvz$|^cvz$/i), pozn: idx(/^poznámka|^poznamka/i), aut: idx(/^autor$/i),
       cop: idx(/^operace$|^číslo operace$|^cislo operace$/i)   // číslo operace z postupu (od exportu 29. 9. 2026); u hlavních operací = kód normy
     };
+    // sloupce „Název“: 1. = název zakázky, operace = ten hned za číslem operace (od 12. 10. 2026 je na konci ještě „Název“ pracoviště), jinak poslední před Poznámkou
     const nazevIdx = H.map((h, i) => (/^název$|^nazev$/i.test(h) ? i : -1)).filter(i => i >= 0);
-    c.zak = nazevIdx[0] != null ? nazevIdx[0] : -1; c.op = nazevIdx.length > 1 ? nazevIdx[nazevIdx.length - 1] : -1;
+    c.zak = nazevIdx[0] != null ? nazevIdx[0] : -1;
+    c.op = (c.cop >= 0 && nazevIdx.includes(c.cop + 1)) ? c.cop + 1 : (c.pozn >= 0 && nazevIdx.filter(i => i < c.pozn).length > 1 ? nazevIdx.filter(i => i < c.pozn).pop() : (nazevIdx.length > 1 ? nazevIdx[nazevIdx.length - 1] : -1));
+    c.hz = idx(/^číslo zakázky|^cislo zakazky/i);   // číslo zakázky Helios (od 12. 10. 2026) — párování výdejek na ČVZ
+    c.prac = nazevIdx.length > 2 && nazevIdx[nazevIdx.length - 1] > c.op ? nazevIdx[nazevIdx.length - 1] : -1;   // název pracoviště
     if (c.dmr < 0 || c.emp < 0 || c.ks < 0) return { rows: [], warn: 'nenalezeny sloupce DMR / jméno / kusy (hlavička: ' + H.slice(0, 8).join(' | ') + ')' };
     const S = v => String(v == null ? '' : v).trim();
     const rows = [];
@@ -109,12 +113,12 @@ function mount(host) {
       const ks = parseFloat(String(row[c.ks]).replace(',', '.'));
       rows.push([date, isoWeekOf(date), em ? em[1] : '', em ? em[2].trim() : empRaw, isFinite(ks) ? ks : 0,
         S(row[c.n1]), c.zak >= 0 ? S(row[c.zak]) : '', c.cvz >= 0 ? S(row[c.cvz]) : '', c.op >= 0 ? S(row[c.op]) : '',
-        c.pozn >= 0 ? S(row[c.pozn]) : '', c.aut >= 0 ? S(row[c.aut]) : '', c.cop >= 0 ? S(row[c.cop]) : '']);
+        c.pozn >= 0 ? S(row[c.pozn]) : '', c.aut >= 0 ? S(row[c.aut]) : '', c.cop >= 0 ? S(row[c.cop]) : '', c.hz >= 0 ? S(row[c.hz]).replace(/\.0$/, '') : '', c.prac >= 0 ? S(row[c.prac]) : '']);
     }
-    return { rows, header: H, maCislo: c.cop >= 0 };
+    return { rows, header: H, maCislo: c.cop >= 0, maZakazku: c.hz >= 0 };
   }
-  const R = { date: 0, week: 1, id: 2, name: 3, ks: 4, dil: 5, zak: 6, cvz: 7, op: 8, pozn: 9, aut: 10, cop: 11 };
-  const PARSER_VER = 2;   // zvýšit při změně parseExport → závody se při nejbližší kontrole načtou znovu i bez nového souboru
+  const R = { date: 0, week: 1, id: 2, name: 3, ks: 4, dil: 5, zak: 6, cvz: 7, op: 8, pozn: 9, aut: 10, cop: 11, hz: 12, prac: 13 };
+  const PARSER_VER = 3;   // zvýšit při změně parseExport → závody se při nejbližší kontrole načtou znovu i bez nového souboru
   const dateOfName = nm => { const m = /(\d{4})[-.]?(\d{2})[-.]?(\d{2})/.exec(nm || ''); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
 
   // Nejnovější export závodu ze složky (dle data v názvu, pak createdTime) → data/vykonnost-<key>.json
@@ -942,6 +946,7 @@ function mount(host) {
     const komponenta = n => /střech|strech|víko|viko|náhradn|nahradn|plachta|žebř|zebr|^nd[ -]|^sd[ -]|rámeč|ramec/i.test(String(n || ''));
     // ČVZ: ve výdejkách chybí → z plánu výroby přes číslo zakázky Helios
     const PL = loadPlan(zKey); const helios2cvz = {}; if (PL && PL.items) Object.entries(PL.items).forEach(([cvz, it]) => { if (it.helios) helios2cvz[it.helios] = (helios2cvz[it.helios] ? helios2cvz[it.helios] + ', ' : '') + cvz; });
+    const D0 = loadData(zKey); if (D0) { const seen = {}; D0.rows.forEach(r => { const hz = r[R.hz], cvz = r[R.cvz]; if (!hz || !cvz) return; const k = hz + '|' + cvz; if (seen[k]) return; seen[k] = 1; if (!helios2cvz[hz]) helios2cvz[hz] = cvz; else if (helios2cvz[hz].indexOf(cvz) < 0) helios2cvz[hz] += ', ' + cvz; }); }
     const cvzOf = x => x.cvz || helios2cvz[String(x.zak || '').replace(/\.0$/, '')] || '';
     const T = x => zKey === 'popelnice' ? 'abr' : (komponenta(x.naz) ? 'jine' : typVyrobku('', x.naz));
     const vyr = V.items.filter(x => !x.sluzba); const tyd = {}, mes = {}, dny = {};
