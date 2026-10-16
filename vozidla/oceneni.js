@@ -29,8 +29,10 @@ const fmtMesic = (d) => d ? (d.m + '/' + d.y) : '—';
 const zaokr = (v, na) => v == null ? null : Math.round(v / na) * na;
 
 /* v:   { reg:{m,y}|null, regZdroj, tachometr, tachometrRok, tachometrMesicu (měsíce od odečtu), kmMes,
-          porizovaciCena, prodejniCena, typ }
-   cfg: { maxLet, maxKm, rocniKm, rezervaProdej, odpisLet, cenyTypu } */
+          porizovaciCena, prodejniCena, typ, trh (výsledek porovnání s inzercí, viz trh.js) }
+   cfg: { maxLet, maxKm, rocniKm, rezervaProdej, odpisLet, cenyTypu }
+   Tržní cena: když je k dispozici porovnání s inzercí (aspoň 3 srovnatelné inzeráty), bere se z něj —
+   to je skutečná „cena obvyklá". Křivka zbytku hodnoty je jen náhrada, když inzerce není. */
 function spocitej(v, cfg, now) {
   const c = Object.assign({ maxLet: 8, maxKm: 250000, rocniKm: 25000, rezervaProdej: 8, odpisLet: 5, cenyTypu: null }, cfg || {});
   now = now || new Date();
@@ -85,9 +87,23 @@ function spocitej(v, cfg, now) {
     const krivka = TYPY_NAKLADNI.includes(v.typ) ? KRIVKA_NAKLADNI : KRIVKA_OSOBNI;
     const ocek = out.stariLet * c.rocniKm;
     out.kmFaktor = najezd != null ? Math.min(1.15, Math.max(0.75, 1 - 0.04 * (najezd - ocek) / 25000)) : 1;   // ±4 % za každých 25 tis. km odchylky
-    out.trzni = zaokr(poriz * zbytek(out.stariLet, krivka) * out.kmFaktor, 1000);
-    out.prodejniNavrh = zaokr(out.trzni * (1 - c.rezervaProdej / 100), 1000);
-  } else { out.zustatkova = null; out.kmFaktor = null; out.trzni = null; out.prodejniNavrh = null; }
+    out.trzniModel = zaokr(poriz * zbytek(out.stariLet, krivka) * out.kmFaktor, 1000);
+  } else { out.zustatkova = null; out.kmFaktor = null; out.trzniModel = null; }
+  // Inzerce: medián srovnatelných inzerátů posunutý na náš nájezd. Má přednost před křivkou.
+  const trh = (v.trh && v.trh.stav === 'ok' && v.trh.n >= 3 && v.trh.odhad > 0) ? v.trh : null;
+  if (trh) {
+    out.trzni = trh.odhad; out.trzniZdroj = 'inzerce';
+    out.inzerce = { n: trh.n, median: trh.median, q1: trh.q1, q3: trh.q3, odhad: trh.odhad, rychly: trh.rychly, ts: trh.ts, odkaz: trh.odkaz || null,
+      rozsireno: !!(trh.dotaz && trh.dotaz.rozsireno), shoda: trh.dotaz ? trh.dotaz.shoda : null };
+    out.rychly = trh.rychly;
+  } else {
+    out.trzni = out.trzniModel; out.trzniZdroj = out.trzniModel != null ? 'model' : null; out.inzerce = null;
+    out.rychly = out.trzni != null ? zaokr(out.trzni * 0.9, 1000) : null;
+    if (!v.trh || v.trh.stav !== 'ok') out.chybi.push('porovnání s inzercí' + (v.trh && v.trh.zprava ? ' (' + v.trh.zprava + ')' : ''));
+  }
+  out.prodejniNavrh = out.trzni != null ? zaokr(out.trzni * (1 - c.rezervaProdej / 100), 1000) : null;
+  // O kolik se křivka lišila od skutečné inzerce — ukazuje, jak moc je model mimo.
+  out.rozdilModel = (trh && out.trzniModel != null) ? trh.odhad - out.trzniModel : null;
   if (v.prodejniCena > 0) { out.prodejni = v.prodejniCena; out.prodejniZdroj = 'zadáno'; }
   else { out.prodejni = out.prodejniNavrh; out.prodejniZdroj = out.prodejniNavrh != null ? 'návrh' : null; }
   out.rozdilProc = (out.prodejni != null && out.trzni) ? +((out.prodejni - out.trzni) / out.trzni * 100).toFixed(1) : null;

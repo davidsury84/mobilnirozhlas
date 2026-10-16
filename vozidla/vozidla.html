@@ -1018,7 +1018,8 @@ function obmenaKarta(v){
   // ocenění
   h+='<div class="grid3" style="margin-top:12px">'
     +'<div><div class="mut">Účetní zůstatková</div><div style="font-size:16px"><strong>'+kc(o.zustatkova)+'</strong></div><div class="mut">rovnoměrně '+n.odpisLet+' let</div></div>'
-    +'<div><div class="mut">Tržní srovnatelná (cena obvyklá)</div><div style="font-size:16px"><strong>'+kc(o.trzni)+'</strong></div><div class="mut">'+(o.kmFaktor!=null?'zbytek dle stáří × nájezd ('+(o.kmFaktor>=1?'+':'')+Math.round((o.kmFaktor-1)*100)+' %)':'')+'</div></div>'
+    +'<div><div class="mut">Tržní (cena obvyklá)'+(o.trzniZdroj==="inzerce"?' — z inzerce':o.trzniZdroj==="model"?' — odhad z křivky':'')+'</div><div style="font-size:16px"><strong>'+kc(o.trzni)+'</strong></div><div class="mut">'
+      +(o.trzniZdroj==="inzerce"?(o.inzerce.n+' srovnatelných inzerátů, medián '+kc(o.inzerce.median)):(o.kmFaktor!=null?'zbytek dle stáří × nájezd ('+(o.kmFaktor>=1?'+':'')+Math.round((o.kmFaktor-1)*100)+' %)':''))+'</div></div>'
     +'<div><div class="mut">Prodejní'+(o.prodejniZdroj==="zadáno"?' (zadaná)':' (návrh: tržní − '+n.rezervaProdej+' %)')+'</div><div style="font-size:16px"><strong>'+kc(o.prodejni)+'</strong>'+(o.rozdilProc!=null?' <span class="'+(o.rozdilProc<-10?'':'mut')+'" style="'+(o.rozdilProc<-10?'color:var(--red)':'')+'">'+(o.rozdilProc>=0?'+':'')+String(o.rozdilProc).replace('.',',')+' % vs. tržní</span>':'')+'</div></div>'
     +'</div>';
   if((o.upozorneni||[]).length) h+='<div class="hint" style="margin-top:8px;color:var(--amber)">⚠ '+o.upozorneni.map(esc).join(' · ')+'</div>';
@@ -1038,7 +1039,8 @@ function obmenaKarta(v){
   } else if(v.plan==="prodej"){
     h+='<div class="hint" style="margin-top:10px">Vozidlo je nabízeno zaměstnancům k odkupu za cenu obvyklou '+kc(o.cenaZamestnanec)+'. Nabídku můžeš podat na <a href="/vozidla/odkup" target="_blank" rel="noopener">/vozidla/odkup</a>.</div>';
   }
-  h+='<div class="hint" style="margin-top:8px">Termín vyřazení = dřívější z prahů '+cis(n.prahKm)+' km / '+n.prahRoky+' let. Tržní cena = pořizovací × zbytek hodnoty dle stáří (křivka ojetin) × korekce na nájezd proti '+cis(n.rocniKm)+' km/rok. Je to podklad pro rozhodnutí, ne znalecký posudek.</div>';
+  h+=inzerceBlok(v);
+  h+='<div class="hint" style="margin-top:8px">Termín vyřazení = dřívější z prahů '+cis(n.prahKm)+' km / '+n.prahRoky+' let. Tržní cena = medián srovnatelných inzerátů na Sauto.cz posunutý na náš nájezd; když inzeráty nejsou, pořizovací × zbytek hodnoty dle stáří × korekce na nájezd proti '+cis(n.rocniKm)+' km/rok. Je to podklad pro rozhodnutí, ne znalecký posudek.</div>';
   // nabídky
   if(v.smiRozhodovat&&v.plan==="prodej"){
     h+='<div style="margin-top:14px"><div class="mut" style="margin-bottom:6px">Nabídky odkupu</div>'+nabidkyTabulka(v,v.nabidky)+'</div>';
@@ -1066,6 +1068,96 @@ async function nabidkaStav(nid,stav,vozId){
   try{ await api("/api/vozidla/odkup/stav",{id:nid,stav}); toast("Nabídka "+(stav==="prijata"?"přijata.":"zamítnuta.")); await nacti(); if(ZALOZKA==="vyrazeni")vykresli(); else detail(vozId); }
   catch(e){alert(e.message);}
 }
+/* ---------- porovnání s inzercí (Sauto.cz) ----------
+   Tržní cena z reálných inzerátů: stejná značka a model, stejný rok, podobný nájezd.
+   Server to obnovuje sám po dávkách; tady se to jen ukazuje a dá ručně spustit. */
+const TRH_STAV_TXT={ok:'',"bez-roku":"chybí rok výroby",malo:"málo inzerátů",nenalezeno:"značka není na Sauto",chyba:"spojení selhalo"};
+function trhDatum(t){ return t&&t.ts?new Date(t.ts).toLocaleDateString("cs-CZ"):""; }
+function trzniBunka(v,o){
+  const t=v.trh||null;
+  let h='';
+  if(o.trzniZdroj==="inzerce"){
+    const i=o.inzerce;
+    h='<strong>'+cis(o.trzni)+'</strong><div class="mut" title="'+esc(i.n+' inzerátů · medián '+cis(i.median)+' · Q1–Q3 '+cis(i.q1)+'–'+cis(i.q3)+' · porovnáno '+trhDatum(t))+'">inzerce · '+i.n+' inz.'+(i.rozsireno?' · širší okno':'')+(i.shoda==="značka"?' · jen značka':'')+'</div>';
+  }else if(o.trzni!=null){
+    h='<strong>'+cis(o.trzni)+'</strong><div class="mut">model'+(t&&t.stav!=="ok"?' · '+esc(TRH_STAV_TXT[t.stav]||t.stav):' · bez inzerce')+(o.odhadCeny?' · odhad':'')+'</div>';
+  }else h='<span class="mut">—</span>'+(t&&t.stav!=="ok"?'<div class="mut">'+esc(TRH_STAV_TXT[t.stav]||t.stav)+'</div>':'');
+  if(v.smiRozhodovat&&!(D.trhStav&&D.trhStav.bezi)) h+='<div><button class="btn sm" style="padding:1px 7px;font-size:11px" title="Porovnat s inzercí teď (Sauto.cz)" onclick="event.stopPropagation();trhObnovVuz(\''+v.id+'\')">↻ inzerce</button></div>';
+  return h;
+}
+function trhTlacitko(){
+  if(!(D.me.admin||D.me.zodpovedny))return '';
+  const b=D.trhStav||{};
+  if(b.bezi) return '<span class="pill warn" id="trhBeh">porovnávám '+b.hotovo+' / '+b.celkem+'…</span>';
+  return '<button class="btn sm" title="Pro všechna vozidla s rokem výroby najít srovnatelné inzeráty na Sauto.cz a přepočítat tržní ceny" onclick="trhObnovVse()">↻ Porovnat s inzercí</button>';
+}
+function trhStavRadek(vs){
+  const b=D.trhStav||{};
+  const sInz=vs.filter(v=>v.trh&&v.trh.stav==="ok").length, bezRoku=vs.filter(v=>!(v.oceneni&&v.oceneni.reg)).length;
+  const nejst=vs.map(v=>v.trh&&v.trh.ts).filter(Boolean).sort((a,b)=>a-b)[0];
+  let h='<div class="hint" style="margin-bottom:8px">Srovnání s inzercí Sauto.cz: <strong>'+sInz+' z '+vs.length+'</strong> vozidel má tržní cenu z inzerátů'
+    +(nejst?' · nejstarší porovnání '+new Date(nejst).toLocaleDateString("cs-CZ"):'')
+    +(bezRoku?' · <span style="color:var(--amber)">'+bezRoku+' bez roku výroby — ty porovnat nejdou</span>':'')
+    +(b.bezi?' · <strong>právě běží hromadné porovnání ('+b.hotovo+' / '+b.celkem+')</strong>':(b.konec?' · poslední běh '+new Date(b.konec).toLocaleString("cs-CZ")+(b.chyby?' ('+b.chyby+' chyb)':''):''))
+    +'</div>';
+  if(b.bezi) trhSleduj();
+  return h;
+}
+let TRH_T=null;
+function trhSleduj(){
+  clearTimeout(TRH_T);
+  TRH_T=setTimeout(async()=>{
+    try{ const st=await api("/api/vozidla/trh/stav"); if(st.bezi){ const el=document.getElementById("trhBeh"); if(el)el.textContent="porovnávám "+st.hotovo+" / "+st.celkem+"…"; trhSleduj(); }
+         else { D=await api("/api/vozidla/data"); if(ZALOZKA==="vyrazeni")vykresli(); toast("Porovnání s inzercí dokončeno."); } }
+    catch(e){ /* zkusí to příští kolo */ }
+  },4000);
+}
+async function trhObnovVse(){
+  if(!confirm("Najít srovnatelné inzeráty pro všechna vozidla s rokem výroby? Běží to na pozadí asi 1–2 s na vozidlo.")) return;
+  try{ const r=await api("/api/vozidla/trh",{vse:true}); toast(r.bezi?"Porovnání už běží.":"Spuštěno pro "+r.spusteno+" vozidel."); D=await api("/api/vozidla/data"); vykresli(); }
+  catch(e){ alert(e.message); }
+}
+async function trhObnovVuz(id){
+  toast("Hledám inzeráty…");
+  try{ const r=await api("/api/vozidla/trh",{id}); D=await api("/api/vozidla/data");
+    const t=r.trh||{}; toast(t.stav==="ok"?("Nalezeno "+t.n+" inzerátů, tržní cena "+kc(t.odhad)+"."):("Porovnání: "+(t.zprava||t.stav)));
+    if(ZALOZKA==="vyrazeni")vykresli(); if($("#modal").classList.contains("on"))detail(id); }
+  catch(e){ toast("Nepodařilo se: "+e.message); }
+}
+// Blok v detailu vozidla: souhrn + nejbližší inzeráty s odkazy.
+function inzerceBlok(v){
+  const t=v.trh||null, o=v.oceneni||{}, d=(t&&t.dotaz)||{};
+  let h='<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"><div class="spread" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><strong>Srovnání s inzercí (Sauto.cz)</strong>'
+    +(t?'<span class="mut">porovnáno '+trhDatum(t)+'</span>':'<span class="mut">zatím neporovnáno</span>')+'<div class="sp" style="flex:1"></div>'
+    +(t&&t.odkaz?'<a class="btn sm" href="'+esc(t.odkaz)+'" target="_blank" rel="noopener" title="Otevřít výpis se stejnými filtry na Sauto.cz">Výpis na Sauto ↗</a> ':'')
+    +(v.smiRozhodovat?'<button class="btn sm" onclick="trhObnovVuz(\''+v.id+'\')">↻ Aktualizovat</button>':'')+'</div>';
+  if(!t){ h+='<div class="mut" style="margin-top:6px">Porovnání proběhne automaticky na pozadí'+(v.smiRozhodovat?', nebo ho spusť tlačítkem':'')+'.</div>'; return h+'</div>'; }
+  if(t.stav!=="ok"){ h+='<div class="hint" style="margin-top:6px;color:var(--amber)">⚠ '+esc(t.zprava||TRH_STAV_TXT[t.stav]||t.stav)+'</div>'; }
+  if(d.znacka){
+    h+='<div class="mut" style="margin-top:6px">Hledáno: <strong>'+esc(d.znacka+(d.model?' '+d.model:''))+'</strong>'+(d.shoda==="značka"?' <span class="pill warn" title="Model se nepodařilo spárovat s číselníkem Sauto — srovnává se celá značka">jen značka</span>':'')
+      +' · rok '+(d.rokOd===d.rokDo?d.rokOd:d.rokOd+'–'+d.rokDo)+(d.kmOd!=null?' · nájezd '+cis(d.kmOd)+'–'+cis(d.kmDo)+' km':' · bez filtru nájezdu')+' · kategorie '+esc(d.kategorieNazev||'')
+      +(d.rozsireno?' <span class="pill mute" title="Přesně stejný rok a nájezd ±30 % nedaly dost inzerátů, okno se rozšířilo">širší okno</span>':'')+'</div>';
+  }
+  if(t.stav==="ok"){
+    const kpi=(l,val,pozn)=>'<div><div class="mut">'+l+'</div><div style="font-size:16px"><strong>'+val+'</strong></div>'+(pozn?'<div class="mut">'+pozn+'</div>':'')+'</div>';
+    h+='<div class="grid3" style="margin-top:10px">'
+      +kpi('Doporučená prodejní cena',kc(t.odhad),'medián inzerátů posunutý na náš nájezd'+(t.sklon10k?' ('+cis(t.sklon10k)+' Kč / 10 tis. km)':''))
+      +kpi('Medián · rozpětí Q1–Q3',kc(t.median),cis(t.q1)+' – '+cis(t.q3)+' Kč · '+t.n+' inzerátů')
+      +kpi('Rychlý prodej',kc(t.rychly),'dolní kvartil, pro prodej do měsíce')
+      +'</div>';
+    if(o.trzniModel!=null) h+='<div class="mut" style="margin-top:6px">Odhad z křivky by dal '+kc(o.trzniModel)+' — inzerce je '+(o.rozdilModel>=0?'o '+cis(o.rozdilModel)+' Kč výš':'o '+cis(-o.rozdilModel)+' Kč níž')+'.</div>';
+  }
+  const vz=t.vzorek||[];
+  if(vz.length){
+    h+='<div class="mut" style="margin:10px 0 4px">Nejbližší inzeráty (nájezdem a rokem)</div>'
+      +'<div style="overflow-x:auto"><table><thead><tr><th>Inzerát</th><th class="num">Rok</th><th class="num">Nájezd</th><th class="num">Cena</th><th>Kraj</th><th></th></tr></thead><tbody>'
+      +vz.map(x=>'<tr><td>'+esc(x.nazev)+'</td><td class="num">'+(x.rok||'—')+'</td><td class="num">'+(x.km?cis(x.km)+' km':'—')+'</td><td class="num"><strong>'+(x.cena?cis(x.cena)+' Kč':'dohodou')+'</strong></td><td>'+esc(x.kraj||'')+'</td>'
+        +'<td><a href="'+esc(x.url)+'" target="_blank" rel="noopener">otevřít ↗</a></td></tr>').join('')
+      +'</tbody></table></div>';
+  }
+  return h+'</div>';
+}
+
 /* ---------- záložka Vyřazení a ocenění ---------- */
 /* Cena rovnou v tabulce: u 50 vozů nikdo nebude otevírat 50 detailů. Prázdné políčko
    ukazuje jako nápovědu odhad, ze kterého se zatím počítá. Ukládá se až po opuštění
@@ -1096,12 +1188,13 @@ function exportVyrazeni(){
   const vs=D.vozidla.filter(v=>v.stav!=="prodano"&&v.stav!=="vyrazeno");
   exportCsv("vyrazeni-a-oceneni",
     ["SPZ","Značka a model","Středisko","Pořízeno","Stáří (let)","Nájezd (km)","km/rok","Vyřazení dle stáří","Vyřazení dle nájezdu",
-     "Návrh na vyřazení","Důvod","Pořizovací (Kč)","Zdroj pořizovací ceny","Zůstatková (Kč)","Tržní (Kč)","Prodejní (Kč)","Tržní − zůstatková (Kč)","Plán","Upozornění"],
+     "Návrh na vyřazení","Důvod","Pořizovací (Kč)","Zdroj pořizovací ceny","Zůstatková (Kč)","Tržní (Kč)","Zdroj tržní ceny","Inzerátů","Inzerce medián (Kč)","Inzerce Q1 (Kč)","Inzerce Q3 (Kč)","Rychlý prodej (Kč)","Porovnáno","Výpis inzerátů","Prodejní (Kč)","Tržní − zůstatková (Kč)","Plán","Upozornění"],
     vs.map(v=>{const o=v.oceneni||{};
       return [v.spz||"",[v.znacka,v.model].filter(Boolean).join(" "),v.stredisko||"",expMesic(o.reg),
         expDes(o.stariLet),expCis(o.najezd),expCis(o.kmRok),expMesic(o.terminStari),expMesic(o.terminNajezd),
         o.terminNyni?"nyní":expMesic(o.termin),o.duvod||"",expCis(o.porizovaci),o.porizovaciZdroj||"",
-        expCis(o.zustatkova),expCis(o.trzni),expCis(o.prodejni),expCis(o.rozdilZustatkova),v.planText||"",(o.upozorneni||[]).join(" · ")];}));
+        expCis(o.zustatkova),expCis(o.trzni),o.trzniZdroj||"",o.inzerce?o.inzerce.n:"",expCis(o.inzerce&&o.inzerce.median),expCis(o.inzerce&&o.inzerce.q1),expCis(o.inzerce&&o.inzerce.q3),
+        expCis(o.rychly),trhDatum(v.trh),(v.trh&&v.trh.odkaz)||"",expCis(o.prodejni),expCis(o.rozdilZustatkova),v.planText||"",(o.upozorneni||[]).join(" · ")];}));
 }
 function exportNabidky(){
   const radky=[];
@@ -1124,9 +1217,11 @@ function vykresliVyrazeni(){
   const nab=[]; D.vozidla.forEach(v=>(v.nabidky||[]).forEach(x=>nab.push(Object.assign({v},x))));
   const odh=z=>z&&/odhad|bez měsíce|\+ \d+ měs/.test(z)?' <span class="pill mute" title="'+esc(z)+'">odhad</span>':'';
   let h='<div class="card"><div class="h"><h2>Vyřazení a ocenění vozidel</h2><div class="sp"></div>'
-    +'<span class="pill '+(nyni.length?"bad":"ok")+'">'+nyni.length+' k vyřazení nyní</span> <span class="pill warn">'+rok.length+' do roka</span> <span class="pill mute">'+prodej.length+' k prodeji · '+likv.length+' k likvidaci</span> '+btnExport("exportVyrazeni()")+'</div><div class="b">'
+    +'<span class="pill '+(nyni.length?"bad":"ok")+'">'+nyni.length+' k vyřazení nyní</span> <span class="pill warn">'+rok.length+' do roka</span> <span class="pill mute">'+prodej.length+' k prodeji · '+likv.length+' k likvidaci</span> '
+    +trhTlacitko()+' '+btnExport("exportVyrazeni()")+'</div><div class="b">'
+    +trhStavRadek(vs.map(r=>r.v))
     +'<div class="hint">Termín vyřazení = dřívější z <strong>stáří '+n.prahRoky+' let</strong> a <strong>nájezdu '+cis(n.prahKm)+' km</strong> při současném ročním nájezdu (prahy v Nastavení). '
-    +'Ceny: <strong>účetní zůstatková</strong> (rovnoměrně '+n.odpisLet+' let) · <strong>tržní srovnatelná</strong> = pořizovací × zbytek hodnoty dle stáří × korekce na nájezd proti '+cis(n.rocniKm)+' km/rok · <strong>prodejní</strong> = tržní − '+n.rezervaProdej+' % nebo ručně. '
+    +'Ceny: <strong>účetní zůstatková</strong> (rovnoměrně '+n.odpisLet+' let) · <strong>tržní</strong> = medián srovnatelných inzerátů na Sauto.cz (stejná značka, model, rok, podobný nájezd) posunutý na náš nájezd; bez inzerátů odhad z křivky · <strong>prodejní</strong> = tržní − '+n.rezervaProdej+' % nebo ručně. '
     +'Tržní hodnota vozidel s podklady: <strong>'+kc(sumT)+'</strong> ('+sPod+' z '+vs.length+' vozů), účetní zůstatková '+kc(sumZ)+'. Hodnoty „odhad" zpřesníš doplněním data pořízení, tachometru a pořizovací ceny.</div>'
     +(nyni.length?'<div class="hint" style="margin-top:8px;color:var(--red)"><strong>K vyřazení nyní:</strong> '+nyni.map(r=>esc(r.v.spz||r.v.vin)+' ('+esc(r.o.duvod)+')').join(', ')+'</div>':'')
     +'<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th>Vozidlo</th><th>Středisko</th><th>Pořízeno</th><th class="num">Stáří</th><th class="num">Nájezd</th><th class="num">km/rok</th><th>Dle stáří</th><th>Dle nájezdu</th><th>Vyřazení</th>'
@@ -1139,14 +1234,15 @@ function vykresliVyrazeni(){
         +'<td>'+fm(o.terminStari)+'</td><td>'+fm(o.terminNajezd)+'</td><td><strong>'+(o.terminNyni?'<span style="color:var(--red)">nyní</span>':fm(o.termin))+'</strong>'+(o.duvod?'<div class="mut">'+esc(o.duvod)+'</div>':'')+'</td>'
         +'<td class="num">'+cenaBunka(v,'poriz',o)+'</td>'
         +'<td class="num">'+(o.zustatkova!=null?cis(o.zustatkova):'—')+'</td>'
-        +'<td class="num"><strong>'+(o.trzni!=null?cis(o.trzni):'—')+'</strong>'+(o.odhadCeny?'<div class="mut">odhad</div>':'')+'</td>'
+        +'<td class="num" style="min-width:150px">'+trzniBunka(v,o)+'</td>'
         +'<td class="num">'+cenaBunka(v,'prodej',o)+(o.rozdilProc!=null&&o.rozdilProc<-10?'<div style="color:var(--red)">'+String(o.rozdilProc).replace('.',',')+' %</div>':'')+'</td>'
         +'<td class="num">'+(rozd==null?'—':'<strong style="color:'+(rozd<0?'var(--red)':'var(--green-d)')+'">'+(rozd>0?'+':'')+cis(rozd)+'</strong>')+'</td>'
         +'<td>'+(v.plan?planPill(v).trim():'')+((o.upozorneni||[]).length?' <span title="'+esc(o.upozorneni.join(' · '))+'">⚠</span>':'')+((v.nabidky||[]).filter(x=>x.stav==="nova").length?' <span class="pill warn">'+(v.nabidky.filter(x=>x.stav==="nova").length)+' nab.</span>':'')+'</td></tr>';}).join('')
     +'</tbody><tfoot><tr style="font-weight:600;background:var(--bg-2)"><td colspan="9">Celkem '+vs.length+' vozidel '+(odhadu?'<span class="mut" style="font-weight:400">· u '+odhadu+' se počítá z orientační ceny podle typu</span>':'')+'</td>'
     +'<td class="num">'+cis(sumP)+'</td><td class="num">'+cis(sumZ)+'</td><td class="num">'+cis(sumT)+'</td><td class="num">'+cis(sumPr)+'</td>'
     +'<td class="num" style="color:'+((sumT-sumZ)<0?'var(--red)':'var(--green-d)')+'">'+((sumT-sumZ)>0?'+':'')+cis(sumT-sumZ)+'</td><td></td></tr></tfoot></table></div>'
-    +'<div class="hint" style="margin-top:8px"><strong>Pořizovací a prodejní cenu přepiš rovnou v tabulce</strong> — uloží se sama. Dokud u vozu skutečná pořizovací cena není, počítá se z orientační ceny podle typu vozidla (Nastavení) a vše odvozené je označené jako <span class="pill mute">odhad</span>. Kliknutím na SPZ otevřeš detail a rozhodneš o plánu (prodej / ekologická likvidace).</div></div></div>';
+    +'<div class="hint" style="margin-top:8px"><strong>Tržní cena = skutečná inzerce.</strong> Pro každý vůz se na Sauto.cz hledají inzeráty stejné značky a modelu, stejného roku výroby a podobného nájezdu; tržní cena je jejich medián posunutý na náš nájezd, <strong>prodejní</strong> je tržní − rezerva '+n.rezervaProdej+' % (nebo ručně). Porovnání se obnovuje samo jednou za '+(n.trhObnovaDni||7)+' dní, u vozů bez inzerátů platí odhad z křivky („model"). '
+    +'<strong>Pořizovací a prodejní cenu přepiš rovnou v tabulce</strong> — uloží se sama; bez pořizovací ceny se zůstatková počítá z orientační ceny podle typu (Nastavení), označeno <span class="pill mute">odhad</span>. Kliknutím na SPZ otevřeš detail se srovnatelnými inzeráty a rozhodneš o plánu.</div></div></div>';
   h+='<div class="card"><div class="h"><h2>Nabídky zaměstnanců na odkup</h2><div class="sp"></div><span class="pill '+(nab.some(x=>x.stav==="nova")?"warn":"mute")+'">'+nab.filter(x=>x.stav==="nova").length+' nových</span> '+(nab.length?btnExport("exportNabidky()"):'')+'</div><div class="b">'
     +'<div class="hint" style="margin-bottom:10px">Vozidla s plánem „prodej" vidí každý přihlášený zaměstnanec na <a href="/vozidla/odkup" target="_blank" rel="noopener">/vozidla/odkup</a> (a na nástěnce intranetu) a může podat nabídku. Cena v nabídce je cena obvyklá; nabídky pod ní jsou označené — rozdíl by byl u zaměstnance nepeněžním příjmem.</div>';
   if(!nab.length) h+='<div class="mut">Zatím žádná nabídka.</div>';
@@ -1330,6 +1426,10 @@ function vykresliNastaveni(){
     +'<label class="f"><span>Rezerva pro rychlý prodej (% pod tržní)</span><input id="nRez" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" type="number" min="0" max="50" value="'+(n.rezervaProdej!=null?n.rezervaProdej:8)+'"></label>'
     +'<label class="f"><span>Účetní odpis (roky)</span><input id="nOdpis" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" type="number" min="1" value="'+(n.odpisLet||5)+'"></label>'
     +'</div>'
+    +'<div class="grid3">'
+    +'<label class="f"><span>Porovnávat s inzercí (Sauto.cz)</span><select id="nTrh" autocomplete="off" onchange="ulozNastaveni()"><option value="1"'+(n.trhZapnuto!==false?' selected':'')+'>zapnuto — tržní ceny z reálných inzerátů</option><option value="0"'+(n.trhZapnuto===false?' selected':'')+'>vypnuto — jen odhad z křivky</option></select></label>'
+    +'<label class="f"><span>Obnovit porovnání každých (dní)</span><input id="nTrhDni" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" type="number" min="1" max="90" value="'+(n.trhObnovaDni||7)+'"></label>'
+    +'</div>'
     +'<div class="mut" style="margin:4px 0 6px">Orientační pořizovací cena podle typu vozidla (Kč) — použije se jen u vozu, kde skutečná cena ještě není zadaná; vše z ní odvozené je v tabulce označené jako odhad.</div>'
     +'<div class="grid3">'+Object.keys(D.typy).map(k=>'<label class="f"><span>'+esc(D.typy[k])+'</span>'
       +'<input id="nCena_'+k+'" autocomplete="off" inputmode="numeric" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" value="'+(((n.cenyTypu||{})[k])||0)+'"></label>').join('')+'</div>'
@@ -1375,6 +1475,7 @@ async function ulozNastaveni(){
       rocniKm:$("#nRocniKm").value,rezervaProdej:$("#nRez").value,odpisLet:$("#nOdpis").value,odkupEmail:$("#nOdkup").value,
       reditelEmail:$("#nReditel").value,
       cenyTypu:Object.keys(D.typy).reduce((a,k)=>{const el=document.getElementById("nCena_"+k); if(el)a[k]=el.value; return a;},{}),
+      trhZapnuto:$("#nTrh")?$("#nTrh").value==="1":undefined, trhObnovaDni:$("#nTrhDni")?$("#nTrhDni").value:undefined,
       kopieNa:$("#nKopie").value.split(/[;,]/).map(s=>s.trim()).filter(Boolean)});
     stavUlozeni("nastStav","uloženo ✓","var(--green-d)");
     D=await api("/api/vozidla/data");

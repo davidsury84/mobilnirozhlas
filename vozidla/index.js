@@ -26,6 +26,7 @@ const path = require('path');
 const crypto = require('crypto');
 const urlLib = require('url');
 const oceneni = require('./oceneni');
+const trh = require('./trh');          // porovnání s inzercí (Sauto.cz)
 
 const HTML_FILE = path.join(__dirname, 'vozidla.html');
 const ODKUP_FILE = path.join(__dirname, 'odkup.html');
@@ -96,6 +97,9 @@ function mount(host) {
     if (typeof n.odkupEmail !== 'string') n.odkupEmail = '';
     // Orientační pořizovací ceny podle typu vozidla — použijí se, dokud u vozu není zadaná skutečná.
     // Bez nich je tabulka ocenění prázdná a není co srovnávat.
+    // porovnání s inzercí: zapnuto, obnova jednou za týden
+    if (typeof n.trhZapnuto !== 'boolean') n.trhZapnuto = true;
+    if (typeof n.trhObnovaDni !== 'number') n.trhObnovaDni = 7;
     if (!n.cenyTypu || typeof n.cenyTypu !== 'object') n.cenyTypu = {};
     Object.keys(CENY_TYPU).forEach((k) => { if (typeof n.cenyTypu[k] !== 'number') n.cenyTypu[k] = CENY_TYPU[k]; });
     if (!Array.isArray(d.odkup)) d.odkup = [];                         // nabídky zaměstnanců na odkup vozu
@@ -337,12 +341,77 @@ function mount(host) {
       reg: r.reg, regZdroj: r.zdroj,
       tachometr: pk ? Number(pk.km) : null, tachometrRok: pk ? pk.rok : null, tachometrMesicu: tachoMes, kmMes: naj / 12,
       porizovaciCena: Number(v.porizovaciCena) || null, prodejniCena: Number(v.prodejniCena) || null, typ: v.typ,
+      trh: v.trh || null,
     }, {
       maxLet: Number(nast.prahRoky) || 8, maxKm: Number(nast.prahKm) || 250000, rocniKm: Number(nast.rocniKm) || 25000,
       rezervaProdej: (nast.rezervaProdej != null && isFinite(nast.rezervaProdej)) ? Number(nast.rezervaProdej) : 8, odpisLet: Number(nast.odpisLet) || 5,
       cenyTypu: nast.cenyTypu || CENY_TYPU,
     }, d0);
   }
+  // ---- porovnání s inzercí (Sauto.cz) ------------------------------------------
+  //  Běží na pozadí: hodinový tick obnoví pár vozů, kterým je porovnání starší než
+  //  trhObnovaDni; správce ho může spustit ručně pro jeden vůz nebo pro všechny.
+  //  Každý vůz se načte a uloží zvlášť, aby se dlouhý běh nepral s editací v UI.
+  const TRH_BEH = { bezi: false, hotovo: 0, celkem: 0, zacatek: null, konec: null, chyby: 0, posledni: '' };
+  function trhVstup(v) {
+    const r = regVozu(v), pk = posledniKm(v);
+    return { znacka: v.znacka, model: v.model, typ: v.typ, rok: r.reg ? r.reg.y : null, km: pk ? Number(pk.km) : null };
+  }
+  async function trhObnovVozy(ids) {
+    if (TRH_BEH.bezi) return false;
+    Object.assign(TRH_BEH, { bezi: true, hotovo: 0, celkem: ids.length, zacatek: Date.now(), konec: null, chyby: 0, posledni: '' });
+    try {
+      for (const id of ids) {
+        const d = load(); const v = d.vozidla.find(x => x.id === id);
+        if (v) {
+          v.trh = await trh.ohodnot(trhVstup(v));
+          if (v.trh.stav === 'chyba') TRH_BEH.chyby++;
+          TRH_BEH.posledni = (v.spz || v.vin || id) + ': ' + v.trh.stav + (v.trh.n != null ? ' (' + v.trh.n + ' inz.)' : '');
+          save(d);
+        }
+        TRH_BEH.hotovo++;
+      }
+    } finally { TRH_BEH.bezi = false; TRH_BEH.konec = Date.now(); }
+    return true;
+  }
+  // Komu je porovnání nejvíc po termínu — ti jdou první. Vozy bez roku výroby nemá smysl zkoušet.
+  function trhKObnove(d, max) {
+    const lhuta = (Number(d.nastaveni.trhObnovaDni) || 7) * DEN;
+    return d.vozidla
+      .filter(v => v.stav === 'aktivni' && regVozu(v).reg && (!v.trh || !v.trh.ts || Date.now() - v.trh.ts > lhuta || v.trh.stav === 'chyba'))
+      .sort((a, b) => ((a.trh && a.trh.ts) || 0) - ((b.trh && b.trh.ts) || 0))
+      .slice(0, max).map(v => v.id);
+  }
+  async function trhTick(d) {
+    if (!d.nastaveni.trhZapnuto || TRH_BEH.bezi) return;
+    const ids = trhKObnove(d, 6);
+    if (!ids.length) return;
+    try { await trhObnovVozy(ids); console.log('[vozidla] porovnání s inzercí obnoveno u ' + ids.length + ' vozidel'); }
+    catch (e) { console.warn('[vozidla] porovnání s inzercí selhalo: ' + e.message); }
+  }
+  async function apiTrh(req, res) {
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const d = load(), r = role(req);
+    if (b.vse) {
+      if (!(r.admin || r.zodpovedny)) { json(res, 403, { chyba: 'Hromadné porovnání spouští správce modulu nebo zodpovědná osoba.' }); return true; }
+      if (TRH_BEH.bezi) { json(res, 200, { ok: true, bezi: true, stav: TRH_BEH }); return true; }
+      const ids = d.vozidla.filter(v => v.stav === 'aktivni' && regVozu(v).reg && (r.admin || smiRozhodovat(v, r))).map(v => v.id);
+      if (!ids.length) { json(res, 400, { chyba: 'Není co porovnávat — žádné vozidlo nemá rok výroby.' }); return true; }
+      trhObnovVozy(ids).catch(e => console.warn('[vozidla] hromadné porovnání: ' + e.message));   // běží dál na pozadí
+      logAct('vozidla', req, 'Porovnání s inzercí spuštěno pro ' + ids.length + ' vozidel');
+      json(res, 200, { ok: true, spusteno: ids.length, stav: TRH_BEH });
+      return true;
+    }
+    const v = d.vozidla.find(x => x.id === b.id);
+    if (!v) { json(res, 404, { chyba: 'Vozidlo nenalezeno.' }); return true; }
+    if (!smiRozhodovat(v, r)) { json(res, 403, { chyba: 'Porovnání spouští správce modulu nebo zodpovědná osoba za středisko.' }); return true; }
+    if (TRH_BEH.bezi) { json(res, 409, { chyba: 'Právě běží hromadné porovnání — počkejte, až doběhne.' }); return true; }
+    v.trh = await trh.ohodnot(trhVstup(v));
+    save(d);
+    json(res, 200, { ok: true, trh: v.trh, oceneni: oceneniVozu(v, d.nastaveni) });
+    return true;
+  }
+
   const PLANY = { prodej: 'Plánovaný prodej', likvidace: 'Vyřazení — ekologická likvidace' };
   // Vozy nabízené zaměstnancům k odkupu: plán „prodej" u vozu, který ještě nebyl prodán ani vyřazen.
   function vozyKOdkupu(d) {
@@ -513,6 +582,8 @@ function mount(host) {
       if (p === '/api/vozidla/odkup/stav' && req.method === 'POST') return apiOdkupStav(req, res);
       if (p === '/api/vozidla/plan' && req.method === 'POST') return apiPlan(req, res);
       if (p === '/api/vozidla/cena' && req.method === 'POST') return apiCena(req, res);
+      if (p === '/api/vozidla/trh' && req.method === 'POST') return apiTrh(req, res);
+      if (p === '/api/vozidla/trh/stav' && req.method === 'GET') { json(res, 200, TRH_BEH); return true; }
       if (p === '/api/vozidla/data' && req.method === 'GET') return apiData(req, res);
       if (p === '/api/vozidla/vuz' && req.method === 'POST') return apiVuz(req, res);
       if (p === '/api/vozidla/vuz/smazat' && req.method === 'POST') return apiVuzSmazat(req, res);
@@ -575,6 +646,7 @@ function mount(host) {
         }) }; })(),
       strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA, plany: PLANY,
       nastaveni: d.nastaveni,
+      trhStav: TRH_BEH,             // běží hromadné porovnání s inzercí?
       zamestnanci: zamestnanci(),   // pro našeptávač; stejná data jako telefonní seznam intranetu
     });
     return true;
@@ -935,6 +1007,8 @@ function mount(host) {
     if (b.rezervaProdej != null) d.nastaveni.rezervaProdej = Math.min(50, Math.max(0, Number(b.rezervaProdej) || 0));
     if (b.odpisLet != null) d.nastaveni.odpisLet = Math.max(1, Number(b.odpisLet) || 5);
     if (b.odkupEmail != null) d.nastaveni.odkupEmail = low(b.odkupEmail);
+    if (b.trhZapnuto != null) d.nastaveni.trhZapnuto = !!b.trhZapnuto;
+    if (b.trhObnovaDni != null) d.nastaveni.trhObnovaDni = Math.min(90, Math.max(1, Number(b.trhObnovaDni) || 7));
     if (b.cenyTypu && typeof b.cenyTypu === 'object') {
       Object.keys(CENY_TYPU).forEach((k) => {
         if (b.cenyTypu[k] == null) return;
@@ -1062,7 +1136,7 @@ function mount(host) {
     const hl = ['SPZ', 'Značka', 'Model', 'VIN', 'Rok výroby', 'Typ', 'Stav', 'Středisko', 'Správce vozu', 'E-mail správce',
       'Zodpovědná osoba', 'STK do', 'Dní do STK', 'Poslední tachometr', 'Rok zápisu', 'Nájezd km/rok',
       'Poslední inventarizace', 'Doporučení prodeje', 'Termín vyřazení', 'Pořizovací cena', 'Zdroj pořizovací ceny',
-      'Zůstatková cena', 'Tržní cena', 'Prodejní cena', 'Tržní − zůstatková', 'Plán'];
+      'Zůstatková cena', 'Tržní cena', 'Zdroj tržní ceny', 'Inzerce — počet', 'Inzerce — medián', 'Inzerce — rychlý prodej', 'Prodejní cena', 'Tržní − zůstatková', 'Plán'];
     const radky = viditelna(d, r).map(v => {
       const st = stavVozu(v, d.nastaveni), pk = posledniKm(v), o = oceneniVozu(v, d.nastaveni);
       const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
@@ -1071,7 +1145,8 @@ function mount(host) {
         pk ? pk.km : '', pk ? pk.rok : '', st.prodej.najezd || '',
         st.inventura.posledni ? st.inventura.posledni.datum : 'nikdy', st.prodej.text,
         o.termin ? oceneni.fmtMesic(o.termin) : '', o.porizovaci || '', o.porizovaciZdroj || '',
-        o.zustatkova == null ? '' : o.zustatkova, o.trzni == null ? '' : o.trzni, o.prodejni == null ? '' : o.prodejni,
+        o.zustatkova == null ? '' : o.zustatkova, o.trzni == null ? '' : o.trzni, o.trzniZdroj || '',
+        o.inzerce ? o.inzerce.n : '', o.inzerce ? o.inzerce.median : '', o.inzerce ? o.inzerce.rychly : '', o.prodejni == null ? '' : o.prodejni,
         o.rozdilZustatkova == null ? '' : o.rozdilZustatkova, PLANY[v.plan] || ''];
     });
     const csv = [hl].concat(radky).map(a => a.map(x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"').join(';')).join('\r\n');
@@ -1201,6 +1276,8 @@ function mount(host) {
       if (ok) { d.odeslano[klic] = Date.now(); zmena = true; }
       return ok;
     };
+    // Porovnání s inzercí nezávisí na upomínkách — běží vždy, po malých dávkách.
+    await trhTick(d);
     // Po hromadném importu evidence dáme lidem čas doplnit údaje, než začnou chodit upomínky.
     if (nast.upominkyOd && dnesStr < nast.upominkyOd) return;
     for (const v of d.vozidla) {
