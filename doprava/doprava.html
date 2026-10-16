@@ -53,7 +53,6 @@
   <b>ELKOPLAST · Doprava</b>
   <button data-tab="prehled" class="act">Přehled</button>
   <button data-tab="vozidla">Vozidla</button>
-  <button data-tab="vyrazeni">Vyřazení</button>
   <button data-tab="zakazky">Zakázky</button>
   <button data-tab="zvrat">Bod zvratu</button>
   <button data-tab="cena">Pohyblivá cena</button>
@@ -71,7 +70,6 @@
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="/doprava/oceneni.js"></script>
 <script>
 'use strict';
 const $ = (s,r=document)=>r.querySelector(s);
@@ -190,7 +188,6 @@ function render(tab){
   Object.keys(CH).forEach(k=>{CH[k].destroy();delete CH[k];});
   if(tab==='prehled') tabPrehled();
   else if(tab==='vozidla') tabVozidla();
-  else if(tab==='vyrazeni') tabVyrazeni();
   else if(tab==='zakazky') tabZakazky();
   else if(tab==='zvrat') tabZvrat();
   else if(tab==='citlivost') tabCitlivost();
@@ -831,89 +828,6 @@ function tabPrehled(){
       scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v=>(v/1000)+' tis.'}}}}});
 }
 
-/* ================= VYŘAZENÍ & OCENĚNÍ (termín dle stáří/nájezdu, srovnatelná vs. prodejní cena, odkup zaměstnanci) ================= */
-// Vstup pro sdílený výpočet Oceneni.spocitej — stejná skladba jako na serveru (vstupOceneni v index.js).
-function vstupOcen(v){
-  const inf=INFO[v.cislo]||{}, e=v.ekV||null, EKN=(DATA.ekonomika&&DATA.ekonomika.mesiceSdaty&&DATA.ekonomika.mesiceSdaty.length)||0;
-  const s=p=>{const x=e&&e.polozky.find(q=>q.nazev.indexOf(p)===0);return x?(x.celkem||0):0;};
-  const ms=M.mesice.filter(k=>((v.mesice[k]||{}).km||0)>0).slice(-6);
-  const kmMes=ms.length?ms.reduce((a,k)=>a+v.mesice[k].km,0)/ms.length:0;
-  return {reg:inf.reg||null,tachometr:inf.tachometr||null,tachometrDatum:inf.tachometrDatum||null,kmMes,porizovaciCena:inf.porizovaciCena||null,prodejniCena:inf.prodejniCena||null,
-    odpisyMes:e&&EKN?s('551000')/EKN:null, opravyKm:e&&e.kmCelkem>0?(s('511200')+s('511300'))/e.kmCelkem:null, smlouvaDo:v.ev?v.ev.smlouvaDo:null, stav:inf.stav||''};
-}
-function ocenVozu(v){ return Oceneni.spocitej(vstupOcen(v), DATA.vyrazeni||{}, new Date()); }
-function tabVyrazeni(){
-  const m=M, cfg=Object.assign({},Oceneni.VYCHOZI,DATA.vyrazeni||{});
-  const radky=m.voz.map(v=>({v,o:ocenVozu(v)}));
-  const ord=r=>r.o.termin?Oceneni.idx(r.o.termin):9e9;
-  radky.sort((a,b)=>ord(a)-ord(b));
-  let h='<h1>Vyřazení a ocenění vozidel</h1>';
-  h+=alertHtml('info','Termín vyřazení = dřívější z <b>stáří '+cfg.maxLet+' let</b> a <b>nájezdu '+Math.round(cfg.maxKm/1000)+' tis. km</b> (při současném měsíčním nájezdu), nejdřív však po konci leasingu. Ocenění: <b>účetní zůstatková</b> (rovnoměrně '+cfg.odpisLet+' let) · <b>tržní srovnatelná</b> (pořizovací × zbytek hodnoty dle stáří × korekce na nájezd) · <b>prodejní</b> (tržní − '+cfg.rezervaProdej+' % rezerva pro rychlý prodej, nebo ručně zadaná). Hodnoty označené „odhad" zpřesní správce v detailu vozu (1. registrace, tachometr, pořizovací cena).');
-  const nyni=radky.filter(r=>r.o.terminNyni), brzy=radky.filter(r=>!r.o.terminNyni&&r.o.mesicuDoTerminu!=null&&r.o.mesicuDoTerminu<=12);
-  if(nyni.length) h+=alertHtml('warn','<b>K vyřazení nyní:</b> '+nyni.map(r=>esc(vozLbl(r.v.cislo))+' ('+esc(r.o.duvod)+')').join(', ')+'.');
-  if(brzy.length) h+=alertHtml('info','<b>Do 12 měsíců:</b> '+brzy.map(r=>esc(vozLbl(r.v.cislo))+' — '+Oceneni.fmtMesic(r.o.termin)).join(', ')+'.');
-  const chybi=radky.filter(r=>r.o.chybi.length);
-  if(chybi.length) h+='<p class="muted" style="font-size:12px">Chybějící podklady (počítá se odhadem): '+chybi.map(r=>esc(r.v.cislo)+' — '+esc(r.o.chybi.join(', '))).join(' · ')+'.</p>';
-  const sumTrz=radky.reduce((a,r)=>a+(r.o.trzni||0),0), sumZust=radky.reduce((a,r)=>a+(r.o.zustatkova||0),0), prodej=radky.filter(r=>(INFO[r.v.cislo]||{}).stav==='prodej');
-  h+='<div class="cards" style="margin-bottom:14px">'
-    +'<div class="card"><div class="muted">Tržní hodnota flotily</div><div class="metr">'+mil(sumTrz)+'</div><div class="muted">srovnatelná cena, vozy s podklady</div></div>'
-    +'<div class="card"><div class="muted">Účetní zůstatková</div><div class="metr">'+mil(sumZust)+'</div><div class="muted">tržní − zůstatková '+sgn(sumTrz-sumZust,mil)+'</div></div>'
-    +'<div class="card"><div class="muted">K vyřazení nyní / do roka</div><div class="metr">'+nyni.length+' / '+brzy.length+'</div><div class="muted">z '+radky.length+' vozů</div></div>'
-    +'<div class="card"><div class="muted">V prodeji zaměstnancům</div><div class="metr">'+prodej.length+'</div><div class="muted">'+(prodej.length?esc(prodej.map(r=>r.v.cislo).join(', ')):'žádný vůz označený „plánovaný prodej"')+'</div></div>'
-    +'</div>';
-  const tm=d=>d?Oceneni.fmtMesic(d):'—', odh=z=>z&&/odhad/.test(z)?' <span class="pill sed" title="'+esc(z)+'">odhad</span>':'';
-  h+='<div class="chartbox" style="overflow-x:auto"><table><thead><tr><th>Vůz</th><th style="text-align:left">Typ</th><th>1. reg.</th><th>Stáří</th><th>Nájezd</th><th>km/měs</th><th>Dle stáří</th><th>Dle nájezdu</th><th>Návrh vyřazení</th><th>Pořizovací</th><th>Zůstatková</th><th>Tržní srovnat.</th><th>Prodejní</th><th>Rozdíl</th><th>Stav</th></tr></thead><tbody>';
-  radky.forEach(r=>{const v=r.v,o=r.o,inf=INFO[v.cislo]||{};
-    h+='<tr'+(o.terminNyni?' style="background:#fdecea"':'')+' data-clic onclick="ukazVozVyraz(\''+esc(v.cislo)+'\')"><td><b>'+esc(v.cislo)+'</b> <span class="muted">'+esc(v.spz)+'</span></td><td style="text-align:left">'+esc(v.typ||(v.ev&&v.ev.znacka)||'—')+'</td>'
-      +'<td>'+tm(o.reg)+odh(o.regZdroj)+'</td><td>'+(o.stariLet!=null?String(o.stariLet).replace('.',',')+' let':'—')+'</td>'
-      +'<td>'+(o.najezd!=null?Math.round(o.najezd/1000).toLocaleString('cs-CZ')+' tis.':'—')+odh(o.najezdZdroj)+'</td><td>'+(o.kmMes?o.kmMes.toLocaleString('cs-CZ'):'—')+'</td>'
-      +'<td>'+tm(o.terminStari)+'</td><td>'+tm(o.terminNajezd)+'</td>'
-      +'<td><b>'+(o.terminNyni?'<span class="pill cerv">nyní</span>':tm(o.termin))+'</b>'+(o.duvod?' <span class="muted" style="font-size:11px">'+esc(o.duvod)+'</span>':'')+'</td>'
-      +'<td>'+(o.porizovaci!=null?tis(o.porizovaci):'—')+odh(o.porizovaciZdroj)+'</td><td>'+(o.zustatkova!=null?tis(o.zustatkova):'—')+'</td><td><b>'+(o.trzni!=null?tis(o.trzni):'—')+'</b></td>'
-      +'<td>'+(o.prodejni!=null?tis(o.prodejni):'—')+(o.prodejniZdroj==='zadáno'?' <span class="pill sed" title="ručně zadaná prodejní cena">R</span>':'')+'</td>'
-      +'<td class="'+(o.rozdilProc!=null&&o.rozdilProc<-10?'neg':'')+'">'+(o.rozdilProc!=null?sgn(o.rozdilProc,x=>x.toFixed(1).replace('.',',')+' %'):'—')+'</td>'
-      +'<td>'+(stavPill(inf.stav)||'')+(o.upozorneni.length?' <span title="'+esc(o.upozorneni.join(' · '))+'">⚠️</span>':'')+'</td></tr>';
-  });
-  h+='</tbody></table><p class="muted" style="font-size:12px;margin:6px 0 0">Kliknutím na řádek otevřeš detail vozu (záložka Vozidla), kde správce doplní 1. registraci, tachometr, pořizovací a případně ruční prodejní cenu a označí vůz k prodeji. „Rozdíl" = prodejní vs. tržní srovnatelná. ⚠️ = upozornění (vysoké opravy, prodej pod zůstatkovou / obvyklou cenou) — text v titulku.</p></div>';
-  if(ADMIN){
-    h+='<div class="chartbox"><h2 style="margin:0 0 8px">Pravidla vyřazení a ocenění</h2><div class="sliders" style="margin-bottom:10px">'
-      +'<div class="sl"><label>Max. stáří</label><input type="number" id="vyMaxLet" min="3" max="20" value="'+cfg.maxLet+'" style="width:80px"><span class="muted">let</span></div>'
-      +'<div class="sl"><label>Max. nájezd</label><input type="number" id="vyMaxKm" min="200000" max="3000000" step="10000" value="'+cfg.maxKm+'" style="width:120px"><span class="muted">km</span></div>'
-      +'<div class="sl"><label>Očekávaný nájezd</label><input type="number" id="vyRocniKm" min="20000" max="300000" step="5000" value="'+cfg.rocniKm+'" style="width:120px"><span class="muted">km/rok</span></div>'
-      +'<div class="sl"><label>Rezerva prodeje</label><input type="number" id="vyRez" min="0" max="40" value="'+cfg.rezervaProdej+'" style="width:80px"><span class="muted">% pod tržní</span></div>'
-      +'<div class="sl"><label>Účetní odpis</label><input type="number" id="vyOdpis" min="3" max="10" value="'+cfg.odpisLet+'" style="width:80px"><span class="muted">let</span></div>'
-      +'<div class="sl"><label>Limit oprav</label><input type="number" id="vyOpr" min="0.5" max="20" step="0.5" value="'+cfg.opravyLimit+'" style="width:80px"><span class="muted">Kč/km</span></div>'
-      +'<div class="sl" style="grid-column:1/-1"><label>E-mail pro nabídky</label><input id="vyMail" value="'+esc(cfg.odkupEmail||'')+'" placeholder="komu poslat zprávu o nové nabídce odkupu (prázdné = neposílat)" style="flex:1;min-width:0"></div>'
-      +'</div><div style="display:flex;gap:10px;align-items:center"><button class="btn" id="vyUloz">Uložit pravidla</button><span class="muted" id="vyStav"></span></div></div>';
-  }
-  h+='<div class="chartbox"><h2 style="margin:0 0 8px">Odkup vozidel zaměstnanci</h2><p class="muted">Vozy ve stavu „plánovaný prodej" vidí všichni přihlášení zaměstnanci na stránce <a href="/doprava/odkup" target="_blank" rel="noopener">/doprava/odkup</a> a mohou podat nabídku. Nabízená cena = <b>cena obvyklá</b> (tržní srovnatelná): prodej zaměstnanci pod ní je u něj nepeněžním příjmem (daň + odvody), proto ji model nestahuje pod tržní.</p><p class="muted" id="odkupStav">Načítám nabídky…</p><div id="odkupTab"></div></div>';
-  $('#app').innerHTML=h;
-  if(ADMIN) $('#vyUloz').onclick=async()=>{ const st=t=>{$('#vyStav').textContent=t;}; st('Ukládám…');
-    try{ const r=await fetch('/api/doprava/vyrazeni-nastaveni',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({maxLet:$('#vyMaxLet').value,maxKm:$('#vyMaxKm').value,rocniKm:$('#vyRocniKm').value,rezervaProdej:$('#vyRez').value,odpisLet:$('#vyOdpis').value,opravyLimit:$('#vyOpr').value,odkupEmail:$('#vyMail').value})});
-      const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status); DATA.vyrazeni=j; tabVyrazeni(); }
-    catch(e){ st('Chyba: '+e.message); } };
-  odkupNacti();
-}
-function ukazVozVyraz(c){ document.querySelectorAll('header button[data-tab]').forEach(x=>x.classList.toggle('act',x.dataset.tab==='vozidla')); render('vozidla'); ukazVoz(c); }
-async function odkupNacti(){
-  const box=$('#odkupTab'), st=$('#odkupStav'); if(!box) return;
-  let d; try{ const r=await fetch('/api/doprava/odkup',{cache:'no-store'}); d=await r.json(); if(!r.ok) throw new Error(d.chyba||r.status); }catch(e){ st.textContent='Nabídky se nepodařilo načíst: '+e.message; return; }
-  const nab=d.nabidky||d.moje||[];
-  st.textContent=(d.vozy.length?'V nabídce: '+d.vozy.map(v=>v.cislo+' '+v.spz+(v.cena!=null?' za '+tis(v.cena):'')).join(', '):'Žádný vůz není v nabídce — označ vůz „plánovaný prodej" v detailu.')+(ADMIN?' · nabídek: '+nab.length:'');
-  if(!nab.length){ box.innerHTML=''; return; }
-  const lbl={nova:'<span class="pill zlut">nová</span>',prijata:'<span class="pill zel">přijata</span>',zamitnuta:'<span class="pill sed">zamítnuta</span>'};
-  box.innerHTML='<table><thead><tr><th>Vůz</th><th style="text-align:left">Zájemce</th><th>Nabídka</th><th>Cena obvyklá</th><th style="text-align:left">Poznámka</th><th>Podáno</th><th>Stav</th>'+(ADMIN?'<th></th>':'')+'</tr></thead><tbody>'
-    +nab.slice().sort((a,b)=>b.ts-a.ts).map(n=>{const v=d.vozy.find(x=>x.cislo===n.cislo), obv=v&&v.cena!=null?v.cena:null;
-      return '<tr><td>'+esc(n.cislo)+' <span class="muted">'+esc(n.spz||'')+'</span></td><td style="text-align:left">'+esc(n.jmeno||n.email)+(n.jmeno?' <span class="muted">'+esc(n.email)+'</span>':'')+'</td><td><b>'+kc(n.cena)+'</b></td>'
-        +'<td>'+(obv!=null?kc(obv):'—')+(obv!=null&&n.cena<obv*0.9?' <span class="pill cerv" title="pod cenou obvyklou — nepeněžní příjem zaměstnance">pod obvyklou</span>':'')+'</td><td style="text-align:left">'+esc(n.pozn||'')+'</td><td>'+new Date(n.ts).toLocaleDateString('cs-CZ')+'</td><td>'+(lbl[n.stav]||esc(n.stav))+'</td>'
-        +(ADMIN?'<td style="white-space:nowrap">'+(n.stav!=='prijata'?'<button class="btn sm" onclick="odkupStav(\''+esc(n.id)+'\',\'prijata\')">Přijmout</button> ':'')+(n.stav!=='zamitnuta'?'<button class="btn sm sec" onclick="odkupStav(\''+esc(n.id)+'\',\'zamitnuta\')">Zamítnout</button>':'')+'</td>':'')+'</tr>';}).join('')
-    +'</tbody></table>';
-}
-async function odkupStav(id,stav){
-  try{ const r=await fetch('/api/doprava/odkup-stav',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,stav})}); const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status); odkupNacti(); }
-  catch(e){ alert('Změna stavu selhala: '+e.message); }
-}
-
 /* ================= VOZIDLA ================= */
 function tabVozidla(){
   const m=M;
@@ -928,12 +842,6 @@ function tabVozidla(){
     +'<label style="width:auto">Vozidlo</label><input id="vozTyp" '+(ADMIN?'':'disabled')+' placeholder="např. Scania R450 · Tautliner" style="flex:1;min-width:0">'
     +'<label style="width:auto">Fix Kč/měs</label><input id="vozFix" '+(ADMIN?'':'disabled')+' style="width:110px" inputmode="numeric">'
     +(ADMIN?'<button class="btn sm" id="vozSave" style="padding:7px 14px">Uložit</button>':'')+'</div>'
-    // podklady pro vyřazení a ocenění (chybějící hodnoty se odhadují — odhad je vidět v placeholderu)
-    +'<div class="sl" style="margin-bottom:4px;max-width:760px;flex-wrap:wrap"><label>1. registrace</label><input id="vozReg" '+(ADMIN?'':'disabled')+' placeholder="MM/RRRR" style="width:110px">'
-    +'<label style="width:auto">Tachometr</label><input id="vozTacho" '+(ADMIN?'':'disabled')+' placeholder="km" inputmode="numeric" style="width:120px"><input type="month" id="vozTachoDat" '+(ADMIN?'':'disabled')+' title="stav k měsíci" style="width:150px">'
-    +'<label style="width:auto">Pořizovací</label><input id="vozPoriz" '+(ADMIN?'':'disabled')+' placeholder="Kč" inputmode="numeric" style="width:120px">'
-    +'<label style="width:auto">Prodejní</label><input id="vozProdej" '+(ADMIN?'':'disabled')+' placeholder="návrh" inputmode="numeric" style="width:120px"></div>'
-    +'<p class="muted" id="vozOcen" style="margin:0 0 8px;font-size:12px"></p>'
     +'<div id="vozStavBox" style="margin:0 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"></div>'
     +'<p class="muted" id="vozEvid" style="margin:0 0 10px;font-size:12px"></p>'
     +cv('chVoz',240)+'<div id="vozTab" style="margin-top:12px"></div>'
@@ -976,8 +884,7 @@ async function ulozVoz(stav){
   const novyStav = stav===undefined ? ((INFO[cislo]||{}).stav||'') : stav;
   const b=$('#vozSave'); if(b){b.disabled=true;b.textContent='Ukládám…';}
   try{
-    const r=await fetch('/api/doprava/vozidlo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cislo,ridic,typ,fixMes,stav:novyStav,
-      reg:$('#vozReg').value,tachometr:$('#vozTacho').value,tachometrDatum:$('#vozTachoDat').value,porizovaciCena:$('#vozPoriz').value,prodejniCena:$('#vozProdej').value})});
+    const r=await fetch('/api/doprava/vozidlo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cislo,ridic,typ,fixMes,stav:novyStav})});
     const j=await r.json(); if(!r.ok) throw new Error(j.chyba||r.status);
     INFO=j.info||INFO; M=spočítej(); tabVozidla(); ukazVoz(cislo);
   }catch(e){ alert('Uložení selhalo: '+e.message); if(b){b.disabled=false;b.textContent='Uložit';} }
@@ -989,18 +896,6 @@ function vozDetail(cislo){
   const sel=$('#selVoz'); if(sel&&sel.value!==cislo) sel.value=cislo;
   $('#vozInfo').textContent=(v.spz?('SPZ '+v.spz+' · '):'')+(v.sazba!=null?d2(v.sazba)+' Kč/km':'bez výkonů')+(v.pausal?' · paušál':'');
   $('#vozRidic').value=jmR(cislo); $('#vozTyp').value=jmT(cislo);
-  // podklady vyřazení/ocenění: zadané hodnoty do polí, odhady do placeholderů, souhrn pod ně
-  const infD=INFO[cislo]||{}, oc=(typeof Oceneni!=='undefined')?ocenVozu(v):null;
-  const nf=x=>Math.round(x).toLocaleString('cs-CZ');
-  $('#vozReg').value=infD.reg?(String(infD.reg.m).padStart(2,'0')+'/'+infD.reg.y):''; $('#vozReg').placeholder=(oc&&oc.reg&&!infD.reg)?('odhad '+Oceneni.fmtMesic(oc.reg)):'MM/RRRR';
-  $('#vozTacho').value=infD.tachometr||''; $('#vozTacho').placeholder=(oc&&oc.najezd!=null&&!infD.tachometr)?('odhad '+nf(oc.najezd)):'km';
-  $('#vozTachoDat').value=infD.tachometrDatum?infD.tachometrDatum.slice(0,7):'';
-  $('#vozPoriz').value=infD.porizovaciCena||''; $('#vozPoriz').placeholder=(oc&&oc.porizovaci&&!infD.porizovaciCena)?('odhad '+nf(oc.porizovaci)):'Kč';
-  $('#vozProdej').value=infD.prodejniCena||''; $('#vozProdej').placeholder=(oc&&oc.prodejniNavrh)?('návrh '+nf(oc.prodejniNavrh)):'návrh';
-  $('#vozOcen').innerHTML=oc?('Vyřazení: <b>'+(oc.terminNyni?'nyní':Oceneni.fmtMesic(oc.termin))+'</b>'+(oc.duvod?' ('+esc(oc.duvod)+')':'')
-    +' · stáří '+(oc.stariLet!=null?String(oc.stariLet).replace('.',',')+' let':'—')+' · nájezd '+(oc.najezd!=null?nf(oc.najezd)+' km':'—')
-    +' · zůstatková '+(oc.zustatkova!=null?tis(oc.zustatkova):'—')+' · <b>tržní '+(oc.trzni!=null?tis(oc.trzni):'—')+'</b> · prodejní '+(oc.prodejni!=null?tis(oc.prodejni):'—')
-    +(oc.upozorneni.length?' · ⚠️ '+esc(oc.upozorneni.join(' · ')):'')+(oc.chybi.length?' · <span class="muted">chybí: '+esc(oc.chybi.join(', '))+'</span>':'')):'';
   const fx=$('#vozFix'); fx.value=v.fixRucne&&v.fix!=null?Math.round(v.fix):''; fx.placeholder=v.fix!=null?('auto: '+Math.round(v.fix).toLocaleString('cs-CZ')):'';
   const ev=v.ev; let et='';
   if(ev){ et='Evidence: '+(ev.znacka||'—')
