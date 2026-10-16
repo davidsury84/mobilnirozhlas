@@ -367,6 +367,7 @@ function mount(host) {
           v.trh = await trh.ohodnot(trhVstup(v));
           if (v.trh.stav === 'chyba') TRH_BEH.chyby++;
           TRH_BEH.posledni = (v.spz || v.vin || id) + ': ' + v.trh.stav + (v.trh.n != null ? ' (' + v.trh.n + ' inz.)' : '');
+          console.log('[vozidla] inzerce ' + TRH_BEH.posledni + (v.trh.odhad ? ' → ' + v.trh.odhad.toLocaleString('cs-CZ') + ' Kč' : '') + (v.trh.zprava ? ' · ' + v.trh.zprava : ''));
           save(d);
         }
         TRH_BEH.hotovo++;
@@ -374,19 +375,21 @@ function mount(host) {
     } finally { TRH_BEH.bezi = false; TRH_BEH.konec = Date.now(); }
     return true;
   }
-  // Komu je porovnání nejvíc po termínu — ti jdou první. Vozy bez roku výroby nemá smysl zkoušet.
-  function trhKObnove(d, max) {
+  // Všechna vozidla, kterým porovnání chybí nebo je po lhůtě — nejstarší první. Vozy bez roku
+  // výroby nemá smysl zkoušet. Žádný strop: po startu serveru se tak dorovná celý park najednou
+  // (52 vozů × ~2,5 s), potom už jen to, co za týden zestárne.
+  function trhKObnove(d) {
     const lhuta = (Number(d.nastaveni.trhObnovaDni) || 7) * DEN;
     return d.vozidla
       .filter(v => v.stav === 'aktivni' && regVozu(v).reg && (!v.trh || !v.trh.ts || Date.now() - v.trh.ts > lhuta || v.trh.stav === 'chyba'))
       .sort((a, b) => ((a.trh && a.trh.ts) || 0) - ((b.trh && b.trh.ts) || 0))
-      .slice(0, max).map(v => v.id);
+      .map(v => v.id);
   }
   async function trhTick(d) {
     if (!d.nastaveni.trhZapnuto || TRH_BEH.bezi) return;
-    const ids = trhKObnove(d, 6);
+    const ids = trhKObnove(d);
     if (!ids.length) return;
-    try { await trhObnovVozy(ids); console.log('[vozidla] porovnání s inzercí obnoveno u ' + ids.length + ' vozidel'); }
+    try { await trhObnovVozy(ids); console.log('[vozidla] porovnání s inzercí obnoveno u ' + ids.length + ' vozidel, chyb ' + TRH_BEH.chyby); }
     catch (e) { console.warn('[vozidla] porovnání s inzercí selhalo: ' + e.message); }
   }
   async function apiTrh(req, res) {
