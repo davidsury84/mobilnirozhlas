@@ -1132,7 +1132,7 @@ function mount(host) {
     const rop = Math.round(leadDem + Z * Math.sqrt(Math.max(0, leadDem)));
     const position = (x.avail || 0) + (x.onOrder || 0);
     let rec = 0, status = 'OK';
-    if ((x.avail || 0) < 0) { rec = Math.round(windowDem > 0 ? Math.max(windowDem - position, -position) : -position); status = 'oversold'; }
+    if ((x.avail || 0) < 0) { rec = Math.round(windowDem > 0 ? Math.max(windowDem - position, -position) : -position); status = position < 0 ? 'oversold' : (rec > 0 ? 'objednat' : 'kryto objednavkou'); }   // schodek krytý objednaným zbožím není kritický
     else if (D <= 0) status = 'bez prodeje';
     else if (ramp) { const need = Math.round(windowDem - position); if (need > 0) { rec = Math.max(P.MOQ || 1, need); status = 'náběh sezóny ' + rampTo; } else status = 'sezóna pokryta'; }
     else if (windowDem < 0.5) status = 'mimo sezónu';
@@ -1266,12 +1266,13 @@ function mount(host) {
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
     const scored = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }));
     try { allocateGroups(scored, smap, P, m0); } catch (e) { console.warn('[nakup-report] alternativy:', e.message); }
-    let list = scored.filter(r => r.o.rec > 0 || (r.x.avail < 0 && !r.o.spec));
+    const nekryto = x => ((x.avail || 0) + (x.onOrder || 0)) < 0;   // rezervace, které nekryje ani zboží objednané u dodavatele
+    let list = scored.filter(r => r.o.rec > 0 || (nekryto(r.x) && !r.o.spec));
     // Utichle: hlasime jen ty, ktere by model JINAK objednal — ostatni jsou jen sum.
     // Stejný filtr jako collectUtichle() — rozhodnuté položky se už nepřipomínají.
     const utichle = scored.filter(r => r.o.utichla && r.o.utichlaKs > 0 && !r.o.dec).sort((a, b) => b.o.utichlaVal - a.o.utichlaVal);
     const utichleVal = utichle.reduce((s2, r) => s2 + r.o.utichlaVal, 0);
-    const totVal = list.reduce((s, r) => s + r.o.value, 0), totKs = list.reduce((s, r) => s + r.o.rec, 0), oversold = list.filter(r => r.x.avail < 0).length;
+    const totVal = list.reduce((s, r) => s + r.o.value, 0), totKs = list.reduce((s, r) => s + r.o.rec, 0), oversold = list.filter(r => nekryto(r.x)).length;
     // seskupit dle dodavatele, řadit dle hodnoty
     const bySup = {}; list.forEach(r => { const k = r.x.skupina || '—'; (bySup[k] = bySup[k] || []).push(r); });
     const sups = Object.keys(bySup).map(k => ({ sup: k, items: bySup[k].sort((a, b) => b.o.value - a.o.value), val: bySup[k].reduce((s, r) => s + r.o.value, 0) })).sort((a, b) => b.val - a.val);
@@ -1333,16 +1334,16 @@ function mount(host) {
       ['Co s tím', 'Podklad pro objednávky u dodavatelů. V aplikaci lze u každého dodavatele <b>předat objednávku nákupčímu</b> (modul Požadavky nákupu) nebo stáhnout Excel.']
     ]) +
       '<div style="background:#e7f0fb;border:1px solid #c9dcf0;border-radius:10px;padding:12px 14px;margin:0 0 14px">' +
-      '<b>' + fmt(list.length) + '</b> položek k objednání · celkem <b>' + fmt(totKs) + ' ks</b> (~' + kc(totVal) + ') · <b>' + fmt(oversold) + '</b> oversold (rezervace > sklad)' + (specN ? ' · <b>' + fmt(specN) + '</b> dropshipping/doprodej (neobjednává se)' : '') + '. Data ERP: ' + esc(obj.date || obj.source || '') + '.</div>';
+      '<b>' + fmt(list.length) + '</b> položek k objednání · celkem <b>' + fmt(totKs) + ' ks</b> (~' + kc(totVal) + ') · <b>' + fmt(oversold) + '</b> oversold (rezervace nekryté ani objednávkou)' + (specN ? ' · <b>' + fmt(specN) + '</b> dropshipping/doprodej (neobjednává se)' : '') + '. Data ERP: ' + esc(obj.date || obj.source || '') + '.</div>';
     sups.forEach(g => {
       body += '<h3 style="margin:16px 0 4px;font-size:15px">' + esc(g.sup) + ' <span style="color:#8a938a;font-weight:400;font-size:13px">· ' + g.items.length + ' pol. · ' + kc(g.val) + '</span></h3>' +
         '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
         '<th style="text-align:left;border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">Kód</th>' +
         '<th style="text-align:left;border-bottom:1px solid #d8dee7;padding:4px 7px;font-size:11px;color:#55605a">Položka</th>' +
         R('Sklad') + R('K dispo') + R('Objednáno') + R('Lhůta') + R('Roč. prodej') + R('Objednat') + R('Krytí po obj.') + R('Hodnota') + '</tr></thead><tbody>' +
-        g.items.map(r => '<tr' + (r.x.avail < 0 ? ' style="background:#fbeaea"' : '') + '><td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.sk + '-' + r.x.reg) + '</td>' +
+        g.items.map(r => '<tr' + (nekryto(r.x) ? ' style="background:#fbeaea"' : '') + '><td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.sk + '-' + r.x.reg) + '</td>' +
           '<td style="padding:4px 7px;border-bottom:1px solid #eef1ec">' + esc(r.x.nazev) + (r.o.skupina ? ' <span title="Alternativní dodavatelé">🔀 <small style="color:#3e5a70">kryje ' + r.o.skupina.clenu + ' variant („' + esc(r.o.skupina.nazev || '') + '")</small></span>' : '') + '</td>' +
-          cellR(fmt(r.x.stock)) + cellR((r.x.avail < 0 ? '<b style="color:#b23">' : '') + fmt(r.x.avail) + (r.x.avail < 0 ? '</b>' : '')) + cellR(fmt(r.x.onOrder)) + cellR(fmt(r.x.lead)) + cellR(fmt(r.o.D)) +
+          cellR(fmt(r.x.stock)) + cellR((nekryto(r.x) ? '<b style="color:#b23">' : '') + fmt(r.x.avail) + (nekryto(r.x) ? '</b>' : '')) + cellR(fmt(r.x.onOrder)) + cellR(fmt(r.x.lead)) + cellR(fmt(r.o.D)) +
           cellR((r.o.fwd ? '<span title="Předzásobení před zdražením +' + r.o.fwd.pct + ' % od ' + r.o.fwd.od + ' (+' + fmt(r.o.fwd.navic) + ' ks navíc)">💰</span> ' : '') + '<b>' + fmt(r.o.rec) + '</b>') + cellR(covTxt(r.o.coverAfter)) + cellR(r.o.value ? kc(r.o.value) : '—') + '</tr>').join('') + '</tbody></table>';
     });
     return { subject: 'Objednávkový report (ERP) — co objednat · ' + (obj.date || ''), html: wrap('Co objednat (ERP × prodeje)', 'Položky pod bodem objednání, seskupené dle dodavatele', body, obj.date || obj.source || '—'), count: list.length, totVal, utichle: utichle.length, utichleVal };

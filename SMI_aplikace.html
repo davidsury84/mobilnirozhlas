@@ -2841,6 +2841,9 @@ function objRenderModel2(rows){
     +tbl('▲ E-shop model objednává víc',up)+tbl('▼ E-shop model objednává míň',dn)+'</div></div>';
   const tg=$('#m2Toggle'),bd=$('#m2Body'); if(tg&&bd)tg.onclick=()=>{const o=bd.style.display!=='none';bd.style.display=o?'none':'block';tg.textContent=o?'Zobrazit rozdíly':'Skrýt rozdíly';};
 }
+// „Nekryté rezervace": K dispo < 0 a schodek NEKRYJE ani zboží objednané u dodavatele. Jen tohle je kritické.
+// K dispo < 0 s dostatečným „Objednáno" = zboží je na cestě → neobjednávat, nefiltrovat jako „k objednání".
+function objNekryto(x){return ((x.avail||0)+(x.onOrder||0))<0;}
 function objComputeOrder(x,sales,P,m0,sea,dem){
   // Dropshipping / doprodej: neobjednává se na sklad — žádné doporučení, utichlé ani forward-buy.
   const spec=specOf(x.sk,x.skupina,String(x.sk)+'-'+String(x.reg));
@@ -2874,7 +2877,8 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   const rop=Math.round(leadDem+P.Z*Math.sqrt(Math.max(0,leadDem)));
   const position=(x.avail||0)+(x.onOrder||0);
   let rec=0,status='OK';
-  if((x.avail||0)<0){ rec=Math.round(windowDem>0?Math.max(windowDem-position,-position):-position); status='Kritické — oversold'; }
+  if((x.avail||0)<0){ rec=Math.round(windowDem>0?Math.max(windowDem-position,-position):-position);
+    status=position<0?'Kritické — oversold':(rec>0?'Objednat (rezervace kryté, doplnit zásobu)':'Rezervace kryté objednávkou — čeká dodání'); }
   else if(D<=0){ status='Bez prodeje'; }
   else if(ramp){ const need=Math.round(windowDem-position); if(need>0){ rec=Math.max(P.MOQ||1,need); status='Náběh sezóny '+rampTo; } else status='Sezóna pokryta'; }
   else if(windowDem<0.5){ status='Mimo sezónu'; }
@@ -2960,11 +2964,11 @@ function objAskFind(q){
   hit=rows.find(x=>norm(x.nazev+'|'+x.dodKod+'|'+x.sk+'-'+x.reg).indexOf(qq)>=0); return hit||null;
 }
 function objAskCard(x){
-  const o=x._o||{},s=x._s,e=x._e||{}; const rec=o.rec||0,crit=(x.avail||0)<0,st=o.status||'';
+  const o=x._o||{},s=x._s,e=x._e||{}; const rec=o.rec||0,crit=objNekryto(x),over=(x.avail||0)<0,st=o.status||'';
   const col=rec>0?(crit?'#b3261e':'#b06f00'):'#2f7d32';
-  const big=rec>0?('Koupit '+fmt(rec)+' ks'):(crit?'Řešit — oversold':'Neobjednávat');
+  const big=rec>0?('Koupit '+fmt(rec)+' ks'):(crit?'Řešit — oversold':(over?'Čeká dodání — neobjednávat':'Neobjednávat'));
   let why;
-  if(crit) why='Rezervace zákazníků ('+fmt(x.reserved)+' ks) přesahují sklad ('+fmt(x.stock)+' ks). '+(rec>0?('Objednávka pokrývá schodek '+(x.onOrder>0?('(z toho už objednáno '+fmt(x.onOrder)+' ks) '):'')+'a doplní zásobu na dodací lhůtu + 2 měsíce.'):('Schodek už kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba.'));
+  if(over) why='Rezervace zákazníků ('+fmt(x.reserved)+' ks) přesahují sklad ('+fmt(x.stock)+' ks). '+(rec>0?('Objednávka pokrývá schodek '+(x.onOrder>0?('(z toho už objednáno '+fmt(x.onOrder)+' ks) '):'')+'a doplní zásobu na dodací lhůtu + 2 měsíce.'):('Schodek už kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba.'));
   else if(/Náběh/.test(st)) why='Náběh sezóny '+(s?s.peak:'')+' — předzásobení na nadcházející špičku s předstihem o dodací lhůtu.';
   else if(/Objednat/.test(st)) why='Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) klesla pod bod objednání. Doplnění na cílovou zásobu za dodací lhůtu + 2 měsíce (~'+fmt(o.windowDem)+' ks).';
   else if(/Mimo sezónu/.test(st)) why='Teď se prakticky neprodává — objednávej až před sezónou, ne s ročním předstihem.';
@@ -3076,10 +3080,10 @@ function objKanalCells(x){
 function objDraw(){
   const rows=(OBJ_DATA&&OBJ_DATA.rows)||[];
   const q=($('#objSearch').value||'').toLowerCase().trim(),sup=$('#objSup').value,only=$('#objOnly').checked;
-  let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||((x.avail||0)<0&&!x._o.spec)));
-  const toOrder=rows.filter(x=>x._o.rec>0),oversold=rows.filter(x=>(x.avail||0)<0&&!x._o.spec),specRows=rows.filter(x=>x._o.spec);
+  let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||(objNekryto(x)&&!x._o.spec)));
+  const toOrder=rows.filter(x=>x._o.rec>0),oversold=rows.filter(x=>objNekryto(x)&&!x._o.spec),ceka=rows.filter(x=>(x.avail||0)<0&&!objNekryto(x)&&!x._o.spec),specRows=rows.filter(x=>x._o.spec);
   const totVal=toOrder.reduce((s,x)=>s+x._o.value,0),supsOrder=new Set(toOrder.map(x=>x.skupina)).size;
-  $('#objKpis').innerHTML=[['',fmt(rows.length),'Položek v ERP'],['warn',fmt(toOrder.length),'K objednání'],['err',fmt(oversold.length),'Oversold (K dispo < 0)'],['',fmt(specRows.length),'Dropship / doprodej'],['',fmt(totVal)+' Kč','Hodnota objednávek'],['',(function(){const v=rows.reduce((s2,x)=>s2+((x._o2&&!x._o.spec)?(x._o2.value||0):0),0);return rows.some(x=>x._o2)?fmt(Math.round(v))+' Kč':'—';})(),'Hodnota — e-shop model'],['',fmt(supsOrder),'Dodavatelů'],['',(function(){const e=rows.reduce((s,x)=>s+((x._k&&x._k.es)||0),0),o=rows.reduce((s,x)=>s+((x._k&&x._k.ob)||0),0);return (e+o)>0?Math.round(100*e/(e+o))+' %':'—';})(),'Prodeje přes e-shop']]
+  $('#objKpis').innerHTML=[['',fmt(rows.length),'Položek v ERP'],['warn',fmt(toOrder.length),'K objednání'],['err',fmt(oversold.length),'Oversold — nekryté rezervace'],['',fmt(ceka.length),'Rezervace kryté objednávkou (čeká dodání)'],['',fmt(specRows.length),'Dropship / doprodej'],['',fmt(totVal)+' Kč','Hodnota objednávek'],['',(function(){const v=rows.reduce((s2,x)=>s2+((x._o2&&!x._o.spec)?(x._o2.value||0):0),0);return rows.some(x=>x._o2)?fmt(Math.round(v))+' Kč':'—';})(),'Hodnota — e-shop model'],['',fmt(supsOrder),'Dodavatelů'],['',(function(){const e=rows.reduce((s,x)=>s+((x._k&&x._k.es)||0),0),o=rows.reduce((s,x)=>s+((x._k&&x._k.ob)||0),0);return (e+o)>0?Math.round(100*e/(e+o))+' %':'—';})(),'Prodeje přes e-shop']]
     .map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
   // Utichlé položky — model by je objednal, ale v prodejní historii už dlouho mlčí. Na ověření.
   const utichle=rows.filter(x=>x._o&&x._o.utichla&&x._o.utichlaKs>0&&!x._o.dec).sort((a,b)=>b._o.utichlaVal-a._o.utichlaVal);
@@ -3158,10 +3162,10 @@ function objDraw(){
   let h2='<thead>'+grpRow+'<tr>'+hdrs.map(c=>'<th '+(c[1]?R:'')+'>'+esc(c[0])+'</th>').join('')+'</tr></thead><tbody>';
   gk.forEach(g=>{
     h2+='<tr class="objsup"><td colspan="'+NC+'">▸ '+esc(g.sup||'—')+' <span style="color:var(--mut);font-weight:400">· '+g.items.length+' pol.'+(g.ks?(' · objednat '+fmt(g.ks)+' ks / '+fmt(g.val)+' Kč'):' · nic k objednání')+'</span>'+(g.ks?objSupplierBtns(g.sup):'')+'</td></tr>';
-    g.items.forEach((x,ri)=>{const o=x._o,crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
+    g.items.forEach((x,ri)=>{const o=x._o,crit=objNekryto(x),over=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
       h2+='<tr class="drow'+(crit?' dcrit':(toOrder?' dorder':(ri%2?' dzeb':'')))+'">'+
         '<td>'+esc(x.sk)+'</td><td>'+esc(x.reg)+'</td><td>'+esc(x.nazev)+objAltBadge(x)+'</td><td class="muted">'+esc(x.dodKod)+'</td>'+
-        '<td '+R+'>'+fmt(x.stock)+'</td><td '+R+(crit?' style="color:#b23;font-weight:700"':'')+'>'+fmt(x.avail)+'</td>'+
+        '<td '+R+'>'+fmt(x.stock)+'</td><td '+R+(crit?' style="color:#b23;font-weight:700" title="Nekryté rezervace: schodek '+fmt(-x.avail)+' ks nekryje ani objednané zboží ('+fmt(x.onOrder)+' ks)"':(over?' style="color:#b06f00;font-weight:600" title="Rezervace přesahují sklad o '+fmt(-x.avail)+' ks, ale schodek kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba"':''))+'>'+fmt(x.avail)+(over&&!crit?' <span class="muted" style="font-size:10px">⏳</span>':'')+'</td>'+
         '<td '+R+'>'+fmt(x.unitPrice)+'</td><td '+R+'>'+fmt(x.unitCost)+'</td>'+
         '<td '+R+'>'+fmt(x.onOrder)+'</td><td '+R+'>'+fmt(x.reserved)+'</td><td '+R+'>'+fmt(x.lead)+'</td>'+
         '<td '+R+(x._out?' title="⚠ Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks. V doporučení objednávky NENÍ zohledněn (omezen na '+fmt(x._out.capped)+' ks/měs), aby nenafoukl nákup."':'')+'>'+(x._prev?('<span title="Položka byla přečíslována — prodeje jsou vedené pod starým kódem '+esc(x._prev)+'.">'+fmt(o.D)+' <span class="muted" style="font-size:11px">↩ '+esc(x._prev)+'</span></span>'):x._nohist?'<span class="muted" title="Není v prodejní historii (obrat plasty) — buď se nikdy nenaskladňuje (dropship), nebo je to nová položka. Doporučení proto nevychází z poptávky, jen z rezervací a skladové pozice.">bez historie</span>':fmt(o.D))+(x._out?' <span style="color:#c0392b;cursor:help">⚠</span>':'')+'</td>'+objKanalCells(x)+'<td '+R+'>'+objSpotTxt(x.recentDaily)+'</td><td'+(x._s&&x._s.isSeasonal?' style="color:#b06f00;font-weight:600"':' class="muted"')+'>'+(x._s?x._s.tag:'—')+(x._sporadic?' <span class="muted" style="font-size:11px" title="Řídce prodávaná položka (prodej jen v pár měsících) — doporučení jede na plochém průměru, ne na sezónní špičce, aby se nepřeobjednávalo z mála dat.">· málo dat</span>':'')+(o.ramp&&o.rec>0?' <span style=\"color:#0a7d33\">· náběh</span>':'')+(x._out?' <span style=\"color:#c0392b;font-weight:700;cursor:help\" title=\"Jednorázový extrém v prodejích: '+MN_CZ[x._out.month]+' '+fmt(x._out.value)+' ks — v objednávce omezeno na '+fmt(x._out.capped)+' ks/měs\">⚠ extrém</span>':'')+'</td><td '+R+((x.avail<0&&o.rec>0)?' title=\"Oversold: rezervace přesahují sklad o '+fmt(-x.avail)+' ks. Objednat '+fmt(o.rec)+' = vykrýt '+fmt(-x.avail)+' ks rezervací + zásoba na (lhůta+pokrytí) '+fmt(o.rec+x.avail)+' ks.\"':'')+'>'+(o.rec?('<span class="ochip" style="background:'+(crit?'#fadbd8':'#fff0cc')+';color:'+(crit?'#922':'#7a5200')+'">'+fmt(o.rec)+'</span>'):'<span class="muted">—</span>')+'</td>'+objM2Cells(x)+'<td '+R+' title="'+(x._e&&x._e.eoq?('dodavatel '+esc(x.skupina)+': 1 společná zásilka / '+objIntTxt(x._e.interval)+(x._e.S?(', doprava '+fmt(x._e.S)+' Kč sdílená'):'')+'; toto je množství této položky na zásilku'):'vyplň dotazník dodavatele (náklad na dopravu)')+'">'+(x._e&&x._e.eoq?fmt(x._e.eoq):'—')+'</td><td '+R+'>'+(x._e?objIntTxt(x._e.interval):'—')+'</td><td '+R+(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>24?' style="color:#c0392b;font-weight:700" title="Extrémní krytí po objednávce (>2 roky) — zkontroluj, možný jednorázový výkyv nebo příliš velká dávka"':(o.rec>0&&isFinite(o.coverAfter)&&o.coverAfter>=1&&o.coverAfter<=8?' style="color:#0a7d33;font-weight:600"':''))+'>'+objCoverTxt(o.coverAfter)+'</td><td '+R+'>'+(o.value?'<b>'+fmt(o.value)+' Kč</b>':'—')+'</td></tr>';});
@@ -3218,9 +3222,9 @@ async function objExport(supFilter){
     const groups=[{n:5,label:'Identifikace',color:OBJXC.id},{n:2,label:'Sklad',color:OBJXC.sklad},{n:2,label:'Ceny (Kč)',color:OBJXC.ceny},{n:3,label:'Objednávky / rezervace',color:OBJXC.objrez},{n:5,label:'Prodej & sezóna',color:OBJXC.prodej},{n:5,label:'Doporučení nákupu',color:OBJXC.dopor}];
     const N=names.length, first=objXlsxHeader(ws,widths,groups,names);
     const FMT={6:'#,##0',7:'#,##0',8:'#,##0.00',9:'#,##0.00',10:'#,##0',11:'#,##0',12:'#,##0',13:'#,##0',14:'#,##0',15:'#,##0',16:'#,##0.00',18:'#,##0',19:'#,##0',20:'#,##0',21:'0.0',22:'#,##0 "Kč"'};
-    const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>(x._o.rec>0||(x.avail||0)<0)&&(!supFilter||x.skupina===supFilter)).sort((a,b)=>String(a.skupina).localeCompare(String(b.skupina),'cs')||b._o.value-a._o.value);
+    const rows=((OBJ_DATA&&OBJ_DATA.rows)||[]).filter(x=>(x._o.rec>0||objNekryto(x))&&(!supFilter||x.skupina===supFilter)).sort((a,b)=>String(a.skupina).localeCompare(String(b.skupina),'cs')||b._o.value-a._o.value);
     if(supFilter&&!rows.length){if(typeof toast==='function')toast('U dodavatele '+supFilter+' není teď nic k objednání.');return;}
-    rows.forEach(x=>{const o=x._o,crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
+    rows.forEach(x=>{const o=x._o,crit=objNekryto(x),toOrder=o.rec>0&&!crit;
       const k=x._k||{};
       const r=ws.addRow([x.sk,x.reg,x.nazev,x.skupina,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(k.es||0),(k.ob||0),(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),o.rec,(x._o2?(x._o2.rec||0):''),(x._o2?(x._o2.rec||0)-(o.rec||0):''),(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value)]);
       if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
@@ -3322,7 +3326,7 @@ async function objExportAll(){
     let curSup=null;
     rows.forEach(x=>{
       if(x.skupina!==curSup){curSup=x.skupina; const hr=ws.addRow(['▸ '+(curSup||'—')]); hr.getCell(1).font={bold:true}; objFillRow(hr,N,OBJXC.sup);}
-      const o=x._o||{},e=x._e||{},ident=String(x.sk)+'-'+String(x.reg),crit=(x.avail||0)<0,toOrder=o.rec>0&&!crit;
+      const o=x._o||{},e=x._e||{},ident=String(x.sk)+'-'+String(x.reg),crit=objNekryto(x),toOrder=o.rec>0&&!crit;
       const k=x._k||{};
       const r=ws.addRow([ident,x.sk,x.reg,x.skupina,x.nazev,x.dodKod,x.stock,x.avail,x.unitPrice,x.unitCost,x.onOrder,x.reserved,x.lead,o.D,(k.es||0),(k.ob||0),(x.recentDaily!=null?x.recentDaily:''),(x._s?x._s.tag:''),(o.rec||0),(x._o2?(x._o2.rec||0):''),(x._o2?(x._o2.rec||0)-(o.rec||0):''),(e.eoq||''),(e.interval!=null&&isFinite(e.interval)?Math.round(e.interval*10)/10:''),(e.S!=null?e.S:''),(isFinite(o.coverAfter)?Math.round(o.coverAfter*10)/10:''),Math.round(o.value||0),(o.status||'')]);
       if(crit)objFillRow(r,N,OBJXC.over); else if(toOrder)objFillRow(r,N,OBJXC.order);
