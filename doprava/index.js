@@ -275,14 +275,15 @@ function parseZakazky(rows, voz) {
     const trasa = String(r[idx.trasa] || '').trim();
     if (!trasa || ZAK_NEJIZDA.test(norm(trasa))) continue;
     const trzby = parseNum(r[idx.trzby]);
-    const km = parseNum(r[idx.km]);
-    if ((trzby == null || trzby === 0) && (km == null || km === 0)) continue;   // řádek bez najetých km i tržby = nejde o reálnou jízdu
+    const km = parseNum(r[idx.km]);                 // vzdálenost s nákladem
+    const prejezd = parseNum(r[idx.prejezd]);       // prázdné km (přejezd k nakládce) — KPI dispečinku
+    if ((trzby == null || trzby === 0) && (km == null || km === 0) && (prejezd == null || prejezd === 0)) continue;   // řádek bez najetých km i tržby = nejde o reálnou jízdu
     out.push({
       datum: dm[3] + '-' + String(dm[2]).padStart(2, '0') + '-' + String(dm[1]).padStart(2, '0'),
       mesic: dm[3] + '-' + String(dm[2]).padStart(2, '0'),
       voz: voz.voz, ridic: voz.ridic || '',
       trasa, cil: cilZTrasy(trasa),
-      km: km || 0, trzby: trzby || 0,
+      km: km || 0, prejezd: prejezd || 0, trzby: trzby || 0,
       obchodnik: String(r[idx.obchodnik] || '').trim().replace(/\.$/, ''),
       putovka: String(r[idx.putovka] || '').trim(),
     });
@@ -324,6 +325,23 @@ function mount(host) {
     } catch (_) { return null; }
   }
   if (naftaCache) { const fk0 = kartyZeSouboru(); if (fk0) naftaCache.karty = fk0; }   // po startu překrýt karty ručním ceníkem
+  // Dispečink: mikroflotily dispečerek (A/B), přiřazení vozů, cíle KPI a poznámky k výkyvům.
+  const DISP_F = path.join(host.dataDir || __dirname, 'doprava-dispecink.json');
+  const DISP_DUVODY = ['nemoc', 'dovolena', 'porucha', 'stk', 'zakaznik', 'jine'];
+  function readDisp() {
+    let d = {}; try { d = JSON.parse(fs.readFileSync(DISP_F, 'utf8')); } catch (_) {}
+    const sk = (d.skupiny && typeof d.skupiny === 'object') ? d.skupiny : {};
+    const c = (d.cile && typeof d.cile === 'object') ? d.cile : {};
+    const num = (v, def, lo, hi) => (v != null && isFinite(v)) ? Math.min(hi, Math.max(lo, Number(v))) : def;
+    return {
+      skupiny: { A: { nazev: String((sk.A || {}).nazev || 'Skupina A').slice(0, 60) }, B: { nazev: String((sk.B || {}).nazev || 'Skupina B').slice(0, 60) } },
+      vozy: (d.vozy && typeof d.vozy === 'object') ? d.vozy : {},            // číslo vozu → 'A' | 'B'
+      // cíle: plnění plánu km/tržeb (%), výnos Kč/km, prázdné km (%, méně = lépe), spotřeba l/100 (méně = lépe), vyplněnost přejezdu (%)
+      cile: { planProc: num(c.planProc, 95, 50, 150), kckm: num(c.kckm, 36, 10, 100), prazdne: num(c.prazdne, 10, 1, 50), spotreba: num(c.spotreba, 28, 10, 60), vyplneno: num(c.vyplneno, 95, 50, 100) },
+      poznamky: Array.isArray(d.poznamky) ? d.poznamky : [],
+    };
+  }
+  function writeDisp(d) { fs.writeFileSync(DISP_F, JSON.stringify(d, null, 2)); }
   // Body u hranic pro hledání nejlevnějších pump (formát „Název|lat|lon;…")
   const naftaBody = (env, vychozi) => (env || vychozi).split(';').map((s) => {
     const [name, lat, lon] = s.split('|').map((x) => x.trim());
@@ -534,7 +552,7 @@ function mount(host) {
           cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
           cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
         ].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, plan: seedPlan || null, nafta: naftaCache || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, plan: seedPlan || null, nafta: naftaCache || null, info: readInfo(), dispecink: readDisp(), ja: ((host.empSession(req) || {}).email || ''), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
@@ -620,6 +638,38 @@ function mount(host) {
       if (!info[cislo].ridic && !info[cislo].typ && info[cislo].fixMes == null && !info[cislo].stav) delete info[cislo];
       try { fs.writeFileSync(INFO_F, JSON.stringify(info, null, 2)); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
       json(res, 200, { ok: true, info }); return true;
+    }
+
+    // Dispečink — nastavení skupin, přiřazení vozů a cílů (jen správce)
+    if (p === '/api/doprava/dispecink' && req.method === 'POST') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Skupiny a cíle nastavuje správce.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+      const d = readDisp();
+      if (b.skupiny) ['A', 'B'].forEach((k) => { if (b.skupiny[k] && b.skupiny[k].nazev != null) d.skupiny[k].nazev = String(b.skupiny[k].nazev).trim().slice(0, 60) || d.skupiny[k].nazev; });
+      if (b.vozy && typeof b.vozy === 'object') { d.vozy = {}; Object.keys(b.vozy).forEach((c) => { const s = String(b.vozy[c] || '').toUpperCase(); if (s === 'A' || s === 'B') d.vozy[String(c).trim()] = s; }); }
+      if (b.cile && typeof b.cile === 'object') Object.keys(d.cile).forEach((k) => { const n = parseNum(String(b.cile[k] == null ? '' : b.cile[k])); if (n != null) d.cile[k] = n; });
+      try { writeDisp(d); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
+      json(res, 200, { ok: true, dispecink: readDisp() }); return true;
+    }
+    // Poznámka k výkyvu (nemoc, dovolená, porucha…) u vozu a měsíce — zapsat smí každý s modulem, smazat autor nebo správce
+    if (p === '/api/doprava/dispecink/poznamka' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+      const d = readDisp(); const ja = (host.empSession(req) || {}).email || '';
+      if (b.smazat) {
+        const n = d.poznamky.find((x) => x.id === String(b.id || ''));
+        if (!n) { json(res, 404, { chyba: 'Poznámka nenalezena.' }); return true; }
+        if (!host.isAdmin(req) && n.kdo !== ja) { json(res, 403, { chyba: 'Poznámku smaže jen její autor nebo správce.' }); return true; }
+        d.poznamky = d.poznamky.filter((x) => x.id !== n.id);
+      } else {
+        const mesic = String(b.mesic || '').trim(), voz = String(b.voz || '').trim(), text = String(b.text || '').trim().slice(0, 500);
+        const duvod = DISP_DUVODY.includes(String(b.duvod)) ? String(b.duvod) : 'jine';
+        if (!/^\d{4}-\d{2}$/.test(mesic) || !voz) { json(res, 400, { chyba: 'Chybí vůz nebo měsíc.' }); return true; }
+        if (!text && duvod === 'jine') { json(res, 400, { chyba: 'Napište, co výkyv způsobilo.' }); return true; }
+        d.poznamky.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), mesic, voz, duvod, text, kdo: ja, ts: Date.now() });
+        if (d.poznamky.length > 2000) d.poznamky = d.poznamky.slice(-2000);
+      }
+      try { writeDisp(d); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
+      json(res, 200, { ok: true, poznamky: d.poznamky }); return true;
     }
 
     json(res, 404, { chyba: 'Neznámá cesta modulu.' }); return true;
