@@ -14,6 +14,7 @@ const fs = require('fs');
 const urlLib = require('url');
 const sheets = require('./lib/sheets');
 const naftaLib = require('./lib/nafta');
+const oceneni = require('./lib/oceneni');
 
 const HTML_FILE = path.join(__dirname, 'doprava.html');
 // Výkony můžou být ve více souborech (ročníky „Daily report ECZ"); čte se ze všech
@@ -506,7 +507,15 @@ function mount(host) {
     const u = urlLib.parse(req.url, true); const p = u.pathname;
     if (!p.startsWith('/doprava') && !p.startsWith('/api/doprava')) return false;
 
-    if (!maModul(req)) {
+    // Odkup vozidel je otevřený KAŽDÉMU přihlášenému zaměstnanci (ne jen lidem s modulem Doprava).
+    const proZamestnance = (p === '/doprava/odkup' || p === '/api/doprava/odkup');
+    if (proZamestnance) {
+      if (!host.empSession(req) && !host.isAdmin(req)) {
+        if (p.startsWith('/api/')) json(res, 401, { chyba: 'Přihlaste se.' });
+        else html(res, 401, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Pro nabídku odkupu se přihlaste do intranetu.</p>');
+        return true;
+      }
+    } else if (!maModul(req)) {
       if (p.startsWith('/api/')) json(res, 403, { chyba: 'Nemáte přístup k modulu Doprava.' });
       else html(res, 403, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">K modulu Doprava nemáte přístup. Přístupy přiděluje správce intranetu.</p>');
       return true;
@@ -515,6 +524,13 @@ function mount(host) {
     if ((p === '/doprava' || p === '/doprava/') && req.method === 'GET') {
       if (!fs.existsSync(HTML_FILE)) { html(res, 404, '<h1>Chybí doprava.html</h1>'); return true; }
       html(res, 200, fs.readFileSync(HTML_FILE, 'utf8')); return true;
+    }
+    if (p === '/doprava/oceneni.js' && req.method === 'GET') {   // sdílený výpočet pro prohlížeč
+      host.send(res, 200, fs.readFileSync(path.join(__dirname, 'lib', 'oceneni.js'), 'utf8'), { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+      return true;
+    }
+    if (p === '/doprava/odkup' && req.method === 'GET') {
+      html(res, 200, fs.readFileSync(path.join(__dirname, 'odkup.html'), 'utf8')); return true;
     }
 
     if (p === '/api/doprava/data' && req.method === 'GET') {
@@ -534,7 +550,7 @@ function mount(host) {
           cache.nakladyChyba ? ('Nákladová kalkulace se nenačetla (' + cache.nakladyChyba + ') — dashboard běží jen nad výkony.') : null,
           cache.evidenceChyba ? ('Evidence vozů se nenačetla (' + cache.evidenceChyba + ') — fixní náklady se počítají plné u všech vozů.') : null,
         ].filter(Boolean).join(' ');
-        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, plan: seedPlan || null, nafta: naftaCache || null, info: readInfo(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
+        json(res, 200, { konfigurace: true, saEmail: sheets.saEmail(), aktualizovano: cache.ts, vozidla: cache.vozidla, naklady: cache.naklady, evidence: cache.evidence || null, vykonyZdroj: cache.vykonyZdroj || null, historie: (cache.historie && cache.historie.roky) || [], zakazky: cache.zakazky || null, ekonomika: cache.ekonomika || seedEkonomika || null, plan: seedPlan || null, nafta: naftaCache || null, info: readInfo(), vyrazeni: vyrazeniCfg(), admin: host.isAdmin(req), varovani: upozorneni || undefined });
       };
       if (!sheets.configured()) {
         if (cache) zCache('Service account není nastaven — zobrazuji poslední stažená data (bez obnovy z Google Sheets).');
@@ -609,6 +625,8 @@ function mount(host) {
       const fixMes = parseNum(String(b.fixMes == null ? '' : b.fixMes));
       const stav = ['prodej', 'likvidace'].includes(String(b.stav || '')) ? String(b.stav) : '';
       const predchozi = info[cislo] || {};
+      const kladne = (x) => { const n = parseNum(String(x == null ? '' : x)); return n != null && n > 0 ? Math.round(n) : null; };
+      const tachoDat = String(b.tachometrDatum || '').trim();
       info[cislo] = {
         ridic: String(b.ridic || '').trim().slice(0, 60),
         typ: String(b.typ || '').trim().slice(0, 60),
@@ -616,13 +634,105 @@ function mount(host) {
         stav,
         stavOd: stav ? (predchozi.stav === stav && predchozi.stavOd ? predchozi.stavOd : Date.now()) : null,
         stavKdo: stav ? ((host.empSession(req) || {}).email || '') : '',
+        // podklady pro termín vyřazení a ocenění (zadává správce; chybějící se odhadují z účetnictví/evidence)
+        reg: oceneni.parseMesic(b.reg) || null,                       // 1. registrace {m,y}
+        tachometr: kladne(b.tachometr),                                // stav km
+        tachometrDatum: /^\d{4}-\d{2}(-\d{2})?$/.test(tachoDat) ? tachoDat : null,
+        porizovaciCena: kladne(b.porizovaciCena),
+        prodejniCena: kladne(b.prodejniCena),                          // ruční prodejní cena (jinak návrh z modelu)
       };
-      if (!info[cislo].ridic && !info[cislo].typ && info[cislo].fixMes == null && !info[cislo].stav) delete info[cislo];
+      const i = info[cislo];
+      if (!i.ridic && !i.typ && i.fixMes == null && !i.stav && !i.reg && i.tachometr == null && i.porizovaciCena == null && i.prodejniCena == null) delete info[cislo];
       try { fs.writeFileSync(INFO_F, JSON.stringify(info, null, 2)); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
       json(res, 200, { ok: true, info }); return true;
     }
 
+    // Pravidla vyřazení/ocenění (limity stáří a nájezdu, rezerva prodeje, e-mail pro nabídky odkupu) — jen správce.
+    if (p === '/api/doprava/vyrazeni-nastaveni' && req.method === 'POST') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+      const c = {}; ['maxLet', 'maxKm', 'rocniKm', 'rezervaProdej', 'odpisLet', 'opravyLimit'].forEach((k) => { const n = parseNum(String(b[k] == null ? '' : b[k])); if (n != null) c[k] = n; });
+      c.odkupEmail = String(b.odkupEmail || '').trim().slice(0, 200);
+      try { fs.writeFileSync(VYRAZENI_F, JSON.stringify(c, null, 2)); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
+      json(res, 200, { ok: true, ...vyrazeniCfg() }); return true;
+    }
+    // Odkup vozidel zaměstnanci: nabízené vozy + vlastní nabídky (každý zaměstnanec), všechny nabídky (správce).
+    if (p === '/api/doprava/odkup' && req.method === 'GET') {
+      const e = host.empSession(req) || {}; const vse = readOdkup();
+      json(res, 200, { vozy: vozyKProdeji(), moje: vse.filter((n) => n.email === e.email), nabidky: host.isAdmin(req) ? vse : undefined, admin: host.isAdmin(req), ja: { email: e.email || '', jmeno: e.name || '' } });
+      return true;
+    }
+    if (p === '/api/doprava/odkup' && req.method === 'POST') {
+      const e = host.empSession(req); if (!e || !e.email) { json(res, 401, { chyba: 'Přihlaste se.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+      const cislo = String(b.cislo || '').trim(); const vuz = vozyKProdeji().find((v) => v.cislo === cislo);
+      if (!vuz) { json(res, 400, { chyba: 'Tento vůz není nabízen k prodeji.' }); return true; }
+      const cena = parseNum(String(b.cena == null ? '' : b.cena));
+      if (cena == null || cena <= 0) { json(res, 400, { chyba: 'Zadejte nabízenou cenu.' }); return true; }
+      const vse = readOdkup();
+      let n = vse.find((x) => x.cislo === cislo && x.email === e.email && x.stav === 'nova');   // jedna otevřená nabídka na vůz a zájemce
+      if (n) { n.cena = Math.round(cena); n.pozn = String(b.pozn || '').trim().slice(0, 500); n.ts = Date.now(); }
+      else { n = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), cislo, spz: vuz.spz, email: e.email, jmeno: e.name || '', cena: Math.round(cena), pozn: String(b.pozn || '').trim().slice(0, 500), ts: Date.now(), stav: 'nova' }; vse.push(n); }
+      try { writeOdkup(vse); } catch (err) { json(res, 500, { chyba: err.message }); return true; }
+      const cfg = vyrazeniCfg();
+      if (cfg.odkupEmail && host.deliver) {
+        Promise.resolve().then(() => host.deliver({ to: cfg.odkupEmail, subject: 'Nabídka odkupu vozu ' + cislo + ' (' + vuz.spz + ')',
+          text: (n.jmeno || n.email) + ' nabízí ' + n.cena.toLocaleString('cs-CZ') + ' Kč za vůz ' + cislo + ' ' + vuz.spz + (vuz.typ ? ' (' + vuz.typ + ')' : '') + '.\n'
+            + 'Cena obvyklá: ' + (vuz.cena != null ? vuz.cena.toLocaleString('cs-CZ') + ' Kč' : '—') + '\n' + (n.pozn ? 'Poznámka: ' + n.pozn + '\n' : '')
+            + '\nSpráva nabídek: ' + (host.publicBaseUrl || '') + '/doprava (záložka Vyřazení)' }))
+          .catch((err) => console.error('[doprava] e-mail o nabídce odkupu selhal:', err.message));
+      }
+      json(res, 200, { ok: true, nabidka: n }); return true;
+    }
+    if (p === '/api/doprava/odkup-stav' && req.method === 'POST') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Jen správce.' }); return true; }
+      let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+      const stav = ['nova', 'prijata', 'zamitnuta'].includes(String(b.stav)) ? String(b.stav) : null;
+      const vse = readOdkup(); const n = vse.find((x) => x.id === String(b.id || ''));
+      if (!n || !stav) { json(res, 400, { chyba: 'Neznámá nabídka nebo stav.' }); return true; }
+      n.stav = stav; n.stavTs = Date.now(); n.stavKdo = (host.empSession(req) || {}).email || '';
+      try { writeOdkup(vse); } catch (err) { json(res, 500, { chyba: err.message }); return true; }
+      json(res, 200, { ok: true, nabidky: vse }); return true;
+    }
+
     json(res, 404, { chyba: 'Neznámá cesta modulu.' }); return true;
+  }
+
+  /* ---------- vyřazení & ocenění vozů + odkup zaměstnanci ---------- */
+  const VYRAZENI_F = path.join(host.dataDir || __dirname, 'doprava-vyrazeni.json');
+  function vyrazeniCfg() {
+    let c = {}; try { c = JSON.parse(fs.readFileSync(VYRAZENI_F, 'utf8')); } catch (_) {}
+    const D = oceneni.VYCHOZI, num = (k, lo, hi) => (c[k] != null && isFinite(c[k])) ? Math.min(hi, Math.max(lo, Number(c[k]))) : D[k];
+    return { maxLet: num('maxLet', 3, 20), maxKm: num('maxKm', 200000, 3000000), rocniKm: num('rocniKm', 20000, 300000), rezervaProdej: num('rezervaProdej', 0, 40),
+      odpisLet: num('odpisLet', 3, 10), opravyLimit: num('opravyLimit', 0.5, 20), odkupEmail: String(c.odkupEmail || D.odkupEmail || '').trim() };
+  }
+  const ODKUP_F = path.join(host.dataDir || __dirname, 'doprava-odkup.json');
+  function readOdkup() { try { const o = JSON.parse(fs.readFileSync(ODKUP_F, 'utf8')); return Array.isArray(o.nabidky) ? o.nabidky : []; } catch (_) { return []; } }
+  function writeOdkup(n) { fs.writeFileSync(ODKUP_F, JSON.stringify({ nabidky: n }, null, 2)); }
+  // Průměrný měsíční nájezd vozu z posledních max 6 měsíců s provozem.
+  function kmMesVozu(v) { const ms = Object.keys(v.mesice || {}).sort().filter((k) => (v.mesice[k].km || 0) > 0).slice(-6); return ms.length ? ms.reduce((a, k) => a + v.mesice[k].km, 0) / ms.length : 0; }
+  // Vstup pro Oceneni.spocitej ze všech zdrojů modulu (stejně to skládá i záložka Vyřazení v prohlížeči).
+  function vstupOceneni(v, inf, ekon, evid) {
+    const e = ekon && ekon.vozy ? ekon.vozy.find((x) => normSpz(x.spz) === normSpz(v.spz)) : null;
+    const EKN = (ekon && ekon.mesiceSdaty && ekon.mesiceSdaty.length) || 0;
+    const s = (p) => { const x = e && e.polozky.find((q) => q.nazev.indexOf(p) === 0); return x ? (x.celkem || 0) : 0; };
+    const ev = evid[normSpz(v.spz)] || null;
+    return { reg: inf.reg || null, tachometr: inf.tachometr || null, tachometrDatum: inf.tachometrDatum || null, kmMes: kmMesVozu(v),
+      porizovaciCena: inf.porizovaciCena || null, prodejniCena: inf.prodejniCena || null,
+      odpisyMes: e && EKN ? s('551000') / EKN : null, opravyKm: e && e.kmCelkem > 0 ? (s('511200') + s('511300')) / e.kmCelkem : null,
+      smlouvaDo: ev ? ev.smlouvaDo : null, stav: inf.stav || '' };
+  }
+  // Vozy ve stavu „plánovaný prodej" i s oceněním — nabídka pro zaměstnance (cena obvyklá = tržní).
+  function vozyKProdeji() {
+    if (!cache || !cache.vozidla) return [];
+    const info = readInfo(), cfg = vyrazeniCfg(), ekon = cache.ekonomika || seedEkonomika;
+    const evid = {}; (cache.evidence || []).forEach((x) => { if (x && x.spz) evid[x.spz] = x; });
+    return cache.vozidla.filter((v) => (info[v.cislo] || {}).stav === 'prodej').map((v) => {
+      const inf = info[v.cislo] || {}; const ev = evid[normSpz(v.spz)];
+      const o = oceneni.spocitej(vstupOceneni(v, inf, ekon, evid), cfg, new Date());
+      return { cislo: v.cislo, spz: v.spz, typ: inf.typ || (ev && ev.znacka) || '', reg: o.reg, regZdroj: o.regZdroj, stariLet: o.stariLet, najezd: o.najezd, najezdZdroj: o.najezdZdroj,
+        cena: o.cenaZamestnanec, prodejni: o.prodejni, termin: o.termin, stavOd: inf.stavOd || null };
+    });
   }
 
   /* ---------- denní e-mail s pohyblivým ceníkem (klouzavá kalkulace na cílovou marži) ---------- */
