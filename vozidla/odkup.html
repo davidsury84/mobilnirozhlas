@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Odkup firemních vozidel — ELKOPLAST</title>
+<style>
+  :root{--ink:#0f1512;--mut:#6b7570;--line:#dfe6e1;--paper:#fff;--green:#1a7f4b;--green-soft:#e3f3ea;--amber:#8a5a00;--yellow-soft:#fff3cd;--red:#b42318;--red-soft:#fdecea}
+  body{margin:0;font-family:"Segoe UI",-apple-system,Roboto,sans-serif;background:#f4f7f5;color:var(--ink)}
+  .wrap{max-width:920px;margin:0 auto;padding:28px 18px 60px}
+  h1{font-size:23px;margin:0 0 6px}
+  .mut{color:var(--mut)} .small{font-size:12px}
+  .alert{background:var(--yellow-soft);border:1px solid #ecd9a0;border-radius:10px;padding:10px 14px;margin:14px 0;font-size:13px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:14px 0;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .spz{font-size:19px;font-weight:700;letter-spacing:.3px}
+  .cena{font-size:21px;font-weight:700;color:var(--green)}
+  .fakta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 16px;margin:10px 0;font-size:13px}
+  .fakta b{display:block;font-size:14px}
+  form{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+  label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:4px}
+  input,textarea{font:inherit;padding:8px 10px;border:1px solid #c9d3cc;border-radius:8px}
+  textarea{min-width:260px;min-height:38px;flex:1}
+  .btn{background:var(--green);color:#fff;border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+  .btn[disabled]{opacity:.6;cursor:default}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#eef2f0;color:#374151}
+  .pill.ok{background:var(--green-soft);color:var(--green)} .pill.warn{background:var(--yellow-soft);color:var(--amber)} .pill.bad{background:var(--red-soft);color:var(--red)}
+  .stav{margin-top:8px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Odkup firemních vozidel</h1>
+  <p class="mut">Vozidla, která firma plánuje vyřadit z provozu, nabízíme nejdřív zaměstnancům. Cena v nabídce je <b>cena obvyklá</b> (tržní srovnatelná, odvozená ze stáří a nájezdu). Nabídku posoudí zodpovědná osoba za středisko; o výsledku se dozvíte zde a e-mailem.</p>
+  <div class="alert">Prodej zaměstnanci <b>pod cenou obvyklou</b> je u zaměstnance nepeněžním příjmem (daň + odvody) — nabídky výrazně pod uvedenou cenou proto nejde přijmout bez dodanění. Nabídka není kupní smlouva; vozidlo se prodává ve stavu, v jakém je, bez záruky.</div>
+  <div id="seznam"><p class="mut">Načítám nabídku…</p></div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const kc=v=>v==null?'—':Math.round(v).toLocaleString('cs-CZ')+' Kč';
+const fm=d=>d?(d.m+'/'+d.y):'—';
+const LBL={nova:'<span class="pill warn">čeká na posouzení</span>',prijata:'<span class="pill ok">přijata</span>',zamitnuta:'<span class="pill">zamítnuta</span>'};
+let D=null;
+async function nacti(){
+  try{ const r=await fetch('/api/vozidla/odkup',{cache:'no-store'}); D=await r.json(); if(!r.ok) throw new Error(D.chyba||r.status); }
+  catch(e){ $('#seznam').innerHTML='<p class="mut">Nabídku se nepodařilo načíst: '+esc(e.message)+'</p>'; return; }
+  if(!D.vozy.length){ $('#seznam').innerHTML='<div class="card"><p class="mut" style="margin:0">Momentálně není k odkupu nabízeno žádné vozidlo. Nabídka se tu objeví, jakmile bude některý vůz označen k prodeji.</p></div>'; return; }
+  $('#seznam').innerHTML=D.vozy.map(v=>{
+    const moje=(D.moje||[]).filter(n=>n.vozId===v.id).sort((a,b)=>b.ts-a.ts)[0];
+    return '<div class="card"><div class="head"><div><span class="spz">'+esc(v.spz)+'</span>'+(v.mojeVozidlo?' <span class="pill ok">vaše svěřené vozidlo</span>':'')+'<div>'+esc(v.popis||'')+(v.typ?' <span class="mut">· '+esc(v.typ)+'</span>':'')+'</div></div>'
+      +'<div style="text-align:right"><div class="cena">'+kc(v.cena)+'</div><div class="mut small">'+(v.cena!=null?'cena obvyklá':'cena se stanovuje')+(v.prodejni!=null&&v.prodejni!==v.cena?' · navržená prodejní '+kc(v.prodejni):'')+'</div></div></div>'
+      +'<div class="fakta"><div><span class="mut">Rok výroby / pořízení</span><b>'+(v.rokVyroby||'—')+(v.reg?' <span class="mut">('+fm(v.reg)+(v.stariLet!=null?', '+String(v.stariLet).replace('.',',')+' let':'')+')</span>':'')+'</b></div>'
+      +'<div><span class="mut">Nájezd</span><b>'+(v.najezd!=null?v.najezd.toLocaleString('cs-CZ')+' km':'—')+'</b>'+(v.najezdZdroj?'<span class="mut small">'+esc(v.najezdZdroj)+'</span>':'')+'</div>'
+      +'<div><span class="mut">Plánované vyřazení</span><b>'+fm(v.termin)+'</b></div>'
+      +'<div><span class="mut">Středisko</span><b>'+esc(v.stredisko||'—')+'</b></div></div>'
+      +(v.planPozn?'<div class="mut small">Poznámka: '+esc(v.planPozn)+'</div>':'')
+      +(moje?'<div class="stav">Vaše nabídka: <b>'+kc(moje.cena)+'</b> '+(LBL[moje.stav]||esc(moje.stav))+' <span class="mut small">(podáno '+new Date(moje.ts).toLocaleDateString('cs-CZ')+')</span></div>':'')
+      +(moje&&moje.stav!=='nova'?'':'<form data-id="'+esc(v.id)+'"><label>Nabízená cena (Kč)<input name="cena" inputmode="numeric" required value="'+(moje?moje.cena:(v.cena!=null?v.cena:''))+'" style="width:140px"></label>'
+        +'<label>Poznámka (volitelně)<textarea name="pozn" placeholder="např. způsob úhrady, termín převzetí…">'+esc(moje?moje.pozn:'')+'</textarea></label>'
+        +'<button class="btn" type="submit">'+(moje?'Upravit nabídku':'Mám zájem — odeslat nabídku')+'</button><span class="mut small" data-stav></span></form>')
+      +'</div>';
+  }).join('');
+  document.querySelectorAll('form[data-id]').forEach(f=>f.onsubmit=async ev=>{
+    ev.preventDefault(); const b=f.querySelector('button'), st=f.querySelector('[data-stav]'); b.disabled=true; st.textContent='Odesílám…';
+    try{
+      const r=await fetch('/api/vozidla/odkup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:f.dataset.id,cena:f.cena.value,pozn:f.pozn.value})});
+      const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status);
+      st.textContent='Nabídka odeslána ✓'; nacti();
+    }catch(e){ st.textContent='Chyba: '+e.message; b.disabled=false; }
+  });
+}
+nacti();
+</script>
+</body>
+</html>

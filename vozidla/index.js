@@ -25,8 +25,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const urlLib = require('url');
+const oceneni = require('./oceneni');
 
 const HTML_FILE = path.join(__dirname, 'vozidla.html');
+const ODKUP_FILE = path.join(__dirname, 'odkup.html');
 const SMERNICE_FILE = path.join(__dirname, 'smernice-sverene-vozidlo.html');
 // Prvotní naplnění evidence: soubor se NEDÁVÁ do repa (je veřejné) — nahraje se na datový
 // disk jako data/vozidla-import.json a modul ho při startu jednorázově naimportuje.
@@ -82,6 +84,13 @@ function mount(host) {
     if (!Array.isArray(n.kopieNa)) n.kopieNa = [];               // komu chodí kopie všech upozornění
     if (typeof n.reditelEmail !== 'string') n.reditelEmail = '';  // ředitel společnosti — hlásí se mu každá škoda
     if (typeof n.reditelJmeno !== 'string') n.reditelJmeno = '';
+    // ocenění a odkup: očekávaný roční nájezd (korekce tržní ceny), rezerva pro rychlý prodej,
+    // délka účetního odpisu a kam hlásit nové nabídky odkupu (kromě zodpovědné osoby za středisko)
+    if (typeof n.rocniKm !== 'number') n.rocniKm = 25000;
+    if (typeof n.rezervaProdej !== 'number') n.rezervaProdej = 8;
+    if (typeof n.odpisLet !== 'number') n.odpisLet = 5;
+    if (typeof n.odkupEmail !== 'string') n.odkupEmail = '';
+    if (!Array.isArray(d.odkup)) d.odkup = [];                         // nabídky zaměstnanců na odkup vozu
     if (!d.odeslano || typeof d.odeslano !== 'object') d.odeslano = {};  // klíč → timestamp (ať se nespamuje)
     if (typeof n.upominkyOd !== 'string') n.upominkyOd = '';      // odklad upomínek po hromadném importu
     if (!d.seedImport && !d.vozidla.length) { if (importSeed(d)) save(d); }
@@ -230,6 +239,11 @@ function mount(host) {
   function smiEditovat(v, r) {
     return !!(r.admin || low(v.spravceEmail) === r.email || r.strediska.indexOf(v.stredisko) >= 0);
   }
+  // O prodeji, vyřazení a cenách rozhoduje správce modulu nebo zodpovědná osoba za středisko —
+  // ne ten, kdo s vozem jezdí (ten může podat nabídku na odkup jako každý jiný zaměstnanec).
+  function smiRozhodovat(v, r) {
+    return !!(r.admin || r.strediska.indexOf(v.stredisko) >= 0);
+  }
 
   // ---- výpočty -------------------------------------------------------------
   const dnes = () => new Date();
@@ -297,6 +311,39 @@ function mount(host) {
         (mes <= 0 ? duvod : mesicSlovy(cil) + ' (' + duvod + ')'),
       kdy, mesicu: mes, najezd,
     };
+  }
+  // ---- termín vyřazení a ocenění (podklad pro obměnu a odkup zaměstnanci) --------
+  //  Stáří z data pořízení (nebo z roku výroby), nájezd z posledního zápisu tachometru
+  //  dopočtený ročním nájezdem; pořizovací a ruční prodejní cenu zadává ten, kdo rozhoduje.
+  function regVozu(v) {
+    const m = /^(\d{4})-(\d{2})/.exec(String(v.porizeno || ''));
+    if (m) return { reg: { y: +m[1], m: +m[2] }, zdroj: 'datum pořízení' };
+    if (Number(v.rokVyroby)) return { reg: { y: Number(v.rokVyroby), m: 6 }, zdroj: 'rok výroby (bez měsíce — počítá se půlka roku)' };
+    return { reg: null, zdroj: null };
+  }
+  function oceneniVozu(v, nast) {
+    const r = regVozu(v), pk = posledniKm(v), naj = rocniNajezd(v), d0 = dnes();
+    let tachoMes = 0;
+    if (pk) tachoMes = pk.ts ? Math.max(0, (Date.now() - pk.ts) / (30.44 * DEN)) : Math.max(0, (d0.getFullYear() - pk.rok) * 12 + (d0.getMonth() + 1 - 7));
+    return oceneni.spocitej({
+      reg: r.reg, regZdroj: r.zdroj,
+      tachometr: pk ? Number(pk.km) : null, tachometrRok: pk ? pk.rok : null, tachometrMesicu: tachoMes, kmMes: naj / 12,
+      porizovaciCena: Number(v.porizovaciCena) || null, prodejniCena: Number(v.prodejniCena) || null, typ: v.typ,
+    }, {
+      maxLet: Number(nast.prahRoky) || 8, maxKm: Number(nast.prahKm) || 250000, rocniKm: Number(nast.rocniKm) || 25000,
+      rezervaProdej: (nast.rezervaProdej != null && isFinite(nast.rezervaProdej)) ? Number(nast.rezervaProdej) : 8, odpisLet: Number(nast.odpisLet) || 5,
+    }, d0);
+  }
+  const PLANY = { prodej: 'Plánovaný prodej', likvidace: 'Vyřazení — ekologická likvidace' };
+  // Vozy nabízené zaměstnancům k odkupu: plán „prodej" u vozu, který ještě nebyl prodán ani vyřazen.
+  function vozyKOdkupu(d) {
+    return d.vozidla.filter(v => v.plan === 'prodej' && v.stav !== 'prodano' && v.stav !== 'vyrazeno').map(v => {
+      const o = oceneniVozu(v, d.nastaveni);
+      return { id: v.id, spz: v.spz, popis: [v.znacka, v.model].filter(Boolean).join(' '), typ: TYPY[v.typ] || v.typ, rokVyroby: v.rokVyroby || null,
+        reg: o.reg, regZdroj: o.regZdroj, stariLet: o.stariLet, najezd: o.najezd, najezdZdroj: o.najezdZdroj,
+        cena: o.cenaZamestnanec, prodejni: o.prodejni, termin: o.termin, planOd: v.planOd || null, planPozn: v.planPozn || '',
+        stredisko: v.stredisko || '', spravceEmail: low(v.spravceEmail || ''), fotky: (v.fotky || []).length };
+    });
   }
   const MESICE = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
   function mesicSlovy(dt) { return MESICE[dt.getMonth()] + ' ' + dt.getFullYear(); }
@@ -427,9 +474,17 @@ function mount(host) {
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true);
     const p = u.pathname;
-    if (p !== '/vozidla' && p !== '/vozidla/' && !p.startsWith('/api/vozidla')) return false;
+    if (p !== '/vozidla' && p !== '/vozidla/' && p !== '/vozidla/odkup' && !p.startsWith('/api/vozidla')) return false;
 
-    if (!maPristup(req)) {
+    // Odkup vozidel je otevřený KAŽDÉMU přihlášenému zaměstnanci — ne jen lidem, kteří modul vidí.
+    const proZamestnance = (p === '/vozidla/odkup' || p === '/api/vozidla/odkup');
+    if (proZamestnance) {
+      if (!host.empSession(req) && !host.isAdmin(req)) {
+        if (p.startsWith('/api/')) json(res, 401, { chyba: 'Přihlaste se do intranetu.' });
+        else htmlOut(res, 401, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">Pro nabídku odkupu se přihlaste do intranetu.</p>');
+        return true;
+      }
+    } else if (!maPristup(req)) {
       if (p.startsWith('/api/')) json(res, 403, { chyba: 'K modulu Vozový park nemáte přístup.' });
       else htmlOut(res, 403, '<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;margin:40px">'
         + 'K modulu Vozový park nemáte přístup. Uvidí ho správce vozu, člověk zodpovědný za středisko a správce intranetu.</p>');
@@ -440,9 +495,15 @@ function mount(host) {
       if (!fs.existsSync(HTML_FILE)) { htmlOut(res, 404, '<h1>Chybí vozidla.html</h1>'); return true; }
       htmlOut(res, 200, fs.readFileSync(HTML_FILE, 'utf8')); return true;
     }
+    if (p === '/vozidla/odkup' && req.method === 'GET') { htmlOut(res, 200, fs.readFileSync(ODKUP_FILE, 'utf8')); return true; }
     if (p === '/api/vozidla/foto' && req.method === 'GET') return servujFoto(res, u.query);
 
     try {
+      if (p === '/api/vozidla/odkup' && req.method === 'GET') return apiOdkupData(req, res);
+      if (p === '/api/vozidla/odkup' && req.method === 'POST') return apiOdkupPodat(req, res);
+      if (p === '/api/vozidla/odkup/stav' && req.method === 'POST') return apiOdkupStav(req, res);
+      if (p === '/api/vozidla/plan' && req.method === 'POST') return apiPlan(req, res);
+      if (p === '/api/vozidla/cena' && req.method === 'POST') return apiCena(req, res);
       if (p === '/api/vozidla/data' && req.method === 'GET') return apiData(req, res);
       if (p === '/api/vozidla/vuz' && req.method === 'POST') return apiVuz(req, res);
       if (p === '/api/vozidla/vuz/smazat' && req.method === 'POST') return apiVuzSmazat(req, res);
@@ -474,6 +535,11 @@ function mount(host) {
       stav_: stavVozu(v, d.nastaveni),
       chybi: chybejiciUdaje(v),      // pro tlačítko „žádost o doplnění" u řádku
       smiEdit: smiEditovat(v, r),
+      smiRozhodovat: smiRozhodovat(v, r),
+      oceneni: oceneniVozu(v, d.nastaveni),
+      planText: PLANY[v.plan] || '',
+      // nabídky odkupu vidí jen ten, kdo o vozu rozhoduje
+      nabidky: smiRozhodovat(v, r) ? d.odkup.filter(n => n.vozId === v.id).map(n => Object.assign({}, n, { kontakt: kontakt(n.email) })) : undefined,
       spravceKontakt: kontakt(v.spravceEmail),                    // živě z databáze zaměstnanců
       zodpovednyKontakt: (() => { const z = d.zodpovedne.find(x => x.stredisko === v.stredisko); return z ? Object.assign({ role: z.role }, kontakt(z.email)) : null; })(),
       fotky: (v.fotky || []).map((f, i) => ({ i, popis: f.popis || '', ts: f.ts, kdo: f.kdo || '', url: '/api/vozidla/foto?id=' + v.id + '&fi=' + i })),
@@ -498,7 +564,7 @@ function mount(host) {
             stredisko: zs.map(x => x.stredisko).filter(Boolean).join(', '),
           });
         }) }; })(),
-      strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA,
+      strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA, plany: PLANY,
       nastaveni: d.nastaveni,
       zamestnanci: zamestnanci(),   // pro našeptávač; stejná data jako telefonní seznam intranetu
     });
@@ -856,8 +922,122 @@ function mount(host) {
       d.nastaveni.reditelEmail = low(b.reditelEmail);
       d.nastaveni.reditelJmeno = jmenoPodleMailu(b.reditelEmail) || String(b.reditelJmeno || '').trim();
     }
+    if (b.rocniKm != null) d.nastaveni.rocniKm = Math.max(1000, Number(b.rocniKm) || 25000);
+    if (b.rezervaProdej != null) d.nastaveni.rezervaProdej = Math.min(50, Math.max(0, Number(b.rezervaProdej) || 0));
+    if (b.odpisLet != null) d.nastaveni.odpisLet = Math.max(1, Number(b.odpisLet) || 5);
+    if (b.odkupEmail != null) d.nastaveni.odkupEmail = low(b.odkupEmail);
     save(d);
     json(res, 200, { ok: true, nastaveni: d.nastaveni });
+    return true;
+  }
+
+  // ---- plán obměny (prodej / ekologická likvidace) a ceny ---------------------
+  async function apiPlan(req, res) {
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const d = load(), r = role(req);
+    const v = d.vozidla.find(x => x.id === b.id);
+    if (!v) { json(res, 404, { chyba: 'Vozidlo nenalezeno.' }); return true; }
+    if (!smiRozhodovat(v, r)) { json(res, 403, { chyba: 'O prodeji a vyřazení rozhoduje správce modulu nebo zodpovědná osoba za středisko.' }); return true; }
+    const plan = PLANY[b.plan] ? b.plan : '';
+    const zmena = (v.plan || '') !== plan;
+    v.plan = plan;
+    v.planOd = plan ? (zmena || !v.planOd ? Date.now() : v.planOd) : null;
+    v.planKdo = plan ? (r.name || r.email) : '';
+    v.planPozn = plan ? String(b.pozn == null ? (v.planPozn || '') : b.pozn).slice(0, 500) : '';
+    save(d);
+    logAct('vozidla', req, 'Plán u vozidla ' + (v.spz || v.vin) + ': ' + (plan ? PLANY[plan] : 'zrušen'));
+    const popis = (v.spz || v.vin) + (v.znacka || v.model ? ' (' + [v.znacka, v.model].filter(Boolean).join(' ') + ')' : '');
+    // Správce vozu se o plánovaném prodeji dozví první — může podat nabídku jako každý zaměstnanec.
+    if (zmena && plan === 'prodej' && v.spravceEmail && low(v.spravceEmail) !== r.email) {
+      const o = oceneniVozu(v, d.nastaveni);
+      await mail(low(v.spravceEmail), 'Svěřené vozidlo ' + popis + ' je plánováno k prodeji',
+        'Vozidlo ' + popis + ', které máte svěřené, je nově vedené jako plánovaný prodej'
+        + (o.termin ? ' (termín obměny ' + oceneni.fmtMesic(o.termin) + ')' : '') + '.\n\n'
+        + 'Firma ho nejdřív nabízí zaměstnancům k odkupu za cenu obvyklou'
+        + (o.cenaZamestnanec ? ' ' + o.cenaZamestnanec.toLocaleString('cs-CZ') + ' Kč' : '') + '. '
+        + 'Pokud máte zájem, podejte nabídku zde: https://intranet.elkoplast.cz/vozidla/odkup\n\n'
+        + 'Rozhodl: ' + (r.name || r.email) + (b.pozn ? '\nPoznámka: ' + b.pozn : ''), 'souhrn');
+    }
+    json(res, 200, { ok: true, plan, oceneni: oceneniVozu(v, d.nastaveni) });
+    return true;
+  }
+  async function apiCena(req, res) {
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const d = load(), r = role(req);
+    const v = d.vozidla.find(x => x.id === b.id);
+    if (!v) { json(res, 404, { chyba: 'Vozidlo nenalezeno.' }); return true; }
+    if (!smiRozhodovat(v, r)) { json(res, 403, { chyba: 'Ceny zadává správce modulu nebo zodpovědná osoba za středisko.' }); return true; }
+    const cislo = x => { const n = Number(String(x == null ? '' : x).replace(/\s/g, '').replace(',', '.')); return n > 0 ? Math.round(n) : null; };
+    // prázdné pole cenu SMAŽE (stejná past jako u roku výroby — nesmí se tiše vrátit k původní)
+    if (b.porizovaciCena !== undefined) v.porizovaciCena = cislo(b.porizovaciCena);
+    if (b.prodejniCena !== undefined) v.prodejniCena = cislo(b.prodejniCena);
+    save(d);
+    json(res, 200, { ok: true, oceneni: oceneniVozu(v, d.nastaveni) });
+    return true;
+  }
+
+  // ---- odkup vozidel zaměstnanci ------------------------------------------------
+  //  Vozy s plánem „prodej" vidí každý přihlášený zaměstnanec na /vozidla/odkup a může podat
+  //  nabídku. Cena v nabídce = cena obvyklá (tržní): pod ní by šlo u zaměstnance o nepeněžní příjem.
+  function apiOdkupData(req, res) {
+    const d = load(), r = role(req);
+    const vozy = vozyKOdkupu(d).map(v => Object.assign({}, v, { mojeVozidlo: !!r.email && v.spravceEmail === r.email }));
+    const moje = d.odkup.filter(n => n.email === r.email);
+    // nabídky k rozhodnutí: správce modulu všechny, zodpovědná osoba jen za svá střediska
+    const rozhoduje = d.odkup.filter(n => { const v = d.vozidla.find(x => x.id === n.vozId); return v && smiRozhodovat(v, r); })
+      .map(n => Object.assign({}, n, { kontakt: kontakt(n.email) }));
+    json(res, 200, { vozy, moje, nabidky: (r.admin || r.zodpovedny) ? rozhoduje : undefined, ja: { email: r.email, jmeno: r.name } });
+    return true;
+  }
+  async function apiOdkupPodat(req, res) {
+    const d = load(), r = role(req);
+    if (!r.email) { json(res, 401, { chyba: 'Přihlaste se do intranetu.' }); return true; }
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const vuz = vozyKOdkupu(d).find(v => v.id === b.id);
+    if (!vuz) { json(res, 400, { chyba: 'Toto vozidlo není nabízeno k odkupu.' }); return true; }
+    const cena = Number(String(b.cena == null ? '' : b.cena).replace(/\s/g, '').replace(',', '.'));
+    if (!(cena > 0)) { json(res, 400, { chyba: 'Zadejte nabízenou cenu.' }); return true; }
+    let n = d.odkup.find(x => x.vozId === vuz.id && x.email === r.email && x.stav === 'nova');   // jedna otevřená nabídka na vůz a zájemce
+    if (n) { n.cena = Math.round(cena); n.pozn = String(b.pozn || '').trim().slice(0, 500); n.ts = Date.now(); }
+    else {
+      n = { id: 'n' + crypto.randomBytes(5).toString('hex'), vozId: vuz.id, spz: vuz.spz, email: r.email, jmeno: r.name || jmenoPodleMailu(r.email) || r.email,
+        cena: Math.round(cena), pozn: String(b.pozn || '').trim().slice(0, 500), ts: Date.now(), stav: 'nova', mojeVozidlo: vuz.spravceEmail === r.email };
+      d.odkup.push(n);
+    }
+    save(d);
+    logAct('vozidla', req, 'Nabídka odkupu ' + vuz.spz + ': ' + n.cena.toLocaleString('cs-CZ') + ' Kč');
+    const v = d.vozidla.find(x => x.id === vuz.id);
+    const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
+    const komu = Array.from(new Set([zod && zod.email, d.nastaveni.odkupEmail].filter(Boolean).map(low)));
+    if (komu.length) {
+      await mail(komu.join(','), 'Nabídka odkupu vozidla ' + vuz.spz + ' — ' + n.cena.toLocaleString('cs-CZ') + ' Kč',
+        (n.jmeno || n.email) + (n.mojeVozidlo ? ' (dosavadní správce vozu)' : '') + ' nabízí ' + n.cena.toLocaleString('cs-CZ') + ' Kč za vozidlo '
+        + vuz.spz + (vuz.popis ? ' (' + vuz.popis + ')' : '') + '.\n'
+        + 'Cena obvyklá: ' + (vuz.cena != null ? vuz.cena.toLocaleString('cs-CZ') + ' Kč' : 'nestanovena — doplňte pořizovací cenu u vozidla') + '\n'
+        + (n.pozn ? 'Poznámka: ' + n.pozn + '\n' : '')
+        + '\nNabídku přijmete nebo zamítnete v intranetu → Vozový park → Vyřazení a ocenění.');
+    }
+    json(res, 200, { ok: true, nabidka: n });
+    return true;
+  }
+  async function apiOdkupStav(req, res) {
+    const d = load(), r = role(req);
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const n = d.odkup.find(x => x.id === String(b.id || ''));
+    if (!n) { json(res, 404, { chyba: 'Nabídka nenalezena.' }); return true; }
+    const v = d.vozidla.find(x => x.id === n.vozId);
+    if (!v || !smiRozhodovat(v, r)) { json(res, 403, { chyba: 'O nabídce rozhoduje správce modulu nebo zodpovědná osoba za středisko.' }); return true; }
+    const stav = ['nova', 'prijata', 'zamitnuta'].indexOf(b.stav) >= 0 ? b.stav : null;
+    if (!stav) { json(res, 400, { chyba: 'Neznámý stav nabídky.' }); return true; }
+    n.stav = stav; n.stavTs = Date.now(); n.stavKdo = r.name || r.email;
+    save(d);
+    logAct('vozidla', req, 'Nabídka odkupu ' + n.spz + ' (' + n.jmeno + '): ' + stav);
+    if (stav !== 'nova') {
+      await mail(n.email, 'Vaše nabídka na odkup vozidla ' + n.spz + ' — ' + (stav === 'prijata' ? 'přijata' : 'zamítnuta'),
+        'Vaše nabídka ' + n.cena.toLocaleString('cs-CZ') + ' Kč na odkup vozidla ' + n.spz + ' byla ' + (stav === 'prijata' ? 'PŘIJATA' : 'zamítnuta') + '.\n'
+        + 'Rozhodl: ' + n.stavKdo + '\n\n' + (stav === 'prijata' ? 'Ozveme se vám kvůli kupní smlouvě a předání vozidla.' : 'Děkujeme za zájem.'), 'souhrn');
+    }
+    json(res, 200, { ok: true, nabidka: n });
     return true;
   }
 
@@ -866,14 +1046,15 @@ function mount(host) {
     const d = load(), r = role(req);
     const hl = ['SPZ', 'Značka', 'Model', 'VIN', 'Rok výroby', 'Typ', 'Stav', 'Středisko', 'Správce vozu', 'E-mail správce',
       'Zodpovědná osoba', 'STK do', 'Dní do STK', 'Poslední tachometr', 'Rok zápisu', 'Nájezd km/rok',
-      'Poslední inventarizace', 'Doporučení prodeje'];
+      'Poslední inventarizace', 'Doporučení prodeje', 'Termín vyřazení', 'Pořizovací cena', 'Zůstatková cena', 'Tržní cena', 'Prodejní cena', 'Plán'];
     const radky = viditelna(d, r).map(v => {
-      const st = stavVozu(v, d.nastaveni), pk = posledniKm(v);
+      const st = stavVozu(v, d.nastaveni), pk = posledniKm(v), o = oceneniVozu(v, d.nastaveni);
       const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
       return [v.spz, v.znacka, v.model, v.vin, v.rokVyroby || '', TYPY[v.typ] || v.typ, STAVY[v.stav] || v.stav, v.stredisko,
         v.spravceJmeno, v.spravceEmail, zod ? zod.jmeno : '', v.stkDo || '', st.dnyStk == null ? '' : st.dnyStk,
         pk ? pk.km : '', pk ? pk.rok : '', st.prodej.najezd || '',
-        st.inventura.posledni ? st.inventura.posledni.datum : 'nikdy', st.prodej.text];
+        st.inventura.posledni ? st.inventura.posledni.datum : 'nikdy', st.prodej.text,
+        o.termin ? oceneni.fmtMesic(o.termin) : '', o.porizovaci || '', o.zustatkova == null ? '' : o.zustatkova, o.trzni == null ? '' : o.trzni, o.prodejni == null ? '' : o.prodejni, PLANY[v.plan] || ''];
     });
     const csv = [hl].concat(radky).map(a => a.map(x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"').join(';')).join('\r\n');
     host.send(res, 200, '﻿' + csv, {
@@ -961,6 +1142,20 @@ function mount(host) {
         urgent: problem.some(v => stavVozu(v, d.nastaveni).upozorneni.some(u => u.urgent)),
       });
     }
+    // Odkup: vozy k prodeji vidí na nástěnce každý zaměstnanec; nové nabídky ten, kdo o nich rozhoduje.
+    const kOdkupu = vozyKOdkupu(d);
+    if (kOdkupu.length) out.push({
+      modul: 'vozidla', modulNazev: 'Vozový park', ikona: 'truck',
+      text: 'K odkupu zaměstnanci: ' + kOdkupu.map(v => v.spz + (v.cena ? ' za ' + v.cena.toLocaleString('cs-CZ') + ' Kč' : '')).join(', '),
+      sub: 'nabídku podáte na intranet.elkoplast.cz/vozidla/odkup', url: '/vozidla/odkup', urgent: false,
+    });
+    const r0 = { email, admin: false, strediska };
+    const nove = d.odkup.filter(n => n.stav === 'nova').filter(n => { const v = d.vozidla.find(x => x.id === n.vozId); return v && smiRozhodovat(v, r0); });
+    if (nove.length) out.push({
+      modul: 'vozidla', modulNazev: 'Vozový park', ikona: 'truck',
+      text: nove.length + (nove.length === 1 ? ' nová nabídka' : nove.length < 5 ? ' nové nabídky' : ' nových nabídek') + ' na odkup vozidla čeká na rozhodnutí',
+      sub: nove.slice(0, 3).map(n => n.spz + ' — ' + n.jmeno + ' ' + n.cena.toLocaleString('cs-CZ') + ' Kč').join(', '), urgent: false,
+    });
     return out;
   }
 

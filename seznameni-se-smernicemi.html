@@ -5100,7 +5100,8 @@ async function loadNotifikace(){
       '<div class="li-left"><div class="li-ic">'+mujIcon(ic)+'</div><div>'+
       '<div class="li-t">'+esc(x.text)+'</div>'+
       '<div class="muted" style="font-size:12px;margin-top:2px"><b>'+esc(x.modulNazev)+'</b>'+(x.sub?' · '+esc(x.sub):'')+'</div></div></div>'+
-      '<button class="btn sm'+(x.urgent?'':' ghost')+'" onclick="mjGo(\''+x.modul+'\')">'+mjT('Otevřít')+'</button></div>';
+      // dlaždice s vlastní adresou (např. odkup vozidel pro lidi bez přístupu k modulu) se otevře přímo, ne přes modul
+      '<button class="btn sm'+(x.urgent?'':' ghost')+'" onclick="'+(x.url&&/^\/[a-z0-9\/_-]*$/i.test(x.url)?'window.open(\''+esc(x.url)+'\',\'_blank\')':'mjGo(\''+x.modul+'\')')+'">'+mjT('Otevřít')+'</button></div>';
   }).join('');
 }
 // ---------- Bilance skladu e-shop (home widget, jen pro přístup k modulu eshop) ----------
