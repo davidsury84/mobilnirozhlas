@@ -45,6 +45,10 @@ const ROLE = {
 const STAVY = { aktivni: 'V provozu', odstaveno: 'Odstaveno', prodano: 'Prodáno', vyrazeno: 'Vyřazeno' };
 const TYPY = { osobni: 'Osobní', uzitkove: 'Užitkové', nakladni: 'Nákladní', tahac: 'Tahač', privees: 'Přívěs / návěs', stroj: 'Stroj' };
 
+// Orientační pořizovací cena podle typu vozidla (Kč, nové). Slouží jen jako výchozí odhad pro ocenění,
+// dokud u konkrétního vozu nikdo nezadá skutečnou pořizovací cenu; mění se v Nastavení.
+const CENY_TYPU = { osobni: 700000, uzitkove: 950000, nakladni: 2600000, tahac: 3200000, privees: 450000, stroj: 1800000 };
+
 // Lhůta technické prohlídky podle typu vozidla (roky) — orientační, admin ji může přepsat u vozu.
 const STK_LHUTA = { osobni: 2, uzitkove: 2, nakladni: 1, tahac: 1, privees: 1, stroj: 2 };
 
@@ -90,6 +94,10 @@ function mount(host) {
     if (typeof n.rezervaProdej !== 'number') n.rezervaProdej = 8;
     if (typeof n.odpisLet !== 'number') n.odpisLet = 5;
     if (typeof n.odkupEmail !== 'string') n.odkupEmail = '';
+    // Orientační pořizovací ceny podle typu vozidla — použijí se, dokud u vozu není zadaná skutečná.
+    // Bez nich je tabulka ocenění prázdná a není co srovnávat.
+    if (!n.cenyTypu || typeof n.cenyTypu !== 'object') n.cenyTypu = {};
+    Object.keys(CENY_TYPU).forEach((k) => { if (typeof n.cenyTypu[k] !== 'number') n.cenyTypu[k] = CENY_TYPU[k]; });
     if (!Array.isArray(d.odkup)) d.odkup = [];                         // nabídky zaměstnanců na odkup vozu
     if (!d.odeslano || typeof d.odeslano !== 'object') d.odeslano = {};  // klíč → timestamp (ať se nespamuje)
     if (typeof n.upominkyOd !== 'string') n.upominkyOd = '';      // odklad upomínek po hromadném importu
@@ -332,6 +340,7 @@ function mount(host) {
     }, {
       maxLet: Number(nast.prahRoky) || 8, maxKm: Number(nast.prahKm) || 250000, rocniKm: Number(nast.rocniKm) || 25000,
       rezervaProdej: (nast.rezervaProdej != null && isFinite(nast.rezervaProdej)) ? Number(nast.rezervaProdej) : 8, odpisLet: Number(nast.odpisLet) || 5,
+      cenyTypu: nast.cenyTypu || CENY_TYPU,
     }, d0);
   }
   const PLANY = { prodej: 'Plánovaný prodej', likvidace: 'Vyřazení — ekologická likvidace' };
@@ -926,6 +935,12 @@ function mount(host) {
     if (b.rezervaProdej != null) d.nastaveni.rezervaProdej = Math.min(50, Math.max(0, Number(b.rezervaProdej) || 0));
     if (b.odpisLet != null) d.nastaveni.odpisLet = Math.max(1, Number(b.odpisLet) || 5);
     if (b.odkupEmail != null) d.nastaveni.odkupEmail = low(b.odkupEmail);
+    if (b.cenyTypu && typeof b.cenyTypu === 'object') {
+      Object.keys(CENY_TYPU).forEach((k) => {
+        if (b.cenyTypu[k] == null) return;
+        d.nastaveni.cenyTypu[k] = Math.max(0, Math.round(Number(String(b.cenyTypu[k]).replace(/\s/g, '')) || 0));
+      });
+    }
     save(d);
     json(res, 200, { ok: true, nastaveni: d.nastaveni });
     return true;
@@ -1046,7 +1061,8 @@ function mount(host) {
     const d = load(), r = role(req);
     const hl = ['SPZ', 'Značka', 'Model', 'VIN', 'Rok výroby', 'Typ', 'Stav', 'Středisko', 'Správce vozu', 'E-mail správce',
       'Zodpovědná osoba', 'STK do', 'Dní do STK', 'Poslední tachometr', 'Rok zápisu', 'Nájezd km/rok',
-      'Poslední inventarizace', 'Doporučení prodeje', 'Termín vyřazení', 'Pořizovací cena', 'Zůstatková cena', 'Tržní cena', 'Prodejní cena', 'Plán'];
+      'Poslední inventarizace', 'Doporučení prodeje', 'Termín vyřazení', 'Pořizovací cena', 'Zdroj pořizovací ceny',
+      'Zůstatková cena', 'Tržní cena', 'Prodejní cena', 'Tržní − zůstatková', 'Plán'];
     const radky = viditelna(d, r).map(v => {
       const st = stavVozu(v, d.nastaveni), pk = posledniKm(v), o = oceneniVozu(v, d.nastaveni);
       const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
@@ -1054,7 +1070,9 @@ function mount(host) {
         v.spravceJmeno, v.spravceEmail, zod ? zod.jmeno : '', v.stkDo || '', st.dnyStk == null ? '' : st.dnyStk,
         pk ? pk.km : '', pk ? pk.rok : '', st.prodej.najezd || '',
         st.inventura.posledni ? st.inventura.posledni.datum : 'nikdy', st.prodej.text,
-        o.termin ? oceneni.fmtMesic(o.termin) : '', o.porizovaci || '', o.zustatkova == null ? '' : o.zustatkova, o.trzni == null ? '' : o.trzni, o.prodejni == null ? '' : o.prodejni, PLANY[v.plan] || ''];
+        o.termin ? oceneni.fmtMesic(o.termin) : '', o.porizovaci || '', o.porizovaciZdroj || '',
+        o.zustatkova == null ? '' : o.zustatkova, o.trzni == null ? '' : o.trzni, o.prodejni == null ? '' : o.prodejni,
+        o.rozdilZustatkova == null ? '' : o.rozdilZustatkova, PLANY[v.plan] || ''];
     });
     const csv = [hl].concat(radky).map(a => a.map(x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"').join(';')).join('\r\n');
     host.send(res, 200, '﻿' + csv, {

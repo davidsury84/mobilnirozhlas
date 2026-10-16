@@ -30,9 +30,9 @@ const zaokr = (v, na) => v == null ? null : Math.round(v / na) * na;
 
 /* v:   { reg:{m,y}|null, regZdroj, tachometr, tachometrRok, tachometrMesicu (měsíce od odečtu), kmMes,
           porizovaciCena, prodejniCena, typ }
-   cfg: { maxLet, maxKm, rocniKm, rezervaProdej, odpisLet } */
+   cfg: { maxLet, maxKm, rocniKm, rezervaProdej, odpisLet, cenyTypu } */
 function spocitej(v, cfg, now) {
-  const c = Object.assign({ maxLet: 8, maxKm: 250000, rocniKm: 25000, rezervaProdej: 8, odpisLet: 5 }, cfg || {});
+  const c = Object.assign({ maxLet: 8, maxKm: 250000, rocniKm: 25000, rezervaProdej: 8, odpisLet: 5, cenyTypu: null }, cfg || {});
   now = now || new Date();
   const ted = { y: now.getFullYear(), m: now.getMonth() + 1 }, tedI = idx(ted);
   const out = { upozorneni: [], chybi: [] };
@@ -69,9 +69,17 @@ function spocitej(v, cfg, now) {
   out.mesicuDoTerminu = kand.length ? Math.max(0, kand[0].i - tedI) : null;
 
   // --- ocenění ---
-  const poriz = v.porizovaciCena > 0 ? v.porizovaciCena : null;
+  // Bez pořizovací ceny by celá tabulka cen byla prázdná, a ta se u 50 vozů ručně nedoplní přes noc.
+  // Proto se bere orientační cena podle typu vozidla (nastavitelná) a všechno z ní odvozené se označí
+  // jako odhad — jakmile se u vozu doplní skutečná cena, odhad se přestane používat.
+  let poriz = v.porizovaciCena > 0 ? v.porizovaciCena : null;
+  out.porizovaciZdroj = poriz ? 'zadáno' : null;
+  if (!poriz && c.cenyTypu) {
+    const odhad = Number(c.cenyTypu[v.typ || 'osobni']) || 0;
+    if (odhad > 0) { poriz = odhad; out.porizovaciZdroj = 'odhad podle typu vozidla'; out.odhadCeny = true; }
+  }
   out.porizovaci = poriz;
-  if (!poriz) out.chybi.push('pořizovací cena');
+  if (!(v.porizovaciCena > 0)) out.chybi.push('pořizovací cena');
   if (poriz && out.stariLet != null) {
     out.zustatkova = Math.round(poriz * Math.max(0, 1 - out.stariLet / c.odpisLet));
     const krivka = TYPY_NAKLADNI.includes(v.typ) ? KRIVKA_NAKLADNI : KRIVKA_OSOBNI;
@@ -83,6 +91,9 @@ function spocitej(v, cfg, now) {
   if (v.prodejniCena > 0) { out.prodejni = v.prodejniCena; out.prodejniZdroj = 'zadáno'; }
   else { out.prodejni = out.prodejniNavrh; out.prodejniZdroj = out.prodejniNavrh != null ? 'návrh' : null; }
   out.rozdilProc = (out.prodejni != null && out.trzni) ? +((out.prodejni - out.trzni) / out.trzni * 100).toFixed(1) : null;
+  // Srovnání cen: o kolik je tržní (cena obvyklá) nad/pod účetní zůstatkovou — podklad pro rozhodnutí,
+  // jestli se prodejem realizuje zisk nebo účetní ztráta.
+  out.rozdilZustatkova = (out.trzni != null && out.zustatkova != null) ? Math.round(out.trzni - out.zustatkova) : null;
   out.cenaZamestnanec = out.trzni;
   if (out.prodejni != null && out.zustatkova != null && out.prodejni < out.zustatkova) out.upozorneni.push('prodejní cena je pod účetní zůstatkovou — vznikne účetní ztráta ' + Math.round(out.zustatkova - out.prodejni).toLocaleString('cs-CZ') + ' Kč');
   if (out.prodejni != null && out.trzni && out.prodejni < out.trzni * 0.9) out.upozorneni.push('prodejní cena je pod cenou obvyklou — u prodeje zaměstnanci je rozdíl nepeněžním příjmem (daň + odvody)');

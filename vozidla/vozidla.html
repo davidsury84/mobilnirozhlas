@@ -207,6 +207,25 @@ const dat=s=>s?new Date(s+(s.length===10?"T00:00:00":"")).toLocaleDateString("cs
 let D=null, ZALOZKA="prehled", FILTR={q:"",stredisko:"",jen:"",radit:"",smer:1};
 
 function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2600);}
+
+/* ---------- export tabulek ----------
+   Každá tabulka v modulu má vedle sebe „⬇ CSV" a stáhne přesně to, co je vidět
+   (včetně filtru a řazení). Středníky a BOM, ať to Excel otevře rovnou bez průvodce. */
+function csvPole(x){ const t=String(x==null?"":x); return /[";\r\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t; }
+function exportCsv(nazev,hlavicka,radky){
+  if(!radky.length){ toast("Tabulka je prázdná — není co exportovat."); return; }
+  const txt="\uFEFF"+[hlavicka].concat(radky).map(r=>r.map(csvPole).join(";")).join("\r\n");
+  const url=URL.createObjectURL(new Blob([txt],{type:"text/csv;charset=utf-8"}));
+  const a=document.createElement("a");
+  a.href=url; a.download=nazev+"-"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  toast("Staženo "+radky.length+" řádků.");
+}
+function btnExport(fn,titul){ return '<button class="btn sm" title="'+esc(titul||"Stáhnout tuto tabulku jako CSV pro Excel")+'" onclick="'+fn+'">⬇ CSV</button>'; }
+const expCis=n=>(n==null||n===""||isNaN(n))?"":Number(n);       // do CSV čísla bez mezer, ať se dá počítat
+const expDes=n=>(n==null||n==="")?"":String(n).replace(".",",");  // desetinná čárka — jinak to Excel bere jako text
+const expMesic=d=>d?(d.m+"/"+d.y):"";
 function zavri(){$("#modal").classList.remove("on");}
 function modal(titul,obsah,paticka){$("#mTitul").textContent=titul;$("#mObsah").innerHTML=obsah;$("#mPaticka").innerHTML=paticka||'<button class="btn" onclick="zavri()">Zavřít</button>';$("#modal").classList.add("on");}
 async function api(cesta,telo){
@@ -253,6 +272,15 @@ function planPill(v){
   if(!v.plan)return '';
   return ' <span class="pill '+(v.plan==="likvidace"?"bad":"warn")+'" title="'+esc(v.planText)+(v.planKdo?' · '+esc(v.planKdo):'')+'">'+(v.plan==="likvidace"?"k likvidaci":"k prodeji")+'</span>';
 }
+// Návrh na vyřazení (obměnu) rovnou v přehledu — ne až v záložce Vyřazení a ocenění.
+function vyrazeniBunka(v){
+  const o=v.oceneni||{};
+  if(v.plan) return planPill(v).trim()+(o.termin?'<div class="mut">termín '+fm(o.termin)+'</div>':'');
+  if(!o.termin) return '<span class="mut">—</span>';
+  if(o.terminNyni) return '<span class="pill bad">nyní</span>'+(o.duvod?'<div class="mut">'+esc(o.duvod)+'</div>':'');
+  const doRoka=o.mesicuDoTerminu!=null&&o.mesicuDoTerminu<=12;
+  return '<span class="pill '+(doRoka?"warn":"mute")+'">'+fm(o.termin)+'</span>'+(o.duvod?'<div class="mut">'+esc(o.duvod)+'</div>':'');
+}
 function stavPill(v){
   const s=v.stav_;
   if(v.stav!=="aktivni")return '<span class="pill mute">'+esc(D.stavy[v.stav]||v.stav)+'</span>'+planPill(v);
@@ -288,6 +316,7 @@ function filtrovana(){
   if(FILTR.jen==="nepotvrzeno")vs=vs.filter(v=>v.spravceEmail&&!v.spravcePotvrzen);
   if(FILTR.jen==="km")vs=vs.filter(v=>v.stav_.chybejiciRoky.length);
   if(FILTR.jen==="inv")vs=vs.filter(v=>v.stav_.inventura.potreba);
+  if(FILTR.jen==="vyraz")vs=vs.filter(kVyrazeni);
   if(FILTR.radit&&SLOUPCE[FILTR.radit])return seradit(vs);
   return vs.sort((a,b)=>{
     const ua=a.stav_.upozorneni.some(u=>u.urgent)?0:a.stav_.upozorneni.length?1:2;
@@ -307,6 +336,7 @@ const SLOUPCE={
   stk:      {popis:"Technická do", hodnota:v=>v.stkDo?Date.parse(v.stkDo+"T00:00:00"):null},
   km:       {popis:"Tachometr",    hodnota:v=>tachometr(v)},
   najezd:   {popis:"Nájezd",       hodnota:v=>(v.stav_.prodej&&v.stav_.prodej.najezd)||null},
+  vyrazeni: {popis:"Návrh na vyřazení", hodnota:v=>{const o=v.oceneni||{}; return o.termin?(o.termin.y*12+o.termin.m):null;}},
   stav:     {popis:"Stav",         hodnota:v=>v.stav_.upozorneni.filter(u=>u.urgent).length*100+v.stav_.upozorneni.length},
 };
 function seradit(vs){
@@ -338,12 +368,18 @@ function thRadit(klic,styl){
 }
 /* Dlaždice nahoře: číslo i seznam za ním se počítají ze stejné funkce,
    aby v okně bylo vždycky přesně tolik aut, kolik dlaždice ukazuje. */
+// Vůz, u kterého je obměna na stole: termín vyřazení je tady nebo do roka, nebo už má plán.
+function kVyrazeni(v){
+  const o=v.oceneni||{};
+  return !!v.plan || !!o.terminNyni || (o.mesicuDoTerminu!=null&&o.mesicuDoTerminu<=12);
+}
 function statVozidla(klic){
   const akt=D.vozidla.filter(v=>v.stav==="aktivni");
   const vs = klic==="stk"     ? akt.filter(v=>v.stav_.upozorneni.some(u=>u.druh==="stk"))
            : klic==="doplnit" ? akt.filter(v=>v.stav_.upozorneni.some(u=>["stk-chybi","vin","spravce"].indexOf(u.druh)>=0))
            : klic==="km"      ? akt.filter(v=>v.stav_.chybejiciRoky.length)
            : klic==="inv"     ? akt.filter(v=>v.stav_.inventura.potreba)
+           : klic==="vyraz"   ? akt.filter(kVyrazeni)
            : akt;
   return vs.slice().sort((a,b)=>{
     const ua=a.stav_.upozorneni.some(u=>u.urgent)?0:1, ub=b.stav_.upozorneni.some(u=>u.urgent)?0:1;
@@ -357,6 +393,7 @@ const STAT_POHLED={
   doplnit:{titul:"Vozidla s chybějícími údaji", sloupec:"Co chybí", bunka:v=>{
     const u=v.stav_.upozorneni.filter(x=>["stk-chybi","vin","spravce"].indexOf(x.druh)>=0);
     return u.length?u.map(x=>'<span class="pill warn" style="margin:1px 3px 1px 0">'+esc(x.text)+'</span>').join(""):"—";}},
+  vyraz:{titul:"Návrh na vyřazení / obměnu vozidla", sloupec:"Návrh na vyřazení", bunka:v=>vyrazeniBunka(v)},
   km:{titul:"Chybí roční zápis tachometru", sloupec:"Poslední zápis", bunka:v=>{
     const z=(v.km||[]).slice().sort((a,b)=>a.rok-b.rok).pop();
     return z?cis(z.km)+' km <span class="mut">za '+z.rok+'</span>':'<span class="pill warn">žádný zápis</span>';}},
@@ -385,7 +422,7 @@ function statOtevri(klic){
       +'</tbody></table>';
   }
   modal(p.titul+' ('+vs.length+')', h,
-    (vs.length?'<button class="btn" onclick="zavri();statFiltr(\''+klic+'\')">Vyfiltrovat v přehledu</button>':'')
+    (vs.length?btnExport("exportStat('"+klic+"')")+' <button class="btn" onclick="zavri();statFiltr(\''+klic+'\')">Vyfiltrovat v přehledu</button>':'')
     +'<button class="btn pri" onclick="zavri()">Zavřít</button>');
 }
 function statFiltr(klic){
@@ -393,12 +430,33 @@ function statFiltr(klic){
   vykresli();
   const t=document.querySelector("#obsah table"); if(t)t.scrollIntoView({behavior:"smooth",block:"center"});
 }
+/* Exporty jednotlivých tabulek. Čísla jdou do CSV bez mezer, ať se v Excelu dají sčítat. */
+function exportPrehled(){
+  const vs=filtrovana();
+  exportCsv(ZALOZKA==="moje"?"moje-vozidla":"vozovy-park",
+    ["SPZ","Značka","Model","VIN","Rok výroby","Správce vozu","E-mail správce","Středisko","Technická do","Dní do technické",
+     "Tachometr (km)","Rok zápisu","Nájezd km/rok","Návrh na vyřazení","Důvod","Plán","Stav","Upozornění"],
+    vs.map(v=>{const k=v.spravceKontakt||{},o=v.oceneni||{},z=(v.km||[]).slice().sort((a,b)=>a.rok-b.rok).pop();
+      return [v.spz||"",v.znacka||"",v.model||"",v.vin||"",expCis(v.rokVyroby),
+        k.jmeno||v.spravceJmeno||"",k.email||v.spravceEmail||"",v.stredisko||"",v.stkDo||"",
+        v.stav_.dnyStk==null?"":v.stav_.dnyStk, z?expCis(z.km):"", z?z.rok:"",
+        expCis(v.stav_.prodej&&v.stav_.prodej.najezd), o.terminNyni?"nyní":expMesic(o.termin), o.duvod||"",
+        v.planText||"", D.stavy[v.stav]||v.stav, v.stav_.upozorneni.map(u=>u.text).join(" · ")];}));
+}
+function exportStat(klic){
+  const p=STAT_POHLED[klic]; if(!p)return;
+  exportCsv("vozidla-"+klic,["SPZ","Značka a model","Správce vozu","E-mail","Středisko",p.sloupec],
+    statVozidla(klic).map(v=>{const k=v.spravceKontakt||{};
+      return [v.spz||"",[v.znacka,v.model].filter(Boolean).join(" "),k.jmeno||v.spravceJmeno||"",k.email||v.spravceEmail||"",
+        v.stredisko||"",String(p.bunka(v)).replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim()];}));
+}
 function vykresliPrehled(){
   const vs=filtrovana(), akt=statVozidla("provoz");
   const stk=statVozidla("stk").length;          // propadlá nebo do 60 dní
   const chybiUdaj=statVozidla("doplnit").length;
   const km=statVozidla("km").length;
   const inv=statVozidla("inv").length;
+  const vyraz=statVozidla("vyraz").length;
   // dlaždice = filtr; druhé kliknutí na tutéž dlaždici filtr zase zruší
   const dlazdice=(klic,cislo,popis,barva)=>{
     const on=FILTR.jen===klic;
@@ -413,6 +471,7 @@ function vykresliPrehled(){
     +dlazdice("doplnit",chybiUdaj,"chybí údaje (STK, VIN, správce)","warn")
     +dlazdice("km",km,"chybí roční tachometr","warn")
     +dlazdice("inv",inv,"čeká inventarizace","warn")
+    +dlazdice("vyraz",vyraz,"návrh na vyřazení (nyní nebo do roka)","warn")
     +'</div>';
   if(D.seedImport&&ZALOZKA!=="moje"){
     const bezSpravce=D.vozidla.filter(v=>!v.spravceEmail&&v.spravceZTabulky).length;
@@ -432,18 +491,19 @@ function vykresliPrehled(){
     +'<select class="btn" style="font-weight:400" onchange="FILTR.stredisko=this.value;vykresli()"><option value="">všechna střediska</option>'
       +D.strediska.map(s=>'<option '+(FILTR.stredisko===s?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select>'
     +'<select class="btn" style="font-weight:400" onchange="FILTR.jen=this.value;vykresli()">'
-      +[["","vše"],["provoz","jen vozidla v provozu"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["nepotvrzeno","jen nepotvrzený správce"],["km","jen chybějící tachometr"],["inv","jen inventarizace"]]
+      +[["","vše"],["provoz","jen vozidla v provozu"],["stk","jen technická prohlídka"],["doplnit","jen chybějící údaje"],["nepotvrzeno","jen nepotvrzený správce"],["km","jen chybějící tachometr"],["inv","jen inventarizace"],["vyraz","jen návrh na vyřazení"]]
         .map(([k,t])=>'<option value="'+k+'" '+(FILTR.jen===k?"selected":"")+'>'+t+'</option>').join("")+'</select>'
     +'<div class="sp"></div>'
     +((D.me.admin||D.me.zodpovedny)?'<button class="btn sm" onclick="zadostNahled()" title="Rozeslat lidem, kterým chybí údaje u jejich vozidla, jeden souhrnný e-mail">✉ Žádost o doplnění</button>':'')
-    +'<a class="btn sm" href="/api/vozidla/export">⬇ CSV</a>'
+    +btnExport("exportPrehled()","Stáhne tabulku tak, jak ji vidíš — včetně filtru a řazení")
+    +'<a class="btn sm" href="/api/vozidla/export" title="Kompletní export všech vozidel se všemi sloupci včetně cen">⬇ vše</a>'
     +(D.me.admin?'<button class="btn pri sm" onclick="editVuz(null)">+ Vozidlo</button>':'')
     +'</div>';
   if(!vs.length){h+='<div class="empty">Žádné vozidlo neodpovídá filtru.</div></div>';$("#obsah").innerHTML=h;return;}
   h+='<div class="tabWrap"><table><thead><tr>'
     +thRadit("spz","min-width:110px")+thRadit("vin","min-width:205px")+thRadit("rok","min-width:78px;width:78px")
     +thRadit("spravce","min-width:190px")+thRadit("stredisko","min-width:96px")+thRadit("stk","min-width:125px")
-    +thRadit("km")+thRadit("najezd")+thRadit("stav","min-width:210px")+'<th class="akce"></th></tr></thead><tbody>';
+    +thRadit("km")+thRadit("najezd")+thRadit("vyrazeni","min-width:140px")+thRadit("stav","min-width:210px")+'<th class="akce"></th></tr></thead><tbody>';
   vs.forEach(v=>{
     const pk=(v.km||[]).slice().sort((a,b)=>a.rok-b.rok).pop();
     const e=v.smiEdit;
@@ -467,6 +527,7 @@ function vykresliPrehled(){
              :stkPill(v))+(e&&v.stkDo?'<div class="mut">'+stkPill(v)+'</div>':'')+'</td>'
       +'<td class="num">'+(e?kmBunka(v,pk):(pk?cis(pk.km)+' km<div class="mut">za '+pk.rok+'</div>':'<span class="mut">nezadán</span>'))+'</td>'
       +'<td class="num">'+(v.stav_.prodej&&v.stav_.prodej.najezd?cis(v.stav_.prodej.najezd)+'<div class="mut">km/rok</div>':'<span class="mut">—</span>')+'</td>'
+      +'<td>'+vyrazeniBunka(v)+'</td>'
       +'<td>'+stavPill(v)+upozStrucne(v)+'</td>'
       +'<td class="akce"><span class="radekStav" id="rs_'+v.id+'"></span> '
       +(((D.me.admin||D.me.zodpovedny)&&(v.chybi||[]).length)
@@ -767,7 +828,8 @@ function detail(id){
   h+='</div></div>';
   // tachometr
   h+='<div class="card"><div class="h"><h2>Stav tachometru po letech</h2><div class="sp"></div>'
-    +'<span class="mut">nájezd '+(s.prodej.najezd?cis(s.prodej.najezd)+" km/rok":"zatím neznámý")+'</span></div><div class="b">';
+    +'<span class="mut">nájezd '+(s.prodej.najezd?cis(s.prodej.najezd)+" km/rok":"zatím neznámý")+'</span> '
+    +(kmRady.length?btnExport("exportKm('"+v.id+"')"):'')+'</div><div class="b">';
   if(v.smiEdit){
     const chybi=s.chybejiciRoky;
     h+='<div class="grid3">'
@@ -796,7 +858,7 @@ function detail(id){
   // škody a nehody
   const skody=(v.skody||[]).slice().reverse();
   h+='<div class="card"><div class="h"><h2>Škody a nehody</h2><div class="sp"></div>'
-    +(skody.length?'<span class="pill '+(skody.length?"warn":"ok")+'">'+skody.length+' '+(skody.length===1?"záznam":skody.length<5?"záznamy":"záznamů")+'</span>':'<span class="pill ok">bez škod</span>')
+    +(skody.length?'<span class="pill '+(skody.length?"warn":"ok")+'">'+skody.length+' '+(skody.length===1?"záznam":skody.length<5?"záznamy":"záznamů")+'</span> '+btnExport("exportSkody('"+v.id+"')"):'<span class="pill ok">bez škod</span>')
     +'</div><div class="b">';
   if(v.smiEdit){
     h+='<div class="grid3">'
@@ -823,7 +885,8 @@ function detail(id){
   h+='</div></div>';
   // inventarizace
   h+='<div class="card"><div class="h"><h2>Inventarizace svěřeného majetku</h2><div class="sp"></div>'
-    +'<span class="pill '+(s.inventura.potreba?"warn":"ok")+'">'+esc(s.inventura.text)+'</span></div><div class="b">';
+    +'<span class="pill '+(s.inventura.potreba?"warn":"ok")+'">'+esc(s.inventura.text)+'</span> '
+    +((v.inventury||[]).length?btnExport("exportInventury('"+v.id+"')"):'')+'</div><div class="b">';
   if(v.smiEdit){
     h+='<div class="grid3">'
       +'<label class="f"><span>Stav vozidla</span><select id="invStav" autocomplete="off"><option value="v-poradku">V pořádku</option><option value="drobne-zavady">Drobné závady</option><option value="zavazne-zavady">Závažné závady</option></select></label>'
@@ -1004,6 +1067,50 @@ async function nabidkaStav(nid,stav,vozId){
   catch(e){alert(e.message);}
 }
 /* ---------- záložka Vyřazení a ocenění ---------- */
+/* Cena rovnou v tabulce: u 50 vozů nikdo nebude otevírat 50 detailů. Prázdné políčko
+   ukazuje jako nápovědu odhad, ze kterého se zatím počítá. Ukládá se až po opuštění
+   políčka (onchange) — při psaní po číslicích by se tabulka překreslovala pod rukama. */
+function cenaBunka(v,co,o){
+  if(!v.smiRozhodovat){
+    const h=co==='poriz'?o.porizovaci:o.prodejni;
+    return (h!=null?cis(h):'—')+(co==='poriz'&&o.odhadCeny?'<div class="mut">odhad dle typu</div>':'');
+  }
+  const hod=co==='poriz'?(v.porizovaciCena||''):(v.prodejniCena||'');
+  const napoveda=co==='poriz'?(o.odhadCeny&&o.porizovaci?cis(o.porizovaci)+' ?':'z faktury'):(o.prodejniNavrh?cis(o.prodejniNavrh):'návrh');
+  return '<label class="pero" title="'+(co==='poriz'?'Pořizovací cena z faktury nebo leasingu — přepiš a uloží se sama':'Prodejní cena ručně; prázdné = návrh z modelu')+'">'
+    +'<input class="inl num" id="cn_'+co+'_'+v.id+'" inputmode="numeric" autocomplete="off" value="'+hod+'" placeholder="'+esc(napoveda)+'"'
+    +' onchange="ulozCenuRadek(\''+v.id+'\')"><span class="ic">✎</span></label>'
+    +(co==='poriz'&&o.odhadCeny?'<div class="mut">odhad dle typu</div>':'');
+}
+async function ulozCenuRadek(id){
+  const p=document.getElementById("cn_poriz_"+id), r=document.getElementById("cn_prodej_"+id);
+  if(!p&&!r)return;
+  try{
+    await api("/api/vozidla/cena",{id,porizovaciCena:p?p.value:undefined,prodejniCena:r?r.value:undefined});
+    D=await api("/api/vozidla/data");
+    if(ZALOZKA==="vyrazeni")vykresli();
+    toast("Cena uložena.");
+  }catch(e){ toast("Neuloženo: "+e.message); }
+}
+function exportVyrazeni(){
+  const vs=D.vozidla.filter(v=>v.stav!=="prodano"&&v.stav!=="vyrazeno");
+  exportCsv("vyrazeni-a-oceneni",
+    ["SPZ","Značka a model","Středisko","Pořízeno","Stáří (let)","Nájezd (km)","km/rok","Vyřazení dle stáří","Vyřazení dle nájezdu",
+     "Návrh na vyřazení","Důvod","Pořizovací (Kč)","Zdroj pořizovací ceny","Zůstatková (Kč)","Tržní (Kč)","Prodejní (Kč)","Tržní − zůstatková (Kč)","Plán","Upozornění"],
+    vs.map(v=>{const o=v.oceneni||{};
+      return [v.spz||"",[v.znacka,v.model].filter(Boolean).join(" "),v.stredisko||"",expMesic(o.reg),
+        expDes(o.stariLet),expCis(o.najezd),expCis(o.kmRok),expMesic(o.terminStari),expMesic(o.terminNajezd),
+        o.terminNyni?"nyní":expMesic(o.termin),o.duvod||"",expCis(o.porizovaci),o.porizovaciZdroj||"",
+        expCis(o.zustatkova),expCis(o.trzni),expCis(o.prodejni),expCis(o.rozdilZustatkova),v.planText||"",(o.upozorneni||[]).join(" · ")];}));
+}
+function exportNabidky(){
+  const radky=[];
+  D.vozidla.forEach(v=>(v.nabidky||[]).forEach(n=>radky.push([v.spz||"",[v.znacka,v.model].filter(Boolean).join(" "),
+    (n.kontakt&&n.kontakt.jmeno)||n.jmeno||n.email,n.email,(n.kontakt&&n.kontakt.telefon)||"",expCis(n.cena),
+    expCis(v.oceneni&&v.oceneni.cenaZamestnanec),n.pozn||"",new Date(n.ts).toLocaleDateString("cs-CZ"),
+    n.stav==="prijata"?"přijata":n.stav==="zamitnuta"?"zamítnuta":"nová",n.stavKdo||""])));
+  exportCsv("nabidky-odkupu",["SPZ","Vozidlo","Zájemce","E-mail","Telefon","Nabídka (Kč)","Cena obvyklá (Kč)","Poznámka","Podáno","Stav","Rozhodl"],radky);
+}
 function vykresliVyrazeni(){
   const n=D.nastaveni;
   const vs=D.vozidla.filter(v=>v.stav!=="prodano"&&v.stav!=="vyrazeno").map(v=>({v,o:v.oceneni||{}}));
@@ -1011,26 +1118,36 @@ function vykresliVyrazeni(){
   vs.sort((a,b)=>ord(a)-ord(b));
   const nyni=vs.filter(r=>r.o.terminNyni), rok=vs.filter(r=>!r.o.terminNyni&&r.o.mesicuDoTerminu!=null&&r.o.mesicuDoTerminu<=12);
   const sumT=vs.reduce((a,r)=>a+(r.o.trzni||0),0), sumZ=vs.reduce((a,r)=>a+(r.o.zustatkova||0),0), sPod=vs.filter(r=>r.o.trzni!=null).length;
+  const sumP=vs.reduce((a,r)=>a+(r.o.porizovaci||0),0), sumPr=vs.reduce((a,r)=>a+(r.o.prodejni||0),0);
+  const odhadu=vs.filter(r=>r.o.odhadCeny).length;
   const prodej=vs.filter(r=>r.v.plan==="prodej"), likv=vs.filter(r=>r.v.plan==="likvidace");
   const nab=[]; D.vozidla.forEach(v=>(v.nabidky||[]).forEach(x=>nab.push(Object.assign({v},x))));
   const odh=z=>z&&/odhad|bez měsíce|\+ \d+ měs/.test(z)?' <span class="pill mute" title="'+esc(z)+'">odhad</span>':'';
   let h='<div class="card"><div class="h"><h2>Vyřazení a ocenění vozidel</h2><div class="sp"></div>'
-    +'<span class="pill '+(nyni.length?"bad":"ok")+'">'+nyni.length+' k vyřazení nyní</span> <span class="pill warn">'+rok.length+' do roka</span> <span class="pill mute">'+prodej.length+' k prodeji · '+likv.length+' k likvidaci</span></div><div class="b">'
+    +'<span class="pill '+(nyni.length?"bad":"ok")+'">'+nyni.length+' k vyřazení nyní</span> <span class="pill warn">'+rok.length+' do roka</span> <span class="pill mute">'+prodej.length+' k prodeji · '+likv.length+' k likvidaci</span> '+btnExport("exportVyrazeni()")+'</div><div class="b">'
     +'<div class="hint">Termín vyřazení = dřívější z <strong>stáří '+n.prahRoky+' let</strong> a <strong>nájezdu '+cis(n.prahKm)+' km</strong> při současném ročním nájezdu (prahy v Nastavení). '
     +'Ceny: <strong>účetní zůstatková</strong> (rovnoměrně '+n.odpisLet+' let) · <strong>tržní srovnatelná</strong> = pořizovací × zbytek hodnoty dle stáří × korekce na nájezd proti '+cis(n.rocniKm)+' km/rok · <strong>prodejní</strong> = tržní − '+n.rezervaProdej+' % nebo ručně. '
     +'Tržní hodnota vozidel s podklady: <strong>'+kc(sumT)+'</strong> ('+sPod+' z '+vs.length+' vozů), účetní zůstatková '+kc(sumZ)+'. Hodnoty „odhad" zpřesníš doplněním data pořízení, tachometru a pořizovací ceny.</div>'
     +(nyni.length?'<div class="hint" style="margin-top:8px;color:var(--red)"><strong>K vyřazení nyní:</strong> '+nyni.map(r=>esc(r.v.spz||r.v.vin)+' ('+esc(r.o.duvod)+')').join(', ')+'</div>':'')
-    +'<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th>Vozidlo</th><th>Středisko</th><th>Pořízeno</th><th class="num">Stáří</th><th class="num">Nájezd</th><th class="num">km/rok</th><th>Dle stáří</th><th>Dle nájezdu</th><th>Vyřazení</th><th class="num">Pořizovací</th><th class="num">Zůstatková</th><th class="num">Tržní</th><th class="num">Prodejní</th><th>Plán</th></tr></thead><tbody>'
+    +'<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th>Vozidlo</th><th>Středisko</th><th>Pořízeno</th><th class="num">Stáří</th><th class="num">Nájezd</th><th class="num">km/rok</th><th>Dle stáří</th><th>Dle nájezdu</th><th>Vyřazení</th>'
+    +'<th class="num" style="min-width:120px">Pořizovací</th><th class="num">Zůstatková</th><th class="num">Tržní</th><th class="num" style="min-width:120px">Prodejní</th><th class="num" title="Tržní cena mínus účetní zůstatková — kladné číslo je účetní zisk z prodeje">Tržní − zůst.</th><th>Plán</th></tr></thead><tbody>'
     +vs.map(r=>{const v=r.v,o=r.o;
-      return '<tr style="cursor:pointer'+(o.terminNyni?';background:var(--red-soft,#fdecea)':'')+'" onclick="detail(\''+v.id+'\')"><td><strong>'+esc(v.spz||v.vin)+'</strong><div class="mut">'+esc([v.znacka,v.model].filter(Boolean).join(' '))+'</div></td>'
+      const rozd=o.rozdilZustatkova;
+      return '<tr'+(o.terminNyni?' style="background:var(--red-soft,#fdecea)"':'')+'><td style="cursor:pointer" onclick="detail(\''+v.id+'\')"><strong>'+esc(v.spz||v.vin)+'</strong><div class="mut">'+esc([v.znacka,v.model].filter(Boolean).join(' '))+'</div></td>'
         +'<td>'+esc(v.stredisko||'—')+'</td><td>'+fm(o.reg)+odh(o.regZdroj)+'</td><td class="num">'+(o.stariLet!=null?String(o.stariLet).replace('.',',')+' let':'—')+'</td>'
         +'<td class="num">'+(o.najezd!=null?cis(o.najezd):'—')+odh(o.najezdZdroj)+'</td><td class="num">'+(o.kmRok?cis(o.kmRok):'—')+'</td>'
         +'<td>'+fm(o.terminStari)+'</td><td>'+fm(o.terminNajezd)+'</td><td><strong>'+(o.terminNyni?'<span style="color:var(--red)">nyní</span>':fm(o.termin))+'</strong>'+(o.duvod?'<div class="mut">'+esc(o.duvod)+'</div>':'')+'</td>'
-        +'<td class="num">'+(o.porizovaci?cis(o.porizovaci):'—')+'</td><td class="num">'+(o.zustatkova!=null?cis(o.zustatkova):'—')+'</td><td class="num"><strong>'+(o.trzni!=null?cis(o.trzni):'—')+'</strong></td>'
-        +'<td class="num">'+(o.prodejni!=null?cis(o.prodejni):'—')+(o.prodejniZdroj==="zadáno"?' <span class="pill mute" title="ručně zadaná">R</span>':'')+(o.rozdilProc!=null&&o.rozdilProc<-10?'<div style="color:var(--red)">'+String(o.rozdilProc).replace('.',',')+' %</div>':'')+'</td>'
+        +'<td class="num">'+cenaBunka(v,'poriz',o)+'</td>'
+        +'<td class="num">'+(o.zustatkova!=null?cis(o.zustatkova):'—')+'</td>'
+        +'<td class="num"><strong>'+(o.trzni!=null?cis(o.trzni):'—')+'</strong>'+(o.odhadCeny?'<div class="mut">odhad</div>':'')+'</td>'
+        +'<td class="num">'+cenaBunka(v,'prodej',o)+(o.rozdilProc!=null&&o.rozdilProc<-10?'<div style="color:var(--red)">'+String(o.rozdilProc).replace('.',',')+' %</div>':'')+'</td>'
+        +'<td class="num">'+(rozd==null?'—':'<strong style="color:'+(rozd<0?'var(--red)':'var(--green-d)')+'">'+(rozd>0?'+':'')+cis(rozd)+'</strong>')+'</td>'
         +'<td>'+(v.plan?planPill(v).trim():'')+((o.upozorneni||[]).length?' <span title="'+esc(o.upozorneni.join(' · '))+'">⚠</span>':'')+((v.nabidky||[]).filter(x=>x.stav==="nova").length?' <span class="pill warn">'+(v.nabidky.filter(x=>x.stav==="nova").length)+' nab.</span>':'')+'</td></tr>';}).join('')
-    +'</tbody></table></div><div class="hint" style="margin-top:8px">Kliknutím na řádek otevřeš detail vozidla — tam zadáš pořizovací a prodejní cenu a rozhodneš o plánu (prodej / ekologická likvidace).</div></div></div>';
-  h+='<div class="card"><div class="h"><h2>Nabídky zaměstnanců na odkup</h2><div class="sp"></div><span class="pill '+(nab.some(x=>x.stav==="nova")?"warn":"mute")+'">'+nab.filter(x=>x.stav==="nova").length+' nových</span></div><div class="b">'
+    +'</tbody><tfoot><tr style="font-weight:600;background:var(--bg-2)"><td colspan="9">Celkem '+vs.length+' vozidel '+(odhadu?'<span class="mut" style="font-weight:400">· u '+odhadu+' se počítá z orientační ceny podle typu</span>':'')+'</td>'
+    +'<td class="num">'+cis(sumP)+'</td><td class="num">'+cis(sumZ)+'</td><td class="num">'+cis(sumT)+'</td><td class="num">'+cis(sumPr)+'</td>'
+    +'<td class="num" style="color:'+((sumT-sumZ)<0?'var(--red)':'var(--green-d)')+'">'+((sumT-sumZ)>0?'+':'')+cis(sumT-sumZ)+'</td><td></td></tr></tfoot></table></div>'
+    +'<div class="hint" style="margin-top:8px"><strong>Pořizovací a prodejní cenu přepiš rovnou v tabulce</strong> — uloží se sama. Dokud u vozu skutečná pořizovací cena není, počítá se z orientační ceny podle typu vozidla (Nastavení) a vše odvozené je označené jako <span class="pill mute">odhad</span>. Kliknutím na SPZ otevřeš detail a rozhodneš o plánu (prodej / ekologická likvidace).</div></div></div>';
+  h+='<div class="card"><div class="h"><h2>Nabídky zaměstnanců na odkup</h2><div class="sp"></div><span class="pill '+(nab.some(x=>x.stav==="nova")?"warn":"mute")+'">'+nab.filter(x=>x.stav==="nova").length+' nových</span> '+(nab.length?btnExport("exportNabidky()"):'')+'</div><div class="b">'
     +'<div class="hint" style="margin-bottom:10px">Vozidla s plánem „prodej" vidí každý přihlášený zaměstnanec na <a href="/vozidla/odkup" target="_blank" rel="noopener">/vozidla/odkup</a> (a na nástěnce intranetu) a může podat nabídku. Cena v nabídce je cena obvyklá; nabídky pod ní jsou označené — rozdíl by byl u zaměstnance nepeněžním příjmem.</div>';
   if(!nab.length) h+='<div class="mut">Zatím žádná nabídka.</div>';
   else {
@@ -1102,9 +1219,34 @@ async function smazVuz(id){
   try{ await api("/api/vozidla/vuz/smazat",{id}); toast("Vozidlo smazáno."); zavri(); nacti(); }catch(e){alert(e.message);}
 }
 
+/* ---------- exporty detailových tabulek a středisek ---------- */
+function exportKm(id){
+  const v=vuz(id), rady=(v.km||[]).slice().sort((a,b)=>b.rok-a.rok);
+  exportCsv("tachometr-"+(v.spz||v.id).replace(/\s/g,""),["SPZ","Rok","Stav tachometru (km)","Za rok ujeto (km)","Zapsal","Zdroj"],
+    rady.map((z,i)=>{const pr=rady[i+1];
+      return [v.spz||"",z.rok,expCis(z.km),pr?expCis(z.km-pr.km):"",z.kdo||"",z.zInventury?"inventarizace":"ruční zápis"];}));
+}
+function exportSkody(id){
+  const v=vuz(id), DR={nehoda:"Dopravní nehoda",poskozeni:"Poškození",kradez:"Krádež / vloupání",jine:"Jiná událost"};
+  exportCsv("skody-"+(v.spz||v.id).replace(/\s/g,""),["SPZ","Datum","Druh","Popis","Viník","Policie ČR","Odhad škody (Kč)","Nahlásil"],
+    (v.skody||[]).slice().reverse().map(z=>[v.spz||"",z.datum||"",DR[z.druh]||z.druh,z.popis||"",z.vinik||"",z.policie?"ano":"ne",expCis(z.odhadKc),z.kdo||""]));
+}
+function exportInventury(id){
+  const v=vuz(id), ST={"v-poradku":"v pořádku","drobne-zavady":"drobné závady","zavazne-zavady":"závažné závady"};
+  exportCsv("inventarizace-"+(v.spz||v.id).replace(/\s/g,""),["SPZ","Datum","Stav","Tachometr (km)","Výbava","Poznámka","Provedl"],
+    (v.inventury||[]).slice().reverse().map(z=>[v.spz||"",z.datum||"",ST[z.stav]||z.stav,expCis(z.km),z.vybava||"",z.poznamka||"",z.kdo||""]));
+}
+function exportStrediska(){
+  exportCsv("strediska-odpovednost",["Středisko","Zodpovědná osoba","E-mail","Telefon","Role","Vozidel"],
+    D.strediska.map(st=>{
+      const z=D.zodpovedne.find(x=>x.stredisko===st), k=(z&&z.kontakt)||{};
+      return [st,z?(k.jmeno||z.jmeno||z.email):"",z?z.email:"",k.telefon||"",z?(D.role[z.role]||z.role):"",
+        D.vozidla.filter(v=>v.stredisko===st).length];}));
+}
+
 /* ---------- střediska a odpovědnost ---------- */
 function vykresliStrediska(){
-  let h='<div class="card"><div class="h"><h2>Kdo zodpovídá za středisko</h2></div><div class="b">'
+  let h='<div class="card"><div class="h"><h2>Kdo zodpovídá za středisko</h2><div class="sp"></div>'+btnExport("exportStrediska()")+'</div><div class="b">'
     +'<div class="hint" style="margin-bottom:10px">Za vozidla střediska odpovídá konkrétní člověk — ředitel dopravy, ředitel výroby nebo ředitel střediska. '
     +'Dostává upozornění za celé středisko a vidí v modulu všechna jeho vozidla.</div>'
     +'<table><thead><tr><th>Středisko</th><th>Zodpovědná osoba</th><th>Role</th><th>Vozidel</th><th></th>'+(D.me.admin?'<th></th>':'')+'</tr></thead><tbody>';
@@ -1188,6 +1330,9 @@ function vykresliNastaveni(){
     +'<label class="f"><span>Rezerva pro rychlý prodej (% pod tržní)</span><input id="nRez" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" type="number" min="0" max="50" value="'+(n.rezervaProdej!=null?n.rezervaProdej:8)+'"></label>'
     +'<label class="f"><span>Účetní odpis (roky)</span><input id="nOdpis" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" type="number" min="1" value="'+(n.odpisLet||5)+'"></label>'
     +'</div>'
+    +'<div class="mut" style="margin:4px 0 6px">Orientační pořizovací cena podle typu vozidla (Kč) — použije se jen u vozu, kde skutečná cena ještě není zadaná; vše z ní odvozené je v tabulce označené jako odhad.</div>'
+    +'<div class="grid3">'+Object.keys(D.typy).map(k=>'<label class="f"><span>'+esc(D.typy[k])+'</span>'
+      +'<input id="nCena_'+k+'" autocomplete="off" inputmode="numeric" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" value="'+(((n.cenyTypu||{})[k])||0)+'"></label>').join('')+'</div>'
     +'<label class="f"><span>Nabídky odkupu hlásit také na e-mail (kromě zodpovědné osoby za středisko)</span><input id="nOdkup" autocomplete="off" oninput="ulozZa(&#39;nast&#39;,700,ulozNastaveni)" value="'+esc(n.odkupEmail||'')+'" placeholder="např. doprava@elkoplast.cz — prázdné = jen zodpovědná osoba"></label>'
     +'<label class="f"><span>Ředitel společnosti — hlásí se mu každá škoda'+(n.reditelEmail?'':' <span style="color:var(--red)">(zatím nevyplněno)</span>')+'</span>'
       +acHtml("nReditel",n.reditelEmail,"Začni psát jméno…",ulozNastaveni)+'</label>'
@@ -1229,6 +1374,7 @@ async function ulozNastaveni(){
     await api("/api/vozidla/nastaveni",{prahKm:$("#nKm").value,prahRoky:$("#nRok").value,inventuraMesice:$("#nInv").value,
       rocniKm:$("#nRocniKm").value,rezervaProdej:$("#nRez").value,odpisLet:$("#nOdpis").value,odkupEmail:$("#nOdkup").value,
       reditelEmail:$("#nReditel").value,
+      cenyTypu:Object.keys(D.typy).reduce((a,k)=>{const el=document.getElementById("nCena_"+k); if(el)a[k]=el.value; return a;},{}),
       kopieNa:$("#nKopie").value.split(/[;,]/).map(s=>s.trim()).filter(Boolean)});
     stavUlozeni("nastStav","uloženo ✓","var(--green-d)");
     D=await api("/api/vozidla/data");
