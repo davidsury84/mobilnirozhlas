@@ -110,16 +110,27 @@ td.num{font-family:var(--mono);white-space:nowrap}
 .modal .box .b{padding:18px}
 .modal .box .f2{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 
-.inl{width:100%;border:1px solid transparent;border-radius:6px;padding:4px 6px;font-size:12.5px;background:transparent;font-family:inherit}
-.inl:hover{border-color:var(--line)}
-.inl:focus{outline:none;border-color:var(--green);background:var(--paper)}
+/* Políčka, do kterých se dá psát rovnou v tabulce. Dřív byla průhledná a nebylo
+   poznat, že jde o políčko — proto mají vlastní podklad, rámeček a tužku. */
+.inl{width:100%;border:1px solid var(--line-strong);border-radius:6px;padding:4px 6px;font-size:12.5px;
+  background:var(--bg-2);font-family:inherit;color:var(--ink);transition:border-color .12s,background .12s,box-shadow .12s}
+.inl:hover{border-color:var(--green);background:var(--paper)}
+.inl:focus{outline:none;border-color:var(--green);background:var(--paper);box-shadow:0 0 0 3px rgba(14,138,67,.14)}
+.inl::placeholder{color:var(--faint);font-style:italic}
+/* prázdné políčko = něco chybí; ať to táhne oko a je jasné, že se čeká na doplnění */
+.inl:placeholder-shown,.inl.chybi{background:var(--yellow-soft);border-color:#e8d9a8;border-style:dashed}
+.inl:placeholder-shown:hover,.inl:placeholder-shown:focus,.inl.chybi:hover,.inl.chybi:focus{border-style:solid}
 .inl.mono{font-family:var(--mono);font-size:12.5px;letter-spacing:.2px}
 /* tužka u editovatelného políčka — ať je poznat, že se do něj dá psát */
 .pero{position:relative;display:block}
-.pero .inl{padding-right:20px}
-.pero .ic{position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--faint);pointer-events:none}
-.pero:hover .ic{color:var(--green)}
+.pero .inl{padding-right:21px}
+.pero .ic{position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--green);opacity:.75;pointer-events:none}
+.pero:hover .ic{opacity:1}
 .pero:focus-within .ic{opacity:0}
+/* vysvětlivka nad tabulkou */
+.napoveda{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft)}
+.napoveda .vz{display:inline-block;border:1px dashed #e8d9a8;background:var(--yellow-soft);border-radius:5px;padding:1px 14px 1px 6px;position:relative}
+.napoveda .vz::after{content:"✎";position:absolute;right:4px;top:0;font-size:10px;color:var(--green)}
 .inl.num{text-align:right}
 td.num .pero{max-width:104px;margin-left:auto}
 /* šipky u number inputu ukrajovaly šířku, takže rok nebyl vidět celý */
@@ -409,6 +420,8 @@ function vykresliPrehled(){
   h+='<div class="card"><div class="h">'
     +'<h2>'+(ZALOZKA==="moje"?"Moje vozidla":"Vozidla")+'</h2>'
     +(ZALOZKA!=="moje"?'<span class="mut" style="font-size:12px">celý vozový park · upravovat lze svoje vozidla a vozidla svého střediska</span>':'')
+    +'<span class="napoveda" title="Políčka v tabulce jsou rovnou k vyplnění — ukládá se samo, nic se nemačká">'
+    +'<span class="vz">&nbsp;&nbsp;&nbsp;</span> žlutá políčka čekají na doplnění — klikněte a pište, ukládá se samo</span>'
     +'<input class="btn" style="font-weight:400;min-width:200px" placeholder="Hledat SPZ, VIN, správce, středisko…" value="'+esc(FILTR.q)+'" oninput="FILTR.q=this.value;vykresli()">'
     +'<select class="btn" style="font-weight:400" onchange="FILTR.stredisko=this.value;vykresli()"><option value="">všechna střediska</option>'
       +D.strediska.map(s=>'<option '+(FILTR.stredisko===s?"selected":"")+'>'+esc(s)+'</option>').join("")+'</select>'
@@ -435,14 +448,16 @@ function vykresliPrehled(){
                +'<input class="inl mono" id="in_'+v.id+'_vin" maxlength="17" autocomplete="off" placeholder="17 znaků" value="'+esc(v.vin||"")+'" oninput="ulozZa(\'r'+v.id+'\',800,function(){ulozRadek(\''+v.id+'\');})">'
                +'<span class="ic">✎</span></label>'
              :'<span class="mono">'+esc(v.vin||"—")+'</span>')+'</td>'
-      +'<td>'+(e?'<input class="inl" id="in_'+v.id+'_rok" type="number" min="1980" max="'+(new Date().getFullYear()+1)+'" autocomplete="off" value="'+(v.rokVyroby||"")+'" oninput="ulozZa(\'r'+v.id+'\',800,function(){ulozRadek(\''+v.id+'\');})">'
+      +'<td>'+(e?'<label class="pero" title="Klikni a dopiš rok výroby z velkého technického průkazu">'
+               +'<input class="inl" id="in_'+v.id+'_rok" type="number" min="1980" max="'+(new Date().getFullYear()+1)+'" autocomplete="off" placeholder="rok" value="'+(v.rokVyroby||"")+'" oninput="ulozZa(\'r'+v.id+'\',800,function(){ulozRadek(\''+v.id+'\');})">'
+               +'<span class="ic">✎</span></label>'
              :(v.rokVyroby||"—"))+'</td>'
       +'<td>'+(e?acHtml("in_"+v.id+"_spravce",v.spravceEmail,"Začni psát jméno…",function(){ulozRadek(v.id,true);},"Opravdu odebrat správce vozu? Vozidlo zůstane bez správce a upomínky (technická prohlídka, tachometr, inventarizace) nebudou mít komu chodit.")
                  +(v.spravceEmail&&!v.spravcePotvrzen?'<div class="mut" style="margin-top:2px"><span class="pill warn">z evidence</span></div>':'')
                  +(!v.spravceEmail&&v.spravceZTabulky?'<div class="mut">v tabulce: '+esc(v.spravceZTabulky)+'</div>':'')
              :spravceBunka(v))+'</td>'
       +'<td>'+esc(v.stredisko||"—")+'</td>'
-      +'<td>'+(e?'<input class="inl" id="in_'+v.id+'_stk" type="date" autocomplete="off" value="'+esc(v.stkDo||"")+'" onchange="ulozRadek(\''+v.id+'\')">'
+      +'<td>'+(e?'<input class="inl'+(v.stkDo?'':' chybi')+'" id="in_'+v.id+'_stk" type="date" autocomplete="off" title="Klikni a vyber, do kdy platí technická prohlídka" value="'+esc(v.stkDo||"")+'" onchange="ulozRadek(\''+v.id+'\')">'
              :stkPill(v))+(e&&v.stkDo?'<div class="mut">'+stkPill(v)+'</div>':'')+'</td>'
       +'<td class="num">'+(e?kmBunka(v,pk):(pk?cis(pk.km)+' km<div class="mut">za '+pk.rok+'</div>':'<span class="mut">nezadán</span>'))+'</td>'
       +'<td class="num">'+(v.stav_.prodej&&v.stav_.prodej.najezd?cis(v.stav_.prodej.najezd)+'<div class="mut">km/rok</div>':'<span class="mut">—</span>')+'</td>'
