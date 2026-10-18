@@ -210,7 +210,18 @@ function mount(host) {
   const radekFa = x => '<li style="margin:0 0 8px"><b>Faktura č. ' + esc(x.pz) + '</b> u zákazníka <b>' + esc(x.org) + '</b> na částku <b>' + castkaM(x) + '</b>, splatná ' + esc(x.spl) + ' (<span style="color:#b23">' + x.dni + ' dní po splatnosti</span>)' + (x._fallback ? ' <i style="color:#888">— obchodník „' + esc(x.kdo || '—') + '" nemá v intranetu e-mail</i>' : '') + '</li>';
   // Eskalace pohledávek chodí denně — do souhrnu, ať člověk dostane jeden e-mail ráno
   // se vším, ne zvlášť zprávu ke každé faktuře (přání 2026-10-04).
-  async function posli(to, cc, subject, html, hned) { try { await host.deliver({ to: [].concat(to, cc || []).join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject, html, modul: 'Pohledávky', souhrn: hned ? undefined : 'denni', urgent: !!hned }); return { ok: true }; } catch (e) { return { ok: false, err: e.message }; } }
+  // text = prostá verze; jeho 2. řádek se ukáže v denním souhrnu pod předmětem (souhrn jinak nese jen předmět —
+  // „21. připomínka — 5 faktur" bez toho, kdo a co), proto do něj patří obchodník + zákazníci + částky.
+  async function posli(to, cc, subject, html, hned, text) { try { await host.deliver({ to: [].concat(to, cc || []).join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — pohledávky', subject, text: subject + (text ? '\n' + text : ''), html, modul: 'Pohledávky', souhrn: hned ? undefined : 'denni', urgent: !!hned, odkaz: ((host.mailFrom && host.mailFrom.publicUrl) || '') + '/#modul=pohledavky' }); return { ok: true }; } catch (e) { return { ok: false, err: e.message }; } }
+  // „kdo to má na starosti" jedním řádkem: jméno ze DB zaměstnanců (jinak e-mail) + vystavitel z faktury + zákazníci s částkami
+  function jmenoZam(em) { try { const e = ((host.getState && host.getState().employees) || []).find(x => x && String(x.email || '').toLowerCase() === em); if (e && e.name) return e.name; } catch (_) {} return em; }
+  function kdoCo(em, fa) {
+    const jm = jmenoZam(em);
+    const vyst = [...new Set(fa.map(x => x.kdo).filter(Boolean))].join(', ');
+    const byOrg = {}; fa.forEach(x => { const o = byOrg[x.org] || (byOrg[x.org] = { n: 0, kc: 0, dni: 0 }); o.n++; o.kc += x.saldo || 0; o.dni = Math.max(o.dni, x.dni || 0); });
+    const zak = Object.keys(byOrg).sort((a, b) => byOrg[b].kc - byOrg[a].kc).map(o => o + ' (' + (byOrg[o].n > 1 ? byOrg[o].n + ' fa, ' : '') + kcM(byOrg[o].kc) + ', ' + byOrg[o].dni + ' d)').join('; ');
+    return 'Má na starosti: ' + jm + (vyst && vyst !== jm ? ' (na faktuře: ' + vyst + ')' : '') + ' · ' + zak + ' · celkem ' + kcM(fa.reduce((a, x) => a + (x.saldo || 0), 0));
+  }
   // Denní běh (každá faktura v každé fázi jednou)
   async function tickEskalace() {
     const d = loadUpom(), cfg = d.cfg, P = loadPoh().posledni; if (!P) return { ok: false, error: 'bez snímku pohledávek' };
@@ -230,22 +241,22 @@ function mount(host) {
     for (const em of Object.keys(perObch)) { const fa = perObch[em];
       const html = mailWrap('<p>Dobrý den,</p><p><b>máte po splatnosti ' + (fa.length === 1 ? 'fakturu' : 'faktury') + '</b> (stav pohledávek k ' + esc(P.den) + '):</p><ul style="padding-left:18px">' + fa.map(radekFa).join('') + '</ul>' +
         '<p><b>Vyřešte to prosím co nejrychleji — máte na to 3 dny.</b> V intranetu u každé faktury zvolte: <b>poslat upomínku</b> (odešle ' + esc(lucie.join(', ')) + ' přes Helios), nebo <b>poznámku</b>, jak to řešíte (např. „zaplatí do týdne"). Bez rozhodnutí do ' + cfg.kroky.rozhodnuti + ' dnů přijde připomínka.</p>', publicUrl);
-      const subject = 'Po splatnosti: ' + fa.length + ' ' + (fa.length === 1 ? 'faktura' : fa.length < 5 ? 'faktury' : 'faktur') + ' — vyřešte do 3 dnů';
-      const r = await posli(em, [], subject, html); if (r.ok) fa.forEach(x => { d.stav[x.pz].k10 = { kdy: dnes, komu: em }; });
+      const subject = 'Po splatnosti: ' + fa.length + ' ' + (fa.length === 1 ? 'faktura' : fa.length < 5 ? 'faktury' : 'faktur') + ' — vyřešte do 3 dnů · ' + jmenoZam(em);
+      const r = await posli(em, [], subject, html, false, kdoCo(em, fa)); if (r.ok) fa.forEach(x => { d.stav[x.pz].k10 = { kdy: dnes, komu: em }; });
       vysledky.push({ krok: 'obchodnik', komu: em, faktur: fa.length, ok: r.ok, err: r.err }); console.log('[nakup-report] eskalace 10 d → ' + em + ': ' + fa.length + ' faktur' + (r.ok ? '' : ' CHYBA ' + r.err)); }
     // 2) obchodníci — bez rozhodnutí po 3 dnech: KAŽDÝ DEN znovu, dokud nerozhodnou („šikana" na pokyn 2026-09-23),
     //    od 3. připomínky navíc kopie náhradnímu příjemci (správce) — ať je vidět, kdo to ignoruje
     for (const em of Object.keys(perObch2)) { const fa = perObch2[em]; const n = Math.max.apply(null, fa.map(x => x._nag)) + 1;
       const html = mailWrap('<p>Dobrý den,</p><p style="background:#fbeaea;border:1px solid #efc1c1;border-radius:8px;padding:8px 12px"><b>' + n + '. připomínka.</b> U ' + (fa.length === 1 ? 'této faktury' : 'těchto faktur') + ' po splatnosti <b>stále chybí vaše rozhodnutí</b> (lhůta ' + cfg.kroky.rozhodnuti + ' dny uplynula). Tato připomínka bude chodit <b>každý den</b>, dokud v intranetu nezvolíte <b>poslat upomínku</b>, nebo nenapíšete <b>poznámku</b>, jak fakturu řešíte.' + (n >= 3 ? ' Od třetí připomínky dostává kopii vedení.' : '') + '</p><ul style="padding-left:18px">' + fa.map(radekFa).join('') + '</ul>', publicUrl);
-      const subject = n + '. připomínka — ' + fa.length + ' ' + (fa.length === 1 ? 'faktura' : fa.length < 5 ? 'faktury' : 'faktur') + ' po splatnosti bez vašeho rozhodnutí';
+      const subject = n + '. připomínka — ' + fa.length + ' ' + (fa.length === 1 ? 'faktura' : fa.length < 5 ? 'faktury' : 'faktur') + ' po splatnosti bez rozhodnutí · ' + jmenoZam(em);
       const cc = n >= 3 ? fallback.filter(f => f !== em) : [];
-      const r = await posli(em, cc, subject, html); if (r.ok) fa.forEach(x => { const st = d.stav[x.pz]; st.nag = { pocet: ((st.nag && st.nag.pocet) || 0) + 1, posledni: dnes, komu: em }; });
+      const r = await posli(em, cc, subject, html, false, kdoCo(em, fa) + (cc.length ? ' · kopie vedení: obchodník nereaguje' : '')); if (r.ok) fa.forEach(x => { const st = d.stav[x.pz]; st.nag = { pocet: ((st.nag && st.nag.pocet) || 0) + 1, posledni: dnes, komu: em }; });
       vysledky.push({ krok: 'pripominka', komu: em, faktur: fa.length, n, cc, ok: r.ok, err: r.err }); console.log('[nakup-report] eskalace ' + n + '. připomínka → ' + em + ': ' + fa.length + ' faktur' + (cc.length ? ' (cc ' + cc.join(',') + ')' : '')); }
     // 3) Lucie — upomínky k odeslání přes Helios (jen zaškrtnuté obchodníkem)
     if (upomLucii.length) { const cc = [...new Set(upomLucii.map(x => x._em).filter(Boolean))].filter(e => lucie.indexOf(e) < 0);
       const html = mailWrap('<p>Dobrý den,</p><p>obchodníci označili k odeslání <b>upomínky</b> (přes Helios) u ' + upomLucii.length + ' ' + (upomLucii.length === 1 ? 'faktury' : 'faktur') + ':</p><ul style="padding-left:18px">' + upomLucii.map(x => '<li style="margin:0 0 8px"><b>' + esc(x.org) + '</b> — faktura č. ' + esc(x.pz) + ', ' + castkaM(x) + ', splatná ' + esc(x.spl) + ' (' + x.dni + ' dní), obchodník ' + esc(x.kdo || '—') + (d.stav[x.pz].rozhodnuti && d.stav[x.pz].rozhodnuti.pozn ? ' — <i>' + esc(d.stav[x.pz].rozhodnuti.pozn) + '</i>' : '') + '</li>').join('') + '</ul><p>Po odeslání prosím v intranetu odškrtněte <b>„upomínka odeslána"</b> — za ' + cfg.kroky.vyzvaPoUpomince + ' dní od odeslání se u neuhrazených připraví předžalobní výzva.</p>', publicUrl);
       const subject = 'Upomínky k odeslání (Helios): ' + upomLucii.length + ' ' + (upomLucii.length === 1 ? 'faktura' : upomLucii.length < 5 ? 'faktury' : 'faktur') + ' · ' + kcM(upomLucii.reduce((a, x) => a + x.saldo, 0));
-      const r = await posli(lucie, cc, subject, html); if (r.ok) upomLucii.forEach(x => { d.stav[x.pz].kU = { kdy: dnes, komu: lucie }; });
+      const r = await posli(lucie, cc, subject, html, false, upomLucii.map(x => x.org + ' (' + kcM(x.saldo) + ', obchodník ' + (x.kdo || '—') + ')').join('; ')); if (r.ok) upomLucii.forEach(x => { d.stav[x.pz].kU = { kdy: dnes, komu: lucie }; });
       vysledky.push({ krok: 'upominky', komu: lucie, faktur: upomLucii.length, ok: r.ok, err: r.err }); console.log('[nakup-report] upomínky → ' + lucie.join(', ') + ': ' + upomLucii.length + ' faktur'); }
     // 4) Lucie — předžalobní výzvy (7 dní po odeslané upomínce, stále neuhrazeno)
     const zak = Object.values(vyzvyLucii);

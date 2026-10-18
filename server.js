@@ -852,7 +852,7 @@ function souhrnHtml(polozky, jmeno) {
       const prvni = String(p.text || '').split('\n').filter(x => x.trim())[1] || '';
       h += '<tr><td style="padding:7px 0;border-bottom:1px solid #e3e7e0;vertical-align:top">'
         + '<div><strong>' + esc(p.predmet) + '</strong> <span style="color:#8b938c;font-size:12px">' + cas(p.ts) + '</span></div>'
-        + (prvni ? '<div style="color:#5b635c;font-size:13px">' + esc(prvni.slice(0, 160)) + '</div>' : '')
+        + (prvni ? '<div style="color:#5b635c;font-size:13px">' + esc(prvni.slice(0, 320)) + '</div>' : '')
         + (p.odkaz ? '<div style="font-size:13px"><a href="' + esc(p.odkaz) + '">otevřít</a></div>' : '')
         + '</td></tr>';
     });
