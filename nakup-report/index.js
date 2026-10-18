@@ -117,6 +117,7 @@ function mount(host) {
   // (smazání i přepsání v appce pak platí). Při prvním použití přepíše i dřívější hodnotu — je to výslovný pokyn správce.
   const SEED_PRIRAZENI = [
     { id: 'roto-ladislav-krajca', mapa: 'utvary', klic: 'DIVIZE ROTO', email: 'ladislav.krajca@elkoplast.cz' },   // 2026-09-28: vedoucí Rota
+    { id: 'vyl-elkoplast-bv', seznam: 'vylouceni', hodnota: 'ELKOPLAST BV' },   // 2026-10-18: pobočky NL/BE (ELKOPLAST BV / SRL) řeší S. Šmídová průběžně — bez eskalace
   ];
   const loadUpom = () => { let d = {}; try { d = JSON.parse(fs.readFileSync(UPOM_F, 'utf8')) || {}; } catch (_) {}
     const cfg = Object.assign({}, JSON.parse(JSON.stringify(UPOM_DEFAULT)), d.cfg || {});
@@ -124,7 +125,10 @@ function mount(host) {
     if (!cfg.firma.ucet) cfg.firma.ucet = UPOM_DEFAULT.firma.ucet;
     if (!Array.isArray(cfg.oddeleni) || !cfg.oddeleni.length) cfg.oddeleni = JSON.parse(JSON.stringify(UPOM_DEFAULT.oddeleni));
     const seed = Object.assign({}, d.seed || {});
-    SEED_PRIRAZENI.forEach(x => { if (seed[x.id]) return; cfg[x.mapa] = Object.assign({}, cfg[x.mapa] || {}); cfg[x.mapa][x.klic] = x.email; seed[x.id] = new Date().toISOString().slice(0, 10); });
+    SEED_PRIRAZENI.forEach(x => { if (seed[x.id]) return;
+      if (x.seznam) { cfg[x.seznam] = (cfg[x.seznam] || []).slice(); if (cfg[x.seznam].indexOf(x.hodnota) < 0) cfg[x.seznam].push(x.hodnota); }
+      else { cfg[x.mapa] = Object.assign({}, cfg[x.mapa] || {}); cfg[x.mapa][x.klic] = x.email; }
+      seed[x.id] = new Date().toISOString().slice(0, 10); });
     return { cfg, stav: d.stav || {}, seed }; };
   const saveUpom = d => { try { fs.writeFileSync(UPOM_F, JSON.stringify(d, null, 2)); } catch (_) {} prijemciCache = null; };
   // Kdo je příjemcem eskalace (přiřazený vedoucí útvaru, výjimka podle zákazníka, obchodník, Lucie, náhradní příjemce),
@@ -168,7 +172,7 @@ function mount(host) {
   }
   function obchodnikEmail(kdo, cfg, utvar, org) { return obchodnikInfo(kdo, cfg, utvar, org).email; }
   function nahradniPrijemci(cfg) { const f = cleanEmails(cfg.fallbackKomu || []); return f.length ? f : cleanEmails([process.env.SUPERADMIN || 'david.sury@elkoplast.cz']); }
-  const vyloucen = (x, cfg) => (cfg.vylouceni || []).some(v => v && bezDiak(x.org) === bezDiak(v));
+  const vyloucen = (x, cfg) => (cfg.vylouceni || []).some(v => { if (!v) return false; const a = bezDiak(x.org), b = bezDiak(v); return a === b || (b.length >= 4 && a.indexOf(b) >= 0); });
   const dnesISO = () => new Date().toISOString().slice(0, 10);
   const dniOd = iso => iso ? Math.round((Date.now() - Date.parse(iso)) / 86400000) : null;
   // Fáze faktury podle stavu (co se od koho čeká)
@@ -1775,6 +1779,15 @@ function mount(host) {
         if (akce === 'vyzvaOdeslana') d.stav[pz].vyzvaOdeslana = { kdy: dnes, kdo }; else delete d.stav[pz].vyzvaOdeslana;
         saveUpom(d); return json(res, 200, { ok: true }), true; }
       if (akce === 'rozeslat' && jeAdmin) { const r = await tickEskalace(true); return json(res, 200, r), true; }
+      if (akce === 'upozornit') { if (!jeAdmin) return json(res, 403, { error: 'Upozornit obchodníka může jen správce.' }), true; if (!pz) return json(res, 400, { error: 'Chybí faktura.' }), true;
+        const e = eskalacePrehled(), f = e.faktury.find(x => x.pz === pz); if (!f) return json(res, 404, { error: 'Faktura není v eskalaci.' }), true;
+        const komu = f.obchodnikEmail || nahradniPrijemci(e.cfg)[0]; const publicUrl = (host.mailFrom && host.mailFrom.publicUrl) || '';
+        const pozn = String(b.pozn || '').slice(0, 500);
+        const html = mailWrap('<p>Dobrý den,</p><p style="background:#fff6d2;border:1px solid #e2b96b;border-radius:8px;padding:8px 12px"><b>Upozornění od ' + esc(kdo) + ':</b> prosím o rozhodnutí u této faktury po splatnosti' + (pozn ? ' — <i>' + esc(pozn) + '</i>' : '') + '.</p><ul style="padding-left:18px">' + radekFa(f) + '</ul>' +
+          '<p>V intranetu u faktury zvolte <b>📨 Poslat upomínku</b>, nebo <b>✎ Poznámku</b>, jak to řešíte.</p>', publicUrl);
+        const r = await posli(komu, [], 'Upozornění: faktura ' + f.pz + ' po splatnosti (' + f.org + ') — rozhodněte · ' + jmenoZam(komu), html, true, kdoCo(komu, [f]));
+        if (r.ok) { d.stav[pz] = d.stav[pz] || {}; d.stav[pz].upozorneni = { kdy: dnes, kdo, komu, pocet: ((d.stav[pz].upozorneni || {}).pocet || 0) + 1 }; saveUpom(d); }
+        return json(res, r.ok ? 200 : 500, r.ok ? { ok: true, komu } : { error: r.err }), true; }
       return json(res, 400, { error: 'Neznámá akce.' }), true;
     }
     if (p === '/api/nakup-report/vyzva' && req.method === 'GET') {
