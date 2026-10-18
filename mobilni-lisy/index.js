@@ -453,7 +453,8 @@ function mount(host) {
     const dny = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
     return [{ key: 'lisy-tydenni', module: 'Mobilní lisy', name: 'Týdenní report přihlášek ze sběrných dvorů', to: (rep.to || []).map(r => r.email || r), enabled: !!rep.enabled, schedule: 'týdně (' + (dny[rep.weekday] || 'pondělí') + ')', lastAt: rep.lastAt ? Date.parse(rep.lastAt) : null, preview: null, configHint: 'správa v aplikaci mobilní lisy' }];
   }
-  return { handle, handleClientHost, isHandler, tick, reports };
+  const polozky = () => load().items;   // přehled reakcí obchodníků (server.js: poptavkyReakce)
+  return { handle, handleClientHost, isHandler, tick, reports, polozky, stavy: () => STAVY };
 }
 
 module.exports = { mount };

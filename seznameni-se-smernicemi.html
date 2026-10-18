@@ -5069,6 +5069,9 @@ function showDashboard(){
       '<div class="metric"><b>'+(MUJ.admin?mjT('vše'):nMod)+'</b><span>'+mjT('moduly')+'</span></div>'+
       '<div class="metric"><b>'+totalTodo+'</b><span>'+mjT('k vyřízení')+'</span></div>'+
     '</div></div></section>';
+  if(MUJ.admin || (MUJ.modules||[]).indexOf("poptavky")>=0 || (MUJ.modules||[]).indexOf("obchod")>=0){
+    sideH += '<section class="webpart" id="poptReakceWidget" style="cursor:pointer" onclick="mjGo(\'poptavky\')" title="Otevřít poptávky"><div class="webpart-head"><h3>⏱ Reakce na poptávky</h3><span class="pill amber">obchodníci</span></div><div class="webpart-body"><p class="muted" style="margin:0">Načítám…</p></div></section>';
+  }
   if(MUJ.admin || (MUJ.modules||[]).indexOf("eshop")>=0){
     sideH += '<section class="webpart" id="bilanceWidget" style="cursor:pointer" onclick="mjGo(\'eshop\')" title="Otevřít e-shop"><div class="webpart-head"><h3>Sklad e-shop — bilance</h3><span class="pill green">živě</span></div><div class="webpart-body"><p class="muted" style="margin:0">Načítám…</p></div></section>';
   }
@@ -5081,7 +5084,26 @@ function showDashboard(){
   loadAktuality();
   loadProdukty();
   loadBilanceWidget();
+  loadPoptReakce();
   loadNotifikace();
+}
+// ---------- Jak dlouho obchodníci nereagují na své poptávky (home widget) ----------
+async function loadPoptReakce(){
+  const el=document.getElementById('poptReakceWidget'); if(!el) return; const body=el.querySelector('.webpart-body');
+  try{
+    const d=await (await fetch('/api/poptavky/reakce',{cache:'no-store'})).json(); const ob=d.obchodnici||[];
+    if(!ob.length){ body.innerHTML='<p class="muted" style="margin:0">Žádné přiřazené poptávky.</p>'; return; }
+    const dni=n=>n+' '+(n===1?'den':n<5?'dny':'dní'); const hod=h=>h==null?'—':(h<48?h+' h':Math.round(h/24)+' d');
+    const ceka=ob.reduce((s,o)=>s+o.cekaN,0), nejd=Math.max.apply(null,ob.map(o=>o.nejdeleDni));
+    let h='<div class="metric-grid">'+
+      '<div class="metric"><b style="'+(ceka?'color:#b3261e':'')+'">'+ceka+'</b><span>poptávek bez reakce</span></div>'+
+      '<div class="metric"><b style="'+(nejd>=3?'color:#b3261e':'')+'">'+(ceka?dni(nejd):'—')+'</b><span>nejdéle čeká</span></div></div>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px"><thead><tr style="color:#8a938a;font-size:11px"><th style="text-align:left;padding:3px 0">Obchodník</th><th style="text-align:right;padding:3px 0" title="Přiřazené poptávky, na které obchodník zatím nijak nezareagoval">Bez reakce</th><th style="text-align:right;padding:3px 0">Nejdéle</th><th style="text-align:right;padding:3px 0" title="Medián doby od přiřazení k první reakci, poptávky za 90 dní">Reakce</th></tr></thead><tbody>'
+      +ob.map(o=>'<tr style="border-top:1px solid #e3e7e0"><td style="padding:4px 0">'+esc(o.name)+'</td><td style="text-align:right;padding:4px 0;font-weight:700;'+(o.cekaN?'color:#b3261e':'')+'">'+o.cekaN+'</td><td style="text-align:right;padding:4px 0">'+(o.cekaN?dni(o.nejdeleDni):'—')+'</td><td style="text-align:right;padding:4px 0" title="'+(o.reagovanoN?o.reagovanoN+' reakcí za 90 dní, průměr '+hod(o.prumerHod):'bez reakcí za 90 dní')+'">'+hod(o.medianHod)+'</td></tr>'
+        +(o.ceka.length?'<tr><td colspan="4" style="padding:0 0 6px 10px;font-size:11.5px;color:#5b635c">'+o.ceka.map(p=>'• '+esc((p.cislo?p.cislo+' ':'')+p.kdo)+' — <b>'+dni(p.cekaDni)+'</b> · '+esc(p.zdroj)+(p.stav?' · '+esc(p.stav):'')).join('<br>')+'</td></tr>':'')).join('')+'</tbody></table>';
+    h+='<p style="margin:8px 0 0;font-size:11px;color:#8a938a">Reakce = první krok obchodníka po přiřazení (změna stavu, poznámka, nabídka). Zdroje: '+esc((d.zdroje||[]).join(', '))+'.</p>';
+    body.innerHTML=h;
+  }catch(e){ body.innerHTML='<p class="muted" style="margin:0">Nepodařilo se načíst.</p>'; }
 }
 /* ---------- Notifikace z modulů (konstrukce, poptávky, dovolená, školení…) ---------- */
 const NOTIF_IC={gear:'gear',ticket:'ticket',cal:'cal',school:'school',shield:'shield',file:'file'};

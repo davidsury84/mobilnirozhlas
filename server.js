@@ -1301,6 +1301,41 @@ function notifSkoleni(email) {
   }));
 }
 // Vše dohromady pro daného člověka.
+/* ---------- Reakce obchodníků na poptávky ----------
+   Poptávka = záznam s přiřazeným obchodníkem (lodní kontejnery, mobilní lisy; kalkulačky lisů
+   přiřazení nemají, proto tam nejsou). Přiřazení = první záznam historie „přiřazen…" (jinak
+   založení). Reakce = první záznam historie, který po přiřazení udělal SÁM obchodník (změna
+   stavu, poznámka, nabídka). Uzavřené / zamítnuté / v realizaci se za čekající nepočítají. */
+function poptReakceZ(items, zdroj, stavy) {
+  const now = Date.now(), out = [];
+  (items || []).forEach(it => {
+    const ob = it && it.obchodnik && it.obchodnik.email ? { email: String(it.obchodnik.email).toLowerCase(), name: it.obchodnik.name || it.obchodnik.email } : null;
+    if (!ob) return;
+    const h = (it.historie || []).filter(x => x && x.at).slice().sort((a, b) => a.at - b.at);
+    const pr = h.find(x => /p[řr]i[řr]azen/i.test(String(x.note || '')) && (it.obchodnik.name ? String(x.note).indexOf(it.obchodnik.name) >= 0 : true)) || h.find(x => /p[řr]i[řr]azen/i.test(String(x.note || '')));
+    const prirazenoAt = (pr && pr.at) || it.createdAt || now;
+    const re = h.find(x => x.at >= prirazenoAt && x.by && String(x.by.email || '').toLowerCase() === ob.email);
+    const zavreno = ['uzavreno', 'zamitnuto', 'realizace'].indexOf(it.stav) >= 0;
+    out.push({ zdroj, id: it.id, cislo: it.cislo || '', kdo: [it.firma, it.jmeno].filter(Boolean).join(' / ') || it.email || '', stav: it.stav, stavNazev: (stavy || {})[it.stav] || it.stav || '', obchodnik: ob, prirazenoAt, reakceAt: re ? re.at : null, zavreno,
+      cekaDni: re ? 0 : Math.max(0, Math.round((now - prirazenoAt) / 864e5)), reakceHod: re ? Math.max(0, Math.round((re.at - prirazenoAt) / 36e5)) : null });
+  });
+  return out;
+}
+function poptavkyReakce() {
+  let vse = [];
+  try { if (kontejneryMod && kontejneryMod.polozky) vse = vse.concat(poptReakceZ(kontejneryMod.polozky(), 'Lodní kontejnery', kontejneryMod.stavy && kontejneryMod.stavy())); } catch (_) {}
+  try { if (mobilniLisyMod && mobilniLisyMod.polozky) vse = vse.concat(poptReakceZ(mobilniLisyMod.polozky(), 'Mobilní lisy', mobilniLisyMod.stavy && mobilniLisyMod.stavy())); } catch (_) {}
+  const by = {}, now = Date.now();
+  vse.forEach(p => { const e = by[p.obchodnik.email] || (by[p.obchodnik.email] = { email: p.obchodnik.email, name: p.obchodnik.name, ceka: [], hod: [], otevrene: 0, celkem: 0 });
+    e.celkem++; if (!p.zavreno) e.otevrene++;
+    if (!p.reakceAt && !p.zavreno) e.ceka.push(p);
+    else if (p.reakceAt && (now - p.prirazenoAt) < 90 * 864e5) e.hod.push(p.reakceHod); });
+  const med = a => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  return Object.values(by).map(e => ({ email: e.email, name: e.name, cekaN: e.ceka.length, nejdeleDni: e.ceka.reduce((m, p) => Math.max(m, p.cekaDni), 0),
+    ceka: e.ceka.sort((a, b) => b.cekaDni - a.cekaDni).slice(0, 6).map(p => ({ zdroj: p.zdroj, id: p.id, cislo: p.cislo, kdo: p.kdo, cekaDni: p.cekaDni, stav: p.stavNazev })),
+    reagovanoN: e.hod.length, prumerHod: e.hod.length ? Math.round(e.hod.reduce((a, b) => a + b, 0) / e.hod.length) : null, medianHod: med(e.hod), otevrene: e.otevrene, celkem: e.celkem }))
+    .sort((a, b) => b.nejdeleDni - a.nejdeleDni || b.cekaN - a.cekaN || String(a.name).localeCompare(String(b.name), 'cs'));
+}
 function buildNotifikace(email) {
   email = String(email || '').toLowerCase(); if (!email) return [];
   let mods = [], admin = false;
@@ -5107,6 +5142,12 @@ const server = http.createServer(async (req, res) => {
     }
     // ---- Upozornění z modulů na nástěnku (školení, konstrukce, poptávky, dovolená, reklamace, vozový park) ----
     // Pozor: tahle trasa se 2026-09 omylem smazala spolu s blokem školicích plánů a nástěnka od té doby mlčela.
+    // Jak dlouho obchodníci nereagují na své poptávky (úvodní stránka): správce vidí všechny, obchodník sebe
+    if (p === '/api/poptavky/reakce' && req.method === 'GET') {
+      const eR = empSession(req); if (!eR) return send(res, 401, { error: 'Nepřihlášeno.' });
+      const vse = poptavkyReakce(); const em = String(eR.email || '').toLowerCase();
+      return send(res, 200, { admin: isAdmin(req), obchodnici: isAdmin(req) ? vse : vse.filter(x => x.email === em), zdroje: ['Lodní kontejnery', 'Mobilní lisy'] }, { 'Cache-Control': 'no-store' });
+    }
     if (p === '/api/notifikace' && req.method === 'GET') {
       const eN = empSession(req); if (!eN) return send(res, 401, { error: 'Nepřihlášeno.' });
       return send(res, 200, { items: buildNotifikace(eN.email) }, { 'Cache-Control': 'no-store' });
