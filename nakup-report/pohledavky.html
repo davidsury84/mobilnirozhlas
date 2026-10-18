@@ -77,7 +77,8 @@ const mp=f=>f.mena&&f.mena!=='CZK'?' <span class="pill blue" title="Saldo v měn
 const den=d=>{if(!d)return '—';const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?(+m[3])+'. '+(+m[2])+'. '+m[1]:d;};
 let P=null, U=null;
 // ---- ESKALACE: 10 dní → obchodník rozhodne (3 dny) → upomínka přes Helios (Lucie) → po 7 dnech předžalobní výzva ----
-let E=null, eskFiltr='', eskKresli=null;   // eskFiltr = klíč dlaždice, podle které je tabulka eskalace vyfiltrovaná
+let E=null, eskFiltr='', eskObch='', eskKresli=null;   // eskObch = filtr tabulky na jednoho obchodníka (e-mail)
+function eskObchFiltr(em){eskObch=(eskObch===em?'':em); if(eskKresli)eskKresli(); const t=$('#eskTbl'); if(t&&eskObch)t.scrollIntoView({behavior:'smooth',block:'nearest'});}   // eskFiltr = klíč dlaždice, podle které je tabulka eskalace vyfiltrovaná
 const ESK_SKUP={bez:['bez-rozhodnuti'],ceka:['ceka-obchodnik','nova'],upominka:['upominka'],po:['po-upomince'],vyzva:['vyzva','vyzva-ceka'],poznamka:['poznamka']};
 function eskFiltruj(k){eskFiltr=(eskFiltr===k?'':k); if(eskKresli)eskKresli(); const t=$('#eskTbl'); if(t&&eskFiltr)t.scrollIntoView({behavior:'smooth',block:'nearest'});}
 const FAZE={nova:['čeká na denní běh','muted'],'ceka-obchodnik':['čeká na rozhodnutí obchodníka','amber'],'bez-rozhodnuti':['BEZ ROZHODNUTÍ přes 3 dny','red'],poznamka:['řeší obchodník','blue'],upominka:['k odeslání upomínky (Helios)','amber'],'po-upomince':['upomínka odeslána, běží 7 dní','blue'],'vyzva-ceka':['čeká na denní běh → výzva','red'],vyzva:['PŘEDŽALOBNÍ VÝZVA k odeslání','red'],'vyzva-odeslana':['výzva odeslána','blue'],pozastaveno:['pozastaveno','amber'],pred:['—','muted']};
@@ -120,15 +121,18 @@ async function loadEsk(){
     +'<div class="cfg"><b>Jak to běží:</b> '+k.obchodnik+' dní po splatnosti → e-mail obchodníkovi (<b>'+k.rozhodnuti+' dny na rozhodnutí</b>) → obchodník zvolí <b>📨 Poslat upomínku</b> nebo <b>✎ Poznámka</b> (řeší sám) → upomínky odesílá '+esc((c.vyzvaKomu||[]).join(', '))+' přes Helios a odškrtne odeslání → <b>'+k.vyzvaPoUpomince+' dní po upomínce</b> předžalobní výzva (tisk, podpis '+esc(c.podpis.jmeno)+').</div>'
     +cfgHtml
     +kdoSpravuje(all,c)
-    +'<div class="kpis" id="eskKpis" style="margin:8px 0"></div><div id="eskTbl"></div></div>';
+    +'<div class="kpis" id="eskKpis" style="margin:8px 0"></div><div id="eskObch"></div><div id="eskTbl"></div></div>';
   // dlaždice stavů = filtr tabulky (klik vyfiltruje, druhý klik zruší); filtr přežije i obnovení dat po akci
   const dlazdice=[['bez','red','bez rozhodnutí přes '+k.rozhodnuti+' dny'],['ceka','amber','čeká na obchodníka'],['upominka','amber','k odeslání upomínky (Helios)'],['po','blue','po upomínce, běží '+k.vyzvaPoUpomince+' dní'],['vyzva','red','předžalobní výzva k odeslání'],['poznamka','blue','řeší obchodník']];
   const ve=key=>fa.filter(f=>ESK_SKUP[key].includes(f.faze));
   eskKresli=()=>{
     if(eskFiltr&&!ve(eskFiltr).length)eskFiltr='';
     $('#eskKpis').innerHTML=dlazdice.map(x=>{const c=ve(x[0]).length;return '<div class="kpi '+x[1]+(c?' klik':'')+(eskFiltr===x[0]?' on':'')+'"'+(c?' onclick="eskFiltruj(\''+x[0]+'\')" title="Zobrazit jen tyto faktury"':'')+'><div class="v">'+c+'</div><div class="l">'+esc(x[2])+'</div></div>';}).join('');
-    const rows=eskFiltr?ve(eskFiltr):fa; const nazev=eskFiltr?dlazdice.find(x=>x[0]===eskFiltr)[2]:'';
-    $('#eskTbl').innerHTML=(eskFiltr?'<div style="margin:0 0 6px;font-size:13px"><b>Filtr:</b> '+esc(nazev)+' · '+rows.length+' z '+fa.length+' faktur · '+kc(rows.reduce((s,f)=>s+f.saldo,0))+' Kč <button class="btn" style="margin-left:8px" onclick="eskFiltruj(\''+eskFiltr+'\')">✕ zrušit filtr</button></div>':'')
+    $('#eskObch').innerHTML=reakceObchodniku(fa,k);
+    if(eskObch&&!fa.some(f=>(f.obchodnikEmail||'')===eskObch))eskObch='';
+    let rows=eskFiltr?ve(eskFiltr):fa; if(eskObch)rows=rows.filter(f=>(f.obchodnikEmail||'')===eskObch);
+    const nazev=[eskFiltr?dlazdice.find(x=>x[0]===eskFiltr)[2]:'',eskObch?'obchodník '+jmenoObch(eskObch,fa):''].filter(Boolean).join(' · ');
+    $('#eskTbl').innerHTML=((eskFiltr||eskObch)?'<div style="margin:0 0 6px;font-size:13px"><b>Filtr:</b> '+esc(nazev)+' · '+rows.length+' z '+fa.length+' faktur · '+kc(rows.reduce((s,f)=>s+f.saldo,0))+' Kč <button class="btn" style="margin-left:8px" onclick="eskFiltr=\'\';eskObch=\'\';eskKresli()">✕ zrušit filtr</button></div>':'')
       +(rows.length?tbl(rows):'<div class="muted">Žádná faktura ≥ '+k.obchodnik+' dní po splatnosti'+(E.admin||E.jeLucie?'':' u vás')+'.</div>');
   };
   eskKresli();
@@ -166,6 +170,32 @@ function exportXlsx(typ){
 }
 async function eskPost(body){const r=await fetch('/api/nakup-report/eskalace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||('HTTP '+r.status));return j;}
 async function eskAkce(akce,pz,extra){try{await eskPost(Object.assign({akce,pz},extra||{}));await loadEsk();}catch(e){alert('Nepovedlo se: '+e.message);}}
+// ---- REAKCE OBCHODNÍKŮ: kdo na faktury po splatnosti nereaguje, kdo dal Lucii vědět (📨 upomínka), kdo si to řeší sám (✎ poznámka) ----
+function jmenoObch(em,fa){if(!em)return '(bez vlastníka)'; const f=(fa||[]).find(x=>x.obchodnikEmail===em&&x.zamestnanec); if(f)return f.zamestnanec; const z=(E.zamestnanci||[]).find(x=>x.email===em); if(z)return z.name; const g=(fa||[]).find(x=>x.obchodnikEmail===em&&x.kdo&&!/^e-?shop$|^elkoplast/i.test(x.kdo)); return g?g.kdo:em;}
+function reakceObchodniku(fa,k){
+  const dnes=Date.now(); const by={};
+  fa.forEach(f=>{const em=f.obchodnikEmail||''; if(f.faze==='pozastaveno')return; const e=by[em]||(by[em]={em,n:0,ceka:0,cekaKc:0,maxDni:0,nag:0,upom:0,pozn:0,naposledy:null});
+    e.n++; const s=f.stav||{};
+    if(['nova','ceka-obchodnik','bez-rozhodnuti'].includes(f.faze)){e.ceka++;e.cekaKc+=f.saldo||0; const d=s.k10&&s.k10.kdy?Math.round((dnes-Date.parse(s.k10.kdy))/864e5):Math.max(0,(f.dni||0)-k.obchodnik); if(d>e.maxDni)e.maxDni=d; if(s.nag&&s.nag.pocet>e.nag)e.nag=s.nag.pocet;}
+    else if(s.rozhodnuti){ if(s.rozhodnuti.upominka===true)e.upom++; else e.pozn++; if(s.rozhodnuti.kdy&&(!e.naposledy||s.rozhodnuti.kdy>e.naposledy))e.naposledy=s.rozhodnuti.kdy; }
+    else if(['upominka','po-upomince','vyzva-ceka','vyzva','vyzva-odeslana'].includes(f.faze))e.upom++;});
+  const rows=Object.values(by).filter(e=>E.admin||E.jeLucie||e.em===E.ja).sort((a,b)=>b.maxDni-a.maxDni||b.ceka-a.ceka||b.cekaKc-a.cekaKc);
+  if(!rows.length)return '';
+  const dni=n=>n+' '+(n===1?'den':n>1&&n<5?'dny':'dní');
+  const tr=rows.map(e=>{const on=eskObch===e.em; const sem=e.ceka?(e.maxDni>k.rozhodnuti?'red':'amber'):'green';
+    return '<tr style="cursor:pointer'+(on?';outline:2px solid var(--ink,#222);outline-offset:-2px':'')+'" onclick="eskObchFiltr(\''+esc(e.em)+'\')" title="Kliknutím vyfiltrovat tabulku na tohoto obchodníka">'
+      +'<td class="wrap"><b>'+esc(jmenoObch(e.em,fa))+'</b>'+(e.em?'<br><span class="muted" style="font-size:11px">'+esc(e.em)+'</span>':'<br><span class="err" style="font-size:11px">bez vlastníka → náhradní příjemce</span>')+'</td>'
+      +'<td class="r">'+e.n+'</td>'
+      +'<td class="r"><span class="pill '+sem+'" style="font-size:13px">'+e.ceka+'</span>'+(e.ceka?'<br><span class="muted" style="font-size:11px">'+kc(e.cekaKc)+' Kč</span>':'')+'</td>'
+      +'<td class="r'+(e.maxDni>k.rozhodnuti?' err':'')+'">'+(e.ceka?'<b>'+dni(e.maxDni)+'</b>':'—')+'</td>'
+      +'<td class="r">'+(e.nag?e.nag+'×':'—')+'</td>'
+      +'<td class="r">'+(e.upom?'<span class="pill green">📨 '+e.upom+'</span>':'<span class="muted">—</span>')+'</td>'
+      +'<td class="r">'+(e.pozn?'<span class="pill blue">✎ '+e.pozn+'</span>':'<span class="muted">—</span>')+'</td>'
+      +'<td class="muted">'+(e.naposledy?den(e.naposledy):'—')+'</td></tr>';}).join('');
+  const bez=rows.filter(e=>e.ceka).length;
+  return '<div class="card" style="margin:8px 0;padding:10px 12px"><h3 style="margin:0 0 6px;font:700 15px/1.2 var(--cond)">👥 Reakce obchodníků <span class="muted" style="font-weight:400;font-size:12.5px">· '+(bez?bez+' '+(bez===1?'obchodník má':bez<5?'obchodníci mají':'obchodníků má')+' faktury bez rozhodnutí':'všichni rozhodli')+' · klik na řádek = filtr tabulky</span></h3>'
+    +'<div class="tblwrap" style="max-height:320px"><table><thead><tr><th>Obchodník</th><th class="r" title="Faktury ≥ '+k.obchodnik+' dní po splatnosti v eskalaci">Faktur</th><th class="r" title="Čeká na rozhodnutí obchodníka (včetně těch přes lhůtu)">Bez rozhodnutí</th><th class="r" title="Nejdéle bez rozhodnutí od oznámení (lhůta '+k.rozhodnuti+' dny)">Nejdéle</th><th class="r" title="Kolik denních připomínek už dostal">Připomínek</th><th class="r" title="Dal Lucii vědět — zvolil 📨 Poslat upomínku">Lucii dal vědět</th><th class="r" title="Řeší sám — zvolil ✎ Poznámku">Řeší sám</th><th>Poslední rozhodnutí</th></tr></thead><tbody>'+tr+'</tbody></table></div></div>';
+}
 // ---- KDO CO SPRAVUJE: evidence příjemců eskalace. Vystavitel na faktuře (Helios, sloupec „Příjmení a jméno") → e-mail:
 //  ručně (⚙️ mapa vystavitel → e-mail) › E-SHOP / ELKOPLAST CZ / prázdný → vedoucí útvaru (mapa útvar → e-mail) › DB zaměstnanců › nikdo = náhradní příjemce
 const ZDROJ={zakaznik:['výjimka podle zákazníka','blue'],rucne:['ručně v nastavení','blue'],zamestnanec:['DB zaměstnanců (podle jména)','green'],utvar:['vedoucí útvaru (nastavení)','amber'],null:['NIKDO → náhradní příjemce','red']};
