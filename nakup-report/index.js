@@ -37,9 +37,12 @@ function mount(host) {
   const RUC_F = path.join(host.dataDir || __dirname, 'nakup-rucne-objednano.json');
   const loadRucne = () => { try { return JSON.parse(fs.readFileSync(RUC_F, 'utf8')) || {}; } catch (_) { return {}; } };
   const saveRucne = m => { try { fs.writeFileSync(RUC_F, JSON.stringify(m, null, 2)); } catch (_) {} };
+  // Pojistka proti dvojímu započítání: při zápisu se uloží, kolik bylo v Heliosu objednáno (erpPri).
+  // Když Objednáno v ERP od té doby vzroste, objednávka se tam zjevně dostala → ruční zápis se o nárůst sníží sám.
   const withRucne = rows => { const m = loadRucne(); if (!Object.keys(m).length) return rows;
     return (rows || []).map(r => { const e = m[r.sk + '-' + r.reg]; if (!e || !(e.ks > 0)) return r;
-      return Object.assign({}, r, { onOrderErp: r.onOrder || 0, onOrderRucne: e.ks, onOrder: (r.onOrder || 0) + e.ks, rucne: e }); }); };
+      const erp = r.onOrder || 0, narust = e.erpPri != null ? Math.max(0, erp - e.erpPri) : 0, eff = Math.max(0, e.ks - narust);
+      return Object.assign({}, r, { onOrderErp: erp, onOrderRucne: eff, onOrder: erp + eff, rucne: Object.assign({}, e, { eff, vHeliosu: narust }) }); }); };
   const VYD_SEED = path.join(__dirname, '..', 'eshop-vydejky.json');                // commitnutý základ (tools-gen-eshop-vydejky.js)
   // Seed z repa + živě nahrané dny (volume); u shodného dne vyhrává živý (novější export).
   // ---- ALTERNATIVNÍ DODAVATELÉ: stejné zboží od více dodavatelů (CLD-S = SULO, CLD-CO = Contenur, CLD-M = Mevatec…) ----
@@ -1726,7 +1729,8 @@ function mount(host) {
       const key = String(b.key || '').trim(); if (!key) return json(res, 400, { error: 'Chybí položka.' }), true;
       const se = host.empSession && host.empSession(req), kdo = (se && (se.jmeno || se.email)) || 'neznámý';
       const m = loadRucne(); const ks = Math.max(0, Math.round(+b.ks || 0));
-      if (!ks) delete m[key]; else m[key] = { ks, pozn: String(b.pozn || '').slice(0, 200), kdo, kdy: new Date().toISOString().slice(0, 10) };
+      const row = (loadObj().rows || []).find(r => r.sk + '-' + r.reg === key); const erpPri = row ? (row.onOrder || 0) : 0;
+      if (!ks) delete m[key]; else m[key] = { ks, pozn: String(b.pozn || '').slice(0, 200), kdo, kdy: new Date().toISOString().slice(0, 10), erpPri };
       saveRucne(m);
       return json(res, 200, { ok: true, rucneObjednano: m }), true;
     }
