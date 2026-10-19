@@ -30,6 +30,16 @@ function mount(host) {
   const SUP_F = path.join(host.dataDir || __dirname, 'nakup-dodavatele.json');       // dotazník dodavatelů: termín dodání + náklad na dopravu (writable)
   const loadObj = () => { for (const f of [OBJ_LIVE, OBJ_SEED]) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) {} } return { rows: [], columns: [], date: '' }; };
   const loadSup = () => { try { return JSON.parse(fs.readFileSync(SUP_F, 'utf8')) || {}; } catch (_) { return {}; } };
+  // Ručně zadané „objednáno" — vlastní výroba (skupiny VÝR) se v Heliosu neobjednává, takže sloupec
+  // Objednáno u ní nic neukáže. Nákup tu zapíše, co zadal do výroby; model to bere jako objednané.
+  // {key: {ks, pozn, kdo, kdy}} — maže se ručně po příjmu. Pozor: NEzapisovat do loadObj() — bilance
+  // a pohyby pracují s čistým ERP stavem; promítá se jen do doporučení (withRucne).
+  const RUC_F = path.join(host.dataDir || __dirname, 'nakup-rucne-objednano.json');
+  const loadRucne = () => { try { return JSON.parse(fs.readFileSync(RUC_F, 'utf8')) || {}; } catch (_) { return {}; } };
+  const saveRucne = m => { try { fs.writeFileSync(RUC_F, JSON.stringify(m, null, 2)); } catch (_) {} };
+  const withRucne = rows => { const m = loadRucne(); if (!Object.keys(m).length) return rows;
+    return (rows || []).map(r => { const e = m[r.sk + '-' + r.reg]; if (!e || !(e.ks > 0)) return r;
+      return Object.assign({}, r, { onOrderErp: r.onOrder || 0, onOrderRucne: e.ks, onOrder: (r.onOrder || 0) + e.ks, rucne: e }); }); };
   const VYD_SEED = path.join(__dirname, '..', 'eshop-vydejky.json');                // commitnutý základ (tools-gen-eshop-vydejky.js)
   // Seed z repa + živě nahrané dny (volume); u shodného dne vyhrává živý (novější export).
   // ---- ALTERNATIVNÍ DODAVATELÉ: stejné zboží od více dodavatelů (CLD-S = SULO, CLD-CO = Contenur, CLD-M = Mevatec…) ----
@@ -1207,7 +1217,7 @@ function mount(host) {
     const obj = loadObj(), sd = loadData(), m0 = new Date().getMonth();
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
-    const out = onlyActive(obj.rows)
+    const out = onlyActive(withRucne(obj.rows))
       .map(x => ({ x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }))
       // Rozhodnuté položky už do seznamu nepatří: 'vyrazeno' je vyřízené, 'potvrzeno' vypne
       // příznak utichla úplně. Prošlé potvrzení vrací decFor() jako null → položka se zeptá znovu.
@@ -1279,7 +1289,7 @@ function mount(host) {
     try { detectNew(obj.rows); } catch (_) {}   // NEJDRIV detekce novych, at se dostanou i do doporuceni
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
-    const scored = onlyActive(obj.rows).map(x => ({ x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }));
+    const scored = onlyActive(withRucne(obj.rows)).map(x => ({ x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }));
     try { allocateGroups(scored, smap, P, m0); } catch (e) { console.warn('[nakup-report] alternativy:', e.message); }
     const nekryto = x => ((x.avail || 0) + (x.onOrder || 0)) < 0;   // rezervace, které nekryje ani zboží objednané u dodavatele
     let list = scored.filter(r => r.o.rec > 0 || (nekryto(r.x) && !r.o.spec));
@@ -1678,12 +1688,22 @@ function mount(host) {
     // ERP objednávková data — čtení pro každého přihlášeného (globální SSO už ověřuje); optimalizace objednávek v appce.
     if (p === '/api/nakup-report/objednavky' && req.method === 'GET') {
       const o = loadObj(), mv = loadMoves();
-      const rows = (o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
+      const rows = withRucne(o.rows || []).map(r => { const e = mv[r.sk + '-' + r.reg]; return Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); });
       try { detectNew(o.rows); } catch (_) {}
       json(res, 200, Object.assign({}, o, { rows, hasMoves: Object.keys(mv).length > 0, suppliers: loadSup(),
         noveKlice: Object.keys(loadNew()), rozhodnuti: loadDec(), platnostM: DEC_PLATNOST_M, specialSk: SPEC_SK,
-        predchudci: PREDCH, dropshipAuto: dsAutoCached() }));
+        predchudci: PREDCH, dropshipAuto: dsAutoCached(), rucneObjednano: loadRucne() }));
       return true;
+    }
+    // Ručně objednáno (vlastní výroba): { key, ks, pozn } — ks 0 nebo prázdné = smazat (zboží přišlo).
+    if (p === '/api/nakup-report/rucne-objednano' && req.method === 'POST') {
+      let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {}
+      const key = String(b.key || '').trim(); if (!key) return json(res, 400, { error: 'Chybí položka.' }), true;
+      const se = host.empSession && host.empSession(req), kdo = (se && (se.jmeno || se.email)) || 'neznámý';
+      const m = loadRucne(); const ks = Math.max(0, Math.round(+b.ks || 0));
+      if (!ks) delete m[key]; else m[key] = { ks, pozn: String(b.pozn || '').slice(0, 200), kdo, kdy: new Date().toISOString().slice(0, 10) };
+      saveRucne(m);
+      return json(res, 200, { ok: true, rucneObjednano: m }), true;
     }
     // Prodejní ceny e-shopu (export Shop.CZ feedu, commitnutý v kořeni jako eshop-ceny.json).
     // SMI appka z nich počítá markdown/přecenění — nová cena se navrhuje z REÁLNÉ prodejní ceny,
