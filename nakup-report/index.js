@@ -877,8 +877,11 @@ function mount(host) {
   // Členové potvrzených skupin alternativ patří do sortimentu vždy — varianta bez historie a bez zásoby
   // (nový, levnější dodavatel) musí jít zvolit jako cíl objednávky.
   const altKeys = () => { const out = new Set(); try { const a = loadAlt(); Object.values(a.skupiny || {}).forEach(g => (g.polozky || []).forEach(k => out.add(k))); } catch (_) {} return out; };
-  const onlyActive = rows => { const k = activeKeys(); if (!k.size) return rows || []; const nk = newKeys(), ak2 = altKeys();
-    return (rows || []).filter(r => { const key = r.sk + '-' + r.reg;
+  // Režim 'zakazka' (nakupuje se jen na konkrétní zakázky): pro optimalizaci dodavatel NEEXISTUJE —
+  // žádné řádky, doporučení, utichlé ani reporty. Na rozdíl od dropship/pozastaveno, které se ukazují se stavem.
+  const naZakazku = r => { const c = supCfgCached()[r.skupina]; return !!(c && c.rezim === 'zakazka'); };
+  const onlyActive = rows => { const k = activeKeys(); if (!k.size) return (rows || []).filter(r => !naZakazku(r)); const nk = newKeys(), ak2 = altKeys();
+    return (rows || []).filter(r => { if (naZakazku(r)) return false; const key = r.sk + '-' + r.reg;
       if (k.has(key) || nk.has(key) || ak2.has(key)) return true;
       if (/^služby$/i.test(String(r.skupina || '').trim())) return false;
       return (r.avail || 0) < 0 || (r.reserved || 0) > 0 || (r.onOrder || 0) > 0 || !!specOf(r.sk, r.skupina, r.sk + '-' + r.reg); }); };
@@ -1149,7 +1152,7 @@ function mount(host) {
     const spec = specOf(x.sk, x.skupina, x.sk + '-' + x.reg);
     if (spec) {
       const Dsp = sales ? sales.reduce((s2, v) => s2 + (v || 0), 0) : 0;
-      return { D: Dsp, rec: 0, status: spec.typ === 'dropship' ? '🚚 dropshipping — nenaskladňuje se' : spec.typ === 'pozastaveno' ? '⏸ dodavatel pozastaven — neobjednávat' : '🏷 doprodej — neobjednávat',
+      return { D: Dsp, rec: 0, status: spec.typ === 'zakazka' ? '📌 na zakázku — mimo optimalizaci' : spec.typ === 'dropship' ? '🚚 dropshipping — nenaskladňuje se' : spec.typ === 'pozastaveno' ? '⏸ dodavatel pozastaven — neobjednávat' : '🏷 doprodej — neobjednávat',
         ramp: false, fwd: null, value: 0, coverAfter: 0, spec,
         utichla: false, vyrazeno: false, dec: null, silentM: 0, utichlaKs: 0, utichlaVal: 0, lastSale: '', pattern: null, missed: 0 };
     }
@@ -2022,7 +2025,7 @@ function mount(host) {
           if (v.origin) e.origin = String(v.origin).slice(0, 40);
           if (v.zdrazeniPct !== '' && v.zdrazeniPct != null && isFinite(+v.zdrazeniPct) && +v.zdrazeniPct > 0) e.zdrazeniPct = Math.min(100, Math.round(+v.zdrazeniPct));
           if (v.zdrazeniOd && /^\d{4}-\d{2}-\d{2}$/.test(String(v.zdrazeniOd))) e.zdrazeniOd = String(v.zdrazeniOd);
-          if (['sklad', 'dropship', 'doprodej', 'pozastaveno'].indexOf(v.rezim) >= 0) e.rezim = v.rezim;
+          if (['sklad', 'dropship', 'doprodej', 'pozastaveno', 'zakazka'].indexOf(v.rezim) >= 0) e.rezim = v.rezim;
           if (v.rezimPozn) e.rezimPozn = String(v.rezimPozn).slice(0, 120);
           if (Object.keys(e).length) cur[k] = e; else delete cur[k];
         });

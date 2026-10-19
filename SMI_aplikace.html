@@ -1018,6 +1018,7 @@ function specOf(sk,sup,key){
 // Bunka "Rezim" do tabulek: Sklad / Dropshipping / Doprodej (s vysvetlivkou po najeti)
 function specRezim(sk){
   const s=specOf(sk); if(s&&s.typ==='pozastaveno')return '<td title="'+esc(s.pozn)+'" style="cursor:help;white-space:nowrap;color:#5a635b;font-weight:600">⏸ Pozastaveno</td>';
+  if(s&&s.typ==='zakazka')return '<td title="Nakupuje se jen na konkrétní zakázky — v optimalizaci nákupu se nevyskytuje" style="cursor:help;white-space:nowrap;color:#5a635b;font-weight:600">📌 Na zakázku</td>';
   if(!s)return '<td>Sklad</td>';
   const t=s.typ==='dropship'?'\u{1F69A} Dropshipping':'\u{1F3F7} Doprodej';
   return '<td title="'+esc(s.pozn)+'" style="cursor:help;white-space:nowrap;color:'+(s.typ==='dropship'?'#8a5a00':'#8a2f52')+';font-weight:600">'+t+'</td>';
@@ -2872,7 +2873,7 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   const spec=specOf(x.sk,x.skupina,String(x.sk)+'-'+String(x.reg));
   if(spec){
     const Dsp=sales?sales.reduce((s,v)=>s+(v||0),0):0;
-    return {D:Dsp,rec:0,status:spec.typ==='dropship'?('\u{1F69A} Dropshipping — nenaskladňuje se'+(spec.auto?' (odvozeno z výdejek e-shopu)':'')):spec.typ==='pozastaveno'?('⏸ Dodavatel pozastaven — neobjednávat'+(spec.pozn&&spec.pozn.indexOf(' — ')>0?' ('+spec.pozn.split(' — ')[1]+')':'')):'\u{1F3F7} Doprodej — neobjednávat',
+    return {D:Dsp,rec:0,status:spec.typ==='zakazka'?'📌 Na zakázku — mimo optimalizaci':spec.typ==='dropship'?('\u{1F69A} Dropshipping — nenaskladňuje se'+(spec.auto?' (odvozeno z výdejek e-shopu)':'')):spec.typ==='pozastaveno'?('⏸ Dodavatel pozastaven — neobjednávat'+(spec.pozn&&spec.pozn.indexOf(' — ')>0?' ('+spec.pozn.split(' — ')[1]+')':'')):'\u{1F3F7} Doprodej — neobjednávat',
       ramp:false,nova:false,fwd:null,value:0,windowDem:0,coverAfter:0,spec,
       utichla:false,vyrazeno:false,dec:null,silentM:0,utichlaKs:0,utichlaVal:0,lastSale:'',pattern:null};
   }
@@ -3055,6 +3056,7 @@ async function renderObjednavky(){
     await objLoadAlt();   // členové potvrzených skupin alternativ jsou vidět vždy (i bez historie a zásoby)
     const altK=new Set(); ((OBJ_ALT&&OBJ_ALT.skupiny)||[]).forEach(g=>(g.polozky||[]).forEach(p=>altK.add(p.key)));
     OBJ_DATA.rows=OBJ_DATA.allRows.filter(x=>{
+      if(supRezim(x.skupina)==='zakazka')return false;   // nakupuje se jen na zakázky — pro optimalizaci neexistuje
       const k=String(x.sk)+'-'+String(x.reg);
       if(smap[k]!==undefined||nove.has(k)||altK.has(k))return true;
       if(/^služby$/i.test(String(x.skupina||'').trim()))return false;
@@ -3065,8 +3067,10 @@ async function renderObjednavky(){
     if(sel){const sups=[...new Set(OBJ_DATA.rows.map(x=>x.skupina))].sort((a,b)=>String(a).localeCompare(String(b),'cs'));
       const cur=sel.value; sel.innerHTML='<option value="">Všichni dodavatelé ('+OBJ_DATA.rows.length+')</option>'+sups.map(s=>'<option>'+esc(s)+'</option>').join(''); sel.value=cur;}
     const bezH=OBJ_DATA.rows.filter(x=>x._nohist).length;
+    const zakS=[...new Set(OBJ_DATA.allRows.filter(x=>supRezim(x.skupina)==='zakazka').map(x=>x.skupina))];
     const dt=$('#objDate'); if(dt)dt.textContent=(OBJ_DATA.date||'?')+' · '+OBJ_DATA.rows.length+' položek (z '+OBJ_DATA.allRows.length+' v ERP)'
-      +(bezH?(' · z toho '+bezH+' bez prodejní historie — dropship, rezervace nebo oversold'):'');
+      +(bezH?(' · z toho '+bezH+' bez prodejní historie — dropship, rezervace nebo oversold'):'')
+      +(zakS.length?(' · 📌 přehlíženo '+zakS.length+' dodav. na zakázku: '+zakS.map(x=>String(x).replace(/^ZBO - |^VÝR - /,'')).join(', ')):'');
   }
   const P={cover:Math.max(0.5,parseFloat(String(($('#objCover')&&$('#objCover').value)||'2').replace(',','.'))||2),Z:1.65,MOQ:1};
   const m0=new Date().getMonth();
@@ -3512,7 +3516,7 @@ function objSupIntervalPreview(supplier,shipCost){
 function objRenderSuppliers(list){
   const wrap=$('#objSupWrap'); if(!wrap)return;
   const orig=['','ČR','EU','Čína','jiná'];
-  let h='<p class="muted" style="margin:0 0 8px">U každého dodavatele vyplň <b>termín dodání</b> (dny), <b>náklad na dopravu</b> (Kč za jednu společnou zásilku/kontejner) a případné <b>ohlášené zdražení</b> (kolik % a od kdy — model pak doporučí předzásobení za staré ceny). Z toho se počítá <b>jak často z toho dodavatele objednávat</b> (společný interval) a <b>ekonomická dávka</b> každé položky. Dražší doprava (Čína) = řidší, větší objednávky. „Doporučený interval" se dopočítá živě. Prázdné = použije se lhůta z ERP, EOQ se nepočítá.<br><b>Režim</b> říká, jestli se u dodavatele vůbec optimalizuje nákup: <b>Sklad</b> = ano. <b>🚚 Dropshipping</b> = zboží jde od dodavatele rovnou k zákazníkovi, nenaskladňuje se — žádná doporučení, žádné předzásobení. <b>🏷 Doprodej</b> = dojíždí, neobjednávat. Nastavení tady <b>přebíjí</b> výchozí pravidlo podle SK řady, takže když se u dropshipového dodavatele začne naskladňovat, stačí přepnout na Sklad.</p>';
+  let h='<p class="muted" style="margin:0 0 8px">U každého dodavatele vyplň <b>termín dodání</b> (dny), <b>náklad na dopravu</b> (Kč za jednu společnou zásilku/kontejner) a případné <b>ohlášené zdražení</b> (kolik % a od kdy — model pak doporučí předzásobení za staré ceny). Z toho se počítá <b>jak často z toho dodavatele objednávat</b> (společný interval) a <b>ekonomická dávka</b> každé položky. Dražší doprava (Čína) = řidší, větší objednávky. „Doporučený interval" se dopočítá živě. Prázdné = použije se lhůta z ERP, EOQ se nepočítá.<br><b>Režim</b> říká, jestli se u dodavatele vůbec optimalizuje nákup: <b>Sklad</b> = ano. <b>🚚 Dropshipping</b> = zboží jde od dodavatele rovnou k zákazníkovi, nenaskladňuje se — žádná doporučení, žádné předzásobení. <b>🏷 Doprodej</b> = dojíždí, neobjednávat. <b>📌 Na zakázku</b> = nakupuje se jen na konkrétní zakázky — optimalizace dodavatele <b>úplně přehlíží</b> (zmizí z tabulky, přehledu i reportů; tady v dotazníku zůstane, ať to jde vrátit). Nastavení tady <b>přebíjí</b> výchozí pravidlo podle SK řady, takže když se u dropshipového dodavatele začne naskladňovat, stačí přepnout na Sklad.</p>';
   h+='<div style="margin:0 0 8px"><button class="btn" type="button" id="objSupSave">💾 Uložit dotazník</button> <span class="muted" id="objSupStatus" style="font-size:12px"></span></div>';
   h+='<div class="tblwrap" style="max-height:420px"><table><thead><tr><th>Dodavatel</th><th title="Sklad = zboží držíme a model doporučuje objednávky. Dropshipping = jde od dodavatele rovnou k zákazníkovi, nenaskladňuje se a NEOPTIMALIZUJE se. Doprodej = dojíždí, neobjednávat.">Režim</th><th>Původ</th><th style="text-align:right">Položek</th><th style="text-align:right">Hodnota zásoby</th><th style="text-align:right">ERP lhůta</th><th style="text-align:right">Termín dodání (dny)</th><th style="text-align:right">Doprava (Kč/zásilka)</th><th style="text-align:right" title="Ohlášené zdražení dodavatele — model doporučí předzásobení za staré ceny">Zdražení %</th><th title="Datum, od kterého nové ceny platí">Od data</th><th style="text-align:right" title="Optimální frekvence objednávek z tohoto dodavatele (joint replenishment)">Doporučený interval</th></tr></thead><tbody>';
   list.forEach(s=>{const k=esc(s.supplier); const prev=objSupIntervalPreview(s.supplier,s.shipCost);
@@ -3523,6 +3527,7 @@ function objRenderSuppliers(list){
         +btn('sklad','Sklad','Držíme na skladě — model doporučuje objednávky')
         +btn('dropship','🚚 Dropship','Jde od dodavatele rovnou k zákazníkovi — nenaskladňuje se a neoptimalizuje')
         +btn('doprodej','🏷 Doprodej','Dojíždí — neobjednávat')
+        +btn('zakazka','📌 Na zakázku','Nakupuje se jen na konkrétní zakázky — optimalizace nákupu tohoto dodavatele úplně přehlíží: zmizí z tabulky, přehledu i reportů, v dotazníku zůstane')
         +btn('pozastaveno','⏸ Pozastaveno','Ručně vypnuto: od dodavatele se dočasně neobjednává, zboží se dál prodává. U zaměnitelných položek přebírá objednávky jiná varianta ve skupině.')
       +'</span>'+(zPrav?' <span class="muted" style="font-size:11px" title="Zatím nepotvrzeno — plyne z pravidla nákupu podle SK řady">z pravidla</span>':'')
       +'<input data-f="rezimPozn" value="'+esc(s.rezimPozn||'')+'" placeholder="důvod (např. dražší od 1. 1.)" style="width:150px;margin-left:6px;font-size:11px;'+(rez==='sklad'?'display:none':'')+'" title="Poznámka k režimu — zobrazí se u položek dodavatele"></td>'+
