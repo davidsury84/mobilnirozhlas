@@ -99,6 +99,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .kpi.dead .v{color:var(--dead)}.kpi.err .v{color:var(--err)}.kpi.ok .v{color:var(--ok)}.kpi.warn .v{color:var(--warn)}
   .charts{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:16px}
   .charts>*{min-width:0}
+  #objDashKpis .kpi.on{outline:2px solid #b06f00;outline-offset:-2px}#objDashKpis .kpi:hover{box-shadow:0 2px 8px rgba(0,0,0,.12)}
   #veRokPol td:nth-child(2),#veRokZak td:nth-child(2){white-space:normal;min-width:180px}
   #objDashTop td:nth-child(2),#objDashTop td:nth-child(9),#objDashSup td:first-child{white-space:normal;min-width:160px}   /* dlouhé názvy zalamovat, ne roztahovat tabulku */   /* 1fr = minmax(auto,1fr): široká tabulka by jinak roztáhla sloupec přes okraj stránky */
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
@@ -3105,8 +3106,18 @@ function objKanalCells(x){
   return es+ob;
 }
 // ---- DASHBOARD doporučených nákupů: souhrn všeho, co model navrhuje objednat ----
-var OBJ_DASH_CHART=null;
+var OBJ_DASH_CHART=null, OBJ_DASH_FILTER='';
 const objIsVyr=x=>/^VÝR/i.test(String(x.skupina||'').trim());
+const OBJ_DASH_FILTRY={vse:['Vše k objednání',x=>x._o.rec>0],oversold:['Oversold',x=>x._o.rec>0&&(x.avail||0)<0],vyr:['Vlastní výroba',x=>x._o.rec>0&&objIsVyr(x)],nabeh:['Náběh sezóny',x=>x._o.rec>0&&x._o.ramp],nove:['Nové + předzásobení',x=>x._o.rec>0&&(x._o.nova||x._o.fwd)]};
+var OBJ_DASH_PREV=null;
+function objDashFilter(f){
+  const only=$('#objOnly'), sel=$('#objSup');
+  const bylo=!!OBJ_DASH_FILTER; OBJ_DASH_FILTER=(OBJ_DASH_FILTER===f)?'':f;
+  if(OBJ_DASH_FILTER){ if(!bylo)OBJ_DASH_PREV={only:only?only.checked:true,sup:sel?sel.value:''}; if(sel)sel.value=''; if(only)only.checked=false; }
+  else if(OBJ_DASH_PREV){ if(only)only.checked=OBJ_DASH_PREV.only; if(sel)sel.value=OBJ_DASH_PREV.sup; OBJ_DASH_PREV=null; }   // zrušení vrátí původní zaškrtnutí
+  objDraw();
+  if(OBJ_DASH_FILTER){const t=$('#objTbl');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});}
+}
 function objRenderDash(rows){
   const box=$('#objDash'); if(!box)return;
   const R='style="text-align:right"';
@@ -3118,12 +3129,13 @@ function objRenderDash(rows){
   const sups={}; list.forEach(x=>{const s=sups[x.skupina]||(sups[x.skupina]={sup:x.skupina,n:0,ks:0,kc:0,krit:0,minCover:Infinity,vyr:objIsVyr(x)});s.n++;s.ks+=x._o.rec;s.kc+=val(x);if(crit(x))s.krit++;if(isFinite(x._o.coverAfter))s.minCover=Math.min(s.minCover,x._o.coverAfter);});
   const S=Object.values(sups).sort((a,b)=>b.kc-a.kc);
   $('#objDashPozn').textContent='· '+fmt(list.length)+' položek · '+fmt(ks)+' ks · '+fmt(Math.round(tot))+' Kč · '+S.length+' dodavatelů';
+  // Dlaždice jsou proklikávatelné: klik = filtr tabulky dole na tu skupinu položek (znovu klik = zrušit)
   $('#objDashKpis').innerHTML=[
-    ['warn',fmt(list.length),'Položek k objednání'],['',fmt(Math.round(tot))+' Kč','Hodnota celkem (nákupní ceny)'],
-    ['err',fmt(kritL.length),'Oversold — rezervace přes sklad ('+fmt(Math.round(kritL.reduce((s,x)=>s+val(x),0)))+' Kč)'],
-    ['',fmt(vyrL.length),'🏭 Vlastní výroba (VÝR) — zadat do výroby'],
-    ['',fmt(nabeh.length),'Náběh sezóny'],['',fmt(nove.length+fwd.length),'Nové položky + předzásobení před zdražením']
-  ].map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+'"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+'</div></div>').join('');
+    ['warn',fmt(list.length),'Položek k objednání','vse'],['',fmt(Math.round(tot))+' Kč','Hodnota celkem (nákupní ceny)','vse'],
+    ['err',fmt(kritL.length),'Oversold — rezervace přes sklad ('+fmt(Math.round(kritL.reduce((s,x)=>s+val(x),0)))+' Kč)','oversold'],
+    ['',fmt(vyrL.length),'🏭 Vlastní výroba (VÝR) — zadat do výroby','vyr'],
+    ['',fmt(nabeh.length),'Náběh sezóny','nabeh'],['',fmt(nove.length+fwd.length),'Nové položky + předzásobení před zdražením','nove']
+  ].map(k=>'<div class="kpi'+(k[0]?' '+k[0]:'')+(OBJ_DASH_FILTER===k[3]?' on':'')+'" data-f="'+k[3]+'" style="cursor:pointer" title="Klikni = ukázat tyto položky v tabulce dole" onclick="objDashFilter(\''+k[3]+'\')"><div class="v">'+k[1]+'</div><div class="l">'+k[2]+' ↓</div></div>').join('');
   if(typeof Chart!=='undefined'){
     const mut=_cv('--mut'),line=_cv('--line');
     try{if(OBJ_DASH_CHART)OBJ_DASH_CHART.destroy();}catch(e){}
@@ -3164,7 +3176,11 @@ async function objRucne(key){
 function objDraw(){
   const rows=(OBJ_DATA&&OBJ_DATA.rows)||[];
   const q=($('#objSearch').value||'').toLowerCase().trim(),sup=$('#objSup').value,only=$('#objOnly').checked;
-  let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||(objNekryto(x)&&!x._o.spec)));
+  const dashF=OBJ_DASH_FILTRY[OBJ_DASH_FILTER];
+  let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||(objNekryto(x)&&!x._o.spec))&&(!dashF||dashF[1](x)));
+  { let b=document.getElementById('objDashFiltrBadge'); const tw=$('#objTbl')&&$('#objTbl').closest('.tblwrap');
+    if(!b&&tw){b=document.createElement('div');b.id='objDashFiltrBadge';b.style.cssText='margin:0 0 6px;font-size:13px';tw.parentNode.insertBefore(b,tw);}
+    if(b){b.style.display=dashF?'':'none';if(dashF)b.innerHTML='<span style="display:inline-block;background:#fff0cc;border:1px solid #e8c97a;border-radius:9px;padding:3px 10px"><b>Filtr z přehledu:</b> '+esc(dashF[0])+' · '+list.length+' položek <a href="#" onclick="objDashFilter(\''+OBJ_DASH_FILTER+'\');return false" style="margin-left:8px">✕ zrušit</a></span>';} }
   const toOrder=rows.filter(x=>x._o.rec>0),oversold=rows.filter(x=>objNekryto(x)&&!x._o.spec),ceka=rows.filter(x=>(x.avail||0)<0&&!objNekryto(x)&&!x._o.spec),specRows=rows.filter(x=>x._o.spec);
   const totVal=toOrder.reduce((s,x)=>s+x._o.value,0),supsOrder=new Set(toOrder.map(x=>x.skupina)).size;
   try{objRenderDash(rows);}catch(e){console.warn('dash',e);}
