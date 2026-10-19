@@ -444,11 +444,13 @@ function mount(host) {
     const inv = inventuraStav(v, nast);
     const chybi = chybejiciRoky(v);
     const upoz = [];
-    if (v.stav === 'aktivni') {
+    if (v.stav === 'aktivni' || v.stav === 'odstaveno') {
       // Chybějící údaj není totéž co propadlá prohlídka — urgentní je jen to druhé.
       if (dnyStk === null) upoz.push({ druh: 'stk-chybi', urgent: false, text: 'chybí datum platnosti technické prohlídky' });
-      else if (dnyStk < 0) upoz.push({ druh: 'stk', urgent: true, text: 'technická prohlídka propadla před ' + (-dnyStk) + ' dny' });
-      else if (dnyStk <= 60) upoz.push({ druh: 'stk', urgent: dnyStk <= 14, text: 'technická prohlídka končí za ' + dnyStk + ' ' + (dnyStk === 1 ? 'den' : dnyStk < 5 ? 'dny' : 'dní') });
+      else if (dnyStk < 0) upoz.push({ druh: 'stk', urgent: v.stav === 'aktivni', text: 'technická prohlídka propadla před ' + (-dnyStk) + ' dny' });
+      else if (dnyStk <= 60) upoz.push({ druh: 'stk', urgent: dnyStk <= 14 && v.stav === 'aktivni', text: 'technická prohlídka končí za ' + dnyStk + ' ' + (dnyStk === 1 ? 'den' : dnyStk < 5 ? 'dny' : 'dní') });
+    }
+    if (v.stav === 'aktivni') {
       if (chybi.length) upoz.push({ druh: 'km', urgent: false, text: 'chybí stav tachometru za rok ' + chybi.join(', ') });
       if (inv.potreba) upoz.push({ druh: 'inventura', urgent: false, text: 'inventarizace svěřeného majetku — ' + inv.text });
       if (!v.spravceEmail) upoz.push({ druh: 'spravce', urgent: false, text: 'není přidělen správce vozu' });
@@ -585,6 +587,7 @@ function mount(host) {
       if (p === '/api/vozidla/odkup/stav' && req.method === 'POST') return apiOdkupStav(req, res);
       if (p === '/api/vozidla/plan' && req.method === 'POST') return apiPlan(req, res);
       if (p === '/api/vozidla/cena' && req.method === 'POST') return apiCena(req, res);
+      if (p === '/api/vozidla/ukon' && req.method === 'POST') return apiUkon(req, res);
       if (p === '/api/vozidla/trh' && req.method === 'POST') return apiTrh(req, res);
       if (p === '/api/vozidla/trh/stav' && req.method === 'GET') { json(res, 200, TRH_BEH); return true; }
       if (p === '/api/vozidla/data' && req.method === 'GET') return apiData(req, res);
@@ -647,7 +650,7 @@ function mount(host) {
             stredisko: zs.map(x => x.stredisko).filter(Boolean).join(', '),
           });
         }) }; })(),
-      strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA, plany: PLANY,
+      strediska, role: ROLE, stavy: STAVY, typy: TYPY, stkLhuta: STK_LHUTA, plany: PLANY, zpusobyVyrazeni: ZPUSOBY_VYRAZENI,
       nastaveni: d.nastaveni,
       trhStav: TRH_BEH,             // běží hromadné porovnání s inzercí?
       zamestnanci: zamestnanci(),   // pro našeptávač; stejná data jako telefonní seznam intranetu
@@ -1053,6 +1056,88 @@ function mount(host) {
     json(res, 200, { ok: true, plan, oceneni: oceneniVozu(v, d.nastaveni) });
     return true;
   }
+  // ---- úkony s vozidlem: prodat, vyřadit (zlikvidovat), odstavit, vrátit do provozu ----
+  //  Plán (prodej / likvidace) je záměr; tady se zapisuje, co se s vozem skutečně stalo.
+  //  Stav se mění jen tudy nebo v úpravě vozidla správcem modulu; historie zůstává u vozu.
+  const ZPUSOBY_VYRAZENI = { likvidace: 'Ekologická likvidace', skoda: 'Totální škoda (pojišťovna)', odevzdani: 'Vrácení / odevzdání (leasing, protiúčet)', jine: 'Jiný způsob' };
+  async function apiUkon(req, res) {
+    const b = JSON.parse(await host.readBody(req) || '{}');
+    const d = load(), r = role(req);
+    const v = d.vozidla.find(x => x.id === b.id);
+    if (!v) { json(res, 404, { chyba: 'Vozidlo nenalezeno.' }); return true; }
+    if (!smiRozhodovat(v, r)) { json(res, 403, { chyba: 'O prodeji, vyřazení a odstavení rozhoduje správce modulu nebo zodpovědná osoba za středisko.' }); return true; }
+    const ukon = String(b.ukon || '');
+    const datum = /^\d{4}-\d{2}-\d{2}$/.test(String(b.datum || '')) ? b.datum : new Date().toISOString().slice(0, 10);
+    const kdo = r.name || r.email, pozn = String(b.pozn || '').trim().slice(0, 1000);
+    const o = oceneniVozu(v, d.nastaveni);
+    const popis = (v.spz || v.vin) + (v.znacka || v.model ? ' (' + [v.znacka, v.model].filter(Boolean).join(' ') + ')' : '');
+    const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
+    const komu = Array.from(new Set([v.spravceEmail, zod && zod.email, d.nastaveni.reditelEmail].concat(d.nastaveni.kopieNa || []).filter(Boolean).map(low).filter(e => e !== r.email)));
+    v.historie = v.historie || [];
+    let predmet = '', text = '', log = '';
+    if (ukon === 'prodat') {
+      const cena = Math.round(Number(String(b.cena == null ? '' : b.cena).replace(/\s/g, '').replace(',', '.')) || 0);
+      if (!cena) { json(res, 400, { chyba: 'Zadejte skutečnou prodejní cenu.' }); return true; }
+      const kupujici = String(b.kupujici || '').trim().slice(0, 200);
+      if (!kupujici) { json(res, 400, { chyba: 'Zadejte, komu se vozidlo prodalo.' }); return true; }
+      v.prodej = { datum, kupujici, kupujiciEmail: low(b.kupujiciEmail || ''), cena, pozn, kdo, ts: Date.now(),
+        trzniTehdy: o.trzni || null, trzniZdroj: o.trzniZdroj || null, zustatkovaTehdy: o.zustatkova != null ? o.zustatkova : null, tachometr: posledniKm(v) ? Number(posledniKm(v).km) : null };
+      // přijatá nabídka odkupu se spáruje, ostatní otevřené se uzavřou
+      d.odkup.filter(n => n.vozId === v.id && n.stav === 'nova').forEach(n => {
+        const je = (b.nabidkaId && n.id === b.nabidkaId) || (v.prodej.kupujiciEmail && low(n.email) === v.prodej.kupujiciEmail);
+        n.stav = je ? 'prijata' : 'zamitnuta'; n.stavKdo = kdo; n.stavTs = Date.now();
+      });
+      v.stav = 'prodano'; v.plan = ''; v.planOd = null; v.planKdo = ''; v.planPozn = '';
+      v.historie.push({ ts: Date.now(), datum, ukon: 'prodej', kdo, detail: kupujici + ' · ' + cena.toLocaleString('cs-CZ') + ' Kč' + (pozn ? ' · ' + pozn : '') });
+      log = 'Vozidlo ' + popis + ' prodáno: ' + kupujici + ' za ' + cena.toLocaleString('cs-CZ') + ' Kč';
+      predmet = 'Vozidlo ' + popis + ' prodáno';
+      text = 'Vozidlo ' + popis + ' bylo ' + datum.split('-').reverse().join('. ') + ' prodáno.\n\nKupující: ' + kupujici + '\nCena: ' + cena.toLocaleString('cs-CZ') + ' Kč'
+        + (o.trzni ? ' (tržní cena ' + (o.trzniZdroj === 'inzerce' ? 'dle inzerce' : 'odhad') + ': ' + o.trzni.toLocaleString('cs-CZ') + ' Kč)' : '')
+        + (o.zustatkova != null ? '\nÚčetní zůstatková: ' + o.zustatkova.toLocaleString('cs-CZ') + ' Kč' : '')
+        + '\nZapsal: ' + kdo + (pozn ? '\nPoznámka: ' + pozn : '')
+        + '\n\nVozidlo je vyřazené z evidence svěřených vozidel — upomínky k němu už chodit nebudou. Nezapomeňte na odhlášení v registru, pojištění a předání dokladů a klíčů.';
+    } else if (ukon === 'vyradit') {
+      const zpusob = ZPUSOBY_VYRAZENI[b.zpusob] ? b.zpusob : 'likvidace';
+      v.vyrazeni = { datum, zpusob, zpusobText: ZPUSOBY_VYRAZENI[zpusob], doklad: String(b.doklad || '').trim().slice(0, 200), pozn, kdo, ts: Date.now(),
+        trzniTehdy: o.trzni || null, zustatkovaTehdy: o.zustatkova != null ? o.zustatkova : null, tachometr: posledniKm(v) ? Number(posledniKm(v).km) : null };
+      d.odkup.filter(n => n.vozId === v.id && n.stav === 'nova').forEach(n => { n.stav = 'zamitnuta'; n.stavKdo = kdo; n.stavTs = Date.now(); });
+      v.stav = 'vyrazeno'; v.plan = ''; v.planOd = null; v.planKdo = ''; v.planPozn = '';
+      v.historie.push({ ts: Date.now(), datum, ukon: 'vyrazeni', kdo, detail: ZPUSOBY_VYRAZENI[zpusob] + (v.vyrazeni.doklad ? ' · doklad ' + v.vyrazeni.doklad : '') + (pozn ? ' · ' + pozn : '') });
+      log = 'Vozidlo ' + popis + ' vyřazeno: ' + ZPUSOBY_VYRAZENI[zpusob];
+      predmet = 'Vozidlo ' + popis + ' vyřazeno z provozu';
+      text = 'Vozidlo ' + popis + ' bylo ' + datum.split('-').reverse().join('. ') + ' vyřazeno.\n\nZpůsob: ' + ZPUSOBY_VYRAZENI[zpusob]
+        + (v.vyrazeni.doklad ? '\nDoklad: ' + v.vyrazeni.doklad : '') + (o.zustatkova ? '\nÚčetní zůstatková: ' + o.zustatkova.toLocaleString('cs-CZ') + ' Kč — k odpisu' : '')
+        + '\nZapsal: ' + kdo + (pozn ? '\nPoznámka: ' + pozn : '')
+        + '\n\nVozidlo je vyřazené z evidence svěřených vozidel — upomínky k němu už chodit nebudou. Nezapomeňte na odhlášení v registru a ukončení pojištění.';
+    } else if (ukon === 'odstavit') {
+      v.odstaveni = { datum, duvod: pozn, kdo, ts: Date.now() };
+      v.stav = 'odstaveno';
+      v.historie.push({ ts: Date.now(), datum, ukon: 'odstaveni', kdo, detail: pozn || 'dočasně mimo provoz' });
+      log = 'Vozidlo ' + popis + ' odstaveno' + (pozn ? ': ' + pozn : '');
+      predmet = 'Vozidlo ' + popis + ' odstaveno';
+      text = 'Vozidlo ' + popis + ' je od ' + datum.split('-').reverse().join('. ') + ' dočasně odstavené z provozu' + (pozn ? ' (' + pozn + ')' : '') + '.\nZapsal: ' + kdo + '\n\nPo dobu odstavení k němu nechodí upomínky na tachometr a inventarizaci; technická prohlídka se hlídá dál.';
+    } else if (ukon === 'provoz') {
+      // zpět do provozu: z odstavení smí i zodpovědná osoba, z prodeje/vyřazení jen správce modulu (překlep v zápisu)
+      if ((v.stav === 'prodano' || v.stav === 'vyrazeno') && !r.admin) { json(res, 403, { chyba: 'Prodané nebo vyřazené vozidlo vrací do evidence jen správce modulu.' }); return true; }
+      const z = v.stav;
+      v.stav = 'aktivni'; delete v.odstaveni;
+      if (z === 'prodano') { v.prodejZruseny = v.prodej; delete v.prodej; }
+      if (z === 'vyrazeno') { v.vyrazeniZrusene = v.vyrazeni; delete v.vyrazeni; }
+      v.historie.push({ ts: Date.now(), datum, ukon: 'provoz', kdo, detail: 'zpět do provozu (předtím: ' + (STAVY[z] || z) + ')' + (pozn ? ' · ' + pozn : '') });
+      log = 'Vozidlo ' + popis + ' vráceno do provozu (předtím ' + (STAVY[z] || z) + ')';
+      predmet = 'Vozidlo ' + popis + ' je zpět v provozu';
+      text = 'Vozidlo ' + popis + ' je od ' + datum.split('-').reverse().join('. ') + ' zase vedené jako v provozu (předtím: ' + (STAVY[z] || z) + ').\nZapsal: ' + kdo + (pozn ? '\nPoznámka: ' + pozn : '');
+    } else { json(res, 400, { chyba: 'Neznámý úkon.' }); return true; }
+    // upomínky k tomuto vozu ať začnou od začátku (nebo vůbec)
+    Object.keys(d.odeslano).forEach(k => { if (k.indexOf(':' + v.id + ':') > 0 || k.endsWith(':' + v.id)) delete d.odeslano[k]; });
+    save(d);
+    logAct('vozidla', req, log);
+    synchronizujTag(d);
+    if (komu.length) await mail(komu.join(','), predmet, text + '\n\nDetail: https://intranet.elkoplast.cz/#modul=vozidla', 'souhrn');
+    json(res, 200, { ok: true, stav: v.stav });
+    return true;
+  }
+
   async function apiCena(req, res) {
     const b = JSON.parse(await host.readBody(req) || '{}');
     const d = load(), r = role(req);
@@ -1139,7 +1224,8 @@ function mount(host) {
     const hl = ['SPZ', 'Značka', 'Model', 'VIN', 'Rok výroby', 'Typ', 'Stav', 'Středisko', 'Správce vozu', 'E-mail správce',
       'Zodpovědná osoba', 'STK do', 'Dní do STK', 'Poslední tachometr', 'Rok zápisu', 'Nájezd km/rok',
       'Poslední inventarizace', 'Doporučení prodeje', 'Termín vyřazení', 'Pořizovací cena', 'Zdroj pořizovací ceny',
-      'Zůstatková cena', 'Tržní cena', 'Zdroj tržní ceny', 'Inzerce — počet', 'Inzerce — medián', 'Inzerce — rychlý prodej', 'Prodejní cena', 'Tržní − zůstatková', 'Plán'];
+      'Zůstatková cena', 'Tržní cena', 'Zdroj tržní ceny', 'Inzerce — počet', 'Inzerce — medián', 'Inzerce — rychlý prodej', 'Prodejní cena', 'Tržní − zůstatková', 'Plán',
+      'Prodáno / vyřazeno dne', 'Kupující / způsob vyřazení', 'Skutečná prodejní cena'];
     const radky = viditelna(d, r).map(v => {
       const st = stavVozu(v, d.nastaveni), pk = posledniKm(v), o = oceneniVozu(v, d.nastaveni);
       const zod = d.zodpovedne.find(z => z.stredisko === v.stredisko);
@@ -1150,7 +1236,8 @@ function mount(host) {
         o.termin ? oceneni.fmtMesic(o.termin) : '', o.porizovaci || '', o.porizovaciZdroj || '',
         o.zustatkova == null ? '' : o.zustatkova, o.trzni == null ? '' : o.trzni, o.trzniZdroj || '',
         o.inzerce ? o.inzerce.n : '', o.inzerce ? o.inzerce.median : '', o.inzerce ? o.inzerce.rychly : '', o.prodejni == null ? '' : o.prodejni,
-        o.rozdilZustatkova == null ? '' : o.rozdilZustatkova, PLANY[v.plan] || ''];
+        o.rozdilZustatkova == null ? '' : o.rozdilZustatkova, PLANY[v.plan] || '',
+        (v.prodej && v.prodej.datum) || (v.vyrazeni && v.vyrazeni.datum) || '', v.prodej ? v.prodej.kupujici : (v.vyrazeni ? v.vyrazeni.zpusobText : ''), v.prodej ? v.prodej.cena : ''];
     });
     const csv = [hl].concat(radky).map(a => a.map(x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"').join(';')).join('\r\n');
     host.send(res, 200, '﻿' + csv, {
