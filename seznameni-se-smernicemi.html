@@ -5123,7 +5123,7 @@ async function loadNotifikace(){
       '<div class="li-t">'+esc(x.text)+'</div>'+
       '<div class="muted" style="font-size:12px;margin-top:2px"><b>'+esc(x.modulNazev)+'</b>'+(x.sub?' · '+esc(x.sub):'')+'</div></div></div>'+
       // dlaždice s vlastní adresou (např. odkup vozidel pro lidi bez přístupu k modulu) se otevře přímo, ne přes modul
-      '<button class="btn sm'+(x.urgent?'':' ghost')+'" onclick="'+(x.url&&/^\/[a-z0-9\/_-]*$/i.test(x.url)?'window.open(\''+esc(x.url)+'\',\'_blank\')':'mjGo(\''+x.modul+'\')')+'">'+mjT('Otevřít')+'</button></div>';
+      '<button class="btn sm'+(x.urgent?'':' ghost')+'" onclick="'+(x.url&&/^\/[a-z0-9\/_-]*(#[a-z0-9_-]+)?$/i.test(x.url)?'window.open(\''+esc(x.url)+'\',\'_blank\')':'mjGo(\''+x.modul+'\')')+'">'+mjT('Otevřít')+'</button></div>';
   }).join('');
 }
 // ---------- Bilance skladu e-shop (home widget, jen pro přístup k modulu eshop) ----------

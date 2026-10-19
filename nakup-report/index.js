@@ -295,7 +295,29 @@ function mount(host) {
         if (up.length) out.push({ modul: 'pohledavky', modulNazev: 'Pohledávky', ikona: 'file', urgent: false, text: up.length + ' ' + (up.length === 1 ? 'faktura' : up.length < 5 ? 'faktury' : 'faktur') + ' k odeslání upomínky (Helios)', sub: Math.round(up.reduce((a, f) => a + f.saldo, 0)).toLocaleString('cs-CZ') + ' Kč' });
         if (vy.length) out.push({ modul: 'pohledavky', modulNazev: 'Pohledávky', ikona: 'file', urgent: true, text: vy.length + ' ' + (vy.length === 1 ? 'faktura' : vy.length < 5 ? 'faktury' : 'faktur') + ' k odeslání předžalobní výzvy', sub: [...new Set(vy.map(f => f.org))].slice(0, 3).join(', ') }); }
     } catch (_) {}
+    // Utichlé položky — totéž, co chodí v reportu „rozhodnout o vyřazení / potvrzení",
+    // ale na nástěnce a proklikem rovnou na místo, kde se rozhoduje.
+    try {
+      const cfg = loadCfg();
+      if (cleanEmails(cfg.utichleTo || []).indexOf(em) >= 0) {
+        const u = utichleCache(cfg);
+        if (u.pocet) out.push({ modul: 'eshop', modulNazev: 'Nákup — utichlé položky', ikona: 'file', urgent: false,
+          text: u.pocet + ' ' + (u.pocet === 1 ? 'položka utichla' : u.pocet < 5 ? 'položky utichly' : 'položek utichlo')
+            + ' — rozhodnout o vyřazení / potvrzení',
+          sub: '📉 ' + fmt(u.ukonceny) + ' ukončený sortiment · 📦 ' + fmt(u.narazovy) + ' nárazová zakázka · model by objednal za ' + kc(u.val),
+          url: '/smi-app#utichle' });
+      }
+    } catch (_) {}
     return out;
+  }
+  // Počítá se z celého ERP snímku, takže na každé načtení nástěnky ne — stačí jednou za minutu.
+  let utichleCacheVal = null;
+  function utichleCache(cfg) {
+    if (utichleCacheVal && Date.now() - utichleCacheVal.at < 60000) return utichleCacheVal;
+    const u = collectUtichle(cfg);
+    utichleCacheVal = { at: Date.now(), pocet: u.items.length, val: u.val,
+      ukonceny: u.ukonceny.length, narazovy: u.narazovy.length };
+    return utichleCacheVal;
   }
   const VYZVA_HTML = path.join(__dirname, 'vyzva.html');
   const loadVyd = () => {

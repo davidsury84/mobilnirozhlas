@@ -1549,6 +1549,18 @@ function renderParam(){
     `<span class="muted">Náklady skladu a kapitálovou sazbu zadáš v záložce 📦 Optimalizace nákupu (předvyplněno z reálných dat – doplňkové/skladové náklady 2025). „Odhad ročního ICC" položky = průměrná hodnota zásoby (Kč) × ICC. Tutéž sazbu používá i Optimalizace nákupu (efektivní sazba držení).</span>`;
 }
 const PANE_TBL={chyby:'errTbl',ceny:'priceTbl',mrtve:'deadTbl',model:'modelTbl',elko:'elkoTbl',seg:'csSalesTbl'};
+/* Odkaz z nástěnky intranetu: /smi-app#utichle → záložka Objednávky + rozbalené utichlé položky. */
+let UT_SKOK=false, UT_SKOK_AT=0;
+function utSkokZOdkazu(){
+  if(String(location.hash||'').toLowerCase()!=='#utichle')return;
+  UT_SKOK=true; UT_SKOK_AT=Date.now();
+  const jdi=()=>{ const t=document.querySelector('.tab[data-pane="objednavky"]');
+    if(!t)return;
+    if(t.classList.contains('active')){ try{renderObjednavky();}catch(e){} } else t.click(); };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',jdi,{once:true}); else setTimeout(jdi,0);
+}
+utSkokZOdkazu();
+window.addEventListener('hashchange',utSkokZOdkazu);
 $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='model')ensureModelSup();if(pane==='vyvojeshop')renderVyvojEshop();if(pane==='historie'){renderHistory();refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='objednavky')renderObjednavky();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
 const _bulkBtn=$('#bulkApply');if(_bulkBtn)_bulkBtn.onclick=bulkApply;
 
@@ -3214,7 +3226,15 @@ function objDraw(){
           +'</div>'):'')
         +'</div></div>';
       const tg=$('#utToggle'), bd=$('#utBody');
-      if(tg&&bd)tg.onclick=()=>{const open=bd.style.display!=='none';bd.style.display=open?'none':'block';tg.textContent=open?'Zobrazit seznam':'Skrýt seznam';};
+      // ruční přepnutí zruší „přišel jsem z nástěnky" — jinak by se seznam při překreslení otvíral znovu
+      if(tg&&bd)tg.onclick=()=>{UT_SKOK=false;const open=bd.style.display!=='none';bd.style.display=open?'none':'block';tg.textContent=open?'Zobrazit seznam':'Skrýt seznam';};
+      // Přišel sem odkaz z nástěnky (/smi-app#utichle) → rozbalit a doskrolovat.
+      // Rozbaluje se při každém překreslení (tabulka se vykresluje na víc kol), skroluje jen chvíli po otevření.
+      if(UT_SKOK&&tg&&bd){
+        if(bd.style.display==='none'){ bd.style.display='block'; tg.textContent='Skrýt seznam'; }
+        // plynulé rolování překreslení tabulek přeruší; skáče se natvrdo a jen dokud uživatel sám neodroloval
+        if(Date.now()-UT_SKOK_AT<10000&&window.scrollY<80) setTimeout(()=>{ try{utEl.scrollIntoView({block:'start'});}catch(e){} },80);
+      }
     }
   }
   try{objRenderModel2(rows);}catch(e){console.warn('model2',e);}
