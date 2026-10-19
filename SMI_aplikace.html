@@ -101,7 +101,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .charts>*{min-width:0}
   #objDashKpis .kpi.on{outline:2px solid #b06f00;outline-offset:-2px}#objDashKpis .kpi:hover{box-shadow:0 2px 8px rgba(0,0,0,.12)}
   #veRokPol td:nth-child(2),#veRokZak td:nth-child(2){white-space:normal;min-width:180px}
-  #objDashTop td:nth-child(2),#objDashTop td:nth-child(9),#objDashSup td:first-child{white-space:normal;min-width:160px}   /* dlouhé názvy zalamovat, ne roztahovat tabulku */   /* 1fr = minmax(auto,1fr): široká tabulka by jinak roztáhla sloupec přes okraj stránky */
+  #objDashTop td:nth-child(2),#objDashTop td:nth-child(11),#objDashSup td:first-child{white-space:normal;min-width:160px}   /* dlouhé názvy zalamovat, ne roztahovat tabulku */   /* 1fr = minmax(auto,1fr): široká tabulka by jinak roztáhla sloupec přes okraj stránky */
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
   .card h3{margin:0 0 10px;font-size:13px;color:var(--mut);font-weight:600}
   .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:8px 0 16px;flex-wrap:wrap}
@@ -712,8 +712,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           <div><h4 style="margin:0 0 6px">Hodnota objednávek po dodavatelích</h4><div style="height:260px"><canvas id="objDashChart"></canvas></div></div>
           <div><h4 style="margin:0 0 6px">Dodavatelé <span class="muted" style="font-weight:400;font-size:12px">— klikni = filtr tabulky</span></h4><div class="tblwrap" style="max-height:300px"><table id="objDashSup"></table></div></div>
         </div>
-        <h4 style="margin:12px 0 6px">Nejnaléhavější položky <span class="muted" style="font-weight:400;font-size:12px">— oversold a nejnižší krytí po objednávce</span></h4>
-        <div class="tblwrap" style="max-height:320px"><table id="objDashTop"></table></div>
+        <h4 style="margin:12px 0 6px" id="objDashTopH">Nejnaléhavější položky</h4>
+        <div class="tblwrap" style="max-height:420px"><table id="objDashTop"></table></div>
       </div>
       <div id="objUtichle"></div>
       <div id="objModel2"></div>
@@ -3111,14 +3111,10 @@ function objKanalCells(x){
 var OBJ_DASH_CHART=null, OBJ_DASH_FILTER='';
 const objIsVyr=x=>/^VÝR/i.test(String(x.skupina||'').trim());
 const OBJ_DASH_FILTRY={vse:['Vše k objednání',x=>x._o.rec>0],oversold:['Oversold',x=>x._o.rec>0&&(x.avail||0)<0],vyr:['Vlastní výroba',x=>x._o.rec>0&&objIsVyr(x)],nabeh:['Náběh sezóny',x=>x._o.rec>0&&x._o.ramp],nove:['Nové + předzásobení',x=>x._o.rec>0&&(x._o.nova||x._o.fwd)]};
-var OBJ_DASH_PREV=null;
 function objDashFilter(f){
-  const only=$('#objOnly'), sel=$('#objSup');
-  const bylo=!!OBJ_DASH_FILTER; OBJ_DASH_FILTER=(OBJ_DASH_FILTER===f)?'':f;
-  if(OBJ_DASH_FILTER){ if(!bylo)OBJ_DASH_PREV={only:only?only.checked:true,sup:sel?sel.value:''}; if(sel)sel.value=''; if(only)only.checked=false; }
-  else if(OBJ_DASH_PREV){ if(only)only.checked=OBJ_DASH_PREV.only; if(sel)sel.value=OBJ_DASH_PREV.sup; OBJ_DASH_PREV=null; }   // zrušení vrátí původní zaškrtnutí
-  objDraw();
-  if(OBJ_DASH_FILTER){const t=$('#objTbl');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});}
+  OBJ_DASH_FILTER=(OBJ_DASH_FILTER===f)?'':f;
+  objDraw();   // překreslí přehled vč. tabulky pod dlaždicemi (hlavní tabulky dole se to netýká)
+  const hh=document.getElementById('objDashTopH'); if(hh&&OBJ_DASH_FILTER)hh.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function objRenderDash(rows){
   const box=$('#objDash'); if(!box)return;
@@ -3153,9 +3149,14 @@ function objRenderDash(rows){
   }
   $('#objDashSup').innerHTML='<thead><tr><th>Dodavatel</th><th '+R+'>Položek</th><th '+R+'>Kusů</th><th '+R+'>Hodnota</th><th '+R+'>Oversold</th><th '+R+' title="Nejnižší krytí po objednávce v měsících">Min. krytí</th><th></th></tr></thead><tbody>'+
     S.map(s=>'<tr style="cursor:pointer'+(s.krit?';background:rgba(194,54,54,.07)':'')+'" onclick="(function(){const sel=$(\'#objSup\');if(sel){sel.value='+JSON.stringify(s.sup).replace(/"/g,'&quot;')+';objDraw();}})()"><td>'+(s.vyr?'🏭 ':'')+'<b>'+esc(String(s.sup).replace(/^ZBO - |^VÝR - /,''))+'</b></td><td '+R+'>'+fmt(s.n)+'</td><td '+R+'>'+fmt(s.ks)+'</td><td '+R+'><b>'+fmt(Math.round(s.kc))+' Kč</b></td><td '+R+(s.krit?' style="color:#b23;font-weight:700"':' class="muted"')+'>'+(s.krit||'—')+'</td><td '+R+'>'+(isFinite(s.minCover)?objCoverTxt(s.minCover):'—')+'</td><td style="white-space:nowrap"><button type="button" class="btn" style="padding:2px 8px;font-size:11px;background:#3a7d44;color:#fff;border:0" onclick="event.stopPropagation();objSendToNakupci('+JSON.stringify(s.sup).replace(/"/g,'&quot;')+')">➕ Nákupčímu</button></td></tr>').join('')+'</tbody>';
-  const urgent=list.slice().sort((a,b)=>(crit(b)-crit(a))||((isFinite(a._o.coverAfter)?a._o.coverAfter:99)-(isFinite(b._o.coverAfter)?b._o.coverAfter:99))||(val(b)-val(a))).slice(0,15);
-  $('#objDashTop').innerHTML='<thead><tr><th>Kód</th><th>Položka</th><th>Dodavatel</th><th '+R+'>K dispo</th><th '+R+'>Objednáno</th><th '+R+'>Objednat</th><th '+R+'>Hodnota</th><th '+R+'>Krytí po obj.</th><th>Stav</th></tr></thead><tbody>'+
-    urgent.map(x=>'<tr'+(crit(x)?' style="background:rgba(194,54,54,.07)"':'')+'><td class="muted">'+esc(x.sk+'-'+x.reg)+'</td><td><b>'+esc(x.nazev)+'</b></td><td class="muted">'+esc(String(x.skupina).replace(/^ZBO - |^VÝR - /,''))+'</td><td '+R+(crit(x)?' style="color:#b23;font-weight:700"':'')+'>'+fmt(x.avail)+'</td><td '+R+'>'+fmt(x.onOrder)+(x.onOrderRucne?' <span title="z toho ručně (výroba)" style="color:#8a2f52">✎'+fmt(x.onOrderRucne)+'</span>':'')+'</td><td '+R+'><span class="ochip" style="background:'+(crit(x)?'#fadbd8':'#fff0cc')+';color:'+(crit(x)?'#922':'#7a5200')+'">'+fmt(x._o.rec)+'</span></td><td '+R+'>'+fmt(Math.round(val(x)))+' Kč</td><td '+R+'>'+objCoverTxt(x._o.coverAfter)+'</td><td class="muted" style="font-size:12px">'+esc(x._o.status||'')+'</td></tr>').join('')+'</tbody>';
+  const dashF=OBJ_DASH_FILTRY[OBJ_DASH_FILTER];
+  const srt=(a,b)=>(crit(b)-crit(a))||((isFinite(a._o.coverAfter)?a._o.coverAfter:99)-(isFinite(b._o.coverAfter)?b._o.coverAfter:99))||(val(b)-val(a));
+  const urgent=dashF?list.filter(dashF[1]).sort(srt):list.slice().sort(srt).slice(0,15);
+  const hh=$('#objDashTopH'); if(hh)hh.innerHTML=dashF
+    ?('<span style="display:inline-block;background:#fff0cc;border:1px solid #e8c97a;border-radius:9px;padding:2px 10px">'+esc(dashF[0])+' · '+urgent.length+' položek · '+fmt(Math.round(urgent.reduce((s,x)=>s+val(x),0)))+' Kč <a href="#" onclick="objDashFilter(\''+OBJ_DASH_FILTER+'\');return false" style="margin-left:8px">✕ zpět na nejnaléhavější</a></span>')
+    :'Nejnaléhavější položky <span class="muted" style="font-weight:400;font-size:12px">— oversold a nejnižší krytí po objednávce · klikni na dlaždici nahoře a tady se ukáže celá skupina</span>';
+  $('#objDashTop').innerHTML='<thead><tr><th>Kód</th><th>Položka</th><th>Dodavatel</th><th '+R+'>Sklad</th><th '+R+'>K dispo</th><th '+R+'>Rezerv.</th><th '+R+'>Objednáno</th><th '+R+'>Objednat</th><th '+R+'>Hodnota</th><th '+R+'>Krytí po obj.</th><th>Stav</th></tr></thead><tbody>'+
+    urgent.map(x=>'<tr'+(crit(x)?' style="background:rgba(194,54,54,.07)"':'')+'><td class="muted">'+esc(x.sk+'-'+x.reg)+'</td><td><b>'+esc(x.nazev)+'</b></td><td class="muted">'+esc(String(x.skupina).replace(/^ZBO - |^VÝR - /,''))+'</td><td '+R+'>'+fmt(x.stock)+'</td><td '+R+(crit(x)?' style="color:#b23;font-weight:700"':'')+'>'+fmt(x.avail)+'</td><td '+R+'>'+fmt(x.reserved)+'</td><td '+R+(objIsVyr(x)?' style="cursor:pointer;background:rgba(138,47,82,.06)" title="Vlastní výroba — klikni a zapiš, kolik je ve výrobě" onclick="objRucne(\''+esc(x.sk+'-'+x.reg)+'\')"':'')+'>'+fmt(x.onOrder)+(x.onOrderRucne?' <span title="z toho ručně (výroba)" style="color:#8a2f52">✎'+fmt(x.onOrderRucne)+'</span>':(objIsVyr(x)?' <span class="muted" style="font-size:11px">✎</span>':''))+'</td><td '+R+'><span class="ochip" style="background:'+(crit(x)?'#fadbd8':'#fff0cc')+';color:'+(crit(x)?'#922':'#7a5200')+'">'+fmt(x._o.rec)+'</span></td><td '+R+'>'+fmt(Math.round(val(x)))+' Kč</td><td '+R+'>'+objCoverTxt(x._o.coverAfter)+'</td><td class="muted" style="font-size:12px">'+esc(x._o.status||'')+'</td></tr>').join('')+'</tbody>';
 }
 // ---- RUČNĚ OBJEDNÁNO (vlastní výroba): Helios výrobu neobjednává, nákup to zapíše sem ----
 async function objRucne(key){
@@ -3178,11 +3179,7 @@ async function objRucne(key){
 function objDraw(){
   const rows=(OBJ_DATA&&OBJ_DATA.rows)||[];
   const q=($('#objSearch').value||'').toLowerCase().trim(),sup=$('#objSup').value,only=$('#objOnly').checked;
-  const dashF=OBJ_DASH_FILTRY[OBJ_DASH_FILTER];
-  let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||(objNekryto(x)&&!x._o.spec))&&(!dashF||dashF[1](x)));
-  { let b=document.getElementById('objDashFiltrBadge'); const tw=$('#objTbl')&&$('#objTbl').closest('.tblwrap');
-    if(!b&&tw){b=document.createElement('div');b.id='objDashFiltrBadge';b.style.cssText='margin:0 0 6px;font-size:13px';tw.parentNode.insertBefore(b,tw);}
-    if(b){b.style.display=dashF?'':'none';if(dashF)b.innerHTML='<span style="display:inline-block;background:#fff0cc;border:1px solid #e8c97a;border-radius:9px;padding:3px 10px"><b>Filtr z přehledu:</b> '+esc(dashF[0])+' · '+list.length+' položek <a href="#" onclick="objDashFilter(\''+OBJ_DASH_FILTER+'\');return false" style="margin-left:8px">✕ zrušit</a></span>';} }
+  let list=rows.filter(x=>(!q||((x.nazev+' '+x.sk+'-'+x.reg+' '+x.skupina+' '+(x.dodKod||'')).toLowerCase().indexOf(q)>=0))&&(!sup||x.skupina===sup)&&(!only||x._o.rec>0||(objNekryto(x)&&!x._o.spec)));
   const toOrder=rows.filter(x=>x._o.rec>0),oversold=rows.filter(x=>objNekryto(x)&&!x._o.spec),ceka=rows.filter(x=>(x.avail||0)<0&&!objNekryto(x)&&!x._o.spec),specRows=rows.filter(x=>x._o.spec);
   const totVal=toOrder.reduce((s,x)=>s+x._o.value,0),supsOrder=new Set(toOrder.map(x=>x.skupina)).size;
   try{objRenderDash(rows);}catch(e){console.warn('dash',e);}
