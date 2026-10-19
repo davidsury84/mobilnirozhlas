@@ -739,6 +739,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         <div id="objSupWrap" style="margin-top:8px;font-size:13px"></div>
       </details>
       <details class="settings" id="objAltPanel" style="margin:6px 0 10px"><summary>🔀 Alternativní dodavatelé — stejné zboží od více dodavatelů <span id="objAltBadge" class="muted" style="font-weight:400;font-size:12px"></span></summary>
+        <div class="note" style="margin-top:8px;background:#eef4f8;border-color:#cfdde8"><b>Jak to funguje.</b> Stejnou nádobu nakupujete od víc dodavatelů (např. CLD 240 l: SULO, Contenur, Mevatec, Plastik Gogic, Plastic Omnium) a v ERP je každá zvlášť — model by proto objednal u každého, jako by to bylo jiné zboží. Tady je spojíte do <b>skupiny</b> a skupina se plánuje <b>jako jedna položka</b>: poptávka i zásoba se sečtou přes všechny varianty a objednávka jde jen na <b>🎯 cílovou variantu</b> — tu s nejnižší nákladovou cenou vč. ohlášeného zdražení (při shodě s kratší lhůtou), nebo na tu, kterou označíte ★ preferovaná. Ostatní varianty dostanou stav „🔀 kryje …" a neobjednávají se.<br>
+          <b>Návrhy k posouzení</b> jsou skupiny, které aplikace našla sama podle jádra názvu bez kódu dodavatele (CLD-<i>S</i> / CLD-<i>CO</i> / CLD-<i>M</i>…). Nic z nich neplatí, dokud je nepotvrdíte: <b>✓ Zaměnitelné</b> = pro zákazníka je jedno, od koho nádoba je → skupina se začne plánovat společně; <b>✕ Nezaměnitelné</b> = návrh zmizí. <b>⏸ Pozastavit</b> u varianty = dočasně od ní neobjednávat (s důvodem a „platí do"), zboží se dál prodává; celého dodavatele vypnete režimem ⏸ Pozastaveno v dotazníku dodavatelů.</div>
         <div id="objAltWrap" style="margin-top:8px;font-size:13px"></div>
       </details>
       <div class="toolbar">
