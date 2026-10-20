@@ -790,6 +790,13 @@ function tabPrehled(){
       return '<div class="card"><div class="muted">HV dle účetnictví ('+(mm.length?mm[0]+'–'+mm[mm.length-1]+'/'+String(E.rok||'').slice(2):'')+')</div><div class="metr '+(hv<0?'neg':'pos')+'">'+sgn(hv,mil)+'</div><div class="muted">skutečnost vč. režií · '+(E.zdroj||'')+'</div></div>'
         +'<div class="card"><div class="muted">HV před odpisy</div><div class="metr '+((hv+odp)<0?'neg':'pos')+'">'+sgn(hv+odp,mil)+'</div><div class="muted">odpisy '+mil(odp)+' · provoz bez ceny obnovy flotily</div></div>';})()
     +'</div>';
+  // účetní skutečnost celé flotily — stejná stavba tabulky jako v detailu vozu (sešit Auta-doprava2026)
+  if(maUcto){ const E=DATA.ekonomika, mm=E.mesiceSdaty||[];
+    h+='<div class="chartbox"><h2 style="margin:0 0 6px">Účetní skutečnost — celá flotila <span class="muted">('+(mm.length?mm[0]+'–'+mm[mm.length-1]+'/'+String(E.rok||'').slice(2):'')+' · '+esc(E.zdroj||'')+')</span></h2>'
+      +'<p class="muted" style="font-size:12px;margin:0 0 8px">Součet všech vozů po měsících ve struktuře účetního sešitu — položky, mezisoučty skupin a celkové řádky jako v účetnictví; HV před odpisy je doplněk modulu.</p>'
+      +'<div id="prehledEkonTab" style="overflow-x:auto"></div>'
+      +'<label style="font-size:12px;color:var(--sed);display:inline-flex;align-items:center;gap:6px;margin-top:8px"><input type="checkbox" id="prehledEkonNuly"> zobrazit i nulové položky</label></div>';
+  }
   // grafy
   const lgN=legenda([[GR,'Fixní'],[B,'Mzdy řidičů'],[Y,'Nafta'],[V,'Mýto'],[O,'Opravy'],[G,'Pneu + AdBlue'],[GRN,'Tržby (čára)']]);
   h+=box('Měsíční struktura nákladů vs. tržby (mil. Kč)',cv('chStack',280),m.VAR!=null?lgN:'');
@@ -814,6 +821,7 @@ function tabPrehled(){
     h+=tb;
   }
   $('#app').innerHTML=h;
+  prehledEkonVykresli();
 
   const lb=m.mesice.map(mesLbl);
   if(m.VAR!=null&&m.FIXV!=null){
@@ -1101,24 +1109,10 @@ function ekonVozu(spzN){ const E=DATA.ekonomika; if(!E||!E.vozy) return null; re
 const odpisyVozu=ek=>{const x=ek&&ek.polozky&&ek.polozky.find(q=>q.nazev.indexOf('551000')===0);return x?(x.celkem||0):0;};
 const odpisyMesVozu=ek=>{const x=ek&&ek.polozky&&ek.polozky.find(q=>q.nazev.indexOf('551000')===0);return (x&&x.mesice)||[];};
 const hvPredOdpisy=ek=>((ek&&ek.souhrny&&ek.souhrny.hv&&ek.souhrny.hv.celkem)||0)+odpisyVozu(ek);
-function vozEkonomika(v){
-  const E=DATA.ekonomika, ek=ekonVozu(nSpz(v.spz));
-  const box=$('#vozEkonBox'); if(!box) return;
-  if(!ek){ box.style.display='none'; return; }
-  box.style.display='';
-  const mesN=E.mesiceSdaty||[]; const s=ek.souhrny;
-  $('#vozEkonInfo').textContent='(účetnictví '+(mesN.length?mesN[0]+'–'+mesN[mesN.length-1]+'/'+(E.rok||''):'')+' · '+(E.zdroj||'')+')';
-  const kmC=ek.kmCelkem||0;
-  const kpi=[
-    ['Tržby', kc(s.trzby?s.trzby.celkem:0), ''],
-    ['Náklady celkem', kc(s.naklady?s.naklady.celkem:0), 'z toho režie '+kc(s.rezijni?s.rezijni.celkem:0)],
-    ['HV (zisk/ztráta)', sgn(s.hv?s.hv.celkem:0,kc), '', (s.hv&&s.hv.celkem<0)?'neg':'pos'],
-    ['HV před odpisy', sgn(hvPredOdpisy(ek),kc), 'odpisy '+kc(odpisyVozu(ek))+(kmC>0?' · '+d2(odpisyVozu(ek)/kmC)+' Kč/km':''), hvPredOdpisy(ek)<0?'neg':'pos'],
-    ['Náklady na km', kmC>0&&s.naklady?d2(s.naklady.celkem/kmC)+' Kč':'—', kmC?kmC.toLocaleString('cs-CZ')+' km':''],
-    ['Skutečná spotřeba', (kmC>0&&ek.spotrebaL&&ek.spotrebaL.length)?( (ek.spotrebaL.reduce((a,b)=>a+b,0)/kmC*100).toFixed(1).replace('.',',')+' l/100km'):'—', 'model '+(M.N.spotreba!=null?String(M.N.spotreba).replace('.',','):'—')+' l'],
-  ];
-  $('#vozEkonKpi').innerHTML=kpi.map(k=>'<div class="card" style="padding:10px 14px"><div class="muted" style="font-size:12px">'+k[0]+'</div><div style="font-size:18px;font-weight:800" class="'+(k[3]||'')+'">'+k[1]+'</div>'+(k[2]?'<div class="muted" style="font-size:11px">'+esc(k[2])+'</div>':'')+'</div>').join('');
-  const nuly=$('#vozEkonNuly').checked;
+// Účetní tabulka ve struktuře sešitu Auta-doprava2026 — JEDNA stavba pro detail vozu i celou flotilu v přehledu.
+// ek = {polozky:[{nazev,celkem,mesice,pozn}], souhrny:{primeNaklady,primeMzdy,ostatniPrime,primeCelkem,rezijni,naklady,trzby,hv}}
+function ekonTabulkaHtml(ek,mesN,nuly){
+  const s=ek.souhrny;
   // Struktura 1:1 podle účetního sešitu Auta-doprava2026: tři skupiny přímých nákladů, každá se svým
   // mezisoučtem, pak celkové řádky — názvy mezisoučtů jsou převzaté ze sešitu, ať se tabulka čte stejně.
   const SKUPINY=[
@@ -1149,7 +1143,48 @@ function vozEkonomika(v){
     t+='<tr style="background:#e8f5ee;font-weight:700"><td style="text-align:left">HV před odpisy <span class="muted" style="font-weight:400">(HV Celkem + 551000 — doplněno modulem)</span></td>'
       +mesN.map((_,i)=>{const v2=(hvM[i]||0)+(oM[i]||0);return '<td class="'+(v2<0?'neg':'')+'">'+Math.round(v2).toLocaleString('cs-CZ')+'</td>';}).join('')
       +'<td class="'+(hvPredOdpisy(ek)<0?'neg':'pos')+'">'+Math.round(hvPredOdpisy(ek)).toLocaleString('cs-CZ')+'</td></tr>'; }
-  $('#vozEkonTab').innerHTML=t+'</tbody></table>';
+  return t+'</tbody></table>';
+}
+// Celá flotila = součet položek všech vozů podle účtu (521200 „… - řidiči - Jméno" se sečte pod společný název) a součet souhrnů.
+function ekonFlotila(){
+  const E=DATA.ekonomika; if(!E||!E.vozy||!E.vozy.length) return null;
+  const n=(E.mesiceSdaty||[]).length;
+  const klic=p=>{const m=/^(\d{3,6})\b/.exec(p.nazev); return m?m[1]:p.nazev;};
+  const pol=new Map();
+  E.vozy.forEach(v=>(v.polozky||[]).forEach(p=>{
+    const k=klic(p); let a=pol.get(k);
+    if(!a){ a={nazev:p.nazev,celkem:0,mesice:Array(n).fill(0),_jmena:new Set()}; pol.set(k,a); }
+    a._jmena.add(p.nazev); a.celkem+=p.celkem||0; (p.mesice||[]).forEach((x,i)=>{a.mesice[i]=(a.mesice[i]||0)+(x||0);});
+  }));
+  const polozky=[...pol.values()].map(a=>{ if(a._jmena.size>1){ const jm=[...a._jmena]; const spol=jm[0].split(' - ').slice(0,-1).join(' - '); a.nazev=spol||jm[0]; } delete a._jmena; return a; });
+  const souhrny={};
+  E.vozy.forEach(v=>Object.entries(v.souhrny||{}).forEach(([k,x])=>{ const a=souhrny[k]||(souhrny[k]={celkem:0,mesice:Array(n).fill(0)}); a.celkem+=x.celkem||0; (x.mesice||[]).forEach((y,i)=>{a.mesice[i]+=(y||0);}); }));
+  return {polozky,souhrny,kmCelkem:E.vozy.reduce((a,v)=>a+(v.kmCelkem||0),0),vozu:E.vozy.length};
+}
+function prehledEkonVykresli(){
+  const box=$('#prehledEkonTab'); if(!box) return;
+  const E=DATA.ekonomika, ek=ekonFlotila(); if(!ek) return;
+  box.innerHTML=ekonTabulkaHtml(ek,E.mesiceSdaty||[],$('#prehledEkonNuly').checked);
+  $('#prehledEkonNuly').onchange=prehledEkonVykresli;
+}
+function vozEkonomika(v){
+  const E=DATA.ekonomika, ek=ekonVozu(nSpz(v.spz));
+  const box=$('#vozEkonBox'); if(!box) return;
+  if(!ek){ box.style.display='none'; return; }
+  box.style.display='';
+  const mesN=E.mesiceSdaty||[]; const s=ek.souhrny;
+  $('#vozEkonInfo').textContent='(účetnictví '+(mesN.length?mesN[0]+'–'+mesN[mesN.length-1]+'/'+(E.rok||''):'')+' · '+(E.zdroj||'')+')';
+  const kmC=ek.kmCelkem||0;
+  const kpi=[
+    ['Tržby', kc(s.trzby?s.trzby.celkem:0), ''],
+    ['Náklady celkem', kc(s.naklady?s.naklady.celkem:0), 'z toho režie '+kc(s.rezijni?s.rezijni.celkem:0)],
+    ['HV (zisk/ztráta)', sgn(s.hv?s.hv.celkem:0,kc), '', (s.hv&&s.hv.celkem<0)?'neg':'pos'],
+    ['HV před odpisy', sgn(hvPredOdpisy(ek),kc), 'odpisy '+kc(odpisyVozu(ek))+(kmC>0?' · '+d2(odpisyVozu(ek)/kmC)+' Kč/km':''), hvPredOdpisy(ek)<0?'neg':'pos'],
+    ['Náklady na km', kmC>0&&s.naklady?d2(s.naklady.celkem/kmC)+' Kč':'—', kmC?kmC.toLocaleString('cs-CZ')+' km':''],
+    ['Skutečná spotřeba', (kmC>0&&ek.spotrebaL&&ek.spotrebaL.length)?( (ek.spotrebaL.reduce((a,b)=>a+b,0)/kmC*100).toFixed(1).replace('.',',')+' l/100km'):'—', 'model '+(M.N.spotreba!=null?String(M.N.spotreba).replace('.',','):'—')+' l'],
+  ];
+  $('#vozEkonKpi').innerHTML=kpi.map(k=>'<div class="card" style="padding:10px 14px"><div class="muted" style="font-size:12px">'+k[0]+'</div><div style="font-size:18px;font-weight:800" class="'+(k[3]||'')+'">'+k[1]+'</div>'+(k[2]?'<div class="muted" style="font-size:11px">'+esc(k[2])+'</div>':'')+'</div>').join('');
+  $('#vozEkonTab').innerHTML=ekonTabulkaHtml(ek,mesN,$('#vozEkonNuly').checked);
   $('#vozEkonNuly').onchange=()=>vozEkonomika(v);
 }
 
