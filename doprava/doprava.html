@@ -122,6 +122,7 @@ function spočítej(){
     const f=(suma('551000')+suma('518410')+((e.souhrny.rezijni&&e.souhrny.rezijni.celkem)||0)+suma('548110')+suma('548200')+suma('548210')+suma('531000'))/EKN;
     return f>0? f : null;
   }
+  const NC=naftaCeny(), SPOTRF=spotrebaFlotily();   // dnešní nafta vs. účetní období; spotřeba flotily jako fallback
   const voz = DATA.vozidla.map(v=>{
     let km=0,trz=0,akt=0; const rates=[];
     mesice.forEach(m=>{const x=v.mesice[m]; if(x){km+=x.km;trz+=x.trzby; if(x.km>0){akt++; if(x.trzby>0) rates.push(x.trzby/x.km);}}});
@@ -138,15 +139,23 @@ function spočítej(){
     const fixZdroj = (inf.fixMes!=null)?'rucne':(fixU!=null?'ucto':(ev?'evidence':'model'));
     // Skutečné variabilní náklady vozu z účetnictví (náklady bez fixů / ujeté km)
     const varU = (ekV && ekV.kmCelkem>0 && ekV.souhrny.naklady && fixU!=null)? Math.max(0,(ekV.souhrny.naklady.celkem-fixU*EKN)/ekV.kmCelkem) : null;
+    // Variabilní náklad vozu pro model (všude stejný): účetní varU přeceněný na dnešní cenu nafty přes spotřebu vozu;
+    // bez účetnictví průměr nákladové kalkulace. Dřív Vozidla počítala s průměrem flotily a Plán s varU — nesedělo to.
+    const varV = varU!=null ? Math.max(0, varU + spotrebaVozu(ekV, SPOTRF)/100*NC.dNafta) : null;
+    const vv = varV!=null ? varV : VAR;
     return {...v, km, trz, akt, sazba: km>0?trz/km:null, pausal, ev, leasing,
       fix, fixZdroj, fixRucne: inf.fixMes!=null, varU, ekV,
       ridic: inf.ridic || (ev&&ev.ridic) || '',
       typ: inf.typ || (ev&&ev.znacka) || '',
-      prispevek: VAR!=null? trz-VAR*km : null,
-      vysledek: (VAR!=null&&fix!=null)? trz-VAR*km-fix*mesice.length : null};
+      varV, vv,
+      prispevek: vv!=null? trz-vv*km : null,
+      vysledek: (vv!=null&&fix!=null)? trz-vv*km-fix*mesice.length : null};
   });
   const map = {}; voz.forEach(v=>{ map[v.cislo]={ridic:v.ridic, typ:v.typ}; });
   const KM = voz.reduce((a,v)=>a+v.km,0), TRZ = voz.reduce((a,v)=>a+v.trz,0);
+  // vážený variabilní náklad flotily z nákladů jednotlivých vozů (náhrada za průměr kalkulace ve všech výpočtech)
+  const VARTOT = voz.some(v=>v.vv!=null)? voz.reduce((a,v)=>a+(v.vv!=null?v.vv:0)*v.km,0) : null;
+  const VARF = (VARTOT!=null&&KM>0)? VARTOT/KM : VAR;
   const NVOZ = N.pocetVozidel || voz.filter(v=>v.km>0).length;
   const FIXMES = FIXV!=null? voz.reduce((a,v)=>a+(v.fix!=null?v.fix:FIXV),0) : null;   // fixy celé flotily za měsíc
   const FIXTOT = FIXMES!=null? FIXMES*mesice.length : null;
@@ -156,8 +165,8 @@ function spočítej(){
   return { N, VAR, FIXV, FIXBASE, NVOZ, mesAll, mesice, vyloucene, rozpracovany, sum, voz, map, KM, TRZ,
     SAZBA: KM>0?TRZ/KM:0, evidenceOk,
     leasingu: voz.filter(v=>v.leasing).length, prodanych: voz.filter(v=>v.ev&&v.ev.prodano).length,
-    VARTOT: VAR!=null?VAR*KM:null, FIXMES, FIXTOT, FIXA,
-    VYSLEDEK: (VAR!=null&&FIXTOT!=null)? TRZ-VAR*KM-FIXTOT : null,
+    VARTOT, VARF, NC, FIXMES, FIXTOT, FIXA,
+    VYSLEDEK: (VARF!=null&&FIXTOT!=null)? TRZ-VARTOT-FIXTOT : null,
     aktivni, stojici: voz.filter(v=>v.km===0) };
 }
 
@@ -421,58 +430,47 @@ function kartyEditor(zaznamy){
 
 /* ================= FINANČNÍ PLÁN (Plán tržeb aktuální) ================= */
 function tabPlan(){
-  const m=M, P=DATA.plan;
-  if(!P||!P.vozy||!P.vozy.length){ $('#app').innerHTML='<h1>Plán</h1>'+alertHtml('warn','Finanční plán není k dispozici (chybí doprava/seed-plan.json).'); return; }
-  const EKN=(DATA.ekonomika&&DATA.ekonomika.mesiceSdaty&&DATA.ekonomika.mesiceSdaty.length)||0;
-  // provozní fix bez odpisů z účetnictví (režie + pojistky + silniční daň) — odpisy dodává plán
-  function fixProvozni(ekV){
-    if(!ekV||!EKN) return null;
-    const s=p=>{const x=ekV.polozky.find(q=>q.nazev.indexOf(p)===0);return x?(x.celkem||0):0;};
-    return (((ekV.souhrny.rezijni&&ekV.souhrny.rezijni.celkem)||0)+s('518410')+s('548110')+s('548200')+s('548210')+s('531000'))/EKN;
-  }
-  const radky=P.vozy.map(p=>{
-    const mv=m.voz.find(v=>v.cislo===String(p.cislo))||m.voz.find(v=>nSpz(v.spz)===nSpz(p.spz))||null;
-    const varV=(mv&&mv.varU!=null)?mv.varU:m.VAR;
-    const fixP=(mv?fixProvozni(mv.ekV):null); const fixProv=fixP!=null?fixP:(m.FIXBASE!=null?m.FIXBASE:0);
-    const naklady=varV!=null? varV*p.planKm+fixProv+(p.odpisyMes||0) : null;
-    const hv=naklady!=null? p.fakturace-naklady : null;
-    const marze=hv!=null? hv/p.fakturace : null;
-    const kmTed=mv? mv.km/Math.max(1,m.mesice.length) : null;
-    return {...p, mv, varV, fixProv, naklady, hv, marze, kmTed, sazbaTed: mv?mv.sazba:null};
-  });
-  const F=radky.reduce((a,r)=>a+r.fakturace,0), KMp=radky.reduce((a,r)=>a+r.planKm,0);
-  const HV=radky.reduce((a,r)=>a+(r.hv||0),0), NAK=radky.reduce((a,r)=>a+(r.naklady||0),0);
-  const trzTed=m.TRZ/Math.max(1,m.mesice.length), kmTed=m.KM/Math.max(1,m.mesice.length);
-  let h='<h1>Finanční plán <span class="muted">('+esc(P.zdroj||'')+')</span></h1>';
-  h+=alertHtml('info','Model: plánová fakturace − skutečné variabilní náklady vozu (účetnictví) × plánované km − provozní fixy (režie, pojistky, daň) − odpisy dle plánu. Ukazuje, co by plán znamenal, kdyby se plnil.');
-  const podPlan=radky.filter(r=>r.marze!=null&&r.marze<0.05&&!r.pausal);
-  const nadKm=radky.filter(r=>r.kmTed!=null&&r.planKm>r.kmTed*1.25);
-  if(HV>0) h+=alertHtml('ok','Při plnění plánu vydělá flotila <b>'+sgn(HV,tis)+'/měs</b> ('+sgn(HV*12,mil)+'/rok) s marží <b>'+(HV/F*100).toFixed(1).replace('.',',')+' %</b>. Plán = fakturace '+mil(F)+'/měs, tj. <b>'+sgn((F/trzTed-1)*100,x=>x.toFixed(0)+' %')+'</b> proti dnešku ('+mil(trzTed)+'/měs).');
-  else h+=alertHtml('danger','Plán při skutečných nákladech vychází záporně: '+sgn(HV,tis)+'/měs — sazby nebo km je třeba upravit.');
-  if(podPlan.length) h+=alertHtml('warn','Pod cílovou 5% marží (při účetních nákladech): <b>'+podPlan.map(r=>r.cislo+' ('+(r.marze*100).toFixed(1).replace('.',',')+' %)').join(', ')+'</b> — plánová sazba u nich nepokrývá skutečné náklady + 5 %.');
-  if(nadKm.length) h+=alertHtml('warn','Plán km výrazně nad dnešním nájezdem (o 25+ %): <b>'+nadKm.map(r=>r.cislo).join(', ')+'</b> — splnění vyžaduje víc zakázek, ne jen ceny.');
+  const m=M, P=DATA.plan, M0=modelVstupy(), D=DATA.dispecink||{skupiny:{A:{nazev:'A'},B:{nazev:'B'}},vozy:{}};
+  if(m.VARF==null||m.FIXV==null){ $('#app').innerHTML='<h1>Plán</h1>'+alertHtml('warn','Nákladová kalkulace se nenačetla.'); return; }
+  const mes=Math.max(1,m.mesice.length), mp=String(Math.round(M0.marze*1000)/10).replace('.',',');
+  const planCisla=((P&&P.vozy)||[]).map(p=>String(p.cislo));
+  const radky=m.voz.filter(v=>v.km>0||planCisla.includes(String(v.cislo))).map(v=>Object.assign({v,cislo:v.cislo,ridic:v.ridic,skupina:D.vozy[v.cislo]||''},planVozu(v,M0))).filter(r=>r.planKm>0);
+  radky.sort((a,b)=>Number(a.cislo)-Number(b.cislo));
+  const KMp=radky.reduce((a,r)=>a+r.planKm,0), F=radky.reduce((a,r)=>a+(r.trzbyCil||0),0), Forig=radky.reduce((a,r)=>a+(r.fakturaceOrig||0),0);
+  const HV=radky.reduce((a,r)=>a+(r.hvCil||0),0), NAK=F-HV;
+  const trzTed=m.TRZ/mes, kmTed=m.KM/mes, hvTed=radky.reduce((a,r)=>a+r.hvTed,0);
+  let h='<h1>Plán rentability <span class="muted">(cíl '+mp+' % marže · objem km: '+(P?esc(P.zdroj||'finanční plán'):'dnešní průměr vozů')+')</span></h1>';
+  h+=alertHtml('info','Jeden model pro Plán, Dispečink i Citlivost: <b>sazba vozu = (variabilní náklad vozu × plán km + fix vč. odpisů) ÷ (1 − marže) ÷ plán km</b>. Variabilní náklad = účetní skutečnost vozu přeceněná na dnešní naftu <b>'+(M0.cena!=null?d2(M0.cena)+' Kč/l bez DPH':'—')+'</b>'+(M0.tydnu?' (účetní období '+d2(M0.cena0)+' Kč/l, rozdíl '+sgn(M0.dNafta,x=>d2(x)+' Kč/l')+' se promítá přes spotřebu vozu)':'')+'; fixy = odpisy + režie + pojistky + daň z účetnictví. Cílovou marži nastavíš v záložce Dispečink.');
+  const podOrig=radky.filter(r=>r.marzeOrig!=null&&!r.pausal&&r.marzeOrig<M0.marze-0.005);
+  const podDnes=radky.filter(r=>r.sazbaTed!=null&&r.sazbaCil!=null&&!r.pausal&&r.sazbaTed<r.sazbaCil*0.97);
+  const pausalPod=radky.filter(r=>r.pausal&&r.sazbaTed!=null&&r.sazbaCil!=null&&r.sazbaTed<r.sazbaCil);
+  if(Forig>0) h+=alertHtml(Forig<F?'warn':'ok','Původní finanční plán ('+mil(Forig)+'/měs) '+(Forig<F?'je o <b>'+tis(F-Forig)+'/měs pod rentabilní úrovní</b> — při jeho plnění by marže byla '+((Forig-NAK)/Forig*100).toFixed(1).replace('.',',')+' %, ne '+mp+' %.':'rentabilitu pokrývá.')+' Rentabilní plán: <b>'+mil(F)+'/měs</b> při '+KMp.toLocaleString('cs-CZ')+' km, HV <b>'+sgn(HV,tis)+'/měs</b> ('+sgn(HV*12,mil)+'/rok).');
+  if(podOrig.length) h+=alertHtml('warn','Vozy, u kterých byla původní plánová sazba pod rentabilitou: <b>'+podOrig.map(r=>r.cislo+' ('+d2(r.sazbaOrig)+' → potřeba '+d2(r.sazbaCil)+')').join(', ')+'</b>.');
+  if(podDnes.length) h+=alertHtml('danger','Dnešní sazba pod rentabilní (o víc než 3 %): <b>'+podDnes.map(r=>r.cislo+' '+d2(r.sazbaTed)+' / '+d2(r.sazbaCil)).join(', ')+'</b> — bez vyšší sazby nebo nižších nákladů tyto vozy cíl nedají.');
+  if(pausalPod.length) h+=alertHtml('warn','Smluvní paušál pod rentabilní sazbou: <b>'+pausalPod.map(r=>r.cislo+' '+d2(r.sazbaTed)+' / '+d2(r.sazbaCil)).join(', ')+'</b> — tady nerozhoduje dispečink, ale cena ve smlouvě.');
   h+='<div class="cards" style="margin-bottom:12px">'
-    +'<div class="card"><div class="muted">Fakturace dle plánu</div><div class="metr">'+mil(F)+'/měs</div><div class="muted">'+KMp.toLocaleString('cs-CZ')+' km/měs · '+d2(F/KMp)+' Kč/km</div></div>'
-    +'<div class="card"><div class="muted">Náklady při plnění</div><div class="metr">'+mil(NAK)+'/měs</div><div class="muted">účetní sazby + odpisy dle plánu</div></div>'
-    +'<div class="card"><div class="muted">HV plánu</div><div class="metr '+(HV<0?'neg':'pos')+'">'+sgn(HV,tis)+'/měs</div><div class="muted">marže '+(HV/F*100).toFixed(1).replace('.',',')+' %</div></div>'
-    +'<div class="card"><div class="muted">Vs. dnešní běh</div><div class="metr">'+sgn(F-trzTed,tis)+'</div><div class="muted">tržby/měs; km '+sgn(KMp-kmTed,x=>Math.round(x).toLocaleString('cs-CZ'))+'</div></div>'
+    +'<div class="card"><div class="muted">Rentabilní fakturace</div><div class="metr">'+mil(F)+'/měs</div><div class="muted">'+KMp.toLocaleString('cs-CZ')+' km · '+d2(F/KMp)+' Kč/km · '+mp+' % marže</div></div>'
+    +'<div class="card"><div class="muted">HV plánu</div><div class="metr pos">'+sgn(HV,tis)+'/měs</div><div class="muted">'+sgn(HV*12,mil)+'/rok · náklady '+mil(NAK)+'/měs</div></div>'
+    +'<div class="card"><div class="muted">Dnešní běh (ø hodnoceného období)</div><div class="metr">'+mil(trzTed)+'/měs</div><div class="muted">'+Math.round(kmTed).toLocaleString('cs-CZ')+' km · '+d2(m.SAZBA)+' Kč/km · HV dle modelu '+sgn(hvTed,tis)+'</div></div>'
+    +'<div class="card"><div class="muted">Rozdíl plán − dnešek</div><div class="metr '+(F-trzTed<0?'neg':'pos')+'">'+sgn(F-trzTed,tis)+'</div><div class="muted">tržby/měs; km '+sgn(KMp-kmTed,x=>Math.round(x).toLocaleString('cs-CZ'))+' · HV '+sgn(HV-hvTed,tis)+'</div></div>'
     +'</div>';
-  h+='<table><thead><tr><th>Vůz</th><th style="text-align:left">Řidič</th><th>Plán km</th><th>Sazba</th><th>Fakturace</th><th>Var. Kč/km (účto)</th><th>Fix+odpisy/měs</th><th>HV/měs</th><th>Marže</th><th>Dnešní sazba</th><th>Dnešní km/měs</th></tr></thead><tbody>'
-    +radky.map(r=>'<tr'+(r.marze!=null&&r.marze<0?' style="background:#fdecea"':'')+'><td>'+esc(r.cislo)+(r.pausal?' <span class="pill sed">paušál</span>':'')+'</td><td style="text-align:left">'+esc(r.ridic)+'</td>'
-      +'<td>'+r.planKm.toLocaleString('cs-CZ')+'</td><td>'+d2(r.sazba)+'</td><td>'+kc(r.fakturace)+'</td>'
-      +'<td>'+(r.varV!=null?d2(r.varV):'—')+'</td><td>'+tis(r.fixProv+(r.odpisyMes||0))+'</td>'
-      +'<td class="'+(r.hv<0?'neg':'pos')+'">'+(r.hv!=null?sgn(r.hv,tis):'—')+'</td>'
-      +'<td class="'+(r.marze<0.05?'neg':'pos')+'">'+(r.marze!=null?(r.marze*100).toFixed(1).replace('.',',')+' %':'—')+'</td>'
-      +'<td>'+(r.sazbaTed!=null?d2(r.sazbaTed):'—')+'</td><td>'+(r.kmTed!=null?Math.round(r.kmTed).toLocaleString('cs-CZ'):'—')+'</td></tr>').join('')
-    +'</tbody></table>'
-    +'<p class="muted" style="font-size:12px">Cíle z plánu ke každému vozu navíc: spotřeba (22–29 l/100 km dle vozu), '+esc(P.kpiDojezd||'')+', '+esc(P.kpiVolnobeh||'')+' — hodnotí se z telematiky Scania/Orbtrack.</p>';
+  h+='<div style="overflow-x:auto"><table><thead><tr><th>Vůz</th><th style="text-align:left">Řidič</th><th>Skup.</th><th>Plán km</th><th>Var. Kč/km</th><th>Fix+odpisy/měs</th><th>Sazba pro '+mp+' %</th><th>Plán tržeb/měs</th><th>Původní plán</th><th>Dnes Kč/km</th><th>Dnes km/měs</th><th>Dnešní marže</th></tr></thead><tbody>'
+    +radky.map(r=>{ const cl=(r.sazbaTed!=null&&r.sazbaCil!=null)?(r.sazbaTed>=r.sazbaCil?'pos':(r.sazbaTed>=r.sazbaCil*0.97?'':'neg')):'';
+      return '<tr'+(r.marzeTed!=null&&r.marzeTed<0?' style="background:#fdecea"':'')+'><td><b>'+esc(r.cislo)+'</b>'+(r.pausal?' <span class="pill sed">paušál</span>':'')+'</td><td style="text-align:left">'+esc(r.ridic||'')+'</td><td>'+esc(r.skupina||'—')+'</td>'
+      +'<td>'+r.planKm.toLocaleString('cs-CZ')+(r.pl?'':'<div class="muted" style="font-size:11px">dnešní ø</div>')+'</td><td>'+(r.varV!=null?d2(r.varV):'—')+'</td><td>'+tis(r.fix)+'</td>'
+      +'<td><b>'+(r.sazbaCil!=null?d2(r.sazbaCil):'—')+'</b></td><td>'+(r.trzbyCil!=null?kc(r.trzbyCil):'—')+'</td>'
+      +'<td>'+(r.sazbaOrig!=null?d2(r.sazbaOrig)+'<div class="muted" style="font-size:11px">marže '+(r.marzeOrig!=null?(r.marzeOrig*100).toFixed(1).replace('.',',')+' %':'—')+'</div>':'—')+'</td>'
+      +'<td class="'+cl+'">'+(r.sazbaTed!=null?d2(r.sazbaTed):'—')+'</td><td>'+Math.round(r.kmTed).toLocaleString('cs-CZ')+'</td>'
+      +'<td class="'+(r.marzeTed==null?'':(r.marzeTed>=M0.marze?'pos':(r.marzeTed<0?'neg':'')))+'">'+(r.marzeTed!=null?(r.marzeTed*100).toFixed(1).replace('.',',')+' %':'—')+'</td></tr>';}).join('')
+    +'</tbody></table></div>'
+    +'<p class="muted" style="font-size:12px">Sazba pro '+mp+' % = rentabilní sazba vozu při plánovaném nájezdu. „Původní plán" = sazba z finančního plánu a marže, kterou by při skutečných nákladech dala. Dnešní marže = (tržby − variabilní × km − fix) ÷ tržby za hodnocené období. Paušální vozy mají sazbu danou smlouvou.'+(P?' Cíle z plánu navíc: spotřeba dle vozu, '+esc(P.kpiDojezd||'')+', '+esc(P.kpiVolnobeh||'')+' (telematika).':'')+'</p>';
 
-  /* --- cílové odměny dispečerů a vedoucího --- */
-  h+='<div class="chartbox" style="margin-top:16px"><h2 style="margin:0 0 8px">Cílové odměny za plnění plánu</h2>'
+  /* --- cílové odměny dispečerů a vedoucího — z HV rentabilního plánu --- */
+  h+='<div class="chartbox" style="margin-top:16px"><h2 style="margin:0 0 8px">Cílové odměny za plnění rentabilního plánu</h2>'
     +'<div class="sliders" style="margin-bottom:10px">'
     +'<div class="sl"><label>Fond odměn (% z HV plánu)</label><input type="range" id="oFond" min="4" max="20" step="1" value="10"><output id="ooFond"></output></div>'
     +'<div class="sl"><label>Podíl vedoucího dopravy</label><input type="range" id="oVed" min="20" max="60" step="5" value="40"><output id="ooVed"></output></div>'
-    +'<div class="sl"><label>Počet dispečerů</label><input type="range" id="oDisp" min="2" max="4" step="1" value="3"><output id="ooDisp"></output></div>'
+    +'<div class="sl"><label>Počet dispečerů</label><input type="range" id="oDisp" min="2" max="4" step="1" value="2"><output id="ooDisp"></output></div>'
     +'</div><div id="oKarty"></div><div id="oKpi"></div></div>';
   $('#app').innerHTML=h;
   function updOdm(){
@@ -484,11 +482,11 @@ function tabPlan(){
       +'<div class="card"><div class="muted">Vedoucí dopravy</div><div class="metr">'+tis(ved)+'</div><div class="muted">cílová odměna při 100% plnění</div></div>'
       +'<div class="card"><div class="muted">Dispečer (á)</div><div class="metr">'+tis(disp)+'</div><div class="muted">'+nDisp+' dispečeři · při 100% plnění</div></div>'
       +'</div>';
-    const kpiV=[['Plnění plánu fakturace flotily ('+mil(F)+'/měs)','35 %'],['Marže flotily ≥ 5 % (účetní HV / tržby)','30 %'],['Plnění plánu km ('+Math.round(KMp/1000)+' tis. km/měs)','15 %'],['Podíl vozů plnících telematiku (spotřeba, dojezd, volnoběh)','10 %'],['Úplnost dat (Daily report, evidence) do 3. dne','10 %']];
-    const kpiD=[['Fakturace svěřených vozů vs. plán','40 %'],['Dosažená sazba vs. pohyblivý ceník (Kč/km)','25 %'],['Vytížení: plnění plánu km svěřených vozů','20 %'],['Telematika řidičů: spotřeba ≤ cíl, dojezd > 23 %, volnoběh < 10 %','15 %']];
+    const kpiV=[['Plnění rentabilního plánu tržeb flotily ('+mil(F)+'/měs)','35 %'],['Marže flotily ≥ '+mp+' % (účetní HV / tržby)','30 %'],['Plnění plánu km ('+Math.round(KMp/1000)+' tis. km/měs)','15 %'],['Prázdné km flotily ≤ cíl','10 %'],['Úplnost dat (Daily report vč. přejezdů, evidence) do 3. pracovního dne','10 %']];
+    const kpiD=[['Tržby svěřených vozů vs. rentabilní plán','35 %'],['Sazba svěřených vozů vs. rentabilní sazba (Kč/km)','25 %'],['Plnění plánu km svěřených vozů','20 %'],['Prázdné km svěřených vozů ≤ cíl','10 %'],['Vyplněný přejezd v jízdách ≥ cíl, poznámky k výkyvům','10 %']];
     const tab=(t,rows)=>'<h3 style="font-size:14px;margin:12px 0 6px">'+t+'</h3><table><thead><tr><th style="text-align:left">KPI</th><th>Váha</th></tr></thead><tbody>'
       +rows.map(x=>'<tr><td style="text-align:left">'+x[0]+'</td><td>'+x[1]+'</td></tr>').join('')+'</tbody></table>';
-    $('#oKpi').innerHTML=tab('KPI vedoucího dopravy — '+tis(ved)+'/měs',kpiV)+tab('KPI dispečera — '+tis(disp)+'/měs (každý za svěřené vozy)',kpiD)
+    $('#oKpi').innerHTML=tab('KPI vedoucího dopravy — '+tis(ved)+'/měs',kpiV)+tab('KPI dispečera — '+tis(disp)+'/měs (každý za svěřené vozy; stejné ukazatele vidí v záložce Dispečink: cíl / skutečnost / rozdíl / dopad)',kpiD)
       +'<p class="muted" style="font-size:12px;margin-top:8px">Pravidla výplaty: pod 80 % plnění KPI se složka nevyplácí; mezi 80–110 % lineárně 50–120 % cílové částky (strop 120 %). Pojistka marže: klesne-li účetní marže flotily pod 3 %, fond se krátí na polovinu — chrání před honbou za tržbami bez marže. Vyhodnocení měsíčně z účetnictví (list auta-2026) a Daily reportu.</p>';
   }
   ['oFond','oVed','oDisp'].forEach(id=>$('#'+id).addEventListener('input',updOdm));
@@ -539,7 +537,7 @@ function tabCena(){
         y:{...AXC,title:{display:true,text:'Kč/km',color:'#7f8c8d',font:{size:12}},ticks:{...AXC.ticks,callback:v=>v+' Kč'}}}}});
 
   function radekVozu(v,mar,kryti,plan){
-    const varV=v.varU!=null?v.varU:m.VAR;
+    const varV=v.vv!=null?v.vv:m.VARF;
     const F=v.fix!=null?v.fix:m.FIXA;
     const X=plan*kryti;                                     // km, které nesou fixy
     const pA=(varV+F/X)/(1-mar);                            // cena na začátku měsíce
@@ -748,15 +746,15 @@ function tabPrehled(){
     if(m.VYSLEDEK!=null) al += alertHtml('info','Model za hodnocené období: <b>'+sgn(m.VYSLEDEK,mil)+'</b> (fixy kalibrované účetnictvím, průměr '+tis(m.FIXMES/Math.max(1,m.voz.length))+'/vůz/měs). Plný leasingový model ('+tis(m.FIXV)+'/vůz) používej jen pro cenotvorbu nové kapacity — viz Bod zvratu.');
   } else if(m.VYSLEDEK!=null){
     al += m.VYSLEDEK<0
-      ? alertHtml('danger','Podle nákladového modelu je flotila za hodnocené období ve ztrátě <b>'+sgn(m.VYSLEDEK,mil)+'</b> (výnos '+d2(m.SAZBA)+' Kč/km vs. plný náklad '+d2(m.VAR+m.FIXTOT/Math.max(1,m.KM))+' Kč/km).')
-      : alertHtml('ok','Flotila je podle modelu v zisku <b>'+sgn(m.VYSLEDEK,mil)+'</b> (výnos '+d2(m.SAZBA)+' Kč/km vs. plný náklad '+d2(m.VAR+m.FIXTOT/Math.max(1,m.KM))+' Kč/km).');
+      ? alertHtml('danger','Podle nákladového modelu je flotila za hodnocené období ve ztrátě <b>'+sgn(m.VYSLEDEK,mil)+'</b> (výnos '+d2(m.SAZBA)+' Kč/km vs. plný náklad '+d2(m.VARF+m.FIXTOT/Math.max(1,m.KM))+' Kč/km).')
+      : alertHtml('ok','Flotila je podle modelu v zisku <b>'+sgn(m.VYSLEDEK,mil)+'</b> (výnos '+d2(m.SAZBA)+' Kč/km vs. plný náklad '+d2(m.VARF+m.FIXTOT/Math.max(1,m.KM))+' Kč/km).');
     al += m.evidenceOk
       ? alertHtml('info','Fixní náklady dle evidence vozů: <b>'+m.leasingu+'</b> vozů s běžícím leasingem (plný fix '+tis(m.FIXV)+'/měs), <b>'+(m.voz.length-m.leasingu-m.prodanych)+'</b> odepsaných (bez leasingu '+tis(m.FIXBASE)+'/měs)'+(m.prodanych?', '+m.prodanych+' prodaných (0 Kč)':'')+'. Fixy flotily celkem '+tis(m.FIXMES)+'/měs.')
       : alertHtml('warn','Evidence vozů (leasingy) se nenačetla — všechny vozy se počítají s plným fixem '+tis(m.FIXV)+'/měs, ztráta je proto nadsazená.');
   }
-  if(m.VAR!=null){
-    const pausalPod = m.voz.filter(v=>v.pausal && v.sazba!=null && v.sazba < m.VAR);
-    if(pausalPod.length) al+=alertHtml('danger','Vozy <b>'+pausalPod.map(v=>v.cislo).join(', ')+'</b> jezdí za paušál '+d2(pausalPod[0].sazba)+' Kč/km, který je pod variabilními náklady '+d2(m.VAR)+' Kč/km — každý ujetý km prohlubuje ztrátu.');
+  if(m.VARF!=null){
+    const pausalPod = m.voz.filter(v=>v.pausal && v.sazba!=null && v.sazba < (v.vv!=null?v.vv:m.VARF));
+    if(pausalPod.length) al+=alertHtml('danger','Vozy <b>'+pausalPod.map(v=>v.cislo).join(', ')+'</b> jezdí za paušál '+d2(pausalPod[0].sazba)+' Kč/km, který je pod variabilními náklady '+d2(m.VARF)+' Kč/km — každý ujetý km prohlubuje ztrátu.');
   }
   const stoji=m.stojici.filter(v=>v.fix==null||v.fix>0);
   if(stoji.length) al+=alertHtml('warn','Vozy <b>'+stoji.map(v=>v.cislo).join(', ')+'</b> nemají za hodnocené období ani kilometr'+(m.FIXV!=null?' — dle evidence spálí '+tis(stoji.reduce((a,v)=>a+(v.fix!=null?v.fix:m.FIXV),0)*m.mesice.length)+' fixních nákladů':'')+'.');
@@ -781,8 +779,8 @@ function tabPrehled(){
   // KPI
   h+='<div class="cards">'
     +'<div class="card"><div class="muted">Tržby</div><div class="metr">'+mil(m.TRZ)+'</div><div class="muted">'+m.KM.toLocaleString('cs-CZ')+' km</div></div>'
-    +'<div class="card"><div class="muted">Výnos na km</div><div class="metr">'+d2(m.SAZBA)+' Kč</div><div class="muted">'+(m.VAR!=null?'variabilní náklad '+d2(m.VAR)+' Kč/km':'')+'</div></div>'
-    +(m.VAR!=null?'<div class="card"><div class="muted">Krycí příspěvek</div><div class="metr">'+mil(m.TRZ-m.VARTOT)+'</div><div class="muted">tržby − variabilní náklady</div></div>':'')
+    +'<div class="card"><div class="muted">Výnos na km</div><div class="metr">'+d2(m.SAZBA)+' Kč</div><div class="muted">'+(m.VARF!=null?'variabilní náklad '+d2(m.VARF)+' Kč/km':'')+'</div></div>'
+    +(m.VARF!=null?'<div class="card"><div class="muted">Krycí příspěvek</div><div class="metr">'+mil(m.TRZ-m.VARTOT)+'</div><div class="muted">tržby − variabilní náklady</div></div>':'')
     +(m.VYSLEDEK!=null?'<div class="card"><div class="muted">Výsledek dle modelu</div><div class="metr '+(m.VYSLEDEK<0?'neg':'pos')+'">'+sgn(m.VYSLEDEK,mil)+'</div><div class="muted">fixy '+tis(m.FIXMES)+'/měs (účetnictví/evidence)</div></div>':'')
     +(()=>{const E=DATA.ekonomika; if(!E||!E.vozy||!E.vozy.length) return '';
       const hv=E.vozy.reduce((a,v)=>a+((v.souhrny.hv&&v.souhrny.hv.celkem)||0),0), odp=E.vozy.reduce((a,v)=>a+odpisyVozu(v),0);
@@ -799,14 +797,14 @@ function tabPrehled(){
   }
   // grafy
   const lgN=legenda([[GR,'Fixní'],[B,'Mzdy řidičů'],[Y,'Nafta'],[V,'Mýto'],[O,'Opravy'],[G,'Pneu + AdBlue'],[GRN,'Tržby (čára)']]);
-  h+=box('Měsíční struktura nákladů vs. tržby (mil. Kč)',cv('chStack',280),m.VAR!=null?lgN:'');
+  h+=box('Měsíční struktura nákladů vs. tržby (mil. Kč)',cv('chStack',280),m.VARF!=null?lgN:'');
   h+='<div class="grid2">'+box('Výnos vs. náklad na km po měsících',cv('chGap',240),legenda([[G,'Výnos Kč/km'],[R,'Náklad Kč/km (dle reálného nájezdu)']]))
     +box('Měsíční nájezd (km)',cv('chKm',240))+'</div>';
   // tabulka: výnos, náklad, rozdíl na km + skutečně vydělaná částka po měsících
-  if(m.VAR!=null&&m.FIXV!=null){
+  if(m.VARF!=null&&m.FIXV!=null){
     let sK=0,sT=0,sN=0;
     const rdk=m.mesice.map(x=>{
-      const km=m.sum[x].km, trz=m.sum[x].trzby, vyn=trz/km, nak=m.VAR+m.FIXMES/km, nakCelk=m.VAR*km+m.FIXMES;
+      const km=m.sum[x].km, trz=m.sum[x].trzby, vyn=trz/km, nak=m.VARF+m.FIXMES/km, nakCelk=m.VARF*km+m.FIXMES;
       sK+=km; sT+=trz; sN+=nakCelk;
       return {x,km,trz,vyn,nak,roz:vyn-nak,vyd:trz-nakCelk};
     });
@@ -817,14 +815,14 @@ function tabPrehled(){
         +'<td class="'+(r.roz>=0?'pos':'neg')+'">'+sgn(r.roz,d2)+'</td><td class="'+(r.vyd>=0?'pos':'neg')+'">'+sgn(r.vyd,kc)+'</td></tr>').join('')
       +'</tbody><tfoot><tr style="font-weight:600;border-top:2px solid var(--bd,#ccc)"><td style="text-align:left">Celkem</td><td>'+Math.round(sK).toLocaleString('cs-CZ')+'</td><td>'+d2(vynC)+'</td><td>'+d2(nakC)+'</td>'
         +'<td class="'+(vynC-nakC>=0?'pos':'neg')+'">'+sgn(vynC-nakC,d2)+'</td><td class="'+(sT-sN>=0?'pos':'neg')+'">'+sgn(sT-sN,kc)+'</td></tr></tfoot></table>'
-      +'<p class="muted" style="font-size:12px;margin:6px 0 0">Náklad = variabilní '+d2(m.VAR)+' Kč/km + fixy '+tis(m.FIXMES)+'/měs rozpočítané na skutečný nájezd měsíce. „Reálně vyděláno" = (výnos − náklad) × km, tj. tržby měsíce minus náklady (shoduje se s výsledkem dle modelu).</p></div>';
+      +'<p class="muted" style="font-size:12px;margin:6px 0 0">Náklad = variabilní '+d2(m.VARF)+' Kč/km + fixy '+tis(m.FIXMES)+'/měs rozpočítané na skutečný nájezd měsíce. „Reálně vyděláno" = (výnos − náklad) × km, tj. tržby měsíce minus náklady (shoduje se s výsledkem dle modelu).</p></div>';
     h+=tb;
   }
   $('#app').innerHTML=h;
   prehledEkonVykresli();
 
   const lb=m.mesice.map(mesLbl);
-  if(m.VAR!=null&&m.FIXV!=null){
+  if(m.VARF!=null&&m.FIXV!=null){
     const items=[['Fixní',GR,()=>m.FIXMES],['Mzdy řidičů',B,k=>(m.N.mzdyRidicu||0)*k],['Nafta',Y,k=>(m.N.nafta||0)*k],['Mýto',V,k=>(m.N.myto||0)*k],['Opravy',O,k=>(m.N.opravy||0)*k],['Pneu + AdBlue',G,k=>((m.N.pneu||0)+(m.N.adblue||0))*k]];
     chart('chStack',{data:{labels:lb,datasets:[
       ...items.map(it=>({type:'bar',label:it[0],data:m.mesice.map(x=>it[2](m.sum[x].km)/1e6),backgroundColor:it[1],stack:'n',maxBarThickness:42})),
@@ -833,7 +831,7 @@ function tabPrehled(){
         scales:{x:{stacked:true,...AXC,grid:{display:false}},y:{stacked:true,...AXC,ticks:{...AXC.ticks,callback:v=>v.toFixed(1)+' M'}}}}});
     chart('chGap',{type:'line',data:{labels:lb,datasets:[
       {data:m.mesice.map(x=>m.sum[x].trzby/m.sum[x].km),borderColor:G,borderWidth:2,pointRadius:4,pointBackgroundColor:G,tension:.2},
-      {data:m.mesice.map(x=>m.VAR+m.FIXMES/m.sum[x].km),borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:4,pointBackgroundColor:R,tension:.2}]},
+      {data:m.mesice.map(x=>m.VARF+m.FIXMES/m.sum[x].km),borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:4,pointBackgroundColor:R,tension:.2}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>(c.datasetIndex?'Náklad: ':'Výnos: ')+d2(c.parsed.y)+' Kč/km'}}},
         scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' Kč'}}}}});
   } else {
@@ -844,31 +842,82 @@ function tabPrehled(){
       scales:{x:{...AXC,grid:{display:false}},y:{...AXC,ticks:{...AXC.ticks,callback:v=>(v/1000)+' tis.'}}}}});
 }
 
+/* ================= JEDEN MODEL: reálné vstupy → rentabilní plán → KPI (Plán, Dispečink, Citlivost, Vozidla) ================= */
+// Nafta: dnešní tržní cena bez DPH (ČSÚ) a průměr za účetní období (ČSÚ historie) — rozdíl se promítá
+// do variabilního nákladu vozu přes jeho spotřebu. Bez historie je rozdíl 0 (náklad = účetní skutečnost).
+function naftaCeny(){
+  const N=DATA.naklady||{}, csu=(DATA.nafta&&DATA.nafta.csu)||null, E=DATA.ekonomika;
+  const cena=csu?Math.round(csu.price/1.21*10)/10:(N.cenaPhm!=null?N.cenaPhm:null);
+  let cena0=cena, tydnu=0;
+  if(csu&&Array.isArray(csu.historie)&&E&&E.mesiceSdaty&&E.mesiceSdaty.length){
+    const rok=Number(E.rok)||new Date().getFullYear(); const vals=[];
+    csu.historie.forEach(hh=>{ const mm=/^(\d{4})-W(\d{2})$/.exec(String(hh.key||'')); if(!mm||Number(mm[1])!==rok) return;
+      const d=new Date(rok,0,4+(Number(mm[2])-1)*7); if(E.mesiceSdaty.includes(d.getMonth()+1)&&hh.value>0) vals.push(hh.value/1.21); });
+    if(vals.length){ cena0=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10; tydnu=vals.length; }
+  }
+  return { cena, cena0, dNafta:(cena!=null&&cena0!=null)?cena-cena0:0, tydnu, label: csu?(csu.weekLabel||'ČSÚ'):'' };
+}
+function spotrebaFlotily(){
+  const E=DATA.ekonomika; let l=0,km=0;
+  if(E&&E.vozy) E.vozy.forEach(e=>{ if(e.kmCelkem>0){ l+=(e.spotrebaL||[]).reduce((a,b)=>a+b,0); km+=e.kmCelkem; } });
+  return (km>0&&l>0)? l/km*100 : ((DATA.naklady||{}).spotreba||28);
+}
+function spotrebaVozu(ekV,fallback){ if(ekV&&ekV.kmCelkem>0){ const l=(ekV.spotrebaL||[]).reduce((a,b)=>a+b,0); if(l>0) return l/ekV.kmCelkem*100; } return fallback; }
+function modelVstupy(){
+  const c=((DATA.dispecink||{}).cile)||{};
+  return Object.assign({ marze:(c.marze!=null?Number(c.marze):5)/100, spotrF:spotrebaFlotily() }, naftaCeny());
+}
+// Rentabilní plán vozu (sazba, při které plán km dává cílovou marži) + skutečnost za hodnocené období — vše na měsíc.
+function planVozu(v,M0){
+  const m=M, mes=Math.max(1,m.mesice.length);
+  const pl=((DATA.plan&&DATA.plan.vozy)||[]).find(p=>String(p.cislo)===String(v.cislo))||null;
+  const kmTed=v.km/mes, trzTed=v.trz/mes;
+  const planKm=pl?pl.planKm:(kmTed>0?Math.round(kmTed/100)*100:null);
+  const varV=v.varV!=null?v.varV:m.VARF, fix=v.fix!=null?v.fix:(m.FIXA||0);
+  const sazbaCil=(planKm>0&&varV!=null)?(varV*planKm+fix)/((1-M0.marze)*planKm):null;
+  const trzbyCil=sazbaCil!=null?sazbaCil*planKm:null;
+  const hvTed=trzTed-(varV||0)*kmTed-fix;
+  return { pl, planKm, planZdroj:pl?'finanční plán':'dnešní průměr', varV, fix, sazbaCil, trzbyCil, hvCil:trzbyCil!=null?M0.marze*trzbyCil:null,
+    sazbaOrig:pl?pl.sazba:null, fakturaceOrig:pl?pl.fakturace:null,
+    marzeOrig:(pl&&varV!=null&&pl.fakturace>0)?(pl.fakturace-varV*pl.planKm-fix)/pl.fakturace:null,
+    kmTed, trzTed, sazbaTed:v.sazba, hvTed, marzeTed:trzTed>0?hvTed/trzTed:null, pausal:!!v.pausal||!!(pl&&pl.pausal) };
+}
+
 /* ================= DISPEČINK (mikroflotily dispečerek A/B — KPI, cíle, poznámky k výkyvům) ================= */
 const DISP_DUVODY={nemoc:'nemoc řidiče',dovolena:'dovolená řidiče',porucha:'porucha / servis',stk:'STK / odstávka',zakaznik:'výpadek zakázek',jine:'jiné'};
 let DISP_OBD=null;   // vybrané období: 'YYYY-MM' nebo 'rok' (všechny vyhodnocené měsíce)
-// KPI jednoho vozu za zvolené měsíce: km, tržby, Kč/km, plnění plánu, prázdné km (z jízd), spotřeba (účetnictví), vyplněnost přejezdu
-function dispKpiVozu(v,mesice){
-  const ms=mesice.filter(m=>((v.mesice[m]||{}).km||0)>0);
+// Skutečnost vozu za zvolené měsíce (Daily report + jízdy + účetnictví) proti cílům z rentabilního plánu — vše za období.
+function dispKpiVozu(v,mesice,M0){
+  const n=mesice.length, ms=mesice.filter(m=>((v.mesice[m]||{}).km||0)>0);
   const km=ms.reduce((a,m)=>a+v.mesice[m].km,0), trz=ms.reduce((a,m)=>a+v.mesice[m].trzby,0);
   const Z=(DATA.zakazky||[]).filter(z=>z.voz===v.cislo&&mesice.includes(z.mesic));
   const nal=Z.reduce((a,z)=>a+(z.km||0),0), pr=Z.reduce((a,z)=>a+(z.prejezd||0),0);
-  const pl=((DATA.plan&&DATA.plan.vozy)||[]).find(p=>String(p.cislo)===String(v.cislo));
-  const planKm=pl?pl.planKm*mesice.length:null, planTr=pl?pl.fakturace*mesice.length:null;
-  // spotřeba: litry z účetnictví za měsíce, kde účetnictví je, děleno km Daily reportu za tytéž měsíce
-  const E=DATA.ekonomika, ek=(E&&E.vozy)?E.vozy.find(e=>nSpz(e.spz)===nSpz(v.spz)):null;
-  let litry=0,kmL=0; if(ek&&E.mesiceSdaty){ mesice.forEach(m=>{const i=E.mesiceSdaty.indexOf(Number(m.slice(5))); if(i>=0&&(ek.spotrebaL||[])[i]>0&&(v.mesice[m]||{}).km>0){litry+=ek.spotrebaL[i];kmL+=v.mesice[m].km;}}); }
-  return {km,trz,mesicu:ms.length,kckm:km?trz/km:null,nal,pr,prProc:(nal+pr)?pr/(nal+pr)*100:null,planKm,planTr,
-    planKmProc:planKm?km/planKm*100:null,planTrProc:planTr?trz/planTr*100:null,spotreba:kmL?litry/kmL*100:null,litry,kmL,
-    jizd:Z.length,vyplneno:Z.length?Z.filter(z=>z.prejezd>0).length/Z.length*100:null};
+  const E=DATA.ekonomika, ek=v.ekV||null;
+  let litry=0,kmL=0; if(ek&&E&&E.mesiceSdaty){ mesice.forEach(m=>{const i=E.mesiceSdaty.indexOf(Number(m.slice(5))); if(i>=0&&(ek.spotrebaL||[])[i]>0&&(v.mesice[m]||{}).km>0){litry+=ek.spotrebaL[i];kmL+=v.mesice[m].km;}}); }
+  const P=planVozu(v,M0), c=((DATA.dispecink||{}).cile)||{};
+  const varV=P.varV!=null?P.varV:0, fix=P.fix*n;
+  const planKm=P.planKm!=null?P.planKm*n:null, trzCil=P.trzbyCil!=null?P.trzbyCil*n:null, hvCil=P.hvCil!=null?P.hvCil*n:null;
+  const sazba=km?trz/km:null, hv=trz-varV*km-fix, marze=trz>0?hv/trz:null;
+  const prProc=(nal+pr)?pr/(nal+pr)*100:null, spotreba=kmL?litry/kmL*100:null, vyplneno=Z.length?Z.filter(z=>z.prejezd>0).length/Z.length*100:null;
+  // dopady proti cíli v Kč za období (kladné = nad cílem): chybějící km × krycí příspěvek, rozdíl sazby × km,
+  // prázdné km nad cíl × variabilní náklad, litry nad cíl × dnešní cena nafty
+  const dKm=(planKm!=null&&sazba!=null)?(km-planKm)*(sazba-varV):0;
+  const dSaz=(sazba!=null&&P.sazbaCil!=null)?(sazba-P.sazbaCil)*km:0;
+  const dPr=(prProc!=null&&c.prazdne!=null&&prProc>c.prazdne)?-(prProc-c.prazdne)/100*km*varV:0;
+  const dSp=(spotreba!=null&&c.spotreba!=null&&spotreba>c.spotreba&&M0.cena!=null)?-(spotreba-c.spotreba)/100*kmL*M0.cena:0;
+  return {n,km,trz,sazba,hv,marze,varV,fix,planKm,trzCil,hvCil,sazbaCil:P.sazbaCil,pausal:P.pausal,nal,pr,prProc,litry,kmL,spotreba,jizd:Z.length,vyplneno,
+    dKm,dSaz,dPr,dSp,dHv:hvCil!=null?hv-hvCil:0,planKmProc:planKm?km/planKm*100:null};
 }
-function dispKpiSkupiny(vozy,mesice){
-  const k=vozy.map(v=>dispKpiVozu(v,mesice)); const s=f=>k.reduce((a,x)=>a+(f(x)||0),0);
-  const km=s(x=>x.km), trz=s(x=>x.trz), nal=s(x=>x.nal), pr=s(x=>x.pr), planKm=s(x=>x.planKm), planTr=s(x=>x.planTr), litry=s(x=>x.litry), kmL=s(x=>x.kmL), jizd=s(x=>x.jizd), vyp=s(x=>x.jizd&&x.vyplneno!=null?x.vyplneno/100*x.jizd:0);
-  const aut=vozy.length||1, n=mesice.length||1;
-  return {aut:vozy.length,km,trz,kmAuto:km/aut/n,trzAuto:trz/aut/n,kckm:km?trz/km:null,prProc:(nal+pr)?pr/(nal+pr)*100:null,planKmProc:planKm?km/planKm*100:null,planTrProc:planTr?trz/planTr*100:null,spotreba:kmL?litry/kmL*100:null,vyplneno:jizd?vyp/jizd*100:null,vozy:k};
+function dispKpiSkupiny(vozy,mesice,M0){
+  const k=vozy.map(v=>dispKpiVozu(v,mesice,M0)); const s=f=>k.reduce((a,x)=>a+(f(x)||0),0);
+  const km=s(x=>x.km), trz=s(x=>x.trz), hv=s(x=>x.hv), planKm=s(x=>x.planKm), trzCil=s(x=>x.trzCil), hvCil=s(x=>x.hvCil), nal=s(x=>x.nal), pr=s(x=>x.pr), litry=s(x=>x.litry), kmL=s(x=>x.kmL), jizd=s(x=>x.jizd), vyp=s(x=>x.jizd&&x.vyplneno!=null?x.vyplneno/100*x.jizd:0);
+  const n=mesice.length||1, aut=vozy.length;
+  return {aut,n,vozy:k,km,trz,hv,planKm,trzCil,hvCil,sazba:km?trz/km:null,sazbaCil:planKm?trzCil/planKm:null,marze:trz>0?hv/trz:null,
+    kmAuto:aut?km/aut/n:null,trzAuto:aut?trz/aut/n:null,prProc:(nal+pr)?pr/(nal+pr)*100:null,spotreba:kmL?litry/kmL*100:null,vyplneno:jizd?vyp/jizd*100:null,
+    dKm:s(x=>x.dKm),dSaz:s(x=>x.dSaz),dPr:s(x=>x.dPr),dSp:s(x=>x.dSp),dHv:s(x=>x.dHv),
+    potencial:k.reduce((a,x)=>a+Math.min(0,x.dKm)+Math.min(0,x.dSaz)+x.dPr+x.dSp,0)};
 }
-// semafor: 'ok' | 'warn' | 'bad' podle cíle (u „méně = lépe" obráceně), tolerance 10 %
+// semafor: 'pos' | '' | 'neg' podle cíle (u „méně = lépe" obráceně), tolerance 10 %
 function dispSemafor(val,cil,mene){
   if(val==null||cil==null)return '';
   const ok=mene?val<=cil:val>=cil, blizko=mene?val<=cil*1.1:val>=cil*0.9;
@@ -876,56 +925,68 @@ function dispSemafor(val,cil,mene){
 }
 function tabDispecink(){
   const m=M, D=DATA.dispecink||{skupiny:{A:{nazev:'Skupina A'},B:{nazev:'Skupina B'}},vozy:{},cile:{},poznamky:[]};
-  const cile=Object.assign({planProc:95,kckm:36,prazdne:10,spotreba:28,vyplneno:95},D.cile||{});
+  const M0=modelVstupy(), cile=Object.assign({marze:5,prazdne:10,spotreba:28,vyplneno:95},D.cile||{});
+  const mp=String(Math.round(M0.marze*1000)/10).replace('.',',');
   const vsechny=m.mesice.slice();
   if(!DISP_OBD||(DISP_OBD!=='rok'&&!vsechny.includes(DISP_OBD))) DISP_OBD=vsechny[vsechny.length-1];
   const mesice=DISP_OBD==='rok'?vsechny:[DISP_OBD];
-  const predch=DISP_OBD==='rok'?null:vsechny[vsechny.indexOf(DISP_OBD)-1]||null;
   const sk=k=>m.voz.filter(v=>D.vozy[v.cislo]===k);
   const neprir=m.voz.filter(v=>!D.vozy[v.cislo]&&vsechny.some(x=>((v.mesice[x]||{}).km||0)>0));
-  const A=dispKpiSkupiny(sk('A'),mesice), B=dispKpiSkupiny(sk('B'),mesice), F=dispKpiSkupiny(m.voz.filter(v=>mesice.some(x=>((v.mesice[x]||{}).km||0)>0)),mesice);
-  const pA=predch?dispKpiSkupiny(sk('A'),[predch]):null, pB=predch?dispKpiSkupiny(sk('B'),[predch]):null;
+  const A=dispKpiSkupiny(sk('A'),mesice,M0), B=dispKpiSkupiny(sk('B'),mesice,M0), F=dispKpiSkupiny(m.voz.filter(v=>mesice.some(x=>((v.mesice[x]||{}).km||0)>0)),mesice,M0);
   const pozn=(D.poznamky||[]).filter(p=>mesice.includes(p.mesic));
-  let h='<h1>Dispečink — mikroflotily a KPI dispečerek</h1>';
+  let h='<h1>Dispečink — cíle, skutečnost a dopad na výsledek</h1>';
   h+='<div class="sl" style="margin-bottom:10px"><label>Období</label><select id="dispObd">'+vsechny.slice().reverse().map(x=>'<option value="'+x+'"'+(DISP_OBD===x?' selected':'')+'>'+mesLbl(x)+'</option>').join('')+'<option value="rok"'+(DISP_OBD==='rok'?' selected':'')+'>od začátku roku ('+vsechny.length+' měs.)</option></select>'
-    +'<span class="muted">vyhodnocují se jen uzavřené měsíce Daily reportu</span></div>';
+    +'<span class="muted">jen uzavřené měsíce Daily reportu · model: marže '+mp+' %, nafta dnes '+(M0.cena!=null?d2(M0.cena)+' Kč/l bez DPH':'—')+(M0.tydnu?' (účetní období '+d2(M0.cena0)+')':'')+' · cíle vozů = rentabilní plán (záložka Plán)</span></div>';
   if(!sk('A').length&&!sk('B').length) h+=alertHtml('warn','Vozy zatím nejsou rozdělené do mikroflotil — '+(ADMIN?'přiřaď je dole v nastavení (každý vůz jedné dispečerce).':'správce je přiřadí v nastavení záložky.'));
   else if(neprir.length) h+=alertHtml('info','Nepřiřazené vozy s provozem: <b>'+neprir.map(v=>esc(v.cislo)).join(', ')+'</b> — do srovnání skupin se nepočítají.');
-  // --- srovnávací tabulka KPI ---
-  const kpi=[
-    ['Nájezd na auto (km/měs)',x=>x.kmAuto,v=>Math.round(v).toLocaleString('cs-CZ'),null,false,'cíl = plán vozu (viz plnění)'],
-    ['Plnění plánu km',x=>x.planKmProc,v=>d2(v)+' %',cile.planProc,false,'≥ '+cile.planProc+' %'],
-    ['Tržba na auto (Kč/měs)',x=>x.trzAuto,v=>kc(v),null,false,'cíl = plán vozu (viz plnění)'],
-    ['Plnění plánu tržeb',x=>x.planTrProc,v=>d2(v)+' %',cile.planProc,false,'≥ '+cile.planProc+' %'],
-    ['Výnos Kč/km',x=>x.kckm,v=>d2(v),cile.kckm,false,'≥ '+d2(cile.kckm)],
-    ['Prázdné km',x=>x.prProc,v=>d2(v)+' %',cile.prazdne,true,'≤ '+cile.prazdne+' %'],
-    ['Spotřeba (l/100 km, účetnictví)',x=>x.spotreba,v=>d2(v),cile.spotreba,true,'≤ '+cile.spotreba],
-    ['Vyplněný přejezd v jízdách',x=>x.vyplneno,v=>Math.round(v)+' %',cile.vyplneno,false,'≥ '+cile.vyplneno+' % (bez toho prázdné km nesedí)'],
+  // --- hlavní tabulka: KPI | cíl | skupina A (skutečnost / rozdíl / dopad) | skupina B | flotila
+  const pct=v=>v==null?'—':(v*100).toFixed(1).replace('.',',')+' %';
+  const KPI=[
+    {lbl:'Výsledek dle modelu (HV)',cilTxt:'marže × rentabilní plán',cil:K=>K.hvCil,skut:K=>K.hv,fmt:v=>sgn(v,tis),roz:K=>K.hvCil!=null?K.hv-K.hvCil:null,rozFmt:v=>sgn(v,tis),dop:K=>K.dHv,sem:K=>dispSemafor(K.hv,K.hvCil,false),ukazCil:true},
+    {lbl:'Marže',cilTxt:'≥ '+mp+' %',cil:()=>M0.marze,skut:K=>K.marze,fmt:pct,roz:K=>K.marze!=null?K.marze-M0.marze:null,rozFmt:v=>sgn(v*100,x=>x.toFixed(1).replace('.',',')+' p.b.'),dop:null,sem:K=>dispSemafor(K.marze,M0.marze,false)},
+    {lbl:'Nájezd (km)',cilTxt:'plán km vozů',cil:K=>K.planKm,skut:K=>K.km,fmt:v=>Math.round(v).toLocaleString('cs-CZ'),roz:K=>K.planKm!=null?K.km-K.planKm:null,rozFmt:v=>sgn(v,x=>Math.round(x).toLocaleString('cs-CZ')),dop:K=>K.dKm,sem:K=>dispSemafor(K.km,K.planKm,false),ukazCil:true,pozn:'chybějící km × (sazba − variabilní)'},
+    {lbl:'Sazba Kč/km',cilTxt:'rentabilní sazba vozů',cil:K=>K.sazbaCil,skut:K=>K.sazba,fmt:d2,roz:K=>(K.sazba!=null&&K.sazbaCil!=null)?K.sazba-K.sazbaCil:null,rozFmt:v=>sgn(v,d2),dop:K=>K.dSaz,sem:K=>dispSemafor(K.sazba,K.sazbaCil,false),ukazCil:true,pozn:'rozdíl sazby × km'},
+    {lbl:'Tržby',cilTxt:'rentabilní plán tržeb',cil:K=>K.trzCil,skut:K=>K.trz,fmt:kc,roz:K=>K.trzCil!=null?K.trz-K.trzCil:null,rozFmt:v=>sgn(v,kc),dop:null,sem:K=>dispSemafor(K.trz,K.trzCil,false),ukazCil:true},
+    {lbl:'Prázdné km',cilTxt:'≤ '+cile.prazdne+' %',cil:()=>cile.prazdne,skut:K=>K.prProc,fmt:v=>d2(v)+' %',roz:K=>K.prProc!=null?K.prProc-cile.prazdne:null,rozFmt:v=>sgn(v,x=>d2(x)+' p.b.'),dop:K=>K.dPr,sem:K=>dispSemafor(K.prProc,cile.prazdne,true),mene:true,pozn:'km nad cíl × variabilní náklad'},
+    {lbl:'Spotřeba l/100 km',cilTxt:'≤ '+cile.spotreba,cil:()=>cile.spotreba,skut:K=>K.spotreba,fmt:d2,roz:K=>K.spotreba!=null?K.spotreba-cile.spotreba:null,rozFmt:v=>sgn(v,d2),dop:K=>K.dSp,sem:K=>dispSemafor(K.spotreba,cile.spotreba,true),mene:true,pozn:'účetnictví; litry nad cíl × nafta dnes'},
+    {lbl:'Vyplněný přejezd',cilTxt:'≥ '+cile.vyplneno+' %',cil:()=>cile.vyplneno,skut:K=>K.vyplneno,fmt:v=>Math.round(v)+' %',roz:K=>K.vyplneno!=null?K.vyplneno-cile.vyplneno:null,rozFmt:v=>sgn(v,x=>Math.round(x)+' p.b.'),dop:null,sem:K=>dispSemafor(K.vyplneno,cile.vyplneno,false),pozn:'bez přejezdu prázdné km nesedí'},
   ];
-  const bunka=(x,px,f,fmt,cil,mene)=>{const v=f(x); if(v==null)return '<td>—</td>'; const pv=px?f(px):null; const dlt=(pv!=null&&isFinite(pv))?v-pv:null; return '<td class="'+dispSemafor(v,cil,mene)+'"><b>'+fmt(v)+'</b>'+(dlt!=null&&Math.abs(dlt)>1e-9?'<div class="muted" style="font-size:11px">'+sgn(dlt,y=>fmt(y))+' vs. '+mesLbl(predch)+'</div>':'')+'</td>';};
-  h+='<div class="chartbox" style="overflow-x:auto"><h2 style="margin:0 0 8px">Srovnání skupin '+(DISP_OBD==='rok'?'od začátku roku':mesLbl(DISP_OBD))+'</h2>'
-    +'<table><thead><tr><th style="text-align:left">KPI</th><th>'+esc(D.skupiny.A.nazev)+' <span class="muted">('+A.aut+' '+(A.aut===1?'vůz':A.aut<5?'vozy':'vozů')+')</span></th><th>'+esc(D.skupiny.B.nazev)+' <span class="muted">('+B.aut+' '+(B.aut===1?'vůz':B.aut<5?'vozy':'vozů')+')</span></th><th>Celá flotila <span class="muted">('+F.aut+')</span></th><th>Cíl</th></tr></thead><tbody>'
-    +kpi.map(([lbl,f,fmt,cil,mene,cilTxt])=>'<tr><td style="text-align:left">'+lbl+'</td>'+bunka(A,pA,f,fmt,cil,mene)+bunka(B,pB,f,fmt,cil,mene)+'<td>'+(f(F)!=null?fmt(f(F)):'—')+'</td><td class="muted">'+cilTxt+'</td></tr>').join('')
-    +'</tbody></table><p class="muted" style="font-size:12px;margin:6px 0 0">Zeleně = cíl splněn, bez barvy = do 10 % pod cílem, červeně = výrazně pod cílem. Malým písmem změna proti předchozímu měsíci. Plán vozu = finanční plán (záložka Plán); nájezd a tržba na auto se počítají na všechny přiřazené vozy a vybrané měsíce — stojící vůz skupinu táhne dolů (to je záměr: dispečerka má mít auto v pohybu).</p></div>';
+  const bunky=(r,K)=>{ if(!K.aut) return '<td>—</td><td>—</td><td>—</td>'; const s=r.skut(K), c=r.cil(K), z=r.roz(K), d=r.dop?r.dop(K):null;
+    if(s==null) return '<td>—</td><td>—</td><td>—</td>';
+    return '<td class="'+r.sem(K)+'"><b>'+r.fmt(s)+'</b>'+(r.ukazCil&&c!=null?'<div class="muted" style="font-size:11px">cíl '+r.fmt(c)+'</div>':'')+'</td>'
+      +'<td class="'+(z==null?'':(r.mene?(z<=0?'pos':'neg'):(z>=0?'pos':'neg')))+'">'+(z!=null?r.rozFmt(z):'—')+'</td>'
+      +'<td class="'+(d==null?'muted':(d>=0?'pos':'neg'))+'">'+(d!=null?sgn(d,tis):'—')+'</td>'; };
+  const skHl=(K,nazev)=>'<th colspan="3">'+esc(nazev)+' <span class="muted">('+K.aut+' '+(K.aut===1?'vůz':K.aut<5?'vozy':'vozů')+')</span></th>';
+  h+='<div class="chartbox" style="overflow-x:auto"><h2 style="margin:0 0 8px">Co máme dosáhnout → čeho dosahujeme → rozdíl → dopad na výsledek <span class="muted">('+(DISP_OBD==='rok'?'od začátku roku':mesLbl(DISP_OBD))+')</span></h2>'
+    +'<table><thead><tr><th style="text-align:left" rowspan="2">KPI</th><th rowspan="2">Cíl</th>'+skHl(A,D.skupiny.A.nazev)+skHl(B,D.skupiny.B.nazev)+skHl(F,'Celá flotila')+'</tr>'
+    +'<tr>'+'<th>Skutečnost</th><th>Rozdíl</th><th>Dopad Kč</th>'.repeat(3)+'</tr></thead><tbody>'
+    +KPI.map(r=>'<tr><td style="text-align:left">'+r.lbl+(r.pozn?'<div class="muted" style="font-size:11px">'+r.pozn+'</div>':'')+'</td><td class="muted">'+r.cilTxt+'</td>'+bunky(r,A)+bunky(r,B)+bunky(r,F)+'</tr>').join('')
+    +'<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Nevyužitý potenciál vs. cíle</td><td class="muted" style="font-weight:400">součet záporných dopadů</td>'
+    +[A,B,F].map(K=>'<td colspan="3" class="'+(K.potencial<0?'neg':'pos')+'">'+(K.aut?sgn(K.potencial,tis)+(K.n>1?' <span class="muted" style="font-weight:400">('+sgn(K.potencial/K.n,tis)+'/měs)</span>':''):'—')+'</td>').join('')+'</tr>'
+    +'</tbody></table><p class="muted" style="font-size:12px;margin:6px 0 0">Cíle vozů plynou z rentabilního plánu (var. náklad vozu + fix vč. odpisů + marže '+mp+' % při plánovaném nájezdu). Zeleně = cíl splněn, bez barvy = do 10 % pod cílem, červeně = výrazně pod. Dopad = kolik Kč za období ukazatel přidal (+) nebo ubral (−) proti cíli; dopady se částečně překrývají, proto „potenciál" sčítá jen záporné.</p></div>';
   // --- trend po měsících ---
   h+='<div class="grid2">'+box('Nájezd na auto po měsících (km)',cv('chDispKm',240),legenda([[B,D.skupiny.A.nazev],[O,D.skupiny.B.nazev],[GR,'flotila']]))
-    +box('Prázdné km po měsících (%)',cv('chDispPr',240),legenda([[B,D.skupiny.A.nazev],[O,D.skupiny.B.nazev],[GR,'flotila']]))+'</div>';
+    +box('Marže dle modelu po měsících (%)',cv('chDispMar',240),legenda([[B,D.skupiny.A.nazev],[O,D.skupiny.B.nazev],[GR,'flotila'],[R,'cíl '+mp+' %']]))+'</div>';
   // --- vozy ve skupinách + poznámky ---
   const radekVozu=(v,k)=>{
     const pz=pozn.filter(p=>p.voz===v.cislo);
     const odch=k.planKmProc!=null&&k.planKmProc<80;
-    return '<tr'+(odch?' style="background:#fdecea"':'')+'><td><b>'+esc(v.cislo)+'</b> <span class="muted">'+esc(v.ridic||'')+'</span></td>'
-      +'<td>'+Math.round(k.km).toLocaleString('cs-CZ')+(k.planKm?'<div class="muted" style="font-size:11px">plán '+Math.round(k.planKm).toLocaleString('cs-CZ')+' · '+Math.round(k.planKmProc)+' %</div>':'')+'</td>'
-      +'<td>'+kc(k.trz)+(k.planTr?'<div class="muted" style="font-size:11px">'+Math.round(k.planTrProc)+' % plánu</div>':'')+'</td>'
-      +'<td class="'+dispSemafor(k.kckm,cile.kckm,false)+'">'+(k.kckm!=null?d2(k.kckm):'—')+'</td>'
-      +'<td class="'+dispSemafor(k.prProc,cile.prazdne,true)+'">'+(k.prProc!=null?d2(k.prProc)+' %':'—')+(k.jizd?'<div class="muted" style="font-size:11px">'+k.jizd+' jízd · přejezd '+Math.round(k.vyplneno)+' %</div>':'')+'</td>'
+    const dop=k.dKm+k.dSaz+k.dPr+k.dSp;
+    const sub=t=>'<div class="muted" style="font-size:11px">'+t+'</div>';
+    return '<tr'+(odch?' style="background:#fdecea"':'')+'><td><b>'+esc(v.cislo)+'</b> <span class="muted">'+esc(v.ridic||'')+'</span>'+(k.pausal?' <span class="pill sed">paušál</span>':'')+'</td>'
+      +'<td class="'+dispSemafor(k.km,k.planKm,false)+'">'+Math.round(k.km).toLocaleString('cs-CZ')+(k.planKm?sub('cíl '+Math.round(k.planKm).toLocaleString('cs-CZ')+' · '+sgn(k.km-k.planKm,x=>Math.round(x).toLocaleString('cs-CZ'))):'')+'</td>'
+      +'<td class="'+dispSemafor(k.sazba,k.sazbaCil,false)+'">'+(k.sazba!=null?d2(k.sazba):'—')+(k.sazbaCil!=null?sub('cíl '+d2(k.sazbaCil)+(k.sazba!=null?' · '+sgn(k.sazba-k.sazbaCil,d2):'')):'')+'</td>'
+      +'<td class="'+dispSemafor(k.trz,k.trzCil,false)+'">'+kc(k.trz)+(k.trzCil!=null?sub('cíl '+kc(k.trzCil)):'')+'</td>'
+      +'<td class="'+dispSemafor(k.marze,M0.marze,false)+'">'+pct(k.marze)+sub('HV '+sgn(k.hv,tis))+'</td>'
+      +'<td class="'+dispSemafor(k.prProc,cile.prazdne,true)+'">'+(k.prProc!=null?d2(k.prProc)+' %':'—')+(k.jizd?sub(k.jizd+' jízd · přejezd '+Math.round(k.vyplneno)+' %'):'')+'</td>'
       +'<td class="'+dispSemafor(k.spotreba,cile.spotreba,true)+'">'+(k.spotreba!=null?d2(k.spotreba):'—')+'</td>'
-      +'<td style="text-align:left;min-width:220px">'+pz.map(p=>'<div><span class="pill sed">'+esc(DISP_DUVODY[p.duvod]||p.duvod)+'</span> '+(DISP_OBD==='rok'?'<span class="muted">'+mesLbl(p.mesic)+'</span> ':'')+esc(p.text)+' <span class="muted" style="font-size:11px">'+esc((p.kdo||'').split('@')[0])+'</span>'+((ADMIN||p.kdo===DATA.ja)?' <a href="#" onclick="dispPoznSmazat(\''+esc(p.id)+'\');return false" title="smazat">✕</a>':'')+'</div>').join('')
-        +(odch&&!pz.length?'<span class="muted" style="font-size:11px">pod 80 % plánu — doplň důvod</span>':'')+'</td></tr>';
+      +'<td class="'+(dop<-1e3?'neg':(dop>1e3?'pos':''))+'"><b>'+sgn(dop,tis)+'</b></td>'
+      +'<td style="text-align:left;min-width:200px">'+pz.map(p=>'<div><span class="pill sed">'+esc(DISP_DUVODY[p.duvod]||p.duvod)+'</span> '+(DISP_OBD==='rok'?'<span class="muted">'+mesLbl(p.mesic)+'</span> ':'')+esc(p.text)+' <span class="muted" style="font-size:11px">'+esc((p.kdo||'').split('@')[0])+'</span>'+((ADMIN||p.kdo===DATA.ja)?' <a href="#" onclick="dispPoznSmazat(\''+esc(p.id)+'\');return false" title="smazat">✕</a>':'')+'</div>').join('')
+        +(odch&&!pz.length?'<span class="muted" style="font-size:11px">pod 80 % plánu km — doplň důvod</span>':'')+'</td></tr>';
   };
-  const tabSk=(k,K)=>'<div class="chartbox" style="overflow-x:auto"><h2 style="margin:0 0 8px">'+esc(D.skupiny[k].nazev)+' <span class="muted">— '+K.aut+' vozů · '+Math.round(K.km).toLocaleString('cs-CZ')+' km · '+kc(K.trz)+'</span></h2>'
-    +(K.aut?'<table><thead><tr><th style="text-align:left">Vůz · řidič</th><th>km</th><th>Tržby</th><th>Kč/km</th><th>Prázdné</th><th>l/100</th><th style="text-align:left">Poznámka k výkyvu</th></tr></thead><tbody>'
-      +sk(k).map((v,i)=>radekVozu(v,K.vozy[i])).join('')+'</tbody></table>':'<p class="muted">Bez přiřazených vozů.</p>')+'</div>';
+  const tabSk=(k,K)=>'<div class="chartbox" style="overflow-x:auto"><h2 style="margin:0 0 8px">'+esc(D.skupiny[k].nazev)+' <span class="muted">— '+K.aut+' vozů · '+Math.round(K.km).toLocaleString('cs-CZ')+' km · '+kc(K.trz)+' · HV '+sgn(K.hv,tis)+'</span></h2>'
+    +(K.aut?'<table><thead><tr><th style="text-align:left">Vůz · řidič</th><th>km</th><th>Kč/km</th><th>Tržby</th><th>Marže</th><th>Prázdné</th><th>l/100</th><th>Dopad vs. cíle</th><th style="text-align:left">Poznámka k výkyvu</th></tr></thead><tbody>'
+      +sk(k).map((v,i)=>radekVozu(v,K.vozy[i])).join('')+'</tbody></table><p class="muted" style="font-size:12px;margin:6px 0 0">Pod každou hodnotou je cíl vozu a rozdíl; „Dopad" = součet dopadů km, sazby, prázdných km a spotřeby proti cílům.</p>':'<p class="muted">Bez přiřazených vozů.</p>')+'</div>';
   h+='<div class="grid2">'+tabSk('A',A)+tabSk('B',B)+'</div>';
   // --- poznámka ---
   const prirazene=m.voz.filter(v=>D.vozy[v.cislo]);
@@ -935,15 +996,14 @@ function tabDispecink(){
     +'<div class="sl"><label>Důvod</label><select id="pzDuvod">'+Object.keys(DISP_DUVODY).map(k=>'<option value="'+k+'">'+DISP_DUVODY[k]+'</option>').join('')+'</select></div>'
     +'<div class="sl" style="grid-column:1/-1"><label>Text</label><input id="pzText" placeholder="např. řidič 14 dní PN, vůz 5 dní v servisu — převodovka" style="flex:1;min-width:0"></div>'
     +'</div><div style="display:flex;gap:10px;align-items:center"><button class="btn" id="pzUloz">Uložit poznámku</button><span class="muted" id="pzStav"></span></div>'
-    +'<p class="muted" style="font-size:12px;margin:8px 0 0">Poznámka vysvětlí výkyv proti historii (nemoc, dovolená, porucha…) a zobrazí se u vozu v tabulce skupiny. Zapsat ji může každý s přístupem k modulu, smazat autor nebo správce.</p></div>';
+    +'<p class="muted" style="font-size:12px;margin:8px 0 0">Poznámka vysvětlí výkyv proti cíli (nemoc, dovolená, porucha…) a zobrazí se u vozu v tabulce skupiny. Zapsat ji může každý s přístupem k modulu, smazat autor nebo správce.</p></div>';
   // --- nastavení (admin) ---
   if(ADMIN){
     h+='<div class="chartbox"><h2 style="margin:0 0 8px">Nastavení mikroflotil a cílů</h2>'
       +'<div class="sliders" style="margin-bottom:10px">'
       +'<div class="sl"><label>Skupina A</label><input id="skA" value="'+esc(D.skupiny.A.nazev)+'" placeholder="jméno dispečerky" style="flex:1;min-width:0"></div>'
       +'<div class="sl"><label>Skupina B</label><input id="skB" value="'+esc(D.skupiny.B.nazev)+'" placeholder="jméno dispečerky" style="flex:1;min-width:0"></div>'
-      +'<div class="sl"><label>Plnění plánu</label><input type="number" id="ciPlan" min="50" max="150" value="'+cile.planProc+'" style="width:80px"><span class="muted">% km i tržeb</span></div>'
-      +'<div class="sl"><label>Výnos Kč/km</label><input type="number" id="ciKckm" step="0.5" value="'+cile.kckm+'" style="width:80px"><span class="muted">min.</span></div>'
+      +'<div class="sl"><label>Cílová marže</label><input type="number" id="ciMar" min="0" max="30" step="0.5" value="'+cile.marze+'" style="width:80px"><span class="muted">% — určuje rentabilní sazby i HV plánu</span></div>'
       +'<div class="sl"><label>Prázdné km</label><input type="number" id="ciPr" step="0.5" value="'+cile.prazdne+'" style="width:80px"><span class="muted">% max.</span></div>'
       +'<div class="sl"><label>Spotřeba</label><input type="number" id="ciSp" step="0.5" value="'+cile.spotreba+'" style="width:80px"><span class="muted">l/100 max.</span></div>'
       +'<div class="sl"><label>Vyplněný přejezd</label><input type="number" id="ciVyp" min="50" max="100" value="'+cile.vyplneno+'" style="width:80px"><span class="muted">% jízd min.</span></div>'
@@ -955,13 +1015,14 @@ function tabDispecink(){
   $('#app').innerHTML=h;
   $('#dispObd').onchange=e=>{DISP_OBD=e.target.value;tabDispecink();};
   // trendové grafy
-  const lb=vsechny.map(mesLbl), serie=(vozy,f)=>vsechny.map(x=>{const K=dispKpiSkupiny(vozy,[x]);const val=f(K);return val==null?null:+val.toFixed(1);});
+  const lb=vsechny.map(mesLbl), serie=(vozy,f)=>vsechny.map(x=>{const K=dispKpiSkupiny(vozy,[x],M0);const val=f(K);return val==null?null:+val.toFixed(1);});
   const flot=x=>m.voz.filter(v=>((v.mesice[x]||{}).km||0)>0);
-  const serieF=f=>vsechny.map(x=>{const K=dispKpiSkupiny(flot(x),[x]);const val=f(K);return val==null?null:+val.toFixed(1);});
+  const serieF=f=>vsechny.map(x=>{const K=dispKpiSkupiny(flot(x),[x],M0);const val=f(K);return val==null?null:+val.toFixed(1);});
   const lineOpts=suf=>({responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y.toLocaleString('cs-CZ'):'—')+suf}}},scales:{x:{...AXC,grid:{display:false}},y:{...AXC}}});
   const ds=(lbl,data,col,dash)=>({label:lbl,data,borderColor:col,borderWidth:2,pointRadius:3,pointBackgroundColor:col,tension:.2,borderDash:dash||[],spanGaps:true});
   chart('chDispKm',{type:'line',data:{labels:lb,datasets:[ds(D.skupiny.A.nazev,serie(sk('A'),K=>K.aut?K.kmAuto:null),B),ds(D.skupiny.B.nazev,serie(sk('B'),K=>K.aut?K.kmAuto:null),O),ds('flotila',serieF(K=>K.aut?K.kmAuto:null),GR,[6,4])]},options:lineOpts(' km')});
-  chart('chDispPr',{type:'line',data:{labels:lb,datasets:[ds(D.skupiny.A.nazev,serie(sk('A'),K=>K.prProc),B),ds(D.skupiny.B.nazev,serie(sk('B'),K=>K.prProc),O),ds('flotila',serieF(K=>K.prProc),GR,[6,4])]},options:lineOpts(' %')});
+  const marP=K=>K.aut&&K.marze!=null?K.marze*100:null;
+  chart('chDispMar',{type:'line',data:{labels:lb,datasets:[ds(D.skupiny.A.nazev,serie(sk('A'),marP),B),ds(D.skupiny.B.nazev,serie(sk('B'),marP),O),ds('flotila',serieF(marP),GR,[6,4]),ds('cíl',vsechny.map(()=>+(M0.marze*100).toFixed(1)),R,[2,3])]},options:lineOpts(' %')});
   // poznámka
   $('#pzUloz').onclick=async()=>{const st=t=>{$('#pzStav').textContent=t;}; st('Ukládám…');
     try{ const r=await fetch('/api/doprava/dispecink/poznamka',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voz:$('#pzVoz').value,mesic:$('#pzMes').value,duvod:$('#pzDuvod').value,text:$('#pzText').value})});
@@ -969,10 +1030,11 @@ function tabDispecink(){
     catch(e){ st('Chyba: '+e.message); } };
   if(ADMIN&&$('#dispUloz')) $('#dispUloz').onclick=async()=>{const st=t=>{$('#dispStav').textContent=t;}; st('Ukládám…');
     const vozy={}; document.querySelectorAll('.dispPrir').forEach(s=>{if(s.value)vozy[s.dataset.voz]=s.value;});
-    try{ const r=await fetch('/api/doprava/dispecink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skupiny:{A:{nazev:$('#skA').value},B:{nazev:$('#skB').value}},vozy,cile:{planProc:$('#ciPlan').value,kckm:$('#ciKckm').value,prazdne:$('#ciPr').value,spotreba:$('#ciSp').value,vyplneno:$('#ciVyp').value}})});
-      const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status); DATA.dispecink=j.dispecink; tabDispecink(); window.scrollTo(0,document.body.scrollHeight); }
+    try{ const r=await fetch('/api/doprava/dispecink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skupiny:{A:{nazev:$('#skA').value},B:{nazev:$('#skB').value}},vozy,cile:{marze:$('#ciMar').value,prazdne:$('#ciPr').value,spotreba:$('#ciSp').value,vyplneno:$('#ciVyp').value}})});
+      const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status); DATA.dispecink=j.dispecink; M=spočítej(); tabDispecink(); window.scrollTo(0,document.body.scrollHeight); }
     catch(e){ st('Chyba: '+e.message); } };
 }
+
 async function dispPoznSmazat(id){
   if(!confirm('Smazat poznámku?'))return;
   try{ const r=await fetch('/api/doprava/dispecink/poznamka',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,smazat:true})}); const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status); DATA.dispecink.poznamky=j.poznamky; tabDispecink(); }
@@ -1003,18 +1065,18 @@ function tabVozidla(){
     +'<div id="vozHistBox" style="display:none"><h2 style="font-size:15px;margin:18px 0 8px">Historie vozu napříč ročníky <span class="muted" id="vozHistInfo"></span></h2>'+cv('chVozHist',220)+'</div></div>';
   const maEkon=!!(DATA.ekonomika&&DATA.ekonomika.vozy&&DATA.ekonomika.vozy.length);
   const ekMes=maEkon?DATA.ekonomika.mesiceSdaty:[];
-  h+='<h2>Souhrn</h2><table><thead><tr><th>Vůz</th><th style="text-align:left">Řidič</th><th style="text-align:left">Vozidlo</th><th>km</th><th>Tržby</th><th>Kč/km</th>'+(m.FIXV!=null?'<th>Fix/měs</th>':'')+(m.VAR!=null?'<th>Krycí příspěvek</th>':'')+(m.FIXV!=null?'<th>Výsledek dle modelu</th>':'')+(maEkon?'<th>HV účetně ('+ekMes[0]+'–'+ekMes[ekMes.length-1]+')</th><th>Před odpisy</th>':'')+'<th></th></tr></thead><tbody>'
+  h+='<h2>Souhrn</h2><table><thead><tr><th>Vůz</th><th style="text-align:left">Řidič</th><th style="text-align:left">Vozidlo</th><th>km</th><th>Tržby</th><th>Kč/km</th>'+(m.FIXV!=null?'<th>Fix/měs</th>':'')+(m.VARF!=null?'<th>Krycí příspěvek</th>':'')+(m.FIXV!=null?'<th>Výsledek dle modelu</th>':'')+(maEkon?'<th>HV účetně ('+ekMes[0]+'–'+ekMes[ekMes.length-1]+')</th><th>Před odpisy</th>':'')+'<th></th></tr></thead><tbody>'
     +m.voz.slice().sort((a,b)=>b.trz-a.trz).map(v=>'<tr data-clic onclick="ukazVoz(\''+esc(v.cislo)+'\')"><td>'+esc(v.cislo)+' <span class="muted">'+esc(v.spz)+'</span></td>'
       +'<td style="text-align:left">'+(v.ridic?esc(v.ridic):'<span class="muted">—</span>')+'</td>'
       +'<td style="text-align:left">'+(v.typ?esc(v.typ):'<span class="muted">—</span>')+'</td>'
       +'<td>'+v.km.toLocaleString('cs-CZ')+'</td><td>'+kc(v.trz)+'</td><td>'+(v.sazba!=null?d2(v.sazba):'—')+'</td>'
       +(m.FIXV!=null?'<td>'+(v.fix!=null?tis(v.fix):'—')+({rucne:' <span class="pill sed" title="ručně upraveno">R</span>',ucto:' <span class="pill zel" title="dle účetnictví (odpisy+režie+pojistky+daň)">Ú</span>',evidence:(v.leasing?' <span class="pill zlut" title="běžící leasing dle evidence">L</span>':''),model:''}[v.fixZdroj]||'')+'</td>':'')
-      +(m.VAR!=null?'<td class="'+(v.prispevek<0?'neg':'')+'">'+sgn(v.prispevek,kc)+'</td>':'')
+      +(m.VARF!=null?'<td class="'+(v.prispevek<0?'neg':'')+'">'+sgn(v.prispevek,kc)+'</td>':'')
       +(m.FIXV!=null?'<td class="'+(v.vysledek<0?'neg':'pos')+'">'+sgn(v.vysledek,kc)+'</td>':'')
       +(maEkon?(()=>{const e=ekonVozu(nSpz(v.spz)); return '<td class="'+(e&&e.souhrny.hv&&e.souhrny.hv.celkem<0?'neg':'pos')+'">'+(e&&e.souhrny.hv?sgn(e.souhrny.hv.celkem,kc):'—')+'</td><td class="'+(e&&e.souhrny.hv&&hvPredOdpisy(e)<0?'neg':'pos')+'">'+(e&&e.souhrny.hv?sgn(hvPredOdpisy(e),kc):'—')+(e&&odpisyVozu(e)?'<div class="muted" style="font-size:11px">odpisy '+tis(odpisyVozu(e))+'</div>':'')+'</td>';})():'')
       +'<td>'+[stavPill((INFO[v.cislo]||{}).stav),(v.pausal?'<span class="pill sed">paušál</span>':(v.km===0?'<span class="pill cerv">stojí</span>':''))].filter(Boolean).join(' ')+'</td></tr>').join('')
     +'</tbody></table>'
-    +'<p class="muted" style="font-size:12px">Fix/měs: <span class="pill zel">Ú</span> = dle účetnictví (odpisy + režie + pojistky + silniční daň — leasing účetně neběží), <span class="pill zlut">L</span> = běžící leasing dle evidence (plný fix'+(m.FIXV!=null?' '+tis(m.FIXV):'')+'), <span class="pill sed">R</span> = ručně upraveno, bez štítku = model.'+(ADMIN?' Řidiče, typ i fix upravíš v detailu vozu výše.':'')+'</p>';
+    +'<p class="muted" style="font-size:12px">Fix/měs: <span class="pill zel">Ú</span> = dle účetnictví (odpisy + režie + pojistky + silniční daň — leasing účetně neběží), <span class="pill zlut">L</span> = běžící leasing dle evidence (plný fix'+(m.FIXV!=null?' '+tis(m.FIXV):'')+'), <span class="pill sed">R</span> = ručně upraveno, bez štítku = model. Krycí příspěvek a výsledek dle modelu počítají s variabilním nákladem vozu z účetnictví (nafta přeceněná na dnešní cenu), bez účetních dat s průměrem kalkulace.'+(ADMIN?' Řidiče, typ i fix upravíš v detailu vozu výše.':'')+'</p>';
   $('#app').innerHTML=h;
 
   chart('chTrz',{type:'bar',data:{labels:akt.map(v=>v.cislo),datasets:[{data:akt.map(v=>v.trz/1e6),backgroundColor:akt.map(v=>v.pausal?GR:B),borderRadius:4,maxBarThickness:20}]},
@@ -1076,7 +1138,8 @@ function vozDetail(cislo){
       const spr=$('#stavProvoz'); if(spr) spr.onclick=()=>ulozVoz('');
     }
   }
-  const nakl=m.mesice.map(x=>{const d=v.mesice[x]||{km:0,trzby:0}; return (v.fix!=null&&m.VAR!=null)? v.fix+m.VAR*d.km : null;});
+  const vv=v.vv!=null?v.vv:m.VARF;
+  const nakl=m.mesice.map(x=>{const d=v.mesice[x]||{km:0,trzby:0}; return (v.fix!=null&&vv!=null)? v.fix+vv*d.km : null;});
   chart('chVoz',{data:{labels:m.mesice.map(mesLbl),datasets:[
     {type:'bar',data:m.mesice.map(x=>(v.mesice[x]||{}).trzby||0),backgroundColor:B,borderRadius:4,maxBarThickness:38},
     ...(nakl[0]!=null?[{type:'line',data:nakl,borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:3,pointBackgroundColor:R,tension:.1}]:[])]},
@@ -1086,7 +1149,7 @@ function vozDetail(cislo){
   m.mesice.forEach((x,i)=>{ const d=v.mesice[x]||{km:0,trzby:0}; const r=nakl[i]!=null?d.trzby-nakl[i]:null;
     t+='<tr><td>'+mesLbl(x)+'</td><td>'+d.km.toLocaleString('cs-CZ')+'</td><td>'+kc(d.trzby)+'</td>'
       +(r!=null?'<td>'+kc(nakl[i])+'</td><td class="'+(r<0?'neg':'pos')+'">'+sgn(r,kc)+'</td>':'')+'</tr>'; });
-  $('#vozTab').innerHTML=t+'</tbody></table>';
+  $('#vozTab').innerHTML=t+'</tbody></table>'+(vv!=null?'<p class="muted" style="font-size:12px;margin:6px 0 0">Náklady = fix '+tis(v.fix)+'/měs + variabilní náklad vozu '+d2(vv)+' Kč/km × km ('+(v.varV!=null?'účetnictví vozu, nafta přeceněná na dnešních '+d2(m.NC.cena)+' Kč/l':'průměr kalkulace — vůz nemá účetní data')+'). Stejný náklad používá Plán, Dispečink i Citlivost.</p>':'');
   // dlouhodobý příběh vozu: sazba Kč/km ze všech ročníků (párování přes SPZ)
   const spzN=nSpz(v.spz); const hist=[];
   (DATA.historie||[]).forEach(r=>{ const hv=r.vozidla.find(x=>nSpz(x.spz)===spzN); if(hv) Object.entries(hv.mesice).forEach(([k,d])=>{ if(k.startsWith(String(r.rok))) hist.push({k,...d}); }); });
@@ -1191,14 +1254,14 @@ function vozEkonomika(v){
 /* ================= BOD ZVRATU ================= */
 function tabZvrat(){
   const m=M;
-  if(m.VAR==null||m.FIXV==null){ $('#app').innerHTML='<h1>Bod zvratu</h1>'+alertHtml('warn','Nákladová kalkulace se nenačetla — analýza bodu zvratu není k dispozici.'); return; }
+  if(m.VARF==null||m.FIXV==null){ $('#app').innerHTML='<h1>Bod zvratu</h1>'+alertHtml('warn','Nákladová kalkulace se nenačetla — analýza bodu zvratu není k dispozici.'); return; }
   const mes=m.mesice.length;
   const FIXA=m.FIXA;   // průměrný fix aktivního vozu dle evidence (leasing jen kde běží)
   const body=m.aktivni.map(v=>({x:v.km/mes,y:v.sazba,v:v.cislo,p:v.pausal,fix:v.fix}));
-  const be=r=>FIXA/(r-m.VAR);
+  const be=r=>FIXA/(r-m.VARF);
   let h='<h1>Bod zvratu</h1>';
-  h+=alertHtml('info','Křivka rentability: sazba = '+d2(m.VAR)+' Kč/km (variabilní) + '+tis(FIXA)+' průměrných fixů dle evidence / měsíční nájezd. Při průměrné sazbě '+d2(m.SAZBA)+' Kč/km je bod zvratu <b>'+(m.SAZBA>m.VAR?Math.round(be(m.SAZBA)).toLocaleString('cs-CZ')+' km/měs na vůz':'—')+'</b>. Vůz s běžícím leasingem má bod zvratu výš (fix '+tis(m.FIXV)+'), odepsaný níž ('+tis(m.FIXBASE)+').');
-  const nad=body.filter(p=>p.y!=null&&p.y>m.VAR+(p.fix!=null?p.fix:FIXA)/p.x);
+  h+=alertHtml('info','Křivka rentability: sazba = '+d2(m.VARF)+' Kč/km (variabilní) + '+tis(FIXA)+' průměrných fixů dle evidence / měsíční nájezd. Při průměrné sazbě '+d2(m.SAZBA)+' Kč/km je bod zvratu <b>'+(m.SAZBA>m.VARF?Math.round(be(m.SAZBA)).toLocaleString('cs-CZ')+' km/měs na vůz':'—')+'</b>. Vůz s běžícím leasingem má bod zvratu výš (fix '+tis(m.FIXV)+'), odepsaný níž ('+tis(m.FIXBASE)+').');
+  const nad=body.filter(p=>p.y!=null&&p.y>m.VARF+(p.fix!=null?p.fix:FIXA)/p.x);
   h+= nad.length? alertHtml('ok','Nad hranicí rentability (při vlastním fixu dle evidence): vozy <b>'+nad.map(p=>p.v).join(', ')+'</b>.')
     : alertHtml('danger','Žádné vozidlo aktuálně nedosahuje na hranici rentability (počítáno s vlastním fixem každého vozu).');
   h+=box('Sazba vs. měsíční nájezd',cv('chBE',340),legenda([[B,'Vozidlo'],[GR,'Paušál'],[R,'Hranice rentability']]));
@@ -1226,20 +1289,20 @@ function tabZvrat(){
   $('#app').innerHTML=h;
 
   const maxX=Math.max(15000,...body.map(p=>p.x*1.15));
-  const curve=[]; for(let x=Math.max(600,FIXA/60);x<=maxX;x+=200) curve.push({x,y:m.VAR+FIXA/x});
+  const curve=[]; for(let x=Math.max(600,FIXA/60);x<=maxX;x+=200) curve.push({x,y:m.VARF+FIXA/x});
   chart('chBE',{type:'scatter',data:{datasets:[
     {data:body,pointRadius:6,pointBackgroundColor:body.map(p=>p.p?GR:B),pointBorderColor:'#fff',pointBorderWidth:2},
     {data:curve,showLine:true,borderColor:R,borderWidth:2,borderDash:[6,4],pointRadius:0}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{filter:c=>c.datasetIndex===0,callbacks:{title:c=>vozLbl(c[0].raw.v),label:c=>d2(c.raw.y)+' Kč/km, '+Math.round(c.raw.x).toLocaleString('cs-CZ')+' km/měs'}}},
       scales:{x:{min:0,max:maxX,...AXC,title:{display:true,text:'průměrný měsíční nájezd (km)',color:'#7f8c8d'},ticks:{...AXC.ticks,callback:v=>(v/1000)+' tis.'}},
-        y:{min:Math.floor(m.VAR*0.8),max:Math.ceil(Math.max(...body.map(p=>p.y||0),m.VAR)+22),...AXC,title:{display:true,text:'Kč/km',color:'#7f8c8d'}}}}});
+        y:{min:Math.floor(m.VARF*0.8),max:Math.ceil(Math.max(...body.map(p=>p.y||0),m.VARF)+22),...AXC,title:{display:true,text:'Kč/km',color:'#7f8c8d'}}}}});
   chart('chPr',{type:'bar',data:{labels:pr.map(v=>v.cislo),datasets:[{data:pr.map(v=>v.prispevek/1000),backgroundColor:pr.map(v=>v.prispevek<0?R:B),borderRadius:4,maxBarThickness:20}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{title:c=>vozLbl(pr[c[0].dataIndex].cislo),label:c=>{const v=pr[c.dataIndex];return [sgn(v.prispevek,kc),'vlastní fixy za období: '+kc((v.fix!=null?v.fix:m.FIXV)*mes),'chybí do fixů: '+kc(Math.max(0,(v.fix!=null?v.fix:m.FIXV)*mes-v.prispevek))];}}}},
       scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' tis.'}},y:{...AXC,grid:{display:false}}}}});
 
   /* --- cenotvorba: minimální cena/km podle nájezdu, cílové marže a typu fixu --- */
   const zFix=()=>({plny:m.FIXV, prumer:FIXA, odepsany:m.FIXBASE})[$('#zFixSel').value];
-  const cenaKm=(K,mar)=>(m.VAR+zFix()/K)/(1-mar/100);
+  const cenaKm=(K,mar)=>(m.VARF+zFix()/K)/(1-mar/100);
   const najX=[]; for(let x=6000;x<=14000;x+=250) najX.push(x);
   chart('chCenik',{data:{labels:najX.map(x=>x/1000),datasets:[
     {type:'line',data:[],borderColor:B,borderWidth:2,pointRadius:0,tension:.15},
@@ -1307,24 +1370,25 @@ function tabCitlivost(){
       const mv=m.voz.find(x=>nSpz(x.spz)===nSpz(e.spz));
       varTot+=((mv&&mv.varU!=null)?mv.varU:(N.celkemVar||0))*e.kmCelkem;
     });
-    if(km>0&&l>0&&phm>0) real={cena:phm/l, spotr:l/km*100, mzdy:mzdy/km, myto:myto/km, varKm:varTot/km, km};
+    // varKm = stejný vážený náklad vozů jako v Přehledu, Plánu a Dispečinku (m.VARF); zbytek složek se dopočítá proti němu
+    if(km>0&&l>0&&phm>0) real={cena:phm/l, spotr:l/km*100, mzdy:mzdy/km, myto:myto/km, varKm:(m.VARF!=null?m.VARF:varTot/km), km};
   })();
   // Cena nafty = REÁLNÁ TRŽNÍ cena bez DPH (ČSÚ); účetní poměr PHM÷litry je zkreslený
   // posunem faktur a přeúčtováním mezi vozy, slouží jen jako poslední fallback.
-  const trh=(DATA.nafta&&DATA.nafta.csu)||null;
-  const trhBezDph=trh?Math.round(trh.price/1.21*10)/10:null;
+  const M0=modelVstupy(), trh=(DATA.nafta&&DATA.nafta.csu)||null, trhBezDph=M0.cena;
   const def= real
     ? {cena:trhBezDph!=null?trhBezDph:Math.round(real.cena*10)/10, spotr:Math.round(real.spotr*10)/10, myto:Math.round(real.myto*100)/100, mzdy:Math.round(real.mzdy*100)/100, saz:0, naj:0}
     : {cena:trhBezDph!=null?trhBezDph:(N.cenaPhm||28), spotr:N.spotreba||29.3, myto:N.myto||0, mzdy:N.mzdyRidicu||0, saz:0, naj:0};
   const nafta0=Math.round(def.spotr*def.cena)/100;
+  const naftaObd=Math.round(def.spotr*(M0.tydnu&&M0.cena0!=null?M0.cena0:def.cena))/100;   // nafta v účetním období — zbytek nákladů se dopočítá proti ní
   // Ostatní variabilní (opravy, pneu, AdBlue, autopotřeby, parkovné…) = zbytek do skutečných variabilních nákladů
-  const OST= real? Math.max(0, real.varKm-nafta0-def.mzdy-def.myto) : (N.pneu||0)+(N.adblue||0)+(N.opravy||0);
+  const OST= real? Math.max(0, real.varKm-naftaObd-def.mzdy-def.myto) : (N.pneu||0)+(N.adblue||0)+(N.opravy||0);
   const varKm0=nafta0+def.myto+def.mzdy+OST;
   const baseRes=m.TRZ-varKm0*m.KM-m.FIXTOT;   // výchozí bod = reálné sazby × reálné km − kalibrované fixy
   const sl=(id,lab,min,max,step,val)=>'<div class="sl"><label>'+lab+'</label><input type="range" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+val+'"><output id="o'+id+'"></output></div>';
   let h='<h1>Citlivostní analýza <span class="muted">(hodnocené období: '+mes+' měsíců)</span></h1>';
   h+= real
-    ? alertHtml('info','Výchozí hodnoty = <b>reálná data</b>: nafta <b>'+d2(def.cena)+' Kč/l bez DPH</b> ('+(trhBezDph!=null?('aktuální tržní cena, '+esc(trh.weekLabel||'ČSÚ')+(trh.change!=null?', mezitýdně '+sgn(trh.change,x=>d2(x)+' Kč'):'')):'účetní průměr — tržní cena se nenačetla')+'), spotřeba <b>'+real.spotr.toFixed(1).replace('.',',')+' l/100 km</b>, mzdy řidičů '+d2(real.mzdy)+' Kč/km a mýto '+d2(real.myto)+' Kč/km z účetnictví 1–'+((DATA.ekonomika.mesiceSdaty||[]).slice(-1)[0]||'')+'/'+String(DATA.ekonomika.rok||'').slice(2)+', fixy dle vozů. Posuvníky měří odchylku od reality, ne od teoretické kalkulace. Detail cen v záložce Nafta.')
+    ? alertHtml('info','Výchozí hodnoty = <b>reálná data</b>: nafta <b>'+d2(def.cena)+' Kč/l bez DPH</b> ('+(trhBezDph!=null?('aktuální tržní cena, '+esc(trh.weekLabel||'ČSÚ')+(trh.change!=null?', mezitýdně '+sgn(trh.change,x=>d2(x)+' Kč'):'')):'účetní průměr — tržní cena se nenačetla')+'), spotřeba <b>'+real.spotr.toFixed(1).replace('.',',')+' l/100 km</b>, mzdy řidičů '+d2(real.mzdy)+' Kč/km a mýto '+d2(real.myto)+' Kč/km z účetnictví 1–'+((DATA.ekonomika.mesiceSdaty||[]).slice(-1)[0]||'')+'/'+String(DATA.ekonomika.rok||'').slice(2)+', fixy dle vozů. Posuvníky měří odchylku od reality, ne od teoretické kalkulace.'+(M0.tydnu?' Nafta v účetním období '+d2(M0.cena0)+' Kč/l → dnes '+d2(M0.cena)+' ('+sgn(M0.dNafta,x=>d2(x)+' Kč/l')+'), stejně přeceňuje Plán i Dispečink.':'')+' Detail cen v záložce Nafta.')
     : alertHtml('warn','Účetní data nejsou k dispozici — výchozí hodnoty jsou '+(trhBezDph!=null?'tržní cena nafty (ČSÚ) a ':'')+'nákladová kalkulace (modelové).');
   h+='<div class="chartbox"><div class="sliders">'
     +sl('cCena','Cena nafty',Math.max(15,def.cena-8),def.cena+14,0.5,def.cena)
@@ -1339,7 +1403,8 @@ function tabCitlivost(){
     +'<div class="card"><div class="muted">Výsledek (scénář)</div><div class="metr" id="cRes">–</div></div>'
     +'<div class="card"><div class="muted">Rozdíl proti '+(real?'skutečnosti':'modelu')+'</div><div class="metr" id="cDelta">–</div></div>'
     +'<div class="card"><div class="muted">Náklad na km</div><div class="metr" id="cNakl">–</div></div>'
-    +'<div class="card"><div class="muted">Sazba: máme / potřeba</div><div class="metr" id="cSazKpi" style="font-size:21px">–</div></div></div>'
+    +'<div class="card"><div class="muted">Sazba: máme / na nule</div><div class="metr" id="cSazKpi" style="font-size:21px">–</div></div>'
+    +'<div class="card"><div class="muted">Sazba pro '+String(Math.round(M0.marze*1000)/10).replace('.',',')+' % marži</div><div class="metr" id="cSazCil">–</div><div class="muted">rentabilní sazba scénáře · marže scénáře <span id="cMarze">–</span></div></div></div>'
     +'<div id="cAlerts"></div>'
     +'<h2 style="margin:14px 0 8px">Struktura nákladů scénáře <span class="muted">(částky se mění s posuvníky)</span></h2>'
     +'<div id="cStruct"></div></div>';
@@ -1373,6 +1438,8 @@ function tabCitlivost(){
     $('#cDelta').textContent=sgn(delta,mil); $('#cDelta').className='metr '+(delta<0?'neg':'pos');
     $('#cNakl').textContent=d2(naklKm)+' Kč';
     $('#cSazKpi').textContent=d2(sazba)+' / '+d2(naklKm);
+    $('#cSazCil').textContent=d2(naklKm/(1-M0.marze))+' Kč'; $('#cSazCil').className='metr '+(sazba>=naklKm/(1-M0.marze)?'pos':'neg');
+    $('#cMarze').textContent=(trz>0?((res/trz)*100).toFixed(1).replace('.',','):'—')+' %';
     // struktura nákladů scénáře: složka | Kč/měs | za období | podíl | změna proti výchozímu stavu
     const slozky=[
       ['Fixní náklady (odpisy, režie, pojistky…)','#888780', fix, m.FIXTOT],

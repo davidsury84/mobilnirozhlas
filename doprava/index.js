@@ -336,8 +336,8 @@ function mount(host) {
     return {
       skupiny: { A: { nazev: String((sk.A || {}).nazev || 'Skupina A').slice(0, 60) }, B: { nazev: String((sk.B || {}).nazev || 'Skupina B').slice(0, 60) } },
       vozy: (d.vozy && typeof d.vozy === 'object') ? d.vozy : {},            // číslo vozu → 'A' | 'B'
-      // cíle: plnění plánu km/tržeb (%), výnos Kč/km, prázdné km (%, méně = lépe), spotřeba l/100 (méně = lépe), vyplněnost přejezdu (%)
-      cile: { planProc: num(c.planProc, 95, 50, 150), kckm: num(c.kckm, 36, 10, 100), prazdne: num(c.prazdne, 10, 1, 50), spotreba: num(c.spotreba, 28, 10, 60), vyplneno: num(c.vyplneno, 95, 50, 100) },
+      // cíle: cílová marže (%; z ní plynou rentabilní sazby a plán tržeb), prázdné km (%, méně = lépe), spotřeba l/100 (méně = lépe), vyplněnost přejezdu (%)
+      cile: { marze: num(c.marze, 5, 0, 30), prazdne: num(c.prazdne, 10, 1, 50), spotreba: num(c.spotreba, 28, 10, 60), vyplneno: num(c.vyplneno, 95, 50, 100) },
       poznamky: Array.isArray(d.poznamky) ? d.poznamky : [],
     };
   }

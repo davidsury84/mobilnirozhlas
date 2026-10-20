@@ -64,7 +64,9 @@ function parseCsuCsv(text) {
   });
   keyed.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   const last = keyed[keyed.length - 1], prev = keyed[keyed.length - 2];
-  return { price: last.value, previous: prev ? prev.value : null, change: prev ? +(last.value - prev.value).toFixed(2) : null, week: last.key, weekLabel: last.label };
+  // historie týdnů letošního roku — modul z ní počítá průměrnou cenu za účetní období (přecenění nafty v modelu)
+  const historie = keyed.filter((k) => k.key && k.key.startsWith(String(last.key).slice(0, 4))).map((k) => ({ key: k.key, label: k.label, value: k.value }));
+  return { price: last.value, previous: prev ? prev.value : null, change: prev ? +(last.value - prev.value).toFixed(2) : null, week: last.key, weekLabel: last.label, historie };
 }
 
 /* ---------- kraje (cenaphm.cz) ---------- */
