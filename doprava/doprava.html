@@ -1119,23 +1119,34 @@ function vozEkonomika(v){
   ];
   $('#vozEkonKpi').innerHTML=kpi.map(k=>'<div class="card" style="padding:10px 14px"><div class="muted" style="font-size:12px">'+k[0]+'</div><div style="font-size:18px;font-weight:800" class="'+(k[3]||'')+'">'+k[1]+'</div>'+(k[2]?'<div class="muted" style="font-size:11px">'+esc(k[2])+'</div>':'')+'</div>').join('');
   const nuly=$('#vozEkonNuly').checked;
-  const SOUHRN_RADKY=[['primeNaklady','Přímé náklady (materiál, PHM, servis…)'],['primeMzdy','Přímé mzdy řidičů'],['ostatniPrime','Ostatní přímé (mýto, pojistky, daně…)'],['primeCelkem','Přímé náklady celkem'],['rezijni','Režijní náklady (alokace správy)'],['naklady','NÁKLADY CELKEM'],['trzby','TRŽBY'],['hv','HOSPODÁŘSKÝ VÝSLEDEK']];
-  let t='<table><thead><tr><th style="text-align:left">Položka</th>'+mesN.map(mm=>'<th>'+mm+'/26</th>').join('')+'<th>Celkem</th></tr></thead><tbody>';
-  ek.polozky.forEach(p=>{
-    if(!nuly && !p.celkem && !(p.mesice||[]).some(Boolean)) return;
-    t+='<tr><td style="text-align:left">'+esc(p.nazev)+(p.pozn?' <span class="muted">('+esc(p.pozn)+')</span>':'')+'</td>'
+  // Struktura 1:1 podle účetního sešitu Auta-doprava2026: tři skupiny přímých nákladů, každá se svým
+  // mezisoučtem, pak celkové řádky — názvy mezisoučtů jsou převzaté ze sešitu, ať se tabulka čte stejně.
+  const SKUPINY=[
+    ['primeNaklady','Přímé náklady',['501100','501110','501130','511700','511200','501400','518410','551000']],
+    ['primeMzdy','Přímé Mzdy - řidiči',['512200','521200','Odvody','568 - OFN']],
+    ['ostatniPrime','Ostatní přímé náklady',['501000','501700','511300','518511','518700','518820','531000','538100','548110','548200','548210','548300','548400','568400']],
+  ];
+  const patri=(p,ids)=>ids.some(id=>p.nazev.indexOf(id)===0);
+  const radekPolozky=p=>{
+    if(!nuly && !p.celkem && !(p.mesice||[]).some(Boolean)) return '';
+    return '<tr><td style="text-align:left;padding-left:18px">'+esc(p.nazev)+(p.pozn?' <span class="muted">('+esc(p.pozn)+')</span>':'')+'</td>'
       +mesN.map((_,i)=>'<td>'+((p.mesice&&p.mesice[i])?Math.round(p.mesice[i]).toLocaleString('cs-CZ'):'·')+'</td>').join('')
       +'<td><b>'+Math.round(p.celkem).toLocaleString('cs-CZ')+'</b></td></tr>';
+  };
+  const radekSouhrnu=(x,label,barva,hv)=>'<tr style="background:'+barva+';font-weight:700"><td style="text-align:left">'+label+'</td>'
+    +mesN.map((_,i)=>'<td class="'+(hv&&x.mesice[i]<0?'neg':'')+'">'+Math.round(x.mesice[i]||0).toLocaleString('cs-CZ')+'</td>').join('')
+    +'<td class="'+(hv?(x.celkem<0?'neg':'pos'):'')+'">'+Math.round(x.celkem).toLocaleString('cs-CZ')+'</td></tr>';
+  let t='<table><thead><tr><th style="text-align:left">Položka</th>'+mesN.map(mm=>'<th>'+mm+'/26</th>').join('')+'<th>Celkem</th></tr></thead><tbody>';
+  const zarazene=new Set();
+  SKUPINY.forEach(([klic,label,ids])=>{
+    ek.polozky.forEach(p=>{ if(patri(p,ids)){ zarazene.add(p); t+=radekPolozky(p); } });
+    if(s[klic]) t+=radekSouhrnu(s[klic],label,'#f0f2f5',false);
   });
-  SOUHRN_RADKY.forEach(([klic,label])=>{
-    const x=s[klic]; if(!x) return;
-    const hv=klic==='hv';
-    t+='<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">'+label+'</td>'
-      +mesN.map((_,i)=>'<td class="'+(hv&&x.mesice[i]<0?'neg':'')+'">'+Math.round(x.mesice[i]||0).toLocaleString('cs-CZ')+'</td>').join('')
-      +'<td class="'+(hv?(x.celkem<0?'neg':'pos'):'')+'">'+Math.round(x.celkem).toLocaleString('cs-CZ')+'</td></tr>';
-  });
+  ek.polozky.filter(p=>!zarazene.has(p)).forEach(p=>{ t+=radekPolozky(p); });   // nový účet mimo známé skupiny se nesmí ztratit
+  [['primeCelkem','Přímé náklady Celkem'],['rezijni','Režijní náklady Celkem'],['naklady','Náklady Celkem'],['trzby','Tržby celkem'],['hv','HV Celkem']]
+    .forEach(([klic,label])=>{ if(s[klic]) t+=radekSouhrnu(s[klic],label,'#e6e9ee',klic==='hv'); });
   { const oM=odpisyMesVozu(ek), hvM=(s.hv&&s.hv.mesice)||[];
-    t+='<tr style="background:#e8f5ee;font-weight:700"><td style="text-align:left">HV PŘED ODPISY <span class="muted" style="font-weight:400">(HV + odpisy)</span></td>'
+    t+='<tr style="background:#e8f5ee;font-weight:700"><td style="text-align:left">HV před odpisy <span class="muted" style="font-weight:400">(HV Celkem + 551000 — doplněno modulem)</span></td>'
       +mesN.map((_,i)=>{const v2=(hvM[i]||0)+(oM[i]||0);return '<td class="'+(v2<0?'neg':'')+'">'+Math.round(v2).toLocaleString('cs-CZ')+'</td>';}).join('')
       +'<td class="'+(hvPredOdpisy(ek)<0?'neg':'pos')+'">'+Math.round(hvPredOdpisy(ek)).toLocaleString('cs-CZ')+'</td></tr>'; }
   $('#vozEkonTab').innerHTML=t+'</tbody></table>';
