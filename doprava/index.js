@@ -791,4 +791,4 @@ function mount(host) {
   return { handle, tick, reports };
 }
 
-module.exports = { mount, parseZakazky, cilZTrasy };
+module.exports = { mount, parseZakazky, cilZTrasy, parseEkonomika };
