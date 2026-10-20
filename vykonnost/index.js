@@ -585,7 +585,12 @@ function mount(host) {
   const LEG_FLAT = LEGENDA.flatMap(g => g.items);
   const RE_PROD = /úklid|uklid|zaučen|zaucen|zapracov|školen|skolen|transport|manipul|stěhov|stehov|prostoj|čekán|cekan|poruch|údržb|udrzb|likvidac|inventur|sníh|snih|zeleň|zelen|sečen|secen|ostatní|ostatni/i;
   const RE_REKL = /reklam|oprava kontejner/i, RE_ZAUC = /zaučen|zaucen|zapracov|školen|skolen/i, RE_OST = /^ostatní|^ostatni/i;
-  const pracDnyMesice = ym => { const [y, m] = ym.split('-').map(Number); let n = 0; for (let d = 1; d <= 31; d++) { const t = new Date(Date.UTC(y, m - 1, d)); if (t.getUTCMonth() !== m - 1) break; const w = t.getUTCDay(); if (w && w < 6) n++; } return n; };
+  // České státní svátky (pevné + Velký pátek a Velikonoční pondělí) — pracovní den = po–pá bez svátku
+  const velikonoce = y => { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451); return new Date(Date.UTC(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1)); };
+  const _sv = {}; const svatky = y => { if (_sv[y]) return _sv[y]; const S = new Set(['01-01', '05-01', '05-08', '07-05', '07-06', '09-28', '10-28', '11-17', '12-24', '12-25', '12-26'].map(x => y + '-' + x)); const ne = velikonoce(y); [-2, 1].forEach(o => { const t = new Date(ne.getTime() + o * 86400000); S.add(t.toISOString().slice(0, 10)); }); return (_sv[y] = S); };
+  const jeSvatek = d => svatky(+d.slice(0, 4)).has(d);
+  const jePracDen = d => { const w = new Date(d + 'T00:00:00Z').getUTCDay(); return w > 0 && w < 6 && !jeSvatek(d); };
+  const pracDnyMesice = ym => { const [y, m] = ym.split('-').map(Number); let n = 0; for (let d = 1; d <= 31; d++) { const t = new Date(Date.UTC(y, m - 1, d)); if (t.getUTCMonth() !== m - 1) break; if (jePracDen(t.toISOString().slice(0, 10))) n++; } return n; };
   // semafor: 'g' | 'y' | 'r' | '' (bez semaforu)
   function semafor(def, v, ctx) {
     if (def.cil) { const c = ctx && ((ctx.cile && ctx.cile[def.k]) || (def.k === 'A7' ? ctx.cil : null)); if (!c || v == null) return '';
@@ -777,7 +782,7 @@ function mount(host) {
       if (normIndex().items.length) { const n = matchNorma(z.key, op, r[R.dil], r[R.cop]); if (n) { const mn = (n.min || 0) * r[R.ks] / 60; w.normH += mn; if (u === 'svar') { w.normSvar += mn; w.svarMatched = (w.svarMatched || 0) + 1; } } } });
     // muldy z plánu (svařené v závodě, v Heliosu neodváděné) → hotové i svařovna hotovo v den z plánu
     mHot.forEach(x => { const w = W[isoWeekOf(x.d)]; if (!w) return; w.lak += x.ks; w.lakMuldy += x.ks; w.dov += x.ks; w.muldy = (w.muldy || 0) + x.ks; });
-    const weeks = Object.values(W).sort((a, b) => a.week.localeCompare(b.week)).map(w => { const pd = w.week === isoWeekOf(snap) ? Math.max(1, [...w.dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length) : 5;
+    const weeks = Object.values(W).sort((a, b) => a.week.localeCompare(b.week)).map(w => { const tyd = pracDnyTydne(w.week); const pd = w.week === isoWeekOf(snap) ? Math.max(1, [...w.dny].filter(d => jePracDen(d)).length) : Math.max(1, pracDnyRozsah(tyd.od, tyd.do));
       return { week: w.week, muldy: w.muldy || 0, od: pracDnyTydne(w.week).od, rows: w.rows, svarRows: w.svarRows || 0, svarMatched: w.svarMatched || 0, skl: Math.round(w.skl), dov: Math.round(w.dov), lak: Math.round(w.lakAbr), lakVse: Math.round(w.lak), city: Math.round(w.lakCity), muldyVse: Math.round(w.lakMuldy), jine: Math.round(w.lakJine), zakl: Math.round(w.zakl), lide: w.lide.size, svar: w.svar.size, rezieH: Math.round(w.rezieH), rezieSvar: Math.round(w.rezieSvar), rework: Math.round(w.rework), normH: Math.round(w.normH), normSvar: Math.round(w.normSvar), pd, lakDen: Math.round(w.lakAbr / pd * 10) / 10, lakDenVse: Math.round(w.lak / pd * 10) / 10, lakDenMul: Math.round((w.lakAbr + w.lakMuldy) / pd * 10) / 10, cityDen: Math.round(w.lakCity / pd * 10) / 10, muldyDen: Math.round(w.lakMuldy / pd * 10) / 10, dovDen: Math.round(w.dov / pd * 10) / 10, neuplny: w.week === isoWeekOf(snap) }; });
     // odstávka (celozávodní dovolená, svátky) = týden s méně než polovinou obvyklého počtu lidí → do průměrů nepočítat
     const lideSorted = weeks.filter(w => !w.neuplny).map(w => w.lide).sort((a, b) => a - b); const medLide = lideSorted.length ? lideSorted[Math.floor(lideSorted.length / 2)] : 0;
@@ -872,7 +877,7 @@ function mount(host) {
   const PLAN6_F = path.join(dataDir, 'vykonnost-plan6.json');
   function loadPlan6() { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} const faze = PLAN6_DEFAULT.faze.map(f => Object.assign({}, f, (c.faze || {})[f.k] || {})); return { cil: c.cil > 0 ? +c.cil : PLAN6_DEFAULT.cil, smenaMin: c.smenaMin > 0 ? +c.smenaMin : PLAN6_DEFAULT.smenaMin, faze }; }
   function savePlan6(b) { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} if (b.cil != null) c.cil = +b.cil > 0 ? Math.round(+b.cil * 10) / 10 : PLAN6_DEFAULT.cil; if (b.smenaMin != null && +b.smenaMin > 0) c.smenaMin = +b.smenaMin; if (b.faze && typeof b.faze === 'object') { c.faze = c.faze || {}; Object.keys(b.faze).forEach(k => { if (!PLAN6_DEFAULT.faze.some(f => f.k === k)) return; const v = b.faze[k] || {}; const o = c.faze[k] || {}; if (v.min != null && +v.min > 0) o.min = +v.min; if (v.ks != null && +v.ks > 0) o.ks = +v.ks; if (v.reset) delete c.faze[k]; else c.faze[k] = o; }); } try { fs.writeFileSync(PLAN6_F, JSON.stringify(c, null, 2)); } catch (_) {} return loadPlan6(); }
-  const pracDnyRozsah = (od, do_) => { let n = 0; for (const d = new Date(od + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= do_; d.setUTCDate(d.getUTCDate() + 1)) { const w = d.getUTCDay(); if (w && w < 6) n++; } return n; };
+  const pracDnyRozsah = (od, do_) => { let n = 0; for (const d = new Date(od + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= do_; d.setUTCDate(d.getUTCDate() + 1)) { if (jePracDen(d.toISOString().slice(0, 10))) n++; } return n; };
   function planOperaci(z, od, do_) {
     const D = loadData(z.key); if (!D) return null;
     const P = loadPlan6(); const snap = D.snapshot;
