@@ -905,8 +905,15 @@ function dispKpiVozu(v,mesice,M0){
   const dSaz=(sazba!=null&&P.sazbaCil!=null)?(sazba-P.sazbaCil)*km:0;
   const dPr=(prProc!=null&&c.prazdne!=null&&prProc>c.prazdne)?-(prProc-c.prazdne)/100*km*varV:0;
   const dSp=(spotreba!=null&&c.spotreba!=null&&spotreba>c.spotreba&&M0.cena!=null)?-(spotreba-c.spotreba)/100*kmL*M0.cena:0;
-  return {n,km,trz,sazba,hv,marze,varV,fix,planKm,trzCil,hvCil,sazbaCil:P.sazbaCil,pausal:P.pausal,nal,pr,prProc,litry,kmL,spotreba,jizd:Z.length,vyplneno,
-    dKm,dSaz,dPr,dSp,dHv:hvCil!=null?hv-hvCil:0,planKmProc:planKm?km/planKm*100:null};
+  // přínos při SPLNĚNÍ cíle (Kč za období, ≥ 0): kolik by vůz přidal, kdyby dojel plán km / dosáhl rentabilní sazby /
+  // srovnal prázdné km a spotřebu na limit; gKomb = vše najednou (km i sazba na cíl, úspory přepočtené na plánové km)
+  const gKm=(planKm!=null&&km<planKm&&sazba!=null)?(planKm-km)*Math.max(0,sazba-varV):0;
+  const gSaz=(sazba!=null&&P.sazbaCil!=null&&sazba<P.sazbaCil&&!P.pausal)?(P.sazbaCil-sazba)*km:0;
+  const gPr=-dPr, gSp=-dSp;
+  const km2=planKm!=null?Math.max(km,planKm):km, saz2=(sazba!=null&&P.sazbaCil!=null&&!P.pausal)?Math.max(sazba,P.sazbaCil):sazba;
+  const gKomb=(sazba!=null)?Math.max(0,((saz2-varV)*km2-(sazba-varV)*km)+(gPr+gSp)*(km>0?km2/km:1)):0;
+  return {cislo:v.cislo,ridic:v.ridic||'',n,km,trz,sazba,hv,marze,varV,fix,planKm,trzCil,hvCil,sazbaCil:P.sazbaCil,pausal:P.pausal,nal,pr,prProc,litry,kmL,spotreba,jizd:Z.length,vyplneno,
+    dKm,dSaz,dPr,dSp,dHv:hvCil!=null?hv-hvCil:0,planKmProc:planKm?km/planKm*100:null,gKm,gSaz,gPr,gSp,gKomb};
 }
 function dispKpiSkupiny(vozy,mesice,M0){
   const k=vozy.map(v=>dispKpiVozu(v,mesice,M0)); const s=f=>k.reduce((a,x)=>a+(f(x)||0),0);
@@ -915,7 +922,8 @@ function dispKpiSkupiny(vozy,mesice,M0){
   return {aut,n,vozy:k,km,trz,hv,planKm,trzCil,hvCil,sazba:km?trz/km:null,sazbaCil:planKm?trzCil/planKm:null,marze:trz>0?hv/trz:null,
     kmAuto:aut?km/aut/n:null,trzAuto:aut?trz/aut/n:null,prProc:(nal+pr)?pr/(nal+pr)*100:null,spotreba:kmL?litry/kmL*100:null,vyplneno:jizd?vyp/jizd*100:null,
     dKm:s(x=>x.dKm),dSaz:s(x=>x.dSaz),dPr:s(x=>x.dPr),dSp:s(x=>x.dSp),dHv:s(x=>x.dHv),
-    potencial:k.reduce((a,x)=>a+Math.min(0,x.dKm)+Math.min(0,x.dSaz)+x.dPr+x.dSp,0)};
+    potencial:k.reduce((a,x)=>a+Math.min(0,x.dKm)+Math.min(0,x.dSaz)+x.dPr+x.dSp,0),
+    gKm:s(x=>x.gKm),gSaz:s(x=>x.gSaz),gPr:s(x=>x.gPr),gSp:s(x=>x.gSp),gKomb:s(x=>x.gKomb)};
 }
 // semafor: 'pos' | '' | 'neg' podle cíle (u „méně = lépe" obráceně), tolerance 10 %
 function dispSemafor(val,cil,mene){
@@ -964,6 +972,27 @@ function tabDispecink(){
     +'<tr style="background:#f0f2f5;font-weight:700"><td style="text-align:left">Nevyužitý potenciál vs. cíle</td><td class="muted" style="font-weight:400">součet záporných dopadů</td>'
     +[A,B,F].map(K=>'<td colspan="3" class="'+(K.potencial<0?'neg':'pos')+'">'+(K.aut?sgn(K.potencial,tis)+(K.n>1?' <span class="muted" style="font-weight:400">('+sgn(K.potencial/K.n,tis)+'/měs)</span>':''):'—')+'</td>').join('')+'</tr>'
     +'</tbody></table><p class="muted" style="font-size:12px;margin:6px 0 0">Cíle vozů plynou z rentabilního plánu (var. náklad vozu + fix vč. odpisů + marže '+mp+' % při plánovaném nájezdu). Zeleně = cíl splněn, bez barvy = do 10 % pod cílem, červeně = výrazně pod. Dopad = kolik Kč za období ukazatel přidal (+) nebo ubral (−) proti cíli; dopady se částečně překrývají, proto „potenciál" sčítá jen záporné.</p></div>';
+  // --- Dopad KPI na výsledek: co přinese splnění každého cíle (páky), pro skupiny i flotilu ---
+  const PAKY=[
+    ['gKm','Nájezd na plán km','chybějící km × (sazba − variabilní náklad); jen vozy pod plánem a se sazbou nad náklady'],
+    ['gSaz','Sazba na rentabilní','(rentabilní sazba − dnešní) × km; smluvní paušály se nepočítají'],
+    ['gPr','Prázdné km ≤ '+cile.prazdne+' %','km nad limit × variabilní náklad'],
+    ['gSp','Spotřeba ≤ '+cile.spotreba+' l/100','litry nad limit × nafta dnes'],
+    ['gKomb','VŠE DOHROMADY','km i sazba na cíl, úspory přepočtené na plánové km — páky se překrývají, proto to není součet'],
+  ];
+  const top3=(K,k)=>K.vozy.filter(x=>x[k]>1e3).sort((a,b)=>b[k]-a[k]).slice(0,3).map(x=>esc(x.cislo)+' '+sgn(x[k],tis)).join(', ')||'—';
+  const bunkaG=(K,k)=>K.aut?'<td><b>'+sgn(K[k],tis)+'</b>'+(K.n>1?'<div class="muted" style="font-size:11px">'+sgn(K[k]/K.n,tis)+'/měs</div>':'')+'</td>':'<td>—</td>';
+  const hvPo=K=>K.hv+K.gKomb;
+  const marzePo=K=>{ const trz2=K.vozy.reduce((a,x)=>{const km=x.planKm!=null?Math.max(x.km,x.planKm):x.km; const sz=(x.sazba!=null&&x.sazbaCil!=null&&!x.pausal)?Math.max(x.sazba,x.sazbaCil):(x.sazba||0); return a+sz*km;},0); return trz2>0?hvPo(K)/trz2:null; };
+  h+='<div class="chartbox"><h2 style="margin:0 0 6px">Dopad KPI na výsledek — co přinese splnění cílů <span class="muted">('+(DISP_OBD==='rok'?'od začátku roku':mesLbl(DISP_OBD))+')</span></h2>'
+    +'<div class="cards" style="margin-bottom:10px">'
+    +[['A',A],['B',B],['F',F]].map(([k,K])=>'<div class="card"><div class="muted">'+esc(k==='F'?'Celá flotila':D.skupiny[k].nazev)+'</div><div class="metr '+(hvPo(K)<0?'neg':'pos')+'">'+(K.aut?sgn(hvPo(K),tis):'—')+'</div><div class="muted">při splnění všech cílů · dnes '+(K.aut?sgn(K.hv,tis):'—')+(K.aut&&marzePo(K)!=null?' · marže '+pct(K.marze)+' → '+pct(marzePo(K)):'')+'</div></div>').join('')
+    +'</div>'
+    +'<div style="overflow-x:auto"><table><thead><tr><th style="text-align:left">Páka (KPI na cíl)</th><th>'+esc(D.skupiny.A.nazev)+'</th><th>'+esc(D.skupiny.B.nazev)+'</th><th>Celá flotila</th><th style="text-align:left">Největší přínos (vozy)</th></tr></thead><tbody>'
+    +PAKY.map(([k,lbl,pozn])=>'<tr'+(k==='gKomb'?' style="background:#f0f2f5;font-weight:700"':'')+'><td style="text-align:left">'+lbl+'<div class="muted" style="font-size:11px;font-weight:400">'+pozn+'</div></td>'+bunkaG(A,k)+bunkaG(B,k)+bunkaG(F,k)+'<td style="text-align:left;font-weight:400">'+top3(F,k)+'</td></tr>').join('')
+    +'</tbody></table></div>'
+    +cv('chDispPaky',200)
+    +'<p class="muted" style="font-size:12px;margin:6px 0 0">Přínos = kolik Kč by za období přibylo k výsledku dle modelu, kdyby skupina daný cíl splnila (ostatní beze změny). Nájezd předpokládá, že zakázky jsou; sazba se počítá jen u vozů bez smluvního paušálu. Řádek VŠE DOHROMADY je jediný, který se nesmí sčítat s ostatními.</p></div>';
   // --- trend po měsících ---
   h+='<div class="grid2">'+box('Nájezd na auto po měsících (km)',cv('chDispKm',240),legenda([[B,D.skupiny.A.nazev],[O,D.skupiny.B.nazev],[GR,'flotila']]))
     +box('Marže dle modelu po měsících (%)',cv('chDispMar',240),legenda([[B,D.skupiny.A.nazev],[O,D.skupiny.B.nazev],[GR,'flotila'],[R,'cíl '+mp+' %']]))+'</div>';
@@ -1021,6 +1050,8 @@ function tabDispecink(){
   const lineOpts=suf=>({responsive:true,maintainAspectRatio:false,plugins:{...NOLEG,tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y.toLocaleString('cs-CZ'):'—')+suf}}},scales:{x:{...AXC,grid:{display:false}},y:{...AXC}}});
   const ds=(lbl,data,col,dash)=>({label:lbl,data,borderColor:col,borderWidth:2,pointRadius:3,pointBackgroundColor:col,tension:.2,borderDash:dash||[],spanGaps:true});
   chart('chDispKm',{type:'line',data:{labels:lb,datasets:[ds(D.skupiny.A.nazev,serie(sk('A'),K=>K.aut?K.kmAuto:null),B),ds(D.skupiny.B.nazev,serie(sk('B'),K=>K.aut?K.kmAuto:null),O),ds('flotila',serieF(K=>K.aut?K.kmAuto:null),GR,[6,4])]},options:lineOpts(' km')});
+  const pakyLb=PAKY.slice(0,4).map(p=>p[1]), pakyDs=(K,lbl,col)=>({label:lbl,data:PAKY.slice(0,4).map(p=>+(K[p[0]]/1e6).toFixed(3)),backgroundColor:col,borderRadius:4,maxBarThickness:16});
+  chart('chDispPaky',{type:'bar',data:{labels:pakyLb,datasets:[pakyDs(A,D.skupiny.A.nazev,B),pakyDs(B,D.skupiny.B.nazev,O),pakyDs(F,'flotila',GR)]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:11}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+sgn(c.parsed.x*1e6,tis)}}},scales:{x:{...AXC,ticks:{...AXC.ticks,callback:v=>v+' M'}},y:{...AXC,grid:{display:false}}}}});
   const marP=K=>K.aut&&K.marze!=null?K.marze*100:null;
   chart('chDispMar',{type:'line',data:{labels:lb,datasets:[ds(D.skupiny.A.nazev,serie(sk('A'),marP),B),ds(D.skupiny.B.nazev,serie(sk('B'),marP),O),ds('flotila',serieF(marP),GR,[6,4]),ds('cíl',vsechny.map(()=>+(M0.marze*100).toFixed(1)),R,[2,3])]},options:lineOpts(' %')});
   // poznámka
