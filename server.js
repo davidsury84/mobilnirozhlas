@@ -4212,6 +4212,7 @@ try {
     send, readBody, deliver, isAdmin, empSession, employeeModules, getState,
     dataDir: DATA_DIR,
     mailFrom: { user: CFG.user, name: CFG.fromName || 'Intranet ELKOPLAST — Qooling', publicUrl: (CFG.publicUrl || process.env.PUBLIC_URL || '') },
+    extraSections: () => (vykonnostMod && vykonnostMod.tydenniLak) ? vykonnostMod.tydenniLak() : null,   // lakované kusy za minulý týden do pondělního reportu
   });
 } catch (e) {
   console.error('[qooling] modul se nenačetl, intranet pokračuje bez něj:', e.message);

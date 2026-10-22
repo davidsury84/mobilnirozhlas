@@ -1139,7 +1139,7 @@ function mount(host) {
   // vedení + výrobní ředitelé závodů (Chomutov, Bruntál Abroly, Supíkovice); příjemce jde měnit v adminu / Rozesílkách
   const DEF_TO = ['david.sury@elkoplast.cz', 'tomas.krajca@elkoplast.cz', 'jiri.hejda@elkoplast.cz', 'ales.fleger@elkoplast.cz', 'jakub.sefcik@elkoplast.cz'];
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
-  function loadCfg() { let c = {}; try { c = JSON.parse(fs.readFileSync(CFG_F, 'utf8')) || {}; } catch (_) {} return { to: Array.isArray(c.to) ? c.to : DEF_TO.slice(), enabled: c.enabled !== undefined ? !!c.enabled : true, hour: (c.hour >= 0 && c.hour <= 23) ? c.hour : 7 }; }
+  function loadCfg() { let c = {}; try { c = JSON.parse(fs.readFileSync(CFG_F, 'utf8')) || {}; } catch (_) {} const lakMin = Object.assign({ chomutov: 15, abroly: 15, popelnice: 150, supikovice: 15 }, (c.lakMin && typeof c.lakMin === 'object') ? c.lakMin : {}); return { to: Array.isArray(c.to) ? c.to : DEF_TO.slice(), enabled: c.enabled !== undefined ? !!c.enabled : true, hour: (c.hour >= 0 && c.hour <= 23) ? c.hour : 7, lakMin }; }
   const saveCfg = c => { try { fs.writeFileSync(CFG_F, JSON.stringify(c, null, 2)); } catch (e) { console.error('[vykonnost] zápis config:', e.message); } };
   const loadRState = () => { try { return JSON.parse(fs.readFileSync(RSTATE_F, 'utf8')) || {}; } catch (_) { return {}; } };
   const esc = x => String(x == null ? '' : x).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -1212,10 +1212,30 @@ function mount(host) {
   }
   function reportDescriptor() {
     const c = loadCfg(), st = loadRState();
-    return { key: 'vykonnost-mesicni', module: 'Výkonnost středisek', name: 'Měsíční indikátory výkonnosti (4 závody)', to: c.to || [], enabled: !!c.enabled, schedule: 'měsíčně, 1. pracovní den od ' + c.hour + ':00', lastAt: st.lastAt || null, lastError: st.lastError || '', preview: '/api/vykonnost/preview', send: { url: '/api/vykonnost/send', body: {} }, configHint: 'Modul Výkonnost středisek → Měsíční indikátory → 📧' };
+    return { key: 'vykonnost-mesicni', module: 'Výkonnost středisek', name: 'Měsíční indikátory výkonnosti (4 závody)', to: c.to || [], enabled: !!c.enabled, lakMin: c.lakMin, schedule: 'měsíčně, 1. pracovní den od ' + c.hour + ':00', lastAt: st.lastAt || null, lastError: st.lastError || '', preview: '/api/vykonnost/preview', send: { url: '/api/vykonnost/send', body: {} }, configHint: 'Modul Výkonnost středisek → Měsíční indikátory → 📧' };
+  }
+  // Lakované kusy za poslední uzavřený ISO týden po závodech vs. minimum (cfg.lakMin) — sekce do pondělního reportu Qooling + eskalace v předmětu
+  function tydenniLak(wkArg) {
+    const cfg = loadCfg(); const dnes = new Date().toISOString().slice(0, 10); const minusTyden = wk => { const d = new Date(pracDnyTydne(wk).od + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 7); return isoWeekOf(d.toISOString().slice(0, 10)); };
+    const wk = wkArg || minusTyden(isoWeekOf(dnes)); const prev = minusTyden(wk); const rozsah = pracDnyTydne(wk); const ne = new Date(rozsah.od + 'T00:00:00Z'); ne.setUTCDate(ne.getUTCDate() + 6); const neD = ne.toISOString().slice(0, 10);
+    const zav = ZAVODY.map(z => { let V = null; try { V = vystup(z); } catch (_) {} if (!V) return { key: z.key, name: z.name, data: false };
+      const w = (V.weeks || []).find(x => x.week === wk) || null, pw = (V.weeks || []).find(x => x.week === prev) || null;
+      let E = null; try { E = expedice(z.key); } catch (_) {} const ew = ((E && E.tydny) || []).find(t => t.k === wk), epw = ((E && E.tydny) || []).find(t => t.k === prev);
+      const min = cfg.lakMin && cfg.lakMin[z.key] != null ? cfg.lakMin[z.key] : 15; const lak = w ? w.lakVse : 0; const bezDat = !V.snapshot || V.snapshot < rozsah.od;
+      return { key: z.key, name: z.name, data: true, snapshot: V.snapshot, bezDat, neuplny: !bezDat && V.snapshot < neD, lak, abr: w ? w.lak : 0, city: w ? w.city : 0, muldy: w ? w.muldyVse : 0, exp: ew ? ew.ks : null, expAbr: ew ? ew.abr : null, prevLak: pw ? pw.lakVse : null, prevExp: epw ? epw.ks : null, min, pod: !bezDat && lak < min }; });
+    const eskalace = zav.filter(z => z.data && z.pod);
+    const dm = iso => { const p = iso.split('-'); return +p[2] + '. ' + +p[1] + '.'; }; const td = (v, extra) => '<td style="padding:6px 8px;border-bottom:1px solid #eef1ec;white-space:nowrap' + (extra || '') + '">' + v + '</td>';
+    const url = (host.mailFrom && host.mailFrom.publicUrl || '') + '/#modul=vykonnost';
+    const html = '<h2 style="margin:22px 0 4px">Výkonnost — lakované kusy za týden ' + +wk.slice(6) + ' (' + dm(rozsah.od) + '–' + dm(neD) + ')</h2>'
+      + '<p style="color:#6b736c;margin:0 0 10px;font-size:13px">Kus hotový = odvedené lakování vrchů v Heliosu (u Popelnic bedny; muldy u Chomutova i z plánu výroby). Expedováno = výdejky ze skladu. Minimum za týden nastavuje správce v modulu Výkonnost.</p>'
+      + (eskalace.length ? '<p style="margin:0 0 10px;padding:8px 10px;background:#fbe9e8;color:#c93a39;border-radius:8px;font-weight:700">ESKALACE: pod minimem lakovaných kusů ' + eskalace.map(z => esc(z.name) + ' (' + fmt0(z.lak) + ' z ' + fmt0(z.min) + ')').join(', ') + '</p>' : '<p style="margin:0 0 10px;color:#0a7a0a;font-weight:600">Všechny závody nad minimem.</p>')
+      + '<table style="border-collapse:collapse;width:100%;font-size:13px;background:#fff"><thead><tr>' + ['Závod', 'Lakováno', 'z toho ABR / CITY / muldy', 'Expedováno', 'Minimum', 'Předchozí týden (lak / exp)', 'Stav'].map(h => '<th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e6e9e3;color:#6b736c;font-size:12px">' + h + '</th>').join('') + '</tr></thead><tbody>'
+      + zav.map(z => !z.data ? '<tr>' + td('<b>' + esc(z.name) + '</b>') + td('bez dat', '', 1) + '</tr>' : '<tr' + (z.pod ? ' style="background:#fbe9e8"' : '') + '>' + td('<b>' + esc(z.name) + '</b>') + td('<b style="font-size:15px' + (z.pod ? ';color:#c93a39' : '') + '">' + fmt0(z.lak) + '</b>' + (z.neuplny ? ' <span style="color:#8a938a">(data do ' + dm(z.snapshot) + ')</span>' : '') + (z.bezDat ? ' <span style="color:#8a938a">export za tento týden ještě není (snímek ' + dm(z.snapshot || '0000-00-00') + ')</span>' : '')) + td(z.key === 'popelnice' ? fmt0(z.abr) + ' beden' : fmt0(z.abr) + ' / ' + fmt0(z.city) + ' / ' + fmt0(z.muldy)) + td(z.exp == null ? '—' : fmt0(z.exp) + (z.key !== 'popelnice' ? ' <span style="color:#8a938a">(ABR ' + fmt0(z.expAbr) + ')</span>' : '')) + td(fmt0(z.min)) + td((z.prevLak == null ? '—' : fmt0(z.prevLak)) + ' / ' + (z.prevExp == null ? '—' : fmt0(z.prevExp))) + td(z.bezDat ? '<span style="color:#8a938a">bez dat</span>' : (z.pod ? '<b style="color:#c93a39">⚠ pod minimem</b>' : '<span style="color:#0a7a0a">✓</span>')) + '</tr>').join('')
+      + '</tbody></table><p style="margin:8px 0 0;font-size:13px"><a href="' + esc(url) + '" style="color:#1f4e79">→ Výkonnost středisek v intranetu (záložka Hotové po týdnech)</a></p>';
+    return { week: wk, od: rozsah.od, do: neD, zavody: zav, eskalace: eskalace.map(z => z.name), html };
   }
   function reports() { return [reportDescriptor()]; }
-  function setReport(key, b) { if (key !== 'vykonnost-mesicni') return null; const next = Object.assign({}, loadCfg()); if (b.to != null) next.to = cleanEmails(b.to); if (b.enabled != null) next.enabled = !!b.enabled; if (b.hour != null && b.hour >= 0 && b.hour <= 23) next.hour = +b.hour; saveCfg(next); return reportDescriptor(); }
+  function setReport(key, b) { if (key !== 'vykonnost-mesicni') return null; const next = Object.assign({}, loadCfg()); if (b.to != null) next.to = cleanEmails(b.to); if (b.enabled != null) next.enabled = !!b.enabled; if (b.hour != null && b.hour >= 0 && b.hour <= 23) next.hour = +b.hour; if (b.lakMin && typeof b.lakMin === 'object') { next.lakMin = Object.assign({}, next.lakMin); Object.entries(b.lakMin).forEach(([k, v]) => { if (ZAVODY.some(z => z.key === k) && v !== '' && v != null && isFinite(+v) && +v >= 0) next.lakMin[k] = +v; }); } saveCfg(next); return reportDescriptor(); }
 
   // ---------- plánovač ----------
   let lastPlanAt = 0;
@@ -1299,6 +1319,7 @@ function mount(host) {
       setNormaMapa(zk, String(b.op), b.id === null ? null : (b.id === '__none__' ? '__none__' : String(b.id || '')) || null);
       return json(res, 200, { ok: true, mapa: loadNMap() }), true;
     }
+    if (p === '/api/vykonnost/preview-tyden' && req.method === 'GET') { const t = tydenniLak(/^\d{4}-W\d{2}$/.test(u.query.w || '') ? u.query.w : ''); return host.send(res, 200, '<!doctype html><meta charset="utf-8"><title>Lakované kusy za týden</title><div style="font-family:system-ui,sans-serif;max-width:960px;padding:18px">' + t.html + '</div>', { 'Content-Type': 'text/html; charset=utf-8' }), true; }
     if (p === '/api/vykonnost/preview' && req.method === 'GET') { const rep = buildReport(/^\d{4}-\d{2}$/.test(u.query.m || '') ? u.query.m : ''); return host.send(res, 200, rep.html, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }), true; }
     if (p === '/api/vykonnost/send' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {} const r = await sendReport(b.to ? b.to : loadCfg().to, /^\d{4}-\d{2}$/.test(b.m || '') ? b.m : ''); return json(res, r.ok ? 200 : 500, r), true; }
     if (p === '/api/vykonnost/config' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } return json(res, 200, { ok: true, report: setReport('vykonnost-mesicni', b) }), true; }
@@ -1328,7 +1349,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, profese, parseMuldyDny, parsePozice, savePozice, syncVydejky, importVydejky, expedice, syncMzdy, mzdyMesic, sync: () => sync(false), syncPlans, syncNormy, vystup, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, profese, parseMuldyDny, parsePozice, savePozice, syncVydejky, importVydejky, expedice, syncMzdy, mzdyMesic, sync: () => sync(false), syncPlans, syncNormy, vystup, tydenniLak, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };
