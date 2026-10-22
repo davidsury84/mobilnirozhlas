@@ -1625,9 +1625,9 @@ function mount(host) {
         res.end(fs.readFileSync(fp)); return true;
       }
       if (p === '/api/konstrukce/natah-img' && req.method === 'GET') {
-        // ilustrace natahování — jen soubory fNN.jpg z natah-img/ (žádné cesty)
+        // ilustrace natahování z katalogu ABROLL — jen soubory <kód>.jpg z natah-img/ (žádné cesty)
         const f = String((u.query || {}).f || '');
-        if (!/^f\d{2}\.jpg$/.test(f)) { json(res, 404, { chyba: 'Neznámý obrázek.' }); return true; }
+        if (!/^[A-Za-z0-9-]{1,40}\.jpg$/.test(f)) { json(res, 404, { chyba: 'Neznámý obrázek.' }); return true; }
         const fp = path.join(__dirname, 'natah-img', f);
         if (!fs.existsSync(fp)) { json(res, 404, { chyba: 'Neznámý obrázek.' }); return true; }
         res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' });
