@@ -1262,7 +1262,14 @@ function mount(host) {
     // Indikátory všech závodů najednou (společný graf v přehledu); ?bez=popelnice vynechá závod
     if (p === '/api/vykonnost/tydny' && req.method === 'GET') {   // hotové výrobky po týdnech pro všechny závody (řádky = závod × typ, sloupce = týdny)
       const zav = ZAVODY.map(z => { let V = null; try { V = vystup(z); } catch (e) { console.warn('[vykonnost] tydny ' + z.key + ':', e.message); } if (!V) return { key: z.key, name: z.name, kratce: z.kratce, data: false };
-        return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: V.snapshot, bedny: z.key === 'popelnice', cil: V.cil, weeks: (V.weeks || []).map(w => ({ week: w.week, od: w.od, abr: w.lak, city: w.city, muldy: w.muldyVse, muldyPlan: w.muldy, jine: w.jine, celkem: w.lakVse, pd: w.pd, neuplny: !!w.neuplny, odstavka: !!w.odstavka })) }; });
+        // expedované kusy z výdejek po týdnech (kontrola lakováno vs. odjelo); před začátkem výdejek = null
+        let E = null; try { E = expedice(z.key); } catch (_) {} const ex = {}; ((E && E.tydny) || []).forEach(t => ex[t.k] = t); const expOd = E && E.od ? isoWeekOf(E.od) : null;
+        const exp = k => { const t = ex[k]; if (t) return { expAbr: t.abr, expCity: t.city, expMuldy: t.muldy, expVse: t.ks }; return expOd && k >= expOd ? { expAbr: 0, expCity: 0, expMuldy: 0, expVse: 0 } : { expAbr: null, expCity: null, expMuldy: null, expVse: null }; };
+        const weeks = (V.weeks || []).map(w => Object.assign({ week: w.week, od: w.od, abr: w.lak, city: w.city, muldy: w.muldyVse, muldyPlan: w.muldy, jine: w.jine, celkem: w.lakVse, pd: w.pd, neuplny: !!w.neuplny, odstavka: !!w.odstavka }, exp(w.week)));
+        const dnesW = isoWeekOf(new Date().toISOString().slice(0, 10));
+        Object.keys(ex).filter(k => !weeks.some(w => w.week === k) && k > (weeks[weeks.length - 1] || { week: '' }).week).forEach(k => weeks.push(Object.assign({ week: k, od: pracDnyTydne(k).od, abr: 0, city: 0, muldy: 0, muldyPlan: 0, jine: 0, celkem: 0, pd: 5, neuplny: k >= isoWeekOf(V.snapshot || new Date().toISOString().slice(0, 10)) || k >= dnesW, odstavka: false, bezHeliosu: true }, exp(k))));
+        weeks.sort((a, b) => a.week.localeCompare(b.week));
+        return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: V.snapshot, expOd: E && E.od || null, expSnapshot: E && E.snapshot || null, bedny: z.key === 'popelnice', cil: V.cil, weeks }; });
       json(res, 200, { zavody: zav }); return true;
     }
     if (p === '/api/vykonnost/indikatory' && req.method === 'GET') {
