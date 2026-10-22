@@ -35,6 +35,8 @@ const jeVrchniLak = (op, cop, popelnice) => { const n = parseInt(String(cop == n
   if (popelnice) { if (n === 990) return true; if (n >= 1000) return false; return /^lakov[aá]n[ií](\s*2\s*x.*)?$/i.test(o); }
   if ((n >= 940 && n <= 989) || (n >= 800 && n <= 899)) return false; return LAK_NAZEV(o); };
 // Typ hotového výrobku: ABR (hlavní kritérium proti cíli) · CITY · muldy · jiné — podle názvu operace, u obecného názvu podle dílu
+// Fáze zakázky podle odvedené operace v Heliosu (pro přehled zakázek): dělírna → skládání → dovaření → osazení vrat → základování → lakování vrchů
+const fazeHelios = op => { const o = String(op || '').toLowerCase(); if (LAK_NAZEV(op)) return 'lak'; if (/^lakov|lakovna/.test(o)) return null; if (/základ|zaklad/.test(o)) return 'zakl'; if (/osazen/.test(o)) return 'osaz'; if (/dovař|dovar/.test(o)) return 'dov'; if (/sklád|skladan|skladání/.test(o)) return 'skl'; if (/nůžk|nuzk|pálen|palen|\bpila\b|ohraň|ohran|stříh|strih|loch|řezán|rezan|děl[ií]rna|del[ií]rna/.test(o)) return 'del'; return null; };
 const typVyrobku = (op, dil) => { const o = String(op || '').toLowerCase(), d = String(dil || '').toLowerCase();
   const je = (t, re) => re.test(t); const RM = /muld|(^|[^a-z])(am|smr|dmc|dmpm|dms|asm|amk)[- ](?=[a-z0-9])/i, RC = /city|wdg|wdc|\bsit\b|csd/i, RA = /\babr\b|abr-|dsd|afs|alst|ecl|hbi|hbs|\bwd\b|lwc|sth|domat|plato|víko|viko/i;
   if (je(o, /muld/)) return 'muldy'; const oc = je(o, RC), oa = je(o, RA); if (oc && !oa) return 'city'; if (oa && !oc) return 'abr';
@@ -696,7 +698,7 @@ function mount(host) {
       if (!rez && r[R.ks] === 0) nulKs++; if (!r[R.cvz]) bezCvz++; if (!r[R.id]) bezJmena++;
       dny[day] = dny[day] || { date: day, rows: 0, ks: 0, rezieH: 0 }; dny[day].rows++; if (rez) dny[day].rezieH += r[R.ks]; else dny[day].ks += r[R.ks];
       if (!rez) { const O = ops[r[R.op]] = ops[r[R.op]] || { op: r[R.op], rows: 0, ks: 0, lide: new Set() }; O.rows++; O.ks += r[R.ks]; O.lide.add(r[R.name]); }
-      if (r[R.cvz]) { const C = cvzs[r[R.cvz]] = cvzs[r[R.cvz]] || { cvz: r[R.cvz], zak: r[R.zak], rows: 0, ks: 0, rezieH: 0, lide: new Set(), ops: new Set(), first: day, last: day }; C.rows++; if (rez) C.rezieH += r[R.ks]; else C.ks += r[R.ks]; C.lide.add(r[R.name]); C.ops.add(r[R.op]); if (day < C.first) C.first = day; if (day > C.last) C.last = day; if (!C.zak && r[R.zak]) C.zak = r[R.zak]; }
+      if (r[R.cvz]) { const C = cvzs[r[R.cvz]] = cvzs[r[R.cvz]] || { cvz: r[R.cvz], zak: r[R.zak], rows: 0, ks: 0, rezieH: 0, lide: new Set(), ops: new Set(), first: day, last: day }; C.rows++; if (rez) C.rezieH += r[R.ks]; else { C.ks += r[R.ks]; const fk = fazeHelios(r[R.op]); if (fk) { C.f = C.f || {}; C.f[fk] = (C.f[fk] || 0) + r[R.ks]; } } C.lide.add(r[R.name]); C.ops.add(r[R.op]); if (day < C.first) C.first = day; if (day > C.last) C.last = day; if (!C.zak && r[R.zak]) C.zak = r[R.zak]; }
     });
     const dnyArr = Object.values(dny).sort((a, b) => a.date.localeCompare(b.date));
     const topDny = dnyArr.slice().sort((a, b) => b.rows - a.rows).slice(0, 3);
@@ -721,9 +723,13 @@ function mount(host) {
     // párování na plán
     const plan = loadPlan(z.key); const P = (plan && plan.items) || {};
     const planUrl = row => plan && plan.sheetId ? 'https://docs.google.com/spreadsheets/d/' + plan.sheetId + '/edit#gid=' + (plan.gid != null ? plan.gid : 0) + (row ? '&range=A' + row + ':AZ' + row : '') : '';
-    const cvzArr = Object.values(cvzs).map(C => { const p = P[C.cvz]; return { cvz: C.cvz, zak: C.zak, rows: C.rows, ks: Math.round(C.ks), rezieH: Math.round(C.rezieH), lide: C.lide.size, ops: C.ops.size, first: C.first, last: C.last, plan: p ? { vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, skutecny: p.skutecny, exp: p.exp, faze: p.faze, row: p.row, url: planUrl(p.row) } : null }; })
+    const cvzArr = Object.values(cvzs).map(C => { const p = P[C.cvz]; return { cvz: C.cvz, zak: C.zak, rows: C.rows, ks: Math.round(C.ks), rezieH: Math.round(C.rezieH), lide: C.lide.size, ops: C.ops.size, first: C.first, last: C.last, helios: C.f ? Object.fromEntries(Object.entries(C.f).map(([k, v]) => [k, Math.round(v * 10) / 10])) : null, plan: p ? { vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, skutecny: p.skutecny, exp: p.exp, faze: p.faze, row: p.row, url: planUrl(p.row) } : null }; })
       .sort((a, b) => b.rows - a.rows);
     const sparovano = cvzArr.filter(c => c.plan).length;
+    // zakázky z plánu výroby bez jediné odvedené operace v Heliosu (celý rok) s termínem do 14 dnů — hrozí zpoždění; doplňky (plachty, víka, ND) mimo
+    const isoT = x => { const m = /^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/.exec(String(x || '').trim()); return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : (/^\d{4}-\d{2}-\d{2}/.test(String(x || '')) ? String(x).slice(0, 10) : ''); };
+    const allCvz = new Set(all.map(r => r[R.cvz]).filter(Boolean)); const limH = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), limD = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+    const nezacate = Object.entries(P).filter(([cvz, p]) => !allCvz.has(cvz) && !/plachta|víko|viko|náhradn|nahradn|nájezd|najezd|rámeč|ramec|^nd[ -]/i.test(p.vyrobek || '')).map(([cvz, p]) => ({ cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t: isoT(p.termin), row: p.row, url: planUrl(p.row) })).filter(x => x.t && x.t >= limD && x.t <= limH).sort((a, b) => a.t.localeCompare(b.t));
     // --- vstupy pro analýzu ---
     // úsek podle názvu operace (heuristika): dělírna / svařovna / lakovna / ostatní
     const usekOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen/.test(o)) return 'Lakovna a příprava'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|stříh|strih/.test(o)) return 'Dělírna'; if (/svař|svar|navař|navar|dovař|dovar|skl[aá]d|osaz|mont|stehov|bodov|trámec|tramec|podlah|bočnic|bocnic|vrat|střech|strech/.test(o)) return 'Svařovna'; return 'Ostatní'; };
@@ -759,7 +765,7 @@ function mount(host) {
       dny: dnyArr.map(d => ({ date: d.date, rows: d.rows, ks: Math.round(d.ks), rezieH: Math.round(d.rezieH) })),
       lide: lideArr, operace: top(ops, 25, 'rows').map(o => ({ op: o.op, rows: o.rows, ks: Math.round(o.ks), lide: o.lide.size })),
       rezie: { kategorie: Object.values(rezKat).sort((a, b) => b.h - a.h).map(k => ({ kat: k.kat, h: Math.round(k.h), rows: k.rows, lide: k.lide.size })), polozky: Object.values(rezPol).sort((a, b) => b.h - a.h).slice(0, 15).map(p => ({ text: p.text, h: Math.round(p.h), rows: p.rows, lide: [...p.lide].slice(0, 4) })) },
-      cvz: cvzArr.slice(0, 200), sparovano, autori: Object.entries(autori).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, rows: n })),
+      cvz: cvzArr.slice(0, 200), sparovano, nezacate, autori: Object.entries(autori).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, rows: n })),
       kvalita: { future, nulKs, bezCvz, bezJmena },
       plan: plan ? { tab: plan.tab, items: Object.keys(P).length, syncedAt: plan.syncedAt, faze: plan.faze || [], url: planUrl(0) } : null
     };
