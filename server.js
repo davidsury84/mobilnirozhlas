@@ -2328,6 +2328,23 @@ function recordZentexSkoleni(a) {
   return { ok: true, attempt: rec.attempts.length, attemptsLeft: Math.max(0, ZENTEX_SKOLENI_MAX - rec.attempts.length), passed };
 }
 // Školení Třídicí linky (technologie, trh a ekonomika dotřídění) – závěrečný test. Jeden záznam na e-mail, pole attempts[] (max 3 pokusy).
+// ---- Modely třídicí linky (návrhy z aplikace Design třídicí linky, s verzemi) ----
+//  Aplikace běží na Railway bez disku, tak si návrhy ukládá sem přes Bearer (= její INTRANET_SSO_SECRET)
+//  a identitu přihlášeného posílá v hlavičkách X-Employee-Email / X-Employee-Name (URL-kódované).
+const TRIDICI_MODELY_F = path.join(DATA_DIR, 'tridici-linka-modely.json');
+const TRIDICI_MODELY_VERZI = 30;
+function tridiciModelyRead() { const d = readJson(TRIDICI_MODELY_F, null); return (d && Array.isArray(d.modely)) ? d : { modely: [] }; }
+function tridiciModelyWrite(d) { writeJson(TRIDICI_MODELY_F, d); }
+function tridiciModelyAuth(req) {
+  const h = String(req.headers.authorization || '');
+  if (SSO_SHARED_SECRET && h === 'Bearer ' + SSO_SHARED_SECRET) {
+    let name = ''; try { name = decodeURIComponent(String(req.headers['x-employee-name'] || '')); } catch (_) { name = String(req.headers['x-employee-name'] || ''); }
+    const email = String(req.headers['x-employee-email'] || '').trim().toLowerCase();
+    return { email: email || 'anonym', name, admin: !!(email && isAdminEmp(email)) };
+  }
+  const e = empSession(req);
+  return e ? { email: e.email, name: e.name, admin: isAdmin(req) } : null;
+}
 const TRIDICI_SKOLENI_MAX = 3;
 function tridiciSkoleniStatus(email) {
   email = (email || '').toLowerCase();
@@ -4258,6 +4275,8 @@ const server = http.createServer(async (req, res) => {
   // Server-to-server cesty modulu Lodní kontejnery (Bearer = SSO tajemství) z aplikace lodni-kontejnery.
   const kontejneryPublic = (p === '/api/kontejnery/ingest' && req.method === 'POST') || (p === '/api/kontejnery/detail' && req.method === 'GET') || (p === '/api/kontejnery/nabidka-ext' && req.method === 'POST') || (p === '/api/kontejnery/nastaveni-ext') || (p === '/api/kontejnery/cenik-ext' && req.method === 'GET') || (p === '/api/kontejnery/list-ext' && req.method === 'GET') || (p === '/api/kontejnery/update-ext' && req.method === 'POST') || (p === '/api/kontejnery/potvrdit-ext' && req.method === 'POST');
   const libraryIngestPublic = (p === '/api/library/ingest-ext' && req.method === 'POST');
+  // Modely třídicí linky — ukládá je aplikace Design třídicí linky server-to-server (Bearer = SSO tajemství).
+  const tridiciModelyPublic = p.indexOf('/api/tridici-linka/modely') === 0;
   // Server-to-server importy modulu Výroba Popelnice (Bearer = SSO tajemství; nástroj tools-vyroba-import.js).
   const vyrobaIngestPublic = (p === '/api/vyroba/ingest' && req.method === 'POST');
   // Veřejná stránka garantů (odkaz s tokenem pro kolegy ze SK/PL) + její API.
@@ -4434,7 +4453,7 @@ const server = http.createServer(async (req, res) => {
   const partnerPublic = (p === '/partner/zalozeni' && req.method === 'GET') || (p === '/partner/heslo' && req.method === 'POST');
 
   // sdílená závora celého webu (Google SSO nebo sdílené heslo; aktivní jen když je aspoň jedno nastaveno)
-  if (!gatePassed(req) && !partnerPublic && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !spokojenostPublic && !libraryIngestPublic && !garantiPublic && !vyrobaIngestPublic) {
+  if (!gatePassed(req) && !partnerPublic && !inviteOk && !smlouvyPublic && !adaptacePublic && !konstrukcePublic && !reklamacePublic && !prekladPublic && !kontejneryPublic && !mobilniLisyPublic && !mobiliarPublic && !spokojenostPublic && !libraryIngestPublic && !garantiPublic && !vyrobaIngestPublic && !tridiciModelyPublic) {
     // přihlášení sdíleným heslem
     if (p === '/gate-login' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await readBody(req)); } catch (_) {}
@@ -5809,6 +5828,52 @@ const server = http.createServer(async (req, res) => {
     // Vkládání dokumentů do Knihovny přes chat (Bearer SSO_SHARED_SECRET) — dokument se založí
     // jako běžný verzovaný dokument, stejně jako by ho správce nahrál ručně. Stejný název ve
     // stejné složce = nová verze místo duplicity.
+    // ---- Modely třídicí linky: návrhy z aplikace Design třídicí linky s verzemi (aplikace sama disk nemá) ----
+    if (tridiciModelyPublic) {
+      const kdo = tridiciModelyAuth(req);
+      if (!kdo) return send(res, 401, { error: 'Nepovoleno.' });
+      const d = tridiciModelyRead();
+      const id = decodeURIComponent(p.slice('/api/tridici-linka/modely'.length).replace(/^\//, '')).trim();
+      const verejne = m => ({ id: m.id, name: m.name, author: m.author, authorEmail: m.authorEmail, createdAt: m.createdAt, updatedAt: m.updatedAt,
+        verzi: m.verze.length, versions: m.verze.map(v => ({ v: v.v, ts: v.ts, author: v.author, note: v.note || '', souhrn: v.souhrn || null })),
+        smiSmazat: !!(kdo.admin || (m.authorEmail && m.authorEmail === kdo.email)) });
+      if (req.method === 'GET' && !id) return send(res, 200, { modely: d.modely.slice().sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))).map(verejne), ja: kdo.email });
+      if (req.method === 'GET') {
+        const m = d.modely.find(x => x.id === id); if (!m) return send(res, 404, { error: 'Model nenalezen.' });
+        const chci = Number(u.query.v) || 0;
+        const verze = chci ? m.verze.find(x => x.v === chci) : m.verze[m.verze.length - 1];
+        if (!verze) return send(res, 404, { error: 'Verze nenalezena.' });
+        return send(res, 200, { model: verejne(m), verze });
+      }
+      if (req.method === 'POST') {
+        let b = {}; try { b = JSON.parse(await readBody(req) || '{}'); } catch (_) { return send(res, 400, { error: 'Neplatné tělo.' }); }
+        const data = b.data; if (!data || typeof data !== 'object' || !Array.isArray(data.nodes)) return send(res, 400, { error: 'Chybí data modelu (nodes).' });
+        const name = String(b.name || '').trim().slice(0, 120);
+        const ted = new Date().toISOString();
+        let m = b.id ? d.modely.find(x => x.id === String(b.id)) : null;
+        if (!m) {
+          if (!name) return send(res, 400, { error: 'Zadejte název modelu.' });
+          m = { id: 'm' + crypto.randomBytes(5).toString('hex'), name, author: kdo.name || kdo.email, authorEmail: kdo.email, createdAt: ted, updatedAt: ted, verze: [] };
+          d.modely.push(m);
+        } else if (name) m.name = name;
+        const v = (m.verze.length ? m.verze[m.verze.length - 1].v : 0) + 1;
+        m.verze.push({ v, ts: ted, author: kdo.name || kdo.email, authorEmail: kdo.email, note: String(b.note || '').trim().slice(0, 500), souhrn: (b.souhrn && typeof b.souhrn === 'object') ? b.souhrn : null, data });
+        if (m.verze.length > TRIDICI_MODELY_VERZI) m.verze = m.verze.slice(-TRIDICI_MODELY_VERZI);   // starší verze odpadnou
+        m.updatedAt = ted;
+        tridiciModelyWrite(d);
+        logActivity('tridici-linka', { email: kdo.email, name: kdo.name }, 'Model třídicí linky „' + m.name + '" uložen jako verze ' + v);
+        return send(res, 200, { ok: true, id: m.id, v, model: verejne(m) });
+      }
+      if (req.method === 'DELETE' && id) {
+        const i = d.modely.findIndex(x => x.id === id); if (i < 0) return send(res, 404, { error: 'Model nenalezen.' });
+        const m = d.modely[i];
+        if (!(kdo.admin || (m.authorEmail && m.authorEmail === kdo.email))) return send(res, 403, { error: 'Model smí smazat jen jeho autor nebo správce.' });
+        d.modely.splice(i, 1); tridiciModelyWrite(d);
+        logActivity('tridici-linka', { email: kdo.email, name: kdo.name }, 'Model třídicí linky „' + m.name + '" smazán');
+        return send(res, 200, { ok: true });
+      }
+      return send(res, 405, { error: 'Nepodporovaná metoda.' });
+    }
     if (p === '/api/library/ingest-ext' && req.method === 'POST') {
       const auth = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
       let bearerOk = false;
