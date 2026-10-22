@@ -1254,6 +1254,11 @@ function mount(host) {
     const mv = /^\/api\/vykonnost\/vystup\/([a-z]+)$/.exec(p);
     if (mv && req.method === 'GET') { const z = zavodOf(mv[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; } const V = vystup(z); json(res, 200, V ? Object.assign({ data: true, admin: !!host.isAdmin(req) }, V) : { data: false, zavod: z.key, name: z.name }); return true; }
     // Indikátory všech závodů najednou (společný graf v přehledu); ?bez=popelnice vynechá závod
+    if (p === '/api/vykonnost/tydny' && req.method === 'GET') {   // hotové výrobky po týdnech pro všechny závody (řádky = závod × typ, sloupce = týdny)
+      const zav = ZAVODY.map(z => { let V = null; try { V = vystup(z); } catch (e) { console.warn('[vykonnost] tydny ' + z.key + ':', e.message); } if (!V) return { key: z.key, name: z.name, kratce: z.kratce, data: false };
+        return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: V.snapshot, bedny: z.key === 'popelnice', cil: V.cil, weeks: (V.weeks || []).map(w => ({ week: w.week, od: w.od, abr: w.lak, city: w.city, muldy: w.muldyVse, muldyPlan: w.muldy, jine: w.jine, celkem: w.lakVse, pd: w.pd, neuplny: !!w.neuplny, odstavka: !!w.odstavka })) }; });
+      json(res, 200, { zavody: zav }); return true;
+    }
     if (p === '/api/vykonnost/indikatory' && req.method === 'GET') {
       const bez = String(u.query.bez || '').split(',').filter(Boolean);
       const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, cile: I.cile, snapshot: I.snapshot, mesice: I.mesice.map(M => { const o = { m: M.m, neuplny: M.neuplny, rows: M.rows, ks: M.ks, rezH: M.rezH, pracDny: M.pracDny, vyrAbr: M.vyrAbr, vyrCity: M.vyrCity, vyrMul: M.vyrMul, vyrVse: M.vyrVse, hr: M.D1z === 'helios' ? null : M.D1, hrVyr: M.D1vyr, hrZdroj: M.D1z }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
