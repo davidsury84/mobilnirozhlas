@@ -241,10 +241,11 @@ function mount(host) {
     let extra = null; try { extra = host.extraSections ? host.extraSections() : null; } catch (e) { console.warn('[qooling] extra sekce reportu:', e.message); }
     const period = S.source || (S.issues[0] && S.issues[0].date) || '';
     const html = '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#1c1d1a;line-height:1.55;max-width:960px;background:#f6f7f5;padding:18px">' +
+      (extra && extra.html ? extra.html.replace('margin:22px 0 4px', 'margin:0 0 4px') + '<hr style="border:0;border-top:1px solid #e6e9e3;margin:18px 0">' : '') +
       '<h2 style="margin:0 0 4px">Qooling — kvalita</h2>' +
       '<p style="color:#6b736c;margin:0 0 16px;font-size:13px">Stav závad hlášených v Qoolingu — co je otevřené, kdo chyby způsobuje a kolik stojí opravy času. ' +
       'Celkem ' + fmt(S.issues.length) + ' evidovaných závad · Zdroj: ' + esc(period) + '</p>' +
-      kpiRowHtml(S) + monthsChartHtml(S) + minutesMatrixHtml(S) + issuesTableHtml(S) + (extra && extra.html ? extra.html : '') +
+      kpiRowHtml(S) + monthsChartHtml(S) + minutesMatrixHtml(S) + issuesTableHtml(S) +
       '<p style="margin:0;font-size:13px"><a href="' + esc((host.mailFrom && host.mailFrom.publicUrl || '')) + '/#modul=qooling" style="color:#1f4e79">→ Otevřít interaktivní přehled v intranetu (filtry, hledání)</a></p>' +
       '<hr style="border:0;border-top:1px solid #e6e9e3;margin:18px 0"><div style="font-size:12px;color:#8a938a">Automatický pondělní report · Intranet ELKOPLAST CZ → Qooling. Příjemce a zapnutí spravuje správce v modulu / v přehledu Rozesílky.</div></div>';
     return { subject: 'Qooling — týdenní stav závad · otevřených ' + S.open.length + ', nových za 30 dní ' + S.new30.length + (extra && extra.eskalace && extra.eskalace.length ? ' · ESKALACE lakování: ' + extra.eskalace.join(', ') : ''), html, count: S.open.length };
