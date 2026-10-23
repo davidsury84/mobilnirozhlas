@@ -107,7 +107,9 @@ function mount(host) {
     const c = {
       dmr: idx(/\(DMR\)/i), emp: idx(/příjmení a jméno|prijmeni a jmeno/i), ks: idx(/odváděné kusy|odvadene kusy/i),
       n1: idx(/^název 1$|^nazev 1$/i), cvz: idx(/^čvz$|^cvz$/i), pozn: idx(/^poznámka|^poznamka/i), aut: idx(/^autor$/i),
-      cop: idx(/^operace$|^číslo operace$|^cislo operace$/i)   // číslo operace z postupu (od exportu 29. 9. 2026); u hlavních operací = kód normy
+      cop: idx(/^operace$|^číslo operace$|^cislo operace$/i),   // číslo operace z postupu (od exportu 29. 9. 2026); u hlavních operací = kód normy
+      // od exportu 23. 10. 2026: Kč za řádek (Mzda/Cena = ks × sazba, Doplatek), normovaný čas Heliosu za řádek (min), agenturní pracovník 0/1, řada dokladu (…01 výroba, …01-P polotovary, …03 režie), příznak V
+      kc: idx(/^mzda\s*\/\s*cena$/i), dop: idx(/^doplatek$/i), nmin: idx(/^normovaný čas|^normovany cas/i), ag: idx(/^agenturní|^agenturni/i), rada: idx(/^řada$|^rada$/i), v: idx(/^v$/i)
     };
     // sloupce „Název“: 1. = název zakázky, operace = ten hned za číslem operace (od 12. 10. 2026 je na konci ještě „Název“ pracoviště), jinak poslední před Poznámkou
     const nazevIdx = H.map((h, i) => (/^název$|^nazev$/i.test(h) ? i : -1)).filter(i => i >= 0);
@@ -116,7 +118,7 @@ function mount(host) {
     c.hz = idx(/^číslo zakázky|^cislo zakazky/i);   // číslo zakázky Helios (od 12. 10. 2026) — párování výdejek na ČVZ
     c.prac = nazevIdx.length > 2 && nazevIdx[nazevIdx.length - 1] > c.op ? nazevIdx[nazevIdx.length - 1] : -1;   // název pracoviště
     if (c.dmr < 0 || c.emp < 0 || c.ks < 0) return { rows: [], warn: 'nenalezeny sloupce DMR / jméno / kusy (hlavička: ' + H.slice(0, 8).join(' | ') + ')' };
-    const S = v => String(v == null ? '' : v).trim();
+    const S = v => String(v == null ? '' : v).trim(); const N = (row, i) => { if (i < 0) return 0; const x = parseFloat(String(row[i] == null ? '' : row[i]).replace(/\s/g, '').replace(',', '.')); return isFinite(x) ? x : 0; };
     const rows = [];
     for (let r = hi + 1; r < first.length; r++) {
       const row = first[r] || []; if (row.length < 5) continue;
@@ -125,12 +127,13 @@ function mount(host) {
       const ks = parseFloat(String(row[c.ks]).replace(',', '.'));
       rows.push([date, isoWeekOf(date), em ? em[1] : '', em ? em[2].trim() : empRaw, isFinite(ks) ? ks : 0,
         S(row[c.n1]), c.zak >= 0 ? S(row[c.zak]) : '', c.cvz >= 0 ? S(row[c.cvz]) : '', c.op >= 0 ? S(row[c.op]) : '',
-        c.pozn >= 0 ? S(row[c.pozn]) : '', c.aut >= 0 ? S(row[c.aut]) : '', c.cop >= 0 ? S(row[c.cop]) : '', c.hz >= 0 ? S(row[c.hz]).replace(/\.0$/, '') : '', c.prac >= 0 ? S(row[c.prac]) : '']);
+        c.pozn >= 0 ? S(row[c.pozn]) : '', c.aut >= 0 ? S(row[c.aut]) : '', c.cop >= 0 ? S(row[c.cop]) : '', c.hz >= 0 ? S(row[c.hz]).replace(/\.0$/, '') : '', c.prac >= 0 ? S(row[c.prac]) : '',
+        N(row, c.kc), N(row, c.dop), N(row, c.nmin), c.ag >= 0 ? (N(row, c.ag) ? 1 : 0) : 0, c.rada >= 0 ? S(row[c.rada]) : '', c.v >= 0 ? (N(row, c.v) ? 1 : 0) : 0]);
     }
-    return { rows, header: H, maCislo: c.cop >= 0, maZakazku: c.hz >= 0 };
+    return { rows, header: H, maCislo: c.cop >= 0, maZakazku: c.hz >= 0, maKc: c.kc >= 0 };
   }
-  const R = { date: 0, week: 1, id: 2, name: 3, ks: 4, dil: 5, zak: 6, cvz: 7, op: 8, pozn: 9, aut: 10, cop: 11, hz: 12, prac: 13 };
-  const PARSER_VER = 3;   // zvýšit při změně parseExport → závody se při nejbližší kontrole načtou znovu i bez nového souboru
+  const R = { date: 0, week: 1, id: 2, name: 3, ks: 4, dil: 5, zak: 6, cvz: 7, op: 8, pozn: 9, aut: 10, cop: 11, hz: 12, prac: 13, kc: 14, dop: 15, nmin: 16, ag: 17, rada: 18, v: 19 };
+  const PARSER_VER = 4;   // zvýšit při změně parseExport → závody se při nejbližší kontrole načtou znovu i bez nového souboru
   const dateOfName = nm => { const m = /(\d{4})[-.]?(\d{2})[-.]?(\d{2})/.exec(nm || ''); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
 
   // Nejnovější export závodu ze složky (dle data v názvu, pak createdTime) → data/vykonnost-<key>.json
@@ -565,6 +568,7 @@ function mount(host) {
       { k: 'A7m', label: 'Hotových muld za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy v lakování muld (AM, SMR, DMC, DMS…) + u Chomutova muldy z listu „kapa-plán Mulden“, které se v Heliosu neodvádějí ÷ pracovní dny měsíce', proc: 'Vedlejší výroba vedená zvlášť, do cíle 6 ABR/den se nepočítá.' },
       { k: 'A8', klic: true, label: 'Hlavních operací za pracovní den', jedn: 'op.', smer: 'up', cil: true, vzorec: 'kusy odvedené v 10 hlavních fázích kontejneru (natahování, trámec rolen, podlaha, 2× bočnice, 2× vrata, skládání, dovařování, osazení vrat, odkuličkování, lakování) ÷ pracovní dny měsíce', proc: 'Jeden kontejner = 12 hlavních operací, cíl 6 kontejnerů denně = 72 operací denně. Říká, jestli se odvádí tolik práce, kolik je na cílový výstup potřeba — dřív, než se to projeví na hotových kusech (A7). Zelená = cíl splněn, žlutá = nad 80 % cíle. Časy a počty fází se berou ze záložky Plán 6 ABR/den.' },
       { k: 'A9', label: 'Hlavních operací na hotový kontejner', jedn: 'op.', smer: 'watch', cil: true, pasmo: [10, 25], vzorec: 'kusy odvedené v 10 hlavních fázích ÷ kusy v operaci lakování ABR', proc: 'Má vyjít 12. Méně = část práce na kontejneru se neodvádí (nebo končí v režii). Více = rozpracovanost roste, vyrábí se dílce, které se nedolakují. Zelená = do 10 % od 12, žlutá = do 25 %.' },
+      { k: 'A11', klic: true, label: 'Režie v Kč jako podíl odvedených Kč', jedn: '%', smer: 'down', prah: [10, 15], vzorec: 'Σ Kč režijních řádků (Název 1 obsahuje „režij“) ÷ Σ Kč všech odvedených řádků měsíce', proc: 'Strop vedení: režie max 10 % z mzdového fondu. Zelená ≤ 10 %, žlutá ≤ 15 %. Počítá se z Kč v Heliosu (od exportu 23. 10. 2026), ne z hodin.' },
       { k: 'A10', label: 'Odvedená práce v hlavních operacích — osobosměn za den', jedn: 'os.', smer: 'up', cil: true, vzorec: 'Σ (kusy fáze × čas fáze z plánu) ÷ délka směny ÷ pracovní dny měsíce', proc: 'Totéž co A8, ale vážené časem: dovařování (450 min) váží víc než natahování (60 min). Cíl = kolik lidí plně v úkolu je potřeba na cílový výstup (6 kontejnerů × 1 850 min ÷ 440 min = 25,2 osobosměny denně). Počet lidí na operaci počet kusů nemění — dva lidé na jednom dovaření si v Heliosu kus dělí (0,5 + 0,5).' }
     ] },
     { skup: 'M', nazev: 'Mzdy — co stojí jeden kontejner', items: [
@@ -572,6 +576,8 @@ function mount(host) {
       { k: 'M2', klic: true, label: 'Obrat na 1 Kč mezd', jedn: 'Kč', smer: 'up', vzorec: 'expedovaná hodnota z výdejek (CC bez daní) ÷ hrubé mzdy střediska v měsíci', proc: 'Kolik korun obratu vygeneruje jedna koruna hrubých mezd střediska (10 mil. obratu ÷ 1,5 mil. mezd = 6,7). Čím výš, tím líp. Expedice jde po dávkách, proto číst i tříměsíční pohled v tabulce mezd.' },
       { k: 'M3', label: 'Hrubá mzda na odpracovanou hodinu', jedn: 'Kč/h', smer: 'watch', vzorec: 'hrubé mzdy střediska ÷ hodiny ve složkách základní mzda, úkol, riziko a přesčas', proc: 'Cena hodiny práce včetně prémií a dovolené.' },
       { k: 'M4', label: 'Podíl úkolu na hrubé mzdě výroby', jedn: '%', smer: 'up', vzorec: '(úkolová 310 + základní riziková 357 + základní za přesčas 002) ÷ hrubé mzdy lidí výrobních profesí', proc: 'Kolik mzdy výroby je vázané na odvedené operace. Nízký podíl = platí se čas, ne výkon (Chomutov: Filipínci v hodinové mzdě úkol nemají).' },
+      { k: 'M8', klic: true, label: 'Odvedené Kč v Heliosu ÷ úkolová mzda', jedn: '%', smer: 'watch', cil: true, pasmo: [10, 25], vzorec: 'Σ Mzda/Cena + Doplatek ze všech odvedených řádků měsíce ÷ úkolová mzda ve mzdách (310 úkolová + 357 základní riziková + 002 základní za přesčas)', proc: 'Kontrola, že odvedené operace sedí na vyplacený úkol. Má vyjít ~100 %: zelená ±10 %, žlutá ±25 %. Výrazně pod 100 = platí se úkol bez odvedení (nebo hodinová mzda — Chomutov Filipínci), nad 100 = odvádí se víc, než se platí (zpětné / dvojí odvádění, nebo úkol ještě není ve mzdách).' },
+      { k: 'M9', klic: true, label: 'Kč odvedených operací na 1 hotový kus', jedn: 'Kč', smer: 'down', vzorec: 'Σ Mzda/Cena + Doplatek výrobních řádků (bez režie) ÷ všechny hotové výrobky v měsíci', proc: 'Úkolová cena práce na jeden kus přímo z Heliosu — bez vlivu prémií, dovolených a THP. Čím níž, tím líp; porovnávat v čase v rámci závodu.' },
       { k: 'M7', klic: true, label: 'Mzdy svářečů na 1 mil. Kč obratu', jedn: 'Kč', smer: 'down', vzorec: 'hrubé mzdy lidí s profesí svářeč (svařovna) ÷ expedovaná hodnota z výdejek (CC bez daní) v mil. Kč', proc: 'Kolik korun hrubých mezd svařovny stojí jeden milion expedovaného obratu. Čím níž, tím líp. Obrat kolísá s dávkami expedice, proto číst i tříměsíční průměr v tabulce mezd.' },
       { k: 'M5', label: 'Úkol podle norem jako % úkolu ve mzdách', jedn: '%', smer: 'watch', vzorec: 'Σ (Kč normy × ks) u spárovaných operací ÷ (310 + 357 + 002)', proc: 'Kontrola odvedených operací na úkolovou mzdu. Při pokrytí normami ~50 % (A6) vychází kolem 50 %; roste s doplňováním norem. Nad 100 % = úkol ve mzdách je nižší než podle norem (prémie krácené o oblečení, hodinová mzda).' }
     ] },
@@ -591,6 +597,7 @@ function mount(host) {
     { skup: 'D', nazev: 'Lidé a kapacita', items: [
       { k: 'D1', label: 'Lidí ve stavu (personalistika)', jedn: '', smer: 'watch', vzorec: 'v měsících s exportem mezd každý placený s útvarem závodu; po posledním exportu mezd aktuální seznam pracovních pozic; bez obojího lidé s odváděním', proc: 'Zdroj pravdy o stavu lidí. Základ fondu pracovní doby pro A1, A5 a A4.' },
       { k: 'D1h', label: 'Odvádí v Heliosu', jedn: '', smer: 'watch', vzorec: 'počet různých osobních čísel s odvedenou operací v měsíci', proc: 'Kolik lidí ze stavu skutečně zapisuje. Trvale nižší než D1 = lidé pracují mimo odvádění (nebo jsou mimo).' },
+      { k: 'D3', label: 'Podíl agenturních pracovníků na odvedených Kč', jedn: '%', smer: 'watch', vzorec: 'Σ Kč řádků s příznakem Agenturní pracovník = 1 ÷ Σ Kč všech řádků měsíce', proc: 'Kolik odvedené práce dělají agenturní lidé (Popelnice). Informativní.' },
       { k: 'D2', klic: true, label: 'Lidí z roku bez odvádění v měsíci', jedn: '', smer: 'down', prah: [15, 30], vzorec: 'lidé, kteří odváděli dřív v roce, ale v měsíci nic; semafor podle podílu z (D1h + D2)', proc: 'Buď mimo (dovolená, nemoc, odchod), nebo pracují neviditelně. Párovat s docházkou.' }
     ] }
   ];
@@ -615,7 +622,7 @@ function mount(host) {
   }
   // kolik hlavních operací (kusů fází) připadá na jeden kontejner podle plánu — výchozí 12
   const opsNaKont = () => loadPlan6().faze.reduce((s, f) => s + (+f.ks || 0), 0);
-  const cileZ = cil => { if (!cil) return {}; const P = loadPlan6(), oK = opsNaKont(); return { A7: cil, A8: Math.round(cil * oK * 10) / 10, A9: oK, A10: Math.round(cil * P.faze.reduce((s, f) => s + f.ks * f.min, 0) / P.smenaMin * 10) / 10 }; };
+  const cileZ = cil => { if (!cil) return { M8: 100 }; const P = loadPlan6(), oK = opsNaKont(); return { M8: 100, A7: cil, A8: Math.round(cil * oK * 10) / 10, A9: oK, A10: Math.round(cil * P.faze.reduce((s, f) => s + f.ks * f.min, 0) / P.smenaMin * 10) / 10 }; };
   function indikatoryMesice(rows, ym, rokRows, zavodKey) {
     const pd = pracDnyMesice(ym); const rez = rows.filter(r => isRezie(r[R.dil])), prod = rows.filter(r => !isRezie(r[R.dil]));
     let nMin = 0, nRows = 0, nKc = 0; if (normIndex().items.length) prod.forEach(r => { const n = matchNorma(zavodKey, r[R.op], r[R.dil], r[R.cop]); if (n) { nMin += (n.min || 0) * r[R.ks]; nKc += (n.kc || 0) * r[R.ks]; nRows++; } });
@@ -624,6 +631,8 @@ function mount(host) {
     let lakA = 0, lakC = 0, lakM = 0; prod.forEach(r => { if (!FZ.lak(r[R.op], r[R.cop]) || MP.set.has(r[R.cvz])) return; const t = zavodKey === 'popelnice' ? 'abr' : typVyrobku(r[R.op], r[R.dil]); if (t === 'abr') lakA += r[R.ks]; else if (t === 'city') lakC += r[R.ks]; else if (t === 'muldy') lakM += r[R.ks]; });
     lakM += muldyKs; const lakKs = lakA;
     const rezH = rez.reduce((s, r) => s + r[R.ks], 0), ks = prod.reduce((s, r) => s + r[R.ks], 0);
+    // Kč a normovaný čas přímo z Heliosu (export od 23. 10. 2026; starší řádky mají 0)
+    const kcOf = r => (+r[R.kc] || 0) + (+r[R.dop] || 0); const kcOdv = rows.reduce((s, r) => s + kcOf(r), 0), kcRez = rez.reduce((s, r) => s + kcOf(r), 0), kcProd = kcOdv - kcRez, nminH = prod.reduce((s, r) => s + (+r[R.nmin] || 0), 0), agentKc = rows.filter(r => +r[R.ag] === 1).reduce((s, r) => s + kcOf(r), 0);
     // hlavní operace kontejneru (fáze plánu 6 ABR/den) — jen závody s cílem v kontejnerech
     let opKs = null, opMin = null, lakAbr = 0; const P6 = loadPlan6();
     if (CIL_DEFAULT[zavodKey]) { opKs = 0; opMin = 0; prod.forEach(r => { const fk = fazeOf(r); const f = fk && P6.faze.find(f => f.k === fk); if (f) { opKs += r[R.ks]; opMin += r[R.ks] * f.min; } if (fk === 'lakovani') lakAbr += r[R.ks]; }); }
@@ -644,6 +653,10 @@ function mount(host) {
       M3: (() => { const Z = mzdyMesic(zavodKey, ym); return Z && Z.hodiny > 0 ? Math.round(Z.hrube / Z.hodiny) : null; })(), M4: (() => { const Z = mzdyMesic(zavodKey, ym); return Z && Z.vyrobni.hrube > 0 ? Math.round(Z.vyrobni.ukol / Z.vyrobni.hrube * 100) : null; })(), M5: (() => { const Z = mzdyMesic(zavodKey, ym); return Z && Z.ukol > 0 && nKc > 0 ? Math.round(nKc / Z.ukol * 100) : null; })(),
       expKc: (() => { const E = expedice(zavodKey); const mm = E && E.mesice.find(x => x.k === ym); return mm ? Math.round(mm.kc) : null; })(),
       M7: (() => { const Z = mzdyMesic(zavodKey, ym); const E = expedice(zavodKey); const mm = E && E.mesice.find(x => x.k === ym); return Z && Z.profese && Z.profese.svar.hrube && mm && mm.kc > 0 ? Math.round(Z.profese.svar.hrube / (mm.kc / 1e6)) : null; })(),
+      kcOdv: Math.round(kcOdv), kcProd: Math.round(kcProd), kcRez: Math.round(kcRez), nminH: Math.round(nminH), agentKc: Math.round(agentKc),
+      M8: (() => { const Z = mzdyMesic(zavodKey, ym); return kcOdv > 0 && Z && Z.ukol > 0 ? Math.round(kcOdv / Z.ukol * 100) : null; })(),
+      M9: (() => { const v = lakA + lakC + lakM; return kcProd > 0 && v > 0 ? Math.round(kcProd / v) : null; })(),
+      A11: kcOdv > 0 ? Math.round(kcRez / kcOdv * 1000) / 10 : null, D3: kcOdv > 0 ? Math.round(agentKc / kcOdv * 1000) / 10 : null,
       mzdySvar: (() => { const Z = mzdyMesic(zavodKey, ym); return Z && Z.profese ? Z.profese.svar.hrube : null; })(),
       mzdy: (() => { const Z = mzdyMesic(zavodKey, ym); return Z ? { lidi: Z.lidi, hrube: Z.hrube, ukol: Z.ukol, hodiny: Z.hodiny, vyrobni: Z.vyrobni, normKc: Math.round(nKc) } : null; })(),
       A7c: pd && zavodKey !== 'popelnice' ? Math.round(lakC / pd * 10) / 10 : null, A7m: pd && zavodKey !== 'popelnice' ? Math.round(lakM / pd * 10) / 10 : null, muldyPlan: muldyKs || undefined,
@@ -708,7 +721,7 @@ function mount(host) {
       if (!rez && r[R.ks] === 0) nulKs++; if (!r[R.cvz]) bezCvz++; if (!r[R.id]) bezJmena++;
       dny[day] = dny[day] || { date: day, rows: 0, ks: 0, rezieH: 0 }; dny[day].rows++; if (rez) dny[day].rezieH += r[R.ks]; else dny[day].ks += r[R.ks];
       if (!rez) { const O = ops[r[R.op]] = ops[r[R.op]] || { op: r[R.op], rows: 0, ks: 0, lide: new Set() }; O.rows++; O.ks += r[R.ks]; O.lide.add(r[R.name]); }
-      if (r[R.cvz]) { const C = cvzs[r[R.cvz]] = cvzs[r[R.cvz]] || { cvz: r[R.cvz], zak: r[R.zak], rows: 0, ks: 0, rezieH: 0, lide: new Set(), ops: new Set(), first: day, last: day }; C.rows++; if (rez) C.rezieH += r[R.ks]; else { C.ks += r[R.ks]; const fk = fazeHelios(r[R.op]); if (fk) { C.f = C.f || {}; C.f[fk] = (C.f[fk] || 0) + r[R.ks]; } const jeAbr = /^abr/i.test(String(r[R.dil] || '')); if (jeAbr) { C.abrRows = (C.abrRows || 0) + 1; if (fk === 'lak') C.lakAbr = (C.lakAbr || 0) + r[R.ks]; } if (fk === 'ost') { C.ost = C.ost || {}; C.ost[r[R.op]] = (C.ost[r[R.op]] || 0) + r[R.ks]; } } C.lide.add(r[R.name]); C.ops.add(r[R.op]); if (day < C.first) C.first = day; if (day > C.last) C.last = day; if (!C.zak && r[R.zak]) C.zak = r[R.zak]; }
+      if (r[R.cvz]) { const C = cvzs[r[R.cvz]] = cvzs[r[R.cvz]] || { cvz: r[R.cvz], zak: r[R.zak], rows: 0, ks: 0, rezieH: 0, lide: new Set(), ops: new Set(), first: day, last: day }; C.rows++; C.kc = (C.kc || 0) + (+r[R.kc] || 0) + (+r[R.dop] || 0); C.nmin = (C.nmin || 0) + (+r[R.nmin] || 0); if (rez) C.rezieH += r[R.ks]; else { C.ks += r[R.ks]; const fk = fazeHelios(r[R.op]); if (fk) { C.f = C.f || {}; C.f[fk] = (C.f[fk] || 0) + r[R.ks]; } const jeAbr = /^abr/i.test(String(r[R.dil] || '')); if (jeAbr) { C.abrRows = (C.abrRows || 0) + 1; if (fk === 'lak') C.lakAbr = (C.lakAbr || 0) + r[R.ks]; } if (fk === 'ost') { C.ost = C.ost || {}; C.ost[r[R.op]] = (C.ost[r[R.op]] || 0) + r[R.ks]; } } C.lide.add(r[R.name]); C.ops.add(r[R.op]); if (day < C.first) C.first = day; if (day > C.last) C.last = day; if (!C.zak && r[R.zak]) C.zak = r[R.zak]; }
     });
     const dnyArr = Object.values(dny).sort((a, b) => a.date.localeCompare(b.date));
     const topDny = dnyArr.slice().sort((a, b) => b.rows - a.rows).slice(0, 3);
@@ -738,7 +751,7 @@ function mount(host) {
       const faze = NORMA_ABR.map(([k, label, norma]) => { const naKus = Math.round((f[k] || 0) / n * 100) / 100; return { k, label, norma, ks: Math.round((f[k] || 0) * 10) / 10, naKus, stav: NORMA_STAV(naKus, norma) }; });
       const ost = Math.round((f.ost || 0) / n * 10) / 10, sp = Math.round((f.sp || 0) / n * 10) / 10;
       return { ks: Math.round(n * 10) / 10, faze, chybi: faze.filter(x => x.stav === 'chybi').map(x => x.label), vic: faze.filter(x => x.stav === 'vic').map(x => x.label + ' ' + x.naKus + '/' + x.norma), ost, sp, ok: faze.every(x => x.stav === 'ok') }; };
-    const cvzArr = Object.values(cvzs).map(C => { const p = P[C.cvz]; return { cvz: C.cvz, zak: C.zak, rows: C.rows, ks: Math.round(C.ks), rezieH: Math.round(C.rezieH), lide: C.lide.size, ops: C.ops.size, first: C.first, last: C.last, helios: C.f ? Object.fromEntries(Object.entries(C.f).map(([k, v]) => [k, Math.round(v * 10) / 10])) : null, norma: normaCvz(C), plan: p ? { vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, skutecny: p.skutecny, exp: p.exp, faze: p.faze, row: p.row, url: planUrl(p.row) } : null }; })
+    const cvzArr = Object.values(cvzs).map(C => { const p = P[C.cvz]; return { cvz: C.cvz, zak: C.zak, rows: C.rows, ks: Math.round(C.ks), kc: Math.round(C.kc || 0), nmin: Math.round(C.nmin || 0), rezieH: Math.round(C.rezieH), lide: C.lide.size, ops: C.ops.size, first: C.first, last: C.last, helios: C.f ? Object.fromEntries(Object.entries(C.f).map(([k, v]) => [k, Math.round(v * 10) / 10])) : null, norma: normaCvz(C), plan: p ? { vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, skutecny: p.skutecny, exp: p.exp, faze: p.faze, row: p.row, url: planUrl(p.row) } : null }; })
       .sort((a, b) => b.rows - a.rows);
     const sparovano = cvzArr.filter(c => c.plan).length;
     // souhrn za závod: hotové ABR zakázky v období, skutečnost na 1 ABR po fázích vs. norma, operace bez normy
@@ -1315,7 +1328,7 @@ function mount(host) {
     }
     if (p === '/api/vykonnost/indikatory' && req.method === 'GET') {
       const bez = String(u.query.bez || '').split(',').filter(Boolean);
-      const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, cile: I.cile, snapshot: I.snapshot, mesice: I.mesice.map(M => { const o = { m: M.m, neuplny: M.neuplny, rows: M.rows, ks: M.ks, rezH: M.rezH, pracDny: M.pracDny, vyrAbr: M.vyrAbr, vyrCity: M.vyrCity, vyrMul: M.vyrMul, vyrVse: M.vyrVse, hr: M.D1z === 'helios' ? null : M.D1, hrVyr: M.D1vyr, hrZdroj: M.D1z }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
+      const zav = ZAVODY.filter(z => bez.indexOf(z.key) < 0).map(z => { const I = indikatory(z); return I ? { key: z.key, name: z.name, kratce: z.kratce, cil: I.cil, cile: I.cile, snapshot: I.snapshot, mesice: I.mesice.map(M => { const o = { m: M.m, neuplny: M.neuplny, rows: M.rows, ks: M.ks, rezH: M.rezH, pracDny: M.pracDny, vyrAbr: M.vyrAbr, vyrCity: M.vyrCity, vyrMul: M.vyrMul, vyrVse: M.vyrVse, hr: M.D1z === 'helios' ? null : M.D1, hrVyr: M.D1vyr, hrZdroj: M.D1z, kcOdv: M.kcOdv, kcProd: M.kcProd, kcRez: M.kcRez, nminH: M.nminH, agentKc: M.agentKc }; LEG_FLAT.forEach(d => o[d.k] = M[d.k]); return o; }) } : { key: z.key, name: z.name, kratce: z.kratce, data: false }; });
       let prof = null; try { prof = profese(); } catch (e) { console.warn('[vykonnost] profese:', e.message); }
       json(res, 200, { zavody: zav, legenda: LEGENDA, profese: prof }); return true;
     }
