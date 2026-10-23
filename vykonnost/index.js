@@ -30,7 +30,8 @@ const ZAVODY = [
 // střecha / příplatky nejsou výrobek. Samotné číslo 9xx nestačí — v postupu ho mají i akrylování, střih čela nebo pálení.
 // Popelnice: číslo 990 = Lakování beden (vč. variant „Lakování 2x + 10 Kč“), 1025/1040 = rámečky, pruhy, polepy.
 // (ne \b za „lakování“ — za „í“ v JS nefunguje; „+ víko“ / „s víkem“ je kontejner s víkem = výrobek, samotné „lakování ABR víko“ je jen víko)
-const LAK_NAZEV = op => /^lakov[aá]n[ií](?=\s|$)/i.test(op) && !/^lakov[aá]n[ií]\s+(abr\s+|city\s+)?v[ií]ko\b|střech|strech|rámeč|ramec|polep|vrstv|díl|dil\b|lem\b|pruh|p[řr][ií]platek|výztuh|vyztuh|b[ií]l[aá]\s*[\/,]\s*[žz]lut/i.test(op);   // bílá/žlutá = druhá barva na témže kusu (Abroly), ne další kontejner
+// „lakování … + vrstva navíc“ JE hotový kus (cenová varianta s vrstvou navíc — v Abrolech 182 z 183 řádků nemá jiné lakování téhož kusu; dřívější vyloučení bylo chybné); bílá/žlutá = druhá barva na témže kusu (Abroly), ne další kontejner
+const LAK_NAZEV = op => /^lakov[aá]n[ií](?=\s|$)/i.test(op) && !/^lakov[aá]n[ií]\s+(abr\s+|city\s+)?v[ií]ko\b|střech|strech|rámeč|ramec|polep|díl|dil\b|lem\b|pruh|p[řr][ií]platek|výztuh|vyztuh|b[ií]l[aá]\s*[\/,]\s*[žz]lut/i.test(op);
 const jeVrchniLak = (op, cop, popelnice) => { const n = parseInt(String(cop == null ? '' : cop).trim(), 10); const o = String(op || '').trim();
   if (popelnice) { if (n === 990) return true; if (n >= 1000) return false; return /^lakov[aá]n[ií](\s*2\s*x.*)?$/i.test(o); }
   if ((n >= 940 && n <= 989) || (n >= 800 && n <= 899)) return false; return LAK_NAZEV(o); };
