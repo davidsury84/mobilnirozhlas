@@ -380,6 +380,10 @@ select.dq2-opt{width:100%;max-width:560px}
 .ot-item .ot-track{margin-bottom:6px}
 .ot-item.red{border-left:4px solid var(--red)}
 .ot-item.amber{border-left:4px solid var(--amber)}
+code.vk{font-size:12px;font-weight:800;background:#eef1ec;color:#1f3a2a;border-radius:6px;padding:1px 7px;white-space:nowrap;max-width:46%;overflow:hidden;text-overflow:ellipsis}
+.vks{font-size:12px;white-space:nowrap}
+.sub code.vk{font-size:11px;max-width:none}
+.dh-vyrobek{font-weight:800;font-size:14px;margin-top:4px;color:#1f3a2a}
 .ot-prob{font-size:12.5px;font-weight:700;margin:0 0 10px;padding:6px 10px;border-radius:8px}
 .ot-prob.red{color:var(--red);background:#fdecec}
 .ot-prob.amber{color:var(--amber);background:#fff3d6}
@@ -1315,6 +1319,11 @@ function kPattern(s){
   if((m=s.match(/^(Založení nabídky|Založení objednávky)\s+—\s+typ:\s+(.+)$/))){
     h=kT(m[1]); if(h===m[1]) return null; var t2=kPattern(m[2])||kT(m[2]); return h+' — '+kT('typ')+': '+t2;
   }
+  /* „4 ks" (štítek v přehledu) a „ABR ALST 5000x2300x1500, 4 ks" (záhlaví detailu) */
+  if((m=s.match(/^(?:(.+), )?(\d+) ks$/))){
+    var ksw2={en:'pcs',de:'Stk.',pl:'szt.',ua:'шт.',ro:'buc.'}[K_LANG]; if(!ksw2) return null;
+    return (m[1]?m[1]+', ':'')+m[2]+' '+ksw2;
+  }
   /* „Kontejner (2 ks × 96 400 Kč)" */
   if((m=s.match(/^(Kontejner)\s+\((\d+)\s+ks\s+×\s+(.+)\)$/))){
     h=kT(m[1]); if(h===m[1]) return null;
@@ -1602,12 +1611,34 @@ function zkTimeline(z){
     (krok?'<span class="tl-n"><b>'+dobaText(krok.prac||0)+'</b><span class="lab">'+esc(z.stavLabel)+'</span></span>':'')+
     toTxt+'</div></div>';
 }
+/* Hlavní kód výrobku pro přehledy: u ABROLL základ kódu z katalogu (řada + vnitřní rozměry + plechy),
+   např. „ABR-ALST-5000x2300x1500-54"; u ostatních typů TYP + rozměry z dotazníku. Prázdné, když rozměry chybí. */
+function vyrobekKod(z){
+  if(z.kodAbr){var m=z.kodAbr.match(/^([A-Z]+-[A-Z0-9]+-\d+x\d+x\d+(?:-\d+)?)/i);return m?m[1]:z.kodAbr}
+  var dq=z.dotaznik||{};var roz=String(dq.rozmery||'').replace(/\s+/g,'').replace(/[×X]/g,'x');
+  if(!roz)return '';
+  return (z.family==='abroll'?'ABR-':'')+String(z.typKey||'').toUpperCase()+'-'+roz;
+}
+/* Název výrobku s počtem kusů do záhlaví detailu: „ABR ALST 5000x2300x1500, 4 ks" (bez plechů). */
+function vyrobekNazev(z){
+  var kod=vyrobekKod(z);if(!kod)return '';
+  var base=kod.replace(/-(\d{2,3})$/,'');var parts=base.split('-');var roz=parts.pop();
+  var ks=parseInt((z.dotaznik||{}).pocet,10);
+  return parts.join(' ')+' '+roz+(ks>0?', '+ks+' ks':'');
+}
+function vyrobekKs(z){var ks=parseInt((z.dotaznik||{}).pocet,10);return ks>0?ks:0}
+/* Štítek s hlavním kódem (+ ks) do karet přehledu; celý kód ABR v titulku. */
+function vyrobekTag(z){
+  var kod=vyrobekKod(z);if(!kod)return '';
+  var ks=vyrobekKs(z);
+  return '<code class="vk" title="'+esc(z.kodAbr||kod)+'">'+esc(kod)+'</code>'+(ks?'<span class="muted vks">'+ks+' ks</span>':'');
+}
 function zkCard(z){
   var right=(z.deadline&&!isTerminal(z.stav)&&z.stav!=='schvaleno')?('<span class="muted" style="font-size:12.5px">termín '+fdt(z.deadline)+'</span>'):'';
   return '<div class="card zk" onclick="openDrawer(\''+z.id+'\')">'+
     '<div class="row" style="justify-content:space-between">'+
       '<div class="row"><span class="dot '+z.semafor+'"></span><div><div class="t">'+esc(z.cisloZobraz||z.cislo)+' · '+esc(z.zakaznik)+'</div>'+
-      '<div class="sub">'+esc(z.typName)+' · v'+(z.versionCount||0)+(z.assignedName?(' · '+esc(z.assignedName)):'')+'</div></div></div>'+
+      '<div class="sub">'+(vyrobekKod(z)?vyrobekTag(z)+' · ':'')+esc(z.typName)+' · v'+(z.versionCount||0)+(z.assignedName?(' · '+esc(z.assignedName)):'')+'</div></div></div>'+
       '<div style="text-align:right"><span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span><div class="sub" style="margin-top:4px">'+esc(z.responsibleName||'—')+' '+right+'</div></div>'+
     '</div>'+zkTimeline(z)+'</div>';
 }
@@ -1681,7 +1712,7 @@ function renderDash(m){
   if(!shown.length)h+='<div class="empty">Žádné zakázky v tomto filtru.</div>';
   else h+=shown.map(function(x){ var pi=problemInfo(x); var cc=pi?pi.cls:'';
     return '<div class="ot-item'+(cc?' '+cc:'')+'" onclick="openDrawer(\''+x.id+'\')">'+
-      '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span>'+cvzOdznak(x)+'<b>'+esc(x.cisloZobraz||x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span><span class="muted" style="margin-left:auto;font-size:12px">zadal '+esc(x.obchodnikName||'—')+'</span></div>'+
+      '<div class="ot-item-head"><span class="dot '+x.semafor+'"></span>'+cvzOdznak(x)+'<b>'+esc(x.cisloZobraz||x.cislo)+'</b> <span class="muted">· '+esc(x.zakaznik)+'</span>'+vyrobekTag(x)+'<span class="muted" style="margin-left:auto;font-size:12px">zadal '+esc(x.obchodnikName||'—')+'</span></div>'+
       (pi?'<div class="ot-prob '+pi.cls+'">'+pi.text+'</div>':'')+
       orderTrack(x)+'</div>';}).join('');
   h+='<div class="kpi">'+
@@ -2667,6 +2698,7 @@ function renderDrawer(z){
   var audit='<div class="sec">Auditní log</div><div class="tl">'+((z.audit||[]).slice().reverse().map(function(a){return '<div class="it"><div>'+esc(a.action)+(a.note?(' — '+esc(a.note)):'')+'</div><div class="m">'+esc(a.by)+' · '+fdt(a.at)+'</div></div>'}).join('')||'<span class="muted">—</span>')+'</div>';
 
   d.innerHTML='<div class="dhead"><div><div class="row"><span class="dot '+z.semafor+'"></span>'+cvzOdznak(z)+'<h2 style="margin:0;font-size:18px">'+esc(z.cisloZobraz||z.cislo)+'</h2>'+(z.rezim==='objednavka'?'<span class="ot-faze obj">OBJEDNÁVKA</span>'+(z.zNabidky?'<span class="muted" style="font-size:12.5px">z nabídky '+esc(z.cislo)+'</span>':'<span class="muted" style="font-size:12.5px">přímé zadání</span>'):'<span class="ot-faze nab">NABÍDKA</span>')+'<span class="pill '+z.stav+'">'+esc(z.stavLabel)+'</span></div>'+
+      (vyrobekNazev(z)?'<div class="dh-vyrobek" title="'+esc(z.kodAbr||vyrobekKod(z))+'">'+esc(vyrobekNazev(z))+'</div>':'')+
       '<div class="muted" style="margin-top:3px">'+esc(z.zakaznik)+' · '+esc(z.typName)+'</div></div><button class="x" onclick="closeDrawer()">×</button></div>'+
     '<div class="dbody">'+
       orderTrack(z)+
