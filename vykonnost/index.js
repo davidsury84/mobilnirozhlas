@@ -1174,7 +1174,7 @@ function mount(host) {
   // vedení + výrobní ředitelé závodů (Chomutov, Bruntál Abroly, Supíkovice); příjemce jde měnit v adminu / Rozesílkách
   const DEF_TO = ['david.sury@elkoplast.cz', 'tomas.krajca@elkoplast.cz', 'jiri.hejda@elkoplast.cz', 'ales.fleger@elkoplast.cz', 'jakub.sefcik@elkoplast.cz'];
   const cleanEmails = a => (Array.isArray(a) ? a : String(a || '').split(/[;,\n]/)).map(x => String(x).trim().toLowerCase()).filter(x => /@/.test(x));
-  function loadCfg() { let c = {}; try { c = JSON.parse(fs.readFileSync(CFG_F, 'utf8')) || {}; } catch (_) {} const lakMin = Object.assign({ chomutov: 15, abroly: 15, popelnice: 150, supikovice: 15 }, (c.lakMin && typeof c.lakMin === 'object') ? c.lakMin : {}); return { to: Array.isArray(c.to) ? c.to : DEF_TO.slice(), enabled: c.enabled !== undefined ? !!c.enabled : true, hour: (c.hour >= 0 && c.hour <= 23) ? c.hour : 7, lakMin }; }
+  function loadCfg() { let c = {}; try { c = JSON.parse(fs.readFileSync(CFG_F, 'utf8')) || {}; } catch (_) {} const lakMin = Object.assign({ chomutov: 15, abroly: 15, popelnice: 50, supikovice: 15 }, (c.lakMin && typeof c.lakMin === 'object') ? c.lakMin : {}); return { to: Array.isArray(c.to) ? c.to : DEF_TO.slice(), enabled: c.enabled !== undefined ? !!c.enabled : true, hour: (c.hour >= 0 && c.hour <= 23) ? c.hour : 7, lakMin }; }
   const saveCfg = c => { try { fs.writeFileSync(CFG_F, JSON.stringify(c, null, 2)); } catch (e) { console.error('[vykonnost] zápis config:', e.message); } };
   const loadRState = () => { try { return JSON.parse(fs.readFileSync(RSTATE_F, 'utf8')) || {}; } catch (_) { return {}; } };
   const esc = x => String(x == null ? '' : x).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
