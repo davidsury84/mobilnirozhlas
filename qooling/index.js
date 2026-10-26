@@ -256,7 +256,7 @@ function mount(host) {
     if (!to.length) return { ok: false, error: 'žádný příjemce' };
     const rep = buildReport();
     try {
-      await host.deliver({ to: to.join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — Qooling', subject: rep.subject, text: rep.subject, html: rep.html });
+      await host.deliver({ urgent: true, to: to.join(', '), fromAddr: (host.mailFrom && host.mailFrom.user) || '', fromName: (host.mailFrom && host.mailFrom.name) || 'Intranet ELKOPLAST — Qooling', subject: rep.subject, text: rep.subject, html: rep.html });
       return { ok: true, to, count: rep.count };
     } catch (e) { return { ok: false, error: e.message }; }
   }
