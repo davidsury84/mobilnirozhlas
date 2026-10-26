@@ -248,7 +248,7 @@ function mount(host) {
       kpiRowHtml(S) + monthsChartHtml(S) + minutesMatrixHtml(S) + issuesTableHtml(S) +
       '<p style="margin:0;font-size:13px"><a href="' + esc((host.mailFrom && host.mailFrom.publicUrl || '')) + '/#modul=qooling" style="color:#1f4e79">→ Otevřít interaktivní přehled v intranetu (filtry, hledání)</a></p>' +
       '<hr style="border:0;border-top:1px solid #e6e9e3;margin:18px 0"><div style="font-size:12px;color:#8a938a">Automatický pondělní report · Intranet ELKOPLAST CZ → Qooling. Příjemce a zapnutí spravuje správce v modulu / v přehledu Rozesílky.</div></div>';
-    return { subject: 'Qooling — týdenní stav závad · otevřených ' + S.open.length + ', nových za 30 dní ' + S.new30.length + (extra && extra.eskalace && extra.eskalace.length ? ' · ESKALACE lakování: ' + extra.eskalace.join(', ') : ''), html, count: S.open.length };
+    return { subject: 'Qooling — týdenní stav závad · otevřených ' + S.open.length + ', nových za 30 dní ' + S.new30.length + (extra && extra.eskalace && extra.eskalace.length ? ' · ESKALACE lakování: ' + extra.eskalace.join(', ') : '') + (extra && extra.nezacate ? ' · nezačatých zakázek do 6 týdnů: ' + extra.nezacate : ''), html, count: S.open.length };
   }
 
   async function sendReport(toList) {
