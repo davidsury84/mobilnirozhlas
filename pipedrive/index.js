@@ -20,7 +20,8 @@
 //
 //  Použité endpointy (https://pipedrive.readme.io/docs/getting-started):
 //    GET /v1/users, /v1/users/me, /v1/activityTypes
-//    GET /api/v2/activities   (done, updated_since, cursor, limit ≤ 500)
+//    GET /api/v2/activities   (done, updated_since, cursor, limit ≤ 500, include_fields=attendees)
+//    GET /api/v2/organizations, /api/v2/persons, /api/v2/deals ?ids=…  (kdo s kým a kde u schůzek)
 //    GET /api/v2/deals        (updated_since, cursor, limit ≤ 500)
 //    GET /v1/notes            (start_date, end_date, start, limit ≤ 500)
 // ----------------------------------------------------------------------------
@@ -153,11 +154,28 @@ function mount(host) {
   let otevreneC = null;
   function otevrene(token) {
     if (otevreneC && otevreneC.token === token && Date.now() - otevreneC.ts < CACHE_MS) return otevreneC.p;
-    const p = pdVse('/api/v2/activities', { done: false, sort_by: 'due_date', sort_direction: 'asc' }, token);
+    const p = pdVse('/api/v2/activities', { done: false, sort_by: 'due_date', sort_direction: 'asc', include_fields: 'attendees' }, token);
     otevreneC = { token, ts: Date.now(), p };
     p.catch(() => { if (otevreneC && otevreneC.p === p) otevreneC = null; });
     return p;
   }
+
+  // Firmy, osoby a dealy ke schůzkám — dotahují se po dávkách ?ids= a drží se hodinu.
+  const entity = { organizations: new Map(), persons: new Map(), deals: new Map() };
+  async function nactiEntity(druh, ids, token) {
+    const m = entity[druh], chybi = [];
+    ids.forEach(id => { const z = m.get(id); if (!z || Date.now() - z.ts > CISELNIKY_MS) chybi.push(id); });
+    for (let i = 0; i < chybi.length && i < 2000; i += 100) {
+      const davka = chybi.slice(i, i + 100);
+      try {
+        const j = await pd('/api/v2/' + druh, { ids: davka.join(','), limit: 100 }, token);
+        (j.data || []).forEach(x => m.set(x.id, { ts: Date.now(), x }));
+      } catch (e) { console.error('[pipedrive] ' + druh + ':', e.message); }
+      davka.forEach(id => { if (!m.has(id)) m.set(id, { ts: Date.now(), x: null }); });
+    }
+    return id => { const z = m.get(id); return z ? z.x : null; };
+  }
+  const adresa = l => String((l && (l.formatted_address || l.value)) || (typeof l === 'string' ? l : '')).trim().slice(0, 300);
 
   const cache = new Map();     // 'od|do' → { ts, data }
   const bezi = new Map();      // 'od|do' → Promise (souběžné dotazy čekají na jedno načtení)
@@ -185,7 +203,7 @@ function mount(host) {
     const posunDen = (d, n) => new Date(new Date(d + 'T00:00:00Z').getTime() + n * 86400000).toISOString().slice(0, 10);
     const [cis, hot, otev, dealy, pozn] = await Promise.all([
       nactiCiselniky(token),
-      pdVse('/api/v2/activities', { done: true, updated_since: odCas, sort_by: 'update_time', sort_direction: 'desc' }, token),
+      pdVse('/api/v2/activities', { done: true, updated_since: odCas, sort_by: 'update_time', sort_direction: 'desc', include_fields: 'attendees' }, token),
       otevrene(token),
       pdVse('/api/v2/deals', { updated_since: odCas, sort_by: 'update_time', sort_direction: 'desc' }, token),
       pdVseV1('/v1/notes', { start_date: posunDen(od, -1), end_date: posunDen(doo, 1), sort: 'add_time DESC' }, token),
@@ -201,13 +219,14 @@ function mount(host) {
           id, jmeno: u ? u.jmeno : ('Uživatel #' + id), email: u ? u.email : '', aktivni: u ? u.aktivni : false,
           hotovo: 0, podleTypu: {}, podleDne: {}, podleDneTypu: {}, naplanovano: 0, poTerminu: 0, posledni: '',
           dealyNove: 0, dealyVyhrane: 0, dealyProhrane: 0, vyhranoHodnota: {}, noveHodnota: {},
-          poznamky: 0, aktivity: [], otevrene: [], dealy: [], poznamkySeznam: [],
+          poznamky: 0, aktivity: [], otevrene: [], dealy: [], poznamkySeznam: [], schuzky: [],
         });
       }
       return lide.get(id);
     };
     cis.uzivatele.filter(u => u.aktivni).forEach(u => clovek(u.id));
 
+    const schuzkyRaw = [];
     const tvarAktivity = (a, kdy) => ({
       id: a.id, predmet: String(a.subject || '').slice(0, 200), typ: a.type || '', den: kdy,
       termin: a.due_date || '', cas: (a.due_time || '').slice(0, 5), deal: a.deal_id || null,
@@ -227,6 +246,7 @@ function mount(host) {
       dt[t] = (dt[t] || 0) + 1;
       if (kdy > c.posledni) c.posledni = kdy;
       c.aktivity.push(tvarAktivity(a, kdy));
+      if (t === TYP_SCHUZKA) schuzkyRaw.push({ a, c, den: kdy, stav: 'hotova' });
     });
     otev.data.forEach(a => {
       if (a.is_deleted || a.owner_id == null) return;
@@ -234,7 +254,49 @@ function mount(host) {
       const po = !!a.due_date && a.due_date < dnes;
       if (po) c.poTerminu++; else c.naplanovano++;
       c.otevrene.push(Object.assign(tvarAktivity(a, a.due_date || ''), { poTerminu: po }));
+      // Naplánované schůzky s termínem v období (a všechny po termínu) — ať je vidět i to, co teprve bude.
+      if ((a.type || '') === TYP_SCHUZKA && (po || vObdobi(a.due_date || ''))) schuzkyRaw.push({ a, c, den: a.due_date || '', stav: po ? 'poTerminu' : 'planovana' });
     });
+
+    // Schůzky: kdo s kým a kde. Firma/osoba/deal z vazeb aktivity, pozvaní z kalendářové pozvánky,
+    // místo z aktivity, jinak adresa firmy.
+    if (schuzkyRaw.length) {
+      const idsO = new Set(), idsP = new Set(), idsD = new Set();
+      schuzkyRaw.forEach(({ a }) => {
+        if (a.org_id) idsO.add(a.org_id);
+        if (a.person_id) idsP.add(a.person_id);
+        (a.participants || []).forEach(u => { if (u && u.person_id) idsP.add(u.person_id); });
+        (a.attendees || []).forEach(u => { if (u && u.person_id) idsP.add(u.person_id); });
+        if (a.deal_id) idsD.add(a.deal_id);
+      });
+      const [org, os, dl] = await Promise.all([
+        nactiEntity('organizations', Array.from(idsO), token),
+        nactiEntity('persons', Array.from(idsP), token),
+        nactiEntity('deals', Array.from(idsD), token),
+      ]);
+      schuzkyRaw.forEach(({ a, c, den: kdy, stav }) => {
+        const firma = a.org_id ? org(a.org_id) : null;
+        const osobyIds = []; const pridej = id => { if (id && osobyIds.indexOf(id) < 0) osobyIds.push(id); };
+        pridej(a.person_id); (a.participants || []).forEach(u => pridej(u && u.person_id));
+        const osoby = osobyIds.map(id => os(id)).filter(Boolean).map(p => ({ id: p.id, jmeno: String(p.name || '').slice(0, 120), pozice: String(p.job_title || '').slice(0, 120) }));
+        const ucastnici = (a.attendees || []).filter(u => u && (u.email || u.name) && !(u.user_id && u.user_id === a.owner_id)).map(u => ({
+          jmeno: String(u.name || '').slice(0, 120), email: String(u.email || '').slice(0, 160), stav: String(u.status || '').slice(0, 20),
+          kolega: !!u.user_id, organizator: !!u.is_organizer,
+        }));
+        const deal = a.deal_id ? dl(a.deal_id) : null;
+        let kde = adresa(a.location), kdeZdroj = kde ? 'schuzka' : '';
+        if (!kde && firma && firma.address) { kde = adresa(firma.address); kdeZdroj = kde ? 'firma' : ''; }
+        if (!kde && a.conference_meeting_url) { kde = 'online (' + String(a.conference_meeting_client || 'videohovor') + ')'; kdeZdroj = 'online'; }
+        c.schuzky.push({
+          id: a.id, den: kdy, cas: (a.due_time || '').slice(0, 5), trvani: (a.duration || '').slice(0, 5), stav,
+          predmet: String(a.subject || '').slice(0, 200),
+          firma: firma ? String(firma.name || '').slice(0, 160) : '', firmaId: a.org_id || null,
+          osoby, ucastnici, kde, kdeZdroj,
+          deal: a.deal_id || null, dealNazev: deal ? String(deal.title || '').slice(0, 160) : '',
+          poznamka: cisti(a.note, 400), popis: cisti(a.public_description, 300),
+        });
+      });
+    }
     const pricti = (o, mena, kolik) => { if (kolik) { const m = mena || '—'; o[m] = Math.round(((o[m] || 0) + Number(kolik)) * 100) / 100; } };
     dealy.data.forEach(d => {
       if (d.is_deleted || d.status === 'deleted' || d.owner_id == null) return;
@@ -271,6 +333,7 @@ function mount(host) {
     seznam.forEach(c => {
       c.aktivity.sort((a, b) => (b.den + b.cas).localeCompare(a.den + a.cas));
       c.otevrene.sort((a, b) => (a.den || '9').localeCompare(b.den || '9'));
+      c.schuzky.sort((a, b) => (b.den + b.cas).localeCompare(a.den + a.cas));
       c.dealy.sort((a, b) => b.den.localeCompare(a.den));
     });
     seznam.sort((a, b) => b.hotovo - a.hotovo || a.jmeno.localeCompare(b.jmeno, 'cs'));
@@ -311,7 +374,7 @@ function mount(host) {
       // Seznamy aktivit a dealů jdou zvlášť (/detail), ať je přehled lehký.
       const lide = d.lide.filter(c => vse || skr.indexOf(c.id) < 0).map(c => {
         const o = Object.assign({}, c, { skryty: skr.indexOf(c.id) >= 0 });
-        delete o.aktivity; delete o.otevrene; delete o.dealy; delete o.poznamkySeznam; return o;
+        o.schuzkyPocet = c.schuzky.length; delete o.aktivity; delete o.otevrene; delete o.dealy; delete o.poznamkySeznam; delete o.schuzky; return o;
       });
       let minule = null;
       if (m) {
@@ -338,7 +401,22 @@ function mount(host) {
       otevrene: c.otevrene.slice(0, 300), otevrenychCelkem: c.otevrene.length,
       dealy: c.dealy.slice(0, 300),
       poznamky: c.poznamkySeznam.slice(0, 300), poznamekCelkem: c.poznamkySeznam.length,
+      schuzky: c.schuzky.slice(0, 300), schuzekCelkem: c.schuzky.length,
     });
+    return true;
+  }
+
+  // Všechny schůzky obchodníků za období (kdo s kým a kde) — záložka „Schůzky".
+  async function apiSchuzky(req, res, me, q) {
+    const k = konfig();
+    if (!k.token) { json(res, 200, { nastaveno: false }); return true; }
+    const { od, doo } = obdobi(q);
+    let d;
+    try { d = await prehled(od, doo, q.obnovit === '1'); }
+    catch (e) { console.error('[pipedrive] schůzky:', e.message); json(res, 200, { nastaveno: true, od, do: doo, chyba: e.message }); return true; }
+    const skr = skryti();
+    const lide = d.lide.filter(c => skr.indexOf(c.id) < 0 && c.schuzky.length).map(c => ({ id: c.id, jmeno: c.jmeno, schuzky: c.schuzky.slice(0, 300), schuzekCelkem: c.schuzky.length }));
+    json(res, 200, { nastaveno: true, od: d.od, do: d.do, dnes: d.dnes, nacteno: d.nacteno, domena: d.domena, lide, orez: d.orez });
     return true;
   }
 
@@ -459,6 +537,7 @@ function mount(host) {
     try {
       if (p === '/api/pipedrive/data' && req.method === 'GET') return await apiData(req, res, me, u.query);
       if (p === '/api/pipedrive/detail' && req.method === 'GET') return await apiDetail(req, res, me, u.query);
+      if (p === '/api/pipedrive/schuzky' && req.method === 'GET') return await apiSchuzky(req, res, me, u.query);
       if (p === '/api/pipedrive/plan' && req.method === 'GET') return await apiPlan(req, res, me, u.query);
       if (p === '/api/pipedrive/cile' && req.method === 'POST') return await apiCile(req, res, me);
       if (p === '/api/pipedrive/skryt' && req.method === 'POST') return await apiSkryt(req, res, me);

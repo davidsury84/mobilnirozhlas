@@ -122,6 +122,15 @@ tfoot td{font-weight:700;border-top:2px solid var(--line-strong);border-bottom:0
 .pl{position:relative;height:12px;background:var(--bg);border-radius:6px}
 .plf{height:100%;background:var(--green);border-radius:6px;min-width:2px}
 .plt{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:1px}
+.sch{padding:10px 0;border-bottom:1px solid var(--line)}
+.sch:last-child{border-bottom:0}
+.schk{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.schd{font-size:13px;color:var(--ink-soft)}
+.schp{font-weight:600;margin:2px 0 4px}
+.schr{font-size:13px;margin-top:2px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.schl{display:inline-block;min-width:44px;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);font-weight:600}
+.schob.sbal .schb{display:none}
+.lista input[type=search]{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line-strong);border-radius:10px;background:var(--paper)}
 .pozn{white-space:pre-line;font-size:12.5px;color:var(--ink-soft);margin-top:3px;max-width:70ch}
 .pozn.ink{color:var(--ink);font-size:13px}
 .kr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;border-top:1px dashed var(--line);padding-top:10px}
@@ -167,10 +176,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--line-strong);border-bottom:0
   <div class="lista">
     <span class="mut jen-obdobi">Od</span><input class="jen-obdobi" type="date" id="od" onchange="vlastni()">
     <span class="mut jen-obdobi">do</span><input class="jen-obdobi" type="date" id="do" onchange="vlastni()">
-    <div class="tabs" id="pohledy"><button class="on" data-p="dash" onclick="pohled('dash')">Dashboard</button><button data-p="tab" onclick="pohled('tab')">Tabulka</button><button data-p="plan" onclick="pohled('plan')">Plnění plánu</button></div>
+    <div class="tabs" id="pohledy"><button class="on" data-p="dash" onclick="pohled('dash')">Dashboard</button><button data-p="tab" onclick="pohled('tab')">Tabulka</button><button data-p="schuzky" onclick="pohled('schuzky')">Schůzky</button><button data-p="plan" onclick="pohled('plan')">Plnění plánu</button></div>
     <span id="skryte"></span>
     <div class="sp"></div>
-    <button class="btn sm" onclick="POHLED==='plan'?nactiPlan(true):nacti(true)">↻ Načíst znovu z Pipedrive</button>
+    <button class="btn sm" onclick="POHLED==='plan'?nactiPlan(true):POHLED==='schuzky'?nactiSchuzky(true):nacti(true)">↻ Načíst znovu z Pipedrive</button>
     <button class="btn sm" id="btnNast" style="display:none" onclick="nastaveni()">⚙ Nastavení</button>
   </div>
 
@@ -282,6 +291,7 @@ function vykresli(){
   }
   document.querySelectorAll(".jen-obdobi").forEach(e=>{ e.style.display=POHLED==="plan"?"none":""; });
   if(POHLED==="plan"){ vykresliPlan(); return; }
+  if(POHLED==="schuzky"){ nactiSchuzky(); return; }
   const lide=D.lide||[];
   const sum=k=>lide.reduce((a,c)=>a+(c[k]||0),0);
   const min=D.minule&&D.minule.lide;
@@ -308,6 +318,52 @@ function vykresli(){
   $("#obsah").innerHTML=h;
 }
 function pohled(p){ POHLED=p; document.querySelectorAll("#pohledy button").forEach(b=>b.classList.toggle("on",b.dataset.p===p)); if(D) vykresli(); }
+
+/* ---- schůzky: kdo s kým a kde ---- */
+// Odpověď pozvaného na pozvánku — Pipedrive vrací yes/no/maybe/unknown (starší zápisy accepted/declined…).
+const UCAST={yes:["ok","přijal"],accepted:["ok","přijal"],no:["zle","odmítl"],declined:["zle","odmítl"],maybe:["warn","možná"],tentative:["warn","možná"],unknown:["mute","bez odpovědi"],needsAction:["mute","bez odpovědi"]};
+const SCHUZKA_STAV={hotova:["ok","proběhla"],planovana:["mute","naplánovaná"],poTerminu:["zle","po termínu"]};
+function schuzkaHtml(x,web){
+  const odkazD=(idd,t)=>web?'<a href="'+web+'/deal/'+Number(idd)+'" target="_blank" rel="noopener">'+t+'</a>':t;
+  const odkazO=(idd,t)=>web?'<a href="'+web+'/organization/'+Number(idd)+'" target="_blank" rel="noopener">'+t+'</a>':t;
+  const st=SCHUZKA_STAV[x.stav]||["mute",x.stav];
+  const kym=[];
+  if(x.firma) kym.push('<b>'+odkazO(x.firmaId,esc(x.firma))+'</b>');
+  (x.osoby||[]).forEach(o=>kym.push(esc(o.jmeno)+(o.pozice?' <span class="mut">('+esc(o.pozice)+')</span>':'')));
+  (x.ucastnici||[]).forEach(u=>{ const z=UCAST[u.stav]; kym.push((u.jmeno?esc(u.jmeno):esc(u.email))+(u.jmeno&&u.email?' <span class="mut">'+esc(u.email)+'</span>':'')+(u.kolega?' <span class="pill mute">kolega</span>':'')+(z?' <span class="pill '+z[0]+'">'+z[1]+'</span>':'')); });
+  return '<div class="sch"><div class="schk"><div class="schd">'+cz(x.den)+(x.cas?' <b>'+esc(x.cas)+'</b>':'')+(x.trvani&&x.trvani!=="00:00"?' <span class="mut">'+esc(x.trvani)+' h</span>':'')+'</div><span class="pill '+st[0]+'">'+st[1]+'</span></div>'+
+    '<div class="schp">'+esc(x.predmet||"(bez předmětu)")+(x.deal?' <span class="mut">· '+odkazD(x.deal,esc(x.dealNazev||("deal #"+x.deal)))+'</span>':'')+'</div>'+
+    '<div class="schr"><span class="schl">S kým</span>'+(kym.length?kym.join('<span class="mut"> · </span>'):'<span class="mut">v Pipedrive není uvedeno</span>')+'</div>'+
+    '<div class="schr"><span class="schl">Kde</span>'+(x.kde?esc(x.kde)+(x.kdeZdroj==="firma"?' <span class="pill mute" title="u schůzky není místo, zobrazena adresa firmy">adresa firmy</span>':''):'<span class="mut">neuvedeno</span>')+'</div>'+
+    (x.popis?'<div class="pozn">'+esc(x.popis)+'</div>':'')+(x.poznamka?'<div class="pozn">'+esc(x.poznamka)+'</div>':'')+'</div>';
+}
+let SCH=null;
+async function nactiSchuzky(znovu){
+  $("#obsah").innerHTML='<div class="card"><div class="empty">Načítám schůzky z Pipedrive…</div></div>';
+  try{ SCH=await api("/api/pipedrive/schuzky?od="+encodeURIComponent(D.od)+"&do="+encodeURIComponent(D.do)+(znovu?"&obnovit=1":"")); vykresliSchuzky(); }
+  catch(e){ $("#obsah").innerHTML='<div class="chyba">'+esc(e.message)+'</div>'; }
+}
+function vykresliSchuzky(){
+  const S=SCH; if(S.chyba){ $("#obsah").innerHTML='<div class="chyba">'+esc(S.chyba)+'</div>'; return; }
+  const web=S.domena&&/^[a-z0-9-]+$/i.test(S.domena)?"https://"+S.domena+".pipedrive.com":"";
+  const lide=(S.lide||[]).slice().sort((a,b)=>b.schuzekCelkem-a.schuzekCelkem||a.jmeno.localeCompare(b.jmeno,"cs"));
+  const celkem=lide.reduce((a,c)=>a+c.schuzekCelkem,0);
+  $("#podtitul").textContent="Schůzky · "+cz(S.od)+" – "+cz(S.do)+" · "+cislo(celkem)+" schůzek";
+  let h='';
+  if(S.orez) h+='<div class="varovani">Za zvolené období je v Pipedrive víc záznamů, než modul najednou načte — seznam může být neúplný.</div>';
+  h+='<div class="lista"><input type="search" id="schHledat" placeholder="Hledat firmu, osobu, místo, předmět…" autocomplete="off" oninput="filtrSchuzky(this.value)"><span class="mut">Proběhlé v období + naplánované na období + po termínu. Klepnutím na jméno sbalíte / rozbalíte.</span></div>';
+  if(!lide.length) h+='<div class="card"><div class="empty">V období nemá žádný obchodník schůzku.</div></div>';
+  lide.forEach(c=>{
+    h+='<div class="card schob" data-ob="'+Number(c.id)+'"><div class="h" style="cursor:pointer" onclick="this.parentNode.classList.toggle(\'sbal\')"><h2>'+esc(c.jmeno)+'</h2><span class="pill mute">'+cislo(c.schuzekCelkem)+'</span><div class="sp"></div><span class="mut">'+c.schuzky.filter(x=>x.stav==="hotova").length+' proběhlo · '+c.schuzky.filter(x=>x.stav==="planovana").length+' naplánováno'+(c.schuzky.some(x=>x.stav==="poTerminu")?' · <span class="pill zle">'+c.schuzky.filter(x=>x.stav==="poTerminu").length+' po termínu</span>':'')+'</span></div>'+
+      '<div class="b schb">'+c.schuzky.map(x=>schuzkaHtml(x,web)).join("")+(c.schuzekCelkem>c.schuzky.length?'<p class="mut">Zobrazeno prvních '+c.schuzky.length+'.</p>':'')+'</div></div>';
+  });
+  $("#obsah").innerHTML=h;
+}
+function filtrSchuzky(q){
+  q=bezDiak(q);
+  document.querySelectorAll(".schob").forEach(k=>{ let n=0; k.querySelectorAll(".sch").forEach(e=>{ const ok=!q||bezDiak(e.textContent).indexOf(q)>=0; e.style.display=ok?"":"none"; if(ok) n++; }); k.style.display=n?"":"none"; k.classList.remove("sbal"); });
+}
+function bezDiak(s){ return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase(); }
 
 /* ---- plnění měsíčního plánu schůzek a hovorů ---- */
 let PLAN=null, MESIC="";
@@ -505,6 +561,7 @@ async function detail(id){
     const tab=(radky,prazdno)=>radky.length?'<div class="posuv"><table><tbody>'+radky.join("")+'</tbody></table></div>':'<p class="mut">'+prazdno+'</p>';
     const radA=a=>'<tr><td style="white-space:nowrap;width:1%">'+(a.den?cz(a.den):"bez termínu")+(a.cas?' <span class="mut">'+esc(a.cas)+'</span>':'')+'</td><td style="width:1%"><span class="pill mute">'+esc(nazevTypu(a.typ))+'</span></td><td>'+odkazA(a)+(a.poznamka?'<div class="pozn">'+esc(a.poznamka)+'</div>':'')+'</td><td style="width:1%;white-space:nowrap">'+(a.deal?odkazD(a.deal,"deal #"+Number(a.deal)):"")+'</td></tr>';
     const STAV={novy:['mute','nový'],vyhrany:['ok','vyhraný'],prohrany:['zle','prohraný']};
+    h+='<h3>Schůzky ('+d.schuzekCelkem+')</h3>'+(d.schuzky.length?d.schuzky.map(x=>schuzkaHtml(x,web)).join(""):'<p class="mut">V období žádná schůzka.</p>')+(d.schuzekCelkem>d.schuzky.length?'<p class="mut">Zobrazeno prvních '+d.schuzky.length+'.</p>':'');
     h+='<h3>Dealy v období ('+d.dealy.length+')</h3>'+tab(d.dealy.map(x=>'<tr><td style="white-space:nowrap;width:1%">'+cz(x.den)+'</td><td style="width:1%"><span class="pill '+STAV[x.co][0]+'">'+STAV[x.co][1]+'</span></td><td>'+odkazD(x.id,esc(x.nazev||"(bez názvu)"))+'</td><td class="c" style="white-space:nowrap">'+(x.hodnota?cislo(x.hodnota)+" "+esc(x.mena):"")+'</td></tr>'),"Žádné nové, vyhrané ani prohrané dealy.");
     h+='<h3>Poznámky ('+d.poznamekCelkem+')</h3>'+tab(d.poznamky.map(x=>'<tr><td style="white-space:nowrap;width:1%;vertical-align:top">'+cz(x.den)+'</td><td><div class="mut">'+[x.deal?odkazD(x.deal,esc(x.dealNazev||("deal #"+x.deal))):"",esc(x.firma),esc(x.osoba)].filter(Boolean).join(" · ")+'</div><div class="pozn ink">'+esc(x.text||"(prázdná poznámka)")+'</div></td></tr>'),"V období žádná poznámka.")+(d.poznamekCelkem>d.poznamky.length?'<p class="mut">Zobrazeno prvních '+d.poznamky.length+'.</p>':'');
     h+='<h3>Po termínu ('+po.length+')</h3>'+tab(po.map(radA),"Nic po termínu.");
