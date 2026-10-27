@@ -1732,6 +1732,60 @@ function mount(host) {
       zalozky: Object.entries(e.zalozky).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => k + ' (' + v + '×)') })).sort((a, b) => b.posledni - a.posledni);
     return { ok: true, lide, zaznamy: d.zaznamy.slice(-400).reverse(), celkem: d.zaznamy.length, od: d.zaznamy.length ? d.zaznamy[0].ts : null };
   }
+  // ---- KPI vedoucího e-shopu (scorecard 2027) — jen pro vyjmenované osoby ----
+  // Automaticky měřené: obrat (výdejky ř. 441), marže (výdej × skladová cena), opakovaní zákazníci, noví dodavatelé
+  // (SK poprvé ve výdejkách v daném roce, obrat ≥ 100 tis.), pohledávky útvaru E-shop, nekryté rezervace.
+  // Ručně: zahraničí (chybí země dodání v exportu), distribuční smlouvy, reakce na poptávky, NPS. Cíle editovatelné.
+  const KPI_PRISTUP = String(process.env.KPI_PRISTUP || 'david.sury@elkoplast.cz').split(/[,;\s]+/).map(x => x.toLowerCase()).filter(Boolean);
+  const KPI_F = path.join(host.dataDir || __dirname, 'eshop-kpi.json');
+  const KPI_DEF = { mzda: { zaklad: 45000, variabilni: 0.25 }, vahy: { obrat: 0.25, marze: 0.15, zahranici: 0.15, dodavatele: 0.15, smlouvy: 0.10, opakovani: 0.10, provoz: 0.10 },
+    cile: { '2027': { obrat: { prah: 45, cil: 48, stretch: 52 }, marze: { prah: 0.40, cil: 0.42, stretch: 0.44 }, zahranici: { prah: 2.0, cil: 3.0, stretch: 4.5 }, dodavatele: { prah: 8, cil: 12, stretch: 16 }, smlouvy: { prah: 2, cil: 4, stretch: 6 }, opakovani: { prah: 0.11, cil: 0.13, stretch: 0.15 }, provoz: { prah: 3, cil: 4, stretch: 4 } } },
+    plan: [0.20, 0.48, 0.75, 1.00], rucni: {} };
+  const loadKpi = () => { let d = {}; try { d = JSON.parse(fs.readFileSync(KPI_F, 'utf8')) || {}; } catch (_) {} const o = JSON.parse(JSON.stringify(KPI_DEF)); o.mzda = Object.assign(o.mzda, d.mzda || {}); o.vahy = Object.assign(o.vahy, d.vahy || {}); o.cile = Object.assign(o.cile, d.cile || {}); if (Array.isArray(d.plan) && d.plan.length === 4) o.plan = d.plan; o.rucni = d.rucni || {}; return o; };
+  const saveKpi = d => { try { fs.writeFileSync(KPI_F, JSON.stringify(d, null, 2)); } catch (_) {} };
+  const kpiSmi = req => { const se = host.empSession && host.empSession(req); const em = String((se && se.email) || '').toLowerCase(); return !!em && KPI_PRISTUP.indexOf(em) >= 0; };
+  function kpiAuto(rok) {
+    const Y = String(rok), vd = loadVyd().dny || {}, dny = Object.keys(vd).sort();
+    const o = loadObj(); const meta = {}; (o.rows || []).forEach(r => { meta[r.sk + '-' + r.reg] = unitVal(r); });
+    let kc = 0, nakl = 0, naklKc = 0, zak = 0, b2b = 0, posl = ''; const q = [0, 0, 0, 0]; const zk = {}; const sk = {}; const prvni = {};
+    dny.forEach(d => { const v = vd[d]; Object.keys(v.polozky || {}).forEach(k => { const s0 = k.split('-')[0]; if (!prvni[s0] || d < prvni[s0]) prvni[s0] = d; });
+      if (d.slice(0, 4) !== Y) return; posl = d; kc += v.kc || 0; zak += v.zakazek || 0; b2b += v.b2bKc || 0; q[Math.floor((+d.slice(5, 7) - 1) / 3)] += v.kc || 0;
+      Object.keys(v.polozky || {}).forEach(k => { const it = v.polozky[k], uc = meta[k]; if (uc > 0) { nakl += it.ks * uc; naklKc += it.kc || 0; } const s0 = k.split('-')[0]; sk[s0] = (sk[s0] || 0) + (it.kc || 0); });
+      Object.keys(v.zakaznici || {}).forEach(nm => { const z = zk[nm] || (zk[nm] = { zak: 0, kc: 0 }); z.zak += v.zakaznici[nm].zak || 0; z.kc += v.zakaznici[nm].kc || 0; }); });
+    const prvniRok = dny.length ? dny[0].slice(0, 4) : Y;
+    const novi = Object.keys(sk).filter(s0 => prvni[s0] && prvni[s0].slice(0, 4) === Y && Y > prvniRok && sk[s0] >= 100000).map(s0 => ({ sk: s0, obrat: Math.round(sk[s0]) })).sort((a, b) => b.obrat - a.obrat);
+    const zakN = Object.keys(zk).length, opak = Object.values(zk).filter(z => z.zak >= 2).length;
+    let poh = null; try { const P = pohledavkyPrehled(35); if (P && P.ok) { const u = (P.utvary || []).find(x => /e\s*-?\s*shop/i.test(x.utvar)); const fa = (P.faktury || []).filter(x => /e\s*-?\s*shop/i.test(x.utvar || '')); poh = { saldo: u ? u.saldo : 0, n: u ? u.n : 0, maxDni: fa.reduce((m, x) => Math.max(m, x.dni || 0), 0), den: P.den }; } } catch (_) {}
+    let oversold = null; try { oversold = onlyActive(withRucne(o.rows || [])).filter(x => ((x.avail || 0) + (x.onOrder || 0)) < 0 && !specOf(x.sk, x.skupina, x.sk + '-' + x.reg)).length; } catch (_) {}
+    const top = Object.values(sk).sort((a, b) => b - a), tot = top.reduce((a, b) => a + b, 0);
+    return { rok: Y, obratKc: Math.round(kc), zakazek: zak, b2bPodil: kc ? b2b / kc : null, marze: naklKc > 0 ? (naklKc - nakl) / naklKc : null, marzeKc: Math.round(naklKc - nakl), marzePokryti: kc ? naklKc / kc : 0,
+      kvartaly: q.map(Math.round), posledniDen: posl, dnuSDaty: dny.filter(d => d.slice(0, 4) === Y).length, zakazniku: zakN, opakovanych: opak, opakovaniPodil: zakN ? opak / zakN : null,
+      noviDodavatele: novi, dodavateluCelkem: Object.keys(sk).length, top3Podil: tot ? top.slice(0, 3).reduce((a, b) => a + b, 0) / tot : null, pohledavky: poh, oversoldNekryte: oversold, dataOd: prvniRok, erpDen: o.date || null };
+  }
+  // plnění 0–1,5: pod prahem 0; práh→cíl 0,5–1; cíl→stretch 1–1,5
+  const kpiPlneni = (v, c) => { if (v == null || !c) return null; if (v < c.prah) return 0; if (c.cil === c.prah) return v >= c.stretch ? 1.5 : 1; if (v < c.cil) return 0.5 + 0.5 * (v - c.prah) / (c.cil - c.prah); if (c.stretch === c.cil) return 1; if (v < c.stretch) return 1 + 0.5 * (v - c.cil) / (c.stretch - c.cil); return 1.5; };
+  function kpiHodnoceni(rok) {
+    const d = loadKpi(), Y = String(rok), a = kpiAuto(Y), c = d.cile[Y] || d.cile['2027'], r = d.rucni[Y] || {};
+    const hodn = {
+      obrat: { v: a.obratKc / 1e6, c: c.obrat, zdroj: 'auto', pozn: a.zakazek + ' zakázek, data do ' + (a.posledniDen || '—') },
+      marze: { v: a.marze, c: c.marze, zdroj: 'auto', pozn: a.marze == null ? 'bez spárovaných položek' : 'spárováno ' + Math.round(a.marzePokryti * 100) + ' % obratu' },
+      zahranici: { v: r.zahraniciKc != null ? r.zahraniciKc / 1e6 : null, c: c.zahranici, zdroj: 'ručně', pozn: 'země dodání v exportu zatím není' },
+      dodavatele: { v: r.dodavatele != null ? r.dodavatele : (Y > a.dataOd ? a.noviDodavatele.length : null), c: c.dodavatele, zdroj: r.dodavatele != null ? 'ručně' : 'auto', pozn: Y > a.dataOd ? a.noviDodavatele.length + ' řad poprvé ve výdejkách s obratem ≥ 100 tis.' : 'první rok dat — noví dodavatelé se poznají až od ' + (+a.dataOd + 1) },
+      smlouvy: { v: r.smlouvy != null ? r.smlouvy : null, c: c.smlouvy, zdroj: 'ručně', pozn: '' },
+      opakovani: { v: a.opakovaniPodil, c: c.opakovani, zdroj: 'auto', pozn: a.opakovanych + ' z ' + a.zakazniku + ' zákazníků' },
+    };
+    const pp = a.pohledavky, prov = [
+      { k: 'pohledavky', nazev: 'Pohledávky útvaru E-shop po splatnosti ≤ 100 tis. Kč, žádná přes 60 dní', ok: pp ? (pp.saldo <= 100000 && pp.maxDni <= 60) : null, stav: pp ? Math.round(pp.saldo).toLocaleString('cs-CZ') + ' Kč · ' + pp.n + ' fa · nejstarší ' + pp.maxDni + ' d (k ' + pp.den + ')' : 'bez dat', zdroj: 'auto' },
+      { k: 'reakce', nazev: 'Reakce na přiřazenou poptávku: medián ≤ 1 pracovní den', ok: r.reakceDni != null ? r.reakceDni <= 1 : null, stav: r.reakceDni != null ? r.reakceDni + ' d' : 'nezadáno', zdroj: 'ručně' },
+      { k: 'oversold', nazev: 'Nekryté rezervace (oversold bez objednávky) ≤ 10 položek', ok: a.oversoldNekryte != null ? a.oversoldNekryte <= 10 : null, stav: a.oversoldNekryte != null ? a.oversoldNekryte + ' položek (ERP ' + (a.erpDen || '') + ')' : 'bez dat', zdroj: 'auto' },
+      { k: 'nps', nazev: 'Spokojenost: NPS ≥ 50', ok: r.nps != null ? r.nps >= 50 : null, stav: r.nps != null ? 'NPS ' + r.nps : 'nezadáno', zdroj: 'ručně' }];
+    hodn.provoz = { v: prov.filter(x => x.ok).length, c: c.provoz, zdroj: 'mix', pozn: prov.filter(x => x.ok === null).length + ' nezadáno', polozky: prov };
+    let vaz = 0, vahSum = 0; Object.keys(hodn).forEach(k => { const h = hodn[k]; h.plneni = kpiPlneni(h.v, h.c); h.vaha = d.vahy[k] || 0; if (h.plneni != null) { vaz += h.plneni * h.vaha; vahSum += h.vaha; } });
+    const marzePod = hodn.marze.v != null && hodn.marze.v < c.marze.prah;
+    const cilova = d.mzda.zaklad * d.mzda.variabilni, var_ = Math.round(cilova * vaz * (marzePod ? 0.5 : 1));
+    const plan = d.plan.map(p => Math.round(c.obrat.cil * p * 1e6)); let kum = 0; const kvart = a.kvartaly.map((v, i) => { kum += v; return { q: 'Q' + (i + 1), skut: v, kum, plan: plan[i], podil: plan[i] ? kum / plan[i] : null }; });
+    return { ok: true, rok: Y, auto: a, cile: c, vahy: d.vahy, mzda: d.mzda, rucni: r, hodnoceni: hodn, vazene: vaz, vahyPouzite: vahSum, marzePod, odmena: { cilova: Math.round(cilova), variabilni: var_, celkem: d.mzda.zaklad + var_ }, kvartaly: kvart, roky: [...new Set([String(a.dataOd), '2027', Y])].sort() };
+  }
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true), p = u.pathname;
     if (p === '/pohledavky/vyzva') {
@@ -1817,7 +1871,15 @@ function mount(host) {
       return json(res, 200, { ok: true }), true;
     }
     // ---- Návštěvy SMI appky: kdo ji otevřel, které záložky používá, co v ní udělal (klient posílá beacon) ----
-    if (p === '/api/nakup-report/ja' && req.method === 'GET') { const se = host.empSession && host.empSession(req); return json(res, 200, { email: ((se && se.email) || '').toLowerCase(), jmeno: (se && se.jmeno) || '', admin: !!host.isAdmin(req) }), true; }
+    if (p === '/api/nakup-report/ja' && req.method === 'GET') { const se = host.empSession && host.empSession(req); return json(res, 200, { email: ((se && se.email) || '').toLowerCase(), jmeno: (se && se.jmeno) || '', admin: !!host.isAdmin(req), kpi: kpiSmi(req) }), true; }
+    if (p === '/api/nakup-report/kpi' && req.method === 'GET') { if (!kpiSmi(req)) return json(res, 403, { error: 'KPI vidí jen vyjmenované osoby.' }), true; const rok = String((u.query && u.query.rok) || '2027').replace(/\D/g, '').slice(0, 4) || '2027'; try { return json(res, 200, kpiHodnoceni(rok)), true; } catch (e) { return json(res, 500, { error: e.message }), true; } }
+    if (p === '/api/nakup-report/kpi' && req.method === 'POST') { if (!kpiSmi(req)) return json(res, 403, { error: 'KPI mění jen vyjmenované osoby.' }), true; let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {} const d = loadKpi(); const rok = String(b.rok || '2027').replace(/\D/g, '').slice(0, 4) || '2027';
+      const num = v => (v === '' || v == null || isNaN(Number(v))) ? null : Number(v);
+      if (b.cile && typeof b.cile === 'object') { d.cile[rok] = d.cile[rok] || JSON.parse(JSON.stringify(KPI_DEF.cile['2027'])); Object.keys(KPI_DEF.cile['2027']).forEach(k => { const c = b.cile[k]; if (c && typeof c === 'object') ['prah', 'cil', 'stretch'].forEach(f => { const v = num(c[f]); if (v != null) d.cile[rok][k][f] = v; }); }); }
+      if (b.vahy && typeof b.vahy === 'object') Object.keys(KPI_DEF.vahy).forEach(k => { const v = num(b.vahy[k]); if (v != null && v >= 0 && v <= 1) d.vahy[k] = v; });
+      if (b.mzda && typeof b.mzda === 'object') { const z = num(b.mzda.zaklad), v = num(b.mzda.variabilni); if (z != null && z > 0) d.mzda.zaklad = z; if (v != null && v >= 0 && v <= 1) d.mzda.variabilni = v; }
+      if (b.rucni && typeof b.rucni === 'object') { const r = d.rucni[rok] || {}; ['zahraniciKc', 'dodavatele', 'smlouvy', 'reakceDni', 'nps'].forEach(k => { if (k in b.rucni) { const v = num(b.rucni[k]); if (v == null) delete r[k]; else r[k] = v; } }); if ('pozn' in b.rucni) r.pozn = String(b.rucni.pozn || '').slice(0, 2000); d.rucni[rok] = r; }
+      saveKpi(d); return json(res, 200, kpiHodnoceni(rok)), true; }
     if (p === '/api/nakup-report/aktivita' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {} try { aktZapis(req, b); } catch (_) {} return json(res, 200, { ok: true }), true; }
     if (p === '/api/nakup-report/aktivita' && req.method === 'GET') { if (!host.isAdmin(req)) return json(res, 403, { error: 'Jen správce.' }), true; return json(res, 200, aktPrehled()), true; }
     if (p === '/api/nakup-report/eskalace' && req.method === 'GET') {
