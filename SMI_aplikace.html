@@ -2905,7 +2905,12 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
     if((inPeak || distStart<=Lm+coverM) && reachEnd>windowM){ windowM=reachEnd; ramp=true; rampTo=sea.peak; }
   }
   const sd=months=>{let s=0;for(let k=0;k<Math.ceil(months);k++){const fr=Math.min(1,months-k);s+=(dem?(dem[(m0+k)%12]||0):0)*fr;}return s;};
-  const windowDem=sd(windowM), leadDem=sd(Lm);
+  let windowDem=sd(windowM), leadDem=sd(Lm), demZ='';
+  // Rezervace nad sklad = zákazníci kupují TEĎ, ať sezónní křivka pro příští měsíce říká cokoli (pytle 700×1100:
+  // 361 ks/rok, pro XI–XII profil dával 2 ks → „objednat 32" při 30 ks v rezervacích). Okno se pak počítá aspoň
+  // z ročního průměru, aby „pokrytí 2 měsíce" znamenalo 2 měsíce běžného prodeje.
+  const flatM=D/12;
+  if((x.avail||0)<0 && flatM*windowM>windowDem){ windowDem=flatM*windowM; leadDem=Math.max(leadDem,flatM*Lm); demZ='průměr'; }
   const rop=Math.round(leadDem+P.Z*Math.sqrt(Math.max(0,leadDem)));
   const position=(x.avail||0)+(x.onOrder||0);
   let rec=0,status='OK';
@@ -2954,7 +2959,7 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
     } else if(mUntil>3&&rec>0){ status+=' · zdražení od '+supCfg.zdrazeniOd; }
   }
   const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,dem,m0);
-  return {D,rec,status,ramp,nova,fwd,value:unitC*rec,windowDem:Math.round(windowDem),coverAfter:coverAfter,
+  return {D,rec,status,ramp,nova,fwd,value:unitC*rec,windowDem:Math.round(windowDem),demZ,coverAfter:coverAfter,
     utichla,vyrazeno,dec:dec||null,silentM,utichlaKs,utichlaVal:unitC*utichlaKs,
     lastSale:(utichla||vyrazeno)?objLastSale(sales):'',
     pattern:(utichla||vyrazeno)?objSalesPattern(sales):null};
@@ -3000,7 +3005,7 @@ function objAskCard(x){
   const col=rec>0?(crit?'#b3261e':'#b06f00'):'#2f7d32';
   const big=rec>0?('Koupit '+fmt(rec)+' ks'):(crit?'Řešit — oversold':(over?'Čeká dodání — neobjednávat':'Neobjednávat'));
   let why;
-  if(over) why='Rezervace zákazníků ('+fmt(x.reserved)+' ks) přesahují sklad ('+fmt(x.stock)+' ks). '+(rec>0?('Objednávka pokrývá schodek '+(x.onOrder>0?('(z toho už objednáno '+fmt(x.onOrder)+' ks) '):'')+'a doplní zásobu na dodací lhůtu + 2 měsíce.'):('Schodek už kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba.'));
+  if(over) why=(o.demZ==='průměr'?'Poptávka pro objednávku počítána z ročního průměru ('+fmt(Math.round(o.D/12))+' ks/měs), ne ze sezónního profilu — rezervace dokazují, že se prodává teď. ':'')+'Rezervace zákazníků ('+fmt(x.reserved)+' ks) přesahují sklad ('+fmt(x.stock)+' ks). '+(rec>0?('Objednávka pokrývá schodek '+(x.onOrder>0?('(z toho už objednáno '+fmt(x.onOrder)+' ks) '):'')+'a doplní zásobu na dodací lhůtu + 2 měsíce.'):('Schodek už kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba.'));
   else if(/Náběh/.test(st)) why='Náběh sezóny '+(s?s.peak:'')+' — předzásobení na nadcházející špičku s předstihem o dodací lhůtu.';
   else if(/Objednat/.test(st)) why='Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) klesla pod bod objednání. Doplnění na cílovou zásobu za dodací lhůtu + 2 měsíce (~'+fmt(o.windowDem)+' ks).';
   else if(/Mimo sezónu/.test(st)) why='Teď se prakticky neprodává — objednávej až před sezónou, ne s ročním předstihem.';

@@ -1181,7 +1181,9 @@ function mount(host) {
       if ((inPeak || distStart <= Lm + coverM) && reachEnd > windowM) { windowM = reachEnd; ramp = true; rampTo = sea.peak; }
     }
     const sd = months => { let s = 0; for (let k = 0; k < Math.ceil(months); k++) { const fr = Math.min(1, months - k); s += (dem ? (dem[(m0 + k) % 12] || 0) : 0) * fr; } return s; };
-    const windowDem = sd(windowM), leadDem = sd(Lm), Z = P.Z || 1.65;
+    let windowDem = sd(windowM), leadDem = sd(Lm); const Z = P.Z || 1.65;
+    // rezervace nad sklad = prodává se teď → okno aspoň z ročního průměru (stejně jako v appce)
+    if ((x.avail || 0) < 0 && D > 0) { const flatM = D / 12; if (flatM * windowM > windowDem) { windowDem = flatM * windowM; leadDem = Math.max(leadDem, flatM * Lm); } }
     const rop = Math.round(leadDem + Z * Math.sqrt(Math.max(0, leadDem)));
     const position = (x.avail || 0) + (x.onOrder || 0);
     let rec = 0, status = 'OK';
