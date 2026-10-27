@@ -43,6 +43,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .tabs{display:flex;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:5px;flex-wrap:wrap}
 .tabs button{border:0;background:transparent;padding:8px 15px;border-radius:8px;font-weight:600;font-size:13.5px;color:var(--ink-soft)}
 .tabs button.on{background:var(--green-soft);color:var(--green-d)}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden;margin-right:8px;vertical-align:middle}.seg button{border:0;background:var(--paper);padding:7px 12px;font-weight:600;font-size:12.5px;color:var(--ink-soft);white-space:nowrap}.seg button.on{background:var(--green-soft);color:var(--green-d)}
 .tabs button b{font-family:var(--mono);font-weight:500;font-size:11.5px;margin-left:4px;color:var(--faint)}
 .stat{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
 .stat .s{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:11px 16px;min-width:130px;cursor:pointer}
@@ -212,6 +213,15 @@ const cis=n=>(n==null||n==="")?"—":Number(n).toLocaleString("cs-CZ");
 const dat=s=>s?new Date(String(s).slice(0,10)+"T00:00:00").toLocaleDateString("cs-CZ"):"—";
 const kw=(o)=>o.kwDodani?("KW "+o.kwDodani+(o.kwRok?"/"+String(o.kwRok).slice(2):"")):(o.terminDodani?dat(o.terminDodani):"—");
 let D=null, ZALOZKA="prehled", FILTR={q:"",stav:"",zak:"",jen:""}, VYBER=new Set();
+/* kategorie výrobků: výchozí jen popelnice (boxy + víka); muldy, abrolly a ostatní za přepínačem */
+let KAT="popelnice"; try{ KAT=localStorage.getItem("vyroba.kat")||"popelnice"; }catch(_){}
+function vKat(p){ return KAT==="vse"||(KAT==="popelnice"?p.kategorie==="popelnice":p.kategorie!=="popelnice"); }
+function objVKat(o){ return KAT==="vse"||(o.polozky||[]).some(vKat)||(!o.polozky||!o.polozky.length); }
+function prepniKat(k){ KAT=k; try{localStorage.setItem("vyroba.kat",k);}catch(_){} VYBER.clear(); vykresli(); }
+function segKat(){ const n=k=>vsechnyPolozkyVse().filter(p=>k==="vse"||(k==="popelnice"?p.kategorie==="popelnice":p.kategorie!=="popelnice")).length; return '<span class="seg">'+[["popelnice","Popelnice"],["ostatni","Muldy, abrolly, ostatní"],["vse","Vše"]].map(([k,t])=>'<button class="'+(KAT===k?"on":"")+'" onclick="prepniKat(\''+k+'\')">'+t+' <b class="mut" style="font-weight:500">'+n(k)+'</b></button>').join("")+'</span>'; }
+/* řazení: nahoře nejnovější zadání */
+const kZadani=p=>String(p.zadanoDne||(p._o&&p._o.datum)||"")+"|"+String(p.cvz||"").replace(/\d+/g,m=>m.padStart(6,"0"));
+function nejnovejsiPrvni(a,b){ return kZadani(b).localeCompare(kZadani(a)); }
 
 function toast(t){const e=$("#toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2800);}
 function zavri(){$("#modal").classList.remove("on");$("#mBox").classList.remove("wide");}
@@ -243,18 +253,19 @@ function ralHtml(p){
   const m=String(p.ral||"").match(/(\d{4})/); const hex=m&&D.ralHex[m[1]];
   return (hex?'<span class="ral" style="background:'+hex+'"></span>':'')+esc(p.ral||(p.povrch==="zaklad"?"základ":"—"))+(p.lem?' <span class="mut">lem '+esc(p.lem)+'</span>':'');
 }
-function vsechnyPolozky(){ const out=[]; (D.objednavky||[]).forEach(o=>o.polozky.forEach(p=>out.push(Object.assign({_o:o},p)))); return out; }
+function vsechnyPolozkyVse(){ const out=[]; (D.objednavky||[]).forEach(o=>o.polozky.forEach(p=>out.push(Object.assign({_o:o},p)))); return out; }
+function vsechnyPolozky(){ return vsechnyPolozkyVse().filter(vKat); }
 function obj(id){return (D.objednavky||[]).find(o=>o.id===id);}
 
 /* ---------- záhlaví ---------- */
 function vykresliZalozky(){
   const pol=vsechnyPolozky(); const n=k=>pol.filter(p=>p.stav===k).length;
   const veVyrobe=pol.filter(p=>["zadano","svarovna","lakovna","zinkovna"].includes(p.stav)).length;
-  const z=[["prehled","Přehled"],["objednavky","Objednávky","<b>"+(D.objednavky||[]).length+"</b>"],["vyroba","Výroba","<b>"+veVyrobe+"</b>"],["expedice","Ložné plány a expedice","<b>"+(n("hotovo")+n("naplanovano"))+"</b>"],["katalog","Katalog"],["zakaznici","Zákazníci"]];
+  const z=[["prehled","Přehled"],["objednavky","Objednávky","<b>"+(D.objednavky||[]).filter(objVKat).length+"</b>"],["vyroba","Výroba","<b>"+veVyrobe+"</b>"],["expedice","Ložné plány a expedice","<b>"+(n("hotovo")+n("naplanovano"))+"</b>"],["katalog","Katalog"],["zakaznici","Zákazníci"]];
   if(D.me.obchod)z.push(["nastaveni","Nastavení a import"]);
   $("#zalozky").innerHTML=z.map(([k,t,b])=>'<button class="'+(ZALOZKA===k?"on":"")+'" onclick="prepni(\''+k+'\')">'+t+(b||"")+'</button>').join("");
   $("#sub").textContent=(D.me.obchod?"obchod · ":"dílna · ")+(D.me.name||D.me.email)+" · dnes "+dat(D.dnes);
-  $("#topAkce").innerHTML=(D.me.obchod?'<button class="btn pri" onclick="formObjednavka()">＋ Nová objednávka</button> ':'')+'<a class="btn" href="/api/vyroba/export">⬇ CSV</a>';
+  $("#topAkce").innerHTML=segKat()+(D.me.obchod?'<button class="btn pri" onclick="formObjednavka()">＋ Nová objednávka</button> ':'')+'<a class="btn" href="/api/vyroba/export">⬇ CSV</a>';
 }
 function prepni(k){ZALOZKA=k;VYBER.clear();vykresli();}
 function vykresli(){
@@ -313,7 +324,7 @@ function filtrPol(){
     if(FILTR.jen==="vyroba"&&!["zadano","svarovna"].includes(p.stav))return false;
     if(q){const s=[p.cvz,p.kod,p.razeni,p.ral,p._o.cislo,p._o.helios,p._o.zakaznik,p._o.prijemce,p.kamion].join(" ").toLowerCase(); if(!s.includes(q))return false;}
     return true;
-  }).sort((a,b)=>String(a.terminVyroby||"9").localeCompare(String(b.terminVyroby||"9"))||String(a.cvz||"").localeCompare(String(b.cvz||"")));
+  }).sort(nejnovejsiPrvni);
 }
 function tabPolozky(){
   const rows=filtrPol();
@@ -331,9 +342,9 @@ function vykresPill(p){const s=p.vykres&&p.vykres.stav||"neni"; if(s==="neni")re
 /* ---------- objednávky ---------- */
 function objStavPill(o){return stavPill({stav:o.stav,skluzDni:o.skluzDni,ks:o.ks});}
 function htmlObjednavky(){
-  const os=(D.objednavky||[]);
+  const os=(D.objednavky||[]).filter(objVKat);
   if(!os.length)return '<div class="card"><div class="empty">Zatím žádné objednávky.'+(D.me.obchod?' Založte první tlačítkem „Nová objednávka" nebo naimportujte stávající plán výroby v záložce Nastavení a import.':'')+'</div></div>';
-  return '<div class="card"><div class="h"><h2>Objednávky</h2><span class="mut">'+os.length+' · řazeno podle data</span></div><div class="tw"><table><thead><tr><th>Objednávka</th><th>Helios</th><th>Datum</th><th>Zákazník</th><th>Příjemce</th><th>Dodání</th><th class="r">Položek</th><th class="r">Ks</th><th class="r">Kg</th><th>Potvrzena</th><th>Ložný plán</th><th>Stav</th></tr></thead><tbody>'
+  return '<div class="card"><div class="h"><h2>Objednávky</h2><span class="mut">'+os.length+' · nejnovější nahoře</span></div><div class="tw"><table><thead><tr><th>Objednávka</th><th>Helios</th><th>Datum</th><th>Zákazník</th><th>Příjemce</th><th>Dodání</th><th class="r">Položek</th><th class="r">Ks</th><th class="r">Kg</th><th>Potvrzena</th><th>Ložný plán</th><th>Stav</th></tr></thead><tbody>'
     +os.map(o=>'<tr class="klik" onclick="detail(\''+o.id+'\')"><td class="num"><b>'+esc(o.cislo||"—")+'</b>'+(o.cisloAU?'<div class="mut">'+esc(o.cisloAU)+'</div>':'')+'</td><td class="num">'+esc(o.helios||"—")+'</td><td class="num">'+dat(o.datum)+'</td><td>'+esc(o.zakaznik)+'</td><td class="mut">'+esc(o.prijemce&&o.prijemce!==o.zakaznik?o.prijemce:"")+'</td><td class="num">'+kw(o)+'</td>'
       +'<td class="num r">'+o.polozky.length+'</td><td class="num r">'+cis(o.ks)+'</td><td class="num r">'+(o.kg?cis(o.kg):"—")+'</td><td>'+(o.potvrzena?'<span class="pill ok">'+dat(o.potvrzenaDatum)+'</span>':'<span class="pill mute">ne</span>')+'</td>'
       +'<td>'+(o.loznyplan?'<span class="pill viol">odesláno '+dat(o.loznyplan.sentAt)+'</span>':'<span class="mut">—</span>')+'</td><td>'+objStavPill(o)+'</td></tr>').join("")+'</tbody></table></div></div>';
@@ -605,7 +616,7 @@ async function planCell(el){ const t=el.textContent.trim(); const d=el.dataset.d
 function pracovniciEdit(){ const cur=(D.planSkladani.pracovnici||[]).join("\n"); modal2("Pracovníci (sloupce plánu)",'<label class="f"><span>Jeden pracovník na řádek — celé jméno</span><textarea id="prList" style="min-height:180px">'+esc(cur)+'</textarea></label><div class="mut">Odebrání pracovníka ze seznamu jeho buňky nesmaže, jen ho skryje.</div>','<button class="btn pri" onclick="ulozPracovniky()">Uložit</button><button class="btn" onclick="zavri2()">Zrušit</button>'); }
 async function ulozPracovniky(){ const list=$("#prList").value.split(/\n/).map(x=>x.trim()).filter(Boolean); try{ await api("/api/vyroba/plan-skladani",{pracovnici:list}); zavri2(); toast("Uloženo."); nacti(); }catch(e){alert(e.message);} }
 function htmlFronta(){
-  const pol=vsechnyPolozky().filter(p=>!p.mimoBruntal&&["zadano","svarovna","lakovna","zinkovna","hotovo","pozastaveno"].includes(p.stav)).sort((a,b)=>String(a.terminVyroby||"9").localeCompare(String(b.terminVyroby||"9")));
+  const pol=vsechnyPolozky().filter(p=>!p.mimoBruntal&&["zadano","svarovna","lakovna","zinkovna","hotovo","pozastaveno"].includes(p.stav)).sort(nejnovejsiPrvni);
   // pořadí operací v dílně: svařovna → zinkovna (externí) → lakovna → hotovo → kamion; další krok si každá položka nese podle provedení (Zin / Lac)
   const sloupce=[["zadano","Zadáno do výroby"],["svarovna","Svařovna"],["zinkovna","Zinkovna"],["lakovna","Lakovna"],["hotovo","Hotovo na skladě"]];
   const KROK={svarovna:"→ Svařovna",zinkovna:"→ Zinkovna",lakovna:"→ Lakovna",hotovo:"→ Hotovo",naplanovano:"→ Na kamion"};
@@ -630,7 +641,7 @@ async function rychle(pid,stav){
 
 /* ---------- ložné plány a expedice ---------- */
 function htmlExpedice(){
-  const os=(D.objednavky||[]).map(o=>Object.assign({},o,{hot:o.polozky.filter(p=>["hotovo","naplanovano"].includes(p.stav))})).filter(o=>o.hot.length);
+  const os=(D.objednavky||[]).map(o=>Object.assign({},o,{hot:o.polozky.filter(p=>vKat(p)&&["hotovo","naplanovano"].includes(p.stav))})).filter(o=>o.hot.length);
   let h='<div class="card"><div class="h"><h2>Hotové položky k naložení</h2><span class="mut">po objednávkách · odeslání vloží položky do sdíleného úložiště aplikace Ložný plán (stejné typy beden, ks, RAL, adresa příjemce)</span><div class="sp"></div><a class="btn sm" href="/loznyplan-app" target="_blank">Otevřít Ložný plán ↗</a></div>';
   if(!os.length)h+='<div class="empty">Žádné hotové položky.</div>';
   else h+='<div class="tw"><table><thead><tr><th>Objednávka</th><th>Příjemce</th><th>Položky</th><th class="r">Ks</th><th class="r">Kg</th><th>Dodání</th><th>Ložný plán</th><th></th></tr></thead><tbody>'

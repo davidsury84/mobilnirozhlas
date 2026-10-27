@@ -370,6 +370,14 @@ function mount(host) {
     const dni = Math.floor((new Date(dnes + 'T00:00:00Z') - new Date(p.terminVyroby + 'T00:00:00Z')) / DEN);
     return dni > 0 ? dni : 0;
   }
+  // kategorie výrobku: popelnice (boxy CP/CPR/HES + jejich víka a příslušenství) · mulda · abroll · ostatni
+  function kategorieProduktu(p) {
+    const k = String(p.kod || '').trim(); const t = (k + ' ' + String(p.nazev || '')).toLowerCase();
+    if (/^(cp|hes|sb\s?\d)/i.test(k) || /víko (na bednu|k boxu)|plastov[eé] víko|ližina na bedny|náhradní díly na bedny|metallbox|metalbox/.test(t)) return 'popelnice';
+    if (/^(abr|alst|dsd|acts|abrol|abr din)/i.test(k)) return 'abroll';
+    if (/^(dmc|smr|flm|am-|asm|smc|wfm|wgm|s\s?\d|kl\s?\d)/i.test(k) || /mulde|mulda|muldu|schiffli/.test(t)) return 'mulda';
+    return 'ostatni';
+  }
   function obohatPolozku(d, p, dnes, nast) {
     const k = p.katalogId ? d.katalog.find(x => x.id === p.katalogId) : najdiKatalog(d, p.kod);
     // provedení mimo katalog (nebo v katalogu bez hmotnosti) → hmotnost/rozměr od sourozence stejné řady a objemu
@@ -380,7 +388,7 @@ function mount(host) {
     return Object.assign({}, p, {
       kgKs: kg, kgCelkem: kg != null ? Math.round(kg * num(p.ks)) : null, kgOdvozene: kg != null && p.kgKs == null && !(k && k.kg != null),
       rozmer: p.rozmer || (k ? k.rozmer : (od ? od.rozmer : '')), objem: p.objem != null ? p.objem : (k ? k.objem : (od ? od.objem : null)),
-      skluzDni: skluz(p, dnes), dnuVeStavu, dalsiKrok: dalsiKrok(p),
+      skluzDni: skluz(p, dnes), dnuVeStavu, dalsiKrok: dalsiKrok(p), kategorie: kategorieProduktu(p),
       cekaBezKamionu: p.stav === 'hotovo' && dnuVeStavu != null && dnuVeStavu >= nast.upozorneniDny,
     });
   }
@@ -390,7 +398,7 @@ function mount(host) {
     const pr = d.zakaznici.find(x => x.id === o.prijemceId) || z;
     return Object.assign({}, o, {
       polozky: pol,
-      stav: stavObjednavky(pol),
+      stav: stavObjednavky(pol), kategorie: [...new Set(pol.map(x => x.kategorie))],
       zakaznik: z ? z.nazev : (o.zakaznikNazev || ''),
       prijemce: pr ? pr.nazev : (o.prijemceNazev || ''),
       prijemceAdresa: pr ? adresa(pr) : (o.prijemceAdresa || ''),
