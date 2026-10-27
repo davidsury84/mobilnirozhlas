@@ -1335,8 +1335,10 @@ function mount(host) {
     if (!pol.length) { json(res, 400, { chyba: 'Objednávka nemá žádné hotové položky. Zaškrtněte „včetně nehotových", pokud chcete plánovat dopředu.' }); return true; }
     const shared = await httpJson('GET', loznyplanUrl('/api/shared'));
     shared.boxTypes = shared.boxTypes || []; shared.orders = shared.orders || [];
+    // Striktně oddělená čísla: orderNo = BESTELLUNG (obj. zákazníka), heliosNo = číslo z Heliosu
     const orderNo = o.cislo || o.helios || ob.zakaznik;
-    const ex = shared.orders.find(x => String(x.orderNo || '') === orderNo && orderNo);
+    const heliosNo = o.helios || '';
+    const ex = shared.orders.find(x => orderNo && (String(x.orderNo || '') === orderNo || (heliosNo && String(x.heliosNo || '') === heliosNo)));
     const boxes = {}, rals = {}, serials = {}; let nove = 0, bezRozmeru = [];
     pol.forEach(p => {
       const k = p.katalogId ? d.katalog.find(x => x.id === p.katalogId) : najdiKatalog(d, p.kod);
@@ -1353,7 +1355,7 @@ function mount(host) {
     const maxOid = Math.max(1000, ...shared.orders.flatMap(x => [+x.id || 0].concat((x.addresses || []).map(a => +a.id || 0))));
     const addr = { id: (ex && ex.addresses && ex.addresses[0] && ex.addresses[0].id) || maxOid + 1, address: ob.prijemceAdresa || ob.prijemce, boxes, serials, rals };
     const order = Object.assign(ex || { id: maxOid + 2, color: PALETA[shared.orders.length % PALETA.length], includeInCalc: true, priority: 0 }, {
-      orderNo, customer: ob.prijemce || ob.zakaznik, name: [orderNo, ob.prijemce || ob.zakaznik].filter(Boolean).join(' · '),
+      orderNo, heliosNo, customer: ob.prijemce || ob.zakaznik, name: [orderNo, ob.prijemce || ob.zakaznik].filter(Boolean).join(' · '),
       addresses: [addr], intranetId: o.id, intranetAt: new Date().toISOString(),
     });
     if (!ex) shared.orders.push(order);
