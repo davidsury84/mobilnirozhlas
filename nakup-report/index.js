@@ -1708,6 +1708,30 @@ function mount(host) {
   // každý s přístupem do E-shopu, Obchodu, zahraničního obchodu (obchodexp) nebo Dopravy (pokyn 2026-09-23).
   const hasPohledavky = req => { if (host.isAdmin(req)) return true; try { const e = host.empSession && host.empSession(req); const m = (e && host.employeeModules && host.employeeModules(e.email)) || []; return ['pohledavky', 'eshop', 'obchod', 'obchodexp', 'doprava'].some(k => m.indexOf(k) >= 0); } catch (_) { return false; } };
   const POH_HTML = path.join(__dirname, 'pohledavky.html');
+  // ---- Log návštěv a akcí v SMI appce ----
+  // Záznam = {ts, email, jmeno, typ: otevreni|zalozka|akce|export, co, detail}; kruhový buffer 5 000 záznamů,
+  // stejný záznam od téhož člověka do minuty se neduplikuje. Přehled jen pro správce (záložka 👣 Návštěvy v SMI).
+  const AKT_F = path.join(host.dataDir || __dirname, 'smi-aktivita.json');
+  const loadAkt = () => { try { const d = JSON.parse(fs.readFileSync(AKT_F, 'utf8')); return (d && Array.isArray(d.zaznamy)) ? d : { zaznamy: [] }; } catch (_) { return { zaznamy: [] }; } };
+  function aktZapis(req, b) {
+    const se = host.empSession && host.empSession(req);
+    const z = { ts: Date.now(), email: String((se && se.email) || (host.isAdmin(req) ? 'správce (heslo)' : 'neznámý')).toLowerCase(), jmeno: String((se && se.jmeno) || '').slice(0, 80),
+      typ: String(b.typ || '').slice(0, 20), co: String(b.co || '').replace(/\s+/g, ' ').trim().slice(0, 120), detail: String(b.detail || '').replace(/\s+/g, ' ').trim().slice(0, 200) };
+    if (!z.typ || !z.co) return;
+    const d = loadAkt(); const last = d.zaznamy[d.zaznamy.length - 1];
+    if (last && last.email === z.email && last.typ === z.typ && last.co === z.co && last.detail === z.detail && z.ts - last.ts < 60000) return;
+    d.zaznamy.push(z); if (d.zaznamy.length > 5000) d.zaznamy = d.zaznamy.slice(-5000);
+    try { fs.writeFileSync(AKT_F, JSON.stringify(d)); } catch (_) {}
+  }
+  function aktPrehled() {
+    const d = loadAkt(), od = Date.now() - 30 * 864e5, by = {};
+    d.zaznamy.forEach(z => { const e = by[z.email] || (by[z.email] = { email: z.email, jmeno: z.jmeno, posledni: 0, dny: new Set(), zalozky: {}, akce: 0, exporty: 0, celkem: 0 });
+      if (z.jmeno) e.jmeno = z.jmeno; e.celkem++; if (z.ts > e.posledni) e.posledni = z.ts;
+      if (z.ts >= od) { e.dny.add(new Date(z.ts).toISOString().slice(0, 10)); if (z.typ === 'zalozka') e.zalozky[z.co] = (e.zalozky[z.co] || 0) + 1; if (z.typ === 'akce') e.akce++; if (z.typ === 'export') e.exporty++; } });
+    const lide = Object.values(by).map(e => ({ email: e.email, jmeno: e.jmeno, posledni: e.posledni, dnu30: e.dny.size, akce30: e.akce, exporty30: e.exporty, celkem: e.celkem,
+      zalozky: Object.entries(e.zalozky).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => k + ' (' + v + '×)') })).sort((a, b) => b.posledni - a.posledni);
+    return { ok: true, lide, zaznamy: d.zaznamy.slice(-400).reverse(), celkem: d.zaznamy.length, od: d.zaznamy.length ? d.zaznamy[0].ts : null };
+  }
   async function handle(req, res) {
     const u = urlLib.parse(req.url, true), p = u.pathname;
     if (p === '/pohledavky/vyzva') {
@@ -1792,6 +1816,10 @@ function mount(host) {
       saveAlt(alt);
       return json(res, 200, { ok: true }), true;
     }
+    // ---- Návštěvy SMI appky: kdo ji otevřel, které záložky používá, co v ní udělal (klient posílá beacon) ----
+    if (p === '/api/nakup-report/ja' && req.method === 'GET') { const se = host.empSession && host.empSession(req); return json(res, 200, { email: ((se && se.email) || '').toLowerCase(), jmeno: (se && se.jmeno) || '', admin: !!host.isAdmin(req) }), true; }
+    if (p === '/api/nakup-report/aktivita' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) {} try { aktZapis(req, b); } catch (_) {} return json(res, 200, { ok: true }), true; }
+    if (p === '/api/nakup-report/aktivita' && req.method === 'GET') { if (!host.isAdmin(req)) return json(res, 403, { error: 'Jen správce.' }), true; return json(res, 200, aktPrehled()), true; }
     if (p === '/api/nakup-report/eskalace' && req.method === 'GET') {
       if (!hasPohledavky(req)) { json(res, 403, { error: 'Bez přístupu.' }); return true; }
       const e = eskalacePrehled(), se = host.empSession && host.empSession(req), em = ((se && se.email) || '').toLowerCase();

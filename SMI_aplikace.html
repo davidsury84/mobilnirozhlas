@@ -293,6 +293,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       <div class="tab" data-pane="historie">📈 Historie &amp; vývoj položky</div>
       <span class="tabgrp">Model &amp; data</span><div class="tab" data-pane="model">📋 SMI model — vše <span class="badge" id="b_all">0</span></div>
       <div class="tab" data-pane="souhrn">📄 Souhrn</div>
+      <div class="tab" data-pane="navstevy" id="tabNavstevy" style="display:none" title="Kdo aplikaci otevírá, které záložky používá a co v ní udělal (jen správce)">👣 Návštěvy</div>
       <div class="tab" data-pane="param">📄 Parametry</div>
       <div class="tab" data-pane="elko">🖼 Obrázky z e-shopu</div>
       <div class="tab" data-pane="navod">📖 Návod</div>
@@ -455,6 +456,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       </div>
       <div class="tblwrap"><table id="modelTbl"></table></div>
     </div>
+    <div class="pane" id="pane-navstevy"><div id="navstevyBody" class="muted">Načítám…</div></div>
     <div class="pane" id="pane-souhrn">
       <div class="note">Náhled listu „Souhrn" — souhrnné KPI a tabulka kategorií (v Excelu doplněná o grafy).</div>
       <div id="souhrnBox"></div>
@@ -1570,7 +1572,28 @@ function utSkokZOdkazu(){
 }
 utSkokZOdkazu();
 window.addEventListener('hashchange',utSkokZOdkazu);
-$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='model')ensureModelSup();if(pane==='vyvojeshop')renderVyvojEshop();if(pane==='historie'){renderHistory();refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='objednavky')renderObjednavky();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
+// ---- Log návštěv: každé otevření appky, přepnutí záložky, POST akce a export se hlásí serveru (👣 Návštěvy, jen správce) ----
+function aktLog(typ,co,detail){try{fetch('/api/nakup-report/aktivita',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({typ,co,detail:detail||''})}).catch(()=>{});}catch(e){}}
+aktLog('otevreni','SMI aplikace',location.hash||'');
+$$('.tab').forEach(t=>t.addEventListener('click',()=>aktLog('zalozka',t.textContent.replace(/\s+/g,' ').trim().replace(/\s*\d+\s*$/,''))));
+(function(){const _f=window.fetch;window.fetch=function(u,o){try{if(o&&/^post$/i.test(o.method||'')&&typeof u==='string'&&u.indexOf('/api/')===0&&u.indexOf('/aktivita')<0&&u.indexOf('/historie')<0){let d='';try{const b=JSON.parse(o.body);d=b.akce||b.typ||b.rezim||(b.key?String(b.key):'')||'';}catch(e){}aktLog('akce',u.replace(/^\/api\//,'').split('?')[0],String(d).slice(0,120));}}catch(e){}return _f.apply(this,arguments);};
+  const _c=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){try{if(this.download)aktLog('export',String(this.download));}catch(e){}return _c.apply(this,arguments);};})();
+fetch('/api/nakup-report/ja',{cache:'no-store'}).then(r=>r.json()).then(j=>{if(j&&j.admin){const t=$('#tabNavstevy');if(t)t.style.display='';}}).catch(()=>{});
+async function loadNavstevy(){const el=$('#navstevyBody');if(!el)return;let d;try{d=await (await fetch('/api/nakup-report/aktivita',{cache:'no-store'})).json();}catch(e){el.innerHTML='Nepodařilo se načíst.';return;}
+  if(!d||!d.ok){el.innerHTML=esc((d&&d.error)||'Bez přístupu.');return;}
+  const kdy=ts=>ts?new Date(ts).toLocaleString('cs-CZ',{day:'numeric',month:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  const jm=z=>esc(z.jmeno||z.email);
+  const TYP={otevreni:'otevřel aplikaci',zalozka:'záložka',akce:'akce',export:'export'};
+  let h='<h2 style="margin:0 0 4px">👣 Návštěvy SMI aplikace <span class="muted" style="font-weight:400;font-size:13px">· '+fmt(d.celkem)+' záznamů'+(d.od?' od '+kdy(d.od):'')+'</span></h2>'
+    +'<p class="muted" style="margin:0 0 10px;font-size:12.5px">Každé otevření, přepnutí záložky, uložená změna (akce) a stažený soubor (export). Souhrn za posledních 30 dní.</p>'
+    +'<div class="tblwrap" style="max-height:380px"><table><thead><tr><th>Kdo</th><th>Poslední návštěva</th><th style="text-align:right" title="Počet dní za 30 dnů, kdy aplikaci otevřel">Dní (30 d)</th><th style="text-align:right">Akce (30 d)</th><th style="text-align:right">Exporty (30 d)</th><th>Nejčastější záložky (30 d)</th></tr></thead><tbody>'
+    +(d.lide||[]).map(l=>'<tr><td><b>'+jm(l)+'</b>'+(l.jmeno?'<br><span class="muted" style="font-size:11px">'+esc(l.email)+'</span>':'')+'</td><td>'+kdy(l.posledni)+'</td><td style="text-align:right">'+l.dnu30+'</td><td style="text-align:right">'+l.akce30+'</td><td style="text-align:right">'+l.exporty30+'</td><td class="muted">'+esc((l.zalozky||[]).join(', ')||'—')+'</td></tr>').join('')+'</tbody></table></div>'
+    +'<h3 style="margin:16px 0 6px">Poslední záznamy <input id="navF" placeholder="filtr: jméno / záložka / akce" style="margin-left:10px;font-size:12px;padding:3px 8px;width:260px"></h3>'
+    +'<div class="tblwrap" style="max-height:460px"><table id="navTbl"><thead><tr><th>Kdy</th><th>Kdo</th><th>Co</th><th>Detail</th></tr></thead><tbody></tbody></table></div>';
+  el.innerHTML=h;
+  const draw=()=>{const q=($('#navF').value||'').toLowerCase();$('#navTbl tbody').innerHTML=(d.zaznamy||[]).filter(z=>!q||(z.jmeno+' '+z.email+' '+z.co+' '+z.detail+' '+(TYP[z.typ]||z.typ)).toLowerCase().indexOf(q)>=0).map(z=>'<tr><td style="white-space:nowrap">'+kdy(z.ts)+'</td><td>'+jm(z)+'</td><td>'+(z.typ==='zalozka'?'📑 ':z.typ==='akce'?'✎ ':z.typ==='export'?'⬇ ':'🚪 ')+esc((TYP[z.typ]||z.typ)+(z.typ==='otevreni'?'':': '+z.co))+'</td><td class="muted">'+esc(z.detail||'')+'</td></tr>').join('');};
+  $('#navF').oninput=draw; draw();}
+$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');$$('.pane').forEach(p=>p.classList.remove('active'));$('#pane-'+t.dataset.pane).classList.add('active');const pane=t.dataset.pane;if(pane==='navstevy')loadNavstevy();const tid=PANE_TBL[pane];if(tid){const el=document.getElementById(tid);if(el)addColumnFilters(el);}if(pane==='model')ensureModelSup();if(pane==='vyvojeshop')renderVyvojEshop();if(pane==='historie'){renderHistory();refreshItemPicker();renderItem();}if(pane==='meva')renderMeva();if(pane==='elko')renderElko();if(pane==='objednavky')renderObjednavky();if(pane==='seg')renderSeg();if(pane==='pokryti')renderCoverage();if(pane==='eanalyza')renderEshopAnalyza();if(pane==='fulfillment')renderFulfillment();try{tableTools();}catch(e){}});
 const _bulkBtn=$('#bulkApply');if(_bulkBtn)_bulkBtn.onclick=bulkApply;
 
 /* ===== Požadavek nákupčímu — E-shop žádá o objednání N kusů (→ intranet /api/pozadavky) ===== */
