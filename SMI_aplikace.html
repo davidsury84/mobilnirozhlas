@@ -2911,6 +2911,9 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   // z ročního průměru, aby „pokrytí 2 měsíce" znamenalo 2 měsíce běžného prodeje.
   const flatM=D/12;
   if((x.avail||0)<0 && flatM*windowM>windowDem){ windowDem=flatM*windowM; leadDem=Math.max(leadDem,flatM*Lm); demZ='průměr'; }
+  // Denní pohyby ze skladu (aspoň 10 dnů) ukazují vyšší spotřebu než sezónní profil → okno z nich (pokyn 2026-10-27)
+  const denM=(x.recentDaily>0&&(x.moveDays||0)>=10)?x.recentDaily*30:0;
+  if(denM*windowM>windowDem){ windowDem=denM*windowM; leadDem=Math.max(leadDem,denM*Lm); demZ='denní pohyby'; }
   const rop=Math.round(leadDem+P.Z*Math.sqrt(Math.max(0,leadDem)));
   const position=(x.avail||0)+(x.onOrder||0);
   let rec=0,status='OK';
@@ -3005,9 +3008,9 @@ function objAskCard(x){
   const col=rec>0?(crit?'#b3261e':'#b06f00'):'#2f7d32';
   const big=rec>0?('Koupit '+fmt(rec)+' ks'):(crit?'Řešit — oversold':(over?'Čeká dodání — neobjednávat':'Neobjednávat'));
   let why;
-  if(over) why=(o.demZ==='průměr'?'Poptávka pro objednávku počítána z ročního průměru ('+fmt(Math.round(o.D/12))+' ks/měs), ne ze sezónního profilu — rezervace dokazují, že se prodává teď. ':'')+'Rezervace zákazníků ('+fmt(x.reserved)+' ks) přesahují sklad ('+fmt(x.stock)+' ks). '+(rec>0?('Objednávka pokrývá schodek '+(x.onOrder>0?('(z toho už objednáno '+fmt(x.onOrder)+' ks) '):'')+'a doplní zásobu na dodací lhůtu + 2 měsíce.'):('Schodek už kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba.'));
+  if(over) why=(o.demZ==='průměr'?'Poptávka pro objednávku počítána z ročního průměru ('+fmt(Math.round(o.D/12))+' ks/měs), ne ze sezónního profilu — rezervace dokazují, že se prodává teď. ':o.demZ==='denní pohyby'?'Poptávka pro objednávku počítána z denních pohybů ze skladu ('+fmt(Math.round(x.recentDaily*30))+' ks/měs za posledních '+fmt(x.moveDays)+' dnů) — vyšší než sezónní profil. ':'')+'Rezervace zákazníků ('+fmt(x.reserved)+' ks) přesahují sklad ('+fmt(x.stock)+' ks). '+(rec>0?('Objednávka pokrývá schodek '+(x.onOrder>0?('(z toho už objednáno '+fmt(x.onOrder)+' ks) '):'')+'a doplní zásobu na dodací lhůtu + 2 měsíce.'):('Schodek už kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba.'));
   else if(/Náběh/.test(st)) why='Náběh sezóny '+(s?s.peak:'')+' — předzásobení na nadcházející špičku s předstihem o dodací lhůtu.';
-  else if(/Objednat/.test(st)) why='Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) klesla pod bod objednání. Doplnění na cílovou zásobu za dodací lhůtu + 2 měsíce (~'+fmt(o.windowDem)+' ks).';
+  else if(/Objednat/.test(st)) why=(o.demZ==='denní pohyby'?'Poptávka počítána z denních pohybů ze skladu ('+fmt(Math.round(x.recentDaily*30))+' ks/měs za '+fmt(x.moveDays)+' dnů), které běží nad sezónním profilem. ':'')+'Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) klesla pod bod objednání. Doplnění na cílovou zásobu za dodací lhůtu + 2 měsíce (~'+fmt(o.windowDem)+' ks).';
   else if(/Mimo sezónu/.test(st)) why='Teď se prakticky neprodává — objednávej až před sezónou, ne s ročním předstihem.';
   else if(/Bez prodeje/.test(st)) why='Za poslední rok bez prodeje — neobjednávat.';
   else why='Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) pokrývá poptávku za dodací lhůtu + 2 měsíce. Objednávat teď netřeba.';

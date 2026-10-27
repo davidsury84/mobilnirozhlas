@@ -1184,6 +1184,9 @@ function mount(host) {
     let windowDem = sd(windowM), leadDem = sd(Lm); const Z = P.Z || 1.65;
     // rezervace nad sklad = prodává se teď → okno aspoň z ročního průměru (stejně jako v appce)
     if ((x.avail || 0) < 0 && D > 0) { const flatM = D / 12; if (flatM * windowM > windowDem) { windowDem = flatM * windowM; leadDem = Math.max(leadDem, flatM * Lm); } }
+    // denní pohyby ze skladu (≥ 10 dnů) nad sezónním profilem → okno z nich (stejně jako v appce)
+    const denM = (x.recentDaily > 0 && (x.moveDays || 0) >= 10) ? x.recentDaily * 30 : 0;
+    if (denM * windowM > windowDem) { windowDem = denM * windowM; leadDem = Math.max(leadDem, denM * Lm); }
     const rop = Math.round(leadDem + Z * Math.sqrt(Math.max(0, leadDem)));
     const position = (x.avail || 0) + (x.onOrder || 0);
     let rec = 0, status = 'OK';
@@ -1319,7 +1322,8 @@ function mount(host) {
     try { detectNew(obj.rows); } catch (_) {}   // NEJDRIV detekce novych, at se dostanou i do doporuceni
     const smap = {}; (sd.rows || []).forEach(r => { smap[r.sk + '-' + r.reg] = (r.sales || []).map(x => x || 0); });
     const P = { cover: cfg.cover || 2, Z: cfg.Z || 1.65, MOQ: cfg.MOQ || 1, holdM: cfg.holdM };
-    const scored = onlyActive(withRucne(obj.rows)).map(x => ({ x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }));
+    const mvR = loadMoves();   // denní pohyby → recentDaily / moveDays i pro report (API je má, report dosud ne)
+    const scored = onlyActive(withRucne(obj.rows)).map(r => { const e = mvR[r.sk + '-' + r.reg]; const x = Object.assign({}, r, { recentDaily: (e && e.days > 0) ? Math.round(e.sum / e.days * 100) / 100 : null, moveDays: e ? e.days : 0 }); return { x, o: computeOrderRow(x, salesOf(smap, x), P, m0) }; });
     try { allocateGroups(scored, smap, P, m0); } catch (e) { console.warn('[nakup-report] alternativy:', e.message); }
     const nekryto = x => ((x.avail || 0) + (x.onOrder || 0)) < 0;   // rezervace, které nekryje ani zboží objednané u dodavatele
     let list = scored.filter(r => r.o.rec > 0 || (nekryto(r.x) && !r.o.spec));
