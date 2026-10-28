@@ -1530,6 +1530,8 @@ const MUJ_MODS = [
   { key:"pipedrive", icon:MUJ_IC.poll, label:"Pipedrive — aktivita obchodníků", gated:true },
   { key:"reklamace", icon:MUJ_IC.shield, label:"Reklamace", gated:true },
   { key:"zadanikonstrukce", icon:MUJ_IC.file, label:"Nabídka – konstrukce", gated:true },
+  { grp:"Web" },
+  { key:"sklepy", icon:MUJ_IC.globe, label:"Sklepy — soutěž a web", gated:true },
   { grp:"Smlouvy" },
   { key:"smlouvy", icon:MUJ_IC.file, label:"Smlouvy", gated:true },
   { key:"sortiment", icon:MUJ_IC.poll, label:"Hlídač sortimentu", gated:true },
@@ -1572,6 +1574,8 @@ const MJ_L10N = {
   'Pohledávky': ['Receivables','Forderungen','Należności','Дебіторська заборгованість','Creanțe'],
   'Kalkulačky': ['Calculators','Rechner','Kalkulatory','Калькулятори','Calculatoare'],
   'Vývoj projektů': ['Project development','Projektentwicklung','Rozwój projektów','Розвиток проєктів','Dezvoltare proiecte'],
+  'Web': ['Web','Web','Web','Веб','Web'],
+  'Sklepy — soutěž a web': ['Cellars — contest & website','Keller — Gewinnspiel & Web','Piwnice — konkurs i strona','Погреби — конкурс і сайт','Pivnițe — concurs și site'],
   'E-shop': ['E-shop','E-Shop','E-sklep','Інтернет-магазин','E-shop'],
   'Kalkulace-lisy': ['Baler calculator','Kalkulation Pressen','Kalkulacja — prasy','Калькуляція — преси','Calculație prese'],
   'LOXXER — kalkulace': ['LOXXER — calculator','LOXXER — Kalkulation','LOXXER — kalkulacja','LOXXER — калькуляція','LOXXER — calculație'],
@@ -1900,7 +1904,7 @@ function renderSidebar(){
   });
   h+='</nav>';
   document.getElementById("mjSide").innerHTML=h;
-  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="palime"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="pohledavky"||MUJ.view==="vyroba"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk"||MUJ.view==="pipedrive");
+  const mainEl=document.querySelector(".mj-main"); if(mainEl) mainEl.classList.toggle("mj-full", MUJ.view==="eshop"||MUJ.view==="kalkulace"||MUJ.view==="loxxerkalk"||MUJ.view==="palime"||MUJ.view==="sklepy"||MUJ.view==="svozesa"||MUJ.view==="tridicilinka"||MUJ.view==="stavebnipovoleni"||MUJ.view==="eshopmodel"||MUJ.view==="prekladiste"||MUJ.view==="loznyplan"||MUJ.view==="vozidla"||MUJ.view==="pohledavky"||MUJ.view==="vyroba"||MUJ.view==="kovo"||MUJ.view==="doprava"||MUJ.view==="konstrukce"||MUJ.view==="smlouvy"||MUJ.view==="adaptace"||MUJ.view==="sortiment"||MUJ.view==="obchod"||MUJ.view==="zadanikonstrukce"||MUJ.view==="reklamace"||MUJ.view==="pozadavky"||MUJ.view==="kontejnerykalk"||MUJ.view==="pipedrive");
 }
 const MUJ_PROVOZ = { sklady:"Sklady", plasty:"Plasty" };
 const FREELO_URL="https://app.freelo.io/dashboard";
@@ -1978,6 +1982,7 @@ function mjGo(key){
   else if(key==="kalkulace") showKalkulace();
   else if(key==="loxxerkalk") showLoxxerKalk();
   else if(key==="palime") showPalime();
+  else if(key==="sklepy") showSklepy();
   else if(key==="poptavky") showPoptavky();
   else if(key==="kontejnerykalk") showKontejneryKalk();
   else if(key==="svozesa") showSvozEsa();
@@ -2851,6 +2856,18 @@ function showPalime(part){
     +'<button class="btn'+(part==="zadani"?"":" sec")+'" style="padding:7px 14px" onclick="showPalime(\'zadani\')">Nové zadání (pro zákazníka)</button>'
     +'<span style="margin-left:auto;font-size:12.5px;color:var(--ink-soft)">Veřejná adresa pro zákazníky: <a href="/palime-zadani" target="_blank" rel="noopener">otevřít v novém okně</a></span></div>'
     +'<iframe src="'+src+'" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#eef1ec" title="Pálíme — laserové pálení"></iframe>';
+  window.scrollTo(0,0);
+}
+/* Sklepy — správa přihlášek do soutěže a textů webu sklepy.elkoplast.cz. Vlastní app (repo sklepy) bez hesla:
+   intranet na /sklepy-web-admin ověří přístup, podepíše SSO token a přesměruje do jejího /admin (stejně jako LOXXER). */
+function showSklepy(){
+  MUJ.view="sklepy"; renderSidebar();
+  const body=document.getElementById("mujBody");
+  if(!moduleVisible({key:"sklepy",gated:true})){ body.innerHTML='<div class="card pad" style="margin:26px">K modulu „Sklepy — soutěž a web" nemáte přístup. Přiděluje správce.</div>'; return; }
+  body.innerHTML='<div style="display:flex;gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--paper)">'
+    +'<a class="btn" style="padding:7px 14px;text-decoration:none" href="/sklepy-web-admin" target="_blank" rel="noopener">🍎 Správa sklepů</a>'
+    +'<span style="font-size:12.5px;color:var(--ink-soft)">Přihlášky do soutěže a texty webu Sklepy — otevře se v novém okně, přihlášení proběhne automaticky (SSO).</span></div>'
+    +'<iframe src="/sklepy-web-admin" style="width:100%;height:calc(100vh - 118px);border:0;display:block;background:#eef1ec" title="Sklepy — správa"></iframe>';
   window.scrollTo(0,0);
 }
 async function showPoptavky(){
@@ -5132,6 +5149,12 @@ function showDashboard(){
     vyvoj.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
     mainH += '</div>';
   }
+  const web = [["sklepy","Sklepy — soutěž a web",MUJ_IC.globe,"Přihlášky do soutěže a texty webu sklepy.elkoplast.cz"]].filter(p=>MUJ.admin||(MUJ.modules||[]).indexOf(p[0])>=0);
+  if(web.length){
+    mainH += '<div class="dash-sec">'+mjT('Web')+'</div><div class="dash-grid">';
+    web.forEach(p=> mainH += tile({ icon:p[2], title:p[1], desc:p[3], action:"mjGo('"+p[0]+"')", badge:'<span class="badge ok">'+mjT('Přístup')+'</span>' }));
+    mainH += '</div>';
+  }
 
   // ----- Pravý sloupec hubu: KPI „Dnes ve firmě" + Fotka týdne -----
   const dirTot=c.dirs.length, confirmedPct = dirTot ? Math.round((dirTot-c.dirTodo)/dirTot*100) : 100;
@@ -6752,13 +6775,14 @@ async function saveLibDoc(id){
 /* ============================================================
    PŘÍSTUPY — provozní moduly (Sklady, Plasty, Kovo, E-shop)
    ============================================================ */
-const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["palime","Pálíme — laserové pálení (výroba)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["pipedrive","Pipedrive — aktivita obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"]];
+const ACCESS_MODULES = [["pohledavky","Pohledávky po splatnosti"],["sklady","Sklady"],["plasty","Plasty"],["kovo","Kovo (vč. kalkulace)"],["palime","Pálíme — laserové pálení (výroba)"],["eshop","E-shop"],["kalkulace","Kalkulace-lisy"],["loxxerkalk","LOXXER — kalkulace"],["svozesa","Kalkulačka svoz ESA"],["tridicilinka","Design třídicí linky"],["eshopmodel","Vývoj projektů — E-shop"],["prekladiste","Kalkulačka překladiště"],["doprava","Doprava"],["loznyplan","Ložný plán"],["vozidla","Vozový park"],["vyroba","Výroba Popelnice (obchod)"],["vyrobadilna","Výroba Popelnice (dílna)"],["qooling","Qooling — kvalita (závady)"],["vykonnost","Výkonnost středisek (odvádění Helios)"],["konstrukce","Konstrukce"],["obchod","Rozdělení obchodníků"],["pipedrive","Pipedrive — aktivita obchodníků"],["obchodexp","Obchod EXP (export)"],["kontejnery","Lodní kontejnery (poptávky)"],["kontejnerykalk","Lodní kontejnery — kalkulačka"],["smlouvy","Smlouvy"],["reklamace","Reklamace"],["sortiment","Hlídač sortimentu"],["stavebnipovoleni","Stavební povolení"],["adaptace","Adaptace (správa)"],["freelo","Freelo"],["aktuality","Aktuality (zadávání novinek)"],["sklepy","Sklepy — soutěž a web (správa přihlášek a textů)"]];
 const SUPERADMIN_EMAIL = 'david.sury@elkoplast.cz';
 /* Skupiny modulů pro přehlednost matice (klíče musí odpovídat ACCESS_MODULES) */
 const ACCESS_GROUPS=[
   ["Provoz",["sklady","plasty","kovo","palime","eshop","qooling","vykonnost"]],
   ["Kalkulačky",["kalkulace","svozesa","tridicilinka","prekladiste"]],
   ["Vývoj projektů",["eshopmodel"]],
+  ["Web",["sklepy"]],
   ["Finance",["pohledavky"]],
   ["Agendy",["doprava","loznyplan","vozidla","vyroba","vyrobadilna","konstrukce","obchod","pipedrive","obchodexp","kontejnery","kontejnerykalk","smlouvy","reklamace","sortiment","stavebnipovoleni","adaptace","freelo","aktuality"]]
 ];

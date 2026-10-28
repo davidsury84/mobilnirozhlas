@@ -56,6 +56,15 @@ Spusť jako službu (systemd / pm2) a postav před to nginx/Caddy s HTTPS.
 | `GOOGLE_CLIENT_ID` | OAuth Client ID (intranet – přihlášení zaměstnanců) | – |
 | `GOOGLE_CLIENT_SECRET` | OAuth Client Secret | – |
 | `ALLOWED_HD` | omezení SSO jen na firemní doménu (např. `elkoplast.cz`) | bez omezení |
+| `SSO_SHARED_SECRET` | sdílené tajemství pro bezheslový vstup (SSO) do externích aplikací — Kalkulace-lisy, LOXXER, Pálíme, Sklepy; každá z nich musí mít nastavenou **stejnou** hodnotu | interní tajemství serveru (`data/secret.json`) |
+| `SKLEPY_WEB_URL` | adresa aplikace Sklepy (web plastového sklepu + soutěž); intranet na `/sklepy-web-admin` přesměruje oprávněného do `<URL>/admin?sso=…` | `https://sklepy.elkoplast.cz` |
+
+### Externí aplikace přes SSO (Kalkulace-lisy, LOXXER, Pálíme, Sklepy)
+Externí aplikace nemají vlastní hesla do správy. Intranet po kontrole oprávnění (správce, nebo zaměstnanec s příslušným
+modulem přiděleným v **Přístupy**) podepíše krátkodobý token (`ssoSign`, HMAC-SHA256 tajemstvím `SSO_SHARED_SECRET`,
+platnost 5 minut) a přesměruje na `<aplikace>/admin?sso=<token>`. Aplikace token stejným tajemstvím ověří a přihlásí uživatele.
+Pro **Sklepy** (repo `sklepy`, doména `sklepy.elkoplast.cz`) je to routa `/sklepy-web-admin`, modul `sklepy`
+(„Sklepy — soutěž a web“) a proměnná `SKLEPY_WEB_URL`; v aplikaci sklepy musí být `SSO_SHARED_SECRET` shodný s intranetem.
 
 ## Intranet pro zaměstnance (přihlášení přes Google)
 

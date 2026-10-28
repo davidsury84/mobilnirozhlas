@@ -139,6 +139,7 @@ const KALK_APP_URL = process.env.KALKULACE_APP_URL || 'https://lisy-production.u
 const LOXXER_KALK_APP_URL = process.env.LOXXER_KALK_APP_URL || 'https://loxxer-kalkulace-production.up.railway.app'; // LOXXER Kalkulátor (Railway); interní nástroj obchodníka na nabídky LOXXER
 const PALIME_APP_URL = (process.env.PALIME_APP_URL || 'https://palime.elkoplast.cz').replace(/\/$/, ''); // Pálíme — zadání a evidence laserového pálení (vlastní app, SSO stejným tajemstvím jako Kalkulace-lisy)
 const LOXXER_WEB_URL = process.env.LOXXER_WEB_URL || 'https://loxxer-production.up.railway.app'; // Veřejná prezentace LOXXER (Railway); má /admin na správu fotky a textů
+const SKLEPY_WEB_URL = (process.env.SKLEPY_WEB_URL || 'https://sklepy.elkoplast.cz').replace(/\/$/, ''); // Sklepy — web plastového sklepu + přihlášky do soutěže (repo sklepy, Railway); /admin přijímá SSO token intranetu (stejný SSO_SHARED_SECRET)
 const SVOZ_ESA_URL = process.env.SVOZ_ESA_URL || ''; // aplikace „Kalkulačka svoz ESA" (repo kalkulacka-svoz-esa) — doplň URL nasazení
 const RANGES_WATCHDOG_URL = process.env.RANGES_WATCHDOG_URL || ''; // aplikace „Hlídač sortimentu" (repo ranges-watchdog)
 const STAVEBNI_POVOLENI_URL = (process.env.STAVEBNI_POVOLENI_URL || '').replace(/\/$/, ''); // aplikace „Stavební povolení" (repo stavebni-povoleni) — leady pro obchodníky z úředních desek stavebních úřadů
@@ -6153,6 +6154,15 @@ const server = http.createServer(async (req, res) => {
       const allowed = isAdmin(req) || (e && employeeModules(e.email).indexOf('loxxerkalk') >= 0);
       if (!allowed) return send(res, 403, '<h1>Ke správě prezentace LOXXER nemáte přístup.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
       let target = LOXXER_WEB_URL.replace(/\/$/, '') + '/admin';
+      if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
+      res.writeHead(302, { 'Location': target }); return res.end();
+    }
+    // ---- Sklepy — správa přihlášek do soutěže a textů webu sklepy.elkoplast.cz; bezešvě přes SSO, jen správce nebo osoba s modulem Sklepy ----
+    if (p === '/sklepy-web-admin') {
+      const e = empSession(req);
+      const allowed = isAdmin(req) || (e && employeeModules(e.email).indexOf('sklepy') >= 0);
+      if (!allowed) return send(res, 403, '<h1>Ke správě sklepů nemáte přístup.</h1>', { 'Content-Type': 'text/html; charset=utf-8' });
+      let target = SKLEPY_WEB_URL + '/admin';
       if (e) { const tok = ssoSign({ email: e.email, name: e.name, admin: isAdmin(req), exp: Date.now() + 5 * 60 * 1000 }); target += '?sso=' + encodeURIComponent(tok); }
       res.writeHead(302, { 'Location': target }); return res.end();
     }
