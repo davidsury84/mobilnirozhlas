@@ -764,7 +764,7 @@ function mount(host) {
       ost: Math.round(hot.reduce((s, C) => s + ((C.f || {}).ost || 0), 0) / lakSum * 10) / 10, sp: Math.round(hot.reduce((s, C) => s + ((C.f || {}).sp || 0), 0) / lakSum * 10) / 10,
       bezNormy: (() => { const m = {}; hot.forEach(C => Object.entries(C.ost || {}).forEach(([op, ks]) => { const o = m[op] = m[op] || { op, ks: 0, zak: 0 }; o.ks += ks; o.zak++; })); return Object.values(m).map(o => ({ op: o.op, ks: Math.round(o.ks), naKus: Math.round(o.ks / lakSum * 100) / 100, zak: o.zak })).sort((a, b) => b.ks - a.ks).slice(0, 25); })() } : null;
     // zakázky z plánu výroby bez jediné odvedené operace v Heliosu (celý rok) s termínem do 14 dnů — hrozí zpoždění; doplňky (plachty, víka, ND) mimo
-    const nezacate = nezacateZakazky(z.key, 14, 90);
+    const nezacate = nezacateZakazky(z.key, 56, 90);   // 8 týdnů dopředu = horizont zadání (6–8 týdnů na kontejner)
     // --- vstupy pro analýzu ---
     // úsek podle názvu operace (heuristika): dělírna / svařovna / lakovna / ostatní
     const usekOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen/.test(o)) return 'Lakovna a příprava'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|stříh|strih/.test(o)) return 'Dělírna'; if (/svař|svar|navař|navar|dovař|dovar|skl[aá]d|osaz|mont|stehov|bodov|trámec|tramec|podlah|bočnic|bocnic|vrat|střech|strech/.test(o)) return 'Svařovna'; return 'Ostatní'; };
@@ -919,6 +919,16 @@ function mount(host) {
   function loadPlan6() { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} const faze = PLAN6_DEFAULT.faze.map(f => Object.assign({}, f, (c.faze || {})[f.k] || {})); return { cil: c.cil > 0 ? +c.cil : PLAN6_DEFAULT.cil, smenaMin: c.smenaMin > 0 ? +c.smenaMin : PLAN6_DEFAULT.smenaMin, faze }; }
   function savePlan6(b) { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} if (b.cil != null) c.cil = +b.cil > 0 ? Math.round(+b.cil * 10) / 10 : PLAN6_DEFAULT.cil; if (b.smenaMin != null && +b.smenaMin > 0) c.smenaMin = +b.smenaMin; if (b.faze && typeof b.faze === 'object') { c.faze = c.faze || {}; Object.keys(b.faze).forEach(k => { if (!PLAN6_DEFAULT.faze.some(f => f.k === k)) return; const v = b.faze[k] || {}; const o = c.faze[k] || {}; if (v.min != null && +v.min > 0) o.min = +v.min; if (v.ks != null && +v.ks > 0) o.ks = +v.ks; if (v.reset) delete c.faze[k]; else c.faze[k] = o; }); } try { fs.writeFileSync(PLAN6_F, JSON.stringify(c, null, 2)); } catch (_) {} return loadPlan6(); }
   const pracDnyRozsah = (od, do_) => { let n = 0; for (const d = new Date(od + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= do_; d.setUTCDate(d.getUTCDate() + 1)) { if (jePracDen(d.toISOString().slice(0, 10))) n++; } return n; };
+  // Kolik času potřebuje 1 kontejner: (a) součet norem za sebou jdoucích operací z katalogu (svařovna, lakovna, dělírna), (b) odhady fází plánu, (c) skutečnost z Heliosu — normovaný čas obsluhy na 1 hotový ABR (export od 23. 10. 2026)
+  function casNaKontejner(z, P, D) {
+    let norma = null; try { norma = normIndex().items.length ? normyNaKont(z.key) : null; } catch (_) {}
+    const odhad = { svar: P.faze.filter(f => f.usek === 'svar').reduce((s, f) => s + f.min * f.ks, 0), lak: P.faze.filter(f => f.usek === 'lak').reduce((s, f) => s + f.min * f.ks, 0) };
+    const by = {}; D.rows.forEach(r => { const c = r[R.cvz]; if (!c || isRezie(r[R.dil])) return; const A = by[c] = by[c] || { rows: 0, abr: 0, lak: 0, nmin: 0, u: { svar: 0, lak: 0, del: 0 } }; A.rows++; if (/^abr/i.test(String(r[R.dil] || ''))) { A.abr++; if (LAK_NAZEV(r[R.op])) A.lak += r[R.ks]; } const n = +r[R.nmin] || 0; A.nmin += n; const fk = fazeHelios(r[R.op]); A.u[fk === 'del' ? 'del' : (/^(odk|odm|zakl|lak|lakdopl)$/.test(fk || '') ? 'lak' : 'svar')] += n; });
+    const hot = Object.values(by).filter(A => A.lak >= 1 && A.abr > A.rows * 0.5 && A.nmin > 0); const ks = hot.reduce((s, A) => s + A.lak, 0);
+    const helios = ks ? { zakazek: hot.length, ks: Math.round(ks), min: Math.round(hot.reduce((s, A) => s + A.nmin, 0) / ks), svar: Math.round(hot.reduce((s, A) => s + A.u.svar, 0) / ks), lak: Math.round(hot.reduce((s, A) => s + A.u.lak, 0) / ks), del: Math.round(hot.reduce((s, A) => s + A.u.del, 0) / ks) } : null;
+    const celkem = norma ? (norma.svar || 0) + (norma.lak || 0) + (norma.del || 0) : null;
+    return { norma: norma ? { svar: norma.svar, lak: norma.lak, del: norma.del, celkem, zdroj: norma.zdroj } : null, odhad, helios, smenaMin: P.smenaMin, pruchodSmen: celkem ? Math.round(celkem / P.smenaMin * 10) / 10 : null, pruchodSmenHelios: helios ? Math.round(helios.min / P.smenaMin * 10) / 10 : null };
+  }
   function planOperaci(z, od, do_) {
     const D = loadData(z.key); if (!D) return null;
     const P = loadPlan6(); const snap = D.snapshot;
@@ -941,7 +951,7 @@ function mount(host) {
     const hrdlo = faze.filter(f => f.usek === 'svar').slice().sort((a, b) => a.plneni - b.plneni)[0];
     return { zavod: z.key, name: z.name, snapshot: snap, od, do: do_, pracDny: pd, mesic: ym, pracDnyMes: pdMes, cil: P.cil, smenaMin: P.smenaMin, kontMes: P.cil * pdMes,
       opsKont: faze.reduce((s, f) => s + f.ks, 0), opsDen: faze.reduce((s, f) => s + f.potrebaDen, 0), opsMes: faze.reduce((s, f) => s + f.potrebaMes, 0), skutOpsDen: Math.round(faze.reduce((s, f) => s + f.skutKs, 0) / pd * 10) / 10,
-      faze, osobosmenSvar: Math.round(sumU('svar') * 10) / 10, osobosmenLak: Math.round(sumU('lak') * 10) / 10, hrdlo: hrdlo ? hrdlo.nazev : '', maNormy: maN };
+      faze, osobosmenSvar: Math.round(sumU('svar') * 10) / 10, osobosmenLak: Math.round(sumU('lak') * 10) / 10, hrdlo: hrdlo ? hrdlo.nazev : '', maNormy: maN, casKont: casNaKontejner(z, P, D) };
   }
 
   // ---------- 3. kontrolní bod: výdejky (export „Výdej ze skladu“ po závodech, podsložky Chomutov / Abroly / Popelnice / Supíkovice) ----------
@@ -1255,7 +1265,9 @@ function mount(host) {
     const plan = loadPlan(zKey); const P = (plan && plan.items) || {}; const D = loadData(zKey); if (!D) return [];
     const url = row => plan && plan.sheetId ? 'https://docs.google.com/spreadsheets/d/' + plan.sheetId + '/edit#gid=' + (plan.gid != null ? plan.gid : 0) + (row ? '&range=A' + row + ':AZ' + row : '') : '';
     const maCvz = new Set(D.rows.map(r => r[R.cvz]).filter(Boolean)); const limH = new Date(Date.now() + dnyDopredu * 86400000).toISOString().slice(0, 10), limD = new Date(Date.now() - dnyZpet * 86400000).toISOString().slice(0, 10);
-    return Object.entries(P).filter(([cvz, p]) => !maCvz.has(cvz) && !/plachta|víko|viko|náhradn|nahradn|nájezd|najezd|rámeč|ramec|síť|sit\b|střech|strech|oprav|plato|^nd[ -]/i.test(p.vyrobek || '')).map(([cvz, p]) => ({ cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t: isoT(p.termin), row: p.row, url: url(p.row) })).filter(x => x.t && x.t >= limD && x.t <= limH).sort((a, b) => a.t.localeCompare(b.t));
+    // průběžná doba 1 kontejneru od schválení výkresu po expedici = 6–8 týdnů → nejpozdější zadání = termín − 8 týdnů (bezpečně) / − 6 týdnů (nejpozději)
+    const dnes = new Date().toISOString().slice(0, 10); const posun = (iso, d) => { const t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); }; const dni = (a, b) => Math.round((new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 86400000);
+    return Object.entries(P).filter(([cvz, p]) => !maCvz.has(cvz) && !/plachta|víko|viko|náhradn|nahradn|nájezd|najezd|rámeč|ramec|síť|sit\b|střech|strech|oprav|plato|^nd[ -]/i.test(p.vyrobek || '')).map(([cvz, p]) => { const t = isoT(p.termin); const z8 = t ? posun(t, -56) : '', z6 = t ? posun(t, -42) : ''; return { cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t, row: p.row, url: url(p.row), zadani8: z8, zadani6: z6, zbyva8: t ? dni(z8, dnes) : null, zbyva6: t ? dni(z6, dnes) : null, poTerminu: !!t && t < dnes }; }).filter(x => x.t && x.t >= limD && x.t <= limH).sort((a, b) => a.t.localeCompare(b.t));
   }
   // Lakované kusy za poslední uzavřený ISO týden po závodech vs. minimum (cfg.lakMin) — sekce do pondělního reportu Qooling + eskalace v předmětu
   function tydenniLak(wkArg) {
