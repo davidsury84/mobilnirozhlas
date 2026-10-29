@@ -329,13 +329,20 @@ function mount(host) {
   const DISP_F = path.join(host.dataDir || __dirname, 'doprava-dispecink.json');
   const DISP_DUVODY = ['nemoc', 'dovolena', 'porucha', 'stk', 'zakaznik', 'jine'];
   function readDisp() {
-    let d = {}; try { d = JSON.parse(fs.readFileSync(DISP_F, 'utf8')); } catch (_) {}
+    let d = null; try { d = JSON.parse(fs.readFileSync(DISP_F, 'utf8')); } catch (_) {}
+    if (!d || typeof d !== 'object') {
+      // první spuštění: výchozí rozdělení vozů a typy návěsů z přibaleného seedu (bez jmen — ta se doplní v modulu)
+      d = {};
+      try { const sd = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed-dispecink.json'), 'utf8')); d = { vozy: sd.vozy || {}, navesy: sd.navesy || {} }; fs.writeFileSync(DISP_F, JSON.stringify(d, null, 2)); } catch (_) {}
+    }
     const sk = (d.skupiny && typeof d.skupiny === 'object') ? d.skupiny : {};
     const c = (d.cile && typeof d.cile === 'object') ? d.cile : {};
     const num = (v, def, lo, hi) => (v != null && isFinite(v)) ? Math.min(hi, Math.max(lo, Number(v))) : def;
     return {
       skupiny: { A: { nazev: String((sk.A || {}).nazev || 'Skupina A').slice(0, 60) }, B: { nazev: String((sk.B || {}).nazev || 'Skupina B').slice(0, 60) } },
       vozy: (d.vozy && typeof d.vozy === 'object') ? d.vozy : {},            // číslo vozu → 'A' | 'B'
+      navesy: (d.navesy && typeof d.navesy === 'object') ? d.navesy : {},      // číslo vozu → typ návěsu (souprava, plato, RO…)
+      zmenil: d.zmenil || '', zmenaTs: d.zmenaTs || null,
       // cíle: cílová marže (%; z ní plynou rentabilní sazby a plán tržeb), prázdné km (%, méně = lépe), spotřeba l/100 (méně = lépe), vyplněnost přejezdu (%)
       cile: { marze: num(c.marze, 5, 0, 30), prazdne: num(c.prazdne, 10, 1, 50), spotreba: num(c.spotreba, 28, 10, 60), vyplneno: num(c.vyplneno, 95, 50, 100) },
       poznamky: Array.isArray(d.poznamky) ? d.poznamky : [],
@@ -640,14 +647,16 @@ function mount(host) {
       json(res, 200, { ok: true, info }); return true;
     }
 
-    // Dispečink — nastavení skupin, přiřazení vozů a cílů (jen správce)
+    // Dispečink — rozdělení vozů, jména skupin a typy návěsů upraví každý s přístupem k modulu (provozní věc dispečinku);
+    // cíle KPI mění jen správce.
     if (p === '/api/doprava/dispecink' && req.method === 'POST') {
-      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Skupiny a cíle nastavuje správce.' }); return true; }
       let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
       const d = readDisp();
+      if (b.navesy && typeof b.navesy === 'object') { d.navesy = {}; Object.keys(b.navesy).forEach((c) => { const t = String(b.navesy[c] || '').trim().slice(0, 40); if (t) d.navesy[String(c).trim()] = t; }); }
+      d.zmenil = (host.empSession(req) || {}).email || ''; d.zmenaTs = Date.now();
       if (b.skupiny) ['A', 'B'].forEach((k) => { if (b.skupiny[k] && b.skupiny[k].nazev != null) d.skupiny[k].nazev = String(b.skupiny[k].nazev).trim().slice(0, 60) || d.skupiny[k].nazev; });
       if (b.vozy && typeof b.vozy === 'object') { d.vozy = {}; Object.keys(b.vozy).forEach((c) => { const s = String(b.vozy[c] || '').toUpperCase(); if (s === 'A' || s === 'B') d.vozy[String(c).trim()] = s; }); }
-      if (b.cile && typeof b.cile === 'object') Object.keys(d.cile).forEach((k) => { const n = parseNum(String(b.cile[k] == null ? '' : b.cile[k])); if (n != null) d.cile[k] = n; });
+      if (b.cile && typeof b.cile === 'object' && host.isAdmin(req)) Object.keys(d.cile).forEach((k) => { const n = parseNum(String(b.cile[k] == null ? '' : b.cile[k])); if (n != null) d.cile[k] = n; });
       try { writeDisp(d); } catch (e) { json(res, 500, { chyba: e.message }); return true; }
       json(res, 200, { ok: true, dispecink: readDisp() }); return true;
     }

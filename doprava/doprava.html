@@ -882,7 +882,7 @@ function tabDispecink(){
   let h='<h1>Plán &amp; KPI dispečinku — co máme dosáhnout, čeho dosahujeme, rozdíl a dopad na výsledek</h1>';
   h+='<div class="sl" style="margin-bottom:10px"><label>Období</label><select id="dispObd">'+vsechny.slice().reverse().map(x=>'<option value="'+x+'"'+(DISP_OBD===x?' selected':'')+'>'+mesLbl(x)+'</option>').join('')+'<option value="rok"'+(DISP_OBD==='rok'?' selected':'')+'>od začátku roku ('+vsechny.length+' měs.)</option></select>'
     +'<span class="muted">jen uzavřené měsíce Daily reportu · model: marže '+mp+' %, nafta dnes '+(M0.cena!=null?d2(M0.cena)+' Kč/l bez DPH':'—')+(M0.tydnu?' (účetní období '+d2(M0.cena0)+')':'')+' · cíle vozů = rentabilní plán (záložka Plán)</span></div>';
-  if(!sk('A').length&&!sk('B').length) h+=alertHtml('warn','Vozy zatím nejsou rozdělené do mikroflotil — '+(ADMIN?'přiřaď je dole v nastavení (každý vůz jedné dispečerce).':'správce je přiřadí v nastavení záložky.'));
+  if(!sk('A').length&&!sk('B').length) h+=alertHtml('warn','Vozy zatím nejsou rozdělené do mikroflotil — přiřaď je dole v bloku Mikroflotily (každý vůz jedné dispečerce).');
   else if(neprir.length) h+=alertHtml('info','Nepřiřazené vozy s provozem: <b>'+neprir.map(v=>esc(v.cislo)).join(', ')+'</b> — do srovnání skupin se nepočítají.');
   // --- rentabilní plán (dřív samostatná záložka Plán): sazby a tržby, při kterých dává plán km cílovou marži ---
   const mesN=Math.max(1,m.mesice.length), P=DATA.plan, planCisla=((P&&P.vozy)||[]).map(p=>String(p.cislo));
@@ -958,7 +958,7 @@ function tabDispecink(){
     const odch=k.planKmProc!=null&&k.planKmProc<80;
     const dop=k.dKm+k.dSaz+k.dPr+k.dSp;
     const sub=t=>'<div class="muted" style="font-size:11px">'+t+'</div>';
-    return '<tr'+(odch?' style="background:#fdecea"':'')+'><td><b>'+esc(v.cislo)+'</b> <span class="muted">'+esc(v.ridic||'')+'</span>'+(k.pausal?' <span class="pill sed">paušál</span>':'')+'</td>'
+    return '<tr'+(odch?' style="background:#fdecea"':'')+'><td><b>'+esc(v.cislo)+'</b> <span class="muted">'+esc(v.ridic||'')+'</span>'+(k.pausal?' <span class="pill sed">paušál</span>':'')+((D.navesy||{})[v.cislo]?sub(esc(D.navesy[v.cislo])):'')+'</td>'
       +'<td class="'+dispSemafor(k.km,k.planKm,false)+'">'+Math.round(k.km).toLocaleString('cs-CZ')+(k.planKm?sub('cíl '+Math.round(k.planKm).toLocaleString('cs-CZ')+' ('+Math.round(pl.planKm).toLocaleString('cs-CZ')+'/měs'+(pl.pl?'':', dnešní ø')+') · '+sgn(k.km-k.planKm,x=>Math.round(x).toLocaleString('cs-CZ'))):'')+'</td>'
       +'<td>'+(pl.varV!=null?d2(pl.varV):'—')+'</td><td>'+tis(pl.fix)+'</td>'
       +'<td class="'+dispSemafor(k.sazba,k.sazbaCil,false)+'">'+(k.sazba!=null?d2(k.sazba):'—')+(k.sazbaCil!=null?sub('cíl '+d2(k.sazbaCil)+(k.sazba!=null?' · '+sgn(k.sazba-k.sazbaCil,d2):'')+(pl.sazbaOrig!=null?' · plán '+d2(pl.sazbaOrig):'')):'')+'</td>'
@@ -992,20 +992,22 @@ function tabDispecink(){
     +'<div class="sl"><label>Podíl vedoucího dopravy</label><input type="range" id="oVed" min="20" max="60" step="5" value="40"><output id="ooVed"></output></div>'
     +'<div class="sl"><label>Počet dispečerů</label><input type="range" id="oDisp" min="2" max="4" step="1" value="2"><output id="ooDisp"></output></div>'
     +'</div><div id="oKarty"></div><div id="oKpi"></div></div>';
-  // --- nastavení (admin) ---
-  if(ADMIN){
-    h+='<div class="chartbox"><h2 style="margin:0 0 8px">Nastavení mikroflotil a cílů</h2>'
+  // --- mikroflotily: rozdělení vozů, jména a typ návěsu upraví každý z dispečinku; cíle KPI jen správce ---
+  {
+    h+='<div class="chartbox"><h2 style="margin:0 0 8px">Mikroflotily — rozdělení vozů'+(ADMIN?' a cíle':'')+'</h2>'
+      +'<p class="muted" style="font-size:12px;margin:0 0 8px">Rozdělení vozů, jména skupin a typ návěsu může upravit každý s přístupem k modulu'+(D.zmenaTs?' · naposledy '+new Date(D.zmenaTs).toLocaleDateString('cs-CZ')+(D.zmenil?' ('+esc(String(D.zmenil).split('@')[0])+')':''):'')+'.'+(ADMIN?' Cíle KPI nastavuje správce.':'')+'</p>'
       +'<div class="sliders" style="margin-bottom:10px">'
       +'<div class="sl"><label>Skupina A</label><input id="skA" value="'+esc(D.skupiny.A.nazev)+'" placeholder="jméno dispečerky" style="flex:1;min-width:0"></div>'
       +'<div class="sl"><label>Skupina B</label><input id="skB" value="'+esc(D.skupiny.B.nazev)+'" placeholder="jméno dispečerky" style="flex:1;min-width:0"></div>'
-      +'<div class="sl"><label>Cílová marže</label><input type="number" id="ciMar" min="0" max="30" step="0.5" value="'+cile.marze+'" style="width:80px"><span class="muted">% — určuje rentabilní sazby i HV plánu</span></div>'
+      +(ADMIN?'<div class="sl"><label>Cílová marže</label><input type="number" id="ciMar" min="0" max="30" step="0.5" value="'+cile.marze+'" style="width:80px"><span class="muted">% — určuje rentabilní sazby i HV plánu</span></div>'
       +'<div class="sl"><label>Prázdné km</label><input type="number" id="ciPr" step="0.5" value="'+cile.prazdne+'" style="width:80px"><span class="muted">% max.</span></div>'
       +'<div class="sl"><label>Spotřeba</label><input type="number" id="ciSp" step="0.5" value="'+cile.spotreba+'" style="width:80px"><span class="muted">l/100 max.</span></div>'
-      +'<div class="sl"><label>Vyplněný přejezd</label><input type="number" id="ciVyp" min="50" max="100" value="'+cile.vyplneno+'" style="width:80px"><span class="muted">% jízd min.</span></div>'
-      +'</div><div style="overflow-x:auto"><table><thead><tr><th style="text-align:left">Vůz</th><th style="text-align:left">Řidič</th><th>km/měs (ø)</th><th>Skupina</th></tr></thead><tbody>'
+      +'<div class="sl"><label>Vyplněný přejezd</label><input type="number" id="ciVyp" min="50" max="100" value="'+cile.vyplneno+'" style="width:80px"><span class="muted">% jízd min.</span></div>':'')
+      +'</div><div style="overflow-x:auto"><table><thead><tr><th style="text-align:left">Vůz</th><th style="text-align:left">Řidič</th><th>km/měs (ø)</th><th>Skupina</th><th style="text-align:left">Typ návěsu</th></tr></thead><tbody>'
       +m.voz.map(v=>'<tr><td style="text-align:left"><b>'+esc(v.cislo)+'</b> <span class="muted">'+esc(v.spz)+'</span></td><td style="text-align:left">'+esc(v.ridic||'—')+'</td><td>'+Math.round(v.km/Math.max(1,m.mesice.length)).toLocaleString('cs-CZ')+'</td>'
-        +'<td><select data-voz="'+esc(v.cislo)+'" class="dispPrir"><option value="">—</option><option value="A"'+(D.vozy[v.cislo]==='A'?' selected':'')+'>A · '+esc(D.skupiny.A.nazev)+'</option><option value="B"'+(D.vozy[v.cislo]==='B'?' selected':'')+'>B · '+esc(D.skupiny.B.nazev)+'</option></select></td></tr>').join('')
-      +'</tbody></table></div><div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button class="btn" id="dispUloz">Uložit nastavení</button><span class="muted" id="dispStav"></span></div></div>';
+        +'<td><select data-voz="'+esc(v.cislo)+'" class="dispPrir"><option value="">—</option><option value="A"'+(D.vozy[v.cislo]==='A'?' selected':'')+'>A · '+esc(D.skupiny.A.nazev)+'</option><option value="B"'+(D.vozy[v.cislo]==='B'?' selected':'')+'>B · '+esc(D.skupiny.B.nazev)+'</option></select></td>'
+        +'<td><input class="dispNaves" data-voz="'+esc(v.cislo)+'" value="'+esc((D.navesy||{})[v.cislo]||'')+'" placeholder="souprava / plato / RO…" style="width:170px"></td></tr>').join('')
+      +'</tbody></table></div><div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button class="btn" id="dispUloz">Uložit rozdělení</button><span class="muted" id="dispStav"></span></div></div>';
   }
   $('#app').innerHTML=h;
   $('#dispObd').onchange=e=>{DISP_OBD=e.target.value;tabDispecink();};
@@ -1041,9 +1043,12 @@ function tabDispecink(){
     try{ const r=await fetch('/api/doprava/dispecink/poznamka',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voz:$('#pzVoz').value,mesic:$('#pzMes').value,duvod:$('#pzDuvod').value,text:$('#pzText').value})});
       const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status); DATA.dispecink.poznamky=j.poznamky; tabDispecink(); }
     catch(e){ st('Chyba: '+e.message); } };
-  if(ADMIN&&$('#dispUloz')) $('#dispUloz').onclick=async()=>{const st=t=>{$('#dispStav').textContent=t;}; st('Ukládám…');
+  if($('#dispUloz')) $('#dispUloz').onclick=async()=>{const st=t=>{$('#dispStav').textContent=t;}; st('Ukládám…');
     const vozy={}; document.querySelectorAll('.dispPrir').forEach(s=>{if(s.value)vozy[s.dataset.voz]=s.value;});
-    try{ const r=await fetch('/api/doprava/dispecink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skupiny:{A:{nazev:$('#skA').value},B:{nazev:$('#skB').value}},vozy,cile:{marze:$('#ciMar').value,prazdne:$('#ciPr').value,spotreba:$('#ciSp').value,vyplneno:$('#ciVyp').value}})});
+    const navesy={}; document.querySelectorAll('.dispNaves').forEach(i=>{if(i.value.trim())navesy[i.dataset.voz]=i.value.trim();});
+    const telo={skupiny:{A:{nazev:$('#skA').value},B:{nazev:$('#skB').value}},vozy,navesy};
+    if(ADMIN&&$('#ciMar')) telo.cile={marze:$('#ciMar').value,prazdne:$('#ciPr').value,spotreba:$('#ciSp').value,vyplneno:$('#ciVyp').value};
+    try{ const r=await fetch('/api/doprava/dispecink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(telo)});
       const j=await r.json(); if(!r.ok||j.chyba) throw new Error(j.chyba||r.status); DATA.dispecink=j.dispecink; M=spočítej(); tabDispecink(); window.scrollTo(0,document.body.scrollHeight); }
     catch(e){ st('Chyba: '+e.message); } };
 }

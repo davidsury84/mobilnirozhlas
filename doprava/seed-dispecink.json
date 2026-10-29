@@ -1,0 +1,7 @@
+{
+  "zdroj": "Návrh flotil A+B (tabulka dispečinku, 29. 10. 2026) — jména skupin se doplňují v modulu",
+  "vozy": { "92": "A", "404": "A", "89": "A", "408": "A", "412": "A", "409": "A", "96": "A", "162": "A", "400": "A",
+            "403": "B", "91": "B", "90": "B", "405": "B", "410": "B", "402": "B", "85": "B", "163": "B", "160": "B" },
+  "navesy": { "92": "souprava", "404": "plato", "89": "souprava", "408": "souprava CH", "412": "plato", "409": "RO", "96": "plato, plachta vnitro", "162": "", "400": "souprava CV",
+              "403": "plato", "91": "souprava", "90": "souprava", "405": "GVS CH", "410": "RO", "402": "plato", "85": "plato, plachta vnitro", "163": "plato", "160": "plato, plachta vnitro" }
+}
