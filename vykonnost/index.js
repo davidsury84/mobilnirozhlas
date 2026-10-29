@@ -165,7 +165,12 @@ function mount(host) {
   // ---------- plány výroby (Google Sheets) ----------
   // Hledá list dle regexu, hlavičku (řádek s „ČVZ" nebo „Výrobek") a sloupce regexem. ČVZ rozdělené
   // do dvou sloupců (Abroly: „26B" | „594") se skládá dohromady. Fáze = sloupce Dělírna/Svařovna/… s „x".
-  function parsePlanValues(values) {
+  // Sloupec poznámky v plánu výroby (volný text): Chomutov G, Supíkovice J, Bruntál F — storno / převedeno jinam / ze skladu / nevyrábět = zakázka se nepočítá mezi „bez odvedené operace“
+  const PLAN_POZN_COL = { chomutov: 'G', supikovice: 'J', abroly: 'F' };
+  const colIdx = L => String(L || '').toUpperCase().split('').reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0) - 1;
+  const RE_STORNO = /storno|zru[šs]en|p[řr]eveden|p[řr]esun|ze skladu|vzaty ze zak|na 2\d[A-Z]\d|k zak[áa]zce 2\d|nevyr[áa]b|v\s*PL\b|polsk|j[ií]n[ýy] z[áa]vod/i;
+  const jeStornoNeboPresun = pozn => RE_STORNO.test(String(pozn || ''));
+  function parsePlanValues(values, opts) {
     // Řádek se skutečnými názvy sloupců = ten s „Výrobek" (Abroly má ČVZ o řádek výš ve skupinové hlavičce); jinak řádek s ČVZ.
     let hi = -1;
     for (let i = 0; i < Math.min(values.length, 8); i++) { const r = values[i] || []; if (r.some(c => /^výrobek$|^vyrobek$/i.test(String(c || '').trim()))) { hi = i; break; } }
@@ -192,7 +197,8 @@ function mount(host) {
       const S = i => i >= 0 ? String(row[i] == null ? '' : row[i]).trim() : '';
       const ks = parseFloat(String(S(c.ks)).replace(',', '.'));
       items[cvz] = { vyrobek: S(c.vyr), ks: isFinite(ks) ? ks : null, helios: S(c.helios).replace(/\.0$/, ''), ral: S(c.ral), zakaznik: S(c.zak), termin: S(c.termin), skutecny: S(c.skut), exp: S(c.exp), kontakt: S(c.kontakt),
-        faze: faze.map(f => ({ n: f.n, ok: !!String(row[f.i] == null ? '' : row[f.i]).trim() })), row: r + 1 };  // row = číslo řádku v tabulce (1-based)
+        faze: faze.map(f => ({ n: f.n, ok: !!String(row[f.i] == null ? '' : row[f.i]).trim() })), row: r + 1,   // row = číslo řádku v tabulce (1-based)
+        pozn: opts && opts.poznIdx >= 0 ? String(row[opts.poznIdx] == null ? '' : row[opts.poznIdx]).trim() : '' };
     }
     // hlavička pro zobrazení celého řádku: kde je 2. řádek prázdný, doplní se skupinový název z 1. řádku
     const labels = H.map((h, i) => h || H0[i] || '');
@@ -223,7 +229,7 @@ function mount(host) {
     } catch (e) { return { ok: false, error: 'listy: ' + e.message }; }
     const range = (tab ? "'" + tab.replace(/'/g, "''") + "'!" : '') + 'A1:AZ5000';
     const r = await host.sheetsGet(z.plan.sheetId, range);
-    const p = parsePlanValues((r && r.values) || []);
+    const p = parsePlanValues((r && r.values) || [], { poznIdx: PLAN_POZN_COL[z.key] ? colIdx(PLAN_POZN_COL[z.key]) : -1 });
     const n = Object.keys(p.items).length;
     if (!n) return { ok: false, error: 'list „' + tab + '": ' + (p.warn || 'žádné zakázky') };
     // Chomutov: muldy svařované v závodě se neodvádějí v Heliosu — denní počty jsou v listu „kapa-plán Mulden“ („2x215, 1x216“ = ks × číslo zakázky)
@@ -801,7 +807,7 @@ function mount(host) {
       dny: dnyArr.map(d => ({ date: d.date, rows: d.rows, ks: Math.round(d.ks), rezieH: Math.round(d.rezieH) })),
       lide: lideArr, operace: top(ops, 25, 'rows').map(o => ({ op: o.op, rows: o.rows, ks: Math.round(o.ks), lide: o.lide.size })),
       rezie: { kategorie: Object.values(rezKat).sort((a, b) => b.h - a.h).map(k => ({ kat: k.kat, h: Math.round(k.h), rows: k.rows, lide: k.lide.size })), polozky: Object.values(rezPol).sort((a, b) => b.h - a.h).slice(0, 15).map(p => ({ text: p.text, h: Math.round(p.h), rows: p.rows, lide: [...p.lide].slice(0, 4) })) },
-      cvz: cvzArr.slice(0, 200), cvzCelkem: cvzArr.length, sparovano, nezacate, normaSouhrn, autori: Object.entries(autori).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, rows: n })),
+      cvz: cvzArr.slice(0, 200), cvzCelkem: cvzArr.length, sparovano, nezacate, nezacateStorno: stornoBezOdvadeni(z.key), normaSouhrn, autori: Object.entries(autori).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, rows: n })),
       kvalita: { future, nulKs, bezCvz, bezJmena },
       plan: plan ? { tab: plan.tab, items: Object.keys(P).length, syncedAt: plan.syncedAt, faze: plan.faze || [], url: planUrl(0) } : null
     };
@@ -1262,13 +1268,14 @@ function mount(host) {
   }
   // Zakázky z plánu výroby bez jediné odvedené operace v Heliosu (celý rok) s termínem expedice do dnyDopredu dní (vč. prošlých za dnyZpet dní); doplňky mimo
   const isoT = x => { const m = /^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/.exec(String(x || '').trim()); return m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : (/^\d{4}-\d{2}-\d{2}/.test(String(x || '')) ? String(x).slice(0, 10) : ''); };
+  function stornoBezOdvadeni(zKey) { const plan = loadPlan(zKey); const P = (plan && plan.items) || {}; const D = loadData(zKey); if (!D) return 0; const ma = new Set(D.rows.map(r => r[R.cvz]).filter(Boolean)); return Object.entries(P).filter(([c, p]) => !ma.has(c) && jeStornoNeboPresun(p.pozn)).length; }
   function nezacateZakazky(zKey, dnyDopredu, dnyZpet) {
     const plan = loadPlan(zKey); const P = (plan && plan.items) || {}; const D = loadData(zKey); if (!D) return [];
     const url = row => plan && plan.sheetId ? 'https://docs.google.com/spreadsheets/d/' + plan.sheetId + '/edit#gid=' + (plan.gid != null ? plan.gid : 0) + (row ? '&range=A' + row + ':AZ' + row : '') : '';
     const maCvz = new Set(D.rows.map(r => r[R.cvz]).filter(Boolean)); const limH = new Date(Date.now() + dnyDopredu * 86400000).toISOString().slice(0, 10), limD = new Date(Date.now() - dnyZpet * 86400000).toISOString().slice(0, 10);
     // průběžná doba 1 kontejneru od schválení výkresu po expedici = 6–8 týdnů → nejpozdější zadání = termín − 8 týdnů (bezpečně) / − 6 týdnů (nejpozději)
     const dnes = new Date().toISOString().slice(0, 10); const posun = (iso, d) => { const t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); }; const dni = (a, b) => Math.round((new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 86400000);
-    return Object.entries(P).filter(([cvz, p]) => !maCvz.has(cvz) && !/plachta|víko|viko|náhradn|nahradn|nájezd|najezd|rámeč|ramec|síť|sit\b|střech|strech|oprav|plato|^nd[ -]/i.test(p.vyrobek || '')).map(([cvz, p]) => { const t = isoT(p.termin); const z8 = t ? posun(t, -56) : '', z6 = t ? posun(t, -42) : ''; return { cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t, row: p.row, url: url(p.row), zadani8: z8, zadani6: z6, zbyva8: t ? dni(z8, dnes) : null, zbyva6: t ? dni(z6, dnes) : null, poTerminu: !!t && t < dnes }; }).filter(x => x.t && x.t >= limD && x.t <= limH).sort((a, b) => a.t.localeCompare(b.t));
+    return Object.entries(P).filter(([cvz, p]) => !maCvz.has(cvz) && !jeStornoNeboPresun(p.pozn) && !/plachta|víko|viko|náhradn|nahradn|nájezd|najezd|rámeč|ramec|síť|sit\b|střech|strech|oprav|plato|^nd[ -]/i.test(p.vyrobek || '')).map(([cvz, p]) => { const t = isoT(p.termin); const z8 = t ? posun(t, -56) : '', z6 = t ? posun(t, -42) : ''; return { cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t, row: p.row, url: url(p.row), pozn: p.pozn || '', zadani8: z8, zadani6: z6, zbyva8: t ? dni(z8, dnes) : null, zbyva6: t ? dni(z6, dnes) : null, poTerminu: !!t && t < dnes }; }).filter(x => x.t && x.t >= limD && x.t <= limH).sort((a, b) => a.t.localeCompare(b.t));
   }
   // Lakované kusy za poslední uzavřený ISO týden po závodech vs. minimum (cfg.lakMin) — sekce do pondělního reportu Qooling + eskalace v předmětu
   function tydenniLak(wkArg) {
