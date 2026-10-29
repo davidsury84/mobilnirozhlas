@@ -822,7 +822,7 @@ function mount(host) {
       dny: dnyArr.map(d => ({ date: d.date, rows: d.rows, ks: Math.round(d.ks), rezieH: Math.round(d.rezieH) })),
       lide: lideArr, operace: top(ops, 25, 'rows').map(o => ({ op: o.op, rows: o.rows, ks: Math.round(o.ks), lide: o.lide.size })),
       rezie: { kategorie: Object.values(rezKat).sort((a, b) => b.h - a.h).map(k => ({ kat: k.kat, h: Math.round(k.h), rows: k.rows, lide: k.lide.size })), polozky: Object.values(rezPol).sort((a, b) => b.h - a.h).slice(0, 15).map(p => ({ text: p.text, h: Math.round(p.h), rows: p.rows, lide: [...p.lide].slice(0, 4) })) },
-      cvz: cvzArr.slice(0, 200), cvzCelkem: cvzArr.length, sparovano, nezacate, nezacateStorno: stornoBezOdvadeni(z.key), nezacatePL: plBezOdvadeni(z.key), normaSouhrn, autori: Object.entries(autori).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, rows: n })),
+      cvz: cvzArr.slice(0, 200), cvzCelkem: cvzArr.length, sparovano, nezacate, nezacateStorno: nezacate.vyrazenoStorno || 0, nezacatePL: nezacate.vyrazenoPL || 0, normaSouhrn, autori: Object.entries(autori).sort((a, b) => b[1] - a[1]).map(([a, n]) => ({ autor: a, rows: n })),
       kvalita: { future, nulKs, bezCvz, bezJmena },
       plan: plan ? { tab: plan.tab, items: Object.keys(P).length, syncedAt: plan.syncedAt, faze: plan.faze || [], url: planUrl(0) } : null
     };
@@ -1291,7 +1291,11 @@ function mount(host) {
     const maCvz = new Set(D.rows.map(r => r[R.cvz]).filter(Boolean)); const limH = new Date(Date.now() + dnyDopredu * 86400000).toISOString().slice(0, 10), limD = new Date(Date.now() - dnyZpet * 86400000).toISOString().slice(0, 10);
     // průběžná doba 1 kontejneru od schválení výkresu po expedici = 6–8 týdnů → nejpozdější zadání = termín − 8 týdnů (bezpečně) / − 6 týdnů (nejpozději)
     const dnes = new Date().toISOString().slice(0, 10); const posun = (iso, d) => { const t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); }; const dni = (a, b) => Math.round((new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 86400000);
-    return Object.entries(P).filter(([cvz, p]) => !maCvz.has(cvz) && !jeStornoNeboPresun(p.pozn) && !jeZPL(cvz) && !/plachta|víko|viko|náhradn|nahradn|nájezd|najezd|rámeč|ramec|síť|sit\b|střech|strech|oprav|plato|^nd[ -]/i.test(p.vyrobek || '')).map(([cvz, p]) => { const t = isoT(p.termin); const z8 = t ? posun(t, -56) : '', z6 = t ? posun(t, -42) : ''; return { cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t, row: p.row, url: url(p.row), pozn: p.pozn || '', zadani8: z8, zadani6: z6, zbyva8: t ? dni(z8, dnes) : null, zbyva6: t ? dni(z6, dnes) : null, poTerminu: !!t && t < dnes }; }).filter(x => x.t && x.t >= limD && x.t <= limH).sort((a, b) => a.t.localeCompare(b.t));
+    const vOkne = ([cvz, p]) => { const t = isoT(p.termin); return !maCvz.has(cvz) && t && t >= limD && t <= limH && !/plachta|víko|viko|náhradn|nahradn|nájezd|najezd|rámeč|ramec|síť|sit\b|střech|strech|oprav|plato|^nd[ -]/i.test(p.vyrobek || ''); };
+    const kand = Object.entries(P).filter(vOkne); const vyrStorno = kand.filter(([c, p]) => jeStornoNeboPresun(p.pozn)).length, vyrPL = kand.filter(([c, p]) => !jeStornoNeboPresun(p.pozn) && jeZPL(c)).length;
+    const out = kand.filter(([cvz, p]) => !jeStornoNeboPresun(p.pozn) && !jeZPL(cvz)).map(([cvz, p]) => { const t = isoT(p.termin); const z8 = t ? posun(t, -56) : '', z6 = t ? posun(t, -42) : ''; return { cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t, row: p.row, url: url(p.row), pozn: p.pozn || '', zadani8: z8, zadani6: z6, zbyva8: t ? dni(z8, dnes) : null, zbyva6: t ? dni(z6, dnes) : null, poTerminu: !!t && t < dnes }; }).sort((a, b) => a.t.localeCompare(b.t));
+    out.vyrazenoStorno = vyrStorno; out.vyrazenoPL = vyrPL;   // počty vyřazených ve stejném okně (pro hlavičku)
+    return out;
   }
   // Lakované kusy za poslední uzavřený ISO týden po závodech vs. minimum (cfg.lakMin) — sekce do pondělního reportu Qooling + eskalace v předmětu
   function tydenniLak(wkArg) {
