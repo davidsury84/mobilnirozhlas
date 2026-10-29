@@ -647,9 +647,9 @@ function mount(host) {
       json(res, 200, { ok: true, info }); return true;
     }
 
-    // Dispečink — rozdělení vozů, jména skupin a typy návěsů upraví každý s přístupem k modulu (provozní věc dispečinku);
-    // cíle KPI mění jen správce.
+    // Dispečink — rozdělení vozů, jména skupin, typy návěsů i cíle nastavuje jen správce (David, 2026-10-29: „editovatelnost dej jen mě").
     if (p === '/api/doprava/dispecink' && req.method === 'POST') {
+      if (!host.isAdmin(req)) { json(res, 403, { chyba: 'Rozdělení mikroflotil a cíle nastavuje správce.' }); return true; }
       let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
       const d = readDisp();
       if (b.navesy && typeof b.navesy === 'object') { d.navesy = {}; Object.keys(b.navesy).forEach((c) => { const t = String(b.navesy[c] || '').trim().slice(0, 40); if (t) d.navesy[String(c).trim()] = t; }); }
