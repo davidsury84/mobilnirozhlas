@@ -188,7 +188,7 @@ function mount(host) {
       if (cvzPrefixCol >= 0) { const pre = String(row[cvzPrefixCol] || '').trim(); if (/^\d{2}[A-Z]$/i.test(pre) && /^\d+[A-Z]?$/i.test(cvz)) cvz = pre.toUpperCase() + cvz.padStart(3, '0'); else if (!/^\d{2}[A-Z]/i.test(cvz)) continue; }
       if (/^\d{2}[A-Z]$/i.test(cvz)) { const nx = String(row[c.cvz + 1] == null ? '' : row[c.cvz + 1]).trim().replace(/\.0$/, ''); if (/^\d{1,4}$/.test(nx)) cvz = cvz + nx.padStart(3, '0'); else continue; }   // Chomutov: „26C“ | „001“
       cvz = cvz.toUpperCase().replace(/[\s\-*]/g, '');   // hvězdička u ČVZ (26S171*) nemá pro párování význam — stejná zakázka jako bez ní
-      if (items[cvz]) { items[cvz]._dup = (items[cvz]._dup || 0) + 1; }   // dvojí řádek téže zakázky (s * i bez): první vyhrává, počet duplicit jen pro informaci
+      if (items[cvz]) { items[cvz]._dup = (items[cvz]._dup || 0) + 1; continue; }   // dvojí řádek téže zakázky (s * i bez): první vyhrává, počet duplicit jen pro informaci
       const S = i => i >= 0 ? String(row[i] == null ? '' : row[i]).trim() : '';
       const ks = parseFloat(String(S(c.ks)).replace(',', '.'));
       items[cvz] = { vyrobek: S(c.vyr), ks: isFinite(ks) ? ks : null, helios: S(c.helios).replace(/\.0$/, ''), ral: S(c.ral), zakaznik: S(c.zak), termin: S(c.termin), skutecny: S(c.skut), exp: S(c.exp), kontakt: S(c.kontakt),
