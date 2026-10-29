@@ -4211,7 +4211,7 @@ function vykRenderDetail(){
     +'</div>':'')
     +(VYK_GRP.has(VYK.tab)?'<div id="vykG-zakazky" style="display:'+(VYK.tab==='zakazky'?'':'none')+'">'
     +'<div class="card pad" style="margin-bottom:14px;'+VYK_KO+'"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:14px">Zakázky (ČVZ)</b>'+vykObdPill()+'<input id="vykCvzQ" placeholder="🔍 ČVZ / zakázka / zákazník…" value="'+esc(VYK.cvzQ)+'" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
-      +'<span class="muted" style="font-size:12px">'+(d.plan?'spárováno s plánem výroby: <b>'+d.sparovano+' z '+d.cvz.length+'</b> (list „'+esc(d.plan.tab)+'", '+d.plan.items+' zakázek)':'<span style="color:#a86a00">plán výroby zatím nenačten</span>')+'</span></div>'+vykPlanObdobi(d)+'<div id="vykCvz" style="overflow-x:auto;margin-top:10px"></div></div>'
+      +'<span class="muted" style="font-size:12px">'+(d.plan?'spárováno s plánem výroby: <b>'+d.sparovano+' z '+(d.cvzCelkem||d.cvz.length)+'</b> (list „'+esc(d.plan.tab)+'", '+d.plan.items+' zakázek)':'<span style="color:#a86a00">plán výroby zatím nenačten</span>')+'</span></div>'+vykPlanObdobi(d)+'<div id="vykCvz" style="overflow-x:auto;margin-top:10px"></div></div>'
     +'</div>':'');
   const ms=document.getElementById('vykMes'); if(ms) ms.onchange=function(){ if(this.value){ VYK.preset='mesic'; VYK.mesic=this.value; vykLoadZavod(); } };
   if(VYK.tab==='ind'){ vykIndLoad(); return; }
