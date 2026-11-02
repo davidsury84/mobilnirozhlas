@@ -167,6 +167,9 @@ function mount(host) {
   // do dvou sloupců (Abroly: „26B" | „594") se skládá dohromady. Fáze = sloupce Dělírna/Svařovna/… s „x".
   // Sloupec poznámky v plánu výroby (volný text): Chomutov G, Supíkovice J, Bruntál F — storno / převedeno jinam / ze skladu / nevyrábět = zakázka se nepočítá mezi „bez odvedené operace“
   const PLAN_POZN_COL = { chomutov: 'G', supikovice: 'J', abroly: 'F' };
+  // Sloupec „OPAKOVANÉ ZAKÁZKA - KÓD“: Chomutov W, Bruntál AD, Supíkovice Y — vyplněný kód výrobku / odkaz na starší ČVZ = opakovaná zakázka, výkres existuje (bez schvalování)
+  const PLAN_OPAK_COL = { chomutov: 'W', abroly: 'AD', supikovice: 'Y' };
+  const jeKodOpakovani = v => { const s = String(v || '').trim(); if (!s) return false; if (/^(2\d-?[A-Z]-?\d{2,4}|xxx)$/i.test(s)) return true; if ((s.match(/\s/g) || []).length > 2) return false; return /^[A-Z0-9][A-Z0-9 ._\/,x\-]*$/i.test(s) && /[A-Z]/i.test(s) && /\d/.test(s); };
   const colIdx = L => String(L || '').toUpperCase().split('').reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0) - 1;
   const RE_STORNO = /storno|zru[šs]en|p[řr]eveden|p[řr]esun|ze skladu|vzaty ze zak|na 2\d[A-Z]\d|k zak[áa]zce 2\d|nevyr[áa]b|v\s*PL\b|polsk|j[ií]n[ýy] z[áa]vod/i;
   const jeStornoNeboPresun = pozn => RE_STORNO.test(String(pozn || ''));
@@ -198,7 +201,7 @@ function mount(host) {
       const ks = parseFloat(String(S(c.ks)).replace(',', '.'));
       items[cvz] = { vyrobek: S(c.vyr), ks: isFinite(ks) ? ks : null, helios: S(c.helios).replace(/\.0$/, ''), ral: S(c.ral), zakaznik: S(c.zak), termin: S(c.termin), skutecny: S(c.skut), exp: S(c.exp), kontakt: S(c.kontakt),
         faze: faze.map(f => ({ n: f.n, ok: !!String(row[f.i] == null ? '' : row[f.i]).trim() })), row: r + 1,   // row = číslo řádku v tabulce (1-based)
-        pozn: opts && opts.poznIdx >= 0 ? String(row[opts.poznIdx] == null ? '' : row[opts.poznIdx]).trim() : '' };
+        pozn: opts && opts.poznIdx >= 0 ? String(row[opts.poznIdx] == null ? '' : row[opts.poznIdx]).trim() : '', opak: opts && opts.opakIdx >= 0 ? String(row[opts.opakIdx] == null ? '' : row[opts.opakIdx]).trim() : '' };
     }
     // hlavička pro zobrazení celého řádku: kde je 2. řádek prázdný, doplní se skupinový název z 1. řádku
     const labels = H.map((h, i) => h || H0[i] || '');
@@ -229,7 +232,7 @@ function mount(host) {
     } catch (e) { return { ok: false, error: 'listy: ' + e.message }; }
     const range = (tab ? "'" + tab.replace(/'/g, "''") + "'!" : '') + 'A1:AZ5000';
     const r = await host.sheetsGet(z.plan.sheetId, range);
-    const p = parsePlanValues((r && r.values) || [], { poznIdx: PLAN_POZN_COL[z.key] ? colIdx(PLAN_POZN_COL[z.key]) : -1 });
+    const p = parsePlanValues((r && r.values) || [], { poznIdx: PLAN_POZN_COL[z.key] ? colIdx(PLAN_POZN_COL[z.key]) : -1, opakIdx: PLAN_OPAK_COL[z.key] ? colIdx(PLAN_OPAK_COL[z.key]) : -1 });
     const n = Object.keys(p.items).length;
     if (!n) return { ok: false, error: 'list „' + tab + '": ' + (p.warn || 'žádné zakázky') };
     // Chomutov: muldy svařované v závodě se neodvádějí v Heliosu — denní počty jsou v listu „kapa-plán Mulden“ („2x215, 1x216“ = ks × číslo zakázky)
@@ -1293,7 +1296,7 @@ function mount(host) {
     const dnes = new Date().toISOString().slice(0, 10); const posun = (iso, d) => { const t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); }; const dni = (a, b) => Math.round((new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 86400000);
     const vOkne = ([cvz, p]) => { const t = isoT(p.termin); return !maCvz.has(cvz) && t && t >= limD && t <= limH && !/plachta|víko|viko|náhradn|nahradn|nájezd|najezd|rámeč|ramec|síť|sit\b|střech|strech|oprav|plato|^nd[ -]/i.test(p.vyrobek || ''); };
     const kand = Object.entries(P).filter(vOkne); const vyrStorno = kand.filter(([c, p]) => jeStornoNeboPresun(p.pozn)).length, vyrPL = kand.filter(([c, p]) => !jeStornoNeboPresun(p.pozn) && jeZPL(c)).length;
-    const out = kand.filter(([cvz, p]) => !jeStornoNeboPresun(p.pozn) && !jeZPL(cvz)).map(([cvz, p]) => { const t = isoT(p.termin); const z8 = t ? posun(t, -56) : '', z6 = t ? posun(t, -42) : ''; return { cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t, row: p.row, url: url(p.row), pozn: p.pozn || '', zadani8: z8, zadani6: z6, zbyva8: t ? dni(z8, dnes) : null, zbyva6: t ? dni(z6, dnes) : null, poTerminu: !!t && t < dnes }; }).sort((a, b) => a.t.localeCompare(b.t));
+    const out = kand.filter(([cvz, p]) => !jeStornoNeboPresun(p.pozn) && !jeZPL(cvz)).map(([cvz, p]) => { const t = isoT(p.termin); const z8 = t ? posun(t, -56) : '', z6 = t ? posun(t, -42) : ''; return { cvz, vyrobek: p.vyrobek, ks: p.ks, zakaznik: p.zakaznik, termin: p.termin, t, row: p.row, url: url(p.row), pozn: p.pozn || '', opak: jeKodOpakovani(p.opak) ? p.opak : '', opakovana: jeKodOpakovani(p.opak), zadani8: z8, zadani6: z6, zbyva8: t ? dni(z8, dnes) : null, zbyva6: t ? dni(z6, dnes) : null, poTerminu: !!t && t < dnes }; }).sort((a, b) => a.t.localeCompare(b.t));
     out.vyrazenoStorno = vyrStorno; out.vyrazenoPL = vyrPL;   // počty vyřazených ve stejném okně (pro hlavičku)
     return out;
   }
@@ -1319,9 +1322,9 @@ function mount(host) {
       + '</tbody></table>'
       // zakázky z plánu bez jediné odvedené operace s termínem expedice do 6 týdnů (vč. prošlých za 90 dní) — po závodech jako seznam
       + (() => { const bloky = ZAVODY.map(z => { let L = []; try { L = nezacateZakazky(z.key, 42, 42); } catch (_) {} return { z, L }; }); const CAP = 25; const n = bloky.reduce((s, b) => s + b.L.length, 0); const poTerm = bloky.reduce((s, b) => s + b.L.filter(x => x.t < dnes).length, 0);
-        return '<h3 style="margin:16px 0 4px;font-size:15px;color:' + (n ? '#c93a39' : '#0a7a0a') + '">Zakázky z plánu bez jediné odvedené operace s termínem expedice do 6 týdnů: ' + n + (poTerm ? ' (po termínu ' + poTerm + ')' : '') + '</h3>'
+        const nove = bloky.reduce((s, b) => s + b.L.filter(x => !x.opakovana).length, 0); return '<h3 style="margin:16px 0 4px;font-size:15px;color:' + (n ? '#c93a39' : '#0a7a0a') + '">Zakázky z plánu bez jediné odvedené operace s termínem expedice do 6 týdnů: ' + n + (poTerm ? ' (po termínu ' + poTerm + ')' : '') + (n ? ' · z toho ' + (n - nove) + ' opakovaných (výkres je) a ' + nove + ' s novým výkresem' : '') + '</h3>'
           + '<p style="color:#6b736c;margin:0 0 8px;font-size:12.5px">Zakázka je v plánu výroby (ČVZ, termín do 6 týdnů dopředu nebo prošlý za posledních 6 týdnů), ale v Heliosu na ni letos není odvedená ani dělírna. Doplňky (plachty, víka, střechy, ND), zakázky se stornem / převedené (poznámka v plánu) a výrobky vyráběné v PL (jen lakování na závodě, stačí 3–7 dní před expedicí; podle Order book PL) se neuvádějí. Červeně = termín už prošel.</p>'
-          + bloky.map(b => '<div style="margin:0 0 8px"><b>' + esc(b.z.name) + '</b>' + (b.L.length ? '<ul style="margin:4px 0 0 18px;padding:0;font-size:13px">' + b.L.slice(0, CAP).map(x => '<li style="margin:1px 0' + (x.t < dnes ? ';color:#c93a39;font-weight:600' : '') + '">' + (x.url ? '<a href="' + esc(x.url) + '" style="color:inherit">' + esc(x.cvz) + '</a>' : esc(x.cvz)) + ' · ' + esc(x.vyrobek || '') + (x.ks != null ? ' · ' + x.ks + ' ks' : '') + ' · ' + esc(x.zakaznik || '') + ' · termín ' + esc(x.termin || '') + (x.t < dnes ? ' (po termínu)' : '') + '</li>').join('') + (b.L.length > CAP ? '<li style="color:#6b736c">… a dalších ' + (b.L.length - CAP) + ' (celý seznam v kartě Plán závodu)</li>' : '') + '</ul>' : ' <span style="color:#0a7a0a">— žádné</span>') + '</div>').join('');
+          + bloky.map(b => '<div style="margin:0 0 8px"><b>' + esc(b.z.name) + '</b>' + (b.L.length ? '<ul style="margin:4px 0 0 18px;padding:0;font-size:13px">' + b.L.slice(0, CAP).map(x => '<li style="margin:1px 0' + (x.t < dnes ? ';color:#c93a39;font-weight:600' : '') + '">' + (x.url ? '<a href="' + esc(x.url) + '" style="color:inherit">' + esc(x.cvz) + '</a>' : esc(x.cvz)) + ' · ' + esc(x.vyrobek || '') + (x.ks != null ? ' · ' + x.ks + ' ks' : '') + ' · ' + esc(x.zakaznik || '') + ' · termín ' + esc(x.termin || '') + (x.t < dnes ? ' (po termínu)' : '') + (x.opakovana ? ' · <span style="color:#0a7a0a">opakovaná, výkres je</span>' : ' · <span style="color:#b57400">nový výkres</span>') + '</li>').join('') + (b.L.length > CAP ? '<li style="color:#6b736c">… a dalších ' + (b.L.length - CAP) + ' (celý seznam v kartě Plán závodu)</li>' : '') + '</ul>' : ' <span style="color:#0a7a0a">— žádné</span>') + '</div>').join('');
       })()
       + '<p style="margin:8px 0 0;font-size:13px"><a href="' + esc(url) + '" style="color:#1f4e79">→ Výkonnost středisek v intranetu (záložka Hotové po týdnech, karta Plán závodu)</a></p>';
     const nezacate = ZAVODY.reduce((s, z) => { try { return s + nezacateZakazky(z.key, 42, 42).length; } catch (_) { return s; } }, 0);
