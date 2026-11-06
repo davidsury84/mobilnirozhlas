@@ -2997,7 +2997,7 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   // (dotazník dodavatelů). Objednávky před D jedou za staré ceny → vyplatí se vzít navíc
   // zásobu i na měsíce PO zdražení, dokud úspora X % převyšuje náklad na držení (ICC/12
   // měsíčně): E = min(6, X / držení_měs). Aktivuje se až ≤3 měsíce před D.
-  let fwd=null;
+  let fwd=null; const recPredFwd=rec;
   const supCfg=(typeof OBJ_DATA!=='undefined'&&OBJ_DATA&&OBJ_DATA.suppliers)?OBJ_DATA.suppliers[x.skupina]:null;
   if(supCfg&&+supCfg.zdrazeniPct>0&&supCfg.zdrazeniOd&&D>0&&!utichla&&!vyrazeno&&(x.avail||0)>=0){
     const mUntil=(new Date(supCfg.zdrazeniOd)-Date.now())/2592000000;
@@ -3016,8 +3016,13 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
       }
     } else if(mUntil>3&&rec>0){ status+=' · zdražení od '+supCfg.zdrazeniOd; }
   }
+  // STROP 12 MĚSÍCŮ (pokyn 6. 11. 2026): pozice + objednávka nesmí přesáhnout poptávku za 12 měsíců dopředu.
+  // Rezervace (záporná pozice) se vykryjí vždy. Platí i pro předzásobení před zdražením a nové položky.
+  const dem12=sd(12); let strop12=false, nadZasoba=false;
+  if(rec>0){ const maxRec=Math.max(position<0?-position:0,Math.round(dem12-position)); if(rec>maxRec){ rec=maxRec; strop12=true; status+=' · strop 12 měs.'; if(fwd){ fwd.navic=Math.max(0,rec-recPredFwd); fwd.uspora=Math.round(fwd.navic*unitC*fwd.pct/100); if(!fwd.navic)fwd=null; } } }
+  if(dem12>0&&position>dem12){ nadZasoba=true; if(rec===0&&!/strop|Vyřazeno|Utichlo/.test(status))status='Zásoba přes 12 měsíců'; }
   const coverAfter=objForwardCover((x.avail||0)+(x.onOrder||0)+rec,dem,m0);
-  return {D,rec,status,ramp,nova,fwd,value:unitC*rec,windowDem:Math.round(windowDem),demZ,coverAfter:coverAfter,
+  return {D,rec,status,ramp,nova,fwd,value:unitC*rec,windowDem:Math.round(windowDem),demZ,strop12,nadZasoba,dem12:Math.round(dem12),coverAfter:coverAfter,
     utichla,vyrazeno,dec:dec||null,silentM,utichlaKs,utichlaVal:unitC*utichlaKs,
     lastSale:(utichla||vyrazeno)?objLastSale(sales):'',
     pattern:(utichla||vyrazeno)?objSalesPattern(sales):null};
@@ -3065,10 +3070,10 @@ function objAskCard(x){
   let why;
   if(over) why=(o.demZ==='průměr'?'Poptávka pro objednávku počítána z ročního průměru ('+fmt(Math.round(o.D/12))+' ks/měs), ne ze sezónního profilu — rezervace dokazují, že se prodává teď. ':o.demZ==='denní pohyby'?'Poptávka pro objednávku počítána z denních pohybů ze skladu ('+fmt(Math.round(x.recentDaily*30))+' ks/měs za posledních '+fmt(x.moveDays)+' dnů) — vyšší než sezónní profil. ':'')+'Rezervace zákazníků ('+fmt(x.reserved)+' ks) přesahují sklad ('+fmt(x.stock)+' ks). '+(rec>0?('Objednávka pokrývá schodek '+(x.onOrder>0?('(z toho už objednáno '+fmt(x.onOrder)+' ks) '):'')+'a doplní zásobu na dodací lhůtu + 2 měsíce.'):('Schodek už kryje objednané zboží ('+fmt(x.onOrder)+' ks na cestě) — objednávat netřeba.'));
   else if(/Náběh/.test(st)) why='Náběh sezóny '+(s?s.peak:'')+' — předzásobení na nadcházející špičku s předstihem o dodací lhůtu.';
-  else if(/Objednat/.test(st)) why=(o.demZ==='denní pohyby'?'Poptávka počítána z denních pohybů ze skladu ('+fmt(Math.round(x.recentDaily*30))+' ks/měs za '+fmt(x.moveDays)+' dnů), které běží nad sezónním profilem. ':'')+'Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) klesla pod bod objednání. Doplnění na cílovou zásobu za dodací lhůtu + 2 měsíce (~'+fmt(o.windowDem)+' ks).';
+  else if(/Objednat/.test(st)) why=(o.strop12?'Objednávka OMEZENA stropem 12 měsíců: pozice + objednávka nesmí přesáhnout roční poptávku ('+fmt(o.dem12)+' ks). ':'')+(o.demZ==='denní pohyby'?'Poptávka počítána z denních pohybů ze skladu ('+fmt(Math.round(x.recentDaily*30))+' ks/měs za '+fmt(x.moveDays)+' dnů), které běží nad sezónním profilem. ':'')+'Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) klesla pod bod objednání. Doplnění na cílovou zásobu za dodací lhůtu + 2 měsíce (~'+fmt(o.windowDem)+' ks).';
   else if(/Mimo sezónu/.test(st)) why='Teď se prakticky neprodává — objednávej až před sezónou, ne s ročním předstihem.';
   else if(/Bez prodeje/.test(st)) why='Za poslední rok bez prodeje — neobjednávat.';
-  else why='Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) pokrývá poptávku za dodací lhůtu + 2 měsíce. Objednávat teď netřeba.';
+  else why=(o.nadZasoba?'ZÁSOBA PŘES 12 MĚSÍCŮ: pozice '+fmt((x.avail||0)+(x.onOrder||0))+' ks převyšuje roční poptávku '+fmt(o.dem12)+' ks — neobjednávat, zvážit doprodej. ':'')+'Pozice (dispo '+fmt(x.avail)+' + objednáno '+fmt(x.onOrder)+' = '+fmt((x.avail||0)+(x.onOrder||0))+' ks) pokrývá poptávku za dodací lhůtu + 2 měsíce. Objednávat teď netřeba.';
   const chip=(l,v)=>'<div style="background:#fff;border:1px solid #e0e6df;border-radius:8px;padding:6px 9px"><div style="font-size:11px;color:#8a938a">'+l+'</div><div style="font-weight:700">'+v+'</div></div>';
   return '<div style="background:#fff;border:1px solid #dbe2d8;border-radius:12px;padding:14px 16px">'
     +'<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">'

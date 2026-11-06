@@ -1207,7 +1207,7 @@ function mount(host) {
     // v DENNICH pohybech — ta je ziva bez ohledu na to, co rika starsi kvartalni report.
     // Predzasobeni pred ohlasenym zdrazenim dodavatele (dotaznik): aktivace <=3 mesice pred datem,
     // navic zasoba na E = min(6, zdrazeni% / drzeni%/mes) mesicu po zdrazeni (drzeni default 2 %/mes).
-    let fwd = null;
+    let fwd = null; const recPredFwd = rec;
     const supC = loadSup()[x.skupina];
     if (supC && +supC.zdrazeniPct > 0 && supC.zdrazeniOd && D > 0 && (x.avail || 0) >= 0) {
       const mUntil = (new Date(supC.zdrazeniOd) - Date.now()) / 2592000000;
@@ -1240,8 +1240,12 @@ function mount(host) {
     const vyrazeno = !!(dec && dec.stav === 'vyrazeno');
     if (vyrazeno) { utichlaKs = rec; rec = 0; status = 'vyřazeno (rozhodnutí nákupu)'; }
     else if (utichla) { utichlaKs = rec; rec = 0; status = 'utichlo — rozhodnout'; }
+    // STROP 12 MĚSÍCŮ (pokyn 2026-11-06): pozice + objednávka ≤ poptávka za 12 měsíců; rezervace se vykryjí vždy
+    const dem12 = sd(12); let strop12 = false, nadZasoba = false;
+    if (rec > 0) { const maxRec = Math.max(position < 0 ? -position : 0, Math.round(dem12 - position)); if (rec > maxRec) { rec = maxRec; strop12 = true; status += ' · strop 12 měs.'; if (fwd) { fwd.navic = Math.max(0, rec - recPredFwd); fwd.uspora = Math.round(fwd.navic * unitC * fwd.pct / 100); if (!fwd.navic) fwd = null; } } }
+    if (dem12 > 0 && position > dem12) { nadZasoba = true; if (rec === 0 && !/strop|vyřazeno|utichlo/.test(status)) status = 'zásoba přes 12 měsíců'; }
     const coverAfter = fwdCover((x.avail || 0) + (x.onOrder || 0) + rec, dem, m0);
-    return { D, rec, status, ramp, fwd, value: unitC * rec, coverAfter,
+    return { D, rec, status, ramp, fwd, value: unitC * rec, coverAfter, strop12, nadZasoba, dem12: Math.round(dem12),
       utichla, vyrazeno, dec: dec || null, silentM, utichlaKs, utichlaVal: unitC * utichlaKs,
       lastSale: (utichla || vyrazeno) ? lastSaleTxt(sales) : '',
       pattern: (utichla || vyrazeno) ? salesPattern(sales) : null, missed };
