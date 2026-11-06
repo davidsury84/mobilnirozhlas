@@ -2963,7 +2963,11 @@ function objComputeOrder(x,sales,P,m0,sea,dem){
   const flatM=D/12;
   if((x.avail||0)<0 && flatM*windowM>windowDem){ windowDem=flatM*windowM; leadDem=Math.max(leadDem,flatM*Lm); demZ='průměr'; }
   // Denní pohyby ze skladu (aspoň 10 dnů) ukazují vyšší spotřebu než sezónní profil → okno z nich (pokyn 2026-10-27)
-  const denM=(x.recentDaily>0&&(x.moveDays||0)>=10)?x.recentDaily*30:0;
+  // Brzda (čerpadlo Viscomat, 6. 11.): pár kusů v posledních dnech u položky, která se prodává jednou za rok, nesmí
+  // udělat měsíční spotřebu. Pravidlo platí jen při aspoň 3 ks v okně pohybů, u položky s historií ≥ 12 ks/rok,
+  // a nejvýš do trojnásobku ročního průměru.
+  const movKs=(x.recentDaily||0)*(x.moveDays||0);
+  let denM=(x.recentDaily>0&&(x.moveDays||0)>=10&&movKs>=3&&D>=12)?Math.min(x.recentDaily*30,3*flatM):0;
   if(denM*windowM>windowDem){ windowDem=denM*windowM; leadDem=Math.max(leadDem,denM*Lm); demZ='denní pohyby'; }
   const rop=Math.round(leadDem+P.Z*Math.sqrt(Math.max(0,leadDem)));
   const position=(x.avail||0)+(x.onOrder||0);

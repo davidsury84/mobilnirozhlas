@@ -1185,7 +1185,9 @@ function mount(host) {
     // rezervace nad sklad = prodává se teď → okno aspoň z ročního průměru (stejně jako v appce)
     if ((x.avail || 0) < 0 && D > 0) { const flatM = D / 12; if (flatM * windowM > windowDem) { windowDem = flatM * windowM; leadDem = Math.max(leadDem, flatM * Lm); } }
     // denní pohyby ze skladu (≥ 10 dnů) nad sezónním profilem → okno z nich (stejně jako v appce)
-    const denM = (x.recentDaily > 0 && (x.moveDays || 0) >= 10) ? x.recentDaily * 30 : 0;
+    // brzda: jen při ≥ 3 ks v okně pohybů, historii ≥ 12 ks/rok a nejvýš 3× roční průměr (stejně jako v appce)
+    const movKs = (x.recentDaily || 0) * (x.moveDays || 0), flatM0 = D / 12;
+    const denM = (x.recentDaily > 0 && (x.moveDays || 0) >= 10 && movKs >= 3 && D >= 12) ? Math.min(x.recentDaily * 30, 3 * flatM0) : 0;
     if (denM * windowM > windowDem) { windowDem = denM * windowM; leadDem = Math.max(leadDem, denM * Lm); }
     const rop = Math.round(leadDem + Z * Math.sqrt(Math.max(0, leadDem)));
     const position = (x.avail || 0) + (x.onOrder || 0);
