@@ -481,6 +481,7 @@ var K_L10N = {
 'Hledám…':['Searching…','Suche…','Szukam…','Пошук…','Se caută…'],
 'Správce':['Administrator','Administrator','Administrator','Адміністратор','Administrator'],
 'Konstruktér':['Designer','Konstrukteur','Konstruktor','Конструктор','Proiectant'],
+'Konstruktér:':['Designer:','Konstrukteur:','Konstruktor:','Конструктор:','Proiectant:'],
 'Konstruktéři':['Designers','Konstrukteure','Konstruktorzy','Конструктори','Proiectanți'],
 'Obchodník':['Sales rep','Vertrieb','Handlowiec','Менеджер з продажу','Reprezentant vânzări'],
 'Šéf konstrukce':['Head of engineering','Konstruktionsleiter','Kierownik konstrukcji','Керівник конструкції','Șef proiectare'],
@@ -3022,7 +3023,10 @@ function actionsFor(z){
   if(z.stav==='prideleni'&&canSef){blocks.push(assignBlock(z))}
 
   if((z.stav==='prace'||z.stav==='revize')&&canKon){blocks.push(konstrukterBlock(z))}
-  if((z.stav==='prace'||z.stav==='revize')&&canSef&&!canKon){blocks.push('<div class="actions">'+assignReassign(z)+'</div>')}
+  /* Přeřazení konstruktéra: šéf konstrukce kdykoli během běžící zakázky — i když je sám přiřazeným konstruktérem
+     (Andrey = šéf + konstruktér; dřív se mu u vlastních zakázek volba schovala). Server přeřazení povoluje v každém
+     stavu, tady se nabízí ve všech krocích, kde na konstruktérovi záleží. */
+  if(PRERADIT_STAVY.indexOf(z.stav)>=0&&canSef){blocks.push(preraditBlock(z))}
 
   if(z.stav==='kontrola'&&canSef){blocks.push(
     '<div class="card" style="background:#faf7fc"><b>Interní kontrola</b>'+
@@ -3057,6 +3061,12 @@ function assignBlock(z){
     '<div class="row" style="margin-top:6px">'+konstrSelect('asg_'+z.id,z.family)+'<button class="btn sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přidělit</button></div></div>';
 }
 function assignReassign(z){return konstrSelect('asg_'+z.id,z.family)+'<button class="btn ghost sm" onclick="assign(\''+z.id+'\',\'asg_'+z.id+'\')">Přeřadit</button>'}
+/* Stavy, ve kterých šéf konstrukce může zakázku přeřadit jinému konstruktérovi (běžící kroky s konstruktérem). */
+var PRERADIT_STAVY=['prace','kontrola','revize','obchodnik','klient','schvaleno'];
+function preraditBlock(z){
+  return '<div class="actions" style="align-items:center;gap:8px;flex-wrap:wrap">'+
+    '<span class="muted" style="font-size:12.5px">Konstruktér: <b>'+esc(z.assignedName||'—')+'</b></span>'+assignReassign(z)+'</div>';
+}
 // konstruktér pokrývá rodinu, pokud nemá skupiny (=všechny) nebo ji má v seznamu
 function konstrCoversFamily(email,family){var c=(D.konstrukteri||[]).find(function(x){return x.email===email});if(!c)return true;return !family||!c.groups||!c.groups.length||c.groups.indexOf(family)>=0;}
 function strediskoSelect(id,sel){

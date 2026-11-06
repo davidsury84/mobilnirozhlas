@@ -2263,6 +2263,8 @@ function mount(host) {
     if (z.stav === 'prideleni') enterState(d, z, 'prace');
     audit(z, me.email, prev ? 'Přeřazení' : 'Přidělení', 'konstruktér: ' + empName(konstrukter) + (b.duvod ? ' — ' + b.duvod : ''));
     notify(d, konstrukter, 'Byl vám přidělen výkres ' + z.cislo + ' (' + z.zakaznik + '). Termín zkreslení: ' + fmtDate(z.deadline) + '.', z.id);
+    // původní konstruktér se o přeřazení dozví v aplikaci (ať na zakázce nepracuje dál)
+    if (prev && prev.toLowerCase() !== konstrukter && prev.toLowerCase() !== me.email) notify(d, prev, 'Zakázka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') byla přeřazena na ' + empName(konstrukter) + '.', z.id);
     save(d);
     mail(konstrukter, 'Přidělen výkres · ' + z.cislo, 'Byl vám přidělen požadavek na výkres.\n\nČíslo: ' + z.cislo + '\nZákazník: ' + z.zakaznik + '\nTermín zkreslení: ' + fmtDate(z.deadline) + '\n\nOtevřete intranet → Konstrukce.');
     json(res, 200, { ok: true });
@@ -2688,6 +2690,7 @@ function mount(host) {
     if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
     const text = String(b.text || '').trim().slice(0, 2000);
     if (!text) { json(res, 400, { chyba: 'Prázdný komentář.' }); return true; }
+    notifyKomentar(d, z, me.email, me.name || empName(me.email), text);   // před uložením komentáře: autor se sám neupozorňuje, dřívější pisatelé ano
     addComment(z, me, 'internal', text);
     save(d);
     json(res, 200, { ok: true });
@@ -2923,6 +2926,26 @@ function mount(host) {
     console.log('[konstrukce] zakázka ' + (z.cisloObj || z.cislo) + ' (' + z.zakaznik + ') smazána uživatelem ' + me.email);
     json(res, 200, { ok: true });
     return true;
+  }
+  // Lidé, kteří na zakázce pracují: obchodník, přiřazený konstruktér, šéf konstrukce,
+  // výrobní ředitel zvoleného závodu a každý, kdo už k zakázce psal interní komentář.
+  function ucastniciZakazky(d, z) {
+    const out = new Set();
+    const add = e => { e = String(e || '').toLowerCase().trim(); if (e) out.add(e); };
+    add(z.obchodnikEmail); add(z.assignedTo);
+    employeesWithRole('sef').forEach(add);
+    if (z.strediskoKey) add(oblastReditel(d, z.strediskoKey));
+    (z.comments || []).forEach(c => { if (c.role !== 'client') add(c.author); });
+    return out;
+  }
+  // Upozornění v aplikaci na nový komentář — všem účastníkům kromě autora.
+  function notifyKomentar(d, z, autorEmail, autorJmeno, text) {
+    const ukazka = text.length > 90 ? text.slice(0, 90) + '…' : text;
+    const me = String(autorEmail || '').toLowerCase();
+    for (const em of ucastniciZakazky(d, z)) {
+      if (em === me) continue;
+      notify(d, em, '💬 ' + (autorJmeno || 'Někdo') + ' ke ' + (z.cisloObj || z.cislo) + ': „' + ukazka + '“', z.id);
+    }
   }
   function addComment(z, me, role, text) {
     if (!Array.isArray(z.comments)) z.comments = [];
@@ -3419,6 +3442,7 @@ function mount(host) {
       z.stav = 'zamitnuto'; z.deadline = null; z.closedAt = Date.now(); zapisKrok(z, 'zamitnuto', z.closedAt);
       audit(z, (name || 'klient') + ' (klient)', 'Klient zamítl', duvod + ' — IP ' + ip);
       notify(d, z.obchodnikEmail, 'Klient ZAMÍTL výkres ' + z.cislo + '. Řešte další postup.', z.id);
+      for (const em of ucastniciZakazky(d, z)) if (em !== (z.obchodnikEmail || '').toLowerCase()) notify(d, em, 'Klient ZAMÍTL výkres ' + z.cislo + ': „' + duvod.slice(0, 90) + (duvod.length > 90 ? '…' : '') + '“', z.id);
       save(d);
       mail(z.obchodnikEmail, 'Klient zamítl výkres · ' + z.cislo, 'Klient ' + (name || '') + ' zamítl výkres ' + z.cislo + '.\nDůvod: ' + duvod + '\n\nDomluvte se zákazníkem na dalším postupu.', z);
     } else if (action === 'pripominky') {
