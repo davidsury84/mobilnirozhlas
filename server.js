@@ -700,7 +700,7 @@ function loadConfig() {
 }
 let CFG = loadConfig();
 function writeConfig(obj) { const cur = readJson(CFG_F, {}); const merged = Object.assign({}, cur, obj); if (obj.pass === undefined || obj.pass === '') merged.pass = cur.pass || ''; writeJson(CFG_F, merged); CFG = loadConfig(); }
-function configStatus() { return { configured: !!(CFG.host && CFG.user), host: CFG.host, port: CFG.port, secure: CFG.secure, user: CFG.user, fromName: CFG.fromName, hasPass: !!CFG.pass }; }
+function configStatus() { return { configured: !!(CFG.host && CFG.user), host: CFG.host, port: CFG.port, secure: CFG.secure, user: CFG.user, fromName: CFG.fromName, hasPass: !!CFG.pass, blokovano: MAIL_NONPROD_BLOCK ? 'neprodukční prostředí Railway „' + RAILWAY_ENV + '"' : ((process.env.MAIL_DRY_RUN || '') === '1' ? 'MAIL_DRY_RUN' : '') }; }
 
 /* ============================================================
    SMTP klient (bez závislostí) – STARTTLS i SSL, AUTH LOGIN/PLAIN
@@ -976,6 +976,12 @@ async function rozesilkaAplikaceUloz(key, zmena) {
   return Object.assign({}, r.data.report, { key, module: a.nazev, externi: true, appUrl: base });
 }
 
+// Mimo produkční prostředí Railway (např. „test") se pošta NIKDY neposílá naostro. Taková instance se nasazuje
+// ze stejné větve a má zkopírované klíče (Resend), ale cizí nebo prázdná data — rozesílala by kolegům duplicitní
+// a prázdné reporty (stalo se: Qooling každé pondělí od 9/2026 z prostředí test). Povolí jen MAIL_ALLOW_NONPROD=1.
+const RAILWAY_ENV = process.env.RAILWAY_ENVIRONMENT_NAME || '';
+const MAIL_NONPROD_BLOCK = !!RAILWAY_ENV && RAILWAY_ENV !== 'production' && (process.env.MAIL_ALLOW_NONPROD || '') !== '1';
+if (MAIL_NONPROD_BLOCK) console.warn('[mail] Prostředí Railway „' + RAILWAY_ENV + '" není production → žádný e-mail se neodešle, jen se zaloguje (MAIL_ALLOW_NONPROD=1 by to povolilo).');
 function deliver(mail) {
   // Zpráva do denního souhrnu se neodesílá hned — zařadí se do fronty a ráno odejde
   // jedním e-mailem se vším ostatním. Platí jen pro interní adresáty.
@@ -1001,8 +1007,8 @@ function deliver(mail) {
   const zaznam = { ts: Date.now(), to: String((mail && mail.to) || ''), subject: String((mail && mail.subject) || '').slice(0, 200), from: String((mail && (mail.fromName || mail.fromAddr)) || '').slice(0, 100) };
   // MAIL_DRY_RUN=1 → nic se neodešle, jen se vypíše co by odešlo. Pro lokální běh s produkčními
   // proměnnými (railway run): jinak plánovač nad prázdným DATA_DIR rozešle všechny reporty naostro.
-  if ((process.env.MAIL_DRY_RUN || '') === '1') {
-    console.log('[mail:DRY_RUN] NEODESLÁNO → ' + zaznam.to + ' · ' + zaznam.subject);
+  if ((process.env.MAIL_DRY_RUN || '') === '1' || MAIL_NONPROD_BLOCK) {
+    console.log('[mail:' + (MAIL_NONPROD_BLOCK ? 'NEPRODUKČNÍ PROSTŘEDÍ ' + RAILWAY_ENV : 'DRY_RUN') + '] NEODESLÁNO → ' + zaznam.to + ' · ' + zaznam.subject);
     return Promise.resolve({ ok: true, dryRun: true });
   }
   const p = process.env.RESEND_API_KEY ? resendSend(mail) : smtpSend(CFG, mail);
