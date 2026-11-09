@@ -90,6 +90,8 @@ function mount(host) {
   const saveState = st => { try { fs.writeFileSync(STATE_F, JSON.stringify(st, null, 2)); } catch (_) {} };
   // data závodu se drží v paměti, dokud se soubor nezmění (každý dotaz je jinak parsoval znovu)
   const _dc = {};
+  // mtime souboru (0 = neexistuje) — klíč cache; data může přepsat i jiný proces (ruční sync přes railway ssh), proto nikdy necachovat „navždy“
+  const mtimeOf = f => { try { return fs.statSync(f).mtimeMs; } catch (_) { return 0; } };
   const loadData = k => { try { const f = DATA_F(k); const mt = fs.statSync(f).mtimeMs; if (_dc[k] && _dc[k].mt === mt) return _dc[k].d; const d = JSON.parse(fs.readFileSync(f, 'utf8')); _dc[k] = { mt, d }; return d; } catch (_) { return null; } };
   const loadPlan = k => { try { return JSON.parse(fs.readFileSync(PLAN_F(k), 'utf8')); } catch (_) { return null; } };
   const zavodOf = k => ZAVODY.find(z => z.key === k);
@@ -218,9 +220,9 @@ function mount(host) {
   // Hotové muldy z plánu pro závod (do data snímku), ČVZ → nepočítat podruhé z Heliosu
   let _mp = {};
   function muldyPlan(zKey) {
-    if (_mp[zKey]) return _mp[zKey];
+    const mt = mtimeOf(PLAN_F(zKey)); if (_mp[zKey] && _mp[zKey].mt === mt) return _mp[zKey];
     const P = loadPlan(zKey); const M = (P && P.muldy) || null; const dny = (M && M.dny) || [];
-    return (_mp[zKey] = { ma: !!M, tab: M ? M.tab : '', gid: M ? M.gid : null, sheetId: P ? P.sheetId : '', syncedAt: P ? P.syncedAt : '', dny, set: new Set(dny.map(x => x.cvz)), items: (P && P.items) || {} });
+    return (_mp[zKey] = { mt, ma: !!M, tab: M ? M.tab : '', gid: M ? M.gid : null, sheetId: P ? P.sheetId : '', syncedAt: P ? P.syncedAt : '', dny, set: new Set(dny.map(x => x.cvz)), items: (P && P.items) || {} });
   }
   async function syncPlan(z) {
     if (!host.sheetsGet || !z.plan || !z.plan.sheetId) return { ok: false, error: 'plán není nastaven' };
@@ -245,7 +247,7 @@ function mount(host) {
   // ---------- výrobky vyráběné v PL (jiný závod), na cílovém závodě se jen lakují → nepočítají se mezi „bez odvedené operace“, potřeba jen 3–7 dní před expedicí ----------
   // Zdroj: tabulka polské výroby „Order book active“ (+ „Delivered orders“), sloupec I = naše ČVZ, sloupec E = cílový závod, L = požadovaný termín
   const PL_SHEET = '1d9GEieuF9P3vlJXgIfuFFHJkmNZwUldB9NNfnVGlV0E', PL_F = path.join(dataDir, 'vykonnost-pl.json');
-  let _pl = null; const loadPL = () => { if (_pl) return _pl; try { _pl = JSON.parse(fs.readFileSync(PL_F, 'utf8')); } catch (_) { _pl = { items: {} }; } return _pl; };
+  let _pl = null, _plMt = -1; const loadPL = () => { const mt = mtimeOf(PL_F); if (_pl && _plMt === mt) return _pl; try { _pl = JSON.parse(fs.readFileSync(PL_F, 'utf8')); } catch (_) { _pl = { items: {} }; } _plMt = mt; return _pl; };
   const normCvz = s => String(s || '').toUpperCase().replace(/[\s\-*]/g, '');
   async function syncPL() {
     if (!host.sheetsGet) return { ok: false, error: 'sheetsGet není k dispozici' };
@@ -518,9 +520,9 @@ function mount(host) {
     return { ok: true, items: items.length, listy: diag.filter(d => d.items).length };
   }
   // index pro párování (líně, invalidace po syncu / změně mapy)
-  let _nIdx = null;
+  let _nIdx = null, _nIdxMt = -1;
   function normIndex() {
-    if (_nIdx) return _nIdx;
+    const nmt = mtimeOf(NORMY_F) + mtimeOf(NMAP_F); if (_nIdx && _nIdxMt === nmt) return _nIdx; _nIdxMt = nmt;
     const N = loadNormy(); const items = (N && N.items) || [];
     const byN = {}, byB = {}, byId = {}, bySP = {}, byKod = {}; items.forEach(n => { if (/^\d{3,4}$/.test(n.kod || '')) (byKod[n.kod] = byKod[n.kod] || []).push(n); const sp = /^SP (\d{3,4})$/.exec(n.kod || ''); if (sp) (bySP[sp[1]] = bySP[sp[1]] || []).push(n); (byN[n.opN] = byN[n.opN] || []).push(n); (byB[n.opB] = byB[n.opB] || []).push(n); byId[normId(n)] = n; });
     const keys = Object.keys(byB).filter(k => k.length >= 10).sort((a, b) => b.length - a.length);
@@ -1024,7 +1026,8 @@ function mount(host) {
   let _vc = {};
   // expedice závodu: po dnech/týdnech/měsících, podle typu výrobku (bez služeb), Kč bez daní
   function expedice(zKey) {
-    if (_vc[zKey]) return _vc[zKey]; const V = loadVyd(zKey); if (!V || !V.items.length) return (_vc[zKey] = null);
+    const vkey = mtimeOf(VYD_F(zKey)) + '|' + mtimeOf(PLAN_F(zKey)) + '|' + mtimeOf(DATA_F(zKey)); if (_vc[zKey] && _vc[zKey].k === vkey) return _vc[zKey].v;
+    const V = loadVyd(zKey); if (!V || !V.items.length) { _vc[zKey] = { k: vkey, v: null }; return null; }
     const komponenta = n => /střech|strech|víko|viko|náhradn|nahradn|plachta|žebř|zebr|^nd[ -]|^sd[ -]|rámeč|ramec/i.test(String(n || ''));
     // ČVZ: ve výdejkách chybí → z plánu výroby přes číslo zakázky Helios
     const PL = loadPlan(zKey); const helios2cvz = {}; if (PL && PL.items) Object.entries(PL.items).forEach(([cvz, it]) => { if (it.helios) helios2cvz[it.helios] = (helios2cvz[it.helios] ? helios2cvz[it.helios] + ', ' : '') + cvz; });
@@ -1036,9 +1039,10 @@ function mount(host) {
     vyr.forEach(x => { add(tyd, isoWeekOf(x.d), x); add(mes, x.d.slice(0, 7), x); add(dny, x.d, x); });
     const kcSluzby = V.items.filter(x => x.sluzba).reduce((s, x) => s + x.kc, 0);
     const rd = o => Object.keys(o).sort().map(k => Object.assign({ k }, o[k], { ks: Math.round(o[k].ks), abr: Math.round(o[k].abr), city: Math.round(o[k].city), muldy: Math.round(o[k].muldy), jine: Math.round(o[k].jine), kc: Math.round(o[k].kc) }));
-    return (_vc[zKey] = { od: V.od, snapshot: V.snapshot, syncedAt: V.syncedAt, radku: V.items.length, tydny: rd(tyd), mesice: rd(mes), dny: rd(dny), kcSluzby: Math.round(kcSluzby), celkem: { ks: Math.round(vyr.reduce((s, x) => s + x.mn, 0)), abr: Math.round(vyr.filter(x => T(x) === 'abr').reduce((s, x) => s + x.mn, 0)), city: Math.round(vyr.filter(x => T(x) === 'city').reduce((s, x) => s + x.mn, 0)), muldy: Math.round(vyr.filter(x => T(x) === 'muldy').reduce((s, x) => s + x.mn, 0)), jine: Math.round(vyr.filter(x => T(x) === 'jine').reduce((s, x) => s + x.mn, 0)), kc: Math.round(vyr.reduce((s, x) => s + x.kc, 0)) },
+    const _res = { od: V.od, snapshot: V.snapshot, syncedAt: V.syncedAt, radku: V.items.length, tydny: rd(tyd), mesice: rd(mes), dny: rd(dny), kcSluzby: Math.round(kcSluzby), celkem: { ks: Math.round(vyr.reduce((s, x) => s + x.mn, 0)), abr: Math.round(vyr.filter(x => T(x) === 'abr').reduce((s, x) => s + x.mn, 0)), city: Math.round(vyr.filter(x => T(x) === 'city').reduce((s, x) => s + x.mn, 0)), muldy: Math.round(vyr.filter(x => T(x) === 'muldy').reduce((s, x) => s + x.mn, 0)), jine: Math.round(vyr.filter(x => T(x) === 'jine').reduce((s, x) => s + x.mn, 0)), kc: Math.round(vyr.reduce((s, x) => s + x.kc, 0)) },
       cvzPokryti: vyr.length ? Math.round(vyr.filter(x => cvzOf(x)).length / vyr.length * 100) : 0,
-      posledni: V.items.slice(-40).reverse().map(x => ({ d: x.d, cvz: cvzOf(x), naz: x.naz, mn: x.mn, mj: x.mj, kc: x.kc, org: x.org, zak: x.zak, typ: T(x), sluzba: x.sluzba })) });
+      posledni: V.items.slice(-40).reverse().map(x => ({ d: x.d, cvz: cvzOf(x), naz: x.naz, mn: x.mn, mj: x.mj, kc: x.kc, org: x.org, zak: x.zak, typ: T(x), sluzba: x.sluzba })) };
+    _vc[zKey] = { k: vkey, v: _res }; return _res;
   }
   // ---------- Mzdy: měsíční export mzdových složek z Heliosu (Drive „Export ze systému/Mzdy“, MM-RRRR.xlsx) ----------
   // Os. číslo | Příjmení | Jméno | Číslo složky | Název složky | Částka | Hodiny | … ; bez střediska → závod přes pozice (personalistika), náhradně přes odvádění v Heliosu.
@@ -1051,7 +1055,7 @@ function mount(host) {
   const MZCFG_F = path.join(dataDir, 'vykonnost-mzdy-cfg.json');
   const loadMzCfg = () => { let c = {}; try { c = JSON.parse(fs.readFileSync(MZCFG_F, 'utf8')) || {}; } catch (_) {} return { rezim: c.rezim === 'vyrobni' ? 'vyrobni' : 'stredisko', vyloucit: c.vyloucit && typeof c.vyloucit === 'object' ? c.vyloucit : {} }; };
   const saveMzCfg = c => { fs.writeFileSync(MZCFG_F, JSON.stringify(c, null, 2)); _mzc = {}; return c; };
-  let _mz = null; const loadMzdy = () => { if (_mz) return _mz; try { _mz = JSON.parse(fs.readFileSync(MZDY_F, 'utf8')); } catch (_) { _mz = null; } return _mz; };
+  let _mz = null, _mzMt = -1; const loadMzdy = () => { const mt = mtimeOf(MZDY_F); if (_mz && _mzMt === mt) return _mz; try { _mz = JSON.parse(fs.readFileSync(MZDY_F, 'utf8')); } catch (_) { _mz = null; } if (_mzMt !== mt) _mzc = {}; _mzMt = mt; return _mz; };
   function parseMzdy(buf) {
     // list s hlavičkou (soubor může mít navíc kontingenční list „List1“); od 07-2026 je v exportu i sloupec Útvar
     let rows = [], hi = -1; for (const r0 of Object.values(parseAll(buf))) { const i = r0.findIndex(r => (r || []).some(c => /mzdov[eé] slo[žz]ky/i.test(String(c || '')))); if (i >= 0) { rows = r0; hi = i; break; } }
@@ -1144,7 +1148,7 @@ function mount(host) {
     return { items };
   }
   let _pz = null;
-  const loadPozice = () => { if (_pz) return _pz; try { _pz = JSON.parse(fs.readFileSync(POZICE_F, 'utf8')); } catch (_) { _pz = null; } return _pz; };
+  let _pzMt = -1; const loadPozice = () => { const mt = mtimeOf(POZICE_F); if (_pz && _pzMt === mt) return _pz; try { _pz = JSON.parse(fs.readFileSync(POZICE_F, 'utf8')); } catch (_) { _pz = null; } _pzMt = mt; return _pz; };
   const savePozice = (p, soubor) => { const items = p.items || []; const data = { importedAt: new Date().toISOString(), soubor: soubor || '', pocet: items.length, items }; fs.writeFileSync(POZICE_F, JSON.stringify(data)); _pz = data; return data; };
   // lidé ve stavu k danému měsíci (platnost od ≤ konec měsíce, platnost do prázdná nebo ≥ začátek měsíce)
   const poziceVeStavu = (zKey, ym) => { const P = loadPozice(); if (!P) return null; const od = ym + '-01', do_ = ym + '-31'; return P.items.filter(x => x.zavod === zKey && (!x.od || x.od <= do_) && (!x.do || x.do >= od) && !/ukon[cč]en/i.test(x.stav)); };
