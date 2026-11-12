@@ -649,8 +649,10 @@ function mount(host) {
     return x <= def.prah[0] ? 'g' : (x <= def.prah[1] ? 'y' : 'r');
   }
   // kolik hlavních operací (kusů fází) připadá na jeden kontejner podle plánu — výchozí 12
-  const opsNaKont = () => loadPlan6().faze.reduce((s, f) => s + (+f.ks || 0), 0);
-  const cileZ = cil => { if (!cil) return { M8: 100 }; const P = loadPlan6(), oK = opsNaKont(); return { M8: 100, A7: cil, A8: Math.round(cil * oK * 10) / 10, A9: oK, A10: Math.round(cil * P.faze.reduce((s, f) => s + f.ks * f.min, 0) / P.smenaMin * 10) / 10 }; };
+  // hlavní operace kontejneru = fáze s normou (svařovna + lakovna), bez košů dělírny / drobných dílců
+  const hlavniFaze = () => loadPlan6().faze.filter(f => !f.agg && !f.bezNormy);
+  const opsNaKont = () => hlavniFaze().reduce((s, f) => s + (+f.ks || 0), 0);
+  const cileZ = cil => { if (!cil) return { M8: 100 }; const P = loadPlan6(), oK = opsNaKont(); return { M8: 100, A7: cil, A8: Math.round(cil * oK * 10) / 10, A9: oK, A10: Math.round(cil * hlavniFaze().reduce((s, f) => s + f.ks * f.min, 0) / P.smenaMin * 10) / 10 }; };
   function indikatoryMesice(rows, ym, rokRows, zavodKey) {
     const pd = pracDnyMesice(ym); const rez = rows.filter(r => isRezie(r[R.dil])), prod = rows.filter(r => !isRezie(r[R.dil]));
     let nMin = 0, nRows = 0, nKc = 0; if (normIndex().items.length) prod.forEach(r => { const n = matchNorma(zavodKey, r[R.op], r[R.dil], r[R.cop]); if (n) { nMin += (n.min || 0) * r[R.ks]; nKc += (n.kc || 0) * r[R.ks]; nRows++; } });
@@ -663,7 +665,7 @@ function mount(host) {
     const kcOf = r => (+r[R.kc] || 0) + (+r[R.dop] || 0); const kcOdv = rows.reduce((s, r) => s + kcOf(r), 0), kcRez = rez.reduce((s, r) => s + kcOf(r), 0), kcProd = kcOdv - kcRez, nminH = prod.reduce((s, r) => s + (+r[R.nmin] || 0), 0), agentKc = rows.filter(r => +r[R.ag] === 1).reduce((s, r) => s + kcOf(r), 0);
     // hlavní operace kontejneru (fáze plánu 6 ABR/den) — jen závody s cílem v kontejnerech
     let opKs = null, opMin = null, lakAbr = 0; const P6 = loadPlan6();
-    if (CIL_DEFAULT[zavodKey]) { opKs = 0; opMin = 0; prod.forEach(r => { const fk = fazeOf(r); const f = fk && P6.faze.find(f => f.k === fk); if (f) { opKs += r[R.ks]; opMin += r[R.ks] * f.min; } if (fk === 'lakovani') lakAbr += r[R.ks]; }); }
+    if (CIL_DEFAULT[zavodKey]) { opKs = 0; opMin = 0; prod.forEach(r => { const fk = fazeOf(r); const f = fk && P6.faze.find(f => f.k === fk); if (f && !f.agg && !f.bezNormy) { opKs += r[R.ks]; opMin += r[R.ks] * f.min; } if (fk === 'lakovani') lakAbr += r[R.ks]; }); }
     const lide = new Set(rows.map(r => r[R.id] || r[R.name])); const SL = stavLidi(zavodKey, ym); const stav = SL ? SL.n : lide.size; const fond = stav * pd * 8;
     const sum = (arr, f) => arr.filter(f).reduce((s, r) => s + r[R.ks], 0);
     const rezProd = sum(rez, r => !RE_PROD.test(r[R.op])), rezOst = sum(rez, r => RE_OST.test(r[R.op]) || !r[R.pozn]), rekH = sum(rez, r => RE_REKL.test(r[R.op])), zaH = sum(rez, r => RE_ZAUC.test(r[R.op]));
@@ -909,76 +911,114 @@ function mount(host) {
     return { zavod: z.key, name: z.name, snapshot: snap, cil, weeks, kpi, muldy, exped, hrdlo: hrdlo ? hrdlo.n : '', proc, faze: z.key === 'popelnice' ? { skl: 'sestavení vany', dov: 'dovaření vany', lak: 'Lakování beden (číslo operace 990)' } : { skl: 'skládání ABR/CITY', dov: 'dovaření', lak: 'lakování vrchů (bez víka, střechy a příplatků)' } };
   }
 
-  // ---------- operační plán: kolik operací musí být odvedeno pro N hotových ABR (standard DSD/AFS) ----------
-  // Výchozí časy = odhad vedení (tabulka 2026-09), ks/kont = kolikrát se operace odvádí na 1 kontejner,
-  // směna = 440 min čistého času. Správce může časy a ks upravit (data/vykonnost-plan6.json).
-  const PLAN6_DEFAULT = { cil: 6, smenaMin: 440, faze: [
-    { k: 'natahovani', usek: 'svar', nazev: 'Natahování', min: 60, ks: 1, pozn: '1 osoba 12 ks/směna' },
-    { k: 'tramec', usek: 'svar', nazev: 'Trámec rolen', min: 50, ks: 1, pozn: 'Budeme vozit? (čepy, trubka, výpalky, vedení centrálu…)' },
-    { k: 'podlaha', usek: 'svar', nazev: 'Svaření podlahy vč. 2 lyžin', min: 240, ks: 1, must: true, pozn: '2 osoby dají 3 podlahy denně; lyžiny ~40 min' },
-    { k: 'bocnice', usek: 'svar', nazev: 'Bočnice (stůl)', min: 90, ks: 2, must: true, pozn: 'cca 1,5 h/ks, kapacita 5–6 bočnic/směna' },
-    { k: 'vrata', usek: 'svar', nazev: 'Výroba vrat', min: 90, ks: 2, must: true, pozn: '1 osoba 6 vrat denně' },
-    { k: 'skladani', usek: 'svar', nazev: 'Skládání', min: 210, ks: 1, must: true, pozn: '1 osoba 3 kont/směna — budou muset být ve 2?' },
-    { k: 'dovareni', usek: 'svar', nazev: 'Dovařování', min: 450, ks: 1, pozn: 'po 2 lidech 6–8 h; bočnice dovařeny robotem' },
-    { k: 'osazeni', usek: 'svar', nazev: 'Věšení / osazení vrat', min: 210, ks: 1, pozn: 'montáž vrat po 2 lidech' },
-    { k: 'tryskani', usek: 'lak', nazev: 'Mycí box / tryskání', min: 90, ks: 1, pozn: '2-směnný provoz · v odvádění se počítá odkuličkování ABR (1 na kontejner)' },
-    { k: 'lakovani', usek: 'lak', nazev: 'Základování a lakování', min: 180, ks: 1, pozn: '3-směnný provoz' }
-  ] };
-  // Jak poznat fázi v odvádění Heliosu (produkční operace) — kusy = počet odvedených jednotek fáze
+  // ---------- operační plán: fáze = struktura katalogu norem (list „Výrobní normy ABR-XXX“), časy = normy standardního ABR-DSD 6500×2300×2350 / rozestup 750 ----------
+  // Jedna sada časů (rozhodnutí 2026-11-12): minuty i ks/kont bere plán z katalogu norem (sloupce „čas“ a „ks/kont“ listů svařovna / lakovna);
+  // dělírna a drobné dílce jsou koše = součet položek listu × ks/kont. Ručně se nastavuje jen cíl kusů/den (po závodech podle finančního
+  // plánu, vykonnost-cile.json) a délka směny. „odhad“ = záloha z tabulky vedení 09/2026, použije se jen když norma v katalogu chybí.
+  const PLAN6_DIL = 'ABR-DSD 6500x2300x2350';
+  const PLAN6_DEFAULT = { smenaMin: 440 };
+  const PLAN6_FAZE = [
+    { k: 'natahovani', usek: 'svar', nazev: 'Natahování', kod: '143', nahr: ['natahování NS 1570/50 + NS 1570/60 bez háku', ''], ks: 1, odhad: 60 },
+    { k: 'lyziny', usek: 'svar', nazev: 'Lyžiny', kod: '100', nahr: ['lyžina IPN 180 DSD s omegou', ''], ks: 2, odhad: 33 },
+    { k: 'tramec', usek: 'svar', nazev: 'Trámec rolen', kod: '120', nahr: ['trámec rolen AFS/DSD vč. 2 ks rolen a centrálu CE', ''], ks: 1, odhad: 50 },
+    { k: 'podlaha', usek: 'svar', nazev: 'Podlaha', kod: '200', nahr: ['podlaha AFS/DSD/ALST', 'Podlaha DSD 6500'], ks: 1, must: true, odhad: 173 },
+    { k: 'bocnice', usek: 'svar', nazev: 'Bočnice', kod: '251', nahr: ['bočnice DSD 1550-2500 mm', 'Bočnice DSD 6500-2350'], ks: 2, must: true, odhad: 90 },
+    { k: 'vrata', usek: 'svar', nazev: 'Výroba vrat', kod: '162', nahr: ['výroba vrat 2050-2500 mm', ''], ks: 2, must: true, odhad: 90 },
+    { k: 'skladani', usek: 'svar', nazev: 'Skládání', kod: '301', nahr: ['skládání ABR 45/90st 1550-2500 mm', PLAN6_DIL], ks: 1, must: true, odhad: 210 },
+    { k: 'dovareni', usek: 'svar', nazev: 'Dovaření', kod: '403', nahr: ['dovaření ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 450 },
+    { k: 'osazeni', usek: 'svar', nazev: 'Osazení vrat', kod: '502', nahr: ['osazení vrat AFS/DSD/ECL/LWC/WD/HBI 2050-2500 mm', ''], ks: 1, odhad: 210 },
+    { k: 'odkulickovani', usek: 'lak', nazev: 'Odkuličkování / tryskání', kod: '623', nahr: ['odkuličkování ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 90 },
+    { k: 'odmasteni', usek: 'lak', nazev: 'Odmaštění', kod: '723', nahr: ['odmaštění ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 45 },
+    { k: 'zakladovani', usek: 'lak', nazev: 'Základování', kod: '823', nahr: ['základování ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 90 },
+    { k: 'lakovani', usek: 'lak', nazev: 'Lakování vrchů', kod: '923', nahr: ['lakování ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 90 },
+    // koše: list dělírna (střih / ohýbání / pila mají normu, pálení ne), list drobné dílce (standard bez plachty a muld, žebřík-tunel)
+    { k: 'strih', usek: 'del', nazev: 'Střih', kos: { sheet: /d[eě]l[ií]rna/i, op: /^střih|^strih/i }, ks: 1 },
+    { k: 'ohybani', usek: 'del', nazev: 'Ohýbání', kos: { sheet: /d[eě]l[ií]rna/i, op: /^ohýb|^ohyb/i }, ks: 1 },
+    { k: 'pila', usek: 'del', nazev: 'Pila', kos: { sheet: /d[eě]l[ií]rna/i, op: /^pila/i }, ks: 1 },
+    { k: 'paleni', usek: 'del', nazev: 'Pálení', bezNormy: true, ks: 1 },
+    { k: 'drobne', usek: 'drobne', nazev: 'Drobné dílce (SP)', kos: { sheet: /drob/i, op: /^(?!.*(placht|muld|montovateln))/i }, ks: 1 }
+  ];
+  // název normy → fáze (jen operace standardního kontejneru: bez víka, výztuh, příplatků, CITY, muld, klapek, DOMAT, STH, HBS)
+  const PLAN6_NORM_RE = [['natahovani', /^natahování/i], ['lyziny', /^lyžina|^ližina/i], ['tramec', /^trámec rolen/i], ['podlaha', /^podlaha/i], ['bocnice', /^bočnice/i],
+    ['vrata', /^výroba vrat/i], ['skladani', /^skládání/i], ['dovareni', /^dovaření/i], ['osazeni', /^osazení vrat/i],
+    ['odkulickovani', /^odkuličkování|^tryskání/i], ['odmasteni', /^odmaštění/i], ['zakladovani', /^základování/i], ['lakovani', /^lakování/i]];
+  const PLAN6_VYJ = /víko|viko|výztuh|vyztuh|příplatek|priplatek|zhuštěn|zhusten|bílá|žlutá|city|mulda|muldy|klapk|vlajk|domat|\bsth\b|hbs|komponent/i;
+  const fazeOfNorm = n => { if (!n || !/ABR-XXX/i.test(n.file || '') || PLAN6_VYJ.test(n.op || '')) return ''; const h = PLAN6_NORM_RE.find(x => x[1].test(n.op || '')); return h ? h[0] : ''; };
+  // záloha podle názvu operace v Heliosu (řádky bez čísla operace z katalogu)
   const PLAN6_RE = {
-    natahovani: /^natahování(?!.*(řezání|stojn))/i, tramec: /^trámec rolen (afs|dsd|domat)/i, podlaha: /^podlaha (asf|afs|dsd|abr|s t|t profil|zhušt)/i,
+    natahovani: /^natahování(?!.*(řezání|stojn|pálen|sp\s*\d))/i, lyziny: /^lyžina|^ližina/i, tramec: /^trámec rolen (afs|dsd|domat)|^trámec rollen (afs|dsd)/i, podlaha: /^podlaha (asf|afs|dsd|abr|s t|t profil|zhušt)/i,
     bocnice: /^bočnice (\d{3,4}-\d{3,4} mm|alst|dsd|hbi)/i, vrata: /^výroba vrat/i, skladani: /^skládání abr|^skládání$|^skládání včetně/i,
     dovareni: /^dovaření abr \d|^dovaření abr-|^dovaření$|^dovařování$/i, osazeni: /^osazení vrat (afs|l |domat|s l)|^osazení vrat$/i,
-    tryskani: /^odkuličkování abr/i, lakovani: /^lakování abr/i
+    odkulickovani: /^odkuličkování abr(?! víko)|^tryskání abr/i, odmasteni: /^odmaštění abr(?! víko)/i, zakladovani: /^základování abr(?! víko)/i, lakovani: /^lakování abr(?! víko)/i,
+    strih: /^střih|^strih/i, ohybani: /^ohýb|^ohyb/i, pila: /^pila|^řezání/i, paleni: /pálen|palen/i
   };
-  // reprezentativní název operace pro dohledání normy z katalogu (standard DSD 6500×2300×2350)
-  const PLAN6_NORMA = { natahovani: ['natahování NS 1570/50 + NS 1570/60 bez háku', ''], tramec: ['trámec rolen AFS/DSD vč. 2 ks rolen a centrálu CE', ''], podlaha: ['podlaha AFS/DSD/ALST', 'Podlaha DSD 6500'], bocnice: ['bočnice DSD 1550-2500 mm', 'Bočnice DSD 6500-2350'], vrata: ['výroba vrat 2050-2500 mm', ''], skladani: ['skládání ABR 45/90st 1550-2500 mm', 'ABR-DSD 6500x2300x2350'], dovareni: ['dovaření ABR 2050-2500 mm/rozestup 750 mm', 'ABR-DSD 6500x2300x2350'], osazeni: ['osazení vrat AFS/DSD/ECL/LWC/WD/HBI 2050-2500 mm', ''], tryskani: ['odkuličkování ABR 2050-2500 mm/rozestup 750 mm', 'ABR-DSD 6500x2300x2350'], lakovani: ['lakování ABR 2050-2500 mm/rozestup 750 mm', 'ABR-DSD 6500x2300x2350'] };
-  // Fáze plánu pro řádek odvádění: podle názvu operace; když název nestačí („Podlaha“, „bočnice“), podle čísla operace = kódu normy
+  // Fáze plánu pro řádek odvádění: 1) číslo operace = číslo normy standardu (jen při shodě prvního slova názvu — čísla 1–50 jsou v Heliosu
+  // i pořadím v postupu), 2) „SP nnnn“ v názvu = drobný dílec, 3) název operace
   let _fz = new Map(), _fzAt = '';
   function fazeOf(r) {
     const I = normIndex(); if (_fzAt !== I.syncedAt) { _fz = new Map(); _fzAt = I.syncedAt; }
     const op = r[R.op] || '', cop = String(r[R.cop] || '').trim(), k = cop + '|' + op; if (_fz.has(k)) return _fz.get(k);
-    const K = Object.keys(PLAN6_RE); let f = K.find(x => PLAN6_RE[x].test(op)) || '';
-    if (!f && /^\d{3,4}$/.test(cop)) { const p1 = prvni(op); const n = (I.byKod[cop] || []).find(n => prvni(n.op) === p1); if (n) f = K.find(x => PLAN6_RE[x].test(n.op)) || ''; }
+    let f = '';
+    if (/^\d{3,4}$/.test(cop)) { const p1 = prvni(op); const n = (I.byKod[cop] || []).find(n => /ABR-XXX/i.test(n.file || '') && prvni(n.op) === p1); if (n) f = fazeOfNorm(n); }
+    if (!f && /(^|[^a-z0-9])SP\s*\d{3,4}(?!\d)/i.test(op)) f = 'drobne';
+    if (!f) { const K = Object.keys(PLAN6_RE); f = K.find(x => PLAN6_RE[x].test(op)) || ''; }
     _fz.set(k, f); return f;
   }
+  // Fáze s časy z katalogu (cache do změny katalogu / ruční mapy). pm = osobominuty položky (Kč ÷ sazba; dělírna má v „min“ čas na osobu)
+  let _pf = { at: '', z: {} };
+  function planFaze(zKey) {
+    zKey = zKey || 'chomutov'; const I = normIndex(); const at = I.syncedAt + '|' + mtimeOf(NMAP_F); if (_pf.at !== at) _pf = { at, z: {} }; if (_pf.z[zKey]) return _pf.z[zKey];
+    const pm = n => n.kc && n.sazba ? n.kc / n.sazba * 60 : (+n.min || 0);
+    const out = PLAN6_FAZE.map(f => {
+      const o = { k: f.k, usek: f.usek, nazev: f.nazev, must: !!f.must, agg: !!f.kos, bezNormy: !!f.bezNormy, ks: f.ks, min: 0, norma: null, zdroj: '' };
+      if (f.kos) { const items = I.items.filter(n => f.kos.sheet.test(n.sheet || '') && f.kos.op.test(n.op || '') && n.ksKont > 0 && !/\bnebo\s*$/i.test(n.op || '')); const minKont = items.reduce((s, n) => s + pm(n) * n.ksKont, 0), ksKont = items.reduce((s, n) => s + n.ksKont, 0);
+        // koš: ks = kusů na kontejner (součet ks/kont položek), min = průměr na kus → min × ks = minuty na kontejner
+        o.ks = ksKont || 1; o.min = ksKont ? Math.round(minKont / ksKont * 10) / 10 : 0; o.minKont = Math.round(minKont); o.norma = items.length ? { min: o.minKont, polozek: items.length, op: items.length + ' položek listu ' + (items[0].sheet || '') + ', ' + ksKont + ' ks na kontejner' } : null; o.zdroj = items.length ? 'součet listu' : 'bez normy'; o.polozky = items.map(n => n.op + ' ' + n.ksKont + '× ' + Math.round(pm(n)) + ' min'); }
+      else if (f.bezNormy) { o.zdroj = 'bez normy'; }
+      else { let n = I.items.length && f.kod ? (I.byKod[f.kod] || []).find(x => /ABR-XXX/i.test(x.file || '')) : null; let how = 'číslo operace ' + f.kod; if (!n && I.items.length && f.nahr) { n = matchNorma(zKey, f.nahr[0], f.nahr[1]); how = 'podle názvu'; }
+        if (n && n.min > 0) { o.min = n.min; o.ks = n.ksKont > 0 ? n.ksKont : f.ks; o.norma = { min: n.min, kc: n.kc, op: n.op, kod: n.kod || '', how }; o.zdroj = 'norma'; }
+        else { o.min = f.odhad; o.zdroj = 'odhad (norma v katalogu nenalezena)'; } }
+      return o; });
+    return (_pf.z[zKey] = out);
+  }
   const PLAN6_F = path.join(dataDir, 'vykonnost-plan6.json');
-  function loadPlan6() { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} const faze = PLAN6_DEFAULT.faze.map(f => Object.assign({}, f, (c.faze || {})[f.k] || {})); return { cil: c.cil > 0 ? +c.cil : PLAN6_DEFAULT.cil, smenaMin: c.smenaMin > 0 ? +c.smenaMin : PLAN6_DEFAULT.smenaMin, faze }; }
-  function savePlan6(b) { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} if (b.cil != null) c.cil = +b.cil > 0 ? Math.round(+b.cil * 10) / 10 : PLAN6_DEFAULT.cil; if (b.smenaMin != null && +b.smenaMin > 0) c.smenaMin = +b.smenaMin; if (b.faze && typeof b.faze === 'object') { c.faze = c.faze || {}; Object.keys(b.faze).forEach(k => { if (!PLAN6_DEFAULT.faze.some(f => f.k === k)) return; const v = b.faze[k] || {}; const o = c.faze[k] || {}; if (v.min != null && +v.min > 0) o.min = +v.min; if (v.ks != null && +v.ks > 0) o.ks = +v.ks; if (v.reset) delete c.faze[k]; else c.faze[k] = o; }); } try { fs.writeFileSync(PLAN6_F, JSON.stringify(c, null, 2)); } catch (_) {} return loadPlan6(); }
+  function loadPlan6(zKey) { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} return { cil: c.cil > 0 ? +c.cil : null, smenaMin: c.smenaMin > 0 ? +c.smenaMin : PLAN6_DEFAULT.smenaMin, faze: planFaze(zKey) }; }
+  function savePlan6(b) { let c = {}; try { c = JSON.parse(fs.readFileSync(PLAN6_F, 'utf8')) || {}; } catch (_) {} if (b.smenaMin != null && +b.smenaMin > 0) c.smenaMin = +b.smenaMin; delete c.faze; try { fs.writeFileSync(PLAN6_F, JSON.stringify(c, null, 2)); } catch (_) {} return loadPlan6(); }
   const pracDnyRozsah = (od, do_) => { let n = 0; for (const d = new Date(od + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= do_; d.setUTCDate(d.getUTCDate() + 1)) { if (jePracDen(d.toISOString().slice(0, 10))) n++; } return n; };
-  // Kolik času potřebuje 1 kontejner: (a) součet norem za sebou jdoucích operací z katalogu (svařovna, lakovna, dělírna), (b) odhady fází plánu, (c) skutečnost z Heliosu — normovaný čas obsluhy na 1 hotový ABR (export od 23. 10. 2026)
+  // Kolik času potřebuje 1 kontejner: (a) součet norem za sebou jdoucích operací z katalogu (svařovna, lakovna, dělírna, drobné dílce), (b) skutečnost z Heliosu — normovaný čas obsluhy na 1 hotový ABR (export od 23. 10. 2026)
   function casNaKontejner(z, P, D) {
     let norma = null; try { norma = normIndex().items.length ? normyNaKont(z.key) : null; } catch (_) {}
-    const odhad = { svar: P.faze.filter(f => f.usek === 'svar').reduce((s, f) => s + f.min * f.ks, 0), lak: P.faze.filter(f => f.usek === 'lak').reduce((s, f) => s + f.min * f.ks, 0) };
     const by = {}; D.rows.forEach(r => { const c = r[R.cvz]; if (!c || isRezie(r[R.dil])) return; const A = by[c] = by[c] || { rows: 0, abr: 0, lak: 0, nmin: 0, u: { svar: 0, lak: 0, del: 0 } }; A.rows++; if (/^abr/i.test(String(r[R.dil] || ''))) { A.abr++; if (LAK_NAZEV(r[R.op])) A.lak += r[R.ks]; } const n = +r[R.nmin] || 0; A.nmin += n; const fk = fazeHelios(r[R.op]); A.u[fk === 'del' ? 'del' : (/^(odk|odm|zakl|lak|lakdopl)$/.test(fk || '') ? 'lak' : 'svar')] += n; });
     const hot = Object.values(by).filter(A => A.lak >= 1 && A.abr > A.rows * 0.5 && A.nmin > 0); const ks = hot.reduce((s, A) => s + A.lak, 0);
     const helios = ks ? { zakazek: hot.length, ks: Math.round(ks), min: Math.round(hot.reduce((s, A) => s + A.nmin, 0) / ks), svar: Math.round(hot.reduce((s, A) => s + A.u.svar, 0) / ks), lak: Math.round(hot.reduce((s, A) => s + A.u.lak, 0) / ks), del: Math.round(hot.reduce((s, A) => s + A.u.del, 0) / ks) } : null;
-    const celkem = norma ? (norma.svar || 0) + (norma.lak || 0) + (norma.del || 0) : null;
-    return { norma: norma ? { svar: norma.svar, lak: norma.lak, del: norma.del, celkem, zdroj: norma.zdroj } : null, odhad, helios, smenaMin: P.smenaMin, pruchodSmen: celkem ? Math.round(celkem / P.smenaMin * 10) / 10 : null, pruchodSmenHelios: helios ? Math.round(helios.min / P.smenaMin * 10) / 10 : null };
+    const celkem = norma ? (norma.svar || 0) + (norma.lak || 0) + (norma.del || 0) + (norma.drobne || 0) : null;
+    return { norma: norma ? Object.assign({}, norma, { celkem }) : null, helios, smenaMin: P.smenaMin, pruchodSmen: celkem ? Math.round(celkem / P.smenaMin * 10) / 10 : null, pruchodSmenHelios: helios ? Math.round(helios.min / P.smenaMin * 10) / 10 : null };
   }
   function planOperaci(z, od, do_) {
     const D = loadData(z.key); if (!D) return null;
-    const P = loadPlan6(); const snap = D.snapshot;
+    const P = loadPlan6(z.key); const snap = D.snapshot; const cileAll = loadCile(); const cil = cileAll[z.key] || P.cil || 6;
+    let cileRaw = {}; try { cileRaw = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {}
     if (!od) { const d = new Date(snap + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 27); od = d.toISOString().slice(0, 10); } if (!do_) do_ = snap;
     const rows = D.rows.filter(r => r[R.date] >= od && r[R.date] <= do_ && !isRezie(r[R.dil])); const pd = Math.max(1, pracDnyRozsah(od, do_));
     // pracovní dny aktuálního měsíce snímku (pro „měsíčně“)
     const ym = od.slice(0, 7) === do_.slice(0, 7) ? od.slice(0, 7) : snap.slice(0, 7); const pdMes = pracDnyMesice(ym);
-    const maN = normIndex().items.length > 0;
+    const maN = normIndex().items.length > 0; const r1 = x => Math.round(x * 10) / 10;
     const faze = P.faze.map(f => {
       const rs = rows.filter(r => fazeOf(r) === f.k); const ks = rs.reduce((s, r) => s + r[R.ks], 0);
       const lide = {}; rs.forEach(r => { lide[r[R.name]] = (lide[r[R.name]] || 0) + r[R.ks]; });
-      const potrebaDen = P.cil * f.ks, osobosmen = potrebaDen * f.min / P.smenaMin;
-      const skutDen = ks / pd, skutKont = skutDen / f.ks;
-      let norma = null; if (maN) { const [op, dil] = PLAN6_NORMA[f.k] || []; const n = op ? matchNorma(z.key, op, dil) : null; if (n) norma = { min: n.min, kc: n.kc, op: n.op }; }
-      return Object.assign({}, f, { potrebaDen, potrebaMes: potrebaDen * pdMes, osobosmen: Math.round(osobosmen * 100) / 100, minDen: potrebaDen * f.min, skutDen: Math.round(skutDen * 10) / 10, skutKont: Math.round(skutKont * 10) / 10, plneni: Math.round(skutKont / P.cil * 100), skutKs: Math.round(ks), rows: rs.length, lide: Object.keys(lide).length, topLide: Object.entries(lide).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([n, k]) => n + ' (' + Math.round(k) + ')'), norma,
-        // kolik lidí to dnes reálně dělá vs. kolik by při daném čase bylo potřeba na plnou směnu
-        potrebaLidi: Math.round(osobosmen * 10) / 10, chybi: Math.round((potrebaDen - skutDen) * 10) / 10 });
+      const potrebaDen = cil * f.ks, osobosmen = potrebaDen * f.min / P.smenaMin;
+      // koše (dělírna, drobné dílce): kusy Heliosu ÷ kusů na kontejner; pálení normu nemá → jen kusy bez plnění
+      const skutDen = ks / pd, skutKont = f.bezNormy ? null : skutDen / f.ks;
+      const plneni = skutKont == null ? null : Math.round(skutKont / cil * 100);
+      return Object.assign({}, f, { potrebaDen, potrebaMes: potrebaDen * pdMes, osobosmen: Math.round(osobosmen * 100) / 100, minDen: potrebaDen * f.min, skutDen: r1(skutDen), skutKont: skutKont == null ? null : r1(skutKont), plneni, skutKs: Math.round(ks), rows: rs.length, lide: Object.keys(lide).length, topLide: Object.entries(lide).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([n, k]) => n + ' (' + Math.round(k) + ')'),
+        potrebaLidi: r1(osobosmen), chybi: f.agg || f.bezNormy ? null : r1(potrebaDen - skutDen) });
     });
     const sumU = u => faze.filter(f => f.usek === u).reduce((s, f) => s + f.osobosmen, 0);
-    const hrdlo = faze.filter(f => f.usek === 'svar').slice().sort((a, b) => a.plneni - b.plneni)[0];
-    return { zavod: z.key, name: z.name, snapshot: snap, od, do: do_, pracDny: pd, mesic: ym, pracDnyMes: pdMes, cil: P.cil, smenaMin: P.smenaMin, kontMes: P.cil * pdMes,
-      opsKont: faze.reduce((s, f) => s + f.ks, 0), opsDen: faze.reduce((s, f) => s + f.potrebaDen, 0), opsMes: faze.reduce((s, f) => s + f.potrebaMes, 0), skutOpsDen: Math.round(faze.reduce((s, f) => s + f.skutKs, 0) / pd * 10) / 10,
-      faze, osobosmenSvar: Math.round(sumU('svar') * 10) / 10, osobosmenLak: Math.round(sumU('lak') * 10) / 10, hrdlo: hrdlo ? hrdlo.nazev : '', maNormy: maN, casKont: casNaKontejner(z, P, D) };
+    const hl = faze.filter(f => !f.agg && !f.bezNormy);
+    const hrdlo = faze.filter(f => f.usek === 'svar' && f.plneni != null).slice().sort((a, b) => a.plneni - b.plneni)[0];
+    return { zavod: z.key, name: z.name, snapshot: snap, od, do: do_, pracDny: pd, mesic: ym, pracDnyMes: pdMes, cil, cilZdroj: cileRaw[z.key] ? 'závod' : 'výchozí', smenaMin: P.smenaMin, kontMes: cil * pdMes, dil: PLAN6_DIL,
+      opsKont: hl.reduce((s, f) => s + f.ks, 0), opsDen: hl.reduce((s, f) => s + f.potrebaDen, 0), opsMes: hl.reduce((s, f) => s + f.potrebaMes, 0), skutOpsDen: r1(hl.reduce((s, f) => s + f.skutKs, 0) / pd),
+      faze, osobosmenSvar: r1(sumU('svar')), osobosmenLak: r1(sumU('lak')), osobosmenDel: r1(sumU('del')), osobosmenDrobne: r1(sumU('drobne')), hrdlo: hrdlo ? hrdlo.nazev : '', maNormy: maN, casKont: casNaKontejner(z, P, D) };
   }
 
   // ---------- 3. kontrolní bod: výdejky (export „Výdej ze skladu“ po závodech, podsložky Chomutov / Abroly / Popelnice / Supíkovice) ----------
@@ -1120,13 +1160,10 @@ function mount(host) {
   const profOf = op => { const o = String(op || '').toLowerCase(); if (/lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen|odkulič|odkulic/.test(o)) return 'lak'; if (/nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl[ií]rna|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|ohýb|stříh|strih|střih|loch|obrobna|soustruh/.test(o)) return 'del'; return 'svar'; };
   // Normominuty na jeden standardní kontejner (ABR-DSD 6500×2300×2350) z katalogu norem; bez katalogu časy z plánu.
   function normyNaKont(zKey) {
-    const P = loadPlan6(), I = normIndex(), dil = 'ABR-DSD 6500x2300x2350'; const zdroj = { svar: [], lak: [], del: [] };
-    let svar = 0; P.faze.filter(f => f.usek === 'svar').forEach(f => { const [op, d] = PLAN6_NORMA[f.k] || []; const n = I.items.length && op ? matchNorma(zKey, op, d) : null; const min = n && n.min ? n.min : f.min; svar += min * f.ks; zdroj.svar.push(f.nazev + ' ' + f.ks + '× ' + Math.round(min) + ' min' + (n && n.min ? '' : ' (plán)')); });
-    let lak = 0; ['odkuličkování', 'odmaštění', 'základování', 'lakování'].forEach(o => { const n = I.items.length ? matchNorma(zKey, o + ' ABR 2050-2500 mm/rozestup 750 mm', dil) : null; const min = n && n.min ? n.min : (o === 'lakování' ? 90 : o === 'základování' ? 90 : 45); lak += min; zdroj.lak.push(o + ' ' + Math.round(min) + ' min' + (n && n.min ? '' : ' (odhad)')); });
-    // dělírna: list „Výrobní normy dělírna“ — osobominuty na kus (Kč ÷ sazba) × kusů na kontejner; alternativy „… nebo“ se nepočítají dvakrát
-    let del = 0, nDel = 0; I.items.filter(n => /d[eě]l[ií]rna/i.test(n.sheet) && n.ksKont > 0 && !/\bnebo\s*$/i.test(n.op)).forEach(n => { const pm = n.kc && n.sazba ? n.kc / n.sazba * 60 : (n.min || 0); del += pm * n.ksKont; nDel++; });
-    if (nDel) zdroj.del.push(nDel + ' položek listu dělírna (střih, ohýbání, pila) · pálení a obrobna normu nemají'); else del = null;
-    return { svar: Math.round(svar), lak: Math.round(lak), del: del == null ? null : Math.round(del), zdroj };
+    const F = planFaze(zKey); const zdroj = { svar: [], lak: [], del: [], drobne: [] }; const sum = { svar: 0, lak: 0, del: 0, drobne: 0 };
+    F.filter(f => !f.bezNormy).forEach(f => { const mk = f.agg && f.minKont != null ? f.minKont : f.min * f.ks; sum[f.usek] += mk; zdroj[f.usek].push(f.agg ? f.nazev + ' ' + f.ks + ' ks = ' + Math.round(mk) + ' min (' + (f.norma ? f.norma.polozek : 0) + ' položek listu)' : f.nazev + ' ' + f.ks + '× ' + Math.round(f.min) + ' min' + (f.zdroj === 'norma' ? '' : ' (' + f.zdroj + ')')); });
+    const ma = u => F.some(f => f.usek === u && f.norma);
+    return { svar: Math.round(sum.svar), lak: Math.round(sum.lak), del: ma('del') ? Math.round(sum.del) : null, drobne: ma('drobne') ? Math.round(sum.drobne) : null, zdroj };
   }
   // ---------- pracovní pozice z personalistiky (export „LS - pracovní pozice.xlsx“) = zdroj pravdy o stavu lidí ----------
   // Sloupce: Os. číslo | Příjmení a jméno | Platnost od | Platnost do | Stav | Pracovní pozice | Útvar (kmenové středisko jako v Heliosu)
