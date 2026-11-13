@@ -3923,7 +3923,8 @@ function vykRenderShell(){
     +'<div class="card pad" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;flex-wrap:wrap">'+[['zavody','Závody'],['zmeny','Změny po měsících'],['tydny','Hotové po týdnech'],['lide','Lidé a profese'],['ind','Indikátory napříč závody']].map(t=>'<button class="btn sm" style="border-radius:0;white-space:nowrap;'+((VYK.otab||'zavody')===t[0]?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="vykOTab(\''+t[0]+'\')">'+t[1]+'</button>').join('')+'</span><span class="muted" style="font-size:12px">kliknutím na závod níže otevřete jeho detail</span></div>'
     +'<div id="vykO-zavody" style="display:'+((VYK.otab||'zavody')==='zavody'?'':'none')+'">'
     +'<div class="kpis" id="vykZavody" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))"></div>'
-    +'<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Srovnání závodů — hotové ABR za pracovní den</b><span class="muted" style="font-size:12px">hlavní kritérium = odvedené lakování vrchů abrolů (u Popelnic bedny) · CITY a muldy zvlášť (muldy u Chomutova i z plánu výroby) · cíl výchozí 6 ABR/den · odstávky a neúplný týden mimo průměry</span></div><div style="overflow-x:auto;margin-top:8px"><table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>'+['Závod','Cíl / den','ABR · posledních 4 týdny','Včetně muld · 4 týdny','Expedováno ABR/den (výdejky)','ABR · celý rok','Plnění (rok)','Týdnů pod cílem','ABR za rok','CITY za rok (4 týd.)','Muldy za rok (4 týd.)','Úzké hrdlo'].map((h,i)=>'<th style="text-align:'+(i>0&&i<11?'right':'left')+';'+vykTh+'">'+h+'</th>').join('')+'</tr></thead><tbody>'
+    +'<div id="vykCile"></div>'
+    +'<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Srovnání závodů — hotové ABR za pracovní den</b><span class="muted" style="font-size:12px">hlavní kritérium = odvedené lakování vrchů abrolů (u Popelnic bedny) · CITY a muldy zvlášť (muldy u Chomutova i z plánu výroby) · cíl má každý závod vlastní (karta Cíl ABR / den po závodech) · odstávky a neúplný týden mimo průměry</span></div><div style="overflow-x:auto;margin-top:8px"><table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>'+['Závod','Cíl / den','ABR · posledních 4 týdny','Včetně muld · 4 týdny','Expedováno ABR/den (výdejky)','ABR · celý rok','Plnění (rok)','Týdnů pod cílem','ABR za rok','CITY za rok (4 týd.)','Muldy za rok (4 týd.)','Úzké hrdlo'].map((h,i)=>'<th style="text-align:'+(i>0&&i<11?'right':'left')+';'+vykTh+'">'+h+'</th>').join('')+'</tr></thead><tbody>'
       +(ov.zavody||[]).map(z=>{ const v=z.vystup; if(!v) return '<tr><td style="'+vykTd+'"><b>'+esc(z.name)+'</b></td><td colspan="11" class="muted" style="'+vykTd+'">bez dat</td></tr>'; const col=x=>!v.cil||x==null?'var(--ink)':(x>=v.cil?'#0a7a0a':(x>=v.cil*0.8?'#b57400':'#c93a39')); const f=x=>x==null?'—':String(x).replace('.',',');
         return '<tr style="cursor:pointer" onclick="vykPick(\''+z.key+'\')"><td style="'+vykTd+'"><b>'+esc(z.name)+'</b></td><td style="'+vykTd+';text-align:right">'+(v.cil||'—')+'</td><td style="'+vykTd+';text-align:right;font-weight:700;color:'+col(v.lakDen4)+'">'+f(v.lakDen4)+'</td><td style="'+vykTd+';text-align:right">'+(z.key==='popelnice'?'—':f(v.lakDen4Mul)+' <span class="muted" style="font-size:11px">(vč. CITY '+f(v.lakDen4Vse)+')</span>')+'</td><td style="'+vykTd+';text-align:right" title="z výdejek (Výdej ze skladu), od '+(v.exped?vykD(v.exped.od):'—')+'">'+(v.exped&&v.exped.abrDen4!=null?f(v.exped.abrDen4)+' <span class="muted" style="font-size:11px">('+vykF(v.exped.abr4)+' ks)</span>':'—')+'</td><td style="'+vykTd+';text-align:right;color:'+col(v.lakDenRok)+'">'+f(v.lakDenRok)+'</td><td style="'+vykTd+';text-align:right">'+(v.plneniRok!=null?v.plneniRok+' %':'—')+'</td><td style="'+vykTd+';text-align:right">'+(v.tydnuPod!=null?v.tydnuPod+' / '+v.tydnu:'—')+'</td><td style="'+vykTd+';text-align:right">'+vykF(v.lakRok)+'</td><td style="'+vykTd+';text-align:right">'+(z.key==='popelnice'?'—':vykF(v.cityRok)+' <span class="muted">('+vykF(v.city4)+')</span>')+'</td><td style="'+vykTd+';text-align:right">'+(z.key==='popelnice'?'—':vykF(v.muldyVseRok)+' <span class="muted">('+vykF(v.muldyVse4)+')</span>')+'</td><td style="'+vykTd+';font-size:12px;color:var(--ink-soft)">'+esc(v.hrdlo||'')+'</td></tr>'; }).join('')+'</tbody></table></div></div>'
     +'</div><div id="vykO-zmeny" style="display:'+(VYK.otab==='zmeny'?'':'none')+'">'
@@ -3936,7 +3937,7 @@ function vykRenderShell(){
     +'<div class="card pad" style="margin-bottom:14px" id="vykCmpCard"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Indikátory napříč závody</b><span class="muted" style="font-size:12px">jeden indikátor, všechny výrobní závody po měsících · Popelnice vynechána (bedny, jiná měřítka)</span><label style="margin-left:auto;font-size:12px;display:inline-flex;gap:6px;align-items:center;color:var(--ink-soft)"><input type="checkbox" id="vykCmpPop" onchange="VYK.cmpPop=this.checked;vykCmpRender()"> zahrnout Popelnice</label></div><div id="vykCmp" style="margin-top:8px"><p class="muted" style="margin:0">Načítám…</p></div></div>'
     +'</div><div id="vykDetail"></div>'
     +(ov.admin?'<div class="card pad" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between"><span class="muted" style="font-size:12.5px">Service account: '+esc(ov.saEmail||'—')+' · Drive '+(ov.driveConfigured?'nastaven':'<b style="color:#a03a2c">není nastaven</b>')+'</span><span class="inline-actions" style="gap:8px"><button class="btn sm ghost" onclick="vykSync()">🔄 Obnovit z Drive (exporty + plány)</button></span></div>':'');
-  vykRenderZavody(); vykCmpLoad(); if(VYK.otab==='tydny') vykTydnyLoad();
+  vykRenderZavody(); vykCileRender(); vykCmpLoad(); if(VYK.otab==='tydny') vykTydnyLoad();
 }
 function vykOTab(t){ VYK.otab=t; if(t==='tydny') vykTydnyLoad(); ['zavody','zmeny','tydny','lide','ind'].forEach(x=>{ const e=document.getElementById('vykO-'+x); if(e) e.style.display=x===t?'':'none'; }); const bar=document.querySelector('#mujBody .card button[onclick^="vykOTab"]'); if(bar){ bar.parentElement.querySelectorAll('button').forEach(b=>{ const on=b.getAttribute('onclick').indexOf("'"+t+"'")>=0; b.style.background=on?'':'transparent'; b.style.color=on?'':'var(--ink)'; b.style.boxShadow=on?'':'none'; }); } }
 /* Hotové výrobky po týdnech — řádky závod × typ (ABR / CITY / muldy / jiné / celkem), sloupce týdny, vpravo součet a průměr za týden */
@@ -3972,7 +3973,7 @@ function vykTydnyRender(){
 const VYK_KAT_BARVA={'hlavní fáze ABR':'#2a78d6','CITY':'#5aa0e6','muldy':'#8a4baf','drobné dílce (SP)':'#eb6834','dělírna / příprava':'#f0b429','lakovna':'#0a7a0a','ostatní svařovna / montáž':'#8d948c','režie':'#c93a39'};
 function vykRozpadBar(kat,h){ const tot=(kat||[]).reduce((s,x)=>s+x.rows,0)||1; return '<div style="display:flex;height:'+(h||10)+'px;border-radius:5px;overflow:hidden;background:var(--line)">'+(kat||[]).map(x=>'<div title="'+esc(x.kat)+': '+vykF(x.rows)+' zápisů ('+String(x.pct).replace('.',',')+' %)" style="width:'+(x.rows/tot*100)+'%;background:'+(VYK_KAT_BARVA[x.kat]||'#999')+'"></div>').join('')+'</div>'; }
 const VYK_GRP=new Set(['prehled','analyza','lide','zakazky']);
-function vykTab(t){ const cur=VYK.tab||'prehled'; VYK.tab=t; if(VYK_GRP.has(t)&&VYK_GRP.has(cur)&&document.getElementById('vykG-'+t)){ VYK_GRP.forEach(x=>{ const e=document.getElementById('vykG-'+x); if(e) e.style.display=x===t?'':'none'; }); const hd=document.getElementById('vykHead'); if(hd) hd.querySelectorAll('button').forEach(b=>{ const on=(b.getAttribute('onclick')||'').indexOf("'"+t+"'")>=0; b.style.background=on?'':'transparent'; b.style.color=on?'':'var(--ink)'; b.style.boxShadow=on?'':'none'; }); return; } vykRenderDetail(); }
+function vykTab(t){ const cur=VYK.tab||'prehled'; VYK.tab=t; if(VYK_GRP.has(t)&&VYK_GRP.has(cur)&&document.getElementById('vykG-'+t)){ VYK_GRP.forEach(x=>{ const e=document.getElementById('vykG-'+x); if(e) e.style.display=x===t?'':'none'; }); const hd=document.getElementById('vykHead'); if(hd) hd.querySelectorAll('button').forEach(b=>{ const on=(b.getAttribute('onclick')||'').indexOf("'"+t+"'")>=0; b.style.background=on?'':'transparent'; b.style.color=on?'':'var(--ink)'; b.style.boxShadow=on?'':'none'; }); if(t==='zakazky') vykZaLoad(); return; } vykRenderDetail(); }
 function vykRozpadRender(){ const box=document.getElementById('vykRozpad'), RZ=VYK.det&&VYK.det.rozpad; if(!box) return; if(!RZ||!RZ.kat.length){ box.innerHTML='<span class="muted">Bez dat.</span>'; return; }
   const V=VYK.vystup, lak=V&&V.data?null:null; const tot=RZ.rows||1;
   let h=vykRozpadBar(RZ.kat,16)+'<div style="overflow-x:auto;margin-top:10px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr><th style="text-align:left;'+vykTh+'">Kategorie</th><th style="text-align:right;'+vykTh+'">Zápisů</th><th style="text-align:right;'+vykTh+'">Podíl</th><th style="text-align:right;'+vykTh+'">Kusů</th><th style="text-align:right;'+vykTh+'">Lidí</th><th style="text-align:left;'+vykTh+'">Co to je</th></tr></thead><tbody>'
@@ -4053,7 +4054,7 @@ const VYK_MES_M=[
   {k:'M9',l:'Kč odvedených operací / hotový kus',smer:'down',des:0,jedn:' Kč',pop:'Σ Kč výrobních řádků (bez režie) ÷ všechny hotové výrobky v měsíci — úkolová cena práce na kus přímo z Heliosu'},
   {k:'A11',l:'Režie Kč z odvedených Kč',smer:'down',des:1,jedn:' %',pop:'Σ Kč režijních řádků ÷ Σ Kč všech odvedených řádků — strop vedení 10 %'},
   {k:'A7k',l:'Expedováno tis. Kč',smer:'',des:0,pop:'hodnota expedovaných výrobků z výdejek (CC bez daní) v tisících Kč'},
-  {k:'A8',l:'Hlavních operací / den',smer:'up',des:1,cil:true,den:true,pop:'kusy v 10 hlavních fázích kontejneru ÷ pracovní dny (cíl 72)'},
+  {k:'A8',l:'Hlavních operací / den',smer:'up',des:1,cil:true,den:true,pop:'kusy v hlavních fázích kontejneru ÷ pracovní dny · cíl = cíl závodu × počet hlavních operací na 1 kontejner'},
   {k:'rows',l:'Odvedených operací',smer:'',des:0,pop:'počet zápisů odvedení v Heliosu za měsíc'},
   {k:'ks',l:'Kusů',smer:'',des:0,pop:'součet odvedených kusů ve výrobních operacích'},
   {k:'hr',l:'Lidí',smer:'',des:0,pop:'stav lidí závodu z personalistiky: v měsících s exportem mezd každý, kdo byl v měsíci placen s útvarem závodu (zdroj pravdy); v novějších měsících bez mezd aktuální seznam pracovních pozic'},
@@ -4166,8 +4167,8 @@ function vykRenderDetail(){
   const obdobi=VYK.preset==='rok'?'celý rok '+d.snapshot.slice(0,4):(VYK.preset==='tyden'&&VYK.tyden?'týden '+(+VYK.tyden.slice(6))+' ('+vykD(vykTydenRozsah(VYK.tyden).od)+' – '+vykD(vykTydenRozsah(VYK.tyden).do)+')':(VYK.preset==='mesic'&&VYK.mesic?vykMesLabel(VYK.mesic):'posledních 4 týdny do snímku'));
   box.innerHTML=
     '<div class="card pad" id="vykHead" style="margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'
-      +'<b style="font-size:16px;margin-right:6px">'+esc(d.name)+'</b>'
-      +'<span style="display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden">'+[['prehled','Přehled'],['analyza','Analýza'],['lide','Lidé a režie'],['zakazky','Zakázky'],['ind','Měsíční indikátory'],['normy','Normy'],['plan6','Plán 6 ABR/den']].map(t=>'<button class="btn sm" style="border-radius:0;white-space:nowrap;'+((VYK.tab||'prehled')===t[0]?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="vykTab(\''+t[0]+'\')">'+t[1]+'</button>').join('')+'</span>'
+      +'<b style="font-size:16px;margin-right:6px">'+esc(d.name)+'</b>'+vykCilHead()
+      +'<span style="display:inline-flex;flex-wrap:wrap;max-width:100%;border:1.5px solid var(--line);border-radius:10px;overflow:hidden">'+[['prehled','Přehled'],['analyza','Analýza'],['lide','Lidé a režie'],['zakazky','Zakázky'],['dny','Dny a směny'],['ind','Měsíční indikátory'],['normy','Normy'],['plan6',vykPlanTabLbl()]].map(t=>'<button class="btn sm" style="border-radius:0;white-space:nowrap;'+((VYK.tab||'prehled')===t[0]?'':'background:transparent;color:var(--ink);box-shadow:none')+'" onclick="vykTab(\''+t[0]+'\')">'+t[1]+'</button>').join('')+'</span>'
       +'<span class="muted" style="font-size:12.5px;margin-left:auto">Zdroj: '+esc(d.source||'')+' · snímek '+vykD(d.snapshot)+'</span></div>'
     +(VYK.tab==='ind'
       ?'<div style="margin-bottom:14px;padding:9px 14px;border-radius:12px;border:1px solid var(--line);border-left:5px solid #c9cec8;background:var(--card,#fff);font-size:12.5px;color:var(--ink-soft)">Měsíční indikátory ukazují vždy <b>všechny měsíce roku vedle sebe</b> — období se tu nevolí.</div>'
@@ -4180,6 +4181,7 @@ function vykRenderDetail(){
         +'<b style="font-size:13px">'+esc(obdobi)+'</b>'+(d.od?'<span style="font-size:12.5px">'+vykD(d.od)+' – '+vykD(d.do)+'</span>':'')
         +'<span style="font-size:12px;margin-left:auto;color:#3b4a66">mění vše, co má modrý okraj a štítek '+vykObdPill()+' · šedý štítek '+vykRokPill()+' = na období nezávisí</span></div>')
     +(VYK.tab==='ind'?'<div id="vykInd"><div class="card pad"><p class="muted" style="margin:0">Načítám indikátory…</p></div></div>':'')
+    +(VYK.tab==='dny'?'<div id="vykDny"><div class="card pad"><p class="muted" style="margin:0">Načítám dny…</p></div></div>':'')
     +(VYK.tab==='normy'?'<div id="vykNormy"></div>':'')
     +(VYK.tab==='plan6'?'<div id="vykPlan6"><div class="card pad"><p class="muted" style="margin:0">Načítám plán…</p></div></div>':'')
     +(VYK_GRP.has(VYK.tab)?'<div id="vykG-prehled" style="display:'+(VYK.tab==='prehled'?'':'none')+'">'
@@ -4210,17 +4212,20 @@ function vykRenderDetail(){
     +'</div>'
     +'</div>':'')
     +(VYK_GRP.has(VYK.tab)?'<div id="vykG-zakazky" style="display:'+(VYK.tab==='zakazky'?'':'none')+'">'
+    +'<div id="vykZa"></div>'
     +'<div class="card pad" style="margin-bottom:14px;'+VYK_KO+'"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:14px">Zakázky (ČVZ)</b>'+vykObdPill()+'<input id="vykCvzQ" placeholder="🔍 ČVZ / zakázka / zákazník…" value="'+esc(VYK.cvzQ)+'" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
       +'<span class="muted" style="font-size:12px">'+(d.plan?'spárováno s plánem výroby: <b>'+d.sparovano+' z '+(d.cvzCelkem||d.cvz.length)+'</b> (list „'+esc(d.plan.tab)+'", '+d.plan.items+' zakázek)':'<span style="color:#a86a00">plán výroby zatím nenačten</span>')+'</span></div>'+vykPlanObdobi(d)+'<div id="vykCvz" style="overflow-x:auto;margin-top:10px"></div></div>'
     +'</div>':'');
   const ms=document.getElementById('vykMes'); if(ms) ms.onchange=function(){ if(this.value){ VYK.preset='mesic'; VYK.mesic=this.value; vykLoadZavod(); } };
   if(VYK.tab==='ind'){ vykIndLoad(); return; }
+  if(VYK.tab==='dny'){ vykDnyLoad(); return; }
   if(VYK.tab==='normy'){ vykNormyRender(); return; }
   if(VYK.tab==='plan6'){ vykPlan6Load(); return; }
   vykRozpadRender();
   document.getElementById('vykQ').oninput=function(){ VYK.q=this.value; vykLideRender(); };
   document.getElementById('vykCvzQ').oninput=function(){ VYK.cvzQ=this.value; vykCvzRender(); };
   vykAnaRender(); vykWeeksRender(); vykDaysRender(); vykRezieKdyRender(); vykLideRender(); vykRezieRender(); vykOpsRender(); vykCvzRender(); vykKvalitaRender(); vykVystupLoad();
+  if(VYK.tab==='zakazky') vykZaLoad();
 }
 /* ---- Kdy se v měsíci zapisuje režie: sloupce po dnech 1–31, čára = podíl výrobních operací, třetiny, tabulka po měsících ---- */
 function vykRezieKdyRender(){
@@ -4307,6 +4312,340 @@ function vykVystupRender(){
   h+='</div>'; box.innerHTML=h;
 }
 async function vykVydejkyUpload(inp){ const f=inp.files&&inp.files[0]; if(!f) return; toast('Nahrávám výdejky…'); try{ const b64=await new Promise((ok,err)=>{const r=new FileReader(); r.onload=()=>ok(String(r.result).split(',')[1]); r.onerror=err; r.readAsDataURL(f);}); const r=await fetch('/api/vykonnost/vydejky/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zavod:VYK.zavod,name:f.name,b64})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Nahrání selhalo.'); return; } toast('Výdejky: '+j.radku+' řádků, nových '+j.novych+', celkem '+j.celkem+' (od '+vykD(j.od)+')'); await vykLoadZavod(); }catch(e){ toast('Nahrání selhalo: '+e.message); } }
+/* ---- Výkonnost: cíl ABR po závodech · Dny a směny · Analýza zakázek proti normě ---- */
+const vykN1=x=>x==null||isNaN(x)?'—':(Math.round(x*10)/10).toLocaleString('cs-CZ');
+const vykHod=m=>m==null||isNaN(m)?'—':(Math.round(m/6)/10).toLocaleString('cs-CZ');
+const vykDow=d=>['ne','po','út','st','čt','pá','so'][new Date(d+'T12:00:00').getDay()];
+const vykSemP=p=>p==null?'var(--ink-soft)':(p>=100?'#0a7a0a':(p>=80?'#b57400':'#c93a39'));
+const vykZavodOv=k=>((VYK.ov&&VYK.ov.zavody)||[]).find(z=>z.key===(k||VYK.zavod))||null;
+const vykJedn=k=>k==='popelnice'?'beden':'ABR';
+const vykBezDia=s=>String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+const VYK_USEK={svar:'Svařovna',lak:'Lakovna a příprava',del:'Dělírna',drobne:'Drobné dílce'};
+const VYK_TDR=vykTd+';text-align:right', VYK_THR='text-align:right;'+vykTh, VYK_THL='text-align:left;'+vykTh;
+const vykTip=(t,h)=>'<span title="'+esc(String(t||''))+'">'+h+'</span>';
+function vykCilHead(){ const z=vykZavodOv(); if(!z||!z.data) return ''; const j=vykJedn(z.key), kde='Cíl se nastavuje nahoře v přehledu závodů, karta „Cíl ABR / den po závodech“.';
+  if(!z.cil) return vykTip(kde,vykPill('Cíl '+j+' / den: nenastaven','mute'));
+  const vych=z.cilZdroj==='výchozí';
+  return vykTip((vych?'Výchozí hodnota, pro tento závod zatím nikdo cíl nenastavil. ':'')+kde,vykPill('Cíl: '+vykN1(z.cil)+' '+j+' / den'+(vych?' · výchozí, nenastaveno':''),vych?'warn':'info')); }
+function vykPlanTabLbl(){ const z=vykZavodOv(); return z&&z.cil&&z.opsKont?'Plán '+vykN1(z.cil)+' ABR/den':'Plán operací'; }
+
+/* (A) Cíl ABR / den — pro každý závod zvlášť */
+function vykCileRender(){ const box=document.getElementById('vykCile'), ov=VYK.ov; if(!box||!ov) return;
+  const adm=!!ov.admin, Z=ov.zavody||[];
+  const inpS='width:84px;padding:5px 8px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:13px;text-align:right';
+  const rows=Z.map(z=>{ const v=z.vystup||null, nast=z.cilZdroj==='nastaveno', vych=z.cilZdroj==='výchozí', j=vykJedn(z.key);
+    const plan=z.cil&&z.opsKont?z.cil*z.opsKont:null, sk=v?v.lakDen4:null, pl=v&&z.cil&&v.plneni4!=null?v.plneni4:null;
+    const cilTd=adm?'<input type="number" min="0" step="0.1" id="vykCilIn-'+z.key+'" value="'+(nast?String(z.cil):'')+'" placeholder="'+(vych&&z.cilVychozi?String(z.cilVychozi).replace('.',','):'—')+'" style="'+inpS+'"> <span class="muted" style="font-size:11.5px">'+j+'</span>':(z.cil?'<b>'+vykN1(z.cil)+'</b> <span class="muted" style="font-size:11.5px">'+j+'</span>':'—');
+    const zdroj=nast?vykPill('nastaveno','good'):(vych?vykPill('výchozí – nenastaveno','warn')+' <span class="muted" style="font-size:11.5px">platí '+vykN1(z.cil)+'</span>':vykPill('bez cíle','mute'));
+    return '<tr><td style="'+vykTd+'"><b style="cursor:pointer" onclick="vykPick(\''+z.key+'\')">'+esc(z.name)+'</b>'+(z.key==='popelnice'?'<br><span class="muted" style="font-size:11.5px">místo abrolů bedny / den</span>':'')+'</td>'
+      +'<td style="'+VYK_TDR+';white-space:nowrap">'+cilTd+'</td><td style="'+vykTd+'">'+zdroj+'</td>'
+      +'<td style="'+VYK_TDR+'">'+(z.opsKont?String(z.opsKont):'—')+'</td>'
+      +'<td style="'+VYK_TDR+'">'+(plan!=null?vykN1(plan):'—')+'</td>'
+      +'<td style="'+VYK_TDR+'">'+(sk!=null?vykN1(sk):'—')+'</td>'
+      +'<td style="'+VYK_TDR+';font-weight:700;color:'+vykSemP(pl)+'">'+(pl!=null?pl+' %':'—')+'</td></tr>'; }).join('');
+  box.innerHTML='<div class="card pad" style="margin-bottom:14px;'+VYK_KO+'">'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:15px">Cíl ABR / den po závodech</b><span class="muted" style="font-size:12px">pro každý závod zvlášť · průměrný počet hotových abrolů za pracovní den podle finančního plánu</span></div>'
+    +'<p class="muted" style="font-size:12.5px;margin:6px 0 8px">Z cíle závodu se počítají indikátory A7 až A10, Srovnání závodů, plán operací a přehled Dny a směny. Výchozí hodnota 6 je cíl Chomutova. U ostatních závodů je jen převzatá, dokud správce nezadá vlastní.</p>'
+    +'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr>'
+      +[['Závod',0],['Cíl / den',1],['Zdroj cíle',0],['Hlavních operací na 1 kontejner',1],['Plán hlavních operací / den',1],['Skutečnost / den · poslední 4 týdny',1],['Plnění cíle · 4 týdny',1]].map(c=>'<th style="'+(c[1]?VYK_THR:VYK_THL)+'">'+c[0]+'</th>').join('')
+      +'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +(adm?'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px"><button class="btn sm" onclick="vykCileSave()">Uložit cíle</button><span class="muted" style="font-size:12px">Jedna hodnota platí pro celé sledované období, tedy i zpětně. Prázdné pole u uloženého cíle znamená závod bez cíle.</span></div>'
+          :'<div class="muted" style="font-size:12px;margin-top:8px">Cíl mění správce modulu.</div>')
+    +'</div>'; }
+async function vykCileSave(){ const Z=(VYK.ov&&VYK.ov.zavody)||[], zmeny=[];
+  for(const z of Z){ const el=document.getElementById('vykCilIn-'+z.key); if(!el) continue; const raw=String(el.value||'').trim().replace(',','.'), nast=z.cilZdroj==='nastaveno';
+    if(raw===''){ if(el.validity&&el.validity.badInput){ toast('Cíl pro závod '+z.name+' musí být číslo.'); el.focus(); return; } if(nast) zmeny.push({z,cil:null}); continue; }
+    const n=+raw; if(!isFinite(n)||!(n>0)){ toast('Cíl pro závod '+z.name+' musí být kladné číslo.'); el.focus(); return; }
+    const r1=Math.round(n*10)/10; if(nast&&r1===z.cil) continue; zmeny.push({z,cil:r1}); }
+  if(!zmeny.length){ toast('Žádná změna cíle.'); return; }
+  try{ for(const c of zmeny){ const r=await fetch('/api/vykonnost/cil',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zavod:c.z.key,cil:c.cil})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||('Uložení cíle selhalo: '+c.z.name)); return; } }
+    toast('Cíl uložen: '+zmeny.map(c=>c.z.name+' '+(c.cil==null?'bez cíle':String(c.cil).replace('.',','))).join(', '));
+    VYK.ind=null; VYK.dny=null; await showVykonnost(); }
+  catch(e){ toast('Uložení selhalo: '+e.message); } }
+
+/* (C) Dny a směny — den po dni: co bylo odvedeno, plán hlavních operací, kapacita směny */
+let VYK_DNY_SEQ=0;
+async function vykDnyLoad(){ const box=document.getElementById('vykDny'); if(!box) return;
+  const zk=VYK.zavod, d=VYK.det||{}, rg=vykRange(); let od=rg.od||'', do_=rg.do||'';
+  if(!od&&d.snapshot){ od=d.snapshot.slice(0,4)+'-01-01'; do_=d.snapshot; }
+  const key=[zk,od,do_,d.snapshot||''].join('|');
+  if(VYK.dny&&VYK.dny.key===key){ vykDnyRender(); return; }
+  const seq=++VYK_DNY_SEQ;
+  box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Načítám dny…</p></div>';
+  try{ const r=await fetch('/api/vykonnost/dny/'+zk+'?od='+encodeURIComponent(od)+'&do='+encodeURIComponent(do_),{cache:'no-store'}); const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status));
+    if(seq!==VYK_DNY_SEQ) return; VYK.dny={key,j,reqOd:od,open:new Set()}; }
+  catch(e){ if(seq!==VYK_DNY_SEQ) return; const b=document.getElementById('vykDny'); if(b) b.innerHTML='<div class="card pad">Dny se nepodařilo načíst: '+esc(String(e.message))+'</div>'; return; }
+  vykDnyRender(); }
+function vykDnyRender(){ const box=document.getElementById('vykDny'), S=VYK.dny; if(!box||!S) return; const J=S.j;
+  if(!J.data){ box.innerHTML='<div class="card pad"><p class="muted" style="margin:0">Zatím bez dat.</p></div>'; return; }
+  const so=J.souhrn||{}, maF=!!J.maFaze, jed=vykJedn(J.zavod), smH=J.smenaMin/60, vych=J.cilZdroj==='výchozí';
+  const planDen=J.cil&&J.opsKont?J.cil*J.opsKont:null, zkr=!!(S.reqOd&&J.od>S.reqOd);
+  const zdrojStav={pozice:'podle seznamu pozic',mzdy:'podle mezd'};
+  const fakt=(l,v)=>'<div style="min-width:150px"><div class="muted" style="font-size:11.5px">'+l+'</div><div style="font-size:13.5px;font-weight:600">'+v+'</div></div>';
+  const tenke=t=>' <span class="muted" style="font-weight:400">'+t+'</span>';
+  let h='<div class="card pad" style="margin-bottom:14px;'+VYK_KO+'">'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:15px">Dny a směny — co bylo odvedeno proti plánu</b>'+vykObdPill()+'<span class="muted" style="font-size:12px">'+vykD(J.od)+' – '+vykD(J.do)+' · snímek Heliosu '+vykD(J.snapshot)+'</span></div>'
+    +(zkr?'<div style="margin-top:8px;font-size:12.5px;color:#a86a00">Zobrazeno je posledních 92 dní zvoleného období. Starší dny zobrazíte výběrem měsíce.</div>':'')
+    +'<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px">'
+      +fakt('Směna',vykN1(smH)+' h'+tenke('('+J.smenaMin+' min)'))
+      +fakt('Cíl závodu',J.cil?vykN1(J.cil)+' '+jed+' / den'+(vych?' <span style="color:#a86a00;font-weight:400">· výchozí, nenastaveno</span>':''):'nenastaven')
+      +(maF?fakt('Plán hlavních operací / den',planDen!=null?vykN1(planDen)+tenke('= '+vykN1(J.cil)+' × '+J.opsKont+' operací na kontejner'):'—'+tenke(J.cil?'':'bez cíle závodu')):'')
+      +(J.stav?fakt('Výrobních pracovníků',String(J.stav.vyr)+tenke('z '+J.stav.n+' lidí závodu'+(zdrojStav[J.stav.zdroj]?' · '+zdrojStav[J.stav.zdroj]:''))):'')
+    +'</div>'
+    +'<p class="muted" style="font-size:12.5px;margin:10px 0 0;line-height:1.5">Helios neeviduje skutečný čas práce. Normohodiny jsou odvedené kusy krát norma z katalogu norem. Kapacita je počet lidí, kteří ten den něco odvedli, krát délka směny. Den je datum provedení zapsané v Heliosu. Když někdo odvede víc dní najednou nebo zpětně, vyjde den nad kapacitou a okolní dny pod ní. Poslední dny před snímkem mohou být neúplné.'
+      +(maF?'':' Tento závod nemá fáze kontejneru, proto se plán operací nepočítá a sleduje se počet nalakovaných beden.')
+      +' Délku směny mění správce na kartě Plán, cíl v přehledu závodů.</p></div>';
+  const kp=(v,l,c)=>'<div class="kpi"><div class="v" style="font-size:24px'+(c?';color:'+c:'')+'">'+v+'</div><div class="l" style="text-transform:none;letter-spacing:0">'+l+'</div></div>';
+  const pAbr=so.planAbr?Math.round(so.hotAbr/so.planAbr*100):null;
+  h+='<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">'
+    +kp(String(so.pracDny),'pracovních dní v období · bez odvádění '+so.dnyBezOdvadeni+' · odvádění mimo pracovní dny '+so.mimoPracDny)
+    +(maF&&planDen!=null?kp(so.dnySplneno+' z '+so.pracDny,'dní, kdy byl splněn plán '+vykN1(planDen)+' hlavních operací',so.pracDny?vykSemP(Math.round(so.dnySplneno/so.pracDny*100)):null):'')
+    +(maF?kp(vykF(so.opsHl)+(so.planOps?' / '+vykF(so.planOps):''),'hlavních operací odvedeno'+(so.planOps?' / plán · plnění '+so.plneni+' %':''),so.planOps?vykSemP(so.plneni):null):'')
+    +kp(vykF(so.hotAbr)+(so.planAbr?' / '+vykF(so.planAbr):''),(maF?'hotových ABR (lakování vrchů)':'nalakovaných beden')+(so.planAbr?' / cíl za pracovní dny · '+pAbr+' %':'')+(maF&&(so.hotCity||so.hotMul)?' · CITY '+vykF(so.hotCity)+' · muldy '+vykF(so.hotMul):''),so.planAbr?vykSemP(pAbr):null)
+    +kp(vykN1(so.prumLidi),'lidí s odvodem průměrně za den'+(J.stav?' · výrobních pracovníků '+J.stav.vyr:''))
+    +kp(vykF(so.normH+so.rezieH)+' / '+vykF(so.kapH)+' h','normohodiny a režie / kapacita lidí s odvodem'+(so.vytizeni!=null?' · '+so.vytizeni+' %':''))
+    +kp(vykF(so.bezNormy)+' z '+vykF(so.prodRows),'výrobních zápisů nemá normu v katalogu, do normohodin se nepočítají')
+    +'</div>';
+  const cityCol=maF&&so.hotCity>0, mulCol=maF&&so.hotMul>0;
+  const C=[['Den',0,'datum provedení podle Heliosu'],['Lidí',1,'kolik lidí ten den něco odvedlo']]
+    .concat(maF?[['Hlavní operace',1,'odvedené kusy v hlavních fázích kontejneru'],['Plán',1,'cíl závodu × hlavních operací na kontejner'],['Plnění',1,'hlavní operace ÷ plán'],['Ekvivalent kontejnerů',1,'hlavní operace ÷ operací na jeden kontejner']]:[])
+    .concat([[maF?'Hotové ABR':'Nalakováno beden',1,maF?'odvedené lakování vrchů abrolů':'odvedené lakování']])
+    .concat(cityCol?[['CITY',1,'odvedené lakování CITY kontejnerů']]:[]).concat(mulCol?[['Muldy',1,'odvedené lakování muld']]:[])
+    .concat([['Normohodiny',1,'odvedené kusy × norma z katalogu'],['Režie h',1,'odvedené režijní hodiny'],['Kapacita h',1,'lidí s odvodem × '+vykN1(smH)+' h'],['Vytížení',1,'(normohodiny + režie) ÷ kapacita'],['Zápisů',1,'všechny řádky odvádění za den'],['Bez normy',1,'výrobní zápisy bez normy v katalogu'],['Z terminálu',1,'zápisy pořízené terminálem']]);
+  const dny=(J.dny||[]).filter(d=>d.prac||d.rows>0);
+  h+='<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Jednotlivé dny</b><span class="muted" style="font-size:12px">kliknutím na den se rozbalí fáze a lidé · volné dny bez odvádění se nezobrazují</span></div>'
+    +'<div style="overflow-x:auto;margin-top:8px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>'+C.map(c=>'<th title="'+esc(c[2])+'" style="'+(c[1]?VYK_THR:VYK_THL)+'">'+c[0]+'</th>').join('')+'</tr></thead><tbody>'
+    +(dny.length?dny.map(d=>{ const off=!d.prac, dt='<b>'+vykD(d.date)+'</b> <span class="muted">'+vykDow(d.date)+'</span>'+(off?' '+vykTip('odvádění mimo pracovní den',vykPill(d.svatek?'svátek':'víkend','info')):'');
+        if(!d.rows) return '<tr><td style="'+vykTd+';white-space:nowrap">'+dt+'</td><td colspan="'+(C.length-1)+'" style="'+vykTd+';color:#c93a39">bez odvádění'+(planDen!=null?' · plán '+vykN1(planDen)+' hlavních operací':'')+'</td></tr>';
+        const nad=d.vytizeni!=null&&d.vytizeni>100;
+        return '<tr id="vykDnyRow-'+d.date+'" style="cursor:pointer" onclick="vykDnyToggle(\''+d.date+'\')"><td style="'+vykTd+';white-space:nowrap"><span class="muted">▸</span> '+dt+'</td>'
+          +'<td style="'+VYK_TDR+'">'+d.lide+'</td>'
+          +(maF?'<td style="'+VYK_TDR+';font-weight:600">'+vykN1(d.opsHl)+'</td><td style="'+VYK_TDR+'">'+(d.planOps!=null?vykN1(d.planOps):'—')+'</td><td style="'+VYK_TDR+';font-weight:700;color:'+vykSemP(d.plneni)+'">'+(d.plneni!=null?d.plneni+' %':'—')+'</td><td style="'+VYK_TDR+'">'+(d.kontEkv!=null?vykN1(d.kontEkv):'—')+'</td>':'')
+          +'<td style="'+VYK_TDR+';font-weight:600">'+vykN1(d.hotAbr)+'</td>'+(cityCol?'<td style="'+VYK_TDR+'">'+vykN1(d.hotCity)+'</td>':'')+(mulCol?'<td style="'+VYK_TDR+'">'+vykN1(d.hotMul)+'</td>':'')
+          +'<td style="'+VYK_TDR+'">'+vykHod(d.normMin)+'</td><td style="'+VYK_TDR+'">'+vykN1(d.rezieH)+'</td><td style="'+VYK_TDR+'">'+vykHod(d.kapMin)+'</td>'
+          +'<td style="'+VYK_TDR+(nad?';font-weight:700;color:#a86a00':'')+'"'+(nad?' title="víc než kapacita lidí s odvodem: hromadné nebo zpětné odvádění, nebo překonaná norma"':'')+'>'+(d.vytizeni!=null?d.vytizeni+' %':'—')+'</td>'
+          +'<td style="'+VYK_TDR+'">'+vykF(d.rows)+'</td><td style="'+VYK_TDR+'">'+vykF(d.bezNormy)+'</td><td style="'+VYK_TDR+'">'+vykF(d.term)+'</td></tr>'; }).join('')
+      :'<tr><td colspan="'+C.length+'" class="muted" style="'+vykTd+'">V období není žádný pracovní den.</td></tr>')
+    +'</tbody></table></div></div>';
+  box.innerHTML=h;
+  [...S.open].forEach(dt=>{ S.open.delete(dt); vykDnyToggle(dt); }); }
+function vykDnyToggle(date){ const S=VYK.dny; if(!S||!S.j||!S.j.data) return; const tr=document.getElementById('vykDnyRow-'+date); if(!tr) return;
+  const ex=document.getElementById('vykDnyDet-'+date); if(ex){ ex.remove(); S.open.delete(date); return; }
+  const J=S.j, d=(J.dny||[]).find(x=>x.date===date); if(!d) return; S.open.add(date);
+  const smH=J.smenaMin/60, maF=!!J.maFaze, byK={}; (d.faze||[]).forEach(f=>{ byK[f.k]=f.ks; });
+  let h='<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">';
+  if(maF&&(J.fazeDef||[]).length){ h+='<div style="flex:1;min-width:300px"><b style="font-size:13px">Hlavní fáze · '+vykD(d.date)+'</b><table style="border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px"><thead><tr><th style="'+VYK_THL+'">Fáze</th><th style="'+VYK_THL+'">Úsek</th><th style="'+VYK_THR+'">Odvedeno ks</th><th style="'+VYK_THR+'">Plán ks / den</th><th style="'+VYK_THR+'">Rozdíl</th></tr></thead><tbody>'
+      +J.fazeDef.map(f=>{ const ks=byK[f.k]||0, rz=f.plan!=null?Math.round((ks-f.plan)*10)/10:null;
+        return '<tr><td style="'+vykTd+'">'+esc(String(f.nazev||f.k))+'</td><td style="'+vykTd+'" class="muted">'+esc(VYK_USEK[f.usek]||String(f.usek||''))+'</td><td style="'+VYK_TDR+';font-weight:600">'+vykN1(ks)+'</td><td style="'+VYK_TDR+'">'+(f.plan!=null?vykN1(f.plan):'—')+'</td><td style="'+VYK_TDR+';color:'+(rz==null?'var(--ink-soft)':(rz>=0?'#0a7a0a':'#c93a39'))+'">'+(rz==null?'—':(rz>0?'+':'')+vykN1(rz))+'</td></tr>'; }).join('')
+      +'</tbody></table></div>'; }
+  h+='<div style="flex:1.4;min-width:380px"><b style="font-size:13px">Lidé · '+vykD(d.date)+'</b><span class="muted" style="font-size:12px"> · směna '+vykN1(smH)+' h</span><table style="border-collapse:collapse;width:100%;font-size:12.5px;margin-top:6px"><thead><tr><th style="'+VYK_THL+'">Pracovník</th><th style="'+VYK_THR+'">Zápisů</th><th style="'+VYK_THR+'">Ks</th>'+(maF?'<th style="'+VYK_THR+'">Hlavní operace</th>':'')+'<th style="'+VYK_THR+'">Normohodiny</th><th style="'+VYK_THR+'">Režie h</th><th style="'+VYK_THR+'">Celkem h</th><th style="'+VYK_THR+'" title="normohodiny a režie proti délce směny">Proti směně</th><th style="'+VYK_THR+'">Bez normy</th></tr></thead><tbody>'
+    +(d.osoby||[]).map(o=>{ const cel=o.normMin/60+o.rezieH, pct=smH?Math.round(cel/smH*100):null, nad=cel>smH;
+      return '<tr><td style="'+vykTd+'">'+esc(String(o.jmeno||''))+'</td><td style="'+VYK_TDR+'">'+vykF(o.rows)+'</td><td style="'+VYK_TDR+'">'+vykN1(o.ks)+'</td>'+(maF?'<td style="'+VYK_TDR+'">'+vykN1(o.opsHl)+'</td>':'')+'<td style="'+VYK_TDR+'">'+vykHod(o.normMin)+'</td><td style="'+VYK_TDR+'">'+vykN1(o.rezieH)+'</td><td style="'+VYK_TDR+';font-weight:600">'+vykN1(cel)+'</td>'
+        +'<td style="'+VYK_TDR+(nad?';font-weight:700;color:#a86a00':'')+'"'+(nad?' title="víc než směna: hromadné nebo zpětné odvádění, nebo překonaná norma"':'')+'>'+(pct!=null?pct+' %':'—')+(nad?' ▲':'')+'</td><td style="'+VYK_TDR+'">'+vykF(o.bezNormy)+'</td></tr>'; }).join('')
+    +'</tbody></table><div class="muted" style="font-size:11.5px;margin-top:6px">▲ = víc než směna. Znamená hromadné nebo zpětné odvádění, nebo překonanou normu. Zápisy bez normy se do hodin nepočítají.</div></div></div>';
+  const det=document.createElement('tr'); det.id='vykDnyDet-'+date;
+  det.innerHTML='<td colspan="'+tr.children.length+'" style="padding:10px 14px;background:var(--bg-2);border-bottom:1px solid var(--line)">'+h+'</td>'; tr.after(det); }
+
+
+/* (B) Analýza zakázek — čas na zakázce a odvedené operace proti normě */
+async function vykZaLoad(force){ const box=document.getElementById('vykZa'); if(!box) return;
+  const zk=VYK.zavod, snap=(VYK.det&&VYK.det.snapshot)||'';
+  if(!VYK.za||VYK.za.zavod!==zk) VYK.za={zavod:zk,list:null,snap:'',sel:new Set(),q:'',stav:'vse',out:null,err:'',busy:false};
+  const S=VYK.za;
+  if(S.list&&!force&&S.snap===snap){ vykZaRender(); return; }
+  if(S.loading){ vykZaRender(); return; }
+  S.loading=true; S.err=''; vykZaRender();
+  try{ const r=await fetch('/api/vykonnost/zakazky/'+zk,{cache:'no-store'}); const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status));
+    S.list=j; S.snap=snap; if(force) S.out=null;
+    const ok=new Set((j.zakazky||[]).filter(x=>x.rows>0).map(x=>x.cvz)); [...S.sel].forEach(c=>{ if(!ok.has(c)) S.sel.delete(c); }); }
+  catch(e){ S.err=String(e.message||e); }
+  S.loading=false; if(VYK.za===S) vykZaRender(); }
+function vykZaRender(){ const box=document.getElementById('vykZa'), S=VYK.za; if(!box||!S) return;
+  const hlava='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:15px">Analýza zakázek — čas na zakázce a operace proti normě</b>'+vykRokPill('nezávisí na období')+'</div>';
+  const obal=t=>'<div class="card pad" style="margin-bottom:14px;'+VYK_KR+'">'+hlava+t+'</div>';
+  if(S.err&&!S.list){ box.innerHTML=obal('<p style="margin:10px 0 0;color:#c93a39">Seznam zakázek se nepodařilo načíst: '+esc(S.err)+' <button class="btn ghost sm" onclick="vykZaLoad(true)">Zkusit znovu</button></p>'); return; }
+  const L=S.list; if(!L){ box.innerHTML=obal('<p class="muted" style="margin:10px 0 0">Načítám zakázky…</p>'); return; }
+  if(!L.data){ box.innerHTML=obal('<p class="muted" style="margin:10px 0 0">Zatím bez dat.</p>'); return; }
+  const p=L.pocty||{}, F=[['vse','Vše',p.celkem],['rozprac','Rozpracované',p.rozprac],['hotova','Hotové',p.hotova],['nezah','Nezahájené',p.nezah]];
+  box.innerHTML=obal(
+    '<p class="muted" style="font-size:12.5px;margin:6px 0 10px;line-height:1.5">Vyberte jednu nebo více zakázek, hotových i rozpracovaných. Čas na zakázce je součet odvedených kusů krát norma z katalogu norem. Helios skutečný čas práce neeviduje. Zápisy, ke kterým katalog normu nemá, se do času nepočítají, proto je uvedený čas spodní hranice. '
+      +(L.maPlan?'Stav zakázky je z plánu výroby.':'Plán výroby pro tento závod není načtený, stav je odhad podle odvedeného lakování.')+' Snímek Heliosu '+vykD(L.snapshot)+'.</p>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+      +'<input id="vykZaQ" placeholder="🔍 ČVZ / výrobek / zákazník…" value="'+esc(S.q)+'" oninput="VYK.za.q=this.value;vykZaListRender()" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit">'
+      +F.map(f=>'<button class="btn sm'+(S.stav===f[0]?'':' ghost')+'" data-zaf="'+f[0]+'" onclick="vykZaFiltr(\''+f[0]+'\')">'+f[1]+' ('+vykF(f[2]||0)+')</button>').join('')
+    +'</div>'
+    +'<div id="vykZaList" style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:10px"></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">'
+      +'<button class="btn sm" id="vykZaBtn" onclick="vykZaRun()"></button>'
+      +'<button class="btn ghost sm" onclick="vykZaClear()">Zrušit výběr</button>'
+      +'<button class="btn ghost sm" onclick="vykZaLoad(true)">Obnovit seznam</button>'
+      +'<span class="muted" style="font-size:12px">najednou nejvýše 20 zakázek · nezahájené zakázky nemají co analyzovat</span>'
+    +'</div>')
+    +'<div id="vykZaOut"></div>';
+  vykZaListRender(); vykZaOutRender(); }
+function vykZaBtnUpd(){ const b=document.getElementById('vykZaBtn'), S=VYK.za; if(!b||!S) return; b.textContent=S.busy?'Počítám…':'Analyzovat vybrané ('+S.sel.size+')'; b.disabled=S.busy||!S.sel.size; }
+function vykZaStavPill(x){ const m={hotova:['hotová','good'],rozprac:['rozpracovaná','info'],nezah:['nezahájená','mute']}[x.stav]||[String(x.stav||'—'),'mute'];
+  return vykTip(x.stavZdroj||'',vykPill(m[0],m[1]))+(x.lakNeodvedeno?' '+vykTip('Podle plánu výroby je zakázka hotová, ale lakování v Heliosu není odvedené v plném počtu.',vykPill('lakování neodvedeno','warn')):''); }
+function vykZaListRender(){ const el=document.getElementById('vykZaList'), S=VYK.za; if(!el||!S||!S.list||!S.list.data) return;
+  const q=vykBezDia(S.q).trim(), MAX=400;
+  const all=(S.list.zakazky||[]).filter(x=>(S.stav==='vse'||x.stav===S.stav)&&(!q||vykBezDia([x.cvz,x.zak,x.vyrobek,x.zakaznik].join(' ')).indexOf(q)>=0));
+  const rows=all.slice(0,MAX);
+  const th=(t,r)=>'<th style="position:sticky;top:0;background:var(--paper);'+(r?VYK_THR:VYK_THL)+'">'+t+'</th>';
+  el.innerHTML='<table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>'+th('')+th('ČVZ')+th('Výrobek')+th('Zákazník')+th('Ks',1)+th('Stav')+th('Termín')+th('Odvádění od – do')+th('Zápisů',1)+th('Lidí',1)+th('Nalakováno',1)+'</tr></thead><tbody>'
+    +(rows.length?rows.map(x=>{ const bez=!x.rows, on=S.sel.has(x.cvz);
+        return '<tr'+(bez?' style="color:var(--ink-soft)"':'')+'><td style="'+vykTd+'"><input type="checkbox" data-cvz="'+esc(String(x.cvz))+'"'+(on?' checked':'')+(bez?' disabled title="zakázka zatím nemá žádné odvádění"':'')+' onchange="vykZaTog(this)" style="width:16px;height:16px;cursor:pointer"></td>'
+          +'<td style="'+vykTd+';white-space:nowrap;font-weight:600">'+esc(String(x.cvz))+'</td>'
+          +'<td style="'+vykTd+'">'+esc(String(x.vyrobek||'—'))+'</td><td style="'+vykTd+'">'+esc(String(x.zakaznik||'—'))+'</td>'
+          +'<td style="'+VYK_TDR+'">'+(x.ks!=null&&x.ks!==''?vykN1(+x.ks):'—')+'</td>'
+          +'<td style="'+vykTd+';white-space:nowrap">'+vykZaStavPill(x)+'</td>'
+          +'<td style="'+vykTd+';white-space:nowrap">'+esc(String(x.termin||'—'))+'</td>'
+          +'<td style="'+vykTd+';white-space:nowrap">'+(x.first?vykD(x.first)+' – '+vykD(x.last):'—')+'</td>'
+          +'<td style="'+VYK_TDR+'">'+vykF(x.rows||0)+'</td><td style="'+VYK_TDR+'">'+vykF(x.lide||0)+'</td><td style="'+VYK_TDR+'">'+vykN1(x.lak||0)+'</td></tr>'; }).join('')
+      :'<tr><td colspan="11" class="muted" style="'+vykTd+'">Žádná zakázka neodpovídá filtru.</td></tr>')
+    +'</tbody></table>'+(all.length>MAX?'<div class="muted" style="font-size:12px;padding:8px 10px">Zobrazeno prvních '+MAX+' z '+vykF(all.length)+' zakázek. Zpřesněte hledání.</div>':'');
+  vykZaBtnUpd(); }
+function vykZaFiltr(k){ const S=VYK.za; if(!S) return; S.stav=k; document.querySelectorAll('#vykZa [data-zaf]').forEach(b=>b.classList.toggle('ghost',b.getAttribute('data-zaf')!==k)); vykZaListRender(); }
+function vykZaTog(el){ const S=VYK.za; if(!S) return; const c=el.getAttribute('data-cvz');
+  if(el.checked){ if(S.sel.size>=20){ el.checked=false; toast('Najednou lze analyzovat nejvýše 20 zakázek.'); return; } S.sel.add(c); } else S.sel.delete(c);
+  vykZaBtnUpd(); }
+function vykZaClear(){ const S=VYK.za; if(!S) return; S.sel.clear(); S.out=null; vykZaListRender(); vykZaOutRender(); }
+async function vykZaRun(){ const S=VYK.za; if(!S||S.busy) return; if(!S.sel.size){ toast('Vyberte aspoň jednu zakázku.'); return; }
+  S.busy=true; vykZaBtnUpd();
+  try{ const r=await fetch('/api/vykonnost/zakazky/'+S.zavod+'/analyza?cvz='+encodeURIComponent([...S.sel].join(',')),{cache:'no-store'}); const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status)); S.out=j; }
+  catch(e){ S.busy=false; vykZaBtnUpd(); toast('Analýza selhala: '+(e.message||e)); return; }
+  S.busy=false; if(VYK.za!==S) return; vykZaBtnUpd(); vykZaOutRender();
+  const o=document.getElementById('vykZaOut'); if(o&&o.scrollIntoView) o.scrollIntoView({behavior:'smooth',block:'start'}); }
+function vykZaVerdikt(a){ const v=a.verdikt||{}, nb=(v.bezFaze||[]).length, pct=x=>x==null?'—':x+' %';
+  switch(v.stav){
+    case 'ok': return nb||a.lakNeodvedeno?['odvedené fáze v normě'+(nb?', '+nb+' '+(nb<5?'fáze':'fází')+' bez odvodu':'')+(a.lakNeodvedeno?', lakování neodvedeno':''),'warn']:['v normě','good'];
+    case 'chybi': return ['odvedeno méně než norma','warn'];
+    case 'vic': return ['odvedeno víc než norma','crit'];
+    case 'mix': return ['některé fáze víc, jiné méně','crit'];
+    case 'neodvedeno': return ['hlavní fáze neodvedeny','crit'];
+    case 'rozprac': return ['rozpracovaná, zatím '+pct(v.pomer)+' normy','info'];
+    case 'rozpracVic': return ['rozpracovaná, některá fáze už nad normou','warn'];
+    case 'neznamo': return ['nelze určit','mute'];
+    default: return ['bez porovnání s normou','mute']; } }
+function vykZaFazeStav(f,hot){ switch(f.stav){
+    case 'bez': return hot?vykPill('neodvedeno','warn'):vykPill('zatím neodvedeno','mute');
+    case 'chybi': return hot?vykPill('méně než norma','warn'):vykPill('zatím méně','info');
+    case 'ok': return vykPill('v normě','good');
+    case 'vic': return vykPill('víc než norma','crit');
+    default: return vykPill('nelze určit','mute'); } }
+function vykZaOutRender(){ const el=document.getElementById('vykZaOut'), S=VYK.za; if(!el||!S) return; const O=S.out;
+  if(!O){ el.innerHTML=''; return; }
+  if(!O.data){ el.innerHTML='<div class="card pad" style="margin-bottom:14px"><p class="muted" style="margin:0">Zatím bez dat.</p></div>'; return; }
+  const Z=O.zakazky||[], A=Z.filter(a=>!a.nenalezeno), smH=O.smenaMin/60;
+  const maRez=A.some(a=>a.cas&&a.cas.rezieH>0);
+  const T=[['Zakázka',0,''],['Výrobek',0,''],['Ks',1,'počet kusů zakázky'],['Stav',0,''],['Čas na zakázce h',1,'odvedené kusy × norma z katalogu, plus režie odvedená na zakázku'],
+    ...(maRez?[['Z toho režie h',1,'režijní hodiny odvedené přímo na zakázku']]:[]),
+    ['Osobosměny',1,'čas na zakázce ÷ směna '+vykN1(smH)+' h'],['Hodin na kus',1,'čas na zakázce ÷ počet kusů'],['Průběžná doba',1,'pracovní / kalendářní dny od prvního do posledního odvodu'],['Odvádění od – do',0,''],
+    ['Zápisů bez normy',1,'výrobní zápisy bez normy v katalogu, do času se nepočítají'],['Odvedené fáze proti normě',1,'odvedený čas hlavních fází ÷ čas podle normy za tytéž fáze'],['Celá zakázka proti normě',1,'odvedený čas hlavních fází ÷ čas podle normy za všechny hlavní fáze a kusy'],['Výsledek',0,'']];
+  const sum={min:0,rez:0,os:0,bez:0,rows:0};
+  let h='<div class="card pad" style="margin-bottom:14px;'+VYK_KR+'"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Výsledek analýzy</b><span class="muted" style="font-size:12px">'+A.length+' '+(A.length===1?'zakázka':(A.length<5&&A.length>1?'zakázky':'zakázek'))+' · směna '+vykN1(smH)+' h · snímek Heliosu '+vykD(O.snapshot)+'</span></div>'
+    +'<div style="overflow-x:auto;margin-top:8px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>'+T.map(c=>'<th'+(c[2]?' title="'+esc(c[2])+'"':'')+' style="'+(c[1]?VYK_THR:VYK_THL)+'">'+c[0]+'</th>').join('')+'</tr></thead><tbody>'
+    +Z.map((a,i)=>{ if(a.nenalezeno) return '<tr><td style="'+vykTd+';font-weight:600">'+esc(String(a.cvz))+'</td><td colspan="'+(T.length-1)+'" class="muted" style="'+vykTd+'">zakázka v datech Heliosu není</td></tr>';
+        const c=a.cas||{}, vd=vykZaVerdikt(a), bn=(a.bezNormy&&a.bezNormy.rows)||0, hot=a.stav==='hotova';
+        sum.min+=c.celkemMin||0; sum.rez+=c.rezieH||0; sum.os+=c.osobosmen||0; sum.bez+=bn; sum.rows+=a.prodRows||0;
+        return '<tr style="cursor:pointer" onclick="vykZaJdi('+i+')"><td style="'+vykTd+';white-space:nowrap;font-weight:600">'+esc(String(a.cvz))+'</td>'
+          +'<td style="'+vykTd+'">'+esc(String(a.vyrobek||'—'))+'</td><td style="'+VYK_TDR+'">'+(a.ks!=null?vykN1(a.ks):'—')+'</td><td style="'+vykTd+';white-space:nowrap">'+vykZaStavPill(a)+'</td>'
+          +'<td style="'+VYK_TDR+';font-weight:700">'+vykHod(c.celkemMin)+'</td>'+(maRez?'<td style="'+VYK_TDR+'">'+vykN1(c.rezieH||0)+'</td>':'')
+          +'<td style="'+VYK_TDR+'">'+vykN1(c.osobosmen)+'</td><td style="'+VYK_TDR+'">'+(c.hNaKus!=null?vykN1(c.hNaKus)+(hot?'':' <span class="muted">zatím</span>'):'—')+'</td>'
+          +'<td style="'+VYK_TDR+';white-space:nowrap">'+(a.first?a.pracDny+' / '+a.kalDny+' dní':'—')+'</td><td style="'+vykTd+';white-space:nowrap">'+(a.first?vykD(a.first)+' – '+vykD(a.last):'—')+'</td>'
+          +'<td style="'+VYK_TDR+';white-space:nowrap">'+vykF(bn)+' z '+vykF(a.prodRows||0)+'</td>'
+          +'<td style="'+VYK_TDR+'">'+(c.pomerOdv!=null?c.pomerOdv+' %':'—')+'</td><td style="'+VYK_TDR+'">'+(c.pomer!=null?c.pomer+' %':'—')+'</td>'
+          +'<td style="'+vykTd+'">'+vykPill(vd[0],vd[1])+'</td></tr>'; }).join('')
+    +(A.length>1?'<tr style="font-weight:700;background:var(--bg-2)"><td style="'+vykTd+'" colspan="4">Celkem '+A.length+' '+(A.length<5?'zakázky':'zakázek')+'</td><td style="'+VYK_TDR+'">'+vykHod(sum.min)+'</td>'+(maRez?'<td style="'+VYK_TDR+'">'+vykN1(sum.rez)+'</td>':'')+'<td style="'+VYK_TDR+'">'+vykN1(sum.os)+'</td><td style="'+vykTd+'" colspan="3"></td><td style="'+VYK_TDR+';white-space:nowrap">'+vykF(sum.bez)+' z '+vykF(sum.rows)+'</td><td style="'+vykTd+'" colspan="3"></td></tr>':'')
+    +'</tbody></table></div>'
+    +'<div class="muted" style="font-size:12px;margin-top:8px;line-height:1.5">V normě znamená odvedené kusy mezi 90 a 120 % kusů podle normy, stejné pásmo jako kontrola norem na kartě Plán. Hodnotí se jen fáze, které už někdo odvedl. Fáze bez odvodu jsou uvedené zvlášť. Kliknutím na řádek se otevře rozbor zakázky.</div></div>';
+  h+=Z.map((a,i)=>a.nenalezeno?'':vykZaDetail(a,i,A.length===1,O)).join('');
+  el.innerHTML=h; }
+function vykZaJdi(i){ const d=document.getElementById('vykZaDet-'+i); if(!d) return; d.open=true; if(d.scrollIntoView) d.scrollIntoView({behavior:'smooth',block:'start'}); }
+function vykZaDetail(a,i,open,O){ const c=a.cas||{}, v=a.verdikt||{}, vd=vykZaVerdikt(a), hot=a.stav==='hotova', smH=O.smenaMin/60, P=a.plan||null;
+  const bn=a.bezNormy||{rows:0,ks:0,top:[]}, nn=a.nulaNormy||{rows:0,ks:0,top:[]};
+  const fNaz={}; (a.faze||[]).forEach(f=>{ fNaz[f.k]=f.nazev; });
+  const tab=(heads,body)=>'<div style="overflow-x:auto;margin-top:6px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>'+heads.map(c=>'<th'+(c[2]?' title="'+esc(c[2])+'"':'')+' style="'+(c[1]?VYK_THR:VYK_THL)+'">'+c[0]+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+  const nad=t=>'<div style="font-weight:700;font-size:13px;margin-top:16px">'+t+'</div>';
+  const fakt=(l,val)=>val?'<div style="min-width:150px;max-width:340px"><div class="muted" style="font-size:11.5px">'+l+'</div><div style="font-size:13px;font-weight:600">'+val+'</div></div>':'';
+  const kp=(val,l)=>'<div class="kpi"><div class="v" style="font-size:22px">'+val+'</div><div class="l" style="text-transform:none;letter-spacing:0">'+l+'</div></div>';
+  const url=P&&/^https?:\/\//.test(String(P.url||''))?String(P.url):'';
+  let h='<details id="vykZaDet-'+i+'" class="card pad" style="margin-bottom:14px"'+(open?' open':'')+'><summary style="cursor:pointer;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:15px">'+esc(String(a.cvz))+'</b><span>'+esc(String(a.vyrobek||''))+'</span>'+vykZaStavPill(a)+vykPill(vd[0],vd[1])+'<span class="muted" style="font-size:12px;margin-left:auto">čas na zakázce '+vykHod(c.celkemMin)+' h</span></summary>';
+  h+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:12px">'
+    +fakt('Zákazník',P&&P.zakaznik?esc(String(P.zakaznik)):'')
+    +fakt('Zakázka v Heliosu',a.zak?esc(String(a.zak)):'')
+    +fakt('Počet kusů',a.ks!=null?vykN1(a.ks)+' <span class="muted" style="font-weight:400">'+esc(String(a.ksZdroj||''))+'</span>':'neznámý')
+    +fakt('Rozměr',a.rozmer?'délka '+vykF(a.rozmer.L)+' × výška '+vykF(a.rozmer.H)+' mm':'')
+    +fakt('Termín v plánu',P&&P.termin?esc(String(P.termin)):'')
+    +fakt('Skutečný termín',P&&P.skutecny?esc(String(P.skutecny)):'')
+    +fakt('Stav',esc(String(a.stavZdroj||'')))
+    +fakt('Nalakováno',vykN1(a.lak||0)+(a.ks?' z '+vykN1(a.ks)+' ks'+(a.hotovoPct!=null?' · '+a.hotovoPct+' %':''):' ks'))
+    +fakt('Poznámka v plánu',P&&P.pozn?esc(String(P.pozn)):'')
+    +(url?fakt('Plán výroby','<a href="'+esc(url)+'" target="_blank" rel="noopener">otevřít řádek v tabulce</a>'):'')
+    +'</div>';
+  h+='<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:14px 0 0">'
+    +kp(vykHod(c.celkemMin)+' h','čas na zakázce'+(c.rezieH>0?' · z toho režie '+vykN1(c.rezieH)+' h':' · odvedené kusy × norma'))
+    +kp(vykN1(c.osobosmen),'osobosměn při směně '+vykN1(smH)+' h')
+    +kp(c.hNaKus!=null?vykN1(c.hNaKus)+' h':'—','na jeden kus'+(hot?'':' · zatím, zakázka není hotová'))
+    +kp(a.first?a.pracDny+' / '+a.kalDny:'—','průběžná doba · pracovní / kalendářní dny'+(a.first?' · '+vykD(a.first)+' – '+vykD(a.last):''))
+    +kp((a.lide||[]).length+' / '+vykF(a.rowsCelkem||0),'lidí / zápisů odvádění')
+    +(c.heliosMin>0?kp(vykHod(c.heliosMin)+' h','normočas zapsaný v Heliosu · '+vykF(c.heliosRows||0)+' zápisů'):'')
+    +(c.kc>0?kp(vykF(c.kc)+' Kč','úkolová mzda podle Heliosu'):'')
+    +'</div>';
+  const seznam=(l,arr,col)=>arr&&arr.length?'<li><b style="color:'+col+'">'+l+':</b> '+arr.map(x=>esc(String(x))).join(', ')+'</li>':'';
+  h+='<div style="margin-top:14px;padding:10px 12px;background:var(--bg-2);border-radius:10px;font-size:13px;line-height:1.55"><b>Výsledek: '+esc(vd[0])+'</b><ul style="margin:6px 0 0;padding-left:18px">'
+    +(c.odvFazeOcek?'<li>Odvedené hlavní fáze: '+vykHod(c.odvFazeMin)+' h proti '+vykHod(c.odvFazeOcek)+' h podle normy'+(c.pomerOdv!=null?', to je '+c.pomerOdv+' %':'')+'.</li>':'')
+    +(c.hlavniOcek?'<li>Celá zakázka: '+vykHod(c.hlavniOdv)+' h proti '+vykHod(c.hlavniOcek)+' h podle normy za všechny hlavní fáze a kusy'+(c.pomer!=null?', to je '+c.pomer+' %':'')+'.</li>':'')
+    +seznam('Odvedeno víc než norma',v.vicFaze,'#a03a2c')+seznam(hot?'Odvedeno méně než norma':'Zatím odvedeno méně',v.chybiFaze,'#a86a00')+seznam(hot?'Bez odvodu':'Zatím bez odvodu',v.bezFaze,hot?'#a86a00':'var(--ink-soft)')
+    +(v.mimoRozmer?'<li>'+v.mimoRozmer+' '+(v.mimoRozmer===1?'fáze je odvedená':'fáze jsou odvedené')+' pod normou pro jiný rozměr kontejneru.</li>':'')
+    +(a.lakNeodvedeno?'<li>Podle plánu výroby je zakázka hotová, ale lakování v Heliosu není odvedené v plném počtu.</li>':'')
+    +(v.duvod?'<li>'+esc(String(v.duvod))+'</li>':'')
+    +(bn.rows?'<li>'+vykF(bn.rows)+' z '+vykF(a.prodRows||0)+' výrobních zápisů nemá normu v katalogu. Do času se nepočítají, skutečný čas je vyšší.</li>':'')
+    +(c.ostatniMin>0?'<li>Mimo hlavní fáze je odvedeno dalších '+vykHod(c.ostatniMin)+' h.</li>':'')
+    +'</ul></div>';
+  if(a.faze&&a.faze.length){
+    h+=nad('Hlavní fáze proti normě')+tab([['Fáze',0],['Úsek',0],['Odvedeno ks',1],['Podle normy ks',1,'počet kusů zakázky × kusů fáze na kontejner'],['Norma min / ks · kód',1,'čas normy na 1 kus a kód normy v katalogu norem'],['Odvedený čas h',1,'odvedené kusy × norma operace, pod kterou byly odvedeny'],['Čas podle normy h',1],['Rozdíl h',1],['Stav',0]],
+      a.faze.map(f=>{ const bezN=(f.odvedene||[]).some(o=>!o.norma), N=f.norma;
+        return '<tr><td style="'+vykTd+'">'+esc(String(f.nazev||f.k))+'</td><td style="'+vykTd+'" class="muted">'+esc(VYK_USEK[f.usek]||String(f.usek||''))+'</td>'
+          +'<td style="'+VYK_TDR+';font-weight:600">'+vykN1(f.ksOdv)+'</td><td style="'+VYK_TDR+'">'+(f.ksOcek!=null?vykN1(f.ksOcek):'—')+'</td>'
+          +'<td style="'+VYK_TDR+';white-space:nowrap"'+(N?' title="'+esc(String(N.op||'')+(f.normaZdroj?' · '+f.normaZdroj:''))+'"':'')+'>'+(N?vykN1(N.min)+' <span class="muted">· '+esc(String(N.kod||''))+'</span>':'—')+'</td>'
+          +'<td style="'+VYK_TDR+'">'+vykHod(f.minOdv)+(bezN?' '+vykTip('Část odvedených kusů je pod operací, ke které katalog normu nemá. Čas je proto podhodnocený.','<span style="color:#a86a00;font-weight:700">bez normy</span>'):'')+'</td>'
+          +'<td style="'+VYK_TDR+'">'+(f.minOcek!=null?vykHod(f.minOcek):'—')+'</td>'
+          +'<td style="'+VYK_TDR+'">'+(f.rozdilMin!=null&&f.minOcek!=null?(f.rozdilMin>0?'+':'')+vykHod(f.rozdilMin):'—')+'</td><td style="'+vykTd+';white-space:nowrap">'+vykZaFazeStav(f,hot)+'</td></tr>'; }).join(''));
+  } else if(!(a.verdikt&&a.verdikt.duvod)) h+='<p class="muted" style="font-size:12.5px;margin:14px 0 0">Porovnání po fázích je jen pro abrolové kontejnery v závodě, který má fáze kontejneru. U této zakázky je k dispozici čas a rozpad po úsecích a operacích.</p>';
+  if(a.mimoRozmer&&a.mimoRozmer.length) h+=nad('Odvedeno pod normou pro jiný rozměr')+tab([['Fáze',0],['Ks',1],['Odvedená norma',0],['Správná norma podle rozměru',0],['Rozdíl h',1]],
+    a.mimoRozmer.map(m=>{ const nz=n=>n?esc(String(n.kod||''))+' · '+esc(String(n.op||''))+' · '+vykN1(n.min)+' min':'—';
+      return '<tr><td style="'+vykTd+'">'+esc(String(m.faze||''))+'</td><td style="'+VYK_TDR+'">'+vykN1(m.ks)+'</td><td style="'+vykTd+'">'+nz(m.odvedena)+'</td><td style="'+vykTd+'">'+nz(m.spravna)+'</td><td style="'+VYK_TDR+'">'+(m.rozdilMin>0?'+':'')+vykHod(m.rozdilMin)+'</td></tr>'; }).join(''));
+  if(a.useky&&a.useky.length) h+=nad('Čas po úsecích')+tab([['Úsek',0],['Zápisů',1],['Ks',1],['Čas h',1],['Zápisů bez normy',1]],
+    a.useky.map(u=>'<tr><td style="'+vykTd+'">'+esc(String(u.nazev||VYK_USEK[u.usek]||u.usek||''))+'</td><td style="'+VYK_TDR+'">'+vykF(u.rows)+'</td><td style="'+VYK_TDR+'">'+vykN1(u.ks)+'</td><td style="'+VYK_TDR+';font-weight:600">'+vykHod(u.min)+'</td><td style="'+VYK_TDR+(u.bezNormy?';color:#a86a00;font-weight:600':'')+'">'+vykF(u.bezNormy||0)+'</td></tr>').join(''));
+  const opTab=(t,o)=>o.rows?nad(t)+tab([['Operace',0],['Zápisů',1],['Ks',1]],(o.top||[]).map(x=>'<tr><td style="'+vykTd+'">'+esc(String(x.op||''))+'</td><td style="'+VYK_TDR+'">'+vykF(x.rows)+'</td><td style="'+VYK_TDR+'">'+vykN1(x.ks)+'</td></tr>').join('')):'';
+  h+=opTab('Operace bez normy v katalogu · '+vykF(bn.rows)+' zápisů, '+vykN1(bn.ks)+' ks',bn);
+  if(bn.rows) h+='<div class="muted" style="font-size:12px;margin-top:6px">Správce může operaci přiřadit k normě ručně na kartě Normy. Pak se její čas začne počítat.</div>';
+  h+=opTab('Operace s nulovou normou v katalogu · '+vykF(nn.rows)+' zápisů',nn);
+  if(a.rezie&&a.rezie.h>0) h+=nad('Režie odvedená na zakázku · '+vykN1(a.rezie.h)+' h')+tab([['Druh režie',0],['Hodin',1]],(a.rezie.kat||[]).map(k=>'<tr><td style="'+vykTd+'">'+esc(String(k.k||''))+'</td><td style="'+VYK_TDR+'">'+vykN1(k.h)+'</td></tr>').join(''));
+  if(a.lide&&a.lide.length) h+=nad('Lidé na zakázce')+tab([['Pracovník',0],['Zápisů',1],['Ks',1],['Čas h',1],...(c.rezieH>0?[['Režie h',1]]:[]),['Odvádění od – do',0]],
+    a.lide.map(l=>'<tr><td style="'+vykTd+'">'+esc(String(l.jmeno||''))+'</td><td style="'+VYK_TDR+'">'+vykF(l.rows)+'</td><td style="'+VYK_TDR+'">'+vykN1(l.ks)+'</td><td style="'+VYK_TDR+';font-weight:600">'+vykHod(l.normMin)+'</td>'+(c.rezieH>0?'<td style="'+VYK_TDR+'">'+vykN1(l.rezieH)+'</td>':'')+'<td style="'+vykTd+';white-space:nowrap">'+vykD(l.first)+' – '+vykD(l.last)+'</td></tr>').join(''));
+  if(a.dny&&a.dny.length) h+=nad('Dny, kdy se na zakázce odvádělo')+tab([['Den',0],['Lidí',1],['Zápisů',1],['Ks',1],['Čas h',1],...(c.rezieH>0?[['Režie h',1]]:[]),['Odvedené fáze',0]],
+    a.dny.map(d=>'<tr><td style="'+vykTd+';white-space:nowrap">'+vykD(d.date)+' <span class="muted">'+vykDow(d.date)+'</span>'+(d.prac?'':' '+vykPill('mimo pracovní den','info'))+'</td><td style="'+VYK_TDR+'">'+vykF(d.lide)+'</td><td style="'+VYK_TDR+'">'+vykF(d.rows)+'</td><td style="'+VYK_TDR+'">'+vykN1(d.ks)+'</td><td style="'+VYK_TDR+';font-weight:600">'+vykHod(d.normMin)+'</td>'+(c.rezieH>0?'<td style="'+VYK_TDR+'">'+vykN1(d.rezieH)+'</td>':'')+'<td style="'+vykTd+'">'+(d.faze||[]).map(x=>esc(String(x))).join(', ')+'</td></tr>').join(''));
+  if(a.radky&&a.radky.length) h+='<details style="margin-top:16px"><summary style="cursor:pointer;font-weight:700;font-size:13px">Všechny odvedené operace · '+a.radky.length+'</summary>'+tab([['Operace',0],['Fáze',0],['Úsek',0],['Ks',1],['Zápisů',1],['Lidí',1],['Norma min / ks',1],['Čas h',1],['Odvádění od – do',0]],
+    a.radky.map(r=>'<tr><td style="'+vykTd+'">'+esc(String(r.op||''))+'</td><td style="'+vykTd+'">'+esc(String(fNaz[r.faze]||''))+'</td><td style="'+vykTd+'" class="muted">'+esc(VYK_USEK[r.usek]||String(r.usek||''))+'</td><td style="'+VYK_TDR+'">'+vykN1(r.ks)+'</td><td style="'+VYK_TDR+'">'+vykF(r.rows)+'</td><td style="'+VYK_TDR+'">'+vykF(r.lide)+'</td>'
+      +'<td style="'+VYK_TDR+';white-space:nowrap">'+(r.norma?vykN1(r.norma.min)+' <span class="muted">· '+esc(String(r.norma.kod||''))+'</span>':'<span style="color:#a86a00">bez normy</span>')+'</td><td style="'+VYK_TDR+'">'+(r.norma?vykHod(r.normMin):'—')+'</td><td style="'+vykTd+';white-space:nowrap">'+vykD(r.first)+' – '+vykD(r.last)+'</td></tr>').join(''))+'</details>';
+  return h+'</details>'; }
+
+
+/* cíl závodu v hlavičce Měsíčních indikátorů — odkud se berou cíle A7 až A10 */
+function vykIndCil(I){ const j=vykJedn(I.zavod), C=I.cile||{}, kde='Nastavuje se v přehledu závodů, karta „Cíl ABR / den po závodech“.';
+  const obal=t=>'<div class="card pad" style="margin-bottom:14px;'+VYK_KR+'">'+t+'</div>';
+  if(!I.cil) return obal('<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:14px">Cíl závodu</b>'+vykPill('nenastaven','mute')+'<span class="muted" style="font-size:12.5px">Indikátory s cílem (A7 až A10) se bez něj nevyhodnocují, zůstává jen trend. '+kde+'</span></div>');
+  const vych=I.cilZdroj==='výchozí', cast=[];
+  if(C.A7!=null) cast.push('<b>A7</b> '+vykN1(C.A7)+' '+j+' / den');
+  if(C.A8!=null) cast.push('<b>A8</b> '+vykN1(C.A8)+' hlavních operací / den'+(I.opsKont?' = '+vykN1(I.cil)+' × '+String(I.opsKont)+' operací na kontejner':''));
+  if(C.A9!=null) cast.push('<b>A9</b> '+vykN1(C.A9)+' operací na kontejner');
+  if(C.A10!=null) cast.push('<b>A10</b> '+vykN1(C.A10)+' osobosměn / den'+(I.smenaMin?' při směně '+vykN1(I.smenaMin/60)+' h':''));
+  return obal('<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:14px">Cíl závodu: '+vykN1(I.cil)+' '+j+' za pracovní den</b>'+(vych?vykPill('výchozí – nenastaveno','warn'):vykPill('nastaveno','good'))+'<span class="muted" style="font-size:12.5px">'+kde+'</span></div>'
+    +(cast.length?'<div style="font-size:12.5px;margin-top:6px;color:var(--ink-soft)">Cíle indikátorů odvozené z cíle závodu: '+cast.join(' · ')+'</div>':'')
+    +(vych?'<div style="font-size:12.5px;margin-top:4px;color:#a86a00">Pro tento závod zatím nikdo cíl nezadal. Platí výchozí hodnota, která je cílem Chomutova.</div>':'')); }
+function vykIndCilRadek(def,I){ const c=I&&I.cile?I.cile[def.k]:null; if(!def.cil||c==null) return ''; const l={A7:'cíl závodu',A8:'cíl z cíle závodu',A9:'cíl podle norem',A10:'cíl z cíle závodu'}[def.k]||'cíl'; return '<br><span class="muted" style="font-size:11px">'+l+' '+vykN1(c)+(def.jedn==='%'?' %':'')+'</span>'; }
+
 async function vykCilSave(){ const v=document.getElementById('vykCil').value; try{ const r=await fetch('/api/vykonnost/cil',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zavod:VYK.zavod,cil:v===''?null:+v})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení selhalo.'); return; } toast('Cíl uložen'); await showVykonnost(); }catch(e){ toast('Uložení selhalo: '+e.message); } }
 /* ---- Plán N ABR/den: kolik operací musí být odvedeno v úkolu, osobosměny, porovnání se skutečností ---- */
 async function vykPlan6Load(){
@@ -4367,10 +4706,13 @@ function vykPlan6Render(){
     +'</ul></div>';
   box.innerHTML=h;
 }
-async function vykPlan6Save(){ const cil=document.getElementById('vykP6cil'), sm=document.getElementById('vykP6sm');
-  try{ if(cil){ const r=await fetch('/api/vykonnost/cil',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zavod:VYK.zavod,cil:cil.value===''?null:+cil.value})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení cíle selhalo.'); return; } }
-    if(sm){ const r=await fetch('/api/vykonnost/plan6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({smenaMin:+sm.value})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení směny selhalo.'); return; } }
-    toast('Plán uložen'); await vykPlan6Load(); }catch(e){ toast('Uložení selhalo: '+e.message); } }
+async function vykPlan6Save(){ const cil=document.getElementById('vykP6cil'), sm=document.getElementById('vykP6sm'), P0=VYK.plan6||{};
+  /* cíl i směna se ukládají jen při změně — jinak by se výchozí cíl uložil jako nastavený */
+  const cilN=cil?(cil.value===''?null:+cil.value):null, cilZm=!!cil&&cilN!==(P0.cil==null?null:+P0.cil), smZm=!!sm&&+sm.value!==+P0.smenaMin;
+  if(!cilZm&&!smZm){ toast('Žádná změna.'); return; }
+  try{ if(cilZm){ const r=await fetch('/api/vykonnost/cil',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zavod:VYK.zavod,cil:cil.value===''?null:+cil.value})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení cíle selhalo.'); return; } }
+    if(smZm){ const r=await fetch('/api/vykonnost/plan6',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({smenaMin:+sm.value})}); const j=await r.json(); if(!r.ok||j.error){ toast(j.error||'Uložení směny selhalo.'); return; } }
+    toast('Plán uložen'); VYK.ind=null; VYK.dny=null; await showVykonnost(); }catch(e){ toast('Uložení selhalo: '+e.message); } }
 /* ---- Normy: katalog z Drive, pokrytí, spárované / nespárované operace, ruční přiřazení (správce) ---- */
 let VYK_NQ='';
 function vykNormyRender(){
@@ -4462,13 +4804,13 @@ function vykIndRender(){
   // klíčové karty za poslední uzavřený měsíc
   const closed=last&&last.neuplny?prev:last, before=closed?M[M.indexOf(closed)-1]:null;
   const klic=(I.legenda||[]).flatMap(g=>g.items).filter(d=>d.klic);
-  let h='<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">'+klic.map(def=>{ const v=closed?closed[def.k]:null, sm=closed?(closed.sem[def.k]||''):''; const pv=before?before[def.k]:null; const d=(v!=null&&pv!=null)?v-pv:null; const ok=d==null||d===0?null:(def.smer==='up'?d>0:d<0);
+  let h=vykIndCil(I)+'<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">'+klic.map(def=>{ const v=closed?closed[def.k]:null, sm=closed?(closed.sem[def.k]||''):''; const pv=before?before[def.k]:null; const d=(v!=null&&pv!=null)?Math.round((v-pv)*100)/100:null; const ok=d==null||d===0?null:(def.smer==='up'?d>0:d<0);
       return '<div class="kpi" style="border-left:5px solid '+VYK_SEM[sm][1]+'"><div class="v" style="font-size:26px;color:'+VYK_SEM[sm][1]+'">'+vykIndVal(def,v)+'</div><div class="l">'+esc(def.k+' · '+def.label)+'</div><div class="muted" style="font-size:11.5px;margin-top:4px">'+(closed?vykMesLabel(closed.m):'')+(d!=null&&d!==0?' · <span style="color:'+(ok?'#0a7a0a':'#c93a39')+'">'+(d>0?'▲ +':'▼ ')+vykIndVal(def,Math.abs(d)).replace(/^/,d<0?'−':'')+'</span> vs. '+(before?lab(before.m):'')+'':'')+'</div></div>'; }).join('')+'</div>';
   // tabulka
   const thS='padding:8px 8px;border-bottom:2px solid var(--line);font-size:11.5px;color:var(--ink-soft);white-space:nowrap', tdS='padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap';
   h+='<div class="card pad" style="margin-bottom:14px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline"><b style="font-size:14px">Indikátory po měsících</b><span class="muted" style="font-size:12px">barva = semafor (jen u indikátorů s cílem) · šipka = změna proti předchozímu měsíci, zelená = zlepšení · * = neúplný měsíc (do snímku '+vykD(I.snapshot)+')</span></div><div style="overflow-x:auto;margin-top:10px"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr><th style="text-align:left;'+thS+';min-width:260px">Indikátor</th>'+M.map(x=>'<th style="text-align:right;'+thS+(x.neuplny?';color:#a86a00':'')+'">'+lab(x.m)+(x.neuplny?'*':'')+'</th>').join('')+'<th style="'+thS+'">Vývoj</th><th style="text-align:right;'+thS+'" title="medián předchozích 6 měsíců">Medián 6 m</th></tr></thead><tbody>';
   (I.legenda||[]).forEach(g=>{ h+='<tr><td colspan="'+(M.length+3)+'" style="padding:10px 8px 4px;font-weight:600;font-size:12.5px;color:var(--ink-soft);background:var(--bg-2)">'+esc(g.skup+' · '+g.nazev)+'</td></tr>';
-    g.items.forEach(def=>{ h+='<tr><td style="'+tdS+'"><b>'+def.k+'</b> '+esc(def.label)+(def.klic?' <span title="klíčový indikátor" style="color:var(--green-2)">★</span>':'')+(def.prah?'<br><span class="muted" style="font-size:11px">cíl '+(def.smer==='up'?'≥ ':'≤ ')+String(def.prah[0]).replace('.',',')+(def.jedn==='%'?' %':'')+'</span>':'')+'</td>'
+    g.items.forEach(def=>{ h+='<tr><td style="'+tdS+'"><b>'+def.k+'</b> '+esc(def.label)+(def.klic?' <span title="klíčový indikátor" style="color:var(--green-2)">★</span>':'')+(def.prah?'<br><span class="muted" style="font-size:11px">cíl '+(def.smer==='up'?'≥ ':'≤ ')+String(def.prah[0]).replace('.',',')+(def.jedn==='%'?' %':'')+'</span>':vykIndCilRadek(def,I))+'</td>'
         +M.map((x,i)=>{ const v=x[def.k], sm=x.sem[def.k]||'', tr=x.trend[def.k]; const ok=tr==null||tr===0?null:(def.smer==='watch'?null:(def.smer==='up'?tr>0:tr<0)); return '<td style="'+tdS+';text-align:right;background:'+VYK_SEM[sm][0]+';color:'+VYK_SEM[sm][1]+(sm?';font-weight:600':'')+'">'+vykIndVal(def,v)+(tr!=null&&tr!==0&&def.smer!=='watch'?' <span style="font-size:10px;color:'+(ok?'#0a7a0a':'#c93a39')+'">'+(tr>0?'▲':'▼')+'</span>':'')+'</td>'; }).join('')
         +'<td style="'+tdS+'">'+spark(def)+'</td><td style="'+tdS+';text-align:right;color:var(--ink-soft)">'+(last&&last.med[def.k]!=null?vykIndVal(def,Math.round(last.med[def.k]*10)/10):'—')+'</td></tr>'; }); });
   h+='</tbody></table></div></div>';

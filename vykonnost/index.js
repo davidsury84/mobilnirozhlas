@@ -589,15 +589,15 @@ function mount(host) {
       { k: 'A4', label: 'Kusů na osobu a měsíc', jedn: 'ks', smer: 'up', vzorec: 'vyrobené kusy ÷ lidé ve stavu podle personalistiky', proc: 'Hrubá produktivita. Pokles víc měsíců v řadě = méně výstupu na hlavu, nebo méně odvádění.' },
       { k: 'A5', label: 'Normohodiny jako % fondu', jedn: '%', smer: 'up', vzorec: 'Σ (čas normy × ks) u spárovaných operací ÷ fond pracovní doby lidí ve stavu', proc: 'Kolik fondu je kryto normovaným úkolem. Závisí na pokrytí normami (A6) — číst spolu.' },
       { k: 'A6', label: '% výrobních řádků s normou', jedn: '%', smer: 'up', prah: [80, 60], vzorec: 'výrobní řádky spárované s položkou v katalogu norem ÷ výrobní řádky', proc: 'Pokrytí normami. Co není spárované, nemá cenu ani čas — buď chybí norma, nebo jen ruční přiřazení v záložce Normy.' },
-      { k: 'A7', klic: true, label: 'Hotových ABR za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v odvedeném lakování vrchů u abrolových kontejnerů (ABR, DSD, AFS, ALST, ECL, HBI…; u Popelnice „Lakování“ beden) ÷ pracovní dny měsíce', proc: 'Hlavní kritérium: skutečný výstup abrolů proti cíli (výchozí 6 kontejnerů/den; správce může změnit). CITY a muldy se vedou zvlášť (A7c, A7m). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' },
-      { k: 'A7c', label: 'Hotových CITY za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy v lakování vrchů u kontejnerů CITY (CSD, SIT, WDG, WDC) ÷ pracovní dny měsíce', proc: 'Vedlejší výroba vedená zvlášť, do cíle 6 ABR/den se nepočítá. Popelnice nemají.' },
+      { k: 'A7', klic: true, label: 'Hotových ABR za pracovní den', jedn: 'ks', smer: 'up', cil: true, vzorec: 'kusy v odvedeném lakování vrchů u abrolových kontejnerů (ABR, DSD, AFS, ALST, ECL, HBI…; u Popelnice „Lakování“ beden) ÷ pracovní dny měsíce', proc: 'Hlavní kritérium: skutečný výstup abrolů proti cíli závodu. Cíl ABR / den se nastavuje pro každý závod zvlášť podle finančního plánu (karta „Cíl ABR / den po závodech“); dokud není nastaven, platí výchozí hodnota a je tak označená. CITY a muldy se vedou zvlášť (A7c, A7m). Zelená = cíl splněn, žlutá = nad 80 % cíle. Bez cíle (Popelnice) jen trend.' },
+      { k: 'A7c', label: 'Hotových CITY za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy v lakování vrchů u kontejnerů CITY (CSD, SIT, WDG, WDC) ÷ pracovní dny měsíce', proc: 'Vedlejší výroba vedená zvlášť, do cíle ABR / den se nepočítá. Popelnice nemají.' },
       { k: 'A7e', label: 'Expedováno ABR za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy abrolů ve výdejkách (Výdej ze skladu, bez služeb) ÷ pracovní dny měsíce; u Popelnice bedny', proc: '3. kontrolní bod: co skutečně odjelo. Srovnat s A7 — dlouhodobě víc hotových než expedovaných = roste sklad hotových, naopak = odjíždí zásoba. Výdejky jsou k dispozici od 23. 9. 2026.' },
       { k: 'A7k', klic: true, label: 'Expedováno Kč bez daní (tis.)', jedn: 'tis. Kč', smer: 'watch', vzorec: 'součet CC bez daní z výdejek výrobků v měsíci ÷ 1000', proc: 'Hodnota expedované výroby. Jediné místo v datech s korunami.' },
-      { k: 'A7m', label: 'Hotových muld za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy v lakování muld (AM, SMR, DMC, DMS…) + u Chomutova muldy z listu „kapa-plán Mulden“, které se v Heliosu neodvádějí ÷ pracovní dny měsíce', proc: 'Vedlejší výroba vedená zvlášť, do cíle 6 ABR/den se nepočítá.' },
-      { k: 'A8', klic: true, label: 'Hlavních operací za pracovní den', jedn: 'op.', smer: 'up', cil: true, vzorec: 'kusy odvedené v 10 hlavních fázích kontejneru (natahování, trámec rolen, podlaha, 2× bočnice, 2× vrata, skládání, dovařování, osazení vrat, odkuličkování, lakování) ÷ pracovní dny měsíce', proc: 'Jeden kontejner = 12 hlavních operací, cíl 6 kontejnerů denně = 72 operací denně. Říká, jestli se odvádí tolik práce, kolik je na cílový výstup potřeba — dřív, než se to projeví na hotových kusech (A7). Zelená = cíl splněn, žlutá = nad 80 % cíle. Časy a počty fází se berou ze záložky Plán 6 ABR/den.' },
-      { k: 'A9', label: 'Hlavních operací na hotový kontejner', jedn: 'op.', smer: 'watch', cil: true, pasmo: [10, 25], vzorec: 'kusy odvedené v 10 hlavních fázích ÷ kusy v operaci lakování ABR', proc: 'Má vyjít 12. Méně = část práce na kontejneru se neodvádí (nebo končí v režii). Více = rozpracovanost roste, vyrábí se dílce, které se nedolakují. Zelená = do 10 % od 12, žlutá = do 25 %.' },
+      { k: 'A7m', label: 'Hotových muld za pracovní den', jedn: 'ks', smer: 'watch', vzorec: 'kusy v lakování muld (AM, SMR, DMC, DMS…) + u Chomutova muldy z listu „kapa-plán Mulden“, které se v Heliosu neodvádějí ÷ pracovní dny měsíce', proc: 'Vedlejší výroba vedená zvlášť, do cíle ABR / den se nepočítá.' },
+      { k: 'A8', klic: true, label: 'Hlavních operací za pracovní den', jedn: 'op.', smer: 'up', cil: true, vzorec: 'kusy odvedené v hlavních fázích kontejneru (natahování, lyžiny, trámec rolen, podlaha, bočnice, vrata, skládání, dovařování, osazení vrat, odkuličkování, odmaštění, základování, lakování) ÷ pracovní dny měsíce', proc: 'Cíl = cíl ABR / den závodu × počet hlavních operací na jeden kontejner podle norem (bočnice, vrata a lyžiny se počítají 2×). Říká, jestli se odvádí tolik práce, kolik je na cílový výstup potřeba — dřív, než se to projeví na hotových kusech (A7). Zelená = cíl splněn, žlutá = nad 80 % cíle. Časy a počty fází se berou z katalogu norem (záložka Plán výroby).' },
+      { k: 'A9', label: 'Hlavních operací na hotový kontejner', jedn: 'op.', smer: 'watch', cil: true, pasmo: [10, 25], vzorec: 'kusy odvedené v hlavních fázích ÷ kusy v operaci lakování ABR', proc: 'Má vyjít počet hlavních operací na kontejner podle norem (cíl je uveden u hodnoty). Méně = část práce na kontejneru se neodvádí (nebo končí v režii). Více = rozpracovanost roste, vyrábí se dílce, které se nedolakují. Zelená = do 10 % od cíle, žlutá = do 25 %.' },
       { k: 'A11', klic: true, label: 'Režie v Kč jako podíl odvedených Kč', jedn: '%', smer: 'down', prah: [10, 15], vzorec: 'Σ Kč režijních řádků (Název 1 obsahuje „režij“) ÷ Σ Kč všech odvedených řádků měsíce', proc: 'Strop vedení: režie max 10 % z mzdového fondu. Zelená ≤ 10 %, žlutá ≤ 15 %. Počítá se z Kč v Heliosu (od exportu 23. 10. 2026), ne z hodin.' },
-      { k: 'A10', label: 'Odvedená práce v hlavních operacích — osobosměn za den', jedn: 'os.', smer: 'up', cil: true, vzorec: 'Σ (kusy fáze × čas fáze z plánu) ÷ délka směny ÷ pracovní dny měsíce', proc: 'Totéž co A8, ale vážené časem: dovařování (450 min) váží víc než natahování (60 min). Cíl = kolik lidí plně v úkolu je potřeba na cílový výstup (6 kontejnerů × 1 850 min ÷ 440 min = 25,2 osobosměny denně). Počet lidí na operaci počet kusů nemění — dva lidé na jednom dovaření si v Heliosu kus dělí (0,5 + 0,5).' }
+      { k: 'A10', label: 'Odvedená práce v hlavních operacích — osobosměn za den', jedn: 'os.', smer: 'up', cil: true, vzorec: 'Σ (kusy fáze × čas fáze z plánu) ÷ délka směny ÷ pracovní dny měsíce', proc: 'Totéž co A8, ale vážené časem normy: dovařování váží víc než natahování. Cíl = kolik lidí plně v úkolu je potřeba na cílový výstup závodu (cíl ABR / den × minuty hlavních operací kontejneru podle norem ÷ délka směny). Počet lidí na operaci počet kusů nemění — dva lidé na jednom dovaření si v Heliosu kus dělí (0,5 + 0,5).' }
     ] },
     { skup: 'M', nazev: 'Mzdy — co stojí jeden kontejner', items: [
       { k: 'M1', klic: true, label: 'Hrubé mzdy svářečů a lakýrníků na 1 vyrobený kus', jedn: 'Kč', smer: 'down', vzorec: 'hrubé mzdy lidí s profesí svářeč a lakýrník (složky bez 009, 794, 795, 933–940; bez dělírny / přípravy materiálu, mistrů a THP) ÷ všechny hotové výrobky v měsíci (ABR + CITY + muldy; u Popelnice bedny)', proc: 'Kolik korun mezd svářečů a lakýrníků připadá na jeden hotový kus bez ohledu na typ. Příprava materiálu (dělírna) se nezapočítává — pracuje na dílce do zásoby, ne na hotový kus. Čím níž, tím líp; porovnávat v čase v rámci závodu (kusy nejsou mezi závody stejné).' },
@@ -648,11 +648,12 @@ function mount(host) {
     if (def.smer === 'up') return x >= def.prah[0] ? 'g' : (x >= def.prah[1] ? 'y' : 'r');
     return x <= def.prah[0] ? 'g' : (x <= def.prah[1] ? 'y' : 'r');
   }
-  // kolik hlavních operací (kusů fází) připadá na jeden kontejner podle plánu — výchozí 12
+  // kolik hlavních operací (kusů fází) připadá na jeden kontejner — z norem závodu (fáze plánu), ne pevné číslo
   // hlavní operace kontejneru = fáze s normou (svařovna + lakovna), bez košů dělírny / drobných dílců
-  const hlavniFaze = () => loadPlan6().faze.filter(f => !f.agg && !f.bezNormy);
-  const opsNaKont = () => hlavniFaze().reduce((s, f) => s + (+f.ks || 0), 0);
-  const cileZ = cil => { if (!cil) return { M8: 100 }; const P = loadPlan6(), oK = opsNaKont(); return { M8: 100, A7: cil, A8: Math.round(cil * oK * 10) / 10, A9: oK, A10: Math.round(cil * hlavniFaze().reduce((s, f) => s + f.ks * f.min, 0) / P.smenaMin * 10) / 10 }; };
+  const hlavniFaze = zKey => loadPlan6(zKey).faze.filter(f => !f.agg && !f.bezNormy);
+  const opsNaKont = zKey => hlavniFaze(zKey).reduce((s, f) => s + (+f.ks || 0), 0);
+  // cíle indikátorů závodu odvozené z jeho cíle ABR / den (A7): A8 = cíl × operací na kontejner, A10 = cíl × minuty kontejneru ÷ směna
+  const cileZ = (cil, zKey) => { if (!cil) return { M8: 100 }; const P = loadPlan6(zKey), HF = P.faze.filter(f => !f.agg && !f.bezNormy), oK = HF.reduce((s, f) => s + (+f.ks || 0), 0); return { M8: 100, A7: cil, A8: Math.round(cil * oK * 10) / 10, A9: oK, A10: Math.round(cil * HF.reduce((s, f) => s + f.ks * f.min, 0) / P.smenaMin * 10) / 10 }; };
   function indikatoryMesice(rows, ym, rokRows, zavodKey) {
     const pd = pracDnyMesice(ym); const rez = rows.filter(r => isRezie(r[R.dil])), prod = rows.filter(r => !isRezie(r[R.dil]));
     let nMin = 0, nRows = 0, nKc = 0; if (normIndex().items.length) prod.forEach(r => { const n = matchNorma(zavodKey, r[R.op], r[R.dil], r[R.cop]); if (n) { nMin += (n.min || 0) * r[R.ks]; nKc += (n.kc || 0) * r[R.ks]; nRows++; } });
@@ -664,8 +665,8 @@ function mount(host) {
     // Kč a normovaný čas přímo z Heliosu (export od 23. 10. 2026; starší řádky mají 0)
     const kcOf = r => (+r[R.kc] || 0) + (+r[R.dop] || 0); const kcOdv = rows.reduce((s, r) => s + kcOf(r), 0), kcRez = rez.reduce((s, r) => s + kcOf(r), 0), kcProd = kcOdv - kcRez, nminH = prod.reduce((s, r) => s + (+r[R.nmin] || 0), 0), agentKc = rows.filter(r => +r[R.ag] === 1).reduce((s, r) => s + kcOf(r), 0);
     // hlavní operace kontejneru (fáze plánu 6 ABR/den) — jen závody s cílem v kontejnerech
-    let opKs = null, opMin = null, lakAbr = 0; const P6 = loadPlan6();
-    if (CIL_DEFAULT[zavodKey]) { opKs = 0; opMin = 0; prod.forEach(r => { const fk = fazeOf(r); const f = fk && P6.faze.find(f => f.k === fk); if (f && !f.agg && !f.bezNormy) { opKs += r[R.ks]; opMin += r[R.ks] * f.min; } if (fk === 'lakovani') lakAbr += r[R.ks]; }); }
+    let opKs = null, opMin = null, lakAbr = 0; const P6 = loadPlan6(zavodKey);
+    if (CIL_DEFAULT[zavodKey]) { opKs = 0; opMin = 0; prod.forEach(r => { const fk = fazeOfZ(r, zavodKey); const f = fk && P6.faze.find(f => f.k === fk); if (f && !f.agg && !f.bezNormy) { opKs += r[R.ks]; opMin += r[R.ks] * f.min; } if (fk === 'lakovani') lakAbr += r[R.ks]; }); }
     const lide = new Set(rows.map(r => r[R.id] || r[R.name])); const SL = stavLidi(zavodKey, ym); const stav = SL ? SL.n : lide.size; const fond = stav * pd * 8;
     const sum = (arr, f) => arr.filter(f).reduce((s, r) => s + r[R.ks], 0);
     const rezProd = sum(rez, r => !RE_PROD.test(r[R.op])), rezOst = sum(rez, r => RE_OST.test(r[R.op]) || !r[R.pozn]), rekH = sum(rez, r => RE_REKL.test(r[R.op])), zaH = sum(rez, r => RE_ZAUC.test(r[R.op]));
@@ -702,11 +703,11 @@ function mount(host) {
     const all = D.rows.filter(r => r[R.date] <= D.snapshot);
     const mesice = [...new Set(all.map(r => r[R.date].slice(0, 7)))].sort();
     const out = mesice.map(ym => indikatoryMesice(all.filter(r => r[R.date].startsWith(ym)), ym, all, z.key));
-    const snapM = D.snapshot.slice(0, 7); const cilZ = loadCile()[z.key];
+    const snapM = D.snapshot.slice(0, 7); const cilZ = loadCile()[z.key]; const cileZav = cileZ(cilZ, z.key); const smenaZ = loadPlan6(z.key).smenaMin;
     out.forEach((M, i) => {
-      M.cil = cilZ; M.cile = cileZ(cilZ);
+      M.cil = cilZ; M.cile = cileZav;
       M.neuplny = M.m === snapM && !/-(2[89]|3[01])$/.test(D.snapshot);
-      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const MPz = muldyPlan(z.key); const FZz = FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default; const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && FZz.lak(r[R.op], r[R.cop]) && !MPz.set.has(r[R.cvz]) && (z.key === 'popelnice' || typVyrobku(r[R.op], r[R.dil]) === 'abr')).reduce((s, r) => s + r[R.ks], 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; if (M.opKs != null) { M.A8 = Math.round(M.opKs / pdSoFar * 10) / 10; M.A10 = Math.round(M.opMin / loadPlan6().smenaMin / pdSoFar * 10) / 10; } }
+      if (M.neuplny) { const dny = new Set(all.filter(r => r[R.date].startsWith(M.m)).map(r => r[R.date])); const pdSoFar = [...dny].filter(d => new Date(d + 'T00:00:00Z').getUTCDay() % 6).length || 1; const MPz = muldyPlan(z.key); const FZz = FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default; const lakKs = all.filter(r => r[R.date].startsWith(M.m) && !isRezie(r[R.dil]) && FZz.lak(r[R.op], r[R.cop]) && !MPz.set.has(r[R.cvz]) && (z.key === 'popelnice' || typVyrobku(r[R.op], r[R.dil]) === 'abr')).reduce((s, r) => s + r[R.ks], 0); M.A7 = Math.round(lakKs / pdSoFar * 10) / 10; if (M.opKs != null) { M.A8 = Math.round(M.opKs / pdSoFar * 10) / 10; M.A10 = Math.round(M.opMin / smenaZ / pdSoFar * 10) / 10; } }
       M.sem = {}; M.trend = {}; M.med = {};
       LEG_FLAT.forEach(def => {
         M.sem[def.k] = semafor(def, M[def.k], M);
@@ -716,7 +717,7 @@ function mount(host) {
       });
     });
     const MZ = loadMzdy();
-    return { zavod: z.key, name: z.name, snapshot: D.snapshot, cil: cilZ, cile: cileZ(cilZ), opsKont: opsNaKont(), mesice: out, mzdy: MZ ? { syncedAt: MZ.syncedAt, cfg: loadMzCfg(), mesice: Object.keys(MZ.mesice).sort(), detail: Object.keys(MZ.mesice).sort().map(ym => mzdyMesic(z.key, ym)).filter(Boolean).map(x => ({ ym: x.ym, rezim: x.rezim, lidi: x.lidi, lidiVse: x.lidiVse, vylouceno: x.vylouceno, hrube: x.hrube, profese: x.profese, ukol: x.ukol, zakl: x.zakl, premie: x.premie, dovolena: x.dovolena, nahrady: x.nahrady, vyplaceno: x.vyplaceno, hodiny: x.hodiny, hodinyRiziko: x.hodinyRiziko, vyrobni: x.vyrobni, slozky: x.slozky, lide: x.lideSez })), nazvy: MZ.nazvy } : null };
+    return { zavod: z.key, name: z.name, snapshot: D.snapshot, cil: cilZ, cilZdroj: cilZavodu(z.key).zdroj, cile: cileZav, opsKont: z.key === 'popelnice' ? null : opsNaKont(z.key), smenaMin: smenaZ, mesice: out, mzdy: MZ ? { syncedAt: MZ.syncedAt, cfg: loadMzCfg(), mesice: Object.keys(MZ.mesice).sort(), detail: Object.keys(MZ.mesice).sort().map(ym => mzdyMesic(z.key, ym)).filter(Boolean).map(x => ({ ym: x.ym, rezim: x.rezim, lidi: x.lidi, lidiVse: x.lidiVse, vylouceno: x.vylouceno, hrube: x.hrube, profese: x.profese, ukol: x.ukol, zakl: x.zakl, premie: x.premie, dovolena: x.dovolena, nahrady: x.nahrady, vyplaceno: x.vyplaceno, hodiny: x.hodiny, hodinyRiziko: x.hodinyRiziko, vyrobni: x.vyrobni, slozky: x.slozky, lide: x.lideSez })), nazvy: MZ.nazvy } : null };
   }
   // Text pro trend: zlepšení/zhoršení podle směru indikátoru
   const lepsi = (def, d) => def.smer === 'watch' ? null : (def.smer === 'up' ? d > 0 : d < 0);
@@ -837,6 +838,8 @@ function mount(host) {
   // ---------- výstup: hotové výrobky vs. cíl, úzké hrdlo v řetězci, proč cíl neplníme ----------
   const CIL_F = path.join(dataDir, 'vykonnost-cile.json');
   const loadCile = () => { let c = {}; try { c = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {} return Object.assign({}, CIL_DEFAULT, c); };
+  // cíl závodu (hotových ABR za pracovní den) i s původem: nastaveno správcem (vykonnost-cile.json) / výchozí hodnota / bez cíle — původ se ukazuje v UI
+  const cilZavodu = zKey => { let raw = {}; try { raw = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {} const nast = Object.prototype.hasOwnProperty.call(raw, zKey); const v = nast ? raw[zKey] : CIL_DEFAULT[zKey]; return { cil: v > 0 ? +v : null, zdroj: nast ? (v > 0 ? 'nastaveno' : 'bez cíle') : (CIL_DEFAULT[zKey] ? 'výchozí' : 'bez cíle') }; };
   const pracDnyTydne = wk => { const y = +wk.slice(0, 4), n = +wk.slice(6); const d = new Date(Date.UTC(y, 0, 4)); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + (n - 1) * 7); return { od: d.toISOString().slice(0, 10), do: new Date(d.getTime() + 4 * 86400000).toISOString().slice(0, 10) }; };
   function vystup(z) {
     const D = loadData(z.key); if (!D) return null;
@@ -916,7 +919,7 @@ function mount(host) {
   // dělírna a drobné dílce jsou koše = součet položek listu × ks/kont. Ručně se nastavuje jen cíl kusů/den (po závodech podle finančního
   // plánu, vykonnost-cile.json) a délka směny. „odhad“ = záloha z tabulky vedení 09/2026, použije se jen když norma v katalogu chybí.
   const PLAN6_DIL = 'ABR-DSD 6500x2300x2350';
-  const PLAN6_DEFAULT = { smenaMin: 440 };
+  const PLAN6_DEFAULT = { smenaMin: 450 };   // směna 7,5 h (zadání vedení 11/2026); správce ji mění v záložce Plán
   const PLAN6_FAZE = [
     { k: 'natahovani', usek: 'svar', nazev: 'Natahování', kod: '143', nahr: ['natahování NS 1570/50 + NS 1570/60 bez háku', ''], ks: 1, odhad: 60 },
     { k: 'lyziny', usek: 'svar', nazev: 'Lyžiny', kod: '100', nahr: ['lyžina IPN 180 DSD s omegou', ''], ks: 2, odhad: 33 },
@@ -927,7 +930,10 @@ function mount(host) {
     { k: 'skladani', usek: 'svar', nazev: 'Skládání', kod: '301', nahr: ['skládání ABR 45/90st 1550-2500 mm', PLAN6_DIL], ks: 1, must: true, odhad: 210 },
     { k: 'dovareni', usek: 'svar', nazev: 'Dovaření', kod: '403', nahr: ['dovaření ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 450 },
     { k: 'osazeni', usek: 'svar', nazev: 'Osazení vrat', kod: '502', nahr: ['osazení vrat AFS/DSD/ECL/LWC/WD/HBI 2050-2500 mm', ''], ks: 1, odhad: 210 },
-    { k: 'odkulickovani', usek: 'lak', nazev: 'Odkuličkování / tryskání', kod: '623', nahr: ['odkuličkování ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 90 },
+    { k: 'odkulickovani', usek: 'lak', nazev: 'Odkuličkování', kod: '623', nahr: ['odkuličkování ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 90 },
+    // tryskání: katalog má normu „tryskání ABR/CITY (Chomutov)“; v Chomutově se odvádí na kontejner vedle odkuličkování
+    // (5–11/2026: 112 zakázek obojí, 13 jen odkuličkování, 17 jen tryskání), v Bruntále a Supíkovicích ne → fáze jen pro Chomutov
+    { k: 'tryskani', usek: 'lak', nazev: 'Tryskání', kod: '943', nahr: ['tryskání ABR/CITY (Chomutov) 1550-2500', PLAN6_DIL], ks: 1, odhad: 90, zavody: ['chomutov'] },
     { k: 'odmasteni', usek: 'lak', nazev: 'Odmaštění', kod: '723', nahr: ['odmaštění ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 45 },
     { k: 'zakladovani', usek: 'lak', nazev: 'Základování', kod: '823', nahr: ['základování ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 90 },
     { k: 'lakovani', usek: 'lak', nazev: 'Lakování vrchů', kod: '923', nahr: ['lakování ABR 2050-2500 mm/rozestup 750 mm', PLAN6_DIL], ks: 1, odhad: 90 },
@@ -941,15 +947,15 @@ function mount(host) {
   // název normy → fáze (jen operace standardního kontejneru: bez víka, výztuh, příplatků, CITY, muld, klapek, DOMAT, STH, HBS)
   const PLAN6_NORM_RE = [['natahovani', /^natahování/i], ['lyziny', /^lyžina|^ližina/i], ['tramec', /^trámec rolen/i], ['podlaha', /^podlaha/i], ['bocnice', /^bočnice/i],
     ['vrata', /^výroba vrat/i], ['skladani', /^skládání/i], ['dovareni', /^dovaření/i], ['osazeni', /^osazení vrat/i],
-    ['odkulickovani', /^odkuličkování|^tryskání/i], ['odmasteni', /^odmaštění/i], ['zakladovani', /^základování/i], ['lakovani', /^lakování/i]];
-  const PLAN6_VYJ = /víko|viko|výztuh|vyztuh|příplatek|priplatek|zhuštěn|zhusten|bílá|žlutá|city|mulda|muldy|klapk|vlajk|domat|\bsth\b|hbs|komponent/i;
-  const fazeOfNorm = n => { if (!n || !/ABR-XXX/i.test(n.file || '') || PLAN6_VYJ.test(n.op || '')) return ''; const h = PLAN6_NORM_RE.find(x => x[1].test(n.op || '')); return h ? h[0] : ''; };
+    ['odkulickovani', /^odkuličkování/i], ['odmasteni', /^odmaštění/i], ['zakladovani', /^základování/i], ['lakovani', /^lakování/i]];
+  const PLAN6_VYJ = /víko|viko|výztuh|vyztuh|příplatek|priplatek|zhuštěn|zhusten|bílá|žlutá|city|mulda|muldy|klapk|vlajk|domat|\bsth\b|hbs|komponent|hák sklop|sklopn\S* hák/i;
+  const fazeOfNorm = n => { if (!n || !/ABR-XXX/i.test(n.file || '')) return ''; if (/^tryskání abr/i.test(n.op || '')) return 'tryskani'; if (PLAN6_VYJ.test(n.op || '')) return ''; const h = PLAN6_NORM_RE.find(x => x[1].test(n.op || '')); return h ? h[0] : ''; };
   // záloha podle názvu operace v Heliosu (řádky bez čísla operace z katalogu)
   const PLAN6_RE = {
-    natahovani: /^natahování(?!.*(řezání|stojn|pálen|sp\s*\d))/i, lyziny: /^lyžina|^ližina/i, tramec: /^trámec rolen (afs|dsd|domat)|^trámec rollen (afs|dsd)/i, podlaha: /^podlaha (asf|afs|dsd|abr|s t|t profil|zhušt)/i,
+    natahovani: /^natahování(?!.*(řezání|stojn|pálen|sklopn|sp\s*\d))/i, lyziny: /^lyžina|^ližina/i, tramec: /^trámec rolen (afs|dsd|domat)|^trámec rollen (afs|dsd)/i, podlaha: /^podlaha (asf|afs|dsd|abr|s t|t profil|zhušt)/i,
     bocnice: /^bočnice (\d{3,4}-\d{3,4} mm|alst|dsd|hbi)/i, vrata: /^výroba vrat/i, skladani: /^skládání abr|^skládání$|^skládání včetně/i,
     dovareni: /^dovaření abr \d|^dovaření abr-|^dovaření$|^dovařování$/i, osazeni: /^osazení vrat (afs|l |domat|s l)|^osazení vrat$/i,
-    odkulickovani: /^odkuličkování abr(?! víko)|^tryskání abr/i, odmasteni: /^odmaštění abr(?! víko)/i, zakladovani: /^základování abr(?! víko)/i, lakovani: /^lakování abr(?! víko)/i,
+    odkulickovani: /^odkuličkování abr(?! víko)/i, tryskani: /^tryskání abr/i, odmasteni: /^odmaštění abr(?! víko)/i, zakladovani: /^základování abr(?! víko)/i, lakovani: /^lakování abr(?! víko)/i,
     strih: /^střih|^strih/i, ohybani: /^ohýb|^ohyb/i, pila: /^pila|^řezání/i, paleni: /pálen|palen/i
   };
   // Fáze plánu pro řádek odvádění: 1) číslo operace = číslo normy standardu (jen při shodě prvního slova názvu — čísla 1–50 jsou v Heliosu
@@ -964,12 +970,13 @@ function mount(host) {
     if (!f) { const K = Object.keys(PLAN6_RE); f = K.find(x => PLAN6_RE[x].test(op)) || ''; }
     _fz.set(k, f); return f;
   }
+  const fazeOfZ = (r, zKey) => { const f = fazeOf(r); if (!f) return f; const d = PLAN6_FAZE.find(x => x.k === f); return d && d.zavody && !d.zavody.includes(zKey) ? 'odkulickovani' : f; };
   // Fáze s časy z katalogu (cache do změny katalogu / ruční mapy). pm = osobominuty položky (Kč ÷ sazba; dělírna má v „min“ čas na osobu)
   let _pf = { at: '', z: {} };
   function planFaze(zKey) {
     zKey = zKey || 'chomutov'; const I = normIndex(); const at = I.syncedAt + '|' + mtimeOf(NMAP_F); if (_pf.at !== at) _pf = { at, z: {} }; if (_pf.z[zKey]) return _pf.z[zKey];
     const pm = n => n.kc && n.sazba ? n.kc / n.sazba * 60 : (+n.min || 0);
-    const out = PLAN6_FAZE.map(f => {
+    const out = PLAN6_FAZE.filter(f => !f.zavody || f.zavody.includes(zKey)).map(f => {
       const o = { k: f.k, usek: f.usek, nazev: f.nazev, must: !!f.must, agg: !!f.kos, bezNormy: !!f.bezNormy, ks: f.ks, min: 0, norma: null, zdroj: '' };
       if (f.kos) { const items = I.items.filter(n => f.kos.sheet.test(n.sheet || '') && f.kos.op.test(n.op || '') && n.ksKont > 0 && !/\bnebo\s*$/i.test(n.op || '')); const minKont = items.reduce((s, n) => s + pm(n) * n.ksKont, 0), ksKont = items.reduce((s, n) => s + n.ksKont, 0);
         // koš: ks = kusů na kontejner (součet ks/kont položek), min = průměr na kus → min × ks = minuty na kontejner
@@ -996,7 +1003,7 @@ function mount(host) {
   }
   function planOperaci(z, od, do_) {
     const D = loadData(z.key); if (!D) return null;
-    const P = loadPlan6(z.key); const snap = D.snapshot; const cileAll = loadCile(); const cil = cileAll[z.key] || P.cil || 6;
+    const P = loadPlan6(z.key); const snap = D.snapshot; const cileAll = loadCile(); const cil = cilZavodu(z.key).cil || CIL_DEFAULT[z.key] || 6;   // bez nastaveného cíle se plán počítá s výchozím (cilZdroj to říká)
     let cileRaw = {}; try { cileRaw = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {}
     if (!od) { const d = new Date(snap + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 27); od = d.toISOString().slice(0, 10); } if (!do_) do_ = snap;
     const rows = D.rows.filter(r => r[R.date] >= od && r[R.date] <= do_ && !isRezie(r[R.dil])); const pd = Math.max(1, pracDnyRozsah(od, do_));
@@ -1004,7 +1011,7 @@ function mount(host) {
     const ym = od.slice(0, 7) === do_.slice(0, 7) ? od.slice(0, 7) : snap.slice(0, 7); const pdMes = pracDnyMesice(ym);
     const maN = normIndex().items.length > 0; const r1 = x => Math.round(x * 10) / 10;
     const faze = P.faze.map(f => {
-      const rs = rows.filter(r => fazeOf(r) === f.k); const ks = rs.reduce((s, r) => s + r[R.ks], 0);
+      const rs = rows.filter(r => fazeOfZ(r, z.key) === f.k); const ks = rs.reduce((s, r) => s + r[R.ks], 0);
       const lide = {}; rs.forEach(r => { lide[r[R.name]] = (lide[r[R.name]] || 0) + r[R.ks]; });
       const potrebaDen = cil * f.ks, osobosmen = potrebaDen * f.min / P.smenaMin;
       // koše (dělírna, drobné dílce): kusy Heliosu ÷ kusů na kontejner; pálení normu nemá → jen kusy bez plnění
@@ -1235,14 +1242,212 @@ function mount(host) {
     const st = loadState();
     return ZAVODY.map(z => {
       const D = loadData(z.key); const zs = (st.zavody || {})[z.key] || {}; const pl = (st.plany || {})[z.key] || null;
-      if (!D) return { key: z.key, name: z.name, kratce: z.kratce, data: false, error: zs.error || 'zatím nesynchronizováno', plan: pl };
+      const CZ = cilZavodu(z.key); let oK = null, sm = null; try { sm = loadPlan6(z.key).smenaMin; if (z.key !== 'popelnice') oK = opsNaKont(z.key); } catch (_) {}
+      const cilInfo = { cil: CZ.cil, cilZdroj: CZ.zdroj, cilVychozi: CIL_DEFAULT[z.key] || null, smenaMin: sm, opsKont: oK };
+      if (!D) return Object.assign({ key: z.key, name: z.name, kratce: z.kratce, data: false, error: zs.error || 'zatím nesynchronizováno', plan: pl }, cilInfo);
       const snap = D.snapshot; const od = new Date(snap + 'T00:00:00Z'); od.setUTCDate(od.getUTCDate() - 27); const od4 = od.toISOString().slice(0, 10);
       const all = D.rows.filter(r => r[R.date] <= snap); const last4 = all.filter(r => r[R.date] >= od4);
       const agg = (rs, od, do_) => { let ks = 0, rez = 0, term = 0; const l = new Set(), c = new Set(); rs.forEach(r => { if (isRezie(r[R.dil])) rez += r[R.ks]; else ks += r[R.ks]; if (r[R.aut] === 'terminalETH') term++; l.add(r[R.id] || r[R.name]); if (r[R.cvz]) c.add(r[R.cvz]); }); const OH = odpracHodiny(z.key, od, do_, l.size); return { rows: rs.length, ks: Math.round(ks), rezieH: Math.round(rez), lide: l.size, cvz: c.size, termPct: rs.length ? Math.round(term / rs.length * 100) : 0, odprac: OH.h, reziePct: OH.h ? Math.round(rez / OH.h * 100) : null }; };
       const tyd = {}; last4.forEach(r => { tyd[r[R.week]] = (tyd[r[R.week]] || 0) + 1; });
       let vy = null; try { const V = vystup(z); if (V) vy = { cil: V.cil, exped: V.exped ? { abrDen4: V.exped.abrDen4, abr4: V.exped.abr4, vse4: V.exped.vse4, kc4: V.exped.kc4, od: V.exped.od, celkem: V.exped.celkem } : null, lakDen4: V.kpi.lakDen4, lakDen4Mul: V.kpi.lakDen4Mul, lakDen4Vse: V.kpi.lakDen4Vse, lakDenRokMul: V.kpi.lakDenRokMul, lakDenRokVse: V.kpi.lakDenRokVse, lak4: V.kpi.lak4, muldy4: V.kpi.muldy4, city4: V.kpi.city4, muldyVse4: V.kpi.muldyVse4, jine4: V.kpi.jine4, lak4Vse: V.kpi.lak4Vse, cityRok: V.kpi.cityRok, muldyVseRok: V.kpi.muldyVseRok, lakRokVse: V.kpi.lakRokVse, od4: V.kpi.od4, do4: V.kpi.do4, lakDenRok: V.kpi.lakDenRok, plneni4: V.kpi.plneni4, plneniRok: V.kpi.plneniRok, lakRok: V.kpi.lakRok, hrdlo: V.hrdlo, tydnuPod: V.kpi.tydnuPod, tydnu: V.kpi.tydnu }; } catch (_) {}
-      return { key: z.key, name: z.name, kratce: z.kratce, data: true, snapshot: snap, source: D.source, syncedAt: D.syncedAt, error: zs.error || '', rok: agg(all, all[0] ? all.reduce((m, r) => r[R.date] < m ? r[R.date] : m, '9999') : '', snap), t4: agg(last4, od4, snap), rozpad4: rozpadOperaci(last4).kat, od4, tydny4: Object.entries(tyd).sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ week: w, rows: n })), plan: pl, vystup: vy };
+      return { key: z.key, name: z.name, kratce: z.kratce, data: true, cil: cilInfo.cil, cilZdroj: cilInfo.cilZdroj, cilVychozi: cilInfo.cilVychozi, smenaMin: cilInfo.smenaMin, opsKont: cilInfo.opsKont, snapshot: snap, source: D.source, syncedAt: D.syncedAt, error: zs.error || '', rok: agg(all, all[0] ? all.reduce((m, r) => r[R.date] < m ? r[R.date] : m, '9999') : '', snap), t4: agg(last4, od4, snap), rozpad4: rozpadOperaci(last4).kat, od4, tydny4: Object.entries(tyd).sort((a, b) => a[0].localeCompare(b[0])).map(([w, n]) => ({ week: w, rows: n })), plan: pl, vystup: vy };
     });
+  }
+
+  // ---------- zakázky (ČVZ) proti normám · dny závodu proti plánu směny ----------
+  // Export Heliosu nenese skutečný čas (hodiny od–do), jen odvedené kusy operací. „Čas na zakázce“ je proto čas podle norem:
+  // Σ kusy × čas normy odvedené operace (katalog norem) + režijní hodiny psané na zakázku. Normovaný čas Heliosu se ukazuje jen tam, kde je vyplněný.
+  const ZA_USEK = { svar: 'Svařovna', lak: 'Lakovna a příprava', del: 'Dělírna', drobne: 'Drobné dílce' };
+  const ZA_RE_LAK = /lak|trysk|odmaš|odmas|základ|zaklad|barv|polep|lepen|odkulič|odkulic/, ZA_RE_DEL = /nůžk|nuzk|pila|pálen|palen|ohraň|ohran|děl[ií]rna|del[ií]rna|řez|rez[aá]n|vrt|lis|ohyb|stříh|strih|loch|obrobna|soustruh/;
+  const ZA_CELEK = /^(natahovani|skladani|dovareni|osazeni|odkulickovani|tryskani|odmasteni|zakladovani|lakovani)$/;   // fáze psané na celý kontejner (díl = kontejner s rozměry)
+  const zr1 = x => Math.round(x * 10) / 10;
+  const zaCvz = r => String(r[R.cvz] || '').trim();
+  const zaUsek = (r, fk) => { const f = fk && PLAN6_FAZE.find(x => x.k === fk); if (f) return f.usek; const o = String(r[R.op] || '').toLowerCase(); return ZA_RE_LAK.test(o) ? 'lak' : (ZA_RE_DEL.test(o) ? 'del' : 'svar'); };
+  // rozsah délky / výšky normy: z katalogu, jinak z názvu operace („1550-2500 mm“) — stejně jako výběr varianty normy
+  const zaRoz = n => { if (!n || n.del || n.vys) return n || {}; const m = /(\d{3,4})\s*-\s*(\d{3,4})(?:\s*mm|$|\/)/.exec(n.op || ''); if (!m) return n; const a = +m[1], b = +m[2]; return b > 3000 ? { del: [a, b] } : { vys: [a, b] }; };
+  const zaMaRozmer = n => { const r = zaRoz(n); return !!(r.del || r.vys); };
+  const zaRozmerOK = (n, d) => { if (!n || !d) return true; const r = zaRoz(n); return (!r.del || (d.L >= r.del[0] && d.L <= r.del[1])) && (!r.vys || (d.H >= r.vys[0] && d.H <= r.vys[1])); };
+  // „řada“ normy = název bez rozměrů (rozestup, HBI/ECL/ALST zůstávají) — v řadě se hledá varianta pro rozměr kontejneru
+  const zaRada = n => nrm((n && n.op) || '').replace(/\d{3,4}\s*-\s*\d{3,4}/g, ' ').replace(/(^|[ \/])do \d{3,4}/g, ' ').replace(/(^|[ \/])mm(?=[ \/]|$)/g, ' ').replace(/[ \/]+/g, ' ').trim();
+  const zaNorma = n => n ? { kod: n.kod || '', op: n.op || '', min: +n.min || 0, kc: +n.kc || 0, ksKont: n.ksKont > 0 ? +n.ksKont : null, del: zaRoz(n).del || null, vys: zaRoz(n).vys || null, how: n.how || '' } : null;
+  const zaNej = o => { const e = Object.entries(o).sort((a, b) => b[1] - a[1])[0]; return e ? e[0] : ''; };
+  // hlavní díl zakázky = kontejner s rozměry, na který se píší operace celku; jinak rozměr z plánu výroby
+  const zaHlavniDil = (prod, p, sFazi) => {
+    const w = {}, vse = {}; prod.forEach(r => { const d = r[R.dil]; if (!d) return; vse[d] = (vse[d] || 0) + 1; if (!dimsOf(d)) return; w[d] = (w[d] || 0) + (sFazi && ZA_CELEK.test(fazeOf(r)) ? 50 : 1); });
+    return zaNej(w) || (p && p.opak && dimsOf(p.opak) ? p.opak : '') || zaNej(vse) || (p && (p.opak || p.vyrobek)) || '';
+  };
+  // skutečný termín v plánu bývá i částečný („2ks, 9.11.2026“, „3x 29.9.“): součet kusů menší než zakázka = rozpracovaná
+  const zaSkutKs = t => { let k = 0; String(t || '').replace(/(\d+)\s*(?:ks|x)/gi, (m, a) => { k += +a; return m; }); return k; };
+  const zaStav = (p, prodRows, lak, ks) => {
+    const lakVse = ks > 0 && lak >= ks;
+    if (p && p.skutecny) {
+      const hk = zaSkutKs(p.skutecny);
+      if (hk > 0 && ks > 0 && hk < ks && !lakVse) return { stav: 'rozprac', dle: 'plan', zdroj: 'plán výroby: hotovo ' + hk + ' z ' + ks + ' ks (skutečný termín „' + p.skutecny + '“)' };
+      // hotová podle plánu, ale v Heliosu není odvedeno lakování všech kusů → odvody jsou neúplné (nebo ještě nedoběhly)
+      return { stav: 'hotova', dle: 'plan', neodvedeno: ks > 0 && lak < ks, zdroj: 'plán výroby: skutečný termín ' + p.skutecny };
+    }
+    if (!prodRows) return { stav: 'nezah', dle: 'plan', zdroj: 'v plánu výroby, v Heliosu zatím nic odvedeno' };
+    if (lakVse) return { stav: 'hotova', dle: 'helios', zdroj: 'odvedeno lakování všech ' + ks + ' ks' };
+    if (!p && lak >= 1) return { stav: 'hotova', dle: 'helios', zdroj: 'není v plánu výroby; odvedeno lakování ' + zr1(lak) + ' ks' };
+    return { stav: 'rozprac', dle: 'helios', zdroj: ks > 0 ? 'nalakováno ' + zr1(lak) + ' z ' + ks + ' ks' : 'lakování zatím neodvedeno' };
+  };
+  const zaTyp = (zKey, txt) => zKey === 'popelnice' ? 'popelnice' : typVyrobku('', txt);
+
+  // seznam zakázek závodu pro výběr: vše, co má v Heliosu odvedený řádek s ČVZ, plus zakázky z plánu výroby bez odvádění
+  function zakazkySeznam(z) {
+    const D = loadData(z.key); if (!D) return null;
+    const plan = loadPlan(z.key); const P = (plan && plan.items) || {}; const FZ = FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default;
+    const by = {};
+    D.rows.forEach(r => {
+      if (r[R.date] > D.snapshot) return; const c = zaCvz(r); if (!c) return;
+      const o = by[c] || (by[c] = { cvz: c, zak: '', rows: 0, prodRows: 0, odvKs: 0, lak: 0, rezieH: 0, first: r[R.date], last: r[R.date], lide: new Set(), dily: {} });
+      o.rows++; if (r[R.date] < o.first) o.first = r[R.date]; if (r[R.date] > o.last) o.last = r[R.date]; o.lide.add(r[R.id] || r[R.name]); if (!o.zak && r[R.zak]) o.zak = String(r[R.zak]);
+      if (isRezie(r[R.dil])) { o.rezieH += r[R.ks]; return; }
+      o.prodRows++; o.odvKs += r[R.ks]; if (FZ.lak(r[R.op], r[R.cop])) o.lak += r[R.ks]; const d = r[R.dil]; if (d) o.dily[d] = (o.dily[d] || 0) + (dimsOf(d) ? 5 : 1);
+    });
+    const out = Object.values(by).map(o => {
+      const p = P[o.cvz] || null; const dil = zaNej(o.dily) || (p && (p.opak || p.vyrobek)) || ''; const ks = p && p.ks > 0 ? +p.ks : null; const S = zaStav(p, o.prodRows, o.lak, ks);
+      return { cvz: o.cvz, zak: o.zak, vyrobek: dil || (p && p.vyrobek) || '', zakaznik: (p && p.zakaznik) || '', ks, termin: (p && p.termin) || '', skutecny: (p && p.skutecny) || '', stav: S.stav, stavZdroj: S.zdroj, stavDle: S.dle, lakNeodvedeno: !!S.neodvedeno, typ: zaTyp(z.key, dil), rows: o.rows, odvKs: Math.round(o.odvKs), lak: zr1(o.lak), rezieH: zr1(o.rezieH), first: o.first, last: o.last, lide: o.lide.size, vPlanu: !!p };
+    });
+    Object.keys(P).forEach(c => {
+      if (by[c]) return; const p = P[c]; if (jeStornoNeboPresun(p.pozn) || jeZPL(c)) return; const S = zaStav(p, 0, 0, p.ks > 0 ? +p.ks : null); const dil = p.opak || p.vyrobek || '';
+      out.push({ cvz: c, zak: '', vyrobek: dil, zakaznik: p.zakaznik || '', ks: p.ks > 0 ? +p.ks : null, termin: p.termin || '', skutecny: p.skutecny || '', stav: S.stav, stavZdroj: S.zdroj, stavDle: S.dle, lakNeodvedeno: !!S.neodvedeno, typ: zaTyp(z.key, dil), rows: 0, odvKs: 0, lak: 0, rezieH: 0, first: '', last: '', lide: 0, vPlanu: true });
+    });
+    out.sort((a, b) => (b.last || '').localeCompare(a.last || '') || b.cvz.localeCompare(a.cvz));
+    const pocty = { celkem: out.length, hotova: 0, rozprac: 0, nezah: 0 }; out.forEach(x => { pocty[x.stav]++; });
+    return { zavod: z.key, name: z.name, snapshot: D.snapshot, planSync: (plan && plan.syncedAt) || '', maPlan: !!plan, zakazky: out, pocty };
+  }
+
+  // rozbor jedné zakázky: čas podle norem (odvedeno) proti normě kontejneru daného rozměru, fáze, řádky bez normy, lidé, dny
+  function zakazkaAnalyza(z, cvz) {
+    const D = loadData(z.key); if (!D) return null;
+    const plan = loadPlan(z.key); const p = ((plan && plan.items) || {})[cvz] || null;
+    const rows = D.rows.filter(r => r[R.date] <= D.snapshot && zaCvz(r) === cvz);
+    if (!rows.length && !p) return null;
+    const FZ = FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default; const P6 = loadPlan6(z.key); const I = normIndex(); const maNormy = I.items.length > 0; const maFaze = z.key !== 'popelnice';
+    const prod = rows.filter(r => !isRezie(r[R.dil])), rez = rows.filter(r => isRezie(r[R.dil]));
+    const dil = zaHlavniDil(prod, p, maFaze); const dim = dimsOf(dil) || (p && p.opak ? dimsOf(p.opak) : null) || null; const typ = zaTyp(z.key, dil || (p && (p.opak || p.vyrobek)) || '');
+    const lak = prod.reduce((s, r) => s + (FZ.lak(r[R.op], r[R.cop]) ? r[R.ks] : 0), 0);
+    const planKs = p && p.ks > 0 ? +p.ks : null; const ks = planKs || (lak >= 1 ? Math.round(lak) : null);
+    const S = zaStav(p, prod.length, lak, planKs);
+    const E = prod.map(r => { const n = maNormy ? matchNorma(z.key, r[R.op], r[R.dil], r[R.cop]) : null; const fk = maFaze ? fazeOfZ(r, z.key) : ''; return { r, n, fk, usek: zaUsek(r, fk), min: n ? (+n.min || 0) * r[R.ks] : 0 }; });
+    // řádky po operacích (číslo operace + název + norma)
+    const lin = {};
+    E.forEach(e => {
+      const r = e.r, cop = String(r[R.cop] || '').trim(); const k = cop + '|' + r[R.op] + '|' + (e.n ? normId(e.n) : '');
+      const o = lin[k] || (lin[k] = { op: r[R.op], cop, faze: e.fk, usek: e.usek, ks: 0, rows: 0, lide: new Set(), first: r[R.date], last: r[R.date], norma: zaNorma(e.n), normMin: 0, heliosMin: 0, kc: 0 });
+      o.ks += r[R.ks]; o.rows++; o.lide.add(r[R.name]); if (r[R.date] < o.first) o.first = r[R.date]; if (r[R.date] > o.last) o.last = r[R.date]; o.normMin += e.min; o.heliosMin += +r[R.nmin] || 0; o.kc += (+r[R.kc] || 0) + (+r[R.dop] || 0);
+    });
+    const hlavniK = new Set(P6.faze.filter(f => !f.agg && !f.bezNormy).map(f => f.k));
+    const radky = Object.values(lin).map(o => {
+      const x = Object.assign({}, o, { ks: zr1(o.ks), lide: o.lide.size, normMin: Math.round(o.normMin), heliosMin: Math.round(o.heliosMin), kc: Math.round(o.kc) });
+      // dílce s počtem kusů na kontejner v katalogu: odvedeno proti (kusy zakázky × kusů na kontejner)
+      if (ks && o.norma && o.norma.ksKont && !(typ === 'abr' && hlavniK.has(o.faze))) { x.ocekKs = ks * o.norma.ksKont; x.stavKs = NORMA_STAV(o.ks, x.ocekKs); }
+      return x;
+    }).sort((a, b) => b.normMin - a.normMin || b.ks - a.ks);
+    // hlavní fáze kontejneru proti normě pro rozměr zakázky — jen abroly (katalog ABR-XXX)
+    let faze = null; const mimoRozmer = [];
+    if (typ === 'abr' && maNormy && maFaze) {
+      const kand = {}; I.items.forEach(n => { const fk = fazeOfNorm(n); if (fk && +n.min > 0) (kand[fk] = kand[fk] || []).push(n); });
+      const uzsi = (a, b) => { const ra = zaRoz(a), rb = zaRoz(b); const s = r => (r.vys ? r.vys[1] - r.vys[0] : 5000) + (r.del ? (r.del[1] - r.del[0]) / 100 : 100); return s(ra) - s(rb); };
+      const proRozmer = (K, vzor) => {   // norma téže řady, která sedí na rozměr kontejneru; jinak výběr varianty jako u párování
+        if (!dim) return null; const sedi = K.filter(n => zaMaRozmer(n) && zaRozmerOK(n, dim)); if (!sedi.length) return null;
+        if (vzor) { const rada = zaRada(vzor); const f1 = sedi.filter(n => zaRada(n) === rada); if (f1.length) return { n: f1.slice().sort(uzsi)[0], zdroj: 'stejná řada normy, varianta pro rozměr kontejneru' }; }
+        const pv = pickVariant(sedi.slice(), dil); return pv ? { n: pv, zdroj: 'norma podle rozměru kontejneru' } : null;
+      };
+      faze = P6.faze.filter(f => !f.agg && !f.bezNormy).map(f => {
+        const es = E.filter(e => e.fk === f.k); const ksOdv = es.reduce((s, e) => s + e.r[R.ks], 0), minOdv = es.reduce((s, e) => s + e.min, 0);
+        const odv = {}; es.forEach(e => { const id = e.n ? normId(e.n) : ''; const o = odv[id] || (odv[id] = { n: e.n, ks: 0, min: 0, rows: 0 }); o.ks += e.r[R.ks]; o.min += e.min; o.rows++; });
+        const odvL = Object.values(odv).sort((a, b) => b.ks - a.ks); const dom = (odvL.find(o => o.n && +o.n.min > 0) || {}).n || null; const K = kand[f.k] || [];
+        let oc = null, zdroj = '';
+        if (dom && zaRozmerOK(dom, dim)) { oc = dom; zdroj = 'odvedená norma'; }
+        if (!oc) { const h = proRozmer(K, dom); if (h) { oc = h.n; zdroj = h.zdroj; } }
+        if (!oc && dom) { oc = dom; zdroj = 'odvedená norma (varianta pro tento rozměr v katalogu není)'; }
+        if (!oc) { oc = f.norma ? { kod: f.norma.kod || '', op: f.norma.op || f.nazev, min: f.min, kc: f.norma.kc || 0, ksKont: f.ks } : { kod: '', op: f.nazev, min: f.min, ksKont: f.ks }; zdroj = f.zdroj === 'norma' ? 'výchozí norma plánu (nic odvedeno, rozměr neurčen)' : 'odhad plánu (norma v katalogu chybí)'; }
+        const ksNaKus = oc.ksKont > 0 ? +oc.ksKont : f.ks; const ksOcek = ks ? ks * ksNaKus : null; const minOcek = ksOcek != null ? ksOcek * (+oc.min || 0) : null;
+        odvL.forEach(o => {   // odvedená varianta nesedí na rozměr kontejneru a katalog má správnou
+          if (!o.n || !dim || zaRozmerOK(o.n, dim)) return; const h = proRozmer(K, o.n); if (!h || normId(h.n) === normId(o.n)) return;
+          mimoRozmer.push({ faze: f.nazev, ks: zr1(o.ks), odvedena: zaNorma(o.n), spravna: zaNorma(h.n), rozdilMin: Math.round(o.ks * ((+o.n.min || 0) - (+h.n.min || 0))) });
+        });
+        return { k: f.k, usek: f.usek, nazev: f.nazev, ksNaKus, ksOdv: zr1(ksOdv), ksOcek, minOdv: Math.round(minOdv), minOcek: minOcek != null ? Math.round(minOcek) : null, rozdilMin: minOcek != null ? Math.round(minOdv - minOcek) : null,
+          stav: !ksOcek ? 'neznamo' : (ksOdv === 0 ? 'bez' : NORMA_STAV(ksOdv, ksOcek)), norma: zaNorma(oc), normaZdroj: zdroj, rows: es.length,
+          odvedene: odvL.map(o => ({ ks: zr1(o.ks), rows: o.rows, min: Math.round(o.min), norma: zaNorma(o.n), rozmerOK: !o.n || zaRozmerOK(o.n, dim) })),
+          first: es.length ? es.reduce((m, e) => e.r[R.date] < m ? e.r[R.date] : m, '9999') : '', last: es.length ? es.reduce((m, e) => e.r[R.date] > m ? e.r[R.date] : m, '') : '' };
+      });
+    }
+    // úseky, řádky bez normy, normy bez času
+    const us = {}; E.forEach(e => { const u = us[e.usek] || (us[e.usek] = { usek: e.usek, nazev: ZA_USEK[e.usek] || e.usek, rows: 0, ks: 0, min: 0, bezNormy: 0 }); u.rows++; u.ks += e.r[R.ks]; u.min += e.min; if (!e.n || !(+e.n.min > 0)) u.bezNormy++; });
+    const bez = E.filter(e => !e.n), nula = E.filter(e => e.n && !(+e.n.min > 0));
+    const topOp = arr => { const t = {}; arr.forEach(e => { const k = e.r[R.op]; const o = t[k] || (t[k] = { op: k, rows: 0, ks: 0 }); o.rows++; o.ks += e.r[R.ks]; }); return Object.values(t).sort((a, b) => b.rows - a.rows).slice(0, 8).map(o => ({ op: o.op, rows: o.rows, ks: zr1(o.ks) })); };
+    // režie psaná na zakázku (hodiny)
+    const rezieH = rez.reduce((s, r) => s + r[R.ks], 0); const rk = {}; rez.forEach(r => { const k = kategorieRezie(r[R.dil] + ' ' + r[R.pozn]); rk[k] = (rk[k] || 0) + r[R.ks]; });
+    // lidé a dny
+    const li = {}; E.forEach(e => { const k = e.r[R.name] || e.r[R.id]; const o = li[k] || (li[k] = { jmeno: k, rows: 0, ks: 0, normMin: 0, rezieH: 0, first: e.r[R.date], last: e.r[R.date] }); o.rows++; o.ks += e.r[R.ks]; o.normMin += e.min; if (e.r[R.date] < o.first) o.first = e.r[R.date]; if (e.r[R.date] > o.last) o.last = e.r[R.date]; });
+    rez.forEach(r => { const k = r[R.name] || r[R.id]; const o = li[k] || (li[k] = { jmeno: k, rows: 0, ks: 0, normMin: 0, rezieH: 0, first: r[R.date], last: r[R.date] }); o.rows++; o.rezieH += r[R.ks]; if (r[R.date] < o.first) o.first = r[R.date]; if (r[R.date] > o.last) o.last = r[R.date]; });
+    const dn = {}; const den = d => dn[d] || (dn[d] = { date: d, rows: 0, ks: 0, normMin: 0, rezieH: 0, lide: new Set(), faze: new Set() });
+    E.forEach(e => { const o = den(e.r[R.date]); o.rows++; o.ks += e.r[R.ks]; o.normMin += e.min; o.lide.add(e.r[R.name] || e.r[R.id]); const f = e.fk && P6.faze.find(x => x.k === e.fk); o.faze.add(f ? f.nazev : (ZA_USEK[e.usek] || e.usek)); });
+    rez.forEach(r => { const o = den(r[R.date]); o.rows++; o.rezieH += r[R.ks]; o.lide.add(r[R.name] || r[R.id]); o.faze.add('režie'); });
+    const first = rows.length ? rows.reduce((m, r) => r[R.date] < m ? r[R.date] : m, '9999') : '', last = rows.length ? rows.reduce((m, r) => r[R.date] > m ? r[R.date] : m, '') : '';
+    const normMin = E.reduce((s, e) => s + e.min, 0), celkemMin = normMin + rezieH * 60; const heliosMin = prod.reduce((s, r) => s + (+r[R.nmin] || 0), 0), heliosRows = prod.filter(r => +r[R.nmin] > 0).length;
+    const kc = rows.reduce((s, r) => s + (+r[R.kc] || 0) + (+r[R.dop] || 0), 0);
+    const hlOdv = faze ? faze.reduce((s, f) => s + f.minOdv, 0) : null, hlOcek = faze && ks ? faze.reduce((s, f) => s + (f.minOcek || 0), 0) : null;
+    const pomer = hlOcek ? Math.round(hlOdv / hlOcek * 100) : null;
+    // odvedené fáze zvlášť: „jsou odvedené operace v normě?“ se hodnotí jen na fázích, které se na zakázku psaly; fáze bez jediného řádku jsou samostatné zjištění
+    const odvF = faze ? faze.filter(f => f.ksOdv > 0) : [], bezF = faze ? faze.filter(f => f.stav === 'bez').map(f => f.nazev) : [];
+    const vicF = odvF.filter(f => f.stav === 'vic').map(f => f.nazev), chybiF = odvF.filter(f => f.stav === 'chybi').map(f => f.nazev);
+    const odvMin = odvF.reduce((s, f) => s + f.minOdv, 0), odvOcek = faze && ks ? odvF.reduce((s, f) => s + (f.minOcek || 0), 0) : null, pomerOdv = odvOcek ? Math.round(odvMin / odvOcek * 100) : null;
+    // verdikt: pásmo 90–120 % normy = stejné jako dosavadní kontrola kusů fází (NORMA_STAV)
+    let verdikt = null; const vx = { pomer, pomerOdv, vicFaze: vicF, chybiFaze: chybiF, bezFaze: bezF, mimoRozmer: mimoRozmer.length };
+    if (!faze) verdikt = { stav: 'bezPorovnani', duvod: !maNormy ? 'katalog norem není načtený' : (typ === 'abr' ? 'závod nemá fáze kontejneru' : 'porovnání s normou celého výrobku je zatím jen pro abroly') };
+    else if (!ks) verdikt = { stav: 'neznamo', duvod: 'počet kusů zakázky není znám (zakázka není v plánu výroby a lakování není odvedeno)' };
+    else if (S.stav === 'hotova') verdikt = Object.assign({ stav: vicF.length && chybiF.length ? 'mix' : (vicF.length ? 'vic' : (chybiF.length ? 'chybi' : (odvF.length ? 'ok' : 'neodvedeno'))) }, vx);
+    else verdikt = Object.assign({ stav: vicF.length ? 'rozpracVic' : 'rozprac' }, vx);
+    return { cvz, zavod: z.key, stav: S.stav, stavZdroj: S.zdroj, stavDle: S.dle, lakNeodvedeno: !!S.neodvedeno, zak: (rows.find(r => r[R.zak]) || [])[R.zak] || '', vyrobek: dil || (p && p.vyrobek) || '', rozmer: dim, typ, ks, planKs, ksZdroj: planKs ? 'plán výroby' : (ks ? 'odhad z odvedeného lakování' : ''), lak: zr1(lak), hotovoPct: ks ? Math.min(100, Math.round(lak / ks * 100)) : null,
+      plan: p ? { vyrobek: p.vyrobek || '', opak: p.opak || '', ks: p.ks, zakaznik: p.zakaznik || '', termin: p.termin || '', skutecny: p.skutecny || '', pozn: p.pozn || '', url: plan && plan.sheetId ? 'https://docs.google.com/spreadsheets/d/' + plan.sheetId + '/edit#gid=' + (plan.gid != null ? plan.gid : 0) + (p.row ? '&range=A' + p.row + ':AZ' + p.row : '') : '' } : null,
+      cas: { normMin: Math.round(normMin), rezieH: zr1(rezieH), celkemMin: Math.round(celkemMin), osobosmen: zr1(celkemMin / P6.smenaMin), hNaKus: ks ? zr1(celkemMin / 60 / ks) : null, heliosMin: Math.round(heliosMin), heliosRows, kc: Math.round(kc), hlavniOdv: hlOdv, hlavniOcek: hlOcek, pomer, odvFazeMin: faze ? Math.round(odvMin) : null, odvFazeOcek: odvOcek != null ? Math.round(odvOcek) : null, pomerOdv, ostatniMin: hlOdv != null ? Math.round(normMin - hlOdv) : null },
+      verdikt, faze, mimoRozmer, useky: Object.values(us).map(u => Object.assign({}, u, { ks: zr1(u.ks), min: Math.round(u.min) })).sort((a, b) => b.min - a.min), radky,
+      bezNormy: { rows: bez.length, ks: zr1(bez.reduce((s, e) => s + e.r[R.ks], 0)), top: topOp(bez) }, nulaNormy: { rows: nula.length, ks: zr1(nula.reduce((s, e) => s + e.r[R.ks], 0)), top: topOp(nula) },
+      rezie: { h: zr1(rezieH), kat: Object.entries(rk).sort((a, b) => b[1] - a[1]).map(([k, h]) => ({ k, h: zr1(h) })) },
+      lide: Object.values(li).map(o => Object.assign({}, o, { ks: zr1(o.ks), normMin: Math.round(o.normMin), rezieH: zr1(o.rezieH) })).sort((a, b) => (b.normMin + b.rezieH * 60) - (a.normMin + a.rezieH * 60)),
+      dny: Object.values(dn).sort((a, b) => a.date.localeCompare(b.date)).map(o => ({ date: o.date, prac: jePracDen(o.date), rows: o.rows, ks: zr1(o.ks), normMin: Math.round(o.normMin), rezieH: zr1(o.rezieH), lide: o.lide.size, faze: [...o.faze] })),
+      first, last, kalDny: first ? Math.round((new Date(last + 'T00:00:00Z') - new Date(first + 'T00:00:00Z')) / 86400000) + 1 : 0, pracDny: first ? pracDnyRozsah(first, last) : 0, rowsCelkem: rows.length, prodRows: prod.length, smenaMin: P6.smenaMin, maNormy };
+  }
+
+  // dny závodu: co se který den odvedlo proti plánu (cíl ABR × hlavní operace na kontejner) a proti kapacitě směny lidí, kteří ten den odváděli
+  function dnyZavodu(z, od, do_) {
+    const D = loadData(z.key); if (!D) return null;
+    const snap = D.snapshot; if (!do_ || do_ > snap) do_ = snap;
+    const posun = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    if (!od || od > do_) od = posun(do_, -27); if (od < posun(do_, -91)) od = posun(do_, -91);
+    const CZ = cilZavodu(z.key), cil = CZ.cil; const P6 = loadPlan6(z.key); const maFaze = z.key !== 'popelnice'; const HL = maFaze ? P6.faze.filter(f => !f.agg && !f.bezNormy) : []; const hlK = new Set(HL.map(f => f.k)); const opsKont = HL.reduce((s, f) => s + (+f.ks || 0), 0);
+    const FZ = FAZE_VYSTUPU[z.key] || FAZE_VYSTUPU.default; const MP = muldyPlan(z.key); const maNormy = normIndex().items.length > 0;
+    const dny = {}; for (let k = od; k <= do_; k = posun(k, 1)) dny[k] = { date: k, prac: jePracDen(k), svatek: jeSvatek(k), rows: 0, prodRows: 0, ks: 0, opsHl: 0, faze: {}, normMin: 0, bezNormy: 0, rezieH: 0, term: 0, hotAbr: 0, hotCity: 0, hotMul: 0, lide: new Set(), osoby: {} };
+    D.rows.forEach(r => {
+      const o = dny[r[R.date]]; if (!o) return; const kdo = r[R.name] || r[R.id]; o.rows++; o.lide.add(r[R.id] || r[R.name]); if (r[R.aut] === 'terminalETH') o.term++;
+      const os = o.osoby[kdo] || (o.osoby[kdo] = { jmeno: kdo, rows: 0, ks: 0, opsHl: 0, normMin: 0, rezieH: 0, bezNormy: 0 }); os.rows++;
+      if (isRezie(r[R.dil])) { o.rezieH += r[R.ks]; os.rezieH += r[R.ks]; return; }
+      o.prodRows++; o.ks += r[R.ks]; os.ks += r[R.ks];
+      const n = maNormy ? matchNorma(z.key, r[R.op], r[R.dil], r[R.cop]) : null; if (n && +n.min > 0) { o.normMin += n.min * r[R.ks]; os.normMin += n.min * r[R.ks]; } else { o.bezNormy++; os.bezNormy++; }
+      if (maFaze) { const fk = fazeOfZ(r, z.key); if (hlK.has(fk)) { o.opsHl += r[R.ks]; os.opsHl += r[R.ks]; o.faze[fk] = (o.faze[fk] || 0) + r[R.ks]; } }
+      if (FZ.lak(r[R.op], r[R.cop]) && !MP.set.has(r[R.cvz])) { const t = z.key === 'popelnice' ? 'abr' : typVyrobku(r[R.op], r[R.dil]); if (t === 'abr') o.hotAbr += r[R.ks]; else if (t === 'city') o.hotCity += r[R.ks]; else if (t === 'muldy') o.hotMul += r[R.ks]; }
+    });
+    MP.dny.forEach(x => { if (dny[x.d]) dny[x.d].hotMul += x.ks; });
+    const out = Object.values(dny).map(o => {
+      const planOps = o.prac && cil && opsKont ? cil * opsKont : null; const kapMin = o.lide.size * P6.smenaMin; const odvMin = o.normMin + o.rezieH * 60;
+      return { date: o.date, prac: o.prac, svatek: o.svatek, rows: o.rows, prodRows: o.prodRows, ks: zr1(o.ks), opsHl: zr1(o.opsHl), planOps, plneni: planOps ? Math.round(o.opsHl / planOps * 100) : null, kontEkv: opsKont ? zr1(o.opsHl / opsKont) : null,
+        faze: HL.map(f => ({ k: f.k, ks: zr1(o.faze[f.k] || 0) })), normMin: Math.round(o.normMin), rezieH: zr1(o.rezieH), bezNormy: o.bezNormy, term: o.term, lide: o.lide.size, kapMin, vytizeni: kapMin ? Math.round(odvMin / kapMin * 100) : null,
+        hotAbr: zr1(o.hotAbr), hotCity: zr1(o.hotCity), hotMul: zr1(o.hotMul),
+        osoby: Object.values(o.osoby).map(x => ({ jmeno: x.jmeno, rows: x.rows, ks: zr1(x.ks), opsHl: zr1(x.opsHl), normMin: Math.round(x.normMin), rezieH: zr1(x.rezieH), bezNormy: x.bezNormy })).sort((a, b) => (b.normMin + b.rezieH * 60) - (a.normMin + a.rezieH * 60)) };
+    });
+    const pr = out.filter(d => d.prac); const sum = (a, f) => a.reduce((s, d) => s + (f(d) || 0), 0); const sOdv = pr.filter(d => d.rows > 0);
+    const souhrn = { pracDny: pr.length, dnySOdvadenim: sOdv.length, dnyBezOdvadeni: pr.length - sOdv.length, mimoPracDny: out.filter(d => !d.prac && d.rows > 0).length,
+      opsHl: Math.round(sum(out, d => d.opsHl)), planOps: cil && opsKont ? Math.round(cil * opsKont * pr.length) : null, dnySplneno: cil && opsKont ? pr.filter(d => d.opsHl >= d.planOps).length : null,
+      normH: Math.round(sum(out, d => d.normMin) / 60), rezieH: Math.round(sum(out, d => d.rezieH)), kapH: Math.round(sum(out, d => d.kapMin) / 60), hotAbr: Math.round(sum(out, d => d.hotAbr)), hotCity: Math.round(sum(out, d => d.hotCity)), hotMul: Math.round(sum(out, d => d.hotMul)),
+      planAbr: cil ? Math.round(cil * pr.length) : null, prumLidi: sOdv.length ? zr1(sum(sOdv, d => d.lide) / sOdv.length) : null, bezNormy: sum(out, d => d.bezNormy), prodRows: sum(out, d => d.prodRows) };
+    souhrn.plneni = souhrn.planOps ? Math.round(souhrn.opsHl / souhrn.planOps * 100) : null; souhrn.vytizeni = souhrn.kapH ? Math.round((souhrn.normH + souhrn.rezieH) / souhrn.kapH * 100) : null;
+    let SL = null; try { SL = stavLidi(z.key, do_.slice(0, 7)); } catch (_) {}
+    return { zavod: z.key, name: z.name, snapshot: snap, od, do: do_, cil, cilZdroj: CZ.zdroj, smenaMin: P6.smenaMin, opsKont: opsKont || null, maFaze, maNormy, fazeDef: HL.map(f => ({ k: f.k, nazev: f.nazev, usek: f.usek, ks: f.ks, min: f.min, plan: cil ? cil * f.ks : null })),
+      dny: out.sort((a, b) => b.date.localeCompare(a.date)), souhrn, stav: SL ? { n: SL.n, vyr: SL.vyr, zdroj: SL.zdroj } : null };
   }
 
   // ---------- měsíční e-mail „Indikátory výkonnosti středisek“ ----------
@@ -1446,9 +1651,28 @@ function mount(host) {
       if (q) list = list.filter(n => n.opB.includes(q) || nrm(n.varianta).includes(q) || nrm(n.sheet).includes(q));
       json(res, 200, { katalog: I.items.length, syncedAt: I.syncedAt, diag: I.diag, folder: NORMY_FOLDER, items: list.slice(0, 3000).map(n => ({ id: normId(n), ksKont: n.ksKont, sazba: n.sazba, op: n.op, varianta: n.varianta, del: n.del, vys: n.vys, min: n.min, minOdv: n.minOdv || undefined, okruh: n.okruh || okruhOf(n.file), kc: n.kc, file: n.file, sheet: n.sheet, kod: n.kod })), total: list.length, mapa: host.isAdmin(req) ? I.mapa : undefined }); return true;
     }
+    const mZA = /^\/api\/vykonnost\/zakazky\/([a-z]+)\/analyza$/.exec(p);
+    if (mZA && req.method === 'GET') {
+      const z = zavodOf(mZA[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; }
+      const cvz = [...new Set(String(u.query.cvz || '').split(',').map(x => x.trim()).filter(Boolean))].slice(0, 20);
+      if (!cvz.length) { json(res, 400, { error: 'Vyberte aspoň jednu zakázku.' }); return true; }
+      const D = loadData(z.key); if (!D) { json(res, 200, { data: false, zavod: z.key, name: z.name }); return true; }
+      const P6 = loadPlan6(z.key);
+      json(res, 200, { data: true, zavod: z.key, name: z.name, snapshot: D.snapshot, smenaMin: P6.smenaMin, normySync: normIndex().syncedAt || '', zakazky: cvz.map(c => zakazkaAnalyza(z, c) || { cvz: c, nenalezeno: true }) }); return true;
+    }
+    const mZS = /^\/api\/vykonnost\/zakazky\/([a-z]+)$/.exec(p);
+    if (mZS && req.method === 'GET') {
+      const z = zavodOf(mZS[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; }
+      const L = zakazkySeznam(z); json(res, 200, L ? Object.assign({ data: true }, L) : { data: false, zavod: z.key, name: z.name }); return true;
+    }
+    const mDN = /^\/api\/vykonnost\/dny\/([a-z]+)$/.exec(p);
+    if (mDN && req.method === 'GET') {
+      const z = zavodOf(mDN[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; }
+      const X = dnyZavodu(z, parseAnyDate(u.query.od) || '', parseAnyDate(u.query.do) || ''); json(res, 200, X ? Object.assign({ data: true }, X) : { data: false, zavod: z.key, name: z.name }); return true;
+    }
     if (!host.isAdmin(req)) { json(res, 403, { error: 'Jen pro správce.' }); return true; }
     if (p === '/api/vykonnost/plan6' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } return json(res, 200, { ok: true, plan: savePlan6(b) }), true; }
-    if (p === '/api/vykonnost/cil' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } if (!zavodOf(b.zavod)) { json(res, 400, { error: 'Neznámý závod.' }); return true; } let c = {}; try { c = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {} const v = b.cil === null || b.cil === '' ? null : +b.cil; c[b.zavod] = (v != null && isFinite(v) && v > 0) ? Math.round(v * 10) / 10 : null; try { fs.writeFileSync(CIL_F, JSON.stringify(c, null, 2)); } catch (_) {} return json(res, 200, { ok: true, cile: loadCile() }), true; }
+    if (p === '/api/vykonnost/cil' && req.method === 'POST') { let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; } if (!zavodOf(b.zavod)) { json(res, 400, { error: 'Neznámý závod.' }); return true; } let c = {}; try { c = JSON.parse(fs.readFileSync(CIL_F, 'utf8')) || {}; } catch (_) {} const v = b.cil === null || b.cil === '' ? null : +b.cil; c[b.zavod] = (v != null && isFinite(v) && v > 0) ? Math.round(v * 10) / 10 : null; try { fs.writeFileSync(CIL_F, JSON.stringify(c, null, 2)); } catch (_) {} return json(res, 200, { ok: true, cile: loadCile(), zdroje: ZAVODY.reduce((o, z) => { o[z.key] = cilZavodu(z.key).zdroj; return o; }, {}) }), true; }
     if (p === '/api/vykonnost/normy/sync' && req.method === 'POST') { try { const r = await syncNormy(); return json(res, r.ok ? 200 : 500, r), true; } catch (e) { return json(res, 500, { ok: false, error: e.message }), true; } }
     if (p === '/api/vykonnost/normy/mapa' && req.method === 'POST') {
       let b = {}; try { b = JSON.parse(await host.readBody(req) || '{}'); } catch (_) { json(res, 400, { error: 'Neplatné tělo.' }); return true; }
@@ -1486,7 +1710,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, profese, parseMuldyDny, parsePozice, savePozice, syncVydejky, importVydejky, expedice, syncMzdy, mzdyMesic, sync: () => sync(false), syncPlans, syncNormy, vystup, tydenniLak, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, zakazkySeznam, zakazkaAnalyza, dnyZavodu, cilZavodu, overview, profese, parseMuldyDny, parsePozice, savePozice, syncVydejky, importVydejky, expedice, syncMzdy, mzdyMesic, sync: () => sync(false), syncPlans, syncNormy, vystup, tydenniLak, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };
