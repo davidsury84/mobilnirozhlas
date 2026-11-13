@@ -866,15 +866,17 @@ function mount(host) {
   async function syncFinPlan() {
     if (!host.sheetsGet) return { ok: false, error: 'sheetsGet není k dispozici' };
     const F = Object.assign({}, loadFinPlanFile()); F._stav = Object.assign({}, F._stav); const at = new Date().toISOString(); const q = t => "'" + String(t).replace(/'/g, "''") + "'";
+    // Sheets API má limit dotazů za minutu a při startu čte tabulky víc modulů najednou → při 429 počkat a zkusit znovu
+    const volej = async fn => { for (let k = 0; ; k++) { try { return await fn(); } catch (e) { if (k >= 3 || !/429/.test(String(e.message))) throw e; await cekej(25000 * (k + 1)); } } };
     for (const [key, cfg] of Object.entries(FINPLAN)) {
       try {
-        let tabs = []; try { tabs = host.sheetsTabs ? (await host.sheetsTabs(cfg.sheetId) || []).map(t => String(t.title)) : (host.sheetsMeta ? (await host.sheetsMeta(cfg.sheetId) || []).map(String) : []); } catch (e) { throw new Error('listy: ' + e.message); }
+        let tabs = []; try { tabs = host.sheetsTabs ? (await volej(() => host.sheetsTabs(cfg.sheetId)) || []).map(t => String(t.title)) : (host.sheetsMeta ? (await volej(() => host.sheetsMeta(cfg.sheetId)) || []).map(String) : []); } catch (e) { throw new Error('listy: ' + e.message); }
         const tp = tabs.find(t => FINPLAN_TAB.plan.test(t.trim())) || 'finanční plan', tk = tabs.find(t => FINPLAN_TAB.kap.test(t.trim())) || 'kapacita';
-        const rp = await host.sheetsGet(cfg.sheetId, q(tp) + '!A1:D140', { raw: true }), rk = await host.sheetsGet(cfg.sheetId, q(tk) + '!A1:R60', { raw: true });
+        await cekej(1500); const rp = await volej(() => host.sheetsGet(cfg.sheetId, q(tp) + '!A1:D140', { raw: true })); await cekej(1500); const rk = await volej(() => host.sheetsGet(cfg.sheetId, q(tk) + '!A1:R60', { raw: true }));
         const p = parseFinPlan((rp && rp.values) || [], (rk && rk.values) || []);
         if (!(p.trzbyMes > 0) || !(p.kapacitaKs > 0)) throw new Error('v listech „' + tp + '“ a „' + tk + '“ chybí řádek Tržby Celkem nebo měsíční kapacita');
         F[key] = Object.assign(p, { tabPlan: tp, tabKap: tk, syncedAt: at }); F._stav[key] = { ok: true, at };
-      } catch (e) { F._stav[key] = { ok: false, error: String(e.message || e).slice(0, 300), at }; console.warn('[vykonnost] finanční plán ' + key + ':', e.message); }
+      } catch (e) { F._stav[key] = { ok: false, error: String(e.message || e).replace(/\s+/g, ' ').slice(0, 240), at }; console.warn('[vykonnost] finanční plán ' + key + ':', e.message); }
     }
     try { fs.writeFileSync(FINPLAN_F, JSON.stringify(F, null, 2)); } catch (_) {} _fpC = null;
     return F._stav;
@@ -1665,6 +1667,7 @@ function mount(host) {
     try { const s = await sync(false); if (s && !s.ok) console.warn('[vykonnost] sync:', s.error); } catch (e) { console.error('[vykonnost] sync:', e.message); }
     try { await syncVydejky(); } catch (e) { console.warn('[vykonnost] výdejky:', e.message); }
     if (Date.now() - lastPlanAt > 6 * 3600 * 1000) { lastPlanAt = Date.now(); try { await syncPlans(); } catch (e) { console.warn('[vykonnost] plány:', e.message); } try { await syncMzdy(); } catch (e) { console.warn('[vykonnost] mzdy:', e.message); } try { await syncNormy(); } catch (e) { console.warn('[vykonnost] normy:', e.message); } }
+    else if (host.sheetsGet && Object.keys(FINPLAN).some(k => !finPlan(k))) { try { await syncFinPlan(); } catch (e) { console.warn('[vykonnost] finanční plán:', e.message); } }
     await tickReport();
   }
 
