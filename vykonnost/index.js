@@ -400,6 +400,8 @@ function mount(host) {
   const REZIE_SAZBA = +process.env.VYKON_REZIE_SAZBA || 210;   // Kč/h režie dle mzdového přehledu (ruční analýza 08/2026)
   const nrm = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9+/.,\- ]/g, ' ').replace(/\s+/g, ' ').trim();
   const nrmBez = s => nrm(String(s).replace(/\([^)]*\)/g, ' ')).replace(/[.,]+$/, '').trim();
+  // pravopisné varianty téhož slova se párují automaticky: Helios píše „Ližina“, katalog norem „lyžina“ (ližina / ližiny / ližin …)
+  const kan = s => String(s == null ? '' : s).replace(/(^|[^a-z])liz(?=in)/g, '$1lyz');
   const numN = v => { const m = String(v == null ? '' : v).replace(/[\s ]/g, '').replace(',', '.').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
   const rangeN = v => { const s = String(v == null ? '' : v); let m = s.match(/(?:^|[^\d])(\d{1,4})\s*[-–]\s*(\d{3,4})/); if (m) return [+m[1], +m[2]]; m = s.match(/^\s*(\d{3,4})\s*(mm)?\s*$/); if (m) return [+m[1], +m[1]]; m = s.match(/^\s*do\s*(\d{3,4})/i); if (m) return [0, +m[1]]; return null; };
   const dimsOf = dil => { const m = String(dil || '').match(/(\d{4})\s*[x×]\s*(\d{4})(?:\s*\/\s*\d{4})?\s*[x×]\s*(\d{3,4})/); return m ? { L: +m[1], H: +m[3] } : null; };
@@ -465,7 +467,8 @@ function mount(host) {
     'pila manual do 50': 'pila manual obecna fi 50', 'pila manual do 100': 'pila manual obecna fi 100', 'pila manual do 200': 'pila manual obecna fi 200',
     'pila manual pro kulatinu do 50': 'pila manual obecna fi 50', 'pila manual pro kulatinu do 100': 'pila manual obecna fi 100',
     'pila automat do 50': 'pila automat obecna fi 50', 'pila automat do 100': 'pila automat obecna fi 100',
-    'rezani lyziny ipn 180-upn200': 'pila lyzina', 'rezani tramce rolen': 'pila tramec rolen upn 180', 'rezani vyztuhy za celo': 'pila vyztuha za celo'
+    'rezani lyziny ipn 180-upn200': 'pila lyzina', 'rezani tramce rolen': 'pila tramec rolen upn 180', 'rezani vyztuhy za celo': 'pila vyztuha za celo',
+    'rezani vyztuhy za celo uipn 100-upn200': 'pila vyztuha za celo', 'rezani lemu trubka/jakl': 'pila vrchni lem', 'rezani zadnich stojin': 'pila zadni upn bocnice', 'rezani trubky rolen': 'pila trubka rolna'
   };
   // Rodina výrobku z názvu dílu — rozhoduje mezi variantami normy (bočnice DSD vs. ALST/ECL vs. HBI).
   const RODINY = ['dsd', 'afs', 'alst', 'ecl', 'hbi', 'hbs', 'lwc', 'wd', 'sth', 'domat', 'city', 'wdg', 'wdc', 'sit', 'csd', 'renewi', 'veolia'];
@@ -524,7 +527,7 @@ function mount(host) {
   function normIndex() {
     const nmt = mtimeOf(NORMY_F) + mtimeOf(NMAP_F); if (_nIdx && _nIdxMt === nmt) return _nIdx; _nIdxMt = nmt;
     const N = loadNormy(); const items = (N && N.items) || [];
-    const byN = {}, byB = {}, byId = {}, bySP = {}, byKod = {}; items.forEach(n => { if (/^\d{3,4}$/.test(n.kod || '')) (byKod[n.kod] = byKod[n.kod] || []).push(n); const sp = /^SP (\d{3,4})$/.exec(n.kod || ''); if (sp) (bySP[sp[1]] = bySP[sp[1]] || []).push(n); (byN[n.opN] = byN[n.opN] || []).push(n); (byB[n.opB] = byB[n.opB] || []).push(n); byId[normId(n)] = n; });
+    const byN = {}, byB = {}, byId = {}, bySP = {}, byKod = {}; items.forEach(n => { if (/^\d{3,4}$/.test(n.kod || '')) (byKod[n.kod] = byKod[n.kod] || []).push(n); const sp = /^SP (\d{3,4})$/.exec(n.kod || ''); if (sp) (bySP[sp[1]] = bySP[sp[1]] || []).push(n); (byN[kan(n.opN)] = byN[kan(n.opN)] || []).push(n); (byB[kan(n.opB)] = byB[kan(n.opB)] || []).push(n); byId[normId(n)] = n; });
     const keys = Object.keys(byB).filter(k => k.length >= 10).sort((a, b) => b.length - a.length);
     const tok = {}; keys.forEach(k => tok[k] = new Set(k.split(' ').filter(w => w.length > 1)));
     return (_nIdx = { items, byN, byB, byId, bySP, byKod, keys, tok, syncedAt: N ? N.syncedAt : '', diag: (N && N.diag) || [], mapa: loadNMap(), cache: new Map() });
@@ -543,7 +546,7 @@ function mount(host) {
     const noDim = c.find(n => !n.del && !n.vys); return noDim || c[0];
   }
   // první slovo názvu (4 znaky) — pojistka, že číslo operace opravdu míří na příbuznou normu (číslo 100 má v postupu i „Dělírna-nůžky“)
-  const prvni = t => (nrm(t).replace(/[^a-z0-9 ]/g, ' ').trim().split(' ')[0] || '').slice(0, 4);
+  const prvni = t => (kan(nrm(t)).replace(/[^a-z0-9 ]/g, ' ').trim().split(' ')[0] || '').slice(0, 4);
   function matchNorma(zavodKey, op, dil, cop) {
     const I = normIndex(); if (!I.items.length) return null;
     cop = /^\d{3,4}$/.test(String(cop || '').trim()) && I.byKod[String(cop).trim()] ? String(cop).trim() : '';
@@ -557,7 +560,7 @@ function mount(host) {
       // nesmí operaci podle podobného názvu dostat norma jiného SP (Konzole S-hák SP 1067 ≠ SP 1309).
       const spm = /(?:^|[^a-z0-9])SP\s*(\d{3,4})(?!\d)/i.exec(op);
       const ok = a => { const f = (a || []).filter(n => okruhOK(n, zavodKey, dil) && !(spm && /^SP /.test(n.kod || ''))); return f.length ? f : null; };
-      const o = nrm(op), ob = nrmBez(op); let c = null, how = 'přesně';
+      const o = kan(nrm(op)), ob = kan(nrmBez(op)); let c = null, how = 'přesně';
       if (spm && I.bySP[spm[1]]) { c = I.bySP[spm[1]].filter(n => okruhOK(n, zavodKey, dil)); if (c.length) how = 'číslo SP'; else c = null; }
       if (!c) c = ok(I.byN[o]) || ok(I.byB[ob]);
       // číslo operace z Heliosu = kód normy (svařovna 1xx–5xx, lakovna 6xx–7xx); název se mohl v Heliosu upravit („… (-TRUBKA)“, „… + 100 Kč z normy 202“)
