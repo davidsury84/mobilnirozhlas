@@ -100,6 +100,14 @@ label{display:block;font-size:13px;font-weight:600;margin:10px 0 0}
 .dqview b{color:var(--mut);font-weight:600}
 .dqview .bd{font-size:10px;font-weight:700;padding:0 5px;border-radius:4px;margin-left:6px}
 .dqview .s{background:var(--green-soft);color:#0a6b34}.dqview .o{background:#fff3e0;color:#e65100}.dqview .p{background:#e3f2fd;color:#1565c0}
+.dqview .dqrow{display:contents}
+.dqview .vrat-row>b label{cursor:pointer;display:flex;align-items:flex-start;gap:6px;color:inherit;font-weight:600}
+.dqview .vrat-row>b input{width:auto;margin:2px 0 0}
+.dqview .vrat-row.on>b,.dqview .vrat-row.on>span,.dqview .vr-mark>b,.dqview .vr-mark>span{background:#fdecea;border-radius:4px}
+.dqview .vr-mark>b{color:var(--red);box-shadow:inset 3px 0 0 var(--red);padding-left:6px}
+.bd.vr{background:#fdecea;color:#c62828;font-size:10px;font-weight:700;padding:0 5px;border-radius:4px;margin:0 2px}
+.vrat-card{background:#fff5f5;border-color:#e39a9a;padding:10px 12px;margin-top:8px}
+.dq2.dq-vrat{outline:2px solid var(--red);outline-offset:3px;border-radius:8px;background:#fff5f5}
 .dqsec{font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--g2);margin:16px 0 6px;padding-top:10px;border-top:1px solid var(--line)}
 .dqsec:first-of-type{border-top:0;padding-top:0}
 .dq:hover{background:#f7faf7}
@@ -618,6 +626,16 @@ var K_L10N = {
 'Přidělit konstruktéra':['Assign designer','Konstrukteur zuweisen','Przydziel konstruktora','Призначити конструктора','Atribuie proiectant'],
 'Přidělit':['Assign','Zuweisen','Przydziel','Призначити','Atribuie'],
 'Přeřadit':['Reassign','Umbuchen','Przenieś','Перепризначити','Realocă'],
+'↩ Vrátit obchodníkovi k opravě zadání':['↩ Return to sales to fix the specification','↩ An den Vertrieb zur Korrektur der Vorgabe zurückgeben','↩ Zwróć handlowcowi do poprawy zadania','↩ Повернути менеджеру на виправлення завдання','↩ Returnează vânzărilor pentru corectarea specificației'],
+'↩ Vráceno obchodníkovi k opravě zadání':['↩ Returned to sales to fix the specification','↩ An den Vertrieb zur Korrektur der Vorgabe zurückgegeben','↩ Zwrócone handlowcowi do poprawy zadania','↩ Повернуто менеджеру на виправлення завдання','↩ Returnat vânzărilor pentru corectarea specificației'],
+'↩ Vráceno k opravě zadání':['↩ Returned to fix the specification','↩ Zur Korrektur der Vorgabe zurückgegeben','↩ Zwrócone do poprawy zadania','↩ Повернуто на виправлення завдання','↩ Returnat pentru corectarea specificației'],
+'Body k opravě:':['Items to fix:','Zu korrigierende Punkte:','Punkty do poprawy:','Пункти до виправлення:','Puncte de corectat:'],
+'k opravě':['to fix','zu korrigieren','do poprawy','до виправлення','de corectat'],
+'Odeslat obchodníkovi':['Send to sales','An den Vertrieb senden','Wyślij handlowcowi','Надіслати менеджеру','Trimite vânzărilor'],
+'Co přesně je potřeba změnit…':['What exactly needs to change…','Was genau geändert werden muss…','Co dokładnie trzeba zmienić…','Що саме потрібно змінити…','Ce anume trebuie schimbat…'],
+'▶ Zadání opraveno — vrátit konstrukci':['▶ Specification fixed — return to engineering','▶ Vorgabe korrigiert — an die Konstruktion zurück','▶ Zadanie poprawione — zwróć konstrukcji','▶ Завдання виправлено — повернути конструкції','▶ Specificație corectată — înapoi la proiectare'],
+'✎ Opravit zadání':['✎ Fix the specification','✎ Vorgabe korrigieren','✎ Popraw zadanie','✎ Виправити завдання','✎ Corectează specificația'],
+'Zaškrtněte body dotazníku, které jsou špatně, a napište, co přesně je potřeba změnit. Zakázka se pozastaví, obchodník dostane upozornění i e-mail a po opravě ji vrátí konstrukci.':['Tick the questionnaire items that are wrong and write what exactly needs to change. The order is put on hold, sales gets a notification and an e-mail, and returns it to engineering after the fix.','Haken Sie die falschen Punkte des Fragebogens an und schreiben Sie, was genau geändert werden muss. Der Auftrag wird pausiert, der Vertrieb erhält eine Benachrichtigung und eine E-Mail und gibt ihn nach der Korrektur an die Konstruktion zurück.','Zaznacz błędne punkty ankiety i napisz, co dokładnie trzeba zmienić. Zlecenie zostanie wstrzymane, handlowiec dostanie powiadomienie i e-mail, a po poprawie zwróci je konstrukcji.','Позначте неправильні пункти анкети та напишіть, що саме потрібно змінити. Замовлення призупиниться, менеджер отримає сповіщення та e-mail і після виправлення поверне його конструкції.','Bifați punctele greșite din chestionar și scrieți ce anume trebuie schimbat. Comanda se suspendă, vânzările primesc o notificare și un e-mail și o returnează proiectării după corectare.'],
 'skupina výrobku:':['product group:','Produktgruppe:','grupa wyrobu:','група виробу:','grup produs:'],
 '— vyberte závod —':['— select a plant —','— Werk wählen —','— wybierz zakład —','— виберіть завод —','— alegeți fabrica —'],
 '— vyberte konstruktéra —':['— select a designer —','— Konstrukteur wählen —','— wybierz konstruktora —','— виберіть конструктора —','— alegeți proiectantul —'],
@@ -1309,6 +1327,9 @@ function kPattern(s){
     if(a2===m[1]) return null;
     return '🔴 '+a2+' '+kDoba(m[2])+' — '+kT(m[3])+' „'+kT(m[4])+'", '+kT(m[5])+' '+m[6]+(m[7]?(' ('+kT(m[8])+')'):'');
   }
+  /* „↩ Vráceno obchodníkovi k opravě zadání: text" · „Označeno: 3" */
+  if((m=s.match(/^(↩ Vráceno obchodníkovi k opravě zadání): ([\s\S]+)$/))){ h=kT(m[1]); return h===m[1]?null:h+': '+m[2]; }
+  if((m=s.match(/^Označeno: (\d+)$/))){ var oz={en:'Selected',de:'Markiert',pl:'Zaznaczono',ua:'Позначено',ro:'Selectate'}[K_LANG]; return oz?oz+': '+m[1]:null; }
   /* „⏸ Pozastaveno — čeká na podklady: důvod" */
   if((m=s.match(/^⏸?\s*(Pozastaveno — čeká na podklady)(:\s*.+)?$/))){ h=kT(m[1]); return h===m[1]?null:'⏸ '+h+(m[2]||''); }
   /* „Zákazník · DSD — kontejnery v normě DIN" a „DSD — … · v0" */
@@ -2771,7 +2792,7 @@ function stepDurations(z){
   return out;
 }
 function problemInfo(z){
-  if(z.stav==='podklady')return {cls:'amber',text:'⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')};
+  if(z.stav==='podklady')return {cls:'amber',text:holdText(z)};
   if(z.semafor==='red'&&z.deadline)return {cls:'red',text:'🔴 Po termínu o '+dobaText(-(z.zbyvaPrac||0))+' — krok „'+esc(z.stavLabel)+'", na tahu '+esc(z.responsibleName||'—')+(z.stav==='klient'?' (klient nereaguje)':'')};
   if(z.semafor==='amber'&&z.deadline)return {cls:'amber',text:'🟠 Blíží se termín — zbývá '+dobaText(z.zbyvaPrac||0)+' — krok „'+esc(z.stavLabel)+'", na tahu '+esc(z.responsibleName||'—')};
   return null;
@@ -2795,7 +2816,7 @@ function orderTrack(z){
   var loc=(z.strediskoName?(' · závod '+esc(z.strediskoName)):'');   // ČVZ je jako odznak před číslem zakázky
   var fazeLbl=(z.rezim==='objednavka')?'<span class="ot-faze obj">OBJEDNÁVKA '+esc(z.cisloObj||z.cislo)+'</span>':'<span class="ot-faze nab">NABÍDKA '+esc(z.cislo)+'</span>';
   var cap= zam?'<span style="color:var(--red);font-weight:700">✕ Zamítnuto / storno</span>'
-    : cur==='podklady'?'<span style="color:var(--amber);font-weight:700">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</span>'
+    : cur==='podklady'?'<span style="color:var(--amber);font-weight:700">'+holdText(z)+'</span>'
     : '<b>'+esc(z.stavLabel)+'</b>'+loc+(z.deadline?(' · termín '+fdt(z.deadline)):'');
   var parts=[], seq=zam?null:trackSmycky(z,stages,order);
   if(seq){
@@ -2888,7 +2909,7 @@ function stepFlow(z){
     h+=(i?'<span class="arw">→</span>':'')+'<span class="'+cls+'"><span class="rd"></span>'+esc(label)+dtxt+'</span>';
   });
   h+='</div>';
-  if(cur==='podklady')h+='<div style="margin:-4px 0 8px;color:var(--amber);font-size:13px;font-weight:600">⏸ Pozastaveno — čeká na podklady'+(z.holdReason?': '+esc(z.holdReason):'')+'</div>';
+  if(cur==='podklady')h+='<div style="margin:-4px 0 8px;color:var(--amber);font-size:13px;font-weight:600">'+holdText(z)+'</div>';
   if(cur==='zamitnuto')h+='<div style="margin:-4px 0 8px;color:var(--red);font-size:13px;font-weight:600">✕ Zamítnuto / storno</div>';
   return h;
 }
@@ -2949,6 +2970,38 @@ function openPdfModal(id,v){
     '<div class="pdfwrap" style="flex:1;margin-top:10px"><iframe style="height:100%" src="/api/konstrukce/soubor?id='+id+'&v='+v+'&kind=pdf#toolbar=1"></iframe></div></div>';
   m.classList.add('open');
 }
+/* Vrácení zadání obchodníkovi k opravě: konstruktér (nebo šéf) zaškrtne špatné body dotazníku
+   a napíše, co změnit. Zakázka se pozastaví (čeká na podklady), obchodník opraví a vrátí ji konstrukci. */
+var VRAT={id:null,pole:{}};
+var VRAT_STAVY=['prace','kontrola','revize','schvaleno','obchodnik','klient'];
+function vratStart(id){VRAT={id:id,pole:{}};var z=(D.zakazky||[]).find(function(x){return x.id===id});if(z){renderDrawer(z);var el=document.getElementById('vratPanel');if(el)el.scrollIntoView({block:'start'})}}
+function vratCancel(){var id=VRAT.id;VRAT={id:null,pole:{}};var z=(D.zakazky||[]).find(function(x){return x.id===id});if(z)renderDrawer(z)}
+function vratToggle(cb){var k=cb.getAttribute('data-k');if(cb.checked)VRAT.pole[k]=1;else delete VRAT.pole[k];var row=cb.closest('.vrat-row');if(row)row.classList.toggle('on',cb.checked);var n=Object.keys(VRAT.pole).length;var c=document.getElementById('vratCnt');if(c)c.textContent=n?('Označeno: '+n):''}
+function vratSend(id){
+  var t=((document.getElementById('vratText')||{}).value||'').trim();
+  if(t.length<3){alert('Napište, co přesně je potřeba změnit.');return}
+  var pole=Object.keys(VRAT.pole);
+  if(!pole.length&&!confirm('Neoznačili jste žádný bod dotazníku. Odeslat jen s komentářem?'))return;
+  api('/vratit-zadani','POST',{id:id,text:t,pole:pole}).then(function(o){if(!o.ok){alert((o.j&&o.j.chyba)||'Chyba.');return}VRAT={id:null,pole:{}};reloadData()});
+}
+/* Karta „vráceno k opravě" — kdo, kdy, co změnit a které body; obchodník odsud rovnou opraví zadání. */
+function vraceniCard(z){
+  var vr=z.vraceni;if(!vr)return '';
+  return '<div class="card vrat-card"><b>↩ Vráceno obchodníkovi k opravě zadání</b> <span class="muted" style="font-size:12px">'+esc(vr.byName||vr.by||'')+' · '+fdt(vr.at)+'</span>'+
+    '<div style="white-space:pre-wrap;margin-top:5px">'+esc(vr.text||'')+'</div>'+
+    ((vr.pole||[]).length?'<div style="margin-top:6px"><b>Body k opravě:</b> '+vr.pole.map(function(p){return '<span class="bd vr">'+esc(p.label)+'</span>'}).join(' ')+'</div>':'')+
+    (z.muzeEditZadani?'<div class="actions" style="margin-top:8px"><button class="btn sm" onclick="openEditZadani(\''+z.id+'\')">✎ Opravit zadání</button></div>':'')+'</div>';
+}
+/* Zvýraznění vrácených bodů ve formuláři úpravy zadání (po vykreslení dotazníku). */
+function vratZvyrazni(z){
+  var vr=z&&z.vraceni;if(!vr||!(vr.pole||[]).length)return;
+  var box=document.getElementById('paramBox');if(!box)return;
+  var bn=document.getElementById('vratBanner');
+  if(!bn){bn=document.createElement('div');bn.id='vratBanner';bn.className='card vrat-card';bn.style.margin='0 0 10px';box.parentNode.insertBefore(bn,box)}
+  bn.innerHTML='<b>↩ Vráceno k opravě zadání</b> — '+esc(vr.text||'')+'<div style="margin-top:4px"><b>Body k opravě:</b> '+vr.pole.map(function(p){return '<span class="bd vr">'+esc(p.label)+'</span>'}).join(' ')+'</div>';
+  vr.pole.forEach(function(p){var el=box.querySelector('.dq2[data-k="'+p.k+'"]');if(el)el.classList.add('dq-vrat')});
+}
+function holdText(z){return z.vraceni?('↩ Vráceno obchodníkovi k opravě zadání'+(z.vraceni.text?': '+esc(z.vraceni.text):'')):(holdText(z))}
 function dotaznikView(z){
   if(!z.dotaznik||!Object.keys(z.dotaznik).length)return '';
   var t=(D.types||[]).find(function(x){return x.key===z.typKey});
@@ -2956,6 +3009,15 @@ function dotaznikView(z){
   var h='<div class="sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Zadání (dotazník provedení)'+
     '<button class="btn sm" onclick="copyProtokol(\''+z.id+'\')" title="Zkopíruje zadání jako text — jen údaje a odchylky od standardu; vložíte Ctrl+V do Heliosu">⧉ Kopírovat protokol (Ctrl+V do Heliosu)</button>'+
     (z.muzeEditZadani?('<button class="btn ghost sm" onclick="openEditZadani(\''+z.id+'\')" title="Klient mění objednávku za pochodu — úprava se zapíše do historie změn a lidem u zakázky přijde upozornění.">✎ Upravit zadání</button>'):'')+'</div>';
+  var mark=(VRAT.id===z.id), vrSet={};
+  (z.vraceni&&z.vraceni.pole||[]).forEach(function(p){vrSet[p.k]=1});
+  h+=vraceniCard(z);
+  if(mark){var nOz=Object.keys(VRAT.pole).length;
+    h+='<div class="card vrat-card" id="vratPanel"><b>↩ Vrátit obchodníkovi k opravě zadání</b>'+
+      '<div class="muted" style="font-size:12.5px;margin-top:3px">Zaškrtněte body dotazníku, které jsou špatně, a napište, co přesně je potřeba změnit. Zakázka se pozastaví, obchodník dostane upozornění i e-mail a po opravě ji vrátí konstrukci.</div>'+
+      '<textarea id="vratText" rows="3" style="margin-top:8px;width:100%" placeholder="Co přesně je potřeba změnit…"></textarea>'+
+      '<div class="actions" style="margin-top:8px;align-items:center;gap:8px"><button class="btn sm" onclick="vratSend(\''+z.id+'\')">Odeslat obchodníkovi</button><button class="btn ghost sm" onclick="vratCancel()">Zrušit</button><span class="muted" id="vratCnt" style="font-size:12px">'+(nOz?('Označeno: '+nOz):'')+'</span></div></div>';
+  }
   if(z.kodAbr)h+='<div class="card" style="background:#f2f7ee;padding:10px 12px"><b>Kód dle katalogu ABR:</b> <code style="font-weight:800">'+esc(z.kodAbr)+'</code> <button class="btn ghost sm" onclick="copyTxt(\''+esc(z.kodAbr)+'\')">⧉ Kopírovat</button><div class="muted" style="font-size:11.5px;margin-top:3px">Vypisují se jen odchylky od standardu ELKOPLAST; NE se vynechává; žebřík se uvádí od výšky 1500 mm.</div></div>';
   // Důležitá upozornění — výrazně nahoře, ať je konstrukce ani výroba nepřehlédne
   if(typeof z.dotaznik.upozorneni==='string'&&z.dotaznik.upozorneni.trim())
@@ -2984,8 +3046,12 @@ function dotaznikView(z){
     (sec.fields||[]).forEach(function(f){
       var a=z.dotaznik[f.k];if(a==null)return;
       if(f.k==='upozorneni')return;   // zobrazeno výrazně nahoře
-      if(typeof a==='object'){var bd=a.volba==='standard'?'s':(a.volba==='opce'?'o':'p');var bl=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek');var disp=a.hodnota||'';if(a.detail){var u=(f.opceVstup&&f.opceVstup.unit)?(' '+f.opceVstup.unit):'';disp+=(disp?' · ':'')+a.detail+u;}rows+='<b>'+esc(f.label)+'</b><span>'+esc(disp)+' <span class="bd '+bd+'">'+bl+'</span></span>';}
-      else rows+='<b>'+esc(f.label)+'</b><span>'+esc(a)+'</span>';
+      var valHtml;
+      if(typeof a==='object'){var bd=a.volba==='standard'?'s':(a.volba==='opce'?'o':'p');var bl=a.volba==='standard'?'std':(a.volba==='opce'?'opce':'požadavek');var disp=a.hodnota||'';if(a.detail){var u=(f.opceVstup&&f.opceVstup.unit)?(' '+f.opceVstup.unit):'';disp+=(disp?' · ':'')+a.detail+u;}valHtml=esc(disp)+' <span class="bd '+bd+'">'+bl+'</span>';}
+      else valHtml=esc(a);
+      if(mark)rows+='<div class="dqrow vrat-row'+(VRAT.pole[f.k]?' on':'')+'"><b><label><input type="checkbox" id="vrat_'+esc(f.k)+'" data-k="'+esc(f.k)+'"'+(VRAT.pole[f.k]?' checked':'')+' onchange="vratToggle(this)"> <span>'+esc(f.label)+'</span></label></b><span>'+valHtml+'</span></div>';
+      else if(vrSet[f.k])rows+='<div class="dqrow vr-mark"><b>'+esc(f.label)+' <span class="bd vr">k opravě</span></b><span>'+valHtml+'</span></div>';
+      else rows+='<div class="dqrow"><b>'+esc(f.label)+'</b><span>'+valHtml+'</span></div>';
     });
     if(rows)h+='<div class="dqsec" style="margin-top:10px">'+esc(sec.title)+'</div><div class="dqview">'+rows+'</div>';
   });
@@ -3027,6 +3093,7 @@ function actionsFor(z){
      (Andrey = šéf + konstruktér; dřív se mu u vlastních zakázek volba schovala). Server přeřazení povoluje v každém
      stavu, tady se nabízí ve všech krocích, kde na konstruktérovi záleží. */
   if(PRERADIT_STAVY.indexOf(z.stav)>=0&&canSef){blocks.push(preraditBlock(z))}
+  if(VRAT_STAVY.indexOf(z.stav)>=0&&(canKon||canSef)&&VRAT.id!==z.id){blocks.push('<div class="actions" style="margin-top:4px"><button class="btn ghost sm" style="border-color:#e39a9a;color:#b3261e" onclick="vratStart(\''+z.id+'\')" title="Označíte body dotazníku, které jsou špatně, napíšete co změnit; zakázka se pozastaví a obchodník ji po opravě vrátí.">↩ Vrátit obchodníkovi k opravě zadání</button></div>')}
 
   if(z.stav==='kontrola'&&canSef){blocks.push(
     '<div class="card" style="background:#faf7fc"><b>Interní kontrola</b>'+
@@ -3048,7 +3115,7 @@ function actionsFor(z){
 
   // pozastavení / obnovení
   if(!isTerminal(z.stav)&&z.stav!=='schvaleno'){
-    if(z.stav==='podklady'&&(canObch||canSef))blocks.push('<div class="actions"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'unhold\')">▶ Podklady doplněny — pokračovat</button></div>');
+    if(z.stav==='podklady'&&(canObch||canSef))blocks.push('<div class="actions"><button class="btn sm" onclick="doAction(\''+z.id+'\',\'unhold\')">'+(z.vraceni?'▶ Zadání opraveno — vrátit konstrukci':'▶ Podklady doplněny — pokračovat')+'</button></div>');
     else if(z.stav!=='podklady'&&(canObch||canSef))blocks.push('<div class="actions" style="margin-top:4px"><button class="btn ghost sm" onclick="askHold(\''+z.id+'\')">⏸ Čeká na podklady</button>'+((canObch||canSef)?'<button class="btn ghost sm" onclick="askTermin(\''+z.id+'\')">Změnit termín</button>':'')+((maRoli('obchodnik')||maRoli('reditel')||me.isAdmin)?'<button class="btn warn sm" onclick="askStorno(\''+z.id+'\')">Storno</button>':'')+'</div>');
   }
   h=blocks.join('');
@@ -4102,7 +4169,7 @@ function openEditZadani(id,state){
     '</div>'+
     '<div class="dqfoot"><div class="dqkod" id="dqKod" style="display:none"></div><span class="cnt" id="dqcount"></span><button class="btn ghost" onclick="closeModal()">'+esc(tr('Zrušit'))+'</button><button class="btn" onclick="saveZadani(\''+id+'\')">'+esc(tr('Uložit změny zadání'))+'</button></div>'+
   '</div>';
-  m.classList.add('open');renderDotaznik();
+  m.classList.add('open');renderDotaznik();vratZvyrazni(z);
 }
 /* Závod přiřazuje ředitel výroby / šéf — obchodník ho smí jen doplnit, když chybí. */
 function muzeZavod(z){
@@ -4121,7 +4188,7 @@ function typSelectEdit(z,vybrany){
 function editTypZmena(){
   var novy=val('ezTyp'); var inp=document.getElementById('nTyp'); if(inp)inp.value=novy;
   DQ_PREFILL=collectDot();     // co jde, přeneseme; zbytek se dorovná dle nového typu
-  renderDotaznik();
+  renderDotaznik();vratZvyrazni((D.zakazky||[]).find(function(x){return x.id===EDIT_ID}));
 }
 function sbirHlavicku(){
   return {typKey:val('ezTyp'),cisloPoptavky:val('ezPopt'),zakaznik:val('ezZak'),kontakt:val('ezKontakt'),

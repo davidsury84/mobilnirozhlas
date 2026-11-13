@@ -1648,6 +1648,7 @@ function mount(host) {
       if (p === '/api/konstrukce/termin' && req.method === 'POST') return apiDeadline(req, res);
       if (p === '/api/konstrukce/cvz' && req.method === 'POST') return apiCvz(req, res);
       if (p === '/api/konstrukce/zadani' && req.method === 'POST') return apiZadani(req, res);
+      if (p === '/api/konstrukce/vratit-zadani' && req.method === 'POST') return apiVratitZadani(req, res);
       if (p === '/api/konstrukce/plan/nahled' && req.method === 'GET') return apiPlanNahled(req, res, u.query);
       if (p === '/api/konstrukce/notif-read' && req.method === 'POST') return apiNotifRead(req, res);
       if (p === '/api/konstrukce/admin/role' && req.method === 'POST') return apiAdminRole(req, res);
@@ -1784,6 +1785,8 @@ function mount(host) {
       // historie úprav zadání (klient mění objednávku za pochodu) + smí je dělat?
       zmenyZadani: (z.zmenyZadani || []).map(v => ({ at: v.at, by: empName(v.by), duvod: v.duvod || '', zmeny: v.zmeny || [] })),
       muzeEditZadani: smiEditZadani(me, z),
+      // vráceno konstrukcí obchodníkovi k opravě zadání (označené body dotazníku + co změnit)
+      vraceni: z.vraceni ? { by: z.vraceni.by, byName: empName(z.vraceni.by), at: z.vraceni.at, text: z.vraceni.text, pole: z.vraceni.pole || [], zKroku: z.vraceni.zKroku || '' } : null,
       stav: z.stav, stavLabel: STAV[z.stav].label, onTurn: STAV[z.stav].onTurn,
       obchodnikEmail: z.obchodnikEmail, obchodnikName: empName(z.obchodnikEmail),
       assignedTo: z.assignedTo || '', assignedName: z.assignedTo ? empName(z.assignedTo) : '',
@@ -2512,13 +2515,34 @@ function mount(host) {
         if (z.stav !== 'podklady') { err = 'Zakázka nečeká na podklady.'; break; }
         const back = z.prevStav || 'prace';
         const zbyvalo = z.holdZbyva;
-        audit(z, me.email, 'Podklady doplněny', 'návrat do: ' + STAV[back].label);
+        let popis = 'návrat do: ' + STAV[back].label;
+        let zprava = 'Podklady k ' + z.cislo + ' doplněny, pokračujte.';
+        const bylaOprava = !!z.vraceni;
+        if (bylaOprava) {
+          // vrácené zadání: které z označených bodů obchodník opravdu změnil (proti stavu při vrácení)
+          const t = typeOf(d, z.typKey); const fld = {};
+          ((t && t.dotaznik) || []).forEach(sec => (sec.fields || []).forEach(f => { fld[f.k] = f; }));
+          const ted = p => dotStr(fld[p.k], (z.dotaznik || {})[p.k]);
+          const zmenene = (z.vraceni.pole || []).filter(p => ted(p) !== p.hodnota).map(p => p.label);
+          const nezmenene = (z.vraceni.pole || []).filter(p => ted(p) === p.hodnota).map(p => p.label);
+          const dalsi = (z.zmenyZadani || []).filter(v => v.at >= z.vraceni.at).reduce((n, v) => n + (v.zmeny || []).length, 0);
+          popis += (zmenene.length ? ' · opraveno: ' + zmenene.join(', ') : '') + (nezmenene.length ? ' · beze změny: ' + nezmenene.join(', ') : '') + (dalsi ? ' · úprav zadání celkem: ' + dalsi : '');
+          const kdo = me.name || empName(me.email);
+          zprava = '✔ Zadání ' + (z.cisloObj || z.cislo) + ' opraveno (' + kdo + ')' + (zmenene.length ? ' — změněno: ' + zmenene.join(', ') : '') + (nezmenene.length ? ' — BEZE ZMĚNY: ' + nezmenene.join(', ') : '') + (note ? ' — ' + note : '') + '. Pokračujte.';
+          if (!Array.isArray(z.vraceniHistorie)) z.vraceniHistorie = [];
+          z.vraceniHistorie.push(Object.assign({}, z.vraceni, { opravil: me.email, opravenoAt: Date.now(), zmenene, nezmenene }));
+          if (z.vraceniHistorie.length > 50) z.vraceniHistorie.shift();
+          addComment(z, me, 'internal', '✔ Zadání opraveno' + (note ? ': ' + note : '') + (zmenene.length ? '\nZměněno: ' + zmenene.join(', ') : '') + (nezmenene.length ? '\nBeze změny: ' + nezmenene.join(', ') : ''));
+          delete z.vraceni;
+        }
+        audit(z, me.email, bylaOprava ? 'Zadání opraveno' : 'Podklady doplněny', popis);
         enterState(d, z, back);
         // krok pokračuje se zbytkem lhůty, který měl před pozastavením
         if (zbyvalo != null) z.deadline = pridejPrac(z.stepStartedAt, zbyvalo);
         delete z.holdZbyva;
         z.holdReason = ''; z.prevStav = '';
-        notify(d, responsibleEmail(z), 'Podklady k ' + z.cislo + ' doplněny, pokračujte.', z.id);
+        if (bylaOprava) { for (const em of ucastniciZakazky(d, z)) if (em !== me.email) notify(d, em, zprava, z.id); }
+        else notify(d, responsibleEmail(z), zprava, z.id);
         break;
       }
       case 'storno': { // zamítnutí/storno interně (obchodník/ředitel)
@@ -2807,6 +2831,52 @@ function mount(host) {
       out.push({ k, label, z: hlavZobraz(d, k, stara), na: hlavZobraz(d, k, nova), _nova: nova });
     }
     return out;
+  }
+
+  // ---- vrácení zadání obchodníkovi k opravě (přiřazený konstruktér / šéf) ----
+  // Obchodník může dotazník zadat špatně. Konstrukce označí body, které jsou špatně,
+  // napíše co změnit a zakázka se pozastaví jako „čeká na podklady" (lhůty stojí,
+  // krok se po opravě vrátí tam, kde byl). Obchodník dostane upozornění i e-mail.
+  async function apiVratitZadani(req, res) {
+    const me = roleOf(req);
+    let b = {}; try { b = JSON.parse(await host.readBody(req)); } catch (_) {}
+    const d = load();
+    const z = d.zakazky.find(x => x.id === b.id);
+    if (!z) { json(res, 404, { chyba: 'Zakázka nenalezena.' }); return true; }
+    const isSef = me.isAdmin || ma(me, 'sef');
+    const isKon = me.isAdmin || (ma(me, 'konstrukter') && (z.assignedTo || '').toLowerCase() === me.email);
+    if (!isSef && !isKon) { json(res, 403, { chyba: 'Zadání vrací přiřazený konstruktér nebo šéf konstrukce.' }); return true; }
+    const st = STAV[z.stav];
+    if (!st || st.terminal || z.stav === 'podklady') { json(res, 400, { chyba: 'Zakázku v tomto kroku nelze vrátit.' }); return true; }
+    const text = String(b.text || '').trim().slice(0, 2000);
+    if (text.length < 3) { json(res, 400, { chyba: 'Napište, co přesně je v zadání špatně a co je potřeba změnit.' }); return true; }
+    const t = typeOf(d, z.typKey);
+    const keys = Array.isArray(b.pole) ? b.pole.map(k => String(k)) : [];
+    const pole = [];
+    ((t && t.dotaznik) || []).forEach(sec => (sec.fields || []).forEach(f => {
+      if (keys.includes(f.k)) pole.push({ k: f.k, label: f.label, hodnota: dotStr(f, (z.dotaznik || {})[f.k]) });
+    }));
+    // pozastavení jako „čeká na podklady": lhůta se přeruší a po opravě pokračuje se zbytkem
+    z.prevStav = z.stav; z.holdReason = 'oprava zadání: ' + text; z.holdSince = Date.now();
+    z.holdZbyva = z.deadline ? Math.max(0, zbyvaPrac(z, z.holdSince)) : null;
+    stopTimer(z, me.email);
+    z.stav = 'podklady'; z.deadline = null;
+    zapisKrok(z, 'podklady', z.holdSince);
+    z.vraceni = { by: me.email, at: z.holdSince, text, pole, zKroku: z.prevStav };
+    const body = pole.length ? 'Body k opravě: ' + pole.map(p => p.label).join(', ') : '';
+    audit(z, me.email, 'Vráceno obchodníkovi k opravě zadání', text + (body ? ' — ' + body : ''));
+    addComment(z, me, 'internal', '↩ Vráceno k opravě zadání: ' + text + (body ? '\n' + body : ''));
+    const jmeno = me.name || empName(me.email);
+    const cis = z.cisloObj || z.cislo;
+    const ukazka = text.length > 90 ? text.slice(0, 90) + '…' : text;
+    for (const em of ucastniciZakazky(d, z)) if (em !== me.email) notify(d, em, '↩ ' + jmeno + ' vrátil(a) zadání ' + cis + ' obchodníkovi k opravě: „' + ukazka + '“', z.id);
+    save(d);
+    if (z.obchodnikEmail) mail(z.obchodnikEmail, 'Zadání vráceno k opravě · ' + cis,
+      'Konstrukce (' + jmeno + ') vrátila zadání zakázky ' + cis + ' (' + z.zakaznik + ') k opravě.\n\nCo je potřeba změnit:\n' + text +
+      (pole.length ? ('\n\nOznačené body dotazníku:\n' + pole.map(p => '• ' + p.label + (p.hodnota ? ' — nyní: ' + p.hodnota : '')).join('\n')) : '') +
+      '\n\nOpravte zadání v intranetu (✎ Upravit zadání) a potvrďte tlačítkem „Zadání opraveno — vrátit konstrukci". Lhůty jsou po dobu opravy pozastavené.', z);
+    json(res, 200, { ok: true });
+    return true;
   }
 
   async function apiZadani(req, res) {
