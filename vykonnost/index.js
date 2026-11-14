@@ -264,6 +264,7 @@ function mount(host) {
     for (const z of ZAVODY) { try { const r = await syncPlan(z); st.plany[z.key] = Object.assign({}, r, { at: new Date().toISOString() }); } catch (e) { st.plany[z.key] = { ok: false, error: e.message, at: new Date().toISOString() }; } }
     try { st.finplan = await syncFinPlan(); } catch (e) { st.finplan = { ok: false, error: e.message, at: new Date().toISOString() }; }
     try { st.hv = await syncHV(); } catch (e) { st.hv = { ok: false, error: e.message, at: new Date().toISOString() }; }
+    try { st.vpc = await syncVpc(); } catch (e) { st.vpc = { ok: false, error: e.message, at: new Date().toISOString() }; }
     saveState(st); return st.plany;
   }
 
@@ -898,6 +899,8 @@ function mount(host) {
       bodZvratu: v.primeMes > 0 && v.primeMes < v.trzbyMes && v.rezieMes > 0 ? (() => { const o = v.rezieMes / (1 - v.primeMes / v.trzbyMes), ks = o / (v.trzbyMes / v.kapacitaKs); return { obratMes: Math.round(o), ksMes: Math.round(ks * 10) / 10, ksDen: Math.round(ks / FINPLAN_DNY * 100) / 100 }; })() : null,
       zdroj: 'tabulka', nacteno: v.syncedAt || '', soubor: cfg.soubor, url: 'https://docs.google.com/spreadsheets/d/' + cfg.sheetId + '/edit', listy: [v.tabPlan || 'finanční plan', v.tabKap || 'kapacita'], chyba: st && !st.ok ? String(st.error || '') : '' };
   }
+  // ceník VPC není načtený: proč
+  const vpcChybi = () => { const st = loadVpc()._stav || {}; const ch = Object.entries(VPC_ZDROJE).filter(([k]) => !(st[k] && st[k].ok)).map(([k, c]) => c.soubor + (st[k] && st[k].error ? ' (' + st[k].error.slice(0, 80) + ')' : '')); return { chyba: ch.length ? 'nenačteno: ' + ch.join('; ') : 'ceník zatím nebyl načten' }; };
   // tabulka je pro závod nastavená, ale plán z ní (zatím) není: proč
   const finPlanChybi = zKey => { const cfg = FINPLAN[zKey]; if (!cfg) return null; const st = (loadFinPlanFile()._stav || {})[zKey] || null; return { soubor: cfg.soubor, url: 'https://docs.google.com/spreadsheets/d/' + cfg.sheetId + '/edit', chyba: st && !st.ok ? String(st.error || '') : 'tabulka zatím nebyla načtena', at: st ? st.at : '' }; };
   // ---------- Skutečný hospodářský výsledek závodů — controllingové sešity „Vyroba-…2026.xlsx“ (list závodu: řádky jako finanční plán, sloupce = měsíce) ----------
@@ -946,10 +949,10 @@ function mount(host) {
   // drží se závod finančního plánu? hlavní měřítko je ZISK (HV z controllingu proti HV plán) a náklady proti nákladovému plánu;
   // obrat z výdejek proti plánu tržeb zůstává jako kontrola (po měsících, týdnech a jako průměr na den / týden / měsíc)
   function finZisk(zKey, fp, E) {
-    const HVd = hvSkut(zKey); if (!HVd) return null; const M = HVd.mesice, n = M.length, r0 = Math.round; const Em = {}; if (E) E.mesice.forEach(x => { Em[x.k] = x; });
+    const HVd = hvSkut(zKey); if (!HVd) return null; const M = HVd.mesice, n = M.length, r0 = Math.round; const Em = {}; const veVpcZ = !!(E && E.vpc); if (E) E.mesice.forEach(x => { Em[x.k] = x; });
     const pl = fp && fp.hvMes != null ? { trzby: fp.trzbyMes, naklady: fp.nakladyMes, hv: fp.hvMes } : null; let kH = 0, kP = 0, obr = 0, obrN = 0;
-    const mesice = M.map(x => { kH += x.hv; if (pl) kP += pl.hv; const e = Em[x.m]; if (e) { obr += e.kc; obrN++; }
-      return { m: x.m, trzby: x.trzby, naklady: x.naklady, hv: x.hv, planHv: pl ? pl.hv : null, rozdil: pl ? x.hv - pl.hv : null, kumHv: kH, kumPlan: pl ? kP : null, kumPlneni: pl && kP > 0 ? r0(kH / kP * 100) : null, obratVydejky: e ? e.kc : null, abr: e ? e.abr : null }; });
+    const mesice = M.map(x => { kH += x.hv; if (pl) kP += pl.hv; const e = Em[x.m]; if (e) { obr += veVpcZ ? e.vpc : e.kc; obrN++; }
+      return { m: x.m, trzby: x.trzby, naklady: x.naklady, hv: x.hv, planHv: pl ? pl.hv : null, rozdil: pl ? x.hv - pl.hv : null, kumHv: kH, kumPlan: pl ? kP : null, kumPlneni: pl && kP > 0 ? r0(kH / kP * 100) : null, obratVydejky: e ? (veVpcZ ? e.vpc : e.kc) : null, prodejVydejky: e ? e.kc : null, abr: e ? e.abr : null }; });
     const S = k => M.reduce((a, x) => a + (x[k] || 0), 0); const trzby = S('trzby'), naklady = S('naklady'), hv = S('hv'); const pct1 = (a, b) => b ? Math.round(a / b * 1000) / 10 : null;
     const soucet = { mesicu: n, od: M[0].m, do: M[n - 1].m, trzby, naklady, hv, planTrzby: pl ? pl.trzby * n : null, planNaklady: pl ? pl.naklady * n : null, planHv: pl ? pl.hv * n : null,
       plneniHv: pl && pl.hv > 0 ? r0(hv / (pl.hv * n) * 100) : null, rozdilHv: pl ? hv - pl.hv * n : null, plneniTrzby: pl && pl.trzby > 0 ? r0(trzby / (pl.trzby * n) * 100) : null, plneniNaklady: pl && pl.naklady > 0 ? r0(naklady / (pl.naklady * n) * 100) : null,
@@ -970,14 +973,14 @@ function mount(host) {
     const fp = finPlan(z.key); const E0 = expedice(z.key); const zisk = finZisk(z.key, fp, E0); const ziskChyba = zisk ? null : hvChybi(z.key);
     if (!fp) return { zavod: z.key, name: z.name, plan: null, tabulka: finPlanChybi(z.key), zisk, ziskChyba, data: false, verdikt: finVerdikt(zisk, null) };
     const E = E0; if (!E || !E.dny.length) return { zavod: z.key, name: z.name, plan: fp, zisk, ziskChyba, data: false, verdikt: finVerdikt(zisk, null) };
-    const snap = E.snapshot || E.dny[E.dny.length - 1].k, rok = snap.slice(0, 4); const byD = {}; E.dny.forEach(d => { byD[d.k] = d; });
+    const snap = E.snapshot || E.dny[E.dny.length - 1].k, rok = snap.slice(0, 4); const byD = {}; E.dny.forEach(d => { byD[d.k] = d; }); const veVpc = !!E.vpc; const obr = x => veVpc ? x.vpc : x.kc;   // obrat ve VPC, je-li ceník načtený
     const pdC = {}; const pdMes = ym => pdC[ym] || (pdC[ym] = pracDnyMesice(ym)); const r0 = Math.round;
     const plus = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
     const konecMes = ym => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m, 0, 12)).toISOString().slice(0, 10); };
     // plán pracovního dne = měsíční plán tržeb ÷ pracovní dny toho měsíce → měsíc dává přesně částku z tabulky a den, týden i měsíc mají stejné plnění
-    const obd = (od, do_) => { let obrat = 0, plan = 0, pd = 0, mesEkv = 0; const typ = { abr: 0, city: 0, muldy: 0, jine: 0 };
-      for (let d = od; d <= do_; d = plus(d, 1)) { const x = byD[d]; if (x) { obrat += x.kc; typ.abr += x.abr; typ.city += x.city; typ.muldy += x.muldy; typ.jine += x.jine; } if (jePracDen(d)) { const n = pdMes(d.slice(0, 7)); pd++; plan += fp.trzbyMes / n; mesEkv += 1 / n; } }
-      return Object.assign({ od, do: do_, obrat: r0(obrat), plan: r0(plan), plneni: plan ? r0(obrat / plan * 100) : null, rozdil: r0(obrat - plan), pracDny: pd,
+    const obd = (od, do_) => { let obrat = 0, plan = 0, pd = 0, mesEkv = 0, prodej = 0; const typ = { abr: 0, city: 0, muldy: 0, jine: 0 };
+      for (let d = od; d <= do_; d = plus(d, 1)) { const x = byD[d]; if (x) { obrat += obr(x); prodej += x.kc; typ.abr += x.abr; typ.city += x.city; typ.muldy += x.muldy; typ.jine += x.jine; } if (jePracDen(d)) { const n = pdMes(d.slice(0, 7)); pd++; plan += fp.trzbyMes / n; mesEkv += 1 / n; } }
+      return Object.assign({ od, do: do_, obrat: r0(obrat), prodej: r0(prodej), plan: r0(plan), plneni: plan ? r0(obrat / plan * 100) : null, rozdil: r0(obrat - plan), pracDny: pd,
         den: pd ? r0(obrat / pd) : null, planDen: pd ? r0(plan / pd) : null, tyden: pd ? r0(obrat / pd * 5) : null, planTyden: pd ? r0(plan / pd * 5) : null, mesic: mesEkv ? r0(obrat / mesEkv) : null, planMesic: fp.trzbyMes,
         ekvKs: Math.round(obrat / fp.cenaKs * 10) / 10, ekvKsDen: pd ? Math.round(obrat / fp.cenaKs / pd * 100) / 100 : null, planKsDen: pd ? Math.round(fp.kapacitaKs * mesEkv / pd * 100) / 100 : null }, typ, odhadZisku(obrat, mesEkv, pd)); };
     // odhad zisku z obratu: přímé náklady (materiál, úkolové mzdy, ostatní přímé) úměrné obratu podle plánu, režijní náklady pevné podle plánu
@@ -992,7 +995,7 @@ function mount(host) {
     const m3 = mesice.filter(x => x.uzavreny).slice(-3); const t4od = plus(snap, -27);
     const obdobi = { rok: obd(start, snap), m3: m3.length ? Object.assign(obd(m3[0].od, m3[m3.length - 1].do), { mesicu: m3.length }) : null, t4: obd(t4od < start ? start : t4od, snap) };
     const Rk = obdobi.rok;
-    return { zavod: z.key, name: z.name, data: true, plan: fp, zisk, ziskChyba, snapshot: snap, od: start, vydejkyOd: E.od, mesice, tydny, obdobi, verdikt: finVerdikt(zisk, Rk.plneni, Rk) };
+    return { zavod: z.key, name: z.name, data: true, plan: fp, zisk, ziskChyba, snapshot: snap, od: start, vydejkyOd: E.od, veVpc, vpc: E.vpc || null, vpcChyba: veVpc ? null : vpcChybi(), mesice, tydny, obdobi, verdikt: finVerdikt(zisk, Rk.plneni, Rk) };
   }
   const CIL_F = path.join(dataDir, 'vykonnost-cile.json');
   // výchozí cíl závodu: měsíční kapacita z finančního plánu ÷ 20 dní; bez plánu pevná výchozí hodnota
@@ -1231,9 +1234,60 @@ function mount(host) {
     return { ok: true, file: meta.name || '', radku: p.items.length, novych, celkem: cur.items.length, od: cur.od };
   }
   let _vc = {};
-  // expedice závodu: po dnech/týdnech/měsících, podle typu výrobku (bez služeb), Kč bez daní
+  // ---------- Ceník VPC standardních kusů — kalkulační tabulky výroby (ABR-DSD, ABR-AFS, CITY-CSD) ----------
+  // Zadání 14. 11. 2026: výdejky jsou v prodejních cenách obchodu (s marží), výroba má tržby ve VPC. Výdejky se proto párují
+  // na standardní kusy z kalkulací a oceňují jejich VPC. Ceny zůstávají jen v datech serveru (do kódu nepatří).
+  const VPC_ZDROJE = {
+    dsd: { fileId: process.env.VYKON_VPC_DSD || '1RFpob-t9PVWA0ry2zcFQj85CZhTpvmdWYZSllFIpoLU', soubor: 'Kalkulace ABR-DSD' },
+    afs: { fileId: process.env.VYKON_VPC_AFS || '1x9veIBQIS6eIjqZx8qqP98nsnI_dnnmqkedB_E3PM1E', soubor: 'Kalkulace ABR-AFS' },
+    csd: { fileId: process.env.VYKON_VPC_CSD || '1YJ2JxLNVxl3xAPBIdyPZgZhLe54tWx7Gf6Yri4Ib8Rc', soubor: 'Kalkulace CITY-CSD' }
+  };
+  const VPC_F = path.join(dataDir, 'vykonnost-vpc.json');
+  let _vpC = null, _vpMt = -2;
+  const loadVpc = () => { const mt = mtimeOf(VPC_F); if (_vpC && _vpMt === mt) return _vpC; let j = {}; try { j = JSON.parse(fs.readFileSync(VPC_F, 'utf8')) || {}; } catch (_) {} _vpC = j; _vpMt = mt; return j; };
+  // kalkulační list: hlavička se sloupcem „VPC“, řádky = standardní kusy
+  function parseVpc(typ, sheets) {
+    const n = v => typeof v === 'number' ? (isFinite(v) ? v : 0) : (parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')) || 0); const out = [];
+    const VYS = { '07': 750, '10': 1000, '12': 1250, '15': 1500, '17': 1750, '20': 2000, '22': 2250, '24': 2400 };   // kód výšky v označení ABR-DSD DD-VV-PP (objem v tabulce tomu odpovídá)
+    for (const [nm, rows] of Object.entries(sheets || {})) { if (/extras|mzd/i.test(nm)) continue; const hi = (rows || []).findIndex(r => (r || []).some(c => /^VPC$/i.test(String(c == null ? '' : c).trim()))); if (hi < 0) continue; const ci = rows[hi].findIndex(c => /^VPC$/i.test(String(c == null ? '' : c).trim()));
+      for (const r of rows.slice(hi + 1)) { const a = String((r || [])[0] == null ? '' : r[0]).trim(); const v = n((r || [])[ci]); if (!(v > 0)) continue;
+        if (typ === 'dsd') { const m = /^ABR-DSD\s+(\d{2})-(\d{2})-(\d)(\d)/.exec(a); if (m && VYS[m[2]]) out.push({ L: +m[1] * 100, H: VYS[m[2]], dno: +m[3], vpc: Math.round(v) }); }
+        else if (typ === 'afs') { const m = /^ABR-AFS\S*\s+(\d{4})x(\d{4})x(\d{3,4})/.exec(a); if (m) out.push({ rada: /ultra/i.test(nm) ? 'UL' : (/-R\b/i.test(nm) ? 'R' : 'S'), L: +m[1], W: +m[2], H: +m[3], vpc: Math.round(v) }); }
+        else if (typ === 'csd') { if (/^CITY-CSD/i.test(a) && n(r[1]) > 0 && n(r[3]) > 0) out.push({ L: n(r[1]), W: n(r[2]), H: n(r[3]), vpc: Math.round(v) }); } } }
+    return out;
+  }
+  async function syncVpc() {
+    if (!drive || !drive.configured() || !drive.exportXlsx) return { ok: false, error: 'Service account není nastavený.' };
+    const F = Object.assign({}, loadVpc()); F._stav = Object.assign({}, F._stav); const at = new Date().toISOString();
+    for (const [typ, cfg] of Object.entries(VPC_ZDROJE)) {
+      try { const buf = await drive.exportXlsx(cfg.fileId); const p = parseVpc(typ, parseAll(buf)); if (!p.length) throw new Error('v tabulce nejsou řádky se sloupcem VPC'); F[typ] = p; F._stav[typ] = { ok: true, at, polozek: p.length }; }
+      catch (e) { F._stav[typ] = { ok: false, error: String(e.message || e).replace(/\s+/g, ' ').slice(0, 240), at }; console.warn('[vykonnost] ceník VPC ' + typ + ':', e.message); }
+      await cekej(800);
+    }
+    F.syncedAt = at; try { fs.writeFileSync(VPC_F, JSON.stringify(F)); } catch (_) {} _vpC = null; _vc = {};
+    return F._stav;
+  }
+  // lineární interpolace / extrapolace mezi standardními rozměry
+  const vpcLin = (pts, x) => { const mm = new Map(); pts.forEach(p => { if (p[1] != null && isFinite(p[1])) mm.set(p[0], p[1]); }); const P = [...mm.entries()].sort((a, b) => a[0] - b[0]); if (!P.length) return null; if (P.length === 1) return P[0][1]; let i = P.findIndex(p => p[0] >= x); if (i <= 0) i = i === 0 ? 1 : P.length - 1; const [x0, y0] = P[i - 1], [x1, y1] = P[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); };
+  const vpcUniq = a => [...new Set(a)].sort((x, y) => x - y);
+  const vpcRozmer = nz => { const m = /(\d{4})\s*x\s*(\d{4})(?:\s*\/\s*\d{4})?\s*x\s*(\d{3,4})(?!\d)/.exec(nz); return m ? { L: +m[1], W: +m[2], H: +m[3] } : null; };
+  const vpcDno = nz => { const m = /[\/\-]\s*(\d)(\d)(\d)?(?!\d)/.exec(String(nz).replace(/(\d{4})\s*x\s*(\d{4})(\s*\/\s*\d{4})?\s*x\s*(\d{3,4})/, ' ')); return m ? +m[1] : null; };
+  const vpcKomponenta = nz => /střech|strech|víko|viko|náhradn|nahradn|plachta|žebř|zebr|^nd[ -]|^sd[ -]|rámeč|ramec|nájezd|najezd|plato/i.test(nz);
+  // VPC jednoho kusu podle názvu z výdejky: { vpc, jak } nebo null (výrobek v cenících není)
+  function vpcCena(naz) {
+    const C = loadVpc(); const nz = String(naz || ''); if (vpcKomponenta(nz)) return null; const r = vpcRozmer(nz); if (!r) return null; const cl = (v, a) => Math.max(a[0], Math.min(a[a.length - 1], v));
+    if (/^CITY/i.test(nz)) { const G = C.csd || []; if (!G.length) return null; const Ls = vpcUniq(G.map(e => e.L)), Ws = vpcUniq(G.map(e => e.W)), Hs = vpcUniq(G.map(e => e.H)); const Lc = cl(r.L, Ls), Wc = cl(r.W, Ws), Hc = cl(r.H, Hs);
+      const v = vpcLin(Ws.map(w => [w, vpcLin(Ls.map(l => [l, vpcLin(G.filter(e => e.W === w && e.L === l).map(e => [e.H, e.vpc]), Hc)]), Lc)]), Wc); return v > 0 ? { vpc: v, jak: /^CITY-CSD/i.test(nz) ? 'CITY-CSD' : 'CITY podle CITY-CSD' } : null; }
+    if (!/^ABR/i.test(nz)) return null;
+    if (/AFS/i.test(nz) && (C.afs || []).length) { const rada = /AFS[- ]?UL|ULTRA/i.test(nz) ? 'UL' : (/AFS[- ]R\b/i.test(nz) ? 'R' : 'S'); let G = C.afs.filter(e => e.rada === rada); if (!G.length) G = C.afs.filter(e => e.rada === 'S');
+      if (G.length) { const Ls = vpcUniq(G.map(e => e.L)); const ln = Ls.reduce((a, b) => Math.abs(b - r.L) < Math.abs(a - r.L) ? b : a); const P = G.filter(e => e.L === ln).map(e => [e.H, e.vpc]); const hs = P.map(p => p[0]); const v = vpcLin(P, Math.max(Math.min(...hs) - 150, Math.min(Math.max(...hs) + 150, r.H))); if (v > 0) return { vpc: v, jak: 'ABR-AFS' }; } }
+    const d0 = vpcDno(nz), d = d0 >= 5 ? 5 : (d0 === 4 ? 4 : (d0 === 3 ? 3 : 5)); let G = (C.dsd || []).filter(e => e.dno === d); if (!G.length) G = C.dsd || []; if (!G.length) return null;
+    const Hc = Math.max(600, Math.min(2600, r.H)), Lc = Math.max(4000, Math.min(7500, r.L)); const v = vpcLin(vpcUniq(G.map(e => e.L)).map(l => [l, vpcLin(G.filter(e => e.L === l).map(e => [e.H, e.vpc]), Hc)]), Lc);
+    return v > 0 ? { vpc: v, jak: /^ABR-DSD/i.test(nz) ? 'ABR-DSD' : 'ABR podle ABR-DSD stejného rozměru' } : null;
+  }
+  // expedice závodu: po dnech/týdnech/měsících, podle typu výrobku (bez služeb); kc = prodejní cena z výdejek, vpc = ocenění ve VPC
   function expedice(zKey) {
-    const vkey = mtimeOf(VYD_F(zKey)) + '|' + mtimeOf(PLAN_F(zKey)) + '|' + mtimeOf(DATA_F(zKey)); if (_vc[zKey] && _vc[zKey].k === vkey) return _vc[zKey].v;
+    const vkey = mtimeOf(VYD_F(zKey)) + '|' + mtimeOf(PLAN_F(zKey)) + '|' + mtimeOf(DATA_F(zKey)) + '|' + mtimeOf(VPC_F); if (_vc[zKey] && _vc[zKey].k === vkey) return _vc[zKey].v;
     const V = loadVyd(zKey); if (!V || !V.items.length) { _vc[zKey] = { k: vkey, v: null }; return null; }
     const komponenta = n => /střech|strech|víko|viko|náhradn|nahradn|plachta|žebř|zebr|^nd[ -]|^sd[ -]|rámeč|ramec/i.test(String(n || ''));
     // ČVZ: ve výdejkách chybí → z plánu výroby přes číslo zakázky Helios
@@ -1242,12 +1296,19 @@ function mount(host) {
     const cvzOf = x => x.cvz || helios2cvz[String(x.zak || '').replace(/\.0$/, '')] || '';
     const T = x => zKey === 'popelnice' ? 'abr' : (komponenta(x.naz) ? 'jine' : typVyrobku('', x.naz));
     const vyr = V.items.filter(x => !x.sluzba); const tyd = {}, mes = {}, dny = {};
-    const add = (o, k, x) => { const r = o[k] = o[k] || { ks: 0, abr: 0, city: 0, muldy: 0, jine: 0, kc: 0, n: 0 }; r.ks += x.mn; r[T(x)] += x.mn; r.kc += x.kc; r.n++; };
+    const maCenik = ['dsd', 'afs', 'csd'].some(k => (loadVpc()[k] || []).length); const VP = new Map(); let sKc = 0, sVpc = 0, nKc = 0; const nesp = {}, jakS = {};
+    if (maCenik) vyr.forEach(x => { const c = zKey === 'popelnice' ? null : vpcCena(x.naz); if (c) { const v = c.vpc * x.mn; VP.set(x, v); if (x.kc > 0) { sKc += x.kc; sVpc += v; } const J = jakS[c.jak] = jakS[c.jak] || { ks: 0, kc: 0, vpc: 0 }; J.ks += x.mn; J.kc += x.kc; J.vpc += v; } else { nKc += x.kc; const N = nesp[x.naz] = nesp[x.naz] || { naz: x.naz, ks: 0, kc: 0 }; N.ks += x.mn; N.kc += x.kc; } });
+    const pomer = sKc > 0 ? sVpc / sKc : null;   // kolik je VPC z prodejní ceny u spárovaných položek tohoto závodu
+    const vpcOf = x => VP.has(x) ? VP.get(x) : (pomer != null ? x.kc * pomer : x.kc);
+    const add = (o, k, x) => { const r = o[k] = o[k] || { ks: 0, abr: 0, city: 0, muldy: 0, jine: 0, kc: 0, vpc: 0, n: 0 }; r.ks += x.mn; r[T(x)] += x.mn; r.kc += x.kc; r.vpc += vpcOf(x); r.n++; };
     vyr.forEach(x => { add(tyd, isoWeekOf(x.d), x); add(mes, x.d.slice(0, 7), x); add(dny, x.d, x); });
     const kcSluzby = V.items.filter(x => x.sluzba).reduce((s, x) => s + x.kc, 0);
-    const rd = o => Object.keys(o).sort().map(k => Object.assign({ k }, o[k], { ks: Math.round(o[k].ks), abr: Math.round(o[k].abr), city: Math.round(o[k].city), muldy: Math.round(o[k].muldy), jine: Math.round(o[k].jine), kc: Math.round(o[k].kc) }));
+    const rd = o => Object.keys(o).sort().map(k => Object.assign({ k }, o[k], { ks: Math.round(o[k].ks), abr: Math.round(o[k].abr), city: Math.round(o[k].city), muldy: Math.round(o[k].muldy), jine: Math.round(o[k].jine), kc: Math.round(o[k].kc), vpc: Math.round(o[k].vpc) }));
     const _res = { od: V.od, snapshot: V.snapshot, syncedAt: V.syncedAt, radku: V.items.length, tydny: rd(tyd), mesice: rd(mes), dny: rd(dny), kcSluzby: Math.round(kcSluzby), celkem: { ks: Math.round(vyr.reduce((s, x) => s + x.mn, 0)), abr: Math.round(vyr.filter(x => T(x) === 'abr').reduce((s, x) => s + x.mn, 0)), city: Math.round(vyr.filter(x => T(x) === 'city').reduce((s, x) => s + x.mn, 0)), muldy: Math.round(vyr.filter(x => T(x) === 'muldy').reduce((s, x) => s + x.mn, 0)), jine: Math.round(vyr.filter(x => T(x) === 'jine').reduce((s, x) => s + x.mn, 0)), kc: Math.round(vyr.reduce((s, x) => s + x.kc, 0)) },
       cvzPokryti: vyr.length ? Math.round(vyr.filter(x => cvzOf(x)).length / vyr.length * 100) : 0,
+      // ocenění ve VPC: co se podařilo spárovat na standardní kusy z kalkulací a jak se ocenil zbytek
+      vpc: maCenik && pomer != null ? { pomer: Math.round(pomer * 1000) / 10, pokryti: sKc + nKc > 0 ? Math.round(sKc / (sKc + nKc) * 100) : null, sparKc: Math.round(sKc), sparVpc: Math.round(sVpc), nesparKc: Math.round(nKc), celkem: Math.round(vyr.reduce((a, x) => a + vpcOf(x), 0)), cenikOd: loadVpc().syncedAt || '',
+        rady: Object.entries(jakS).map(([jak, J]) => ({ jak, ks: Math.round(J.ks), kc: Math.round(J.kc), vpc: Math.round(J.vpc) })).sort((a, b) => b.vpc - a.vpc), nespar: Object.values(nesp).sort((a, b) => b.kc - a.kc).slice(0, 12).map(N => ({ naz: N.naz, ks: Math.round(N.ks), kc: Math.round(N.kc) })) } : null,
       posledni: V.items.slice(-40).reverse().map(x => ({ d: x.d, cvz: cvzOf(x), naz: x.naz, mn: x.mn, mj: x.mj, kc: x.kc, org: x.org, zak: x.zak, typ: T(x), sluzba: x.sluzba })) };
     _vc[zKey] = { k: vkey, v: _res }; return _res;
   }
@@ -1746,7 +1807,8 @@ function mount(host) {
     try { await syncVydejky(); } catch (e) { console.warn('[vykonnost] výdejky:', e.message); }
     if (Date.now() - lastPlanAt > 6 * 3600 * 1000) { lastPlanAt = Date.now(); try { await syncPlans(); } catch (e) { console.warn('[vykonnost] plány:', e.message); } try { await syncMzdy(); } catch (e) { console.warn('[vykonnost] mzdy:', e.message); } try { await syncNormy(); } catch (e) { console.warn('[vykonnost] normy:', e.message); } }
     else { if (host.sheetsGet && Object.keys(FINPLAN).some(k => !finPlan(k))) { try { await syncFinPlan(); } catch (e) { console.warn('[vykonnost] finanční plán:', e.message); } }
-      if (Object.keys(HV_SOUBORY).some(k => !hvSkut(k))) { try { await syncHV(); } catch (e) { console.warn('[vykonnost] hospodářský výsledek:', e.message); } } }
+      if (Object.keys(HV_SOUBORY).some(k => !hvSkut(k))) { try { await syncHV(); } catch (e) { console.warn('[vykonnost] hospodářský výsledek:', e.message); } }
+      if (Object.keys(VPC_ZDROJE).some(k => !(loadVpc()[k] || []).length)) { try { await syncVpc(); } catch (e) { console.warn('[vykonnost] ceník VPC:', e.message); } } }
     await tickReport();
   }
 
@@ -1873,7 +1935,7 @@ function mount(host) {
     json(res, 404, { error: 'Not found' }); return true;
   }
 
-  return { handle, tick, finPlan, finPlanStav, syncFinPlan, parseFinPlan, parseHV, syncHV, zakazkySeznam, zakazkaAnalyza, dnyZavodu, cilZavodu, overview, profese, parseMuldyDny, parsePozice, savePozice, syncVydejky, importVydejky, expedice, syncMzdy, mzdyMesic, sync: () => sync(false), syncPlans, syncNormy, vystup, tydenniLak, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
+  return { handle, tick, finPlan, finPlanStav, syncFinPlan, parseFinPlan, parseHV, syncHV, parseVpc, syncVpc, vpcCena, zakazkySeznam, zakazkaAnalyza, dnyZavodu, cilZavodu, overview, profese, parseMuldyDny, parsePozice, savePozice, syncVydejky, importVydejky, expedice, syncMzdy, mzdyMesic, sync: () => sync(false), syncPlans, syncNormy, vystup, tydenniLak, planOperaci, parseExport, parsePlanValues, parseNormyGrid, matchNorma, indikatory, buildReport, reports, setReport, ZAVODY, LEGENDA };
 }
 
 module.exports = { mount };
