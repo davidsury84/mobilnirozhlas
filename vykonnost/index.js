@@ -894,6 +894,8 @@ function mount(host) {
     const st = (F._stav || {})[zKey] || null; const r0 = x => x == null ? null : Math.round(x);
     return { trzbyMes: r0(v.trzbyMes), nakladyMes: r0(v.nakladyMes), hvMes: r0(v.hvMes), primeMes: r0(v.primeMes), rezieMes: r0(v.rezieMes), kapacitaKs: v.kapacitaKs, cenaKs: Math.round(v.trzbyMes / v.kapacitaKs), dnuMes: FINPLAN_DNY,
       ksDen: Math.round(v.kapacitaKs / FINPLAN_DNY * 100) / 100, trzbyDen: Math.round(v.trzbyMes / FINPLAN_DNY), trzbyRok: Math.round(v.trzbyMes * 12), skupiny: v.skupiny || {},
+      podilPrimych: v.primeMes > 0 && v.primeMes < v.trzbyMes ? Math.round(v.primeMes / v.trzbyMes * 1000) / 10 : null,
+      bodZvratu: v.primeMes > 0 && v.primeMes < v.trzbyMes && v.rezieMes > 0 ? (() => { const o = v.rezieMes / (1 - v.primeMes / v.trzbyMes), ks = o / (v.trzbyMes / v.kapacitaKs); return { obratMes: Math.round(o), ksMes: Math.round(ks * 10) / 10, ksDen: Math.round(ks / FINPLAN_DNY * 100) / 100 }; })() : null,
       zdroj: 'tabulka', nacteno: v.syncedAt || '', soubor: cfg.soubor, url: 'https://docs.google.com/spreadsheets/d/' + cfg.sheetId + '/edit', listy: [v.tabPlan || 'finanční plan', v.tabKap || 'kapacita'], chyba: st && !st.ok ? String(st.error || '') : '' };
   }
   // tabulka je pro závod nastavená, ale plán z ní (zatím) není: proč
@@ -952,6 +954,8 @@ function mount(host) {
     const soucet = { mesicu: n, od: M[0].m, do: M[n - 1].m, trzby, naklady, hv, planTrzby: pl ? pl.trzby * n : null, planNaklady: pl ? pl.naklady * n : null, planHv: pl ? pl.hv * n : null,
       plneniHv: pl && pl.hv > 0 ? r0(hv / (pl.hv * n) * 100) : null, rozdilHv: pl ? hv - pl.hv * n : null, plneniTrzby: pl && pl.trzby > 0 ? r0(trzby / (pl.trzby * n) * 100) : null, plneniNaklady: pl && pl.naklady > 0 ? r0(naklady / (pl.naklady * n) * 100) : null,
       marze: pct1(hv, trzby), planMarze: pl ? pct1(pl.hv, pl.trzby) : null, obratVydejky: obrN === n ? obr : null };
+    // rozklad rozdílu proti plánu: zisk, který by při skutečných tržbách vyšel podle nákladového plánu (přímé náklady úměrné tržbám, režie pevná) → vliv obratu a vliv nákladů
+    if (pl && fp.primeMes > 0 && fp.rezieMes > 0) { const ocek = trzby * (1 - fp.primeMes / fp.trzbyMes) - fp.rezieMes * n; soucet.ocekZisk = r0(ocek); soucet.vlivObratu = r0(ocek - pl.hv * n); soucet.vlivNakladu = r0(hv - ocek); }
     const PS = (fp && fp.skupiny) || {};
     const skupiny = FIN_SKUPINY.filter(([k]) => M.some(x => x[k] != null)).map(([k, nazev, soucetRadek]) => { const sk = S(k) / n, p = PS[k] != null ? PS[k] : null;
       return { k, nazev, soucet: soucetRadek || 0, skut: r0(sk), plan: p, rozdil: p != null ? r0(sk - p) : null, pct: p > 0 ? r0(sk / p * 100) : null, podilSkut: pct1(S(k), trzby), podilPlan: p != null && pl && pl.trzby ? pct1(p, pl.trzby) : null }; });
@@ -959,7 +963,7 @@ function mount(host) {
     return { rok: HVd.rok, mesice, soucet, skupiny, zdroj: { soubor: cfg.soubor || '', url: cfg.fileId ? 'https://drive.google.com/file/d/' + cfg.fileId + '/view' : '', list: HVd.list || '', nacteno: HVd.syncedAt || '' } };
   }
   // výsledek podle zisku: hranice 100 % a 70 % jsou z KPI ředitelů a mistrů (ziskovost závodu proti plánu: minimum 70 %, plný bonus 100 %)
-  const finVerdikt = (zisk, obratPlneni) => { if (!zisk) return { stav: 'neznamo', obrat: obratPlneni == null ? null : obratPlneni }; const S = zisk.soucet;
+  const finVerdikt = (zisk, obratPlneni, odh) => { if (!zisk) { if (odh && odh.ziskOdhad != null) return { stav: odh.ziskOdhad < 0 ? 'ztrata' : (odh.ziskPlneni >= 100 ? 'vPlanu' : (odh.ziskPlneni >= 70 ? 'nadMinimem' : 'podMinimem')), odhad: true, plneni: odh.ziskPlneni, rozdil: odh.ziskRozdil, hv: odh.ziskOdhad, obrat: obratPlneni == null ? null : obratPlneni }; return { stav: 'neznamo', obrat: obratPlneni == null ? null : obratPlneni }; } const S = zisk.soucet;
     const stav = S.planHv == null ? (S.hv < 0 ? 'ztrata' : 'bezPlanu') : (S.hv < 0 ? 'ztrata' : (S.plneniHv >= 100 ? 'vPlanu' : (S.plneniHv >= 70 ? 'nadMinimem' : 'podMinimem')));
     return { stav, plneni: S.plneniHv, rozdil: S.rozdilHv, hv: S.hv, obrat: obratPlneni == null ? null : obratPlneni }; };
   function finPlanStav(z) {
@@ -975,7 +979,10 @@ function mount(host) {
       for (let d = od; d <= do_; d = plus(d, 1)) { const x = byD[d]; if (x) { obrat += x.kc; typ.abr += x.abr; typ.city += x.city; typ.muldy += x.muldy; typ.jine += x.jine; } if (jePracDen(d)) { const n = pdMes(d.slice(0, 7)); pd++; plan += fp.trzbyMes / n; mesEkv += 1 / n; } }
       return Object.assign({ od, do: do_, obrat: r0(obrat), plan: r0(plan), plneni: plan ? r0(obrat / plan * 100) : null, rozdil: r0(obrat - plan), pracDny: pd,
         den: pd ? r0(obrat / pd) : null, planDen: pd ? r0(plan / pd) : null, tyden: pd ? r0(obrat / pd * 5) : null, planTyden: pd ? r0(plan / pd * 5) : null, mesic: mesEkv ? r0(obrat / mesEkv) : null, planMesic: fp.trzbyMes,
-        ekvKs: Math.round(obrat / fp.cenaKs * 10) / 10, ekvKsDen: pd ? Math.round(obrat / fp.cenaKs / pd * 100) / 100 : null, planKsDen: pd ? Math.round(fp.kapacitaKs * mesEkv / pd * 100) / 100 : null }, typ); };
+        ekvKs: Math.round(obrat / fp.cenaKs * 10) / 10, ekvKsDen: pd ? Math.round(obrat / fp.cenaKs / pd * 100) / 100 : null, planKsDen: pd ? Math.round(fp.kapacitaKs * mesEkv / pd * 100) / 100 : null }, typ, odhadZisku(obrat, mesEkv, pd)); };
+    // odhad zisku z obratu: přímé náklady (materiál, úkolové mzdy, ostatní přímé) úměrné obratu podle plánu, režijní náklady pevné podle plánu
+    function odhadZisku(obrat, mesEkv, pd) { if (!(fp.primeMes > 0) || !(fp.rezieMes > 0) || fp.hvMes == null) return {}; const z = obrat * (1 - fp.primeMes / fp.trzbyMes) - fp.rezieMes * mesEkv, p = fp.hvMes * mesEkv;
+      return { ziskOdhad: r0(z), ziskPlan: r0(p), ziskPlneni: p > 0 ? r0(z / p * 100) : null, ziskRozdil: r0(z - p), ziskDen: pd ? r0(z / pd) : null, ziskPlanDen: pd ? r0(p / pd) : null, ziskTyden: pd ? r0(z / pd * 5) : null, ziskPlanTyden: pd ? r0(p / pd * 5) : null, ziskMesic: mesEkv ? r0(z / mesEkv) : null, ziskPlanMesic: fp.hvMes }; }
     const start = (E.od && E.od.slice(0, 4) === rok) ? E.od.slice(0, 7) + '-01' : rok + '-01-01'; const snapM = snap.slice(0, 7);
     const mesice = []; let kO = 0, kP = 0;
     for (let m = +start.slice(5, 7); m <= +snapM.slice(5, 7); m++) { const ym = rok + '-' + String(m).padStart(2, '0'), uz = ym < snapM; const o = obd(ym + '-01', uz ? konecMes(ym) : snap); kO += o.obrat; kP += o.plan;
@@ -985,7 +992,7 @@ function mount(host) {
     const m3 = mesice.filter(x => x.uzavreny).slice(-3); const t4od = plus(snap, -27);
     const obdobi = { rok: obd(start, snap), m3: m3.length ? Object.assign(obd(m3[0].od, m3[m3.length - 1].do), { mesicu: m3.length }) : null, t4: obd(t4od < start ? start : t4od, snap) };
     const Rk = obdobi.rok;
-    return { zavod: z.key, name: z.name, data: true, plan: fp, zisk, ziskChyba, snapshot: snap, od: start, vydejkyOd: E.od, mesice, tydny, obdobi, verdikt: finVerdikt(zisk, Rk.plneni) };
+    return { zavod: z.key, name: z.name, data: true, plan: fp, zisk, ziskChyba, snapshot: snap, od: start, vydejkyOd: E.od, mesice, tydny, obdobi, verdikt: finVerdikt(zisk, Rk.plneni, Rk) };
   }
   const CIL_F = path.join(dataDir, 'vykonnost-cile.json');
   // výchozí cíl závodu: měsíční kapacita z finančního plánu ÷ 20 dní; bez plánu pevná výchozí hodnota
@@ -1396,7 +1403,7 @@ function mount(host) {
     return ZAVODY.map(z => {
       const D = loadData(z.key); const zs = (st.zavody || {})[z.key] || {}; const pl = (st.plany || {})[z.key] || null;
       const CZ = cilZavodu(z.key); let oK = null, sm = null; try { sm = loadPlan6(z.key).smenaMin; if (z.key !== 'popelnice') oK = opsNaKont(z.key); } catch (_) {}
-      const FPz = finPlan(z.key); const cilInfo = { cil: CZ.cil, cilZdroj: CZ.zdroj, cilVychozi: cilVychozi(z.key), fin: FPz ? (() => { let FS = null; try { FS = finPlanStav(z); } catch (_) {} return { kapacitaKs: FPz.kapacitaKs, dnuMes: FPz.dnuMes, ksDen: FPz.ksDen, trzbyMes: FPz.trzbyMes, zdroj: FPz.zdroj, plneni: FS && FS.data ? FS.obdobi.rok.plneni : null, zisk: FS && FS.zisk ? { plneni: FS.zisk.soucet.plneniHv, hv: FS.zisk.soucet.hv, do: FS.zisk.soucet.do, stav: FS.verdikt.stav } : null }; })() : null, smenaMin: sm, opsKont: oK };
+      const FPz = finPlan(z.key); const cilInfo = { cil: CZ.cil, cilZdroj: CZ.zdroj, cilVychozi: cilVychozi(z.key), fin: FPz ? (() => { let FS = null; try { FS = finPlanStav(z); } catch (_) {} return { kapacitaKs: FPz.kapacitaKs, dnuMes: FPz.dnuMes, ksDen: FPz.ksDen, trzbyMes: FPz.trzbyMes, zdroj: FPz.zdroj, plneni: FS && FS.data ? FS.obdobi.rok.plneni : null, zisk: FS && FS.zisk ? { plneni: FS.zisk.soucet.plneniHv, hv: FS.zisk.soucet.hv, do: FS.zisk.soucet.do, stav: FS.verdikt.stav } : null, odhad: FS && !FS.zisk && FS.data && FS.obdobi.rok.ziskOdhad != null ? { plneni: FS.obdobi.rok.ziskPlneni, hv: FS.obdobi.rok.ziskOdhad, do: FS.snapshot } : null }; })() : null, smenaMin: sm, opsKont: oK };
       if (!D) return Object.assign({ key: z.key, name: z.name, kratce: z.kratce, data: false, error: zs.error || 'zatím nesynchronizováno', plan: pl }, cilInfo);
       const snap = D.snapshot; const od = new Date(snap + 'T00:00:00Z'); od.setUTCDate(od.getUTCDate() - 27); const od4 = od.toISOString().slice(0, 10);
       const all = D.rows.filter(r => r[R.date] <= snap); const last4 = all.filter(r => r[R.date] >= od4);
