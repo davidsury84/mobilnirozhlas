@@ -843,6 +843,7 @@ function mount(host) {
   // ---------- výstup: hotové výrobky vs. cíl, úzké hrdlo v řetězci, proč cíl neplníme ----------
   // ---------- Finanční plán závodů — plán tržeb a měsíční kapacita z tabulek „VÝROBA KONT … fin plan“ (listy „finanční plan“ a „kapacita“) ----------
   // Zadání 13. 11. 2026: výroba je podle finančního plánu v zisku, když plní počet průměrných kontejnerů z listu kapacita; z toho plyne plán obratu.
+  // Plán roku je na listu pojmenovaném rokem („2026“, má ho soubor Chomutov), jinak na listu „finanční plan“.
   // Skutečný obrat = expedice z výdejek (Kč bez daní, bez služeb). Tabulky se čtou přes service account (s plány výroby, á 6 h) a hodnoty zůstávají
   // jen v datech serveru — částky plánu do kódu nepatří. Dokud tabulku nejde načíst, závod finanční plán nemá a rozhraní to říká.
   const FINPLAN_DNY = 20;   // list kapacita počítá měsíc jako 20 pracovních dní (Bruntál: „měsíční kapacita ÷ 20“) → cíl ks / den
@@ -876,7 +877,8 @@ function mount(host) {
     for (const [key, cfg] of Object.entries(FINPLAN)) {
       try {
         let tabs = []; try { tabs = host.sheetsTabs ? (await volej(() => host.sheetsTabs(cfg.sheetId)) || []).map(t => String(t.title)) : (host.sheetsMeta ? (await volej(() => host.sheetsMeta(cfg.sheetId)) || []).map(String) : []); } catch (e) { throw new Error('listy: ' + e.message); }
-        const tp = tabs.find(t => FINPLAN_TAB.plan.test(t.trim())) || 'finanční plan', tk = tabs.find(t => FINPLAN_TAB.kap.test(t.trim())) || 'kapacita';
+        const rokL = String(new Date().getFullYear());   // zadání 14. 11. 2026: pracovat s listy „2026“ — kde list roku není (Bruntál, Supíkovice), je plánem roku list „finanční plan“
+        const tp = tabs.find(t => t.trim() === rokL) || tabs.find(t => FINPLAN_TAB.plan.test(t.trim())) || 'finanční plan', tk = tabs.find(t => FINPLAN_TAB.kap.test(t.trim())) || 'kapacita';
         await cekej(1500); const rp = await volej(() => host.sheetsGet(cfg.sheetId, q(tp) + '!A1:D140', { raw: true })); await cekej(1500); const rk = await volej(() => host.sheetsGet(cfg.sheetId, q(tk) + '!A1:R60', { raw: true }));
         const p = parseFinPlan((rp && rp.values) || [], (rk && rk.values) || []);
         if (!(p.trzbyMes > 0) || !(p.kapacitaKs > 0)) throw new Error('v listech „' + tp + '“ a „' + tk + '“ chybí řádek Tržby Celkem nebo měsíční kapacita');
