@@ -263,8 +263,8 @@ function mount(host) {
     try { st.pl = Object.assign({}, await syncPL(), { at: new Date().toISOString() }); } catch (e) { st.pl = { ok: false, error: e.message, at: new Date().toISOString() }; }
     for (const z of ZAVODY) { try { const r = await syncPlan(z); st.plany[z.key] = Object.assign({}, r, { at: new Date().toISOString() }); } catch (e) { st.plany[z.key] = { ok: false, error: e.message, at: new Date().toISOString() }; } }
     try { st.finplan = await syncFinPlan(); } catch (e) { st.finplan = { ok: false, error: e.message, at: new Date().toISOString() }; }
-    try { st.hv = await syncHV(); } catch (e) { st.hv = { ok: false, error: e.message, at: new Date().toISOString() }; }
-    try { st.vpc = await syncVpc(); } catch (e) { st.vpc = { ok: false, error: e.message, at: new Date().toISOString() }; }
+    if (FIN_ZAPNUTO) { try { st.hv = await syncHV(); } catch (e) { st.hv = { ok: false, error: e.message, at: new Date().toISOString() }; }
+      try { st.vpc = await syncVpc(); } catch (e) { st.vpc = { ok: false, error: e.message, at: new Date().toISOString() }; } }
     saveState(st); return st.plany;
   }
 
@@ -847,6 +847,9 @@ function mount(host) {
   // Plán roku je na listu pojmenovaném rokem („2026“, má ho soubor Chomutov), jinak na listu „finanční plan“.
   // Skutečný obrat = expedice z výdejek (Kč bez daní, bez služeb). Tabulky se čtou přes service account (s plány výroby, á 6 h) a hodnoty zůstávají
   // jen v datech serveru — částky plánu do kódu nepatří. Dokud tabulku nejde načíst, závod finanční plán nemá a rozhraní to říká.
+  // Zadání 14. 11. 2026 večer: finanční věci (zisk, náklady, obrat v Kč, ocenění ve VPC) se zatím NEPOČÍTAJÍ ani neukazují — logika zůstává v kódu.
+  // Zapnutí: proměnná prostředí VYKON_FINANCE=1. Bez ní se z finančního plánu bere jen měsíční kapacita (→ cíl ABR / den).
+  const FIN_ZAPNUTO = /^(1|true|ano)$/i.test(String(process.env.VYKON_FINANCE || ''));
   const FINPLAN_DNY = 20;   // list kapacita počítá měsíc jako 20 pracovních dní (Bruntál: „měsíční kapacita ÷ 20“) → cíl ks / den
   const FINPLAN = {
     chomutov: { sheetId: process.env.VYKON_FINPLAN_CHOMUTOV || '1oRSZY1SiLQGonD24QCwVt7VV9f9JMRRgyL4-3lUT9Ko', soubor: 'VÝROBA KONT Chomutov - FIN PLAN' },
@@ -1296,7 +1299,7 @@ function mount(host) {
     const cvzOf = x => x.cvz || helios2cvz[String(x.zak || '').replace(/\.0$/, '')] || '';
     const T = x => zKey === 'popelnice' ? 'abr' : (komponenta(x.naz) ? 'jine' : typVyrobku('', x.naz));
     const vyr = V.items.filter(x => !x.sluzba); const tyd = {}, mes = {}, dny = {};
-    const maCenik = ['dsd', 'afs', 'csd'].some(k => (loadVpc()[k] || []).length); const VP = new Map(); let sKc = 0, sVpc = 0, nKc = 0; const nesp = {}, jakS = {};
+    const maCenik = FIN_ZAPNUTO && ['dsd', 'afs', 'csd'].some(k => (loadVpc()[k] || []).length); const VP = new Map(); let sKc = 0, sVpc = 0, nKc = 0; const nesp = {}, jakS = {};
     if (maCenik) vyr.forEach(x => { const c = zKey === 'popelnice' ? null : vpcCena(x.naz); if (c) { const v = c.vpc * x.mn; VP.set(x, v); if (x.kc > 0) { sKc += x.kc; sVpc += v; } const J = jakS[c.jak] = jakS[c.jak] || { ks: 0, kc: 0, vpc: 0 }; J.ks += x.mn; J.kc += x.kc; J.vpc += v; } else { nKc += x.kc; const N = nesp[x.naz] = nesp[x.naz] || { naz: x.naz, ks: 0, kc: 0 }; N.ks += x.mn; N.kc += x.kc; } });
     const pomer = sKc > 0 ? sVpc / sKc : null;   // kolik je VPC z prodejní ceny u spárovaných položek tohoto závodu
     const vpcOf = x => VP.has(x) ? VP.get(x) : (pomer != null ? x.kc * pomer : x.kc);
@@ -1464,7 +1467,7 @@ function mount(host) {
     return ZAVODY.map(z => {
       const D = loadData(z.key); const zs = (st.zavody || {})[z.key] || {}; const pl = (st.plany || {})[z.key] || null;
       const CZ = cilZavodu(z.key); let oK = null, sm = null; try { sm = loadPlan6(z.key).smenaMin; if (z.key !== 'popelnice') oK = opsNaKont(z.key); } catch (_) {}
-      const FPz = finPlan(z.key); const cilInfo = { cil: CZ.cil, cilZdroj: CZ.zdroj, cilVychozi: cilVychozi(z.key), fin: FPz ? (() => { let FS = null; try { FS = finPlanStav(z); } catch (_) {} return { kapacitaKs: FPz.kapacitaKs, dnuMes: FPz.dnuMes, ksDen: FPz.ksDen, trzbyMes: FPz.trzbyMes, zdroj: FPz.zdroj, plneni: FS && FS.data ? FS.obdobi.rok.plneni : null, zisk: FS && FS.zisk ? { plneni: FS.zisk.soucet.plneniHv, hv: FS.zisk.soucet.hv, do: FS.zisk.soucet.do, stav: FS.verdikt.stav } : null, odhad: FS && !FS.zisk && FS.data && FS.obdobi.rok.ziskOdhad != null ? { plneni: FS.obdobi.rok.ziskPlneni, hv: FS.obdobi.rok.ziskOdhad, do: FS.snapshot } : null }; })() : null, smenaMin: sm, opsKont: oK };
+      const FPz = finPlan(z.key); const cilInfo = { cil: CZ.cil, cilZdroj: CZ.zdroj, cilVychozi: cilVychozi(z.key), fin: FPz && !FIN_ZAPNUTO ? { kapacitaKs: FPz.kapacitaKs, dnuMes: FPz.dnuMes, ksDen: FPz.ksDen } : FPz ? (() => { let FS = null; try { FS = finPlanStav(z); } catch (_) {} return { kapacitaKs: FPz.kapacitaKs, dnuMes: FPz.dnuMes, ksDen: FPz.ksDen, trzbyMes: FPz.trzbyMes, zdroj: FPz.zdroj, plneni: FS && FS.data ? FS.obdobi.rok.plneni : null, zisk: FS && FS.zisk ? { plneni: FS.zisk.soucet.plneniHv, hv: FS.zisk.soucet.hv, do: FS.zisk.soucet.do, stav: FS.verdikt.stav } : null, odhad: FS && !FS.zisk && FS.data && FS.obdobi.rok.ziskOdhad != null ? { plneni: FS.obdobi.rok.ziskPlneni, hv: FS.obdobi.rok.ziskOdhad, do: FS.snapshot } : null }; })() : null, smenaMin: sm, opsKont: oK };
       if (!D) return Object.assign({ key: z.key, name: z.name, kratce: z.kratce, data: false, error: zs.error || 'zatím nesynchronizováno', plan: pl }, cilInfo);
       const snap = D.snapshot; const od = new Date(snap + 'T00:00:00Z'); od.setUTCDate(od.getUTCDate() - 27); const od4 = od.toISOString().slice(0, 10);
       const all = D.rows.filter(r => r[R.date] <= snap); const last4 = all.filter(r => r[R.date] >= od4);
@@ -1807,8 +1810,8 @@ function mount(host) {
     try { await syncVydejky(); } catch (e) { console.warn('[vykonnost] výdejky:', e.message); }
     if (Date.now() - lastPlanAt > 6 * 3600 * 1000) { lastPlanAt = Date.now(); try { await syncPlans(); } catch (e) { console.warn('[vykonnost] plány:', e.message); } try { await syncMzdy(); } catch (e) { console.warn('[vykonnost] mzdy:', e.message); } try { await syncNormy(); } catch (e) { console.warn('[vykonnost] normy:', e.message); } }
     else { if (host.sheetsGet && Object.keys(FINPLAN).some(k => !finPlan(k))) { try { await syncFinPlan(); } catch (e) { console.warn('[vykonnost] finanční plán:', e.message); } }
-      if (Object.keys(HV_SOUBORY).some(k => !hvSkut(k))) { try { await syncHV(); } catch (e) { console.warn('[vykonnost] hospodářský výsledek:', e.message); } }
-      if (Object.keys(VPC_ZDROJE).some(k => !(loadVpc()[k] || []).length)) { try { await syncVpc(); } catch (e) { console.warn('[vykonnost] ceník VPC:', e.message); } } }
+      if (FIN_ZAPNUTO && Object.keys(HV_SOUBORY).some(k => !hvSkut(k))) { try { await syncHV(); } catch (e) { console.warn('[vykonnost] hospodářský výsledek:', e.message); } }
+      if (FIN_ZAPNUTO && Object.keys(VPC_ZDROJE).some(k => !(loadVpc()[k] || []).length)) { try { await syncVpc(); } catch (e) { console.warn('[vykonnost] ceník VPC:', e.message); } } }
     await tickReport();
   }
 
@@ -1818,7 +1821,7 @@ function mount(host) {
     const u = urlLib.parse(req.url, true), p = u.pathname;
     if (!p.startsWith('/api/vykonnost')) return false;
     if (!hasAccess(req)) { json(res, 403, { error: 'K modulu Výkonnost středisek nemáte přístup.' }); return true; }
-    if (p === '/api/vykonnost' && req.method === 'GET') { json(res, 200, { zavody: overview(), admin: !!host.isAdmin(req), driveConfigured: !!(drive && drive.configured()), saEmail: drive && drive.saEmail ? drive.saEmail() : '' }); return true; }
+    if (p === '/api/vykonnost' && req.method === 'GET') { json(res, 200, { zavody: overview(), finance: FIN_ZAPNUTO, admin: !!host.isAdmin(req), driveConfigured: !!(drive && drive.configured()), saEmail: drive && drive.saEmail ? drive.saEmail() : '' }); return true; }
     const m = /^\/api\/vykonnost\/zavod\/([a-z]+)$/.exec(p);
     if (m && req.method === 'GET') {
       const z = zavodOf(m[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; }
@@ -1875,7 +1878,7 @@ function mount(host) {
       if (q) list = list.filter(n => n.opB.includes(q) || nrm(n.varianta).includes(q) || nrm(n.sheet).includes(q));
       json(res, 200, { katalog: I.items.length, syncedAt: I.syncedAt, diag: I.diag, folder: NORMY_FOLDER, items: list.slice(0, 3000).map(n => ({ id: normId(n), ksKont: n.ksKont, sazba: n.sazba, op: n.op, varianta: n.varianta, del: n.del, vys: n.vys, min: n.min, minOdv: n.minOdv || undefined, okruh: n.okruh || okruhOf(n.file), kc: n.kc, file: n.file, sheet: n.sheet, kod: n.kod })), total: list.length, mapa: host.isAdmin(req) ? I.mapa : undefined }); return true;
     }
-    if (p === '/api/vykonnost/finplan' && req.method === 'GET') { json(res, 200, { dnuMes: FINPLAN_DNY, zavody: ZAVODY.map(z => finPlanStav(z)) }); return true; }
+    if (p === '/api/vykonnost/finplan' && req.method === 'GET') { if (!FIN_ZAPNUTO) { json(res, 200, { vypnuto: true, zavody: [] }); return true; } json(res, 200, { dnuMes: FINPLAN_DNY, zavody: ZAVODY.map(z => finPlanStav(z)) }); return true; }
     const mZA = /^\/api\/vykonnost\/zakazky\/([a-z]+)\/analyza$/.exec(p);
     if (mZA && req.method === 'GET') {
       const z = zavodOf(mZA[1]); if (!z) { json(res, 404, { error: 'Neznámý závod.' }); return true; }
